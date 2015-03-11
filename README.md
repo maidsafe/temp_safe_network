@@ -8,7 +8,7 @@ Appveyor build status (Windows)
 
 [![Build status](https://ci.appveyor.com/api/projects/status/kp7liadkt0uwm7fs?svg=true)](https://ci.appveyor.com/project/dirvine/maidsafe-client)
 
-[Documentation](http://dirvine.github.io/maidsafe_types/)
+[Documentation](http://dirvine.github.io/maidsafe_client/)
 
 
 #Todo
