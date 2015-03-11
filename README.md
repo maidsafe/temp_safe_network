@@ -10,7 +10,6 @@ Appveyor build status (Windows)
 
 [Documentation](http://dirvine.github.io/maidsafe_client/)
 
-
 #Todo
 - [ ] Implement example for basic store retrieve data (chunks) on network
 - [ ] Implement example for create account/login 
