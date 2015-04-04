@@ -1,4 +1,8 @@
 language: rust
+rust: 
+    - 1.0.0-beta
+    - nightly
+sudo: true
 env:
   global:
     secure: HPse/b5ho65gPE2nkOzHAaaeJSpp4Bg/+itrXt3422Cy8xJNzqJ9GiCBHS6lFYSgLQq9jj9BTW2mSUC9pV+oy2QUsg+8xiCNOreP9jP+U4YmqwHE2NTpRsiPsoSYBdcnUgoxetgFegtMdE71xkArV2qgtDF+Welp1qLHgAMuAa8=
