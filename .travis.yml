@@ -8,7 +8,7 @@ rust:
 sudo: true
 env:
   global:
-    secure: "Q8EsABb7DUUkuhefjncpuIKv1P49woHligAlnT2acSj7NZIxKwovgZzKwk13IEHf/CvqWq9lFX8CS6hHE2WJjmgG35EJ8ctFulBo72WRhhDEZy2kdgCnuMoQsjnFE5dT7ZhB/8qP5iZU9p0W0YqcaVwFyEnTeu/9R598klgaXYg="
+    secure: "g8lzQvNQYKdf/E7J29f/DCIyDFmj184qROzcShDO0ZsQNlnJPh26KdIx9paNgjh1Uo1myPUXjGvK6ZvammRSYhna0ZVvQPSnlpEGeDvRY7RrvxyrY45+SaaxWUqrc2XYwuhfL2ODIRrYGoIY+C+EKjGHchzzOTxeAgzwYSszlY8="
 
 install:
 - wget https://github.com/jedisct1/libsodium/releases/download/1.0.0/libsodium-1.0.0.tar.gz
