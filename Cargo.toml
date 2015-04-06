@@ -9,3 +9,11 @@ repository = "https://github.com/dirvine/maidsafe_client"
 readme = "README.md"
 license = "GPL-3.0"
 homepage = "http://www.maidsafe.net"
+
+[dependencies]
+cbor = "*"
+rustc-serialize = "*"
+rust-crypto = "*"
+
+[dependencies.maidsafe_types]
+git = "https://github.com/dirvine/maidsafe_types"
