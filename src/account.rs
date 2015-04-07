@@ -22,6 +22,7 @@ extern crate std;
 
 use self::rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::mem;
+use maidsafe_types::Random;
 
 static ACCOUNT_TAG : u64 = 5483_4000;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
@@ -36,7 +37,7 @@ pub struct Account {
 ///
 impl Account {
     fn new() -> Account {
-        return Account{ account_id : maidsafe_types::Maid::generate() };
+        return Account{ account_id : maidsafe_types::Maid::generate_random() };
     }
 
     ///
