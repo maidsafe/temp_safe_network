@@ -83,9 +83,13 @@ pub struct Client<'a> {
 impl<'a> Client<'a> {
   pub fn new(username : &String, password : &[u8], pin : u32) -> Client<'a> {
     let account = Account::create_account(username, password, pin).ok().unwrap();
-    Client { my_routing: RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
-                                            account.get_maid().clone(), DhtId::generate_random()),
-             my_account: account }
+    let mut client = Client { my_routing: RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
+                                                             account.get_maid().clone(), DhtId::generate_random()),
+                              my_account: account };
+    let encrypted = client.my_account.encrypt(&password, pin);
+    let network_id = Account::generate_network_id(&username, pin);
+    client.my_routing.put(DhtId::new(network_id.0), encrypted.ok().unwrap());
+    client
   }
 
 }
