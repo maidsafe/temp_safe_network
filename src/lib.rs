@@ -31,6 +31,7 @@ pub mod account;
 mod client;
 
 use std::sync::{Mutex, Arc};
+use std::io::Error as IoError;
 
 use routing::routing_client::RoutingClient;
 use routing::types::DhtId;
@@ -104,6 +105,16 @@ impl<'a> Client<'a> {
     Client { my_routing: RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
                                             existing_account.get_maid().clone(), DhtId::generate_random()),
              my_account: existing_account }
+  }
+
+  pub fn put(&mut self, data: Vec<u8>) {
+    self.my_routing.put(DhtId::new(self.my_account.get_maid().get_name().0), data);
+  }
+
+  pub fn get(&mut self, data_name: DhtId) -> Result<Vec<u8>, IoError> {
+    self.my_routing.get(0u64, data_name);
+    // TODO here we have to wait for a get_response, but how the notification come in ?
+    Ok(Vec::<u8>::new())
   }
 
 }
