@@ -97,15 +97,25 @@ impl<'a> Client<'a> {
   }
 
   pub fn log_in(username : &String, password : &[u8], pin : u32) -> Client<'a> {
-    let network_id = Account::generate_network_id(username, pin);
-    let temp_account = Account::new();
-    let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
-    let temp_facade = Arc::new(Mutex::new(ClientFacade::new(temp_cvar.clone())));
-    let mut temp_routing = RoutingClient::new(temp_facade.clone(), temp_account.get_maid().clone(), DhtId::generate_random());
-    temp_routing.get(0u64, DhtId::new(network_id.0));
-    // TODO here we have to wait for a get_response, but how the notification come in ?
-    let encrypted = [5u8, 1024];
-    let existing_account = Account::decrypt(&encrypted, &password, pin).ok().unwrap();
+    let mut fetched_encrypted : Vec<u8>;
+    {
+      let network_id = Account::generate_network_id(username, pin);
+      let temp_account = Account::new();
+      let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
+      let temp_facade = Arc::new(Mutex::new(ClientFacade::new(temp_cvar.clone())));
+      let mut temp_routing = RoutingClient::new(temp_facade.clone(), temp_account.get_maid().clone(), DhtId::generate_random());
+      let get_queue = temp_routing.get(0u64, DhtId::new(network_id.0));
+      let &(ref lock, ref cvar) = &*temp_cvar;
+      let mut fetched = lock.lock().unwrap();
+      while !*fetched {
+          fetched = cvar.wait(fetched).unwrap();
+      }
+      let &ref facade_lock = &*temp_facade;
+      let mut facade = facade_lock.lock().unwrap();
+      let result = facade.get_response(get_queue.ok().unwrap());
+      fetched_encrypted = result.ok().unwrap();
+    }
+    let existing_account = Account::decrypt(&fetched_encrypted[..], &password, pin).ok().unwrap();
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
     let facade = Arc::new(Mutex::new(ClientFacade::new(cvar.clone())));
     Client { my_routing: RoutingClient::new(facade.clone(), existing_account.get_maid().clone(), DhtId::generate_random()),
