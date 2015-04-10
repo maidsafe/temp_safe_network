@@ -20,12 +20,23 @@
 #![doc(html_logo_url = "http://maidsafe.net/img/Resources/branding/maidsafe_logo.fab2.png",
        html_favicon_url = "http://maidsafe.net/img/favicon.ico",
               html_root_url = "http://dirvine.github.io/dirvine/maidsafe_client/")]
+#![allow(dead_code)]
 
 extern crate cbor;
 extern crate crypto;
 extern crate maidsafe_types;
+extern crate routing;
 
 pub mod account;
+mod client;
+
+use std::sync::{Mutex, Arc};
+
+use routing::routing_client::RoutingClient;
+use routing::types::DhtId;
+use client::ClientFacade;
+use account::Account;
+
 
 pub enum CryptoError {
     SymmetricCryptoError(crypto::symmetriccipher::SymmetricCipherError),
@@ -62,3 +73,19 @@ impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
     }
 }
 
+
+
+pub struct Client<'a> {
+  my_routing : RoutingClient<'a ClientFacade>,
+  my_account : Account
+}
+
+impl<'a> Client<'a> {
+  pub fn new(username : &String, password : &[u8], pin : u32) -> Client<'a> {
+    let account = Account::create_account(username, password, pin).ok().unwrap();
+    Client { my_routing: RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
+                                            account.get_maid().clone(), DhtId::generate_random()),
+             my_account: account }
+  }
+
+}
