@@ -36,7 +36,7 @@ pub struct Account {
 /// Represents an Account on the SAFE network
 ///
 impl Account {
-    fn new() -> Account {
+    pub fn new() -> Account {
         return Account{ account_id : maidsafe_types::Maid::generate_random() };
     }
 
@@ -46,16 +46,6 @@ impl Account {
     pub fn create_account(username : &String, password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
         let new_account = Account::new();
         return Ok(new_account);
-    }
-
-    ///
-    /// Open an existing `Account` on the SAFE network
-    ///
-    pub fn open_account(username : &String, password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
-        let network_id = Account::generate_network_id(username, pin);
-        // let encrypted = routing.Get(network_id);
-        let existing_account = Account::new(); // try!(Account::Decrypt(&encrypted, &password, pin));
-        return Ok(existing_account);
     }
 
     pub fn get_maid(&self) -> &maidsafe_types::Maid {
@@ -168,7 +158,7 @@ impl Account {
         return Ok(encrypted);
     }
 
-    fn decrypt(encrypted : &[u8], password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
+    pub fn decrypt(encrypted : &[u8], password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
         let mut decrypted : Vec<u8> = Vec::new();
         {
             use crypto::symmetriccipher::Decryptor;

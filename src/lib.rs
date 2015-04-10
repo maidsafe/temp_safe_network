@@ -92,4 +92,18 @@ impl<'a> Client<'a> {
     client
   }
 
+  pub fn log_in(username : &String, password : &[u8], pin : u32) -> Client<'a> {
+    let network_id = Account::generate_network_id(username, pin);
+    let temp_account = Account::new();
+    let mut temp_routing = RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
+                                              temp_account.get_maid().clone(), DhtId::generate_random());
+    temp_routing.get(0u64, DhtId::new(network_id.0));
+    // TODO here we have to wait for a get_response, but how the notification come in ?
+    let encrypted = [5u8, 1024];
+    let existing_account = Account::decrypt(&encrypted, &password, pin).ok().unwrap();
+    Client { my_routing: RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
+                                            existing_account.get_maid().clone(), DhtId::generate_random()),
+             my_account: existing_account }
+  }
+
 }
