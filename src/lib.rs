@@ -30,7 +30,7 @@ extern crate routing;
 pub mod account;
 mod client;
 
-use std::sync::{Mutex, Arc};
+use std::sync::{Mutex, Arc, Condvar};
 use std::io::Error as IoError;
 
 use routing::routing_client::RoutingClient;
@@ -78,15 +78,18 @@ impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
 
 pub struct Client<'a> {
   my_routing : RoutingClient<'a ClientFacade>,
-  my_account : Account
+  my_account : Account,
+  my_facade : Arc<Mutex<ClientFacade>>,
+  my_cvar : Arc<(Mutex<bool>, Condvar)>
 }
 
 impl<'a> Client<'a> {
   pub fn new(username : &String, password : &[u8], pin : u32) -> Client<'a> {
     let account = Account::create_account(username, password, pin).ok().unwrap();
-    let mut client = Client { my_routing: RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
-                                                             account.get_maid().clone(), DhtId::generate_random()),
-                              my_account: account };
+    let cvar = Arc::new((Mutex::new(false), Condvar::new()));
+    let facade = Arc::new(Mutex::new(ClientFacade::new(cvar.clone())));
+    let mut client = Client { my_routing: RoutingClient::new(facade.clone(), account.get_maid().clone(), DhtId::generate_random()),
+                              my_account: account, my_facade: facade, my_cvar: cvar };
     let encrypted = client.my_account.encrypt(&password, pin);
     let network_id = Account::generate_network_id(&username, pin);
     client.my_routing.put(DhtId::new(network_id.0), encrypted.ok().unwrap());
@@ -96,15 +99,17 @@ impl<'a> Client<'a> {
   pub fn log_in(username : &String, password : &[u8], pin : u32) -> Client<'a> {
     let network_id = Account::generate_network_id(username, pin);
     let temp_account = Account::new();
-    let mut temp_routing = RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
-                                              temp_account.get_maid().clone(), DhtId::generate_random());
+    let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
+    let temp_facade = Arc::new(Mutex::new(ClientFacade::new(temp_cvar.clone())));
+    let mut temp_routing = RoutingClient::new(temp_facade.clone(), temp_account.get_maid().clone(), DhtId::generate_random());
     temp_routing.get(0u64, DhtId::new(network_id.0));
     // TODO here we have to wait for a get_response, but how the notification come in ?
     let encrypted = [5u8, 1024];
     let existing_account = Account::decrypt(&encrypted, &password, pin).ok().unwrap();
-    Client { my_routing: RoutingClient::new(Arc::new(Mutex::new(ClientFacade::new())),
-                                            existing_account.get_maid().clone(), DhtId::generate_random()),
-             my_account: existing_account }
+    let cvar = Arc::new((Mutex::new(false), Condvar::new()));
+    let facade = Arc::new(Mutex::new(ClientFacade::new(cvar.clone())));
+    Client { my_routing: RoutingClient::new(facade.clone(), existing_account.get_maid().clone(), DhtId::generate_random()),
+             my_account: existing_account, my_facade: facade, my_cvar: cvar }
   }
 
   pub fn put(&mut self, data: Vec<u8>) {
@@ -112,9 +117,17 @@ impl<'a> Client<'a> {
   }
 
   pub fn get(&mut self, data_name: DhtId) -> Result<Vec<u8>, IoError> {
-    self.my_routing.get(0u64, data_name);
-    // TODO here we have to wait for a get_response, but how the notification come in ?
-    Ok(Vec::<u8>::new())
+    let get_queue = self.my_routing.get(0u64, data_name);
+    let &(ref lock, ref cvar) = &*self.my_cvar;
+    let mut fetched = lock.lock().unwrap();
+    while !*fetched {
+        fetched = cvar.wait(fetched).unwrap();
+    }
+    let &ref facade_lock = &*self.my_facade;
+    let mut facade = facade_lock.lock().unwrap();
+    let result = facade.get_response(get_queue.ok().unwrap());
+    *fetched = false;
+    Ok(result.ok().unwrap())
   }
 
 }

@@ -15,8 +15,13 @@
 
 #![allow(unused_variables)]
 
+extern crate lru_cache;
+
 extern crate routing;
 extern crate maidsafe_types;
+
+use std::sync::{Mutex, Arc, Condvar};
+use self::lru_cache::LruCache;
 
 use self::routing::Action;
 use self::routing::RoutingError;
@@ -25,7 +30,10 @@ use self::routing::types::DestinationAddress;
 use self::routing::types::DhtId;
 
 
-pub struct ClientFacade;
+pub struct ClientFacade {
+  my_cvar : Arc<(Mutex<bool>, Condvar)>,
+  my_cache : LruCache<u32, Result<Vec<u8>, RoutingError>>
+}
 
 impl routing::Facade for ClientFacade {
   fn handle_get(&mut self, type_id: u64, our_authority: Authority, from_authority: Authority,
@@ -46,7 +54,12 @@ impl routing::Facade for ClientFacade {
   }
 
   fn handle_get_response(&mut self, from_address: DhtId, response: Result<Vec<u8>, RoutingError>) {
-    ;
+    // TODO message_id needs to be passed in here
+    self.my_cache.insert(0, response);
+    let &(ref lock, ref cvar) = &*self.my_cvar;
+    let mut fetched = lock.lock().unwrap();
+    *fetched = true;
+    cvar.notify_one();
   }
 
   fn handle_put_response(&mut self, from_authority: Authority, from_address: DhtId, response: Result<Vec<u8>, RoutingError>) {
@@ -63,7 +76,12 @@ impl routing::Facade for ClientFacade {
 }
 
 impl ClientFacade {
-  pub fn new() -> ClientFacade {
-    ClientFacade
+  pub fn new(cvar: Arc<(Mutex<bool>, Condvar)>) -> ClientFacade {
+    ClientFacade { my_cvar: cvar, my_cache: LruCache::new(10000) }
+  }
+
+  pub fn get_response(&mut self, message_id : u32) -> Result<Vec<u8>, RoutingError> {
+    let result = self.my_cache.remove(&message_id).unwrap();
+    result
   }
 }
