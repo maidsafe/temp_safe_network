@@ -36,29 +36,16 @@ pub struct Account {
 /// Represents an Account on the SAFE network
 ///
 impl Account {
-    fn new() -> Account {
+    pub fn new() -> Account {
         return Account{ account_id : maidsafe_types::Maid::generate_random() };
     }
 
     ///
-    /// Create a new `Account` on the SAFE network
+    /// Create a new `Account`
     ///
     pub fn create_account(username : &String, password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
         let new_account = Account::new();
-        let network_id = Account::generate_network_id(&username, pin);
-        let encrypted = try!(new_account.encrypt(&password, pin));
-        //routing.Post(network_id, encrypted);
         return Ok(new_account);
-    }
-
-    ///
-    /// Open an existing `Account` on the SAFE network
-    ///
-    pub fn open_account(username : &String, password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
-        let network_id = Account::generate_network_id(username, pin);
-        // let encrypted = routing.Get(network_id);
-        let existing_account = Account::new(); // try!(Account::Decrypt(&encrypted, &password, pin));
-        return Ok(existing_account);
     }
 
     pub fn get_maid(&self) -> &maidsafe_types::Maid {
@@ -74,7 +61,7 @@ impl Account {
         }
     }
 
-    fn generate_network_id(username : &String, pin : u32) -> maidsafe_types::NameType {
+    pub fn generate_network_id(username : &String, pin : u32) -> maidsafe_types::NameType {
         use crypto::digest::Digest;
 
         let mut hasher = ::crypto::sha2::Sha512::new();
@@ -134,7 +121,7 @@ impl Account {
         return (key, iv);
     }
 
-    fn encrypt(&self, password : &[u8], pin : u32) -> Result<Vec<u8>, ::MaidsafeError> {
+    pub fn encrypt(&self, password : &[u8], pin : u32) -> Result<Vec<u8>, ::MaidsafeError> {
         let serialised = try!(self.serialise());
 
         let mut encrypted : Vec<u8> = Vec::new();
@@ -171,7 +158,7 @@ impl Account {
         return Ok(encrypted);
     }
 
-    fn decrypt(encrypted : &[u8], password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
+    pub fn decrypt(encrypted : &[u8], password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
         let mut decrypted : Vec<u8> = Vec::new();
         {
             use crypto::symmetriccipher::Decryptor;
@@ -251,8 +238,8 @@ fn account_eq(left : &Account, right : &Account) -> bool {
     let signed_result = slice_eq(&left.get_maid().sign(&data), &right.get_maid().sign(&data));
 
     let other_account = Account::new();
-    let mut sealed1_result = false;
-    let mut sealed2_result = false;
+    let mut sealed1_result : bool;
+    let mut sealed2_result : bool;
     {
         let sealed = other_account.get_maid().seal(&data, &left.get_maid().get_public_keys().1);
         let opened1 = left.get_maid().open(&sealed.0, &sealed.1, &other_account.get_maid().get_public_keys().1);
