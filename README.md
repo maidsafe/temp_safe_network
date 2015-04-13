@@ -7,11 +7,56 @@
 [Documentation](http://dirvine.github.io/maidsafe_client/)
 
 #Todo
-- [ ] Implement example for basic store retrieve data (chunks) on network
-- [ ] Implement example for create account/login 
-- [ ] Implement stored file logout login and retrieve file 
 - [ ] Implement client façade
-- [ ] Test Put Flow
-- [ ] Test Get Flow
-- [ ] Test client façade
-tba
+  - [ ] Implement Basic Read (get):
+    - [ ] for immutable chunk
+      - [ ] test
+    - [ ] for mutable data
+      - [ ] test
+  - [ ] Implement Basic Write (Put):
+    - [ ] for immmutable chunk
+      - [ ] test
+    - [ ] for mutable data
+      - [ ] test
+  - [ ] Implement Modify (Post) for mutable data
+    - [ ] test
+- [ ] Implement Account:
+  - [x] Serialisation
+    - [x] test
+  - [x] Encryption
+    - [x] test
+  - [ ] Creation
+    - [ ] test
+  - [ ] Retrieval
+    - [ ] test
+  - [ ] Password Change
+    - [ ] test
+- [ ] Implement Storage API (think about all of this as one unit when designing!)
+    - [ ] Implement Metadata (for Container and Blob)
+      - [ ] test
+    - [ ] Implement Directory (Container):
+      - [ ] Creation
+        - [ ] test
+      - [ ] Sub-Directory (Container) Creation
+        - [ ] test
+      - [ ] Sub-Directory (Container) Removal
+        - [ ] test
+      - [ ] Directory (Container) Listing:
+        - [ ] Sub-Directories (Containers)
+          - [ ] test
+        - [ ] Files (Blobs)
+          - [ ] test
+      - [ ] File (Blob) History at a specified key
+        - [ ] test
+      - [ ] Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
+        - [ ] test
+    - [ ] Implement File (Blob) :
+      - [ ] File (Blob) Creation
+        - [ ] test
+      - [ ] File (Blob) Modification
+        - [ ] test
+      - [ ] File (Blob) Removal
+        - [ ] test
+      - [ ] File (Blob) Copying
+        - [ ] test
+
