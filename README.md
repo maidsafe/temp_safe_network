@@ -10,4 +10,6 @@
 - [ ] Implement example for basic store retrieve data (chunks) on network
 - [ ] Implement example for create account/login 
 - [ ] Implement stored file logout login and retrieve file 
+- [ ] Implement client façade
+- [ ] Test client façade
 tba
