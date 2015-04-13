@@ -15,7 +15,18 @@ Code Coverage
 [Documentation](http://dirvine.github.io/maidsafe_client/)
 
 #Todo
+- [ ] Implement Get:
+  - [ ] for immutable chunk
+  - [ ] for mutable chunk
+- [ ] Implement Put:
+  - [ ] for immmutable chunk
+  - [ ] for mutable chunk
+- [ ] Implement Account:
+  - [x] Serialisation
+  - [x] Encryption
+  - [ ] Creation
+  - [ ] Retrieval
+  - [ ] Password Change
 - [ ] Implement example for basic store retrieve data (chunks) on network
 - [ ] Implement example for create account/login 
 - [ ] Implement stored file logout login and retrieve file 
-tba
