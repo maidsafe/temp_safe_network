@@ -7,11 +7,30 @@
 [Documentation](http://dirvine.github.io/maidsafe_client/)
 
 #Todo
-- [ ] Implement example for basic store retrieve data (chunks) on network
-- [ ] Implement example for create account/login 
-- [ ] Implement stored file logout login and retrieve file 
 - [ ] Implement client façade
-- [ ] Test Put Flow
-- [ ] Test Get Flow
-- [ ] Test client façade
-tba
+  - [ ] Implement Basic Read (get):
+    - [ ] for immutable chunk
+      - [ ] test
+    - [ ] for mutable data
+      - [ ] test
+  - [ ] Implement Basic Write (Put):
+    - [ ] for immmutable chunk
+      - [ ] test
+    - [ ] for mutable data
+      - [ ] test
+  - [ ] Implement Modify (Post) for mutable data
+    - [ ] test
+- [ ] Implement Account:
+  - [x] Serialisation
+    - [x] test
+  - [x] Encryption
+    - [x] test
+  - [ ] Creation
+    - [ ] test
+  - [ ] Retrieval
+    - [ ] test
+  - [ ] Password Change
+    - [ ] test
+- [ ] Implement Storage API:
+    - [ ] test
+
