@@ -11,5 +11,7 @@
 - [ ] Implement example for create account/login 
 - [ ] Implement stored file logout login and retrieve file 
 - [ ] Implement client façade
+- [ ] Test Put Flow
+- [ ] Test Get Flow
 - [ ] Test client façade
 tba
