@@ -15,19 +15,19 @@
 
 #![allow(unused_variables)]
 
-extern crate lru_cache;
+use lru_cache;
 
-extern crate routing;
-extern crate maidsafe_types;
+use routing;
+use maidsafe_types;
 
 use std::sync::{Mutex, Arc, Condvar};
-use self::lru_cache::LruCache;
+use lru_cache::LruCache;
 
-use self::routing::Action;
-use self::routing::RoutingError;
-use self::routing::types::Authority;
-use self::routing::types::DestinationAddress;
-use self::routing::types::DhtId;
+use routing::Action;
+use routing::RoutingError;
+use routing::types::Authority;
+use routing::types::DestinationAddress;
+use routing::types::DhtId;
 
 
 pub struct ClientFacade {
@@ -35,15 +35,14 @@ pub struct ClientFacade {
   my_cache : LruCache<u32, Result<Vec<u8>, RoutingError>>
 }
 
-impl routing::Facade for ClientFacade {
+impl routing::facade::Facade for ClientFacade {
   fn handle_get(&mut self, type_id: u64, our_authority: Authority, from_authority: Authority,
                 from_address: DhtId, name: DhtId)->Result<Action, RoutingError> {
-    ;
     Err(RoutingError::InvalidRequest)
   }
 
   fn handle_put(&mut self, our_authority: Authority, from_authority: Authority,
-                from_address: DhtId, dest_address: DestinationAddress, data: Vec<u8>)->Result<Action, RoutingError> {
+                from_address: Vec<u8>, dest_address: DestinationAddress, data: Vec<u8>)->Result<Action, RoutingError> {
     ;
     Err(RoutingError::InvalidRequest)
   }

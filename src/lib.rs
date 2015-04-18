@@ -23,6 +23,7 @@
 #![allow(dead_code)]
 
 extern crate cbor;
+extern crate lru_cache;
 extern crate crypto;
 extern crate maidsafe_types;
 extern crate routing;
