@@ -7,7 +7,7 @@
 | [ API Documentation](http://dirvine.github.io/maidsafe_client/)| [MaidSafe System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe web site](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 
 #Todo
-- [ ] Implement client façade
+- [ ] Implement client Interface
   - [ ] Implement Basic Read (get):
     - [ ] for immutable chunk
       - [ ] test
