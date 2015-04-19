@@ -15,12 +15,13 @@
 
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
-extern crate cbor;
-extern crate maidsafe_types;
-extern crate rustc_serialize;
-extern crate std;
+use cbor;
+use maidsafe_types;
+use rustc_serialize;
+use routing;
+use std;
 
-use self::rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
+use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::mem;
 use maidsafe_types::Random;
 
@@ -28,7 +29,7 @@ static ACCOUNT_TAG : u64 = 5483_4000;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
 
 pub struct Account {
-    account_id : maidsafe_types::Maid,
+    account_id : routing::routing_client::ClientIdPacket,
     // Add Mpids etc
 }
 
@@ -61,7 +62,7 @@ impl Account {
         }
     }
 
-    pub fn generate_network_id(username : &String, pin : u32) -> maidsafe_types::NameType {
+    pub fn generate_network_id(username : &String, pin : u32) -> routing::name_type::NameType {
         use crypto::digest::Digest;
 
         let mut hasher = ::crypto::sha2::Sha512::new();
@@ -82,7 +83,7 @@ impl Account {
         hasher.input(&output1);
         hasher.input(&output2);
         hasher.result(&mut name);
-        return maidsafe_types::NameType::new(name);
+        return routing::name_type::NameType::new(name);
     }
 
     fn generate_crypto_keys(password : &[u8], pin : u32) -> (Vec<u8>, Vec<u8>) {

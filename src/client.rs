@@ -15,13 +15,13 @@
 
 #![allow(unused_variables)]
 
-use lru_cache;
+use lru_time_cache;
 
 use routing;
 use maidsafe_types;
 
 use std::sync::{Mutex, Arc, Condvar};
-use lru_cache::LruCache;
+use lru_time_cache::LruCache;
 
 use routing::Action;
 use routing::RoutingError;
@@ -30,19 +30,19 @@ use routing::types::DestinationAddress;
 use routing::types::DhtId;
 
 
-pub struct ClientFacade {
+pub struct RoutingInterface {
   my_cvar : Arc<(Mutex<bool>, Condvar)>,
   my_cache : LruCache<u32, Result<Vec<u8>, RoutingError>>
 }
 
-impl routing::facade::Facade for ClientFacade {
+impl routing::interface::Interface for RoutingInterface {
   fn handle_get(&mut self, type_id: u64, our_authority: Authority, from_authority: Authority,
-                from_address: DhtId, name: DhtId)->Result<Action, RoutingError> {
+                from_address: DhtId, data: Vec<u8>)->Result<Action, RoutingError> {
     Err(RoutingError::InvalidRequest)
   }
 
   fn handle_put(&mut self, our_authority: Authority, from_authority: Authority,
-                from_address: Vec<u8>, dest_address: DestinationAddress, data: Vec<u8>)->Result<Action, RoutingError> {
+                from_address: DhtId, dest_address: DestinationAddress, data: Vec<u8>)->Result<Action, RoutingError> {
     ;
     Err(RoutingError::InvalidRequest)
   }
@@ -54,7 +54,7 @@ impl routing::facade::Facade for ClientFacade {
 
   fn handle_get_response(&mut self, from_address: DhtId, response: Result<Vec<u8>, RoutingError>) {
     // TODO message_id needs to be passed in here
-    self.my_cache.insert(0, response);
+    self.my_cache.add(0, response);
     let &(ref lock, ref cvar) = &*self.my_cvar;
     let mut fetched = lock.lock().unwrap();
     *fetched = true;
@@ -74,13 +74,13 @@ impl routing::facade::Facade for ClientFacade {
   fn drop_node(&mut self, node: DhtId) { unimplemented!() }
 }
 
-impl ClientFacade {
-  pub fn new(cvar: Arc<(Mutex<bool>, Condvar)>) -> ClientFacade {
-    ClientFacade { my_cvar: cvar, my_cache: LruCache::new(10000) }
+impl RoutingInterface {
+  pub fn new(cvar: Arc<(Mutex<bool>, Condvar)>) -> RoutingInterface {
+    RoutingInterface { my_cvar: cvar, my_cache: LruCache::with_capacity(10000) }
   }
 
   pub fn get_response(&mut self, message_id : u32) -> Result<Vec<u8>, RoutingError> {
-    let result = self.my_cache.remove(&message_id).unwrap();
+    let result = self.my_cache.remove(message_id).unwrap();
     result
   }
 }
