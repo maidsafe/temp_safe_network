@@ -10,53 +10,36 @@
 - [ ] Implement client Interface
   - [ ] Implement Basic Read (get):
     - [ ] for immutable chunk
-      - [ ] test
     - [ ] for mutable data
-      - [ ] test
   - [ ] Implement Basic Write (Put):
     - [ ] for immmutable chunk
-      - [ ] test
     - [ ] for mutable data
-      - [ ] test
   - [ ] Implement Modify (Post) for mutable data
-    - [ ] test
 - [ ] Implement Account:
   - [x] Serialisation
-    - [x] test
   - [x] Encryption
-    - [x] test
   - [ ] Creation
-    - [ ] test
   - [ ] Retrieval
-    - [ ] test
   - [ ] Password Change
-    - [ ] test
 - [ ] Implement Storage API (think about all of this as one unit when designing!)
     - [ ] Implement Metadata (for Container and Blob)
-      - [ ] test
     - [ ] Implement Directory (Container):
       - [ ] Creation
-        - [ ] test
       - [ ] Sub-Directory (Container) Creation
-        - [ ] test
       - [ ] Sub-Directory (Container) Removal
-        - [ ] test
       - [ ] Directory (Container) Listing:
         - [ ] Sub-Directories (Containers)
-          - [ ] test
         - [ ] Files (Blobs)
-          - [ ] test
       - [ ] File (Blob) History at a specified key
-        - [ ] test
       - [ ] Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
-        - [ ] test
     - [ ] Implement File (Blob) :
       - [ ] File (Blob) Creation
-        - [ ] test
       - [ ] File (Blob) Modification
-        - [ ] test
       - [ ] File (Blob) Removal
-        - [ ] test
       - [ ] File (Blob) Copying
-        - [ ] test
+- [ ] Self Authentication Implementation
+- [ ] Implement Routing Client Interface
+- [ ]Example:
+  - [ ] Self Authentication Example
+  - [ ] Validate above example against Local network / droplet
 
