@@ -15,6 +15,12 @@
   - [x] Encryption
   - [ ] Creation
   - [ ] Retrieval
+- [ ] Example:
+  - [ ] Self Authentication Example
+  - [ ] Validate above example against Local network / droplet
+- [ ] API Version 0.0.8
+- [ ] Password Change
+- [ ] Implement Modify (Post) for mutable data
 - [ ] Implement Storage API (think about all of this as one unit when designing!)
     - [ ] Implement Metadata (for Container and Blob)
     - [ ] Implement Directory (Container):
@@ -31,10 +37,4 @@
       - [ ] File (Blob) Modification
       - [ ] File (Blob) Removal
       - [ ] File (Blob) Copying
-- [ ] Self Authentication Implementation
-- [ ] Example:
-  - [ ] Self Authentication Example
-  - [ ] Validate above example against Local network / droplet
-- [ ] API Version 0.0.8
-- [ ] Password Change
-- [ ] Implement Modify (Post) for mutable data
+- [ ] API Version 0.1.9 
