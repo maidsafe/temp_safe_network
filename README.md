@@ -9,12 +9,7 @@
 #Todo
 - [ ] Implement client Interface
   - [ ] Implement Basic Read (get):
-    - [ ] for immutable chunk
-    - [ ] for mutable data
   - [ ] Implement Basic Write (Put):
-    - [ ] for immmutable chunk
-    - [ ] for mutable data
-  - [ ] Implement Modify (Post) for mutable data
 - [ ] Implement Account:
   - [x] Serialisation
   - [x] Encryption
@@ -42,3 +37,4 @@
   - [ ] Validate above example against Local network / droplet
 - [ ] API Version 0.0.8
 - [ ] Password Change
+- [ ] Implement Modify (Post) for mutable data
