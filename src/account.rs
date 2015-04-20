@@ -16,17 +16,13 @@
     See the Licences for the specific language governing permissions and limitations relating to
     use of the MaidSafe Software.                                                                 */
 use cbor;
-use maidsafe_types;
-use rustc_serialize;
 use routing;
 use std;
 use sodiumoxide::crypto;
 
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::mem;
-use maidsafe_types::Random;
 use routing::routing_client::ClientIdPacket;
-use routing::types::DhtId;
 
 static ACCOUNT_TAG : u64 = 5483_4000;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
@@ -222,7 +218,7 @@ impl Decodable for Account {
     fn decode<D: Decoder>(d: &mut D) -> Result<Account, D::Error> {
         let tag : u64 = try!(Decodable::decode(d));
 
-        // I'd like to check the tag value, and return an error ... but how?
+        // TODO : I'd like to check the tag value, and return an error ... but how?
         // The Error class is dependent on the generic decoder type, and the
         // functionality for returning an error that works with all types
         // doesn't seem possible. Slightly less fault tolerant now ...

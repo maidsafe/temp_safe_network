@@ -15,10 +15,7 @@
 
 #![allow(unused_variables)]
 
-use lru_time_cache;
-
 use routing;
-use maidsafe_types;
 
 use std::sync::{Mutex, Arc, Condvar};
 use lru_time_cache::LruCache;

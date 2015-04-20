@@ -100,7 +100,7 @@ impl<'a> Client<'a> {
                               my_account: account, my_facade: facade, my_cvar: cvar };
     let encrypted = client.my_account.encrypt(&password, pin);
     let network_id = Account::generate_network_id(&username, pin);
-    client.my_routing.put(DhtId::new(&network_id.0), encrypted.ok().unwrap());
+    let _ = client.my_routing.put(DhtId::new(&network_id.0), encrypted.ok().unwrap());
     client
   }
 
@@ -133,7 +133,7 @@ impl<'a> Client<'a> {
   }
 
   pub fn put(&mut self, data: Vec<u8>) {
-    self.my_routing.put(self.my_account.get_account().get_id(), data);
+    let _ =  self.my_routing.put(self.my_account.get_account().get_id(), data);
   }
 
   pub fn get(&mut self, data_name: DhtId) -> Result<Vec<u8>, IoError> {
