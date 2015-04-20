@@ -20,16 +20,19 @@ use maidsafe_types;
 use rustc_serialize;
 use routing;
 use std;
+use sodiumoxide::crypto;
 
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::mem;
 use maidsafe_types::Random;
+use routing::routing_client::ClientIdPacket;
+use routing::types::DhtId;
 
 static ACCOUNT_TAG : u64 = 5483_4000;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
 
 pub struct Account {
-    account_id : routing::routing_client::ClientIdPacket,
+    account_id : ClientIdPacket,
     // Add Mpids etc
 }
 
@@ -38,7 +41,9 @@ pub struct Account {
 ///
 impl Account {
     pub fn new() -> Account {
-        return Account{ account_id : maidsafe_types::Maid::generate_random() };
+        let sign_keys = crypto::sign::gen_keypair();
+        let asym_keys = crypto::asymmetricbox::gen_keypair();
+        return Account{ account_id : ClientIdPacket::new((sign_keys.0, asym_keys.0), (sign_keys.1, asym_keys.1)) };
     }
 
     ///
@@ -49,7 +54,7 @@ impl Account {
         return Ok(new_account);
     }
 
-    pub fn get_maid(&self) -> &maidsafe_types::Maid {
+    pub fn get_account(&self) -> &ClientIdPacket {
         return &self.account_id;
     }
 
@@ -209,7 +214,7 @@ impl Account {
 
 impl Encodable for Account {
     fn encode<E: Encoder>(&self, e: &mut E) -> Result<(), E::Error> {
-        return cbor::CborTagEncode::new(ACCOUNT_TAG, &(&self.account_id)).encode(e);
+        return cbor::CborTagEncode::new(ACCOUNT_TAG, &self.account_id).encode(e);
     }
 }
 
@@ -222,7 +227,7 @@ impl Decodable for Account {
         // functionality for returning an error that works with all types
         // doesn't seem possible. Slightly less fault tolerant now ...
 
-        let account_id : maidsafe_types::Maid = try!(Decodable::decode(d));
+        let account_id : ClientIdPacket = try!(Decodable::decode(d));
         return Ok(Account{ account_id : account_id });
     }
 }
@@ -236,15 +241,15 @@ fn slice_eq(left : &[u8], right : &[u8]) -> bool {
 #[allow(dead_code)]
 fn account_eq(left : &Account, right : &Account) -> bool {
     let data = "blah blah blah".to_string().into_bytes();
-    let signed_result = slice_eq(&left.get_maid().sign(&data), &right.get_maid().sign(&data));
+    let signed_result = slice_eq(&left.get_account().sign(&data), &right.get_account().sign(&data));
 
     let other_account = Account::new();
     let mut sealed1_result : bool;
     let mut sealed2_result : bool;
     {
-        let sealed = other_account.get_maid().seal(&data, &left.get_maid().get_public_keys().1);
-        let opened1 = left.get_maid().open(&sealed.0, &sealed.1, &other_account.get_maid().get_public_keys().1);
-        let opened2 = right.get_maid().open(&sealed.0, &sealed.1, &other_account.get_maid().get_public_keys().1);
+        let sealed = other_account.get_account().encrypt(&data, &left.get_account().get_public_keys().1);
+        let opened1 = left.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
+        let opened2 = right.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
         sealed1_result = match opened1 {
             Ok(contents1) => match opened2 {
                 Ok(contents2) => slice_eq(&contents1, &contents2),
@@ -254,9 +259,9 @@ fn account_eq(left : &Account, right : &Account) -> bool {
         }
     }
     {
-        let sealed = other_account.get_maid().seal(&data, &right.get_maid().get_public_keys().1);
-        let opened1 = left.get_maid().open(&sealed.0, &sealed.1, &other_account.get_maid().get_public_keys().1);
-        let opened2 = right.get_maid().open(&sealed.0, &sealed.1, &other_account.get_maid().get_public_keys().1);
+        let sealed = other_account.get_account().encrypt(&data, &right.get_account().get_public_keys().1);
+        let opened1 = left.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
+        let opened2 = right.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
         sealed2_result = match opened1 {
             Ok(contents1) => match opened2 {
                 Ok(contents2) => slice_eq(&contents1, &contents2),
