@@ -29,7 +29,6 @@ extern crate maidsafe_types;
 extern crate routing;
 extern crate rustc_serialize; 
 extern crate sodiumoxide;
-extern crate crust;
 
 pub mod account;
 mod client;
@@ -39,7 +38,7 @@ use std::io::Error as IoError;
 use std::net::{SocketAddr};
 use std::str::FromStr;
 
-use crust::Endpoint;
+use routing::routing_client::Endpoint;
 use routing::routing_client::RoutingClient;
 use routing::types::DhtId;
 use client::RoutingInterface;
