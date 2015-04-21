@@ -28,13 +28,17 @@ extern crate crypto;
 extern crate maidsafe_types;
 extern crate routing;
 extern crate rustc_serialize; 
+extern crate sodiumoxide;
 
 pub mod account;
 mod client;
 
 use std::sync::{Mutex, Arc, Condvar};
 use std::io::Error as IoError;
+use std::net::{SocketAddr};
+use std::str::FromStr;
 
+use routing::routing_client::Endpoint;
 use routing::routing_client::RoutingClient;
 use routing::types::DhtId;
 use client::RoutingInterface;
@@ -90,11 +94,12 @@ impl<'a> Client<'a> {
     let account = Account::create_account(username, password, pin).ok().unwrap();
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
     let facade = Arc::new(Mutex::new(RoutingInterface::new(cvar.clone())));
-    let mut client = Client { my_routing: RoutingClient::new(facade.clone(), account.get_maid().clone(), DhtId::generate_random()),
+    let mut client = Client { my_routing: RoutingClient::new(facade.clone(), account.get_account().clone(),
+                                                             (DhtId::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap()))),
                               my_account: account, my_facade: facade, my_cvar: cvar };
     let encrypted = client.my_account.encrypt(&password, pin);
     let network_id = Account::generate_network_id(&username, pin);
-    client.my_routing.put(DhtId::new(network_id.0), encrypted.ok().unwrap());
+    let _ = client.my_routing.put(DhtId::new(&network_id.0), encrypted.ok().unwrap());
     client
   }
 
@@ -105,8 +110,9 @@ impl<'a> Client<'a> {
       let temp_account = Account::new();
       let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
       let temp_facade = Arc::new(Mutex::new(RoutingInterface::new(temp_cvar.clone())));
-      let mut temp_routing = RoutingClient::new(temp_facade.clone(), temp_account.get_maid().clone(), DhtId::generate_random());
-      let get_queue = temp_routing.get(0u64, DhtId::new(network_id.0));
+      let mut temp_routing = RoutingClient::new(temp_facade.clone(), temp_account.get_account().clone(),
+                                                (DhtId::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap())));
+      let get_queue = temp_routing.get(0u64, DhtId::new(&network_id.0));
       let &(ref lock, ref cvar) = &*temp_cvar;
       let mut fetched = lock.lock().unwrap();
       while !*fetched {
@@ -120,12 +126,13 @@ impl<'a> Client<'a> {
     let existing_account = Account::decrypt(&fetched_encrypted[..], &password, pin).ok().unwrap();
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
     let facade = Arc::new(Mutex::new(RoutingInterface::new(cvar.clone())));
-    Client { my_routing: RoutingClient::new(facade.clone(), existing_account.get_maid().clone(), DhtId::generate_random()),
+    Client { my_routing: RoutingClient::new(facade.clone(), existing_account.get_account().clone(),
+                                            (DhtId::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap()))),
              my_account: existing_account, my_facade: facade, my_cvar: cvar }
   }
 
   pub fn put(&mut self, data: Vec<u8>) {
-    self.my_routing.put(DhtId::new(self.my_account.get_maid().get_name().0), data);
+    let _ =  self.my_routing.put(self.my_account.get_account().get_id(), data);
   }
 
   pub fn get(&mut self, data_name: DhtId) -> Result<Vec<u8>, IoError> {
