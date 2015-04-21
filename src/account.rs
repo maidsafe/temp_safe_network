@@ -236,7 +236,7 @@ fn slice_eq(left : &[u8], right : &[u8]) -> bool {
 // somewhat of a hack, but the crypto types didn't implement the eq trait
 #[allow(dead_code)]
 fn account_eq(left : &Account, right : &Account) -> bool {
-    let data = "blah blah blah".to_string().into_bytes();
+    let data = routing::types::generate_random_vec_u8(64);
     let signed_result = slice_eq(&left.get_account().sign(&data), &right.get_account().sign(&data));
 
     let other_account = Account::new();
