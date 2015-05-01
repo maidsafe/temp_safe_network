@@ -236,7 +236,7 @@ fn slice_eq(left : &[u8], right : &[u8]) -> bool {
 #[allow(dead_code)]
 fn account_eq(left : &Account, right : &Account) -> bool {
     let data = routing::types::generate_random_vec_u8(64);
-    let signed_result = slice_eq(&left.get_account().sign(&data), &right.get_account().sign(&data));
+    let signed_result = slice_eq(&left.get_account().sign(&data).0, &right.get_account().sign(&data).0);
 
     let other_account = Account::new();
     let mut sealed1_result : bool;
