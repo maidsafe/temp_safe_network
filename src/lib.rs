@@ -13,8 +13,8 @@
 // KIND, either express or implied.
 //
 // Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software. 
-                                                                */
+// relating to use of the SAFE Network Software.
+
 #![crate_name = "maidsafe_client"]
 #![crate_type = "lib"]
 #![doc(html_logo_url = "http://maidsafe.net/img/Resources/branding/maidsafe_logo.fab2.png",
@@ -26,7 +26,7 @@ extern crate lru_time_cache;
 extern crate crypto;
 extern crate maidsafe_types;
 extern crate routing;
-extern crate rustc_serialize; 
+extern crate rustc_serialize;
 extern crate sodiumoxide;
 
 pub mod account;
@@ -39,7 +39,8 @@ use std::str::FromStr;
 
 use routing::routing_client::Endpoint;
 use routing::routing_client::RoutingClient;
-use routing::types::DhtId;
+use routing::test_utils::random_trait::Random;
+use routing::NameType;
 use client::RoutingInterface;
 use account::Account;
 
@@ -94,11 +95,11 @@ impl<'a> Client<'a> {
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
     let facade = Arc::new(Mutex::new(RoutingInterface::new(cvar.clone())));
     let mut client = Client { my_routing: RoutingClient::new(facade.clone(), account.get_account().clone(),
-                                                             (DhtId::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap()))),
+                                                             (Random::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap()))),
                               my_account: account, my_facade: facade, my_cvar: cvar };
     let encrypted = client.my_account.encrypt(&password, pin);
     let network_id = Account::generate_network_id(&username, pin);
-    let _ = client.my_routing.put(DhtId::new(&network_id.0), encrypted.ok().unwrap());
+    let _ = client.my_routing.put(NameType::new(&network_id.0), encrypted.ok().unwrap());
     client
   }
 
@@ -110,8 +111,8 @@ impl<'a> Client<'a> {
       let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
       let temp_facade = Arc::new(Mutex::new(RoutingInterface::new(temp_cvar.clone())));
       let mut temp_routing = RoutingClient::new(temp_facade.clone(), temp_account.get_account().clone(),
-                                                (DhtId::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap())));
-      let get_queue = temp_routing.get(0u64, DhtId::new(&network_id.0));
+                                                (Random::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap())));
+      let get_queue = temp_routing.get(0u64, NameType::new(&network_id.0));
       let &(ref lock, ref cvar) = &*temp_cvar;
       let mut fetched = lock.lock().unwrap();
       while !*fetched {
@@ -126,7 +127,7 @@ impl<'a> Client<'a> {
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
     let facade = Arc::new(Mutex::new(RoutingInterface::new(cvar.clone())));
     Client { my_routing: RoutingClient::new(facade.clone(), existing_account.get_account().clone(),
-                                            (DhtId::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap()))),
+                                            (Random::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap()))),
              my_account: existing_account, my_facade: facade, my_cvar: cvar }
   }
 
@@ -134,7 +135,7 @@ impl<'a> Client<'a> {
     let _ =  self.my_routing.put(self.my_account.get_account().get_id(), data);
   }
 
-  pub fn get(&mut self, data_name: DhtId) -> Result<Vec<u8>, IoError> {
+  pub fn get(&mut self, data_name: NameType) -> Result<Vec<u8>, IoError> {
     let get_queue = self.my_routing.get(0u64, data_name);
     let &(ref lock, ref cvar) = &*self.my_cvar;
     let mut fetched = lock.lock().unwrap();
