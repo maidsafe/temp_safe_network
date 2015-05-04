@@ -14,7 +14,7 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                */
-use std;
+
 use std::mem;
 
 use cbor;
@@ -23,7 +23,6 @@ use sodiumoxide::crypto;
 
 use routing::NameType;
 use routing::routing_client::ClientIdPacket;
-use routing::types::{generate_random_vec_u8};
 
 static ACCOUNT_TAG : u64 = 5483_4000;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
@@ -229,138 +228,147 @@ impl Decodable for Account {
     }
 }
 
-#[allow(dead_code)]
-fn slice_eq(left : &[u8], right : &[u8]) -> bool {
-    return left.iter().zip(right.iter()).all(|(a, b)| a == b);
-}
+#[cfg(test)]
+mod test {
+    use std;
 
-// somewhat of a hack, but the crypto types didn't implement the eq trait
-#[allow(dead_code)]
-fn account_eq(left : &Account, right : &Account) -> bool {
-    let data = generate_random_vec_u8(64);
-    let signed_result = slice_eq(&left.get_account().sign(&data).0, &right.get_account().sign(&data).0);
+    use routing::types::{generate_random_vec_u8};
 
-    let other_account = Account::new();
-    let mut sealed1_result : bool;
-    let mut sealed2_result : bool;
-    {
-        let sealed = other_account.get_account().encrypt(&data, &left.get_account().get_public_keys().1);
-        let opened1 = left.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
-        let opened2 = right.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
-        sealed1_result = match opened1 {
-            Ok(contents1) => match opened2 {
-                Ok(contents2) => slice_eq(&contents1, &contents2),
+    use super::Account;
+
+    fn slice_eq(left : &[u8], right : &[u8]) -> bool {
+        return left.iter().zip(right.iter()).all(|(a, b)| a == b);
+    }
+
+    // somewhat of a hack, but the crypto types didn't implement the eq trait
+    fn account_eq(left : &Account, right : &Account) -> bool {
+        let data = generate_random_vec_u8(64);
+        let signed_result = slice_eq(&left.get_account().sign(&data).0, &right.get_account().sign(&data).0);
+
+        let other_account = Account::new();
+        let mut sealed1_result : bool;
+        let mut sealed2_result : bool;
+        {
+            let sealed = other_account.get_account().encrypt(&data, &left.get_account().get_public_keys().1);
+            let opened1 = left.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
+            let opened2 = right.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
+            sealed1_result = match opened1 {
+                Ok(contents1) => match opened2 {
+                    Ok(contents2) => slice_eq(&contents1, &contents2),
+                    Err(_) => false
+                },
                 Err(_) => false
-            },
-            Err(_) => false
-        }
-    }
-    {
-        let sealed = other_account.get_account().encrypt(&data, &right.get_account().get_public_keys().1);
-        let opened1 = left.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
-        let opened2 = right.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
-        sealed2_result = match opened1 {
-            Ok(contents1) => match opened2 {
-                Ok(contents2) => slice_eq(&contents1, &contents2),
-                Err(_) => false
-            },
-            Err(_) => false
-        }
-    }
-    return sealed2_result && sealed1_result && signed_result;
-}
-
-#[test]
-fn generating_new_account() {
-    let username = "James".to_string();
-    let password = "Bond".as_bytes();
-    let pin = 500u32;
-    let account1 = Account::create_account(&username, &password, pin);
-    let account2 = Account::create_account(&username, &password, pin);
-    assert!(!account_eq(&account1.ok().unwrap(), &account2.ok().unwrap()));
-}
-
-fn generating_network_id() {
-    let username1 = "user1".to_string();
-    {
-        let user1_id1 = Account::generate_network_id(&username1, 0);
-        let user1_id2 = Account::generate_network_id(&username1, 1234);
-        let user1_id3 = Account::generate_network_id(&username1, std::u32::MAX);
-
-        assert!(!slice_eq(&user1_id1.get_id(), &user1_id2.get_id()));
-        assert!(!slice_eq(&user1_id1.get_id(), &user1_id3.get_id()));
-        assert!(!slice_eq(&user1_id2.get_id(), &user1_id3.get_id()));
-        assert!(slice_eq(&user1_id1.get_id(), &Account::generate_network_id(&username1, 0).get_id()));
-        assert!(slice_eq(&user1_id2.get_id(), &Account::generate_network_id(&username1, 1234).get_id()));
-        assert!(slice_eq(&user1_id3.get_id(), &Account::generate_network_id(&username1, std::u32::MAX).get_id()));
-    }
-    {
-        let username2 = "user2".to_string();
-        assert!(
-            !slice_eq(
-                &Account::generate_network_id(&username1, 248).get_id(),
-                &Account::generate_network_id(&username2, 248).get_id()));
-    }
-}
-
-#[test]
-fn generating_crypto_keys() {
-    let password1 = "super great password".as_bytes();
-    let password2 = "even better password".as_bytes();
-    {
-        let keys1 = Account::generate_crypto_keys(&password1, 0);
-        let keys2 = Account::generate_crypto_keys(&password1, 1234);
-        let keys3 = Account::generate_crypto_keys(&password1, std::u32::MAX);
-
-        assert!(!slice_eq(&keys1.0, &keys2.0));
-        assert!(!slice_eq(&keys1.0, &keys3.0));
-        assert!(!slice_eq(&keys2.0, &keys3.0));
-
-        assert!(!slice_eq(&keys1.1, &keys2.1));
-        assert!(!slice_eq(&keys1.1, &keys3.1));
-        assert!(!slice_eq(&keys2.1, &keys3.1));
-    }
-    {
-        let keys1 = Account::generate_crypto_keys(&password1, 0);
-        let keys2 = Account::generate_crypto_keys(&password2, 0);
-
-        assert!(!slice_eq(&keys1.0, &keys2.0));
-        assert!(!slice_eq(&keys1.1, &keys2.1));
-    }
-    {
-        let keys = Account::generate_crypto_keys(&password1, 0);
-        let again = Account::generate_crypto_keys(&password1, 0);
-        assert!(slice_eq(&keys.0, &again.0));
-        assert!(slice_eq(&keys.1, &again.1));
-    }
-}
-
-#[test]
-fn serialisation() {
-    let account = Account::new();
-    match account.serialise() {
-        Ok(serialised) => match Account::deserialise(&serialised) {
-            Ok(account_again) => assert!(account_eq(&account, &account_again)),
-            Err(_) => assert!(false)
-        },
-        Err(_) => assert!(false)
-    }
-}
-
-#[test]
-fn encryption() {
-    let account = Account::new();
-    let password = "impossible to guess".to_string().into_bytes();
-    let pin = 10000u32;
-    match account.encrypt(&password, pin) {
-        Ok(encrypted) => {
-            assert!(encrypted.len() > 0);
-            assert!(account.serialise().map(|serialised| assert!(encrypted != serialised)).is_ok());
-            match Account::decrypt(&encrypted, &password, pin) {
-                Ok(account_again) => assert!(account_eq(&account, &account_again)),
-                Err(_) => assert!(false)
             }
         }
-        Err(_) => assert!(false)
+        {
+            let sealed = other_account.get_account().encrypt(&data, &right.get_account().get_public_keys().1);
+            let opened1 = left.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
+            let opened2 = right.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
+            sealed2_result = match opened1 {
+                Ok(contents1) => match opened2 {
+                    Ok(contents2) => slice_eq(&contents1, &contents2),
+                    Err(_) => false
+                },
+                Err(_) => false
+            }
+        }
+        return sealed2_result && sealed1_result && signed_result;
     }
+
+    #[test]
+    fn generating_new_account() {
+        let username = "James".to_string();
+        let password = "Bond".as_bytes();
+        let pin = 500u32;
+        let account1 = Account::create_account(&username, &password, pin);
+        let account2 = Account::create_account(&username, &password, pin);
+        assert!(!account_eq(&account1.ok().unwrap(), &account2.ok().unwrap()));
+    }
+
+    #[test]
+    fn generating_network_id() {
+        let username1 = "user1".to_string();
+        {
+            let user1_id1 = Account::generate_network_id(&username1, 0);
+            let user1_id2 = Account::generate_network_id(&username1, 1234);
+            let user1_id3 = Account::generate_network_id(&username1, std::u32::MAX);
+
+            assert!(!slice_eq(&user1_id1.get_id(), &user1_id2.get_id()));
+            assert!(!slice_eq(&user1_id1.get_id(), &user1_id3.get_id()));
+            assert!(!slice_eq(&user1_id2.get_id(), &user1_id3.get_id()));
+            assert!(slice_eq(&user1_id1.get_id(), &Account::generate_network_id(&username1, 0).get_id()));
+            assert!(slice_eq(&user1_id2.get_id(), &Account::generate_network_id(&username1, 1234).get_id()));
+            assert!(slice_eq(&user1_id3.get_id(), &Account::generate_network_id(&username1, std::u32::MAX).get_id()));
+        }
+        {
+            let username2 = "user2".to_string();
+            assert!(
+                !slice_eq(
+                    &Account::generate_network_id(&username1, 248).get_id(),
+                    &Account::generate_network_id(&username2, 248).get_id()));
+        }
+    }
+
+    #[test]
+    fn generating_crypto_keys() {
+        let password1 = "super great password".as_bytes();
+        let password2 = "even better password".as_bytes();
+        {
+            let keys1 = Account::generate_crypto_keys(&password1, 0);
+            let keys2 = Account::generate_crypto_keys(&password1, 1234);
+            let keys3 = Account::generate_crypto_keys(&password1, std::u32::MAX);
+
+            assert!(!slice_eq(&keys1.0, &keys2.0));
+            assert!(!slice_eq(&keys1.0, &keys3.0));
+            assert!(!slice_eq(&keys2.0, &keys3.0));
+
+            assert!(!slice_eq(&keys1.1, &keys2.1));
+            assert!(!slice_eq(&keys1.1, &keys3.1));
+            assert!(!slice_eq(&keys2.1, &keys3.1));
+        }
+        {
+            let keys1 = Account::generate_crypto_keys(&password1, 0);
+            let keys2 = Account::generate_crypto_keys(&password2, 0);
+
+            assert!(!slice_eq(&keys1.0, &keys2.0));
+            assert!(!slice_eq(&keys1.1, &keys2.1));
+        }
+        {
+            let keys = Account::generate_crypto_keys(&password1, 0);
+            let again = Account::generate_crypto_keys(&password1, 0);
+            assert!(slice_eq(&keys.0, &again.0));
+            assert!(slice_eq(&keys.1, &again.1));
+        }
+    }
+
+    #[test]
+    fn serialisation() {
+        let account = Account::new();
+        match account.serialise() {
+            Ok(serialised) => match Account::deserialise(&serialised) {
+                Ok(account_again) => assert!(account_eq(&account, &account_again)),
+                Err(_) => assert!(false)
+            },
+            Err(_) => assert!(false)
+        }
+    }
+
+    #[test]
+    fn encryption() {
+        let account = Account::new();
+        let password = "impossible to guess".to_string().into_bytes();
+        let pin = 10000u32;
+        match account.encrypt(&password, pin) {
+            Ok(encrypted) => {
+                assert!(encrypted.len() > 0);
+                assert!(account.serialise().map(|serialised| assert!(encrypted != serialised)).is_ok());
+                match Account::decrypt(&encrypted, &password, pin) {
+                    Ok(account_again) => assert!(account_eq(&account, &account_again)),
+                    Err(_) => assert!(false)
+                }
+            }
+            Err(_) => assert!(false)
+        }
+    }
+
 }

@@ -22,11 +22,8 @@ use routing;
 use std::sync::{Mutex, Arc, Condvar};
 use lru_time_cache::LruCache;
 
-use routing::Action;
 use routing::RoutingError;
-use routing::types::{Authority, MessageId};
-use routing::types::DestinationAddress;
-use routing::NameType;
+use routing::types::{MessageId};
 
 
 pub struct RoutingInterface {
