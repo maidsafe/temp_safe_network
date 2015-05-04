@@ -52,8 +52,7 @@ impl routing::client_interface::Interface for RoutingInterface {
   // }
 
   fn handle_get_response(&mut self, message_id: MessageId, response: Result<Vec<u8>, RoutingError>) {
-    // TODO message_id needs to be passed in here
-    self.my_cache.add(0, response);
+    self.my_cache.add(message_id, response);
     let &(ref lock, ref cvar) = &*self.my_cvar;
     let mut fetched = lock.lock().unwrap();
     *fetched = true;

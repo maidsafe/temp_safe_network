@@ -37,6 +37,8 @@ use std::io::Error as IoError;
 use std::net::{SocketAddr};
 use std::str::FromStr;
 
+use cbor::{Decoder};
+
 use maidsafe_types::{ImmutableData, StructuredData};
 use routing::routing_client::Endpoint;
 use routing::routing_client::RoutingClient;
@@ -119,16 +121,30 @@ impl<'a> Client<'a> {
       let temp_facade = Arc::new(Mutex::new(RoutingInterface::new(temp_cvar.clone())));
       let mut temp_routing = RoutingClient::new(temp_facade.clone(), temp_account.get_account().clone(),
                                                 (Random::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap())));
-      let get_queue = temp_routing.get(0u64, NameType::new(network_id.0));
+      let mut get_queue = temp_routing.get(102u64, NameType::new(network_id.0));
       let &(ref lock, ref cvar) = &*temp_cvar;
       let mut fetched = lock.lock().unwrap();
       while !*fetched {
           fetched = cvar.wait(fetched).unwrap();
       }
-      let &ref facade_lock = &*temp_facade;
-      let mut facade = facade_lock.lock().unwrap();
-      let result = facade.get_response(get_queue.ok().unwrap());
-      fetched_encrypted = result.ok().unwrap();
+      {
+        let &ref facade_lock = &*temp_facade;
+        let mut facade = facade_lock.lock().unwrap();
+        let fetched_ownership = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
+        // fetched_ownership is serialised SDV, the encrypted account shall be the root of of it
+        let mut d = Decoder::from_bytes(fetched_ownership);
+        let ownership: StructuredData = d.decode().next().unwrap().unwrap();
+        *fetched = false;
+        get_queue = temp_routing.get(101u64, ownership.get_value()[0][0].clone());
+      }
+      while !*fetched {
+          fetched = cvar.wait(fetched).unwrap();
+      }
+      {
+        let &ref facade_lock = &*temp_facade;
+        let mut facade = facade_lock.lock().unwrap();
+        fetched_encrypted = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
+      }
     }
     let existing_account = Account::decrypt(&fetched_encrypted[..], &password, pin).ok().unwrap();
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
