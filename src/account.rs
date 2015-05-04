@@ -14,14 +14,16 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                */
-use cbor;
-use routing;
 use std;
+use std::mem;
+
+use cbor;
+use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use sodiumoxide::crypto;
 
-use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
-use std::mem;
+use routing::NameType;
 use routing::routing_client::ClientIdPacket;
+use routing::types::{generate_random_vec_u8};
 
 static ACCOUNT_TAG : u64 = 5483_4000;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
@@ -62,7 +64,7 @@ impl Account {
         }
     }
 
-    pub fn generate_network_id(username : &String, pin : u32) -> routing::name_type::NameType {
+    pub fn generate_network_id(username : &String, pin : u32) -> NameType {
         use crypto::digest::Digest;
 
         let mut hasher = ::crypto::sha2::Sha512::new();
@@ -83,7 +85,7 @@ impl Account {
         hasher.input(&output1);
         hasher.input(&output2);
         hasher.result(&mut name);
-        return routing::name_type::NameType::new(name);
+        return NameType::new(name);
     }
 
     fn generate_crypto_keys(password : &[u8], pin : u32) -> (Vec<u8>, Vec<u8>) {
@@ -235,7 +237,7 @@ fn slice_eq(left : &[u8], right : &[u8]) -> bool {
 // somewhat of a hack, but the crypto types didn't implement the eq trait
 #[allow(dead_code)]
 fn account_eq(left : &Account, right : &Account) -> bool {
-    let data = routing::types::generate_random_vec_u8(64);
+    let data = generate_random_vec_u8(64);
     let signed_result = slice_eq(&left.get_account().sign(&data).0, &right.get_account().sign(&data).0);
 
     let other_account = Account::new();

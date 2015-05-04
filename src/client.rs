@@ -79,7 +79,7 @@ impl RoutingInterface {
   }
 
   pub fn get_response(&mut self, message_id : u32) -> Result<Vec<u8>, RoutingError> {
-    let result = self.my_cache.remove(message_id).unwrap();
+    let result = self.my_cache.remove(&message_id).unwrap();
     result
   }
 }
