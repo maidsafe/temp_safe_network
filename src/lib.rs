@@ -37,9 +37,13 @@ use std::io::Error as IoError;
 use std::net::{SocketAddr};
 use std::str::FromStr;
 
+use cbor::{Decoder};
+
+use maidsafe_types::{ImmutableData, StructuredData};
 use routing::routing_client::Endpoint;
 use routing::routing_client::RoutingClient;
-use routing::test_utils::random_trait::Random;
+use routing::sendable::Sendable;
+use routing::test_utils::Random;
 use routing::NameType;
 use client::RoutingInterface;
 use account::Account;
@@ -83,7 +87,7 @@ impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
 
 
 pub struct Client<'a> {
-  my_routing : RoutingClient<'a RoutingInterface>,
+  my_routing : RoutingClient<'a, RoutingInterface>,
   my_account : Account,
   my_facade : Arc<Mutex<RoutingInterface>>,
   my_cvar : Arc<(Mutex<bool>, Condvar)>
@@ -97,9 +101,14 @@ impl<'a> Client<'a> {
     let mut client = Client { my_routing: RoutingClient::new(facade.clone(), account.get_account().clone(),
                                                              (Random::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap()))),
                               my_account: account, my_facade: facade, my_cvar: cvar };
-    let encrypted = client.my_account.encrypt(&password, pin);
+    let encrypted_account = ImmutableData::new(client.my_account.encrypt(&password, pin).ok().unwrap());
+    // encrypted account data will be stored as ImmutableData across the network
+    let _ = client.my_routing.put(encrypted_account.clone());
+    // ownership will be reflected as in an SDV so account can be receovered later on during login
     let network_id = Account::generate_network_id(&username, pin);
-    let _ = client.my_routing.put(NameType::new(&network_id.0), encrypted.ok().unwrap());
+    let ownership = StructuredData::new(network_id, client.my_account.get_account().get_name(),
+                                        vec![vec![encrypted_account.name()]]);
+    let _ = client.my_routing.put(ownership);
     client
   }
 
@@ -112,16 +121,30 @@ impl<'a> Client<'a> {
       let temp_facade = Arc::new(Mutex::new(RoutingInterface::new(temp_cvar.clone())));
       let mut temp_routing = RoutingClient::new(temp_facade.clone(), temp_account.get_account().clone(),
                                                 (Random::generate_random(), Endpoint::Tcp(SocketAddr::from_str(&format!("127.0.0.1:5483")).unwrap())));
-      let get_queue = temp_routing.get(0u64, NameType::new(&network_id.0));
+      let mut get_queue = temp_routing.get(102u64, NameType::new(network_id.0));
       let &(ref lock, ref cvar) = &*temp_cvar;
       let mut fetched = lock.lock().unwrap();
       while !*fetched {
           fetched = cvar.wait(fetched).unwrap();
       }
-      let &ref facade_lock = &*temp_facade;
-      let mut facade = facade_lock.lock().unwrap();
-      let result = facade.get_response(get_queue.ok().unwrap());
-      fetched_encrypted = result.ok().unwrap();
+      {
+        let &ref facade_lock = &*temp_facade;
+        let mut facade = facade_lock.lock().unwrap();
+        let fetched_ownership = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
+        // fetched_ownership is serialised SDV, the encrypted account shall be the root of of it
+        let mut d = Decoder::from_bytes(fetched_ownership);
+        let ownership: StructuredData = d.decode().next().unwrap().unwrap();
+        *fetched = false;
+        get_queue = temp_routing.get(101u64, ownership.get_value()[0][0].clone());
+      }
+      while !*fetched {
+          fetched = cvar.wait(fetched).unwrap();
+      }
+      {
+        let &ref facade_lock = &*temp_facade;
+        let mut facade = facade_lock.lock().unwrap();
+        fetched_encrypted = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
+      }
     }
     let existing_account = Account::decrypt(&fetched_encrypted[..], &password, pin).ok().unwrap();
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
@@ -132,7 +155,9 @@ impl<'a> Client<'a> {
   }
 
   pub fn put(&mut self, data: Vec<u8>) {
-    let _ =  self.my_routing.put(self.my_account.get_account().get_id(), data);
+    // data will be stored as ImmutableData
+    // TODO: shall the input data to be checked and sliced into chunks here to fit the restriction of 1MB size each chunk?
+    let _ =  self.my_routing.put(ImmutableData::new(data));
   }
 
   pub fn get(&mut self, data_name: NameType) -> Result<Vec<u8>, IoError> {

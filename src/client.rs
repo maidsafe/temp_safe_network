@@ -22,11 +22,8 @@ use routing;
 use std::sync::{Mutex, Arc, Condvar};
 use lru_time_cache::LruCache;
 
-use routing::Action;
 use routing::RoutingError;
-use routing::types::{Authority, MessageId};
-use routing::types::DestinationAddress;
-use routing::NameType;
+use routing::types::{MessageId};
 
 
 pub struct RoutingInterface {
@@ -52,8 +49,7 @@ impl routing::client_interface::Interface for RoutingInterface {
   // }
 
   fn handle_get_response(&mut self, message_id: MessageId, response: Result<Vec<u8>, RoutingError>) {
-    // TODO message_id needs to be passed in here
-    self.my_cache.add(0, response);
+    self.my_cache.add(message_id, response);
     let &(ref lock, ref cvar) = &*self.my_cvar;
     let mut fetched = lock.lock().unwrap();
     *fetched = true;
@@ -79,7 +75,7 @@ impl RoutingInterface {
   }
 
   pub fn get_response(&mut self, message_id : u32) -> Result<Vec<u8>, RoutingError> {
-    let result = self.my_cache.remove(message_id).unwrap();
+    let result = self.my_cache.remove(&message_id).unwrap();
     result
   }
 }
