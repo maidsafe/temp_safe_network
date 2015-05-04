@@ -87,7 +87,7 @@ impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
 
 
 pub struct Client<'a> {
-  my_routing : RoutingClient<'a RoutingInterface>,
+  my_routing : RoutingClient<'a, RoutingInterface>,
   my_account : Account,
   my_facade : Arc<Mutex<RoutingInterface>>,
   my_cvar : Arc<(Mutex<bool>, Condvar)>
