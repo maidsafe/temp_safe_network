@@ -1,8 +1,11 @@
 # maidsafe_client
 
-|Crate|Travis|Appveyor|Coverage|
-|:-------:|:-------:|:------:|:------:|
-|[![](http://meritbadge.herokuapp.com/maidsafe_client)](https://crates.io/crates/maidsafe_client)|[![Build Status](https://travis-ci.org/maidsafe/maidsafe_client.svg?branch=master)](https://travis-ci.org/maidsafe/maidsafe_client)|[![Build status](https://ci.appveyor.com/api/projects/status/1rnsp7l44y0nvbmt/branch/master?svg=true)](https://ci.appveyor.com/project/dirvine/maidsafe-client-r8y3h/branch/master)|[![Coverage Status](https://coveralls.io/repos/maidsafe/maidsafe_client/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/maidsafe_client?branch=master)|
+**Primary Maintainer:**     Spandan Sharma (spandan.sharma@maidsafe.net)
+**Secondary Maintainer:**   Krishna Kumar (krishna.kumar@maidsafe.net)
+
+|Crate|Travis|Windows|OSX|Coverage|
+|:------:|:-------:|:-------:|:-------:|:-------:|
+|[![](http://meritbadge.herokuapp.com/maidsafe_client)](https://crates.io/crates/maidsafe_client)|[![Build Status](https://travis-ci.org/maidsafe/maidsafe_client.svg?branch=master)](https://travis-ci.org/maidsafe/maidsafe_client)|HERE|[![Coverage Status](https://coveralls.io/repos/maidsafe/maidsafe_client/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/maidsafe_client?branch=master)|
 
 | [ API Documentation](http://maidsafe.github.io/maidsafe_client/)| [MaidSafe System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe web site](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 
