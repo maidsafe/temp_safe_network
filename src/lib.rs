@@ -98,7 +98,7 @@ impl<'a> Client {
     let account = Account::create_account(username, password, pin).ok().unwrap();
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
     let facade = Arc::new(Mutex::new(RoutingInterface::new(cvar.clone())));
-    // FIX ME: Krishna
+    // FIX ME: Krishna - below RoutingClient must use the interface object from facade
     let mut client = Client { my_routing: RoutingClient::new(RoutingInterface::new(cvar.clone()), account.get_account().clone()),
                               my_account: account, my_facade: facade, my_cvar: cvar };
     let encrypted_account = ImmutableData::new(client.my_account.encrypt(&password, pin).ok().unwrap());
