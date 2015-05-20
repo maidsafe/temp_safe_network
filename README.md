@@ -11,34 +11,44 @@
 | [ API Documentation](http://maidsafe.github.io/maidsafe_client/)| [MaidSafe System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe web site](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 
 #Todo
-- [ ] Implement client Interface
-  - [ ] Implement Basic Read (get):
-  - [ ] Implement Basic Write (Put):
-- [ ] Implement Account:
-  - [x] Serialisation
-  - [x] Encryption
-  - [ ] Creation
-  - [ ] Retrieval
 - [ ] Example:
   - [ ] Self Authentication Example
   - [ ] Validate above example against Local network / droplet
 - [ ] API Version 0.0.8
+- [ ] Implement Storage API (think about all of this as one unit when designing!)
+    - [ ] Implement Routing Client Interface
+        - [ ] Put
+        - [ ] Get
+        - [ ] Post
+    - [ ] Define API traits
+        - [ ] Define Metadata API trait (common for Container and Blob)
+        - [ ] Define Container API trait
+        - [ ] Define Blob API trait
+        - [ ] Define Storage API trait
+    - [ ] Implement NFS types
+        - [ ] Implement NFS_Metadata
+            - [ ] Implement Metatdata API trait
+            - [ ] Implement serialisation
+            - [ ] Write test cases
+        - [ ] Implement NFS_Container
+            - [ ] Implement Container API trait
+            - [ ] Implement serialisation
+            - [ ] Write test cases
+        - [ ] Implement NFS_Blob
+            - [ ] Implement Blob API trait
+            - [ ] Implement serialisation
+            - [ ] Write test cases
+    - [ ] Implement NFS_Storage API
+        - [ ] Implement Storage API trait
+        - [ ] Write test cases
+    - [ ] Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
+- [ ] Create Example:
+    - [ ] Example to demonstrate Container API usage
+    - [ ] Example to demonstrate Blob API usage
+
+
+
+
 - [ ] Password Change
 - [ ] Implement Modify (Post) for mutable data
-- [ ] Implement Storage API (think about all of this as one unit when designing!)
-    - [ ] Implement Metadata (for Container and Blob)
-    - [ ] Implement Directory (Container):
-      - [ ] Creation
-      - [ ] Sub-Directory (Container) Creation
-      - [ ] Sub-Directory (Container) Removal
-      - [ ] Directory (Container) Listing:
-        - [ ] Sub-Directories (Containers)
-        - [ ] Files (Blobs)
-      - [ ] File (Blob) History at a specified key
-      - [ ] Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
-    - [ ] Implement File (Blob) :
-      - [ ] File (Blob) Creation
-      - [ ] File (Blob) Modification
-      - [ ] File (Blob) Removal
-      - [ ] File (Blob) Copying
 - [ ] API Version 0.1.0
