@@ -1,4 +1,5 @@
 maidsafe_client Change Log :
 
-- Account Serialisation
-- Account Encryption
+- [ ] Account Creation
+    - [ ] Account Serialisation
+    - [ ] Account Encryption
