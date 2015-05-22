@@ -15,41 +15,42 @@
     - [ ] [MAID-1078](https://maidsafe.atlassian.net/browse/MAID-1078) Register
     - [ ] [MAID-1079](https://maidsafe.atlassian.net/browse/MAID-1079) Login
 - [ ] Implement Storage API
-    - [ ] [MAID-1080](https://maidsafe.atlassian.net/browse/MAID-1080) Define API traits
-        - [ ] Define Metadata trait (common for Container and Blob)
-        - [ ] Define Container trait
-        - [ ] Define Blob trait
-        - [ ] Define Storage trait
-    - [ ] Implement NFS types
-        - [ ] [MAID-1081](https://maidsafe.atlassian.net/browse/MAID-1081) Implement NFS_Metadata
-            - [ ] Implement Metatdata trait
-            - [ ] Implement serialisation
+    - [ ] [MAID-1080](https://maidsafe.atlassian.net/browse/MAID-1080) Implement types
+        - [ ] Implement MetaData, File and DirectoryListing types
+        - [ ] Implement wrapper traits
+    - [ ] Implement Helpers
+        - [ ] [MAID-1081](https://maidsafe.atlassian.net/browse/MAID-1081) Directory Helper
+            - [ ] Save DirectoryListing
+            - [ ] Get Directory
+            - [ ] Get Directory Versions
+        - [ ] File Helper
+            - [ ] [MAID-1082](https://maidsafe.atlassian.net/browse/MAID-1082) Create File & update file, Metatdata
+            - [ ] [MAID-1083](https://maidsafe.atlassian.net/browse/MAID-1083) Get Versions
+            - [ ] [MAID-1084](https://maidsafe.atlassian.net/browse/MAID-1084) Read File
+        - [ ] [MAID-1085](https://maidsafe.atlassian.net/browse/MAID-1085) Unit test cases
+    - [ ] Implement REST DataTypes
+        - [ ] [MAID-1086](https://maidsafe.atlassian.net/browse/MAID-1086) Container & Blob types
+            - [ ] Implement Blob and Container types
+            - [ ] Implement FileWrapper trait for Blob
+            - [ ] Implement DirectoryListingWrapper trait for Container
             - [ ] Unit test cases
-        - [ ] [MAID-1082](https://maidsafe.atlassian.net/browse/MAID-1082) Implement NFS_Blob
-            - [ ] Implement Blob trait
-            - [ ] Implement serialisation
-            - [ ] Unit test cases
-        - [ ] Implement NFS_Container
-            - [ ] [MAID-1083](https://maidsafe.atlassian.net/browse/MAID-1083) Implement Container trait
-                - [ ] [MAID-1086](https://maidsafe.atlassian.net/browse/MAID-1086) Create Container
-                - [ ] [MAID-1084](https://maidsafe.atlassian.net/browse/MAID-1084) List Containers
-                - [ ] [MAID-1085](https://maidsafe.atlassian.net/browse/MAID-1085) Get Container
-                - [ ] [MAID-1087](https://maidsafe.atlassian.net/browse/MAID-1087) Delete Container
-                - [ ] [MAID-1088](https://maidsafe.atlassian.net/browse/MAID-1088) Update / Get Container Metadata
-                - [ ] [MAID-1090](https://maidsafe.atlassian.net/browse/MAID-1090) Create Blob
-                - [ ] [MAID-1089](https://maidsafe.atlassian.net/browse/MAID-1089) List Blobs
-                - [ ] [MAID-1091](https://maidsafe.atlassian.net/browse/MAID-1091) Get Blob
-                - [ ] [MAID-1092](https://maidsafe.atlassian.net/browse/MAID-1092) Update Blob Content
-                - [ ] [MAID-1093](https://maidsafe.atlassian.net/browse/MAID-1093) Get Blob Content
-                - [ ] [MAID-1094](https://maidsafe.atlassian.net/browse/MAID-1094) List Blob Version
-                - [ ] [MAID-1095](https://maidsafe.atlassian.net/browse/MAID-1095) Delete Blob
-                - [ ] [MAID-1096](https://maidsafe.atlassian.net/browse/MAID-1096) Copy Blob
-                - [ ] [MAID-1097](https://maidsafe.atlassian.net/browse/MAID-1097) Update / Get Blob Metadata
-            - [ ] [MAID-1098](https://maidsafe.atlassian.net/browse/MAID-1098) Implement serialisation
-            - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases
+        - [ ] REST API methods in Container
+            - [ ] [MAID-1087](https://maidsafe.atlassian.net/browse/MAID-1087) Create Container & Get Container
+            - [ ] [MAID-1088](https://maidsafe.atlassian.net/browse/MAID-1088) List Containers, Update / Get Container Metadata
+            - [ ] [MAID-1089](https://maidsafe.atlassian.net/browse/MAID-1089) Delete Container
+            - [ ] [MAID-1090](https://maidsafe.atlassian.net/browse/MAID-1090) Create Blob
+            - [ ] [MAID-1091](https://maidsafe.atlassian.net/browse/MAID-1091) List Blobs
+            - [ ] [MAID-1092](https://maidsafe.atlassian.net/browse/MAID-1092) Get Blob
+            - [ ] [MAID-1093](https://maidsafe.atlassian.net/browse/MAID-1093) Update Blob Content
+            - [ ] [MAID-1094](https://maidsafe.atlassian.net/browse/MAID-1094) Get Blob Content
+            - [ ] [MAID-1095](https://maidsafe.atlassian.net/browse/MAID-1095) List Blob Version
+            - [ ] [MAID-1096](https://maidsafe.atlassian.net/browse/MAID-1096) Delete Blob
+            - [ ] [MAID-1097](https://maidsafe.atlassian.net/browse/MAID-1097) Copy Blob
+            - [ ] [MAID-1098](https://maidsafe.atlassian.net/browse/MAID-1098) Update / Get Blob Metadata
+        - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API
     - [ ] [MAID-1100](https://maidsafe.atlassian.net/browse/MAID-1100) Implement NFS_Storage API
     - [ ] [MAID-1101](https://maidsafe.atlassian.net/browse/MAID-1101) Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
 - [ ] Create Example:
     - [ ] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example
     - [ ] [MAID-1103](https://maidsafe.atlassian.net/browse/MAID-1103) Example to demonstrate Storage API
-    - [ ] [MAID-1104](https://maidsafe.atlassian.net/browse/MAID-1104) Validate above example against Local network / droplet    
+    - [ ] [MAID-1104](https://maidsafe.atlassian.net/browse/MAID-1104) Validate above example against Local network / droplet
