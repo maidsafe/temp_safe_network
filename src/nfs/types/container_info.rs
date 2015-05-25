@@ -16,6 +16,41 @@
 // relating to use of the SAFE Network Software.
 use super::metadata::Metadata;
 use super::container_id::ContainerId;
+use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct ContainerInfo(Metadata, ContainerId);
+
+impl fmt::Debug for ContainerInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "metadata: {}, id: {}", self.0, self.1)
+    }
+}
+
+impl fmt::Display for ContainerInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "metadata: {}, id: {}", self.0, self.1)
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use super::super::metadata::Metadata;
+    use super::super::container_id::ContainerId;
+    use cbor;
+
+    #[test]
+    fn serialise() {
+        let obj_before = ContainerInfo(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string()), ContainerId::new());
+
+        let mut e = cbor::Encoder::from_memory();
+        e.encode(&[&obj_before]).unwrap();
+
+        let mut d = cbor::Decoder::from_bytes(e.as_bytes());
+        let obj_after: ContainerInfo = d.decode().next().unwrap().unwrap();
+
+        assert_eq!(obj_before, obj_after);
+    }
+}

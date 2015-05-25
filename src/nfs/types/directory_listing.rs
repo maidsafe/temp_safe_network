@@ -18,6 +18,7 @@ use super::file::File;
 use super::metadata::Metadata;
 use super::container_info::ContainerInfo;
 use super::container_id::ContainerId;
+use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryListing {
@@ -63,5 +64,39 @@ impl DirectoryListing {
 
     pub fn set_name(&mut self, name: String) {
         self.metadata.set_name(name);
+    }
+}
+
+impl fmt::Debug for DirectoryListing {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "id: {}, metadata: {}", self.id, self.metadata)
+    }
+}
+
+impl fmt::Display for DirectoryListing {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "id: {}, metadata: {}", self.id, self.metadata)
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use super::super::metadata::Metadata;
+    use super::super::container_id::ContainerId;
+    use cbor;
+
+    #[test]
+    fn serialise() {
+        let obj_before = DirectoryListing::new("Home".to_string(), "{mime:\"application/json\"}".to_string());
+
+        let mut e = cbor::Encoder::from_memory();
+        e.encode(&[&obj_before]).unwrap();
+
+        let mut d = cbor::Decoder::from_bytes(e.as_bytes());
+        let obj_after: DirectoryListing = d.decode().next().unwrap().unwrap();
+
+        assert_eq!(obj_before, obj_after);
     }
 }

@@ -17,6 +17,41 @@
 
 use super::metadata::Metadata;
 use self_encryption::datamap::DataMap;
+use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct File(Metadata, DataMap);
+
+impl fmt::Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "metadata: {}", self.0)
+    }
+}
+
+impl fmt::Display for File {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "metadata: {}", self.0)
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use super::super::metadata::Metadata;
+    use self_encryption::datamap::DataMap;
+    use cbor;
+
+    #[test]
+    fn serialise() {
+        let obj_before = File(Metadata::new("Home".to_string(), "{mime:\"application/json\"}".to_string()), DataMap::None);
+
+        let mut e = cbor::Encoder::from_memory();
+        e.encode(&[&obj_before]).unwrap();
+
+        let mut d = cbor::Decoder::from_bytes(e.as_bytes());
+        let obj_after: File = d.decode().next().unwrap().unwrap();
+
+        assert_eq!(obj_before, obj_after);
+    }
+}

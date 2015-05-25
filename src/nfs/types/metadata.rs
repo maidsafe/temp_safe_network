@@ -19,6 +19,7 @@ use time;
 use cbor::CborTagEncode;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::str;
+use std::fmt;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Metadata {
@@ -94,5 +95,36 @@ impl Decodable for Metadata {
                         nsec: modified_nsec
                     })
             })
+    }
+}
+
+impl fmt::Debug for Metadata {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "name: {}, size: {}, user_metadata: {}", self.name, self.size, self.user_metadata)
+    }
+}
+
+impl fmt::Display for Metadata {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "name: {}, size: {}, user_metadata: {}", self.name, self.size, self.user_metadata)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use cbor;
+
+    #[test]
+    fn serialise() {
+        let obj_before = Metadata::new("hello.txt".to_string(), "{mime: \"application/json\"}".to_string());
+
+        let mut e = cbor::Encoder::from_memory();
+        e.encode(&[&obj_before]).unwrap();
+
+        let mut d = cbor::Decoder::from_bytes(e.as_bytes());
+        let obj_after: Metadata = d.decode().next().unwrap().unwrap();
+
+        assert_eq!(obj_before, obj_after);
     }
 }

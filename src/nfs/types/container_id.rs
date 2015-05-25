@@ -16,17 +16,14 @@
 // relating to use of the SAFE Network Software.
 const ID_LEN: usize = 512;
 use std::cmp::*;
+use std::fmt;
 use cbor::CborTagEncode;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
+use rand::random;
 
 #[derive(Eq)]
 pub struct ContainerId([u8;ID_LEN]);
 
-impl ContainerId {
-    pub fn new() -> ContainerId {
-        ContainerId([1u8;ID_LEN])
-    }
-}
 /// Convert a container of `u8`s to an array.  If the container is not the exact size specified,
 /// `None` is returned.  Otherwise, all of the elements are moved into the array.
 ///
@@ -55,6 +52,16 @@ macro_rules! container_of_u8_to_array {
             Some(arr)
         }
     }};
+}
+
+impl ContainerId {
+    pub fn new() -> ContainerId {
+        let mut vec = Vec::with_capacity(ID_LEN);
+        for _ in (0..ID_LEN) {
+            vec.push(random::<u8>());
+        }
+        ContainerId(container_of_u8_to_array!(vec, ID_LEN).unwrap())
+    }
 }
 
 fn slice_equal<T: PartialEq>(lhs: &[T], rhs: &[T]) -> bool {
@@ -119,10 +126,59 @@ impl Encodable for ContainerId {
 impl Decodable for ContainerId {
     fn decode<D: Decoder>(d: &mut D)->Result<ContainerId, D::Error> {
         try!(d.read_u64());
-        let id : Vec<u8> = try!(Decodable::decode(d));        
+        let id : Vec<u8> = try!(Decodable::decode(d));
         match container_of_u8_to_array!(id, ID_LEN) {
             Some(id_arr) => Ok(ContainerId(id_arr)),
             None => Err(d.error("Bad NameType size"))
         }
+    }
+}
+
+fn id_to_vec(id: &[u8;ID_LEN]) -> Vec<u8>{
+    let mut vec = Vec::with_capacity(ID_LEN);
+    for i in &id[..] {
+        vec.push(*i);
+    }
+    vec
+}
+
+impl fmt::Debug for ContainerId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", id_to_vec(&self.0))
+    }
+}
+
+impl fmt::Display for ContainerId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", id_to_vec(&self.0))
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use cbor;
+    #[test]
+    fn equality() {
+        let id = ContainerId::new();
+        let id_cloned = id.clone();
+        let id_sec = ContainerId::new();
+        assert_eq!(id, id_cloned);
+        assert!(id != id_sec);
+        assert!(id == id_cloned);
+    }
+
+    #[test]
+    fn serialise() {
+        let obj_before = ContainerId::new();
+
+        let mut e = cbor::Encoder::from_memory();
+        e.encode(&[&obj_before]).unwrap();
+
+        let mut d = cbor::Decoder::from_bytes(e.as_bytes());
+        let obj_after: ContainerId = d.decode().next().unwrap().unwrap();
+
+        assert_eq!(obj_before, obj_after);
     }
 }
