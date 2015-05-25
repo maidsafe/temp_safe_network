@@ -14,12 +14,13 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-const ID_LEN: usize = 512;
 use std::cmp::*;
 use std::fmt;
 use cbor::CborTagEncode;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use rand::random;
+
+const ID_LEN: usize = 64;
 
 #[derive(Eq)]
 pub struct ContainerId([u8;ID_LEN]);
@@ -60,7 +61,10 @@ impl ContainerId {
         for _ in (0..ID_LEN) {
             vec.push(random::<u8>());
         }
-        ContainerId(container_of_u8_to_array!(vec, ID_LEN).unwrap())
+        ContainerId(match container_of_u8_to_array!(vec, ID_LEN) {
+                Some(arr) => arr,
+                None(_) => panic!("Id could not be created")
+        })
     }
 }
 
@@ -134,23 +138,15 @@ impl Decodable for ContainerId {
     }
 }
 
-fn id_to_vec(id: &[u8;ID_LEN]) -> Vec<u8>{
-    let mut vec = Vec::with_capacity(ID_LEN);
-    for i in &id[..] {
-        vec.push(*i);
-    }
-    vec
-}
-
 impl fmt::Debug for ContainerId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", id_to_vec(&self.0))
+        write!(f, "{:?}", id.iter().map(|x| *x).collect::<Vec<u8>>())
     }
 }
 
 impl fmt::Display for ContainerId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", id_to_vec(&self.0))
+        write!(f, "{:?}", id.iter().map(|x| *x).collect::<Vec<u8>>())
     }
 }
 

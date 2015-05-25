@@ -29,7 +29,7 @@ pub struct DirectoryListing {
 }
 
 impl DirectoryListing {
-    pub fn new(name: String, user_metadata: String) -> DirectoryListing {
+    pub fn new(name: String, user_metadata: Vec<u8>) -> DirectoryListing {
         DirectoryListing {
             id: ContainerId::new(),
             metadata: Metadata::new(name, user_metadata),
@@ -89,7 +89,7 @@ mod test {
 
     #[test]
     fn serialise() {
-        let obj_before = DirectoryListing::new("Home".to_string(), "{mime:\"application/json\"}".to_string());
+        let obj_before = DirectoryListing::new("Home".to_string(), "{mime:\"application/json\"}".to_string().into_bytes());
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();

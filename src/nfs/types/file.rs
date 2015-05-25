@@ -20,17 +20,46 @@ use self_encryption::datamap::DataMap;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct File(Metadata, DataMap);
+pub struct File {
+    metadata: Metadata,
+    datamap: DataMap
+}
+
+impl File {
+    pub fn new(metadata: Metadata, datamap: DataMap) -> File {
+        File {
+            metadata: metadata,
+            datamap: datamap
+        }
+    }
+
+    pub set_metadata(&mut self, metadata: Metadata) {
+        self.metadata = metadata;
+    }
+
+    pub get_metadata(&self) -> Metadata {
+        self.metadata.clone()
+    }
+
+    pub set_datamap(&mut self, datamap: DataMap) {
+        self.datamap = datamap;
+    }
+
+    pub get_datamap(&self) -> DataMap {
+        self.datamap.clone()
+    }
+
+}
 
 impl fmt::Debug for File {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}", self.0)
+        write!(f, "metadata: {}", self.get_metadata())
     }
 }
 
 impl fmt::Display for File {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}", self.0)
+        write!(f, "metadata: {}", self.get_metadata())
     }
 }
 
@@ -44,7 +73,7 @@ mod test {
 
     #[test]
     fn serialise() {
-        let obj_before = File(Metadata::new("Home".to_string(), "{mime:\"application/json\"}".to_string()), DataMap::None);
+        let obj_before = File::new(Metadata::new("Home".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), DataMap::None);
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();

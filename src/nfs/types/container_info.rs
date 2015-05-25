@@ -19,17 +19,41 @@ use super::container_id::ContainerId;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct ContainerInfo(Metadata, ContainerId);
+pub struct ContainerInfo {
+    metadata: Metadata,
+    id: ContainerId
+}
+
+impl ContainerInfo {
+    pub fn new(metadata: Metadata, id: ContainerId) -> ContainerInfo {
+        ContainerInfo {
+            metadata: metadata,
+            id: id
+        }
+    }
+
+    pub set_metadata(&mut self, metadata: Metadata) {
+        self.metadata = metadata;
+    }
+
+    pub get_metadata(&self) -> Metadata {
+        self.metadata.clone()
+    }
+
+    pub get_id(&self) -> ContainerId {
+        self.id.clone()
+    }
+}
 
 impl fmt::Debug for ContainerInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}, id: {}", self.0, self.1)
+        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.,get_id())
     }
 }
 
 impl fmt::Display for ContainerInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}, id: {}", self.0, self.1)
+        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.,get_id())
     }
 }
 
@@ -43,7 +67,7 @@ mod test {
 
     #[test]
     fn serialise() {
-        let obj_before = ContainerInfo(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string()), ContainerId::new());
+        let obj_before = ContainerInfo::new(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), ContainerId::new());
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();

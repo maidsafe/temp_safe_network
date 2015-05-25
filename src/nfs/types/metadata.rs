@@ -27,11 +27,11 @@ pub struct Metadata {
     size: i64,
     created_time:  time::Tm,
     modified_time: time::Tm,
-    user_metadata: String
+    user_metadata: Vec<u8>
 }
 
 impl Metadata {
-    pub fn new(name: String, user_metadata: String) -> Metadata {
+    pub fn new(name: String, user_metadata: Vec<u8>) -> Metadata {
         Metadata {
             name: name,
             size: 0,
@@ -57,11 +57,11 @@ impl Metadata {
         self.size
     }
 
-    pub fn set_user_metadata(&mut self, user_metadata: String) {
+    pub fn set_user_metadata(&mut self, user_metadata: Vec<u8>) {
         self.user_metadata = user_metadata;
     }
 
-    pub fn get_user_metadata(&self) -> String {
+    pub fn get_user_metadata(&self) -> Vec<u8> {
         self.user_metadata.clone()
     }
 
@@ -100,13 +100,13 @@ impl Decodable for Metadata {
 
 impl fmt::Debug for Metadata {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "name: {}, size: {}, user_metadata: {}", self.name, self.size, self.user_metadata)
+        write!(f, "name: {}, size: {}, user_metadata: {:?}", self.name, self.size, self.user_metadata)
     }
 }
 
 impl fmt::Display for Metadata {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "name: {}, size: {}, user_metadata: {}", self.name, self.size, self.user_metadata)
+        write!(f, "name: {}, size: {}, user_metadata: {:?}", self.name, self.size, self.user_metadata)
     }
 }
 
@@ -117,7 +117,7 @@ mod test {
 
     #[test]
     fn serialise() {
-        let obj_before = Metadata::new("hello.txt".to_string(), "{mime: \"application/json\"}".to_string());
+        let obj_before = Metadata::new("hello.txt".to_string(), "{mime: \"application/json\"}".to_string().into_bytes());
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();
