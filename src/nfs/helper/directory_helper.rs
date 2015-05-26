@@ -22,6 +22,9 @@ use routing::sendable::Sendable;
 use cbor;
 use Client;
 
+// TODO Validate whether the id is saved as expected
+// TODO check and remove containerid and use NameType itself
+
 pub struct DirectoryHelper<'a> {
     client: &'a mut Client
 }
@@ -44,7 +47,17 @@ impl <'a> DirectoryHelper<'a> {
         }
     }
 
-    pub fn save(&mut self, directory: DirectoryListing) -> Result<(), &str>{
+    pub fn create(&mut self, directory: DirectoryListing) -> Result<(), &str>{
+        let serialised_directory = serialise(directory.clone());
+        let immutable_data = ImmutableData::new(serialised_directory);
+        self.client.put(serialise(immutable_data.clone()));
+        let mut sdv: StructuredData = StructuredData::new(immutable_data.name(),
+            immutable_data.name(), vec![vec![immutable_data.name()]]);
+        self.client.put(serialise(sdv));
+        Ok(())
+    }
+
+    pub fn update(&mut self, directory: DirectoryListing) -> Result<(), &str>{
         let get_result = self.client.get(NameType(directory.get_id().0));
         if get_result.is_err() {
             return Err("Could not find data");
@@ -52,6 +65,7 @@ impl <'a> DirectoryHelper<'a> {
         let mut sdv: StructuredData = deserialise(get_result.unwrap());
         let serialised_directory = serialise(directory.clone());
         let immutable_data = ImmutableData::new(serialised_directory);
+        self.client.put(serialise(immutable_data.clone()));
         let mut versions = sdv.get_value();
         versions[0].push(immutable_data.name());
         sdv.set_value(versions);
@@ -59,7 +73,33 @@ impl <'a> DirectoryHelper<'a> {
         Ok(())
     }
 
-    pub fn get(&mut self, directory_id: ContainerId) -> Result<DirectoryListing, &str>{
+    pub fn get_versions(&mut self, directory_id: ContainerId) -> Result<Vec<NameType>, &str> {
+        let get_result = self.client.get(NameType(directory_id.0));
+        if get_result.is_err() {
+            return Err("Could not find data");
+        }
+        let sdv: StructuredData = deserialise(get_result.unwrap());
+        Ok(sdv.get_value()[0].clone())
+    }
+
+    pub fn get_by_version(&mut self, directory_id: ContainerId, version: NameType) -> Result<DirectoryListing, &str> {
+        let get_result = self.client.get(NameType(directory_id.0));
+        if get_result.is_err() {
+            return Err("Could not find data");
+        }
+        let sdv: StructuredData = deserialise(get_result.unwrap());
+        if !sdv.get_value()[0].contains(&version) {
+            return Err("Version not found");
+        };
+        let data_result = self.client.get(version);
+        if data_result.is_err() {
+            return Err("Could not find data");
+        }
+        let imm: ImmutableData = deserialise(data_result.unwrap());
+        Ok(deserialise(imm.get_value().clone()))
+    }
+
+    pub fn get(&mut self, directory_id: ContainerId) -> Result<DirectoryListing, &str> {
         let get_result = self.client.get(NameType(directory_id.0));
         if get_result.is_err() {
             return Err("Could not find data");
