@@ -20,5 +20,4 @@ routing = "*"
 sodiumoxide = "0.0.4"
 time = "0.1.25"
 rand = "*"
-[dependencies.self_encryption]
-git = "https://github.com/maidsafe/self_encryption.git"
+self_encryption = "0.1.3"
