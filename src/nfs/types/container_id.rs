@@ -23,7 +23,7 @@ use rand::random;
 const ID_LEN: usize = 64;
 
 #[derive(Eq)]
-pub struct ContainerId([u8;ID_LEN]);
+pub struct ContainerId(pub [u8;ID_LEN]);
 
 /// Convert a container of `u8`s to an array.  If the container is not the exact size specified,
 /// `None` is returned.  Otherwise, all of the elements are moved into the array.

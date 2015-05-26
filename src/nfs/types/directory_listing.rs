@@ -65,6 +65,10 @@ impl DirectoryListing {
     pub fn set_name(&mut self, name: String) {
         self.metadata.set_name(name);
     }
+
+    pub fn get_id(&self) -> ContainerId {
+        self.id.clone()
+    }
 }
 
 impl fmt::Debug for DirectoryListing {

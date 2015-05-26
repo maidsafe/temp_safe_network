@@ -14,3 +14,67 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+use nfs::types::{DirectoryListing, ContainerId};
+use maidsafe_types::{ImmutableData, StructuredData};
+use rustc_serialize::{Decodable, Encodable};
+use routing::NameType;
+use routing::sendable::Sendable;
+use cbor;
+use Client;
+
+pub struct DirectoryHelper<'a> {
+    client: &'a mut Client
+}
+
+fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
+    let mut e = cbor::Encoder::from_memory();
+    e.encode(&[&data]);
+    e.into_bytes()
+}
+
+fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
+    let mut d = cbor::Decoder::from_bytes(data);
+    d.decode().next().unwrap().unwrap()
+}
+
+impl <'a> DirectoryHelper<'a> {
+    pub fn new(client: &'a mut Client) -> DirectoryHelper<'a> {
+        DirectoryHelper {
+            client: client
+        }
+    }
+
+    pub fn save(&mut self, directory: DirectoryListing) -> Result<(), &str>{
+        let get_result = self.client.get(NameType(directory.get_id().0));
+        if get_result.is_err() {
+            return Err("Could not find data");
+        }
+        let mut sdv: StructuredData = deserialise(get_result.unwrap());
+        let serialised_directory = serialise(directory.clone());
+        let immutable_data = ImmutableData::new(serialised_directory);
+        let mut versions = sdv.get_value();
+        versions[0].push(immutable_data.name());
+        sdv.set_value(versions);
+        self.client.put(serialise(sdv.clone()));
+        Ok(())
+    }
+
+    pub fn get(&mut self, directory_id: ContainerId) -> Result<DirectoryListing, &str>{
+        let get_result = self.client.get(NameType(directory_id.0));
+        if get_result.is_err() {
+            return Err("Could not find data");
+        }
+        let sdv: StructuredData = deserialise(get_result.unwrap());
+        let name = match sdv.get_value()[0].last() {
+            Some(data) => NameType(data.0),
+            None => return Err("Could not find data")
+        };
+        let data_result = self.client.get(name);
+        if data_result.is_err() {
+            return Err("Could not find data");
+        }
+        let imm: ImmutableData = deserialise(data_result.unwrap());
+        Ok(deserialise(imm.get_value().clone()))
+    }
+
+}

@@ -87,8 +87,6 @@ impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
     }
 }
 
-
-
 pub struct Client {
   my_routing : RoutingClient<RoutingInterface>,
   my_account : Account,
