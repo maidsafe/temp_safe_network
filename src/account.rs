@@ -19,6 +19,7 @@ use std::mem;
 
 use cbor;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
+use crypto::pbkdf2;
 use sodiumoxide::crypto;
 
 use routing::NameType;
@@ -27,8 +28,16 @@ use routing::routing_client::ClientIdPacket;
 static ACCOUNT_TAG : u64 = 5483_4000;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct MaidSafeSessionKeys {
+    pub an_maid: maidsafe_types::AnMaid,
+    pub maid: maidsafe_types::Maid,
+    //pub public_maid: maidsafe_types::PublicMaid,
+}
+
 pub struct Account {
     account_id : ClientIdPacket,
+    session_keys: MaidSafeSessionKeys,
     // Add Mpids etc
 }
 
@@ -45,7 +54,7 @@ impl Account {
     ///
     /// Create a new `Account`
     ///
-    pub fn create_account(username : &String, password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
+    pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Result<Account, ::MaidsafeError> {
         let new_account = Account::new();
         return Ok(new_account);
     }
@@ -63,7 +72,7 @@ impl Account {
         }
     }
 
-    pub fn generate_network_id(username : &String, pin : u32) -> NameType {
+    pub fn generate_network_id(keyword: &String, pin : u32) -> NameType {
         use crypto::digest::Digest;
 
         let mut hasher = ::crypto::sha2::Sha512::new();
@@ -72,7 +81,7 @@ impl Account {
         let mut output1 = vec![0u8; digest_size];
         let mut output2 = vec![0u8; digest_size];
 
-        hasher.input_str(&username);
+        hasher.input_str(&keyword);
         hasher.result(&mut output1);
 
         hasher.reset();
@@ -87,7 +96,16 @@ impl Account {
         return NameType::new(name);
     }
 
-    fn generate_crypto_keys(password : &[u8], pin : u32) -> (Vec<u8>, Vec<u8>) {
+    fn generate_maidsafe_keys() -> MaidSafeSessionKeys {
+        let an_maid = maidsafe_types::AnMaid::new(),
+        let maid = maidsafe_types::Maid::new(&an_maid),
+        MaidSafeSessionKeys {
+            maid: maid,
+            an_maid: an_maid,
+        }
+    }
+
+    fn generate_crypto_keys(password: &[u8], pin: u32) -> (Vec<u8>, Vec<u8>) {
         use crypto::digest::Digest;
 
         let mut hasher = ::crypto::sha2::Sha512::new();
@@ -123,7 +141,7 @@ impl Account {
         return (key, iv);
     }
 
-    pub fn encrypt(&self, password : &[u8], pin : u32) -> Result<Vec<u8>, ::MaidsafeError> {
+    pub fn encrypt(&self, password: &[u8], pin: u32) -> Result<Vec<u8>, ::MaidsafeError> {
         let serialised = try!(self.serialise());
 
         let mut encrypted : Vec<u8> = Vec::new();
@@ -160,7 +178,7 @@ impl Account {
         return Ok(encrypted);
     }
 
-    pub fn decrypt(encrypted : &[u8], password : &[u8], pin : u32) -> Result<Account, ::MaidsafeError> {
+    pub fn decrypt(encrypted: &[u8], password: &[u8], pin: u32) -> Result<Account, ::MaidsafeError> {
         let mut decrypted : Vec<u8> = Vec::new();
         {
             use crypto::symmetriccipher::Decryptor;
@@ -192,7 +210,7 @@ impl Account {
             }
         }
 
-        return Ok(try!(Account::deserialise(&decrypted)))
+        Ok(try!(Account::deserialise(&decrypted)))
     }
 
     fn serialise(&self) -> cbor::CborResult<Vec<u8>> {
@@ -277,35 +295,35 @@ mod test {
 
     #[test]
     fn generating_new_account() {
-        let username = "James".to_string();
+        let keyword = "James".to_string();
         let password = "Bond".as_bytes();
         let pin = 500u32;
-        let account1 = Account::create_account(&username, &password, pin);
-        let account2 = Account::create_account(&username, &password, pin);
+        let account1 = Account::create_account(&keyword, &password, pin);
+        let account2 = Account::create_account(&keyword, &password, pin);
         assert!(!account_eq(&account1.ok().unwrap(), &account2.ok().unwrap()));
     }
 
     #[test]
     fn generating_network_id() {
-        let username1 = "user1".to_string();
+        let keyword1 = "user1".to_string();
         {
-            let user1_id1 = Account::generate_network_id(&username1, 0);
-            let user1_id2 = Account::generate_network_id(&username1, 1234);
-            let user1_id3 = Account::generate_network_id(&username1, std::u32::MAX);
+            let user1_id1 = Account::generate_network_id(&keyword1, 0);
+            let user1_id2 = Account::generate_network_id(&keyword1, 1234);
+            let user1_id3 = Account::generate_network_id(&keyword1, std::u32::MAX);
 
             assert!(!slice_eq(&user1_id1.get_id(), &user1_id2.get_id()));
             assert!(!slice_eq(&user1_id1.get_id(), &user1_id3.get_id()));
             assert!(!slice_eq(&user1_id2.get_id(), &user1_id3.get_id()));
-            assert!(slice_eq(&user1_id1.get_id(), &Account::generate_network_id(&username1, 0).get_id()));
-            assert!(slice_eq(&user1_id2.get_id(), &Account::generate_network_id(&username1, 1234).get_id()));
-            assert!(slice_eq(&user1_id3.get_id(), &Account::generate_network_id(&username1, std::u32::MAX).get_id()));
+            assert!(slice_eq(&user1_id1.get_id(), &Account::generate_network_id(&keyword1, 0).get_id()));
+            assert!(slice_eq(&user1_id2.get_id(), &Account::generate_network_id(&keyword1, 1234).get_id()));
+            assert!(slice_eq(&user1_id3.get_id(), &Account::generate_network_id(&keyword1, std::u32::MAX).get_id()));
         }
         {
-            let username2 = "user2".to_string();
+            let keyword2 = "user2".to_string();
             assert!(
                 !slice_eq(
-                    &Account::generate_network_id(&username1, 248).get_id(),
-                    &Account::generate_network_id(&username2, 248).get_id()));
+                    &Account::generate_network_id(&keyword1, 248).get_id(),
+                    &Account::generate_network_id(&keyword2, 248).get_id()));
         }
     }
 

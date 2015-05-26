@@ -94,8 +94,8 @@ pub struct Client {
 }
 
 impl<'a> Client {
-  pub fn new(username : &String, password : &[u8], pin : u32) -> Client {
-    let account = Account::create_account(username, password, pin).ok().unwrap();
+  pub fn new(keyword : &String, password : &[u8], pin : u32) -> Client {
+    let account = Account::create_account(keyword, password, pin).ok().unwrap();
     let cvar = Arc::new((Mutex::new(false), Condvar::new()));
     let facade = Arc::new(Mutex::new(RoutingInterface::new(cvar.clone())));
     // FIX ME: Krishna - below RoutingClient must use the interface object from facade
@@ -105,17 +105,35 @@ impl<'a> Client {
     // encrypted account data will be stored as ImmutableData across the network
     let _ = client.my_routing.put(encrypted_account.clone());
     // ownership will be reflected as in an SDV so account can be receovered later on during login
-    let network_id = Account::generate_network_id(&username, pin);
+    let network_id = Account::generate_network_id(&keyword, pin);
     let ownership = StructuredData::new(network_id, client.my_account.get_account().get_name(),
                                         vec![vec![encrypted_account.name()]]);
     let _ = client.my_routing.put(ownership);
     client
   }
+    pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Client {
+        let account = Account::create_account(keyword, password, pin).ok().unwrap();
+        let cvar = Arc::new((Mutex::new(false), Condvar::new()));
+        let facade = Arc::new(Mutex::new(RoutingInterface::new(cvar.clone())));
+        // FIX ME: Krishna - below RoutingClient must use the interface object from facade
+        let mut client = Client { my_routing: RoutingClient::new(RoutingInterface::new(cvar.clone()), account.get_account().clone()),
+                                  my_account: account, my_facade: facade, my_cvar: cvar };
+        let encrypted_account = ImmutableData::new(client.my_account.encrypt(&password, pin).ok().unwrap());
+        // encrypted account data will be stored as ImmutableData across the network
+        let _ = client.my_routing.put(encrypted_account.clone());
+        // ownership will be reflected as in an SDV so account can be receovered later on during login
+        let network_id = Account::generate_network_id(&keyword, pin);
+        let ownership = StructuredData::new(network_id, client.my_account.get_account().get_name(),
+                                            vec![vec![encrypted_account.name()]]);
+        let _ = client.my_routing.put(ownership);
+        client
+  }
 
-  pub fn log_in(username : &String, password : &[u8], pin : u32) -> Client {
+
+  pub fn log_in(keyword : &String, password : &[u8], pin : u32) -> Client {
     let mut fetched_encrypted : Vec<u8>;
     {
-      let network_id = Account::generate_network_id(username, pin);
+      let network_id = Account::generate_network_id(keyword, pin);
       let temp_account = Account::new();
       let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
       let temp_facade = Arc::new(Mutex::new(RoutingInterface::new(temp_cvar.clone())));
