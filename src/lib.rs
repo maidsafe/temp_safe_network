@@ -28,10 +28,13 @@ extern crate maidsafe_types;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate sodiumoxide;
+extern crate time;
+extern crate self_encryption;
+extern crate rand;
 
 pub mod account;
 mod client;
-
+mod nfs;
 use std::sync::{Mutex, Arc, Condvar};
 use std::io::Error as IoError;
 use std::net::{SocketAddr};
