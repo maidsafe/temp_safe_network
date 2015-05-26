@@ -63,7 +63,7 @@ impl ContainerId {
         }
         ContainerId(match container_of_u8_to_array!(vec, ID_LEN) {
                 Some(arr) => arr,
-                None(_) => panic!("Id could not be created")
+                None => panic!("Id could not be created")
         })
     }
 }
@@ -140,13 +140,13 @@ impl Decodable for ContainerId {
 
 impl fmt::Debug for ContainerId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", id.iter().map(|x| *x).collect::<Vec<u8>>())
+        write!(f, "{:?}", self.0.iter().map(|x| *x).collect::<Vec<u8>>())
     }
 }
 
 impl fmt::Display for ContainerId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", id.iter().map(|x| *x).collect::<Vec<u8>>())
+        write!(f, "{:?}", self.0.iter().map(|x| *x).collect::<Vec<u8>>())
     }
 }
 

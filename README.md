@@ -15,9 +15,9 @@
     - [ ] [MAID-1078](https://maidsafe.atlassian.net/browse/MAID-1078) Register
     - [ ] [MAID-1079](https://maidsafe.atlassian.net/browse/MAID-1079) Login
 - [ ] Implement Storage API
-    - [ ] [MAID-1080](https://maidsafe.atlassian.net/browse/MAID-1080) Implement types
-        - [ ] Implement MetaData, File and DirectoryListing types
-        - [ ] Implement wrapper traits
+    - [X] [MAID-1080](https://maidsafe.atlassian.net/browse/MAID-1080) Implement types
+        - [X] Implement MetaData, File and DirectoryListing types
+        - [X] Implement wrapper traits
     - [ ] Implement Helpers
         - [ ] [MAID-1081](https://maidsafe.atlassian.net/browse/MAID-1081) Directory Helper
             - [ ] Save DirectoryListing
@@ -47,7 +47,7 @@
             - [ ] [MAID-1095](https://maidsafe.atlassian.net/browse/MAID-1095) Delete Blob
             - [ ] [MAID-1096](https://maidsafe.atlassian.net/browse/MAID-1096) Copy Blob
             - [ ] [MAID-1097](https://maidsafe.atlassian.net/browse/MAID-1097) Update / Get Blob Metadata
-        - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API    
+        - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API
     - [ ] [MAID-1101](https://maidsafe.atlassian.net/browse/MAID-1101) Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
 - [ ] Create Example:
     - [ ] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example

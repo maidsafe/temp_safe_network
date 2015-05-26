@@ -33,19 +33,19 @@ impl File {
         }
     }
 
-    pub set_metadata(&mut self, metadata: Metadata) {
+    pub fn set_metadata(&mut self, metadata: Metadata) {
         self.metadata = metadata;
     }
 
-    pub get_metadata(&self) -> Metadata {
+    pub fn get_metadata(&self) -> Metadata {
         self.metadata.clone()
     }
 
-    pub set_datamap(&mut self, datamap: DataMap) {
+    pub fn set_datamap(&mut self, datamap: DataMap) {
         self.datamap = datamap;
     }
 
-    pub get_datamap(&self) -> DataMap {
+    pub fn get_datamap(&self) -> DataMap {
         self.datamap.clone()
     }
 

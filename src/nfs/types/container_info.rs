@@ -32,28 +32,28 @@ impl ContainerInfo {
         }
     }
 
-    pub set_metadata(&mut self, metadata: Metadata) {
+    pub fn set_metadata(&mut self, metadata: Metadata) {
         self.metadata = metadata;
     }
 
-    pub get_metadata(&self) -> Metadata {
+    pub fn get_metadata(&self) -> Metadata {
         self.metadata.clone()
     }
 
-    pub get_id(&self) -> ContainerId {
+    pub fn get_id(&self) -> ContainerId {
         self.id.clone()
     }
 }
 
 impl fmt::Debug for ContainerInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.,get_id())
+        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.get_id())
     }
 }
 
 impl fmt::Display for ContainerInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.,get_id())
+        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.get_id())
     }
 }
 
