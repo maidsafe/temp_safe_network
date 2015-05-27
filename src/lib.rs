@@ -51,7 +51,6 @@ use routing::NameType;
 use client::RoutingInterface;
 use account::Account;
 
-
 pub enum CryptoError {
     SymmetricCryptoError(crypto::symmetriccipher::SymmetricCipherError),
     BadBuffer
@@ -155,10 +154,10 @@ impl<'a> Client {
              my_account: existing_account, my_facade: facade, my_cvar: cvar }
   }
 
-  pub fn put(&mut self, data: Vec<u8>) {
+  pub fn put<T>(&mut self, data: T) where T: Sendable {
     // data will be stored as ImmutableData
-    // TODO: shall the input data to be checked and sliced into chunks here to fit the restriction of 1MB size each chunk?
-    let _ =  self.my_routing.put(ImmutableData::new(data));
+    // OLD-TODO: shall the input data to be checked and sliced into chunks here to fit the restriction of 1MB size each chunk?
+    let _ =  self.my_routing.put(data);
   }
 
   pub fn get(&mut self, data_name: NameType) -> Result<Vec<u8>, IoError> {

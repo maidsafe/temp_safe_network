@@ -51,10 +51,10 @@ impl <'a> DirectoryHelper<'a> {
     pub fn create(&mut self, directory: DirectoryListing) -> Result<(), &str> {
         let serialised_directory = serialise(directory.clone());
         let immutable_data = ImmutableData::new(serialised_directory);
-        self.client.put(serialise(immutable_data.clone()));
+        self.client.put(immutable_data.clone());
         let mut sdv: StructuredData = StructuredData::new(NameType(directory.get_id().0),
             immutable_data.name(), vec![vec![immutable_data.name()]]);
-        self.client.put(serialise(sdv));
+        self.client.put(sdv);
         Ok(())
     }
 
@@ -66,11 +66,11 @@ impl <'a> DirectoryHelper<'a> {
         let mut sdv: StructuredData = deserialise(get_result.unwrap());
         let serialised_directory = serialise(directory.clone());
         let immutable_data = ImmutableData::new(serialised_directory);
-        self.client.put(serialise(immutable_data.clone()));
+        self.client.put(immutable_data.clone());
         let mut versions = sdv.get_value();
         versions[0].push(immutable_data.name());
         sdv.set_value(versions);
-        self.client.put(serialise(sdv.clone()));
+        self.client.put(sdv);
         Ok(())
     }
 
@@ -80,7 +80,7 @@ impl <'a> DirectoryHelper<'a> {
             return Err("Could not find data");
         }
         let sdv: StructuredData = deserialise(get_result.unwrap());
-        Ok(sdv.get_value()[0].clone())
+        Ok(sdv.get_value()[0])
     }
 
     pub fn get_by_version(&mut self, directory_id: NameType, version: NameType) -> Result<DirectoryListing, &str> {
