@@ -22,8 +22,7 @@ use routing::sendable::Sendable;
 use cbor;
 use Client;
 
-// TODO check and remove containerid and use NameType itself
-
+/// DirectoryHelper provides helper functions to perform Operations on Directory
 pub struct DirectoryHelper<'a> {
     client: &'a mut Client
 }
@@ -40,7 +39,7 @@ fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
 }
 
 impl <'a> DirectoryHelper<'a> {
-
+    /// Create a new DirectoryHelper instance
     pub fn new(client: &'a mut Client) -> DirectoryHelper<'a> {
         DirectoryHelper {
             client: client
@@ -48,6 +47,7 @@ impl <'a> DirectoryHelper<'a> {
     }
 
     // TODO pass owner from client.my-account
+    /// Creates a Directory in the network.
     pub fn create(&mut self, directory: DirectoryListing) -> Result<(), &str> {
         let serialised_directory = serialise(directory.clone());
         let immutable_data = ImmutableData::new(serialised_directory);
@@ -58,6 +58,8 @@ impl <'a> DirectoryHelper<'a> {
         Ok(())
     }
 
+    /// Updates an existing DirectoryListing in the network.
+    /// The version of the new sturcture is updated
     pub fn update(&mut self, directory: DirectoryListing) -> Result<(), &str> {
         let get_result = self.client.get(directory.get_id());
         if get_result.is_err() {
@@ -74,19 +76,20 @@ impl <'a> DirectoryHelper<'a> {
         Ok(())
     }
 
+    /// Return the versions of the directory
     pub fn get_versions(&mut self, directory_id: NameType) -> Result<Vec<NameType>, &str> {
         let get_result = self.client.get(directory_id);
         if get_result.is_err() {
-            return Err("Could not find data");
+            return Err("Could not find Directory");
         }
         let sdv: StructuredData = deserialise(get_result.unwrap());
-        Ok(sdv.get_value()[0])
+        Ok(sdv.get_value()[0].clone())
     }
-
+    /// Return the DirectoryListing for the specified version
     pub fn get_by_version(&mut self, directory_id: NameType, version: NameType) -> Result<DirectoryListing, &str> {
         let get_result = self.client.get(directory_id);
         if get_result.is_err() {
-            return Err("Could not find data");
+            return Err("Could not find Directory");
         }
         let sdv: StructuredData = deserialise(get_result.unwrap());
         if !sdv.get_value()[0].contains(&version) {
@@ -100,6 +103,7 @@ impl <'a> DirectoryHelper<'a> {
         Ok(deserialise(imm.get_value().clone()))
     }
 
+    /// Return the DirectoryListing for the latest version
     pub fn get(&mut self, directory_id: NameType) -> Result<DirectoryListing, &str> {
         let get_result = self.client.get(directory_id);
         if get_result.is_err() {
