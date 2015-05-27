@@ -46,20 +46,20 @@ impl <'a> DirectoryHelper<'a> {
         }
     }
 
-    // TODO pass owner from client.my-account
     /// Creates a Directory in the network.
     pub fn create(&mut self, directory: DirectoryListing) -> Result<(), &str> {
         let serialised_directory = serialise(directory.clone());
         let immutable_data = ImmutableData::new(serialised_directory);
+        // FIXME: Krishna - pass owner from client.my-account once account creation is completed
+        let owner: NameType = NameType([2u8;64]);
         self.client.put(immutable_data.clone());
-        let mut sdv: StructuredData = StructuredData::new(NameType(directory.get_id().0),
-            immutable_data.name(), vec![vec![immutable_data.name()]]);
+        let mut sdv: StructuredData = StructuredData::new(directory.get_id(), owner,
+            vec![vec![immutable_data.name()]]);
         self.client.put(sdv);
         Ok(())
     }
 
     /// Updates an existing DirectoryListing in the network.
-    /// The version of the new sturcture is updated
     pub fn update(&mut self, directory: DirectoryListing) -> Result<(), &str> {
         let get_result = self.client.get(directory.get_id());
         if get_result.is_err() {
@@ -85,6 +85,7 @@ impl <'a> DirectoryHelper<'a> {
         let sdv: StructuredData = deserialise(get_result.unwrap());
         Ok(sdv.get_value()[0].clone())
     }
+
     /// Return the DirectoryListing for the specified version
     pub fn get_by_version(&mut self, directory_id: NameType, version: NameType) -> Result<DirectoryListing, &str> {
         let get_result = self.client.get(directory_id);
