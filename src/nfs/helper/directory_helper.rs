@@ -22,6 +22,8 @@ use routing::sendable::Sendable;
 use cbor;
 use Client;
 
+// TODO Update maidsafe_types crate once the version 0.1.4 is available
+
 /// DirectoryHelper provides helper functions to perform Operations on Directory
 pub struct DirectoryHelper<'a> {
     client: &'a mut Client
