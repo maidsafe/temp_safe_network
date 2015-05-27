@@ -22,7 +22,6 @@ use routing::sendable::Sendable;
 use cbor;
 use Client;
 
-// TODO Validate whether the id is saved as expected
 // TODO check and remove containerid and use NameType itself
 
 pub struct DirectoryHelper<'a> {
@@ -47,17 +46,17 @@ impl <'a> DirectoryHelper<'a> {
         }
     }
 
-    pub fn create(&mut self, directory: DirectoryListing) -> Result<(), &str>{
+    pub fn create(&mut self, directory: DirectoryListing) -> Result<(), &str> {
         let serialised_directory = serialise(directory.clone());
         let immutable_data = ImmutableData::new(serialised_directory);
         self.client.put(serialise(immutable_data.clone()));
-        let mut sdv: StructuredData = StructuredData::new(immutable_data.name(),
+        let mut sdv: StructuredData = StructuredData::new(NameType(directory.get_id().0),
             immutable_data.name(), vec![vec![immutable_data.name()]]);
         self.client.put(serialise(sdv));
         Ok(())
     }
 
-    pub fn update(&mut self, directory: DirectoryListing) -> Result<(), &str>{
+    pub fn update(&mut self, directory: DirectoryListing) -> Result<(), &str> {
         let get_result = self.client.get(NameType(directory.get_id().0));
         if get_result.is_err() {
             return Err("Could not find data");
@@ -116,5 +115,4 @@ impl <'a> DirectoryHelper<'a> {
         let imm: ImmutableData = deserialise(data_result.unwrap());
         Ok(deserialise(imm.get_value().clone()))
     }
-
 }
