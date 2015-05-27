@@ -14,7 +14,7 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-use nfs::types::{DirectoryListing, ContainerId};
+use nfs::types::DirectoryListing;
 use maidsafe_types::{ImmutableData, StructuredData};
 use rustc_serialize::{Decodable, Encodable};
 use routing::NameType;
@@ -40,12 +40,14 @@ fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
 }
 
 impl <'a> DirectoryHelper<'a> {
+
     pub fn new(client: &'a mut Client) -> DirectoryHelper<'a> {
         DirectoryHelper {
             client: client
         }
     }
 
+    // TODO pass owner from client.my-account
     pub fn create(&mut self, directory: DirectoryListing) -> Result<(), &str> {
         let serialised_directory = serialise(directory.clone());
         let immutable_data = ImmutableData::new(serialised_directory);
@@ -57,7 +59,7 @@ impl <'a> DirectoryHelper<'a> {
     }
 
     pub fn update(&mut self, directory: DirectoryListing) -> Result<(), &str> {
-        let get_result = self.client.get(NameType(directory.get_id().0));
+        let get_result = self.client.get(directory.get_id());
         if get_result.is_err() {
             return Err("Could not find data");
         }
@@ -72,8 +74,8 @@ impl <'a> DirectoryHelper<'a> {
         Ok(())
     }
 
-    pub fn get_versions(&mut self, directory_id: ContainerId) -> Result<Vec<NameType>, &str> {
-        let get_result = self.client.get(NameType(directory_id.0));
+    pub fn get_versions(&mut self, directory_id: NameType) -> Result<Vec<NameType>, &str> {
+        let get_result = self.client.get(directory_id);
         if get_result.is_err() {
             return Err("Could not find data");
         }
@@ -81,8 +83,8 @@ impl <'a> DirectoryHelper<'a> {
         Ok(sdv.get_value()[0].clone())
     }
 
-    pub fn get_by_version(&mut self, directory_id: ContainerId, version: NameType) -> Result<DirectoryListing, &str> {
-        let get_result = self.client.get(NameType(directory_id.0));
+    pub fn get_by_version(&mut self, directory_id: NameType, version: NameType) -> Result<DirectoryListing, &str> {
+        let get_result = self.client.get(directory_id);
         if get_result.is_err() {
             return Err("Could not find data");
         }
@@ -98,8 +100,8 @@ impl <'a> DirectoryHelper<'a> {
         Ok(deserialise(imm.get_value().clone()))
     }
 
-    pub fn get(&mut self, directory_id: ContainerId) -> Result<DirectoryListing, &str> {
-        let get_result = self.client.get(NameType(directory_id.0));
+    pub fn get(&mut self, directory_id: NameType) -> Result<DirectoryListing, &str> {
+        let get_result = self.client.get(directory_id);
         if get_result.is_err() {
             return Err("Could not find data");
         }
