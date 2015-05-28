@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync;
-
 use cbor;
 use crypto;
 
@@ -31,14 +29,14 @@ pub struct Client {
     account:            user_account::Account,
     routing:            routing::routing_client::RoutingClient<callback_interface::CallbackInterface>,
     response_notifier:  ::ResponseNotifier,
-    callback_interface: sync::Arc<sync::Mutex<callback_interface::CallbackInterface>>,
+    callback_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
 }
 
 impl Client {
     pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Result<Client, ::IoError> {
-        let notifier = sync::Arc::new((sync::Mutex::new(0), sync::Condvar::new()));
+        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(keyword, pin, password, None); 
-        let callback_interface = sync::Arc::new(sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
+        let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
                                                                             account_packet.get_maid().secret_keys().clone());
 

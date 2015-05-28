@@ -20,10 +20,8 @@ use lru_time_cache;
 
 use routing::error::ResponseError;
 
-use ResponseNotifier;
-
 pub struct CallbackInterface {
-    response_notifier: ResponseNotifier,
+    response_notifier: ::ResponseNotifier,
     message_queue:     lru_time_cache::LruCache<routing::types::MessageId, Result<Vec<u8>, ResponseError>>,
 }
 
@@ -70,7 +68,7 @@ impl routing::client_interface::Interface for CallbackInterface {
 }
 
 impl CallbackInterface {
-    pub fn new(notifier: ResponseNotifier) -> CallbackInterface {
+    pub fn new(notifier: ::ResponseNotifier) -> CallbackInterface {
         CallbackInterface {
             response_notifier: notifier,
             message_queue:     lru_time_cache::LruCache::with_capacity(10000),

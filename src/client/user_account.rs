@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                */
 
-use std::mem;
-
 use cbor;
 use sodiumoxide::crypto;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
@@ -192,8 +190,8 @@ impl Account {
         use crypto::digest::Digest;
         use std::slice;
         unsafe {
-            let address : *const u8 = mem::transmute(&pin);
-            hasher.input(&slice::from_raw_parts(address, mem::size_of_val(&pin)));
+            let address : *const u8 = ::std::mem::transmute(&pin);
+            hasher.input(&slice::from_raw_parts(address, ::std::mem::size_of_val(&pin)));
         }
     }
 
