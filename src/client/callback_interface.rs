@@ -15,23 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                 */
 
-#![allow(unused_variables)]
-
 use routing;
-
-use std::sync::{Mutex, Arc, Condvar};
-use lru_time_cache::LruCache;
+use lru_time_cache;
 
 use routing::error::ResponseError;
-use routing::types::{MessageId};
 
-
-pub struct RoutingInterface {
-  my_cvar : Arc<(Mutex<bool>, Condvar)>,
-  my_cache : LruCache<u32, Result<Vec<u8>, ResponseError>>
+pub struct CallbackInterface {
+    response_notifier: ::ResponseNotifier,
+    message_queue:     lru_time_cache::LruCache<routing::types::MessageId, Result<Vec<u8>, ResponseError>>,
 }
 
-impl routing::client_interface::Interface for RoutingInterface {
+impl routing::client_interface::Interface for CallbackInterface {
   // fn handle_get(&mut self, type_id: u64, our_authority: Authority, from_authority: Authority,
   //               from_address: NameType, data: Vec<u8>)->Result<Action, ResponseError> {
   //   Err(ResponseError::InvalidRequest)
@@ -48,15 +42,19 @@ impl routing::client_interface::Interface for RoutingInterface {
   //   Err(ResponseError::InvalidRequest)
   // }
 
-  fn handle_get_response(&mut self, message_id: MessageId, response: Result<Vec<u8>, ResponseError>) {
-    self.my_cache.add(message_id, response);
-    let &(ref lock, ref cvar) = &*self.my_cvar;
-    let mut fetched = lock.lock().unwrap();
-    *fetched = true;
-    cvar.notify_one();
-  }
+    fn handle_get_response(&mut self,
+                           message_id: routing::types::MessageId,
+                           response: Result<Vec<u8>, ResponseError>) {
+        self.message_queue.add(message_id, response);
+        let &(ref lock, ref condition_var) = &*self.response_notifier;
+        let mut fetched_id = lock.lock().unwrap();
+        *fetched_id = message_id;
+        condition_var.notify_all();
+    }
 
-  fn handle_put_response(&mut self, message: MessageId, response: Result<Vec<u8>, ResponseError>) {
+  fn handle_put_response(&mut self,
+                         message: routing::types::MessageId,
+                         response: Result<Vec<u8>, ResponseError>) {
     ;
   }
 
@@ -69,13 +67,17 @@ impl routing::client_interface::Interface for RoutingInterface {
   // fn drop_node(&mut self, node: NameType) { unimplemented!() }
 }
 
-impl RoutingInterface {
-  pub fn new(cvar: Arc<(Mutex<bool>, Condvar)>) -> RoutingInterface {
-    RoutingInterface { my_cvar: cvar, my_cache: LruCache::with_capacity(10000) }
-  }
+impl CallbackInterface {
+    pub fn new(notifier: ::ResponseNotifier) -> CallbackInterface {
+        CallbackInterface {
+            response_notifier: notifier,
+            message_queue:     lru_time_cache::LruCache::with_capacity(10000),
+        }
+    }
 
-  pub fn get_response(&mut self, message_id : u32) -> Result<Vec<u8>, ResponseError> {
-    let result = self.my_cache.remove(&message_id).unwrap();
-    result
-  }
+    pub fn get_response(&mut self,
+                        message_id: routing::types::MessageId) -> Result<Vec<u8>, ResponseError> {
+        let result = self.message_queue.remove(&message_id).unwrap();
+        result
+    }
 }
