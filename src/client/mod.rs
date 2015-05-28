@@ -96,7 +96,6 @@ impl Client {
   //    let temp_account = Account::new();
   //    let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
   //    let temp_facade = Arc::new(Mutex::new(callback_interface::CallbackInterface::new(temp_cvar.clone())));
-  //    // FIX ME: Krishna
   //    let mut temp_routing = RoutingClient::new(callback_interface::CallbackInterface::new(temp_cvar.clone()), temp_account.get_account().clone());
   //    let mut get_queue = temp_routing.get(102u64, NameType::new(network_id.0));
   //    let &(ref lock, ref condition_var) = &*temp_cvar;
@@ -126,7 +125,6 @@ impl Client {
   //  let existing_account = Account::decrypt(&fetched_encrypted[..], &password, pin).ok().unwrap();
   //  let notifier = Arc::new((Mutex::new(false), Condvar::new()));
   //  let facade = Arc::new(Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
-  //  // FIX ME: Krishna
   //  Client { routing: RoutingClient::new(callback_interface::CallbackInterface::new(notifier.clone()), existing_account.get_account().clone()),
   //           account: existing_account, callback_interface: facade, response_notifier: notifier }
   //}
