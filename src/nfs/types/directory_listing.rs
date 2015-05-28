@@ -17,13 +17,13 @@
 use super::file::File;
 use super::metadata::Metadata;
 use super::directory_info::DirectoryInfo;
-use routing::NameType;
+use routing;
 use routing::test_utils::Random;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryListing {
-    id: NameType,
+    id: routing::NameType,
     metadata: Metadata,
     sub_directories: Vec<DirectoryInfo>,
     files: Vec<File>
@@ -32,7 +32,7 @@ pub struct DirectoryListing {
 impl DirectoryListing {
     pub fn new(name: String, user_metadata: Vec<u8>) -> DirectoryListing {
         DirectoryListing {
-            id: Random::generate_random(),
+            id: routing::test_utils::Random::generate_random(),
             metadata: Metadata::new(name, user_metadata),
             sub_directories: Vec::new(),
             files: Vec::new()
@@ -67,7 +67,7 @@ impl DirectoryListing {
         self.metadata.set_name(name);
     }
 
-    pub fn get_id(&self) -> NameType {
+    pub fn get_id(&self) -> routing::NameType {
         self.id.clone()
     }
 }

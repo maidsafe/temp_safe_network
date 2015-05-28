@@ -14,11 +14,10 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-use nfs::types::DirectoryListing;
-use maidsafe_types::{ImmutableData, StructuredData};
+use nfs;
+use maidsafe_types;
 use rustc_serialize::{Decodable, Encodable};
 use routing;
-use routing::NameType;
 use routing::sendable::Sendable;
 use cbor;
 use client::Client;
@@ -49,12 +48,12 @@ impl <'a> DirectoryHelper<'a> {
     }
 
     /// Creates a Directory in the network.
-    pub fn create(&mut self, owner: NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
-        let directory = DirectoryListing::new(directory_name, user_metadata);
+    pub fn create(&mut self, owner: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
+        let directory = nfs::types::DirectoryListing::new(directory_name, user_metadata);
         let serialised_directory = serialise(directory.clone());
-        let immutable_data = ImmutableData::new(serialised_directory);
+        let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
         self.client.put(immutable_data.clone());
-        let mut sdv: StructuredData = StructuredData::new(directory.get_id(), owner,
+        let mut sdv: maidsafe_types::StructuredData = maidsafe_types::StructuredData::new(directory.get_id(), owner,
             vec![immutable_data.name()]);
         self.client.put(sdv);
         Ok(())
@@ -73,8 +72,8 @@ impl <'a> DirectoryHelper<'a> {
         }
     }
 
-    /// Updates an existing DirectoryListing in the network.
-    pub fn update(&mut self, directory: DirectoryListing) -> Result<(), &str> {
+    /// Updates an existing nfs::types::DirectoryListing in the network.
+    pub fn update(&mut self, directory: nfs::types::DirectoryListing) -> Result<(), &str> {
         let get = self.client.get(directory.get_id());
         if get.is_err() {
             return Err("Network IO Error");
@@ -83,9 +82,9 @@ impl <'a> DirectoryHelper<'a> {
         if data.is_err() {
             return Err("Routing Response Error");
         }
-        let mut sdv: StructuredData = deserialise(data.unwrap());
+        let mut sdv: maidsafe_types::StructuredData = deserialise(data.unwrap());
         let serialised_directory = serialise(directory.clone());
-        let immutable_data = ImmutableData::new(serialised_directory);
+        let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
         self.client.put(immutable_data.clone());
         let mut versions = sdv.value();
         versions.push(immutable_data.name());
@@ -95,7 +94,7 @@ impl <'a> DirectoryHelper<'a> {
     }
 
     /// Return the versions of the directory
-    pub fn get_versions(&mut self, directory_id: NameType) -> Result<Vec<NameType>, &str> {
+    pub fn get_versions(&mut self, directory_id: routing::NameType) -> Result<Vec<routing::NameType>, &str> {
         let get = self.client.get(directory_id);
         if get.is_err() {
             return Err("Network IO Error");
@@ -104,12 +103,12 @@ impl <'a> DirectoryHelper<'a> {
         if data.is_err() {
             return Err("Routing Response Error");
         }
-        let sdv: StructuredData = deserialise(data.unwrap());
+        let sdv: maidsafe_types::StructuredData = deserialise(data.unwrap());
         Ok(sdv.value())
     }
 
-    /// Return the DirectoryListing for the specified version
-    pub fn get_by_version(&mut self, directory_id: NameType, version: NameType) -> Result<DirectoryListing, &str> {
+    /// Return the nfs::types::DirectoryListing for the specified version
+    pub fn get_by_version(&mut self, directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::types::DirectoryListing, &str> {
         let get = self.client.get(directory_id);
         if get.is_err() {
             return Err("Network IO Error");
@@ -118,7 +117,7 @@ impl <'a> DirectoryHelper<'a> {
         if data.is_err() {
             return Err("Routing Response Error");
         }
-        let sdv: StructuredData = deserialise(data.unwrap());
+        let sdv: maidsafe_types::StructuredData = deserialise(data.unwrap());
         if !sdv.value().contains(&version) {
             return Err("Version not found");
         };
@@ -130,12 +129,12 @@ impl <'a> DirectoryHelper<'a> {
         if imm_data.is_err() {
             return Err("Routing Response Error");
         }
-        let imm: ImmutableData = deserialise(imm_data.unwrap());
+        let imm: maidsafe_types::ImmutableData = deserialise(imm_data.unwrap());
         Ok(deserialise(imm.value().clone()))
     }
 
-    /// Return the DirectoryListing for the latest version
-    pub fn get(&mut self, directory_id: NameType) -> Result<DirectoryListing, &str> {
+    /// Return the nfs::types::DirectoryListing for the latest version
+    pub fn get(&mut self, directory_id: routing::NameType) -> Result<nfs::types::DirectoryListing, &str> {
         let get = self.client.get(directory_id);
         if get.is_err() {
             return Err("Network IO Error");
@@ -144,9 +143,9 @@ impl <'a> DirectoryHelper<'a> {
         if data.is_err() {
             return Err("Routing Response Error");
         }
-        let sdv: StructuredData = deserialise(data.unwrap());
+        let sdv: maidsafe_types::StructuredData = deserialise(data.unwrap());
         let name = match sdv.value().last() {
-            Some(data) => NameType(data.0),
+            Some(data) => routing::NameType(data.0),
             None => return Err("Could not find data")
         };
         let get_data = self.client.get(name);
@@ -157,7 +156,7 @@ impl <'a> DirectoryHelper<'a> {
         if imm_data.is_err() {
             return Err("Routing Response Error");
         }
-        let imm: ImmutableData = deserialise(imm_data.unwrap());
+        let imm: maidsafe_types::ImmutableData = deserialise(imm_data.unwrap());
         Ok(deserialise(imm.value().clone()))
     }
 }

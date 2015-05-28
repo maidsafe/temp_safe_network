@@ -16,17 +16,17 @@
 // relating to use of the SAFE Network Software.
 
 use super::metadata::Metadata;
-use self_encryption::datamap::DataMap;
+use self_encryption;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct File {
     metadata: Metadata,
-    datamap: DataMap
+    datamap: self_encryption::datamap::DataMap
 }
 
 impl File {
-    pub fn new(metadata: Metadata, datamap: DataMap) -> File {
+    pub fn new(metadata: Metadata, datamap: self_encryption::datamap::DataMap) -> File {
         File {
             metadata: metadata,
             datamap: datamap
@@ -41,11 +41,11 @@ impl File {
         self.metadata.clone()
     }
 
-    pub fn set_datamap(&mut self, datamap: DataMap) {
+    pub fn set_datamap(&mut self, datamap: self_encryption::datamap::DataMap) {
         self.datamap = datamap;
     }
 
-    pub fn get_datamap(&self) -> DataMap {
+    pub fn get_datamap(&self) -> self_encryption::datamap::DataMap {
         self.datamap.clone()
     }
 
@@ -68,12 +68,14 @@ impl fmt::Display for File {
 mod test {
     use super::*;
     use super::super::metadata::Metadata;
-    use self_encryption::datamap::DataMap;
+    use self_encryption;
     use cbor;
 
     #[test]
     fn serialise() {
-        let obj_before = File::new(Metadata::new("Home".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), DataMap::None);
+        let obj_before = File::new(Metadata::new("Home".to_string(),
+             "{mime:\"application/json\"}".to_string().into_bytes()),
+              self_encryption::datamap::DataMap::None);
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();

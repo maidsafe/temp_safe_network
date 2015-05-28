@@ -15,17 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use super::metadata::Metadata;
-use routing::NameType;
+use routing;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryInfo {
     metadata: Metadata,
-    id: NameType
+    id: routing::NameType
 }
 
 impl DirectoryInfo {
-    pub fn new(metadata: Metadata, id: NameType) -> DirectoryInfo {
+    pub fn new(metadata: Metadata, id: routing::NameType) -> DirectoryInfo {
         DirectoryInfo {
             metadata: metadata,
             id: id
@@ -40,7 +40,7 @@ impl DirectoryInfo {
         self.metadata.clone()
     }
 
-    pub fn get_id(&self) -> NameType {
+    pub fn get_id(&self) -> routing::NameType {
         self.id.clone()
     }
 }
@@ -62,12 +62,12 @@ impl fmt::Display for DirectoryInfo {
 mod test {
     use super::*;
     use super::super::metadata::Metadata;
-    use routing::NameType;
+    use routing;
     use cbor;
 
     #[test]
     fn serialise() {
-        let obj_before = DirectoryInfo::new(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), NameType([1u8;64]));
+        let obj_before = DirectoryInfo::new(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), routing::NameType([1u8;64]));
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();
