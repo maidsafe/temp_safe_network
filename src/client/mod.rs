@@ -21,12 +21,8 @@ use cbor;
 use crypto;
 
 use routing;
-use routing::sendable::Sendable;
 use maidsafe_types;
-
-use IoError;
-use WaitCondition;
-use ResponseNotifier;
+use routing::sendable::Sendable;
 
 mod user_account;
 mod callback_interface;
@@ -34,18 +30,17 @@ mod callback_interface;
 pub struct Client {
     account:            user_account::Account,
     routing:            routing::routing_client::RoutingClient<callback_interface::CallbackInterface>,
-    response_notifier:  ResponseNotifier,
+    response_notifier:  ::ResponseNotifier,
     callback_interface: sync::Arc<sync::Mutex<callback_interface::CallbackInterface>>,
 }
 
 impl Client {
-    pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Client {
+    pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Result<Client, ::IoError> {
         let notifier = sync::Arc::new((sync::Mutex::new(0), sync::Condvar::new()));
         let account_packet = user_account::Account::new(keyword, pin, password, None); 
         let callback_interface = sync::Arc::new(sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
-        let client_id_packet = routing::routing_client::ClientIdPacket::new(
-            account_packet.get_maid().public_keys().clone(),
-            account_packet.get_maid().secret_keys().clone());
+        let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
+                                                                            account_packet.get_maid().secret_keys().clone());
 
         let mut client = Client {
             account: account_packet,
@@ -55,14 +50,45 @@ impl Client {
         };
 
         let encrypted_account = maidsafe_types::ImmutableData::new(client.account.encrypt(&password, pin).ok().unwrap());
-        client.routing.put(encrypted_account.clone());
+        match client.routing.put(encrypted_account.clone()) {
+            Ok(id) => {
+                {
+                    let &(ref lock, ref condition_var) = &*client.response_notifier;
+                    let mut mutex_guard = lock.lock().unwrap();
+                    while *mutex_guard != id {
+                        mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                    }
 
-        let ownership = maidsafe_types::StructuredData::new(user_account::Account::generate_network_id(&keyword, pin),
-                                            client.account.get_public_maid().name(),
-                                            vec![encrypted_account.name()]);
-        client.routing.put(ownership);
+                    let mut cb_interface = client.callback_interface.lock().unwrap();
+                    if cb_interface.get_response(id).is_err() {
+                        return Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!"));
+                    }
+                }
+                let account_version = maidsafe_types::StructuredData::new(user_account::Account::generate_network_id(&keyword, pin),
+                                                                          client.account.get_public_maid().name(),
+                                                                          vec![encrypted_account.name()]);
+                match client.routing.put(account_version) {
+                    Ok(id) => {
+                        {
+                            let &(ref lock, ref condition_var) = &*client.response_notifier;
+                            let mut mutex_guard = lock.lock().unwrap();
+                            while *mutex_guard != id {
+                                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                            }
 
-        client
+                            let mut cb_interface = client.callback_interface.lock().unwrap();
+                            if cb_interface.get_response(id).is_err() {
+                                return Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!"));
+                            }
+                        }
+
+                        Ok(client)
+                    },
+                    Err(io_error) => Err(io_error),
+                }
+            },
+            Err(io_error) => Err(io_error),
+        }
     }
 
   //pub fn log_in(keyword : &String, password : &[u8], pin : u32) -> Client {
@@ -113,10 +139,25 @@ impl Client {
 //    let _ =  self.routing.put(maidsafe_types::ImmutableData::new(data));
 //  }
 
-    pub fn get(&mut self, data_name: routing::NameType) -> Result<WaitCondition, IoError>  {
+    pub fn get(&mut self, data_name: routing::NameType) -> Result<::WaitCondition, ::IoError>  {
         match self.routing.get(0u64, data_name) {
             Ok(id)      => Ok((id, self.response_notifier.clone())),
             Err(io_err) => Err(io_err),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use routing;
+
+    #[test]
+    fn account_creation() {
+        let keyword = "Spandan".to_string();
+        let password = "Sharma".as_bytes();
+        let pin = 1234u32;
+        let mut result = Client::create_account(&keyword, pin, &password);
+        assert!(result.is_ok());
     }
 }

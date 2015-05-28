@@ -333,10 +333,10 @@ mod test {
 
         match account.serialise() {
             Ok(serialised) => match Account::deserialise(&serialised) {
-                Ok(account_again) => assert!(account != account_again),
-                Err(_) => assert!(false)
+                Ok(account_again) => assert_eq!(account, account_again),
+                Err(_) => panic!("Should have been equal !!"),
             },
-            Err(_) => assert!(false)
+            Err(_) => panic!("Serialisation Failed !!"),
         }
     }
 
@@ -354,11 +354,11 @@ mod test {
                 assert!(encrypted.len() > 0);
                 assert!(account.serialise().map(|serialised| assert!(encrypted != serialised)).is_ok());
                 match Account::decrypt(&encrypted, &password, pin) {
-                    Ok(account_again) => assert!(account != account_again),
-                    Err(_) => assert!(false)
+                    Ok(account_again) => assert_eq!(account, account_again),
+                    Err(_) => panic!("Should have been equal !!"),
                 }
             }
-            Err(_) => assert!(false)
+            Err(_) => panic!("Account Encryption Failed !!"),
         }
     }
 
