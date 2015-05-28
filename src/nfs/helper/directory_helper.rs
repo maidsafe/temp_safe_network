@@ -59,19 +59,6 @@ impl <'a> DirectoryHelper<'a> {
         Ok(())
     }
 
-    fn get_data(&mut self, wait_condition: WaitCondition) -> Result<Vec<u8>, routing::error::ResponseError>{
-        let waiting_message_id = wait_condition.0.clone();
-        let pair = wait_condition.1.clone();
-        let &(ref lock, ref cvar) = &*pair;
-        loop {
-            let mut message_id = lock.lock().unwrap();
-            message_id = cvar.wait(message_id).unwrap();
-            if *message_id == waiting_message_id {
-                return self.client.get_response(*message_id);
-            }
-        }
-    }
-
     /// Updates an existing nfs::types::DirectoryListing in the network.
     pub fn update(&mut self, directory: nfs::types::DirectoryListing) -> Result<(), &str> {
         let get = self.client.get(directory.get_id());
@@ -158,5 +145,18 @@ impl <'a> DirectoryHelper<'a> {
         }
         let imm: maidsafe_types::ImmutableData = deserialise(imm_data.unwrap());
         Ok(deserialise(imm.value().clone()))
+    }
+
+    fn get_data(&mut self, wait_condition: WaitCondition) -> Result<Vec<u8>, routing::error::ResponseError>{
+        let waiting_message_id = wait_condition.0.clone();
+        let pair = wait_condition.1.clone();
+        let &(ref lock, ref cvar) = &*pair;
+        loop {
+            let mut message_id = lock.lock().unwrap();
+            message_id = cvar.wait(message_id).unwrap();
+            if *message_id == waiting_message_id {
+                return self.client.get_response(*message_id);
+            }
+        }
     }
 }
