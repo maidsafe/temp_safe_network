@@ -21,6 +21,7 @@ use cbor;
 use crypto;
 
 use routing;
+use routing::sendable::Sendable;
 use maidsafe_types;
 
 use IoError;
