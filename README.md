@@ -4,20 +4,20 @@
 
 **Secondary Maintainer:**   Krishna Kumar (krishna.kumar@maidsafe.net)
 
-|Crate|Travis|Windows|OSX|Coverage|
+|Crate|Linux|Windows|OSX|Coverage|
 |:------:|:-------:|:-------:|:-------:|:-------:|
 |[![](http://meritbadge.herokuapp.com/maidsafe_client)](https://crates.io/crates/maidsafe_client)|[![Build Status](https://travis-ci.org/maidsafe/maidsafe_client.svg?branch=master)](https://travis-ci.org/maidsafe/maidsafe_client)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=maidsafe_client_win64_status_badge)](http://ci.maidsafe.net:8080/job/maidsafe_client_win64_status_badge/)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=maidsafe_client_osx_status_badge)](http://ci.maidsafe.net:8080/job/maidsafe_client_osx_status_badge/)|[![Coverage Status](https://coveralls.io/repos/maidsafe/maidsafe_client/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/maidsafe_client?branch=master)|
 
-| [ API Documentation](http://maidsafe.github.io/maidsafe_client/)| [MaidSafe System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe web site](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
+| [API Documentation](http://maidsafe.github.io/maidsafe_client/)| [SAFENetwork System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe website](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 
 #Todo
 - [ ] [MAID-1077](https://maidsafe.atlassian.net/browse/MAID-1077) Account Creation
     - [ ] [MAID-1078](https://maidsafe.atlassian.net/browse/MAID-1078) Register
     - [ ] [MAID-1079](https://maidsafe.atlassian.net/browse/MAID-1079) Login
 - [ ] Implement Storage API
-    - [ ] [MAID-1080](https://maidsafe.atlassian.net/browse/MAID-1080) Implement types
-        - [ ] Implement MetaData, File and DirectoryListing types
-        - [ ] Implement wrapper traits
+    - [X] [MAID-1080](https://maidsafe.atlassian.net/browse/MAID-1080) Implement types
+        - [X] Implement MetaData, File and DirectoryListing types
+        - [X] Implement wrapper traits
     - [ ] Implement Helpers
         - [ ] [MAID-1081](https://maidsafe.atlassian.net/browse/MAID-1081) Directory Helper
             - [ ] Save DirectoryListing
@@ -47,7 +47,7 @@
             - [ ] [MAID-1095](https://maidsafe.atlassian.net/browse/MAID-1095) Delete Blob
             - [ ] [MAID-1096](https://maidsafe.atlassian.net/browse/MAID-1096) Copy Blob
             - [ ] [MAID-1097](https://maidsafe.atlassian.net/browse/MAID-1097) Update / Get Blob Metadata
-        - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API    
+        - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API
     - [ ] [MAID-1101](https://maidsafe.atlassian.net/browse/MAID-1101) Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
 - [ ] Create Example:
     - [ ] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example
