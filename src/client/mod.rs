@@ -111,45 +111,45 @@ impl Client {
         }
     }
 
-  //pub fn log_in(keyword : &String, password : &[u8], pin : u32) -> Client {
-  //  let mut fetched_encrypted : Vec<u8>;
-  //  {
-  //    let network_id = Account::generate_network_id(keyword, pin);
-  //    let temp_account = Account::new();
-  //    let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
-  //    let temp_facade = Arc::new(Mutex::new(callback_interface::CallbackInterface::new(temp_cvar.clone())));
-  //    let mut temp_routing = RoutingClient::new(callback_interface::CallbackInterface::new(temp_cvar.clone()), temp_account.get_account().clone());
-  //    let mut get_queue = temp_routing.get(102u64, NameType::new(network_id.0));
-  //    let &(ref lock, ref condition_var) = &*temp_cvar;
-  //    let mut fetched = lock.lock().unwrap();
-  //    while !*fetched {
-  //        fetched = condition_var.wait(fetched).unwrap();
-  //    }
-  //    {
-  //      let &ref facade_lock = &*temp_facade;
-  //      let mut facade = facade_lock.lock().unwrap();
-  //      let fetched_ownership = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
-  //      // fetched_ownership is serialised SDV, the encrypted account shall be the root of of it
-  //      let mut d = Decoder::from_bytes(fetched_ownership);
-  //      let ownership: maidsafe_types::StructuredData = d.decode().next().unwrap().unwrap();
-  //      *fetched = false;
-  //      get_queue = temp_routing.get(101u64, ownership.get_value()[0][0].clone());
-  //    }
-  //    while !*fetched {
-  //        fetched = notifier.wait(fetched).unwrap();
-  //    }
-  //    {
-  //      let &ref facade_lock = &*temp_facade;
-  //      let mut facade = facade_lock.lock().unwrap();
-  //      fetched_encrypted = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
-  //    }
-  //  }
-  //  let existing_account = Account::decrypt(&fetched_encrypted[..], &password, pin).ok().unwrap();
-  //  let notifier = Arc::new((Mutex::new(false), Condvar::new()));
-  //  let facade = Arc::new(Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
-  //  Client { routing: RoutingClient::new(callback_interface::CallbackInterface::new(notifier.clone()), existing_account.get_account().clone()),
-  //           account: existing_account, callback_interface: facade, response_notifier: notifier }
-  //}
+    pub fn log_in(keyword: &String, pin: u32, password: &[u8]) -> Result<Client, ::IoError> {
+        let mut fetched_encrypted : Vec<u8>;
+        {
+          let user_network_id = user_account::Account::generate_network_id(keyword, pin);
+          let temp_account = Account::new();
+          let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
+          let temp_facade = Arc::new(Mutex::new(callback_interface::CallbackInterface::new(temp_cvar.clone())));
+          let mut temp_routing = RoutingClient::new(callback_interface::CallbackInterface::new(temp_cvar.clone()), temp_account.get_account().clone());
+          let mut get_queue = temp_routing.get(102u64, NameType::new(user_network_id.0));
+          let &(ref lock, ref condition_var) = &*temp_cvar;
+          let mut fetched = lock.lock().unwrap();
+          while !*fetched {
+              fetched = condition_var.wait(fetched).unwrap();
+          }
+          {
+            let &ref facade_lock = &*temp_facade;
+            let mut facade = facade_lock.lock().unwrap();
+            let fetched_ownership = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
+            // fetched_ownership is serialised SDV, the encrypted account shall be the root of of it
+            let mut d = Decoder::from_bytes(fetched_ownership);
+            let ownership: maidsafe_types::StructuredData = d.decode().next().unwrap().unwrap();
+            *fetched = false;
+            get_queue = temp_routing.get(101u64, ownership.get_value()[0][0].clone());
+          }
+          while !*fetched {
+              fetched = notifier.wait(fetched).unwrap();
+          }
+          {
+            let &ref facade_lock = &*temp_facade;
+            let mut facade = facade_lock.lock().unwrap();
+            fetched_encrypted = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
+          }
+        }
+        let existing_account = Account::decrypt(&fetched_encrypted[..], &password, pin).ok().unwrap();
+        let notifier = Arc::new((Mutex::new(false), Condvar::new()));
+        let facade = Arc::new(Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
+        Client { routing: RoutingClient::new(callback_interface::CallbackInterface::new(notifier.clone()), existing_account.get_account().clone()),
+                 account: existing_account, callback_interface: facade, response_notifier: notifier }
+    }
 
 //  pub fn put(&mut self, data: Vec<u8>) {
 //    // data will be stored as maidsafe_types::ImmutableData
