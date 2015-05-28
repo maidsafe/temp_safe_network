@@ -18,61 +18,80 @@
 use std::mem;
 
 use cbor;
-use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
-use crypto::pbkdf2;
 use sodiumoxide::crypto;
+use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 
-use routing::NameType;
-use routing::routing_client::ClientIdPacket;
+use routing;
+use maidsafe_types;
 
-static ACCOUNT_TAG : u64 = 5483_4000;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct MaidSafeSessionKeys {
-    pub an_maid: maidsafe_types::AnMaid,
-    pub maid: maidsafe_types::Maid,
-    //pub public_maid: maidsafe_types::PublicMaid,
-}
-
+#[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
 pub struct Account {
-    account_id : ClientIdPacket,
-    session_keys: MaidSafeSessionKeys,
-    // Add Mpids etc
+    an_maid: maidsafe_types::RevocationIdType,
+    maid: maidsafe_types::IdType,
+    public_maid: maidsafe_types::PublicIdType,
+
+    an_mpid: maidsafe_types::RevocationIdType,
+    mpid: maidsafe_types::IdType,
+    public_mpid: maidsafe_types::PublicIdType,
+
+    root_dir_id: Option<routing::NameType>,
 }
 
-///
-/// Represents an Account on the SAFE network
-///
 impl Account {
-    pub fn new() -> Account {
-        let sign_keys = crypto::sign::gen_keypair();
-        let asym_keys = crypto::asymmetricbox::gen_keypair();
-        return Account{ account_id : ClientIdPacket::new((sign_keys.0, asym_keys.0), (sign_keys.1, asym_keys.1)) };
-    }
+    pub fn new(keyword: &String,
+               pin: u32,
+               password: &[u8],
+               root_dir_id: Option<routing::NameType>) -> Account {
+        let an_maid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MaidTypeTags>();
+        let maid = maidsafe_types::IdType::new(&an_maid);
+        let public_maid = maidsafe_types::PublicIdType::new(&maid, &an_maid);
 
-    ///
-    /// Create a new `Account`
-    ///
-    pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Result<Account, ::MaidsafeError> {
-        let new_account = Account::new();
-        return Ok(new_account);
-    }
+        let an_mpid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MpidTypeTags>();
+        let mpid = maidsafe_types::IdType::new(&an_mpid);
+        let public_mpid = maidsafe_types::PublicIdType::new(&mpid, &an_mpid);
 
-    pub fn get_account(&self) -> &ClientIdPacket {
-        return &self.account_id;
-    }
-
-    fn hash_pin(hasher : &mut ::crypto::sha2::Sha512, pin : u32) {
-        use crypto::digest::Digest;
-        use std::slice;
-        unsafe {
-            let address : *const u8 = mem::transmute(&pin);
-            hasher.input(&slice::from_raw_parts(address, mem::size_of_val(&pin)));
+        Account {
+            an_maid: an_maid,
+            maid: maid,
+            public_maid: public_maid,
+            an_mpid: an_mpid,
+            mpid: mpid,
+            public_mpid: public_mpid,
+            root_dir_id: root_dir_id,
         }
     }
 
-    pub fn generate_network_id(keyword: &String, pin : u32) -> NameType {
+    pub fn get_an_maid(&self) -> &maidsafe_types::RevocationIdType {
+        &self.an_maid
+    }
+
+    pub fn get_maid(&self) -> &maidsafe_types::IdType {
+        &self.maid
+    }
+
+    pub fn get_public_maid(&self) -> &maidsafe_types::PublicIdType {
+        &self.public_maid
+    }
+
+    pub fn get_an_mpid(&self) -> &maidsafe_types::RevocationIdType {
+        &self.an_mpid
+    }
+
+    pub fn get_mpid(&self) -> &maidsafe_types::IdType {
+        &self.mpid
+    }
+
+    pub fn get_public_mpid(&self) -> &maidsafe_types::PublicIdType {
+        &self.public_mpid
+    }
+
+    pub fn get_root_dir_id(&self) -> &Option<routing::NameType> {
+        &self.root_dir_id
+    }
+
+    pub fn generate_network_id(keyword: &String, pin: u32) -> routing::NameType {
         use crypto::digest::Digest;
 
         let mut hasher = ::crypto::sha2::Sha512::new();
@@ -93,52 +112,8 @@ impl Account {
         hasher.input(&output1);
         hasher.input(&output2);
         hasher.result(&mut name);
-        return NameType::new(name);
-    }
 
-    fn generate_maidsafe_keys() -> MaidSafeSessionKeys {
-        let an_maid = maidsafe_types::AnMaid::new(),
-        let maid = maidsafe_types::Maid::new(&an_maid),
-        MaidSafeSessionKeys {
-            maid: maid,
-            an_maid: an_maid,
-        }
-    }
-
-    fn generate_crypto_keys(password: &[u8], pin: u32) -> (Vec<u8>, Vec<u8>) {
-        use crypto::digest::Digest;
-
-        let mut hasher = ::crypto::sha2::Sha512::new();
-        let digest_size = hasher.output_bytes();
-        let key_size = digest_size / 2;
-        let iv_size = key_size / 2;
-
-        let iterations : u16 = ((pin % 10000) + 10000) as u16;
-        let mut salt : Vec<u8>;
-        {
-            let mut salt_partial = vec![0u8; digest_size];
-
-            Account::hash_pin(&mut hasher, pin);
-            hasher.result(&mut salt_partial);
-
-            // Original version uses a Secure Byte Block,
-            // which we have no available resource for
-            salt = salt_partial.iter().chain(password.iter())
-                                      .chain(MAIDSAFE_VERSION_LABEL.as_bytes().iter())
-                                      .map(|&a| a.clone())
-                                      .collect();
-        }
-
-        hasher.reset();
-        let mut mac = ::crypto::hmac::Hmac::new(hasher, &password);
-
-        let mut output = vec![0u8 ; digest_size];
-        ::crypto::pbkdf2::pbkdf2(&mut mac, &salt, iterations as u32, &mut output);
-
-        let key = output.iter().take(key_size).map(|&a| a.clone()).collect();
-        let iv = output.into_iter().skip(key_size).take(iv_size).collect();
-
-        return (key, iv);
+        routing::NameType::new(name)
     }
 
     pub fn encrypt(&self, password: &[u8], pin: u32) -> Result<Vec<u8>, ::MaidsafeError> {
@@ -213,6 +188,51 @@ impl Account {
         Ok(try!(Account::deserialise(&decrypted)))
     }
 
+    fn hash_pin(hasher : &mut ::crypto::sha2::Sha512, pin : u32) {
+        use crypto::digest::Digest;
+        use std::slice;
+        unsafe {
+            let address : *const u8 = mem::transmute(&pin);
+            hasher.input(&slice::from_raw_parts(address, mem::size_of_val(&pin)));
+        }
+    }
+
+    fn generate_crypto_keys(password: &[u8], pin: u32) -> (Vec<u8>, Vec<u8>) {
+        use crypto::digest::Digest;
+
+        let mut hasher = ::crypto::sha2::Sha512::new();
+        let digest_size = hasher.output_bytes();
+        let key_size = digest_size / 2;
+        let iv_size = key_size / 2;
+
+        let iterations : u16 = ((pin % 10000) + 10000) as u16;
+        let mut salt : Vec<u8>;
+        {
+            let mut salt_partial = vec![0u8; digest_size];
+
+            Account::hash_pin(&mut hasher, pin);
+            hasher.result(&mut salt_partial);
+
+            // Original version uses a Secure Byte Block,
+            // which we have no available resource for
+            salt = salt_partial.iter().chain(password.iter())
+                                      .chain(MAIDSAFE_VERSION_LABEL.as_bytes().iter())
+                                      .map(|&a| a.clone())
+                                      .collect();
+        }
+
+        hasher.reset();
+        let mut mac = ::crypto::hmac::Hmac::new(hasher, &password);
+
+        let mut output = vec![0u8 ; digest_size];
+        ::crypto::pbkdf2::pbkdf2(&mut mac, &salt, iterations as u32, &mut output);
+
+        let key = output.iter().take(key_size).map(|&a| a.clone()).collect();
+        let iv = output.into_iter().skip(key_size).take(iv_size).collect();
+
+        return (key, iv);
+    }
+
     fn serialise(&self) -> cbor::CborResult<Vec<u8>> {
         let mut encoder = cbor::Encoder::from_memory();
         return encoder.encode(&[&self]).map(|()| encoder.into_bytes());
@@ -223,26 +243,6 @@ impl Account {
             Some(result) => return result,
             None => return Err(cbor::CborError::UnexpectedEOF)
         }
-    }
-}
-
-impl Encodable for Account {
-    fn encode<E: Encoder>(&self, e: &mut E) -> Result<(), E::Error> {
-        return cbor::CborTagEncode::new(ACCOUNT_TAG, &self.account_id).encode(e);
-    }
-}
-
-impl Decodable for Account {
-    fn decode<D: Decoder>(d: &mut D) -> Result<Account, D::Error> {
-        let tag : u64 = try!(Decodable::decode(d));
-
-        // TODO : I'd like to check the tag value, and return an error ... but how?
-        // The Error class is dependent on the generic decoder type, and the
-        // functionality for returning an error that works with all types
-        // doesn't seem possible. Slightly less fault tolerant now ...
-
-        let account_id : ClientIdPacket = try!(Decodable::decode(d));
-        return Ok(Account{ account_id : account_id });
     }
 }
 
@@ -258,49 +258,14 @@ mod test {
         return left.iter().zip(right.iter()).all(|(a, b)| a == b);
     }
 
-    // somewhat of a hack, but the crypto types didn't implement the eq trait
-    fn account_eq(left : &Account, right : &Account) -> bool {
-        let data = generate_random_vec_u8(64);
-        let signed_result = slice_eq(&left.get_account().sign(&data).0, &right.get_account().sign(&data).0);
-
-        let other_account = Account::new();
-        let mut sealed1_result : bool;
-        let mut sealed2_result : bool;
-        {
-            let sealed = other_account.get_account().encrypt(&data, &left.get_account().get_public_keys().1);
-            let opened1 = left.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
-            let opened2 = right.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
-            sealed1_result = match opened1 {
-                Ok(contents1) => match opened2 {
-                    Ok(contents2) => slice_eq(&contents1, &contents2),
-                    Err(_) => false
-                },
-                Err(_) => false
-            }
-        }
-        {
-            let sealed = other_account.get_account().encrypt(&data, &right.get_account().get_public_keys().1);
-            let opened1 = left.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
-            let opened2 = right.get_account().decrypt(&sealed.0, &sealed.1, &other_account.get_account().get_public_keys().1);
-            sealed2_result = match opened1 {
-                Ok(contents1) => match opened2 {
-                    Ok(contents2) => slice_eq(&contents1, &contents2),
-                    Err(_) => false
-                },
-                Err(_) => false
-            }
-        }
-        return sealed2_result && sealed1_result && signed_result;
-    }
-
     #[test]
     fn generating_new_account() {
         let keyword = "James".to_string();
         let password = "Bond".as_bytes();
         let pin = 500u32;
-        let account1 = Account::create_account(&keyword, &password, pin);
-        let account2 = Account::create_account(&keyword, &password, pin);
-        assert!(!account_eq(&account1.ok().unwrap(), &account2.ok().unwrap()));
+        let account1 = Account::new(&keyword, pin, &password, None);
+        let account2 = Account::new(&keyword, pin, &password, None);
+        assert!(account1 != account2);
     }
 
     #[test]
@@ -361,10 +326,14 @@ mod test {
 
     #[test]
     fn serialisation() {
-        let account = Account::new();
+        let keyword = "James".to_string();
+        let password = "Bond".as_bytes();
+        let pin = 500u32;
+        let account = Account::new(&keyword, pin, &password, None);
+
         match account.serialise() {
             Ok(serialised) => match Account::deserialise(&serialised) {
-                Ok(account_again) => assert!(account_eq(&account, &account_again)),
+                Ok(account_again) => assert!(account != account_again),
                 Err(_) => assert!(false)
             },
             Err(_) => assert!(false)
@@ -373,7 +342,11 @@ mod test {
 
     #[test]
     fn encryption() {
-        let account = Account::new();
+        let keyword = "James".to_string();
+        let password = "Bond".as_bytes();
+        let pin = 500u32;
+        let account = Account::new(&keyword, pin, &password, None);
+
         let password = "impossible to guess".to_string().into_bytes();
         let pin = 10000u32;
         match account.encrypt(&password, pin) {
@@ -381,7 +354,7 @@ mod test {
                 assert!(encrypted.len() > 0);
                 assert!(account.serialise().map(|serialised| assert!(encrypted != serialised)).is_ok());
                 match Account::decrypt(&encrypted, &password, pin) {
-                    Ok(account_again) => assert!(account_eq(&account, &account_again)),
+                    Ok(account_again) => assert!(account != account_again),
                     Err(_) => assert!(false)
                 }
             }
