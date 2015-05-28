@@ -31,7 +31,7 @@ pub struct Client {
     response_notifier:   ::ResponseNotifier,
     callback_interface:  ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
     routing_stop_flag:   ::std::sync::Arc<::std::sync::Mutex<bool>>,
-    routing_join_handle: ::std::thread::JoinHandle<()>,
+    routing_join_handle: Option<::std::thread::JoinHandle<()>>,
 }
 
 impl Client {
@@ -53,12 +53,12 @@ impl Client {
             callback_interface: callback_interface,
             response_notifier: notifier,
             routing_stop_flag: routing_stop_flag,
-            routing_join_handle: ::std::thread::spawn(move || {
+            routing_join_handle: Some(::std::thread::spawn(move || {
                 while !*routing_stop_flag_clone.lock().unwrap() {
                     ::std::thread::sleep_ms(10);
                     cloned_routing_client.lock().unwrap().run();
                 }
-            }),
+            })),
         };
 
         {
@@ -165,12 +165,12 @@ impl Client {
     }
 }
 
-// impl Drop for Client {
-//     fn drop(&mut self) {
-//         *self.routing_stop_flag.lock().unwrap() = true;
-//         self.routing_join_handle.join();
-//     }
-// }
+impl Drop for Client {
+    fn drop(&mut self) {
+        *self.routing_stop_flag.lock().unwrap() = true;
+        self.routing_join_handle.take().unwrap().join();
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -184,9 +184,5 @@ mod test {
         let pin = 1234u32;
         let mut result = Client::create_account(&keyword, pin, &password);
         assert!(result.is_ok());
-
-        let mut client = result.unwrap();
-        *client.routing_stop_flag.lock().unwrap() = true;
-        client.routing_join_handle.join();
     }
 }
