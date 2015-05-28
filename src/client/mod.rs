@@ -26,35 +26,50 @@ mod user_account;
 mod callback_interface;
 
 pub struct Client {
-    account:            user_account::Account,
-    routing:            routing::routing_client::RoutingClient<callback_interface::CallbackInterface>,
-    response_notifier:  ::ResponseNotifier,
-    callback_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
+    account:             user_account::Account,
+    routing:             ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>>,
+    response_notifier:   ::ResponseNotifier,
+    callback_interface:  ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
+    routing_stop_flag:   ::std::sync::Arc<::std::sync::Mutex<bool>>,
+    routing_join_handle: ::std::thread::JoinHandle<()>,
 }
 
 impl Client {
     pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Result<Client, ::IoError> {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
-        let account_packet = user_account::Account::new(keyword, pin, password, None); 
+        let account_packet = user_account::Account::new(None); 
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
                                                                             account_packet.get_maid().secret_keys().clone());
 
+        let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), client_id_packet)));
+        let mut cloned_routing_client = routing_client.clone();
+        let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
+        let routing_stop_flag_clone = routing_stop_flag.clone();
+
         let mut client = Client {
             account: account_packet,
-            routing: routing::routing_client::RoutingClient::new(callback_interface.clone(), client_id_packet),
+            routing: routing_client,
             callback_interface: callback_interface,
             response_notifier: notifier,
+            routing_stop_flag: routing_stop_flag,
+            routing_join_handle: ::std::thread::spawn(move || {
+                while !*routing_stop_flag_clone.lock().unwrap() {
+                    ::std::thread::sleep_ms(10);
+                    cloned_routing_client.lock().unwrap().run();
+                }
+            }),
         };
 
         {
             let destination = client.account.get_public_maid().name();
             let boxed_public_maid = Box::new(client.account.get_public_maid().clone());
-            client.routing.unauthorised_put(destination, boxed_public_maid);
+            client.routing.lock().unwrap().unauthorised_put(destination, boxed_public_maid);
         }
 
         let encrypted_account = maidsafe_types::ImmutableData::new(client.account.encrypt(&password, pin).ok().unwrap());
-        match client.routing.put(encrypted_account.clone()) {
+        let put_res = client.routing.lock().unwrap().put(encrypted_account.clone());
+        match put_res {
             Ok(id) => {
                 {
                     let &(ref lock, ref condition_var) = &*client.response_notifier;
@@ -71,7 +86,8 @@ impl Client {
                 let account_version = maidsafe_types::StructuredData::new(user_account::Account::generate_network_id(&keyword, pin),
                                                                           client.account.get_public_maid().name(),
                                                                           vec![encrypted_account.name()]);
-                match client.routing.put(account_version) {
+                let put_res = client.routing.lock().unwrap().put(account_version);
+                match put_res {
                     Ok(id) => {
                         {
                             let &(ref lock, ref condition_var) = &*client.response_notifier;
@@ -142,12 +158,19 @@ impl Client {
 //  }
 
     pub fn get(&mut self, data_name: routing::NameType) -> Result<::WaitCondition, ::IoError>  {
-        match self.routing.get(0u64, data_name) {
+        match self.routing.lock().unwrap().get(0u64, data_name) {
             Ok(id)      => Ok((id, self.response_notifier.clone())),
             Err(io_err) => Err(io_err),
         }
     }
 }
+
+// impl Drop for Client {
+//     fn drop(&mut self) {
+//         *self.routing_stop_flag.lock().unwrap() = true;
+//         self.routing_join_handle.join();
+//     }
+// }
 
 #[cfg(test)]
 mod test {
@@ -161,5 +184,9 @@ mod test {
         let pin = 1234u32;
         let mut result = Client::create_account(&keyword, pin, &password);
         assert!(result.is_ok());
+
+        let mut client = result.unwrap();
+        *client.routing_stop_flag.lock().unwrap() = true;
+        client.routing_join_handle.join();
     }
 }

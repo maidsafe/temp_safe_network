@@ -38,10 +38,7 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(keyword: &String,
-               pin: u32,
-               password: &[u8],
-               root_dir_id: Option<routing::NameType>) -> Account {
+    pub fn new(root_dir_id: Option<routing::NameType>) -> Account {
         let an_maid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MaidTypeTags>();
         let maid = maidsafe_types::IdType::new(&an_maid);
         let public_maid = maidsafe_types::PublicIdType::new(&maid, &an_maid);
@@ -258,11 +255,8 @@ mod test {
 
     #[test]
     fn generating_new_account() {
-        let keyword = "James".to_string();
-        let password = "Bond".as_bytes();
-        let pin = 500u32;
-        let account1 = Account::new(&keyword, pin, &password, None);
-        let account2 = Account::new(&keyword, pin, &password, None);
+        let account1 = Account::new(None);
+        let account2 = Account::new(None);
         assert!(account1 != account2);
     }
 
@@ -324,10 +318,7 @@ mod test {
 
     #[test]
     fn serialisation() {
-        let keyword = "James".to_string();
-        let password = "Bond".as_bytes();
-        let pin = 500u32;
-        let account = Account::new(&keyword, pin, &password, None);
+        let account = Account::new(None);
 
         match account.serialise() {
             Ok(serialised) => match Account::deserialise(&serialised) {
@@ -340,10 +331,7 @@ mod test {
 
     #[test]
     fn encryption() {
-        let keyword = "James".to_string();
-        let password = "Bond".as_bytes();
-        let pin = 500u32;
-        let account = Account::new(&keyword, pin, &password, None);
+        let account = Account::new(None);
 
         let password = "impossible to guess".to_string().into_bytes();
         let pin = 10000u32;
