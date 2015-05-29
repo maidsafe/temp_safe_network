@@ -15,18 +15,18 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use super::metadata::Metadata;
-use super::container_id::ContainerId;
+use routing;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct ContainerInfo {
+pub struct DirectoryInfo {
     metadata: Metadata,
-    id: ContainerId
+    id: routing::NameType
 }
 
-impl ContainerInfo {
-    pub fn new(metadata: Metadata, id: ContainerId) -> ContainerInfo {
-        ContainerInfo {
+impl DirectoryInfo {
+    pub fn new(metadata: Metadata, id: routing::NameType) -> DirectoryInfo {
+        DirectoryInfo {
             metadata: metadata,
             id: id
         }
@@ -40,18 +40,18 @@ impl ContainerInfo {
         self.metadata.clone()
     }
 
-    pub fn get_id(&self) -> ContainerId {
+    pub fn get_id(&self) -> routing::NameType {
         self.id.clone()
     }
 }
 
-impl fmt::Debug for ContainerInfo {
+impl fmt::Debug for DirectoryInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "metadata: {}, id: {}", self.get_metadata(), self.get_id())
     }
 }
 
-impl fmt::Display for ContainerInfo {
+impl fmt::Display for DirectoryInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "metadata: {}, id: {}", self.get_metadata(), self.get_id())
     }
@@ -62,18 +62,18 @@ impl fmt::Display for ContainerInfo {
 mod test {
     use super::*;
     use super::super::metadata::Metadata;
-    use super::super::container_id::ContainerId;
+    use routing;
     use cbor;
 
     #[test]
     fn serialise() {
-        let obj_before = ContainerInfo::new(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), ContainerId::new());
+        let obj_before = DirectoryInfo::new(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), routing::NameType([1u8;64]));
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();
 
         let mut d = cbor::Decoder::from_bytes(e.as_bytes());
-        let obj_after: ContainerInfo = d.decode().next().unwrap().unwrap();
+        let obj_after: DirectoryInfo = d.decode().next().unwrap().unwrap();
 
         assert_eq!(obj_before, obj_after);
     }

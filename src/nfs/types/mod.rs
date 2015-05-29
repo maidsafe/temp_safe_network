@@ -18,13 +18,11 @@
 mod metadata;
 mod file;
 mod directory_listing;
-mod container_info;
+mod directory_info;
 mod traits;
-mod container_id;
 
 pub use self::metadata::*;
 pub use self::file::*;
-pub use self::container_info::*;
-pub use self::container_id::*;
+pub use self::directory_info::*;
 pub use self::directory_listing::*;
 pub use self::traits::*;
