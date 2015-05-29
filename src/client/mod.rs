@@ -20,6 +20,7 @@ use crypto;
 
 use routing;
 use maidsafe_types;
+use maidsafe_types::TypeTag;
 use routing::sendable::Sendable;
 
 mod user_account;
@@ -43,11 +44,11 @@ impl Client {
                                                                             account_packet.get_maid().secret_keys().clone());
 
         let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), client_id_packet)));
-        let mut cloned_routing_client = routing_client.clone();
+        let cloned_routing_client = routing_client.clone();
         let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
         let routing_stop_flag_clone = routing_stop_flag.clone();
 
-        let mut client = Client {
+        let client = Client {
             account: account_packet,
             routing: routing_client,
             callback_interface: callback_interface,
@@ -112,43 +113,123 @@ impl Client {
     }
 
     pub fn log_in(keyword: &String, pin: u32, password: &[u8]) -> Result<Client, ::IoError> {
-        let mut fetched_encrypted : Vec<u8>;
-        {
-          let user_network_id = user_account::Account::generate_network_id(keyword, pin);
-          let temp_account = Account::new();
-          let temp_cvar = Arc::new((Mutex::new(false), Condvar::new()));
-          let temp_facade = Arc::new(Mutex::new(callback_interface::CallbackInterface::new(temp_cvar.clone())));
-          let mut temp_routing = RoutingClient::new(callback_interface::CallbackInterface::new(temp_cvar.clone()), temp_account.get_account().clone());
-          let mut get_queue = temp_routing.get(102u64, NameType::new(user_network_id.0));
-          let &(ref lock, ref condition_var) = &*temp_cvar;
-          let mut fetched = lock.lock().unwrap();
-          while !*fetched {
-              fetched = condition_var.wait(fetched).unwrap();
-          }
-          {
-            let &ref facade_lock = &*temp_facade;
-            let mut facade = facade_lock.lock().unwrap();
-            let fetched_ownership = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
-            // fetched_ownership is serialised SDV, the encrypted account shall be the root of of it
-            let mut d = Decoder::from_bytes(fetched_ownership);
-            let ownership: maidsafe_types::StructuredData = d.decode().next().unwrap().unwrap();
-            *fetched = false;
-            get_queue = temp_routing.get(101u64, ownership.get_value()[0][0].clone());
-          }
-          while !*fetched {
-              fetched = notifier.wait(fetched).unwrap();
-          }
-          {
-            let &ref facade_lock = &*temp_facade;
-            let mut facade = facade_lock.lock().unwrap();
-            fetched_encrypted = facade.get_response(get_queue.ok().unwrap()).ok().unwrap();
-          }
+        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
+        let user_network_id = user_account::Account::generate_network_id(keyword, pin);
+        let fake_account_packet = user_account::Account::new(None);
+        let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
+        let fake_client_id_packet = routing::routing_client::ClientIdPacket::new(fake_account_packet.get_maid().public_keys().clone(),
+                                                                                 fake_account_packet.get_maid().secret_keys().clone());
+
+        let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), fake_client_id_packet)));
+        let cloned_fake_routing_client = fake_routing_client.clone();
+        let fake_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
+        let fake_routing_stop_flag_clone = fake_routing_stop_flag.clone();
+
+        struct RAIIThreadExit {
+            routing_stop_flag: ::std::sync::Arc<::std::sync::Mutex<bool>>,
+            join_handle: Option<::std::thread::JoinHandle<()>>,
         }
-        let existing_account = Account::decrypt(&fetched_encrypted[..], &password, pin).ok().unwrap();
-        let notifier = Arc::new((Mutex::new(false), Condvar::new()));
-        let facade = Arc::new(Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
-        Client { routing: RoutingClient::new(callback_interface::CallbackInterface::new(notifier.clone()), existing_account.get_account().clone()),
-                 account: existing_account, callback_interface: facade, response_notifier: notifier }
+
+        impl Drop for RAIIThreadExit {
+            fn drop(&mut self) {
+                *self.routing_stop_flag.lock().unwrap() = true;
+                self.join_handle.take().unwrap().join().unwrap();
+            }
+        }
+
+        let _managed_thread = RAIIThreadExit {
+            routing_stop_flag: fake_routing_stop_flag,
+            join_handle: Some(::std::thread::spawn(move || {
+                while !*fake_routing_stop_flag_clone.lock().unwrap() {
+                    ::std::thread::sleep_ms(10);
+                    cloned_fake_routing_client.lock().unwrap().run();
+                }
+            })),
+        };
+
+        let get_result = fake_routing_client.lock().unwrap().get(100u64, user_network_id); // TODO(Spandan) Structured Data should implement trait TypeTag in maidsafe_types
+
+        match get_result {
+            Ok(id) => {
+                let mut get_response_result: _;
+
+                {
+                    let &(ref lock, ref condition_var) = &*notifier;
+                    let mut mutex_guard = lock.lock().unwrap();
+                    while *mutex_guard != id {
+                        mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                    }
+
+                    let mut cb_interface = callback_interface.lock().unwrap();
+                    get_response_result = cb_interface.get_response(id);
+                }
+
+                match get_response_result {
+                    Ok(raw_data) => {
+                        let mut decoder = cbor::Decoder::from_bytes(raw_data);
+                        let account_version: maidsafe_types::StructuredData = decoder.decode().next().unwrap().unwrap();
+
+                        match account_version.value().pop() {
+                            Some(latest_version) => {
+                                let immutable_data_type_id: maidsafe_types::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+                                let get_result = fake_routing_client.lock().unwrap().get(immutable_data_type_id.type_tag(), latest_version);
+                                match get_result {
+                                    Ok(id) => {
+                                        {
+                                            let &(ref lock, ref condition_var) = &*notifier;
+                                            let mut mutex_guard = lock.lock().unwrap();
+                                            while *mutex_guard != id {
+                                                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                                            }
+
+                                            let mut cb_interface = callback_interface.lock().unwrap();
+                                            get_response_result = cb_interface.get_response(id);
+                                        }
+
+                                        match get_response_result {
+                                            Ok(raw_data) => {
+                                                let mut decoder = cbor::Decoder::from_bytes(raw_data);
+                                                let encrypted_account_packet: maidsafe_types::ImmutableData = decoder.decode().next().unwrap().unwrap();
+                                                let account_packet = user_account::Account::decrypt(&encrypted_account_packet.value()[..], &password, pin).ok().unwrap();
+
+                                                let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
+                                                                                                                    account_packet.get_maid().secret_keys().clone());
+
+                                                let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), client_id_packet)));
+                                                let cloned_routing_client = routing_client.clone();
+                                                let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
+                                                let routing_stop_flag_clone = routing_stop_flag.clone();
+
+                                                let client = Client {
+                                                    account: account_packet,
+                                                    routing: routing_client,
+                                                    callback_interface: callback_interface,
+                                                    response_notifier: notifier,
+                                                    routing_stop_flag: routing_stop_flag,
+                                                    routing_join_handle: Some(::std::thread::spawn(move || {
+                                                        while !*routing_stop_flag_clone.lock().unwrap() {
+                                                            ::std::thread::sleep_ms(10);
+                                                            cloned_routing_client.lock().unwrap().run();
+                                                        }
+                                                    })),
+                                                };
+
+                                                Ok(client)
+                                            },
+                                            Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Session Packet (ImmutableData) GET-Response Failure !!")),
+                                        }
+                                    },
+                                    Err(io_error) => Err(io_error),
+                                }
+                            },
+                            None => Err(::IoError::new(::std::io::ErrorKind::Other, "No Session Packet information in retrieved StructuredData !!")),
+                        }
+                    },
+                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "StructuredData GET-Response Failure !!")),
+                }
+            },
+            Err(io_error) => Err(io_error),
+        }
     }
 
 //  pub fn put(&mut self, data: Vec<u8>) {
@@ -168,7 +249,7 @@ impl Client {
 impl Drop for Client {
     fn drop(&mut self) {
         *self.routing_stop_flag.lock().unwrap() = true;
-        self.routing_join_handle.take().unwrap().join();
+        self.routing_join_handle.take().unwrap().join().unwrap();
     }
 }
 

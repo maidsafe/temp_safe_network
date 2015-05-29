@@ -52,11 +52,15 @@ impl routing::client_interface::Interface for CallbackInterface {
         condition_var.notify_all();
     }
 
-  fn handle_put_response(&mut self,
-                         message: routing::types::MessageId,
-                         response: Result<Vec<u8>, ResponseError>) {
-    ;
-  }
+    fn handle_put_response(&mut self,
+                           message_id: routing::types::MessageId,
+                           response: Result<Vec<u8>, ResponseError>) {
+        self.message_queue.add(message_id, response);
+        let &(ref lock, ref condition_var) = &*self.response_notifier;
+        let mut fetched_id = lock.lock().unwrap();
+        *fetched_id = message_id;
+        condition_var.notify_all();
+    }
 
   // fn handle_post_response(&mut self, from_authority: Authority, from_address: NameType, response: Result<Vec<u8>, ResponseError>) {
   //   ;
