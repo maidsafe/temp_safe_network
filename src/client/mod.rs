@@ -150,14 +150,16 @@ impl Client {
   //  Client { routing: RoutingClient::new(callback_interface::CallbackInterface::new(notifier.clone()), existing_account.get_account().clone()),
   //           account: existing_account, callback_interface: facade, response_notifier: notifier }
   //}
-     pub fn put<T>(&mut self, sendable: T) where T: Sendable {
-       let _ =  self.routing.lock().unwrap().put(sendable);
-     }
+    pub fn put<T>(&mut self, sendable: T) ->  Result<::WaitCondition, ::IoError> where T: Sendable {
+        match self.routing.lock().unwrap().put(sendable) {
+            Ok(id)      => Ok((id, self.response_notifier.clone())),
+            Err(io_err) => Err(io_err),
+        }
+    }
 
-     pub fn get_response(&mut self,
-                         message_id: routing::types::MessageId) -> Result<Vec<u8>, routing::error::ResponseError> {
-        self.callback_interface.lock().unwrap().get_response(message_id)
-     }
+    pub fn get_response(&mut self,message_id: routing::types::MessageId) -> Result<Vec<u8>, routing::error::ResponseError> {
+         self.callback_interface.lock().unwrap().get_response(message_id)
+    }
 
     pub fn get(&mut self, data_name: routing::NameType) -> Result<::WaitCondition, ::IoError>  {
         match self.routing.lock().unwrap().get(0u64, data_name) {
