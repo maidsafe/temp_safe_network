@@ -19,10 +19,10 @@
         - [X] Implement MetaData, File and DirectoryListing types
         - [X] Implement wrapper traits
     - [ ] Implement Helpers
-        - [ ] [MAID-1081](https://maidsafe.atlassian.net/browse/MAID-1081) Directory Helper
-            - [ ] Save DirectoryListing
-            - [ ] Get Directory
-            - [ ] Get Directory Versions
+        - [X] [MAID-1081](https://maidsafe.atlassian.net/browse/MAID-1081) Directory Helper
+            - [X] Save DirectoryListing
+            - [X] Get Directory
+            - [X] Get Directory Versions
         - [ ] File Helper
             - [ ] [MAID-1082](https://maidsafe.atlassian.net/browse/MAID-1082) Create File, update file and Metatdata
             - [ ] [MAID-1083](https://maidsafe.atlassian.net/browse/MAID-1083) Get Versions

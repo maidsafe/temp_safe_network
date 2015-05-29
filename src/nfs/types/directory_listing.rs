@@ -16,22 +16,23 @@
 // relating to use of the SAFE Network Software.
 use super::file::File;
 use super::metadata::Metadata;
-use super::container_info::ContainerInfo;
-use super::container_id::ContainerId;
+use super::directory_info::DirectoryInfo;
+use routing;
+use routing::test_utils::Random;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryListing {
-    id: ContainerId,
+    id: routing::NameType,
     metadata: Metadata,
-    sub_directories: Vec<ContainerInfo>,
+    sub_directories: Vec<DirectoryInfo>,
     files: Vec<File>
 }
 
 impl DirectoryListing {
     pub fn new(name: String, user_metadata: Vec<u8>) -> DirectoryListing {
         DirectoryListing {
-            id: ContainerId::new(),
+            id: routing::test_utils::Random::generate_random(),
             metadata: Metadata::new(name, user_metadata),
             sub_directories: Vec::new(),
             files: Vec::new()
@@ -54,16 +55,20 @@ impl DirectoryListing {
         self.files = files;
     }
 
-    pub fn get_sub_directories(&self) -> Vec<ContainerInfo> {
+    pub fn get_sub_directories(&self) -> Vec<DirectoryInfo> {
         self.sub_directories.clone()
     }
 
-    pub fn set_sub_directories(&mut self, dirs: Vec<ContainerInfo>) {
+    pub fn set_sub_directories(&mut self, dirs: Vec<DirectoryInfo>) {
         self.sub_directories = dirs;
     }
 
     pub fn set_name(&mut self, name: String) {
         self.metadata.set_name(name);
+    }
+
+    pub fn get_id(&self) -> routing::NameType {
+        self.id.clone()
     }
 }
 
@@ -84,7 +89,6 @@ impl fmt::Display for DirectoryListing {
 mod test {
     use super::*;
     use super::super::metadata::Metadata;
-    use super::super::container_id::ContainerId;
     use cbor;
 
     #[test]

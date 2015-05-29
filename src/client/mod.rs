@@ -37,7 +37,7 @@ pub struct Client {
 impl Client {
     pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Result<Client, ::IoError> {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
-        let account_packet = user_account::Account::new(None); 
+        let account_packet = user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
                                                                             account_packet.get_maid().secret_keys().clone());
@@ -150,12 +150,16 @@ impl Client {
   //  Client { routing: RoutingClient::new(callback_interface::CallbackInterface::new(notifier.clone()), existing_account.get_account().clone()),
   //           account: existing_account, callback_interface: facade, response_notifier: notifier }
   //}
+    pub fn put<T>(&mut self, sendable: T) ->  Result<::WaitCondition, ::IoError> where T: Sendable {
+        match self.routing.lock().unwrap().put(sendable) {
+            Ok(id)      => Ok((id, self.response_notifier.clone())),
+            Err(io_err) => Err(io_err),
+        }
+    }
 
-//  pub fn put(&mut self, data: Vec<u8>) {
-//    // data will be stored as maidsafe_types::ImmutableData
-//    // TODO: shall the input data to be checked and sliced into chunks here to fit the restriction of 1MB size each chunk?
-//    let _ =  self.routing.put(maidsafe_types::ImmutableData::new(data));
-//  }
+    pub fn get_response(&mut self,message_id: routing::types::MessageId) -> Result<Vec<u8>, routing::error::ResponseError> {
+         self.callback_interface.lock().unwrap().get_response(message_id)
+    }
 
     pub fn get(&mut self, data_name: routing::NameType) -> Result<::WaitCondition, ::IoError>  {
         match self.routing.lock().unwrap().get(0u64, data_name) {
