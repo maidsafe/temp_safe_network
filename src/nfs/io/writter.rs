@@ -15,9 +15,56 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use nfs;
+use std::sync;
+use super::local_storage::LocalStorage;
+use self_encryption;
+use std::fs;
+use rand;
+use rand::Rng;
 
 pub struct Writter {
     file: nfs::types::File,
     directory: nfs::types::DirectoryListing,
-    self_encryption: u8
+    self_encryptor: self_encryption::SelfEncryptor<LocalStorage>,
+    storage: sync::Arc<LocalStorage>
+}
+
+fn create_temp_path() -> String {
+    let mut rng = rand::thread_rng();
+    let mut name = String::new();
+    for n in rng.gen_ascii_chars().take(10) {
+        name.push(n);
+    }
+    name.push('/');
+    name
+}
+
+impl Writter {
+
+    pub fn new(directory: nfs::types::DirectoryListing, file: nfs::types::File) -> Writter {
+        let temp_path = create_temp_path();
+        fs::create_dir(temp_path.clone());
+        let storage = sync::Arc::new(LocalStorage { storage_path : temp_path });
+        Writter {
+            file: file.clone(),
+            directory: directory,
+            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap()),
+            storage: storage,
+        }
+    }
+
+    pub fn write(&mut self, data: &[u8], position: u64) {
+        self.self_encryptor.write(data, position);
+    }
+
+    pub fn close(mut self) -> self_encryption::datamap::DataMap {
+        let datamap = self.self_encryptor.close();
+        let storage = self.storage.clone();
+        fs::remove_dir_all(&storage.storage_path);
+        // Save chunks to the network
+        // update file object with datamap
+        // update directory
+        datamap
+    }
+
 }

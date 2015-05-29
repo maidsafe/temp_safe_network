@@ -33,6 +33,10 @@ impl File {
         }
     }
 
+    pub fn get_name(&self) -> String {
+        self.get_metadata().get_name()
+    }
+
     pub fn set_metadata(&mut self, metadata: Metadata) {
         self.metadata = metadata;
     }

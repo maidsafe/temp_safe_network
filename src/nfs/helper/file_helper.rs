@@ -39,6 +39,12 @@ fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
     d.decode().next().unwrap().unwrap()
 }
 
+fn file_exists(directory: nfs::types::DirectoryListing, file_name: String) -> bool {
+    directory.get_files().iter().find(|file| {
+            file.get_name() == file_name
+        }).is_some()
+}
+
 impl <'a> FileHelper<'a> {
     /// Create a new FileHelper instance
     pub fn new(client: &'a mut Client) -> FileHelper<'a> {
@@ -47,13 +53,11 @@ impl <'a> FileHelper<'a> {
         }
     }
 
-    fn file_exists(directory: nfs::types::DirectoryListing, file_name: String) -> bool {
-
-    }
-
     pub fn create(&mut self, name: String, user_metatdata: Vec<u8>,
             directory: nfs::types::DirectoryListing) -> Option<nfs::io::Writter> {
-        // Check whether file name exists already, yes error
+        if file_exists(directory.clone(), name.clone()) {
+            return None;
+        }
         // Create writer object and return
         None
     }
