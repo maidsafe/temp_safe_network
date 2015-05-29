@@ -14,9 +14,10 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+use nfs;
 
-mod directory_helper;
-mod file_helper;
-
-pub use self::directory_helper::*;
-pub use self::file_helper::*;
+pub struct Writter {
+    file: nfs::types::File,
+    directory: nfs::types::DirectoryListing,
+    self_encryption: u8
+}
