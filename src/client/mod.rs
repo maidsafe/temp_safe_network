@@ -24,7 +24,10 @@ use maidsafe_types::TypeTag;
 use routing::sendable::Sendable;
 
 mod user_account;
-mod callback_interface;
+pub mod callback_interface;
+
+use self::callback_interface::*;
+use ResponseNotifier;
 
 pub struct Client {
     account:             user_account::Account,
@@ -244,6 +247,14 @@ impl Client {
             Ok(id)      => Ok((id, self.response_notifier.clone())),
             Err(io_err) => Err(io_err),
         }
+    }
+
+    pub fn get_response_notifier(&self) -> ResponseNotifier {
+        self.response_notifier.clone()
+    }
+
+    pub fn get_routing_client(&self) -> ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>> {
+        self.routing.clone()
     }
 
     pub fn get_network_response_callback(&self) -> ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>> {

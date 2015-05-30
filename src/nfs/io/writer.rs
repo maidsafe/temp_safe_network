@@ -16,40 +16,32 @@
 // relating to use of the SAFE Network Software.
 use nfs;
 use std::sync;
-use super::local_storage::LocalStorage;
+use super::network_storage::NetworkStorage;
 use self_encryption;
 use std::fs;
 use rand;
 use rand::Rng;
+use routing;
+use client;
+use ResponseNotifier;
 
-pub struct Writter {
+pub struct Writer {
     file: nfs::types::File,
     directory: nfs::types::DirectoryListing,
-    self_encryptor: self_encryption::SelfEncryptor<LocalStorage>,
-    storage: sync::Arc<LocalStorage>
+    self_encryptor: self_encryption::SelfEncryptor<NetworkStorage>,
 }
 
-fn create_temp_path() -> String {
-    let mut rng = rand::thread_rng();
-    let mut name = String::new();
-    for n in rng.gen_ascii_chars().take(10) {
-        name.push(n);
-    }
-    name.push('/');
-    name
-}
+impl Writer {
 
-impl Writter {
-
-    pub fn new(directory: nfs::types::DirectoryListing, file: nfs::types::File) -> Writter {
-        let temp_path = create_temp_path();
-        fs::create_dir(temp_path.clone());
-        let storage = sync::Arc::new(LocalStorage { storage_path : temp_path });
-        Writter {
+    pub fn new(directory: nfs::types::DirectoryListing, file: nfs::types::File,
+        routing: sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
+        interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
+        response_notifier: ResponseNotifier) -> Writer {
+        let storage = sync::Arc::new(NetworkStorage::new(routing, interface, response_notifier));
+        Writer {
             file: file.clone(),
             directory: directory,
             self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap()),
-            storage: storage,
         }
     }
 
@@ -59,9 +51,6 @@ impl Writter {
 
     pub fn close(mut self) -> self_encryption::datamap::DataMap {
         let datamap = self.self_encryptor.close();
-        let storage = self.storage.clone();
-        fs::remove_dir_all(&storage.storage_path);
-        // Save chunks to the network
         // update file object with datamap
         // update directory
         datamap

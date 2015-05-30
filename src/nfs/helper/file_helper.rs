@@ -22,27 +22,11 @@ use routing::sendable::Sendable;
 use cbor;
 use client::Client;
 use WaitCondition;
+use self_encryption;
 
 /// File provides helper functions to perform Operations on Files
 pub struct FileHelper<'a> {
     client: &'a mut Client
-}
-
-fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
-    let mut e = cbor::Encoder::from_memory();
-    e.encode(&[&data]);
-    e.into_bytes()
-}
-
-fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
-    let mut d = cbor::Decoder::from_bytes(data);
-    d.decode().next().unwrap().unwrap()
-}
-
-fn file_exists(directory: nfs::types::DirectoryListing, file_name: String) -> bool {
-    directory.get_files().iter().find(|file| {
-            file.get_name() == file_name
-        }).is_some()
 }
 
 impl <'a> FileHelper<'a> {
@@ -54,12 +38,19 @@ impl <'a> FileHelper<'a> {
     }
 
     pub fn create(&mut self, name: String, user_metatdata: Vec<u8>,
-            directory: nfs::types::DirectoryListing) -> Option<nfs::io::Writter> {
-        if file_exists(directory.clone(), name.clone()) {
+            directory: nfs::types::DirectoryListing) -> Option<nfs::io::Writer> {
+        if self.file_exists(directory.clone(), name.clone()) {
             return None;
         }
-        // Create writer object and return
-        None
+        let file = nfs::types::File::new(nfs::types::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
+        Some(nfs::io::Writer::new(directory, file, self.client.get_routing_client(), self.client.get_network_response_callback(),
+            self.client.get_response_notifier()))
+    }
+
+    pub fn file_exists(&self, directory: nfs::types::DirectoryListing, file_name: String) -> bool {
+        directory.get_files().iter().find(|file| {
+                file.get_name() == file_name
+            }).is_some()
     }
 
 }
