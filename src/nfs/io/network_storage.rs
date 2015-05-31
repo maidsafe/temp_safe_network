@@ -27,12 +27,28 @@ use WaitCondition;
 use ResponseNotifier;
 use client;
 use routing;
+use rustc_serialize::{Decodable, Encodable};
+use cbor;
+use nfs;
+use routing::sendable::Sendable;
 
 pub struct NetworkStorage {
     routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
     response_notifier: ResponseNotifier
 }
+
+fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
+    let mut e = cbor::Encoder::from_memory();
+    e.encode(&[&data]);
+    e.into_bytes()
+}
+
+fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
+    let mut d = cbor::Decoder::from_bytes(data);
+    d.decode().next().unwrap().unwrap()
+}
+
 
 impl NetworkStorage {
     pub fn new(routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
@@ -67,10 +83,32 @@ impl NetworkStorage {
             Err(io_err) => Err(io_err),
         }
     }
+
+    pub fn save_directory(&self, directory: nfs::types::DirectoryListing) -> Result<(), &str> {
+        let get = self.network_get(101u64, directory.get_id());
+        if get.is_err() {
+            return Err("Network IO Error");
+        }
+        let data = self.blocked_read(get.unwrap());
+        if data.is_err() {
+            return Err("Routing Response Error");
+        }
+        let mut sdv: maidsafe_types::StructuredData = deserialise(data.unwrap());
+        let serialised_directory = serialise(directory.clone());
+        let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
+        let lock = self.routing.clone();
+        let mut routing = lock.lock().unwrap();
+        routing.put(immutable_data.clone());
+        let mut versions = sdv.value();
+        versions.push(immutable_data.name());
+        sdv.set_value(versions);
+        routing.put(sdv);
+        Ok(())
+    }
 }
 
 impl self_encryption::Storage for NetworkStorage {
-    
+
     fn get(&self, name: Vec<u8>) -> Vec<u8> {
         let get_result = self.network_get(100u64, routing::NameType([0u8;64]));
         if get_result.is_err() {

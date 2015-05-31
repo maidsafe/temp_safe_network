@@ -47,6 +47,10 @@ impl DirectoryListing {
         self.metadata = metadata;
     }
 
+    pub fn add_file(&mut self, file: File) {
+        self.files.push(file);
+    }
+
     pub fn get_files(&self) -> Vec<File> {
         self.files.clone()
     }

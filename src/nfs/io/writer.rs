@@ -29,6 +29,7 @@ pub struct Writer {
     file: nfs::types::File,
     directory: nfs::types::DirectoryListing,
     self_encryptor: self_encryption::SelfEncryptor<NetworkStorage>,
+    storage: sync::Arc<NetworkStorage>
 }
 
 impl Writer {
@@ -42,6 +43,7 @@ impl Writer {
             file: file.clone(),
             directory: directory,
             self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap()),
+            storage: storage
         }
     }
 
@@ -49,11 +51,19 @@ impl Writer {
         self.self_encryptor.write(data, position);
     }
 
-    pub fn close(mut self) -> self_encryption::datamap::DataMap {
-        let datamap = self.self_encryptor.close();
-        // update file object with datamap
-        // update directory
-        datamap
+    pub fn close(mut self) {
+        let mut directory = self.directory.clone();
+        let mut file = self.file;
+        if directory.get_files().contains(&file) {
+            file.set_datamap(self.self_encryptor.close());
+            let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
+            directory.get_files().remove(pos);
+            directory.get_files().insert(pos, file);
+        } else {
+            file.set_datamap(self.self_encryptor.close());
+            directory.add_file(file);
+        }
+        self.storage.save_directory(self.directory);
     }
 
 }
