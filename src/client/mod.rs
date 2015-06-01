@@ -25,6 +25,7 @@ use routing::sendable::Sendable;
 
 mod user_account;
 mod callback_interface;
+mod non_networking_test_framework;
 
 pub struct Client {
     account:             user_account::Account,
@@ -147,7 +148,10 @@ impl Client {
             })),
         };
 
-        let get_result = fake_routing_client.lock().unwrap().get(100u64, user_network_id); // TODO(Spandan) Structured Data should implement trait TypeTag in maidsafe_types
+        // let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        // let get_result = fake_routing_client.lock().unwrap().get(structured_data_type_id.type_tag(), user_network_id);
+        // TODO(Spandan) Use the above once maidsafe_types is published in crates.io
+        let get_result = fake_routing_client.lock().unwrap().get(100u64, user_network_id);
 
         match get_result {
             Ok(id) => {
