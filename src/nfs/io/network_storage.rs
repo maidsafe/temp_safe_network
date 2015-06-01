@@ -32,11 +32,11 @@ use cbor;
 use nfs;
 use routing::sendable::Sendable;
 
+const IMMUTABLE_TAG: u64 = 101u64;
+
 // TODO update tag values for SDV and Immutable data
 pub struct NetworkStorage {
-    routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
-    callback_interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
-    response_notifier: ResponseNotifier
+    client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
 fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
@@ -52,13 +52,9 @@ fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
 
 
 impl NetworkStorage {
-    pub fn new(routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
-        callback_interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
-        response_notifier: ResponseNotifier) -> NetworkStorage {
+    pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> NetworkStorage {
         NetworkStorage {
-            routing: routing,
-            callback_interface: callback_interface,
-            response_notifier: response_notifier
+            client: client
         }
     }
 
@@ -70,42 +66,12 @@ impl NetworkStorage {
             let mut message_id = lock.lock().unwrap();
             message_id = cvar.wait(message_id).unwrap();
             if *message_id == waiting_message_id {
-                let interface = self.callback_interface.clone();
-                return interface.lock().unwrap().get_response(*message_id);
+                let mut client = self.client.clone();
+                return client.lock().unwrap().get_response(*message_id);
             }
         }
     }
 
-    pub fn network_get(&self, tag: u64, name: routing::NameType) -> Result<::WaitCondition, ::IoError>{
-        let lock = self.routing.clone();
-        let mut routing = lock.lock().unwrap();
-        match routing.get(tag, name) {
-            Ok(id)      => Ok((id, self.response_notifier.clone())),
-            Err(io_err) => Err(io_err),
-        }
-    }
-
-    pub fn save_directory(&self, directory: nfs::types::DirectoryListing) -> Result<(), &str> {
-        let get = self.network_get(101u64, directory.get_id());
-        if get.is_err() {
-            return Err("Network IO Error");
-        }
-        let data = self.blocked_read(get.unwrap());
-        if data.is_err() {
-            return Err("Routing Response Error");
-        }
-        let mut sdv: maidsafe_types::StructuredData = deserialise(data.unwrap());
-        let serialised_directory = serialise(directory.clone());
-        let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
-        let lock = self.routing.clone();
-        let mut routing = lock.lock().unwrap();
-        routing.put(immutable_data.clone());
-        let mut versions = sdv.value();
-        versions.push(immutable_data.name());
-        sdv.set_value(versions);
-        routing.put(sdv);
-        Ok(())
-    }
 }
 
 // FIXME There is no error handling mechanism in self_encryption::Storage?
@@ -117,7 +83,9 @@ impl self_encryption::Storage for NetworkStorage {
         for i in 0..64 {
             name_id[i] = *name.get(i).unwrap();
         }
-        let get_result = self.network_get(100u64, routing::NameType(name_id));
+        let client_mutex = self.client.clone();
+        let mut client = client_mutex.lock().unwrap();
+        let get_result = client.get(IMMUTABLE_TAG, routing::NameType(name_id));
         if get_result.is_err() {
             return Vec::new();
         }
@@ -130,8 +98,9 @@ impl self_encryption::Storage for NetworkStorage {
 
     fn put(&self, name: Vec<u8>, data: Vec<u8>) {
         let sendable = maidsafe_types::ImmutableData::new(data);
-        let mut routing = self.routing.clone();
-        routing.lock().unwrap().put(sendable);
+        let client_mutex = self.client.clone();
+        let mut client = client_mutex.lock().unwrap();
+        client.put(sendable);
     }
 
 }

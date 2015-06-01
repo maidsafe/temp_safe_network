@@ -15,28 +15,20 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use nfs;
-use routing;
 use routing::sendable::Sendable;
 use client;
-use WaitCondition;
 use self_encryption;
 
 /// File provides helper functions to perform Operations on Files
 pub struct FileHelper {
-    routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
-    callback_interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
-    response_notifier: ::ResponseNotifier
+    client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
 impl FileHelper {
     /// Create a new FileHelper instance
-    pub fn new(routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
-        callback_interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
-        response_notifier: ::ResponseNotifier) -> FileHelper {
+    pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> FileHelper {
         FileHelper {
-            routing: routing,
-            callback_interface: callback_interface,
-            response_notifier: response_notifier
+            client: client
         }
     }
 
@@ -46,29 +38,29 @@ impl FileHelper {
             return Err("File already exists");
         }
         let file = nfs::types::File::new(nfs::types::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
-        Ok(nfs::io::Writer::new(directory, file, self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone()))
+        Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
     }
 
-    pub fn update(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing) -> Result<nfs::io::Writer, &str> {
-        if !self.file_exists(directory.clone(), file.get_name()) {
-            return Err("File not present in the directory");
-        }
-        Ok(nfs::io::Writer::new(directory, file, self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone()))
-    }
-
-    /// Updates the file metadata. Returns the updated DirectoryListing
-    pub fn update_metadata(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing, user_metadata: Vec<u8>) -> Result<nfs::types::DirectoryListing, &str> {
-        if !self.file_exists(directory.clone(), file.get_name()) {
-            return Err("File not present in the directory");
-        }
-        file.get_metadata().set_user_metadata(user_metadata);
-        let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
-        directory.get_files().remove(pos);
-        directory.get_files().insert(pos, file);
-        let network_storage = nfs::io::NetworkStorage::new(self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone());
-        network_storage.save_directory(directory.clone());
-        Ok(directory)
-    }
+    // pub fn update(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing) -> Result<nfs::io::Writer, &str> {
+    //     if !self.file_exists(directory.clone(), file.get_name()) {
+    //         return Err("File not present in the directory");
+    //     }
+    //     Ok(nfs::io::Writer::new(directory, file, self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone()))
+    // }
+    //
+    // /// Updates the file metadata. Returns the updated DirectoryListing
+    // pub fn update_metadata(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing, user_metadata: Vec<u8>) -> Result<nfs::types::DirectoryListing, &str> {
+    //     if !self.file_exists(directory.clone(), file.get_name()) {
+    //         return Err("File not present in the directory");
+    //     }
+    //     file.get_metadata().set_user_metadata(user_metadata);
+    //     let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
+    //     directory.get_files().remove(pos);
+    //     directory.get_files().insert(pos, file);
+    //     let network_storage = nfs::io::NetworkStorage::new(self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone());
+    //     network_storage.save_directory(directory.clone());
+    //     Ok(directory)
+    // }
 
 
     fn file_exists(&self, directory: nfs::types::DirectoryListing, file_name: String) -> bool {

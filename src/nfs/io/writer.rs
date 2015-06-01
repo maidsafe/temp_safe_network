@@ -23,27 +23,24 @@ use rand;
 use rand::Rng;
 use routing;
 use client;
-use ResponseNotifier;
 
 pub struct Writer {
     file: nfs::types::File,
     directory: nfs::types::DirectoryListing,
     self_encryptor: self_encryption::SelfEncryptor<NetworkStorage>,
-    storage: sync::Arc<NetworkStorage>
+    client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
 impl Writer {
 
     pub fn new(directory: nfs::types::DirectoryListing, file: nfs::types::File,
-        routing: sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
-        interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
-        response_notifier: ResponseNotifier) -> Writer {
-        let storage = sync::Arc::new(NetworkStorage::new(routing, interface, response_notifier));
+        client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> Writer {
+        let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
         Writer {
             file: file.clone(),
             directory: directory,
             self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap()),
-            storage: storage
+            client: client
         }
     }
 
@@ -62,7 +59,8 @@ impl Writer {
         } else {
             directory.add_file(file);
         }
-        self.storage.save_directory(self.directory);
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+        directory_helper.update(directory);
     }
 
 }
