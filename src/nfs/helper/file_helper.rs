@@ -15,11 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use nfs;
-use maidsafe_types;
-use rustc_serialize::{Decodable, Encodable};
 use routing;
 use routing::sendable::Sendable;
-use cbor;
 use client;
 use WaitCondition;
 use self_encryption;
@@ -59,7 +56,7 @@ impl FileHelper {
         Ok(nfs::io::Writer::new(directory, file, self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone()))
     }
 
-    /// Updates the file metadata.Returns the updated DirectoryListing
+    /// Updates the file metadata. Returns the updated DirectoryListing
     pub fn update_metadata(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing, user_metadata: Vec<u8>) -> Result<nfs::types::DirectoryListing, &str> {
         if !self.file_exists(directory.clone(), file.get_name()) {
             return Err("File not present in the directory");
