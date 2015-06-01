@@ -11,9 +11,9 @@
 | [API Documentation](http://maidsafe.github.io/maidsafe_client/)| [SAFENetwork System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe website](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 
 #Todo
-- [ ] [MAID-1077](https://maidsafe.atlassian.net/browse/MAID-1077) Account Creation
-    - [ ] [MAID-1078](https://maidsafe.atlassian.net/browse/MAID-1078) Register
-    - [ ] [MAID-1079](https://maidsafe.atlassian.net/browse/MAID-1079) Login
+- [X] [MAID-1077](https://maidsafe.atlassian.net/browse/MAID-1077) Account Creation
+    - [X] [MAID-1078](https://maidsafe.atlassian.net/browse/MAID-1078) Register
+    - [X] [MAID-1079](https://maidsafe.atlassian.net/browse/MAID-1079) Login
 - [ ] Implement Storage API
     - [X] [MAID-1080](https://maidsafe.atlassian.net/browse/MAID-1080) Implement types
         - [X] Implement MetaData, File and DirectoryListing types
@@ -50,6 +50,6 @@
         - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API
     - [ ] [MAID-1101](https://maidsafe.atlassian.net/browse/MAID-1101) Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
 - [ ] Create Example:
-    - [ ] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example
+    - [X] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example
     - [ ] [MAID-1103](https://maidsafe.atlassian.net/browse/MAID-1103) Example to demonstrate Storage API
     - [ ] [MAID-1104](https://maidsafe.atlassian.net/browse/MAID-1104) Validate above example against Local network / droplet
