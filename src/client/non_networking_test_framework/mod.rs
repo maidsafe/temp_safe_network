@@ -122,7 +122,6 @@ impl RoutingClientMock {
 mod test {
     use ::std::error::Error;
 
-    use routing;
     use maidsafe_types;
     use maidsafe_types::TypeTag;
     use routing::sendable::Sendable;
@@ -176,11 +175,11 @@ mod test {
                     }
 
                     match callback_interface.lock().unwrap().get_response(id) {
-                        Ok(data) => (),
+                        Ok(_) => (),
                         Err(error) => panic!("Unauthorised-PUT Response Failure :: {:?}", error.description()),
                     }
                 },
-                Err(io_error) => panic!("Failure in Unauthorised-PUT !!"),
+                Err(_) => panic!("Failure in Unauthorised-PUT !!"),
             }
         }
 
@@ -198,11 +197,11 @@ mod test {
                     }
 
                     match callback_interface.lock().unwrap().get_response(id) {
-                        Ok(data) => panic!("Overwriting of Existing Data Should Not Be Allowed !!"),
-                        Err(error) => (),
+                        Ok(_) => panic!("Overwriting of Existing Data Should Not Be Allowed !!"),
+                        Err(_) => (),
                     }
                 },
-                Err(io_error) => panic!("Failure in Unauthorised-PUT !!"),
+                Err(_) => panic!("Failure in Unauthorised-PUT !!"),
             }
         }
     }
@@ -210,7 +209,6 @@ mod test {
     #[test]
     fn check_put_and_get_for_immutable_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
-        let account_packet = ::client::user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
         let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone())));
@@ -321,7 +319,7 @@ mod test {
                     }
 
                     match callback_interface.lock().unwrap().get_response(id) {
-                        Ok(data) => panic!("Second PUT for same ImmutableData should fail !!"),
+                        Ok(_) => panic!("Second PUT for same ImmutableData should fail !!"),
                         Err(_) => (),
                     }
                 },
