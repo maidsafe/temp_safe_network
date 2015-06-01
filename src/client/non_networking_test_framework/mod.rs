@@ -16,24 +16,30 @@
 // relating to use of the SAFE Network Software.
 
 use routing;
-use maidsafe_types;
 use routing::sendable::Sendable;
 use routing::client_interface::Interface;
 
 use client::callback_interface;
 
+pub type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::BTreeMap<routing::NameType, Vec<u8>>>>;
+
+pub fn get_new_data_store() -> DataStore {
+    ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()))
+}
+
 pub struct RoutingClientMock {
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
-    data_store: ::std::sync::Arc<::std::sync::Mutex<::std::collections::BTreeMap<routing::NameType, Vec<u8>>>>,
+    data_store: DataStore,
     msg_id: routing::types::MessageId,
     network_delay_ms: u32,
 }
 
 impl RoutingClientMock {
-    pub fn new(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>) -> RoutingClientMock {
+    pub fn new(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
+               data_store: DataStore) -> RoutingClientMock {
         RoutingClientMock {
             callback_interface: cb_interface,
-            data_store: ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new())),
+            data_store: data_store,
             msg_id: 1,
             network_delay_ms: 1000,
         }
@@ -94,6 +100,7 @@ impl RoutingClientMock {
         let cb_interface = self.callback_interface.clone();
         let data_store = self.data_store.clone();
 
+        //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
         let success: bool = if sendable.type_tag() != 100u64 && data_store.lock().unwrap().contains_key(&sendable.name()) {
             false
         } else {
@@ -134,7 +141,7 @@ mod test {
         let account_packet = ::client::user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
-        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone())));
+        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone(), get_new_data_store())));
         let mock_routing_clone = mock_routing.clone();
 
         let mock_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
@@ -211,7 +218,7 @@ mod test {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
-        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone())));
+        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone(), get_new_data_store())));
         let mock_routing_clone = mock_routing.clone();
 
         let mock_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
@@ -334,7 +341,7 @@ mod test {
         let account_packet = ::client::user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
-        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone())));
+        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone(), get_new_data_store())));
         let mock_routing_clone = mock_routing.clone();
 
         let mock_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
@@ -368,7 +375,8 @@ mod test {
         let orig_immutable_data = maidsafe_types::ImmutableData::new(orig_data);
 
         // Construct StructuredData, 1st version, for this ImmutableData
-        // let structured_data_type_id: maidsafe_types::data::structured_data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() }; //TODO(Spandan) Use this when maidsafe_types is updated in crates
+        //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
+        // let structured_data_type_id: maidsafe_types::data::structured_data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let keyword = "Spandan".to_string();
         let pin = 1234u32;
         let user_id = ::client::user_account::Account::generate_network_id(&keyword, pin);
@@ -378,7 +386,8 @@ mod test {
 
         // GET StructuredData should fail
         {
-            // match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) { //TODO Search for 100u64 later and replace once maidsafe_clients is fine
+            //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
+            // match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
             match mock_routing.lock().unwrap().get(100u64, user_id.clone()) {
                 Ok(id) => {
                     let &(ref lock, ref condition_var) = &*notifier;
@@ -438,7 +447,8 @@ mod test {
 
         // GET StructuredData should pass
         {
-            //match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) { //TODO
+            //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
+            //match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
             match mock_routing.lock().unwrap().get(100u64, user_id.clone()) {
                 Ok(id) => {
                     let &(ref lock, ref condition_var) = &*notifier;
@@ -535,7 +545,8 @@ mod test {
 
         // GET for new StructuredData version should pass
         {
-            //match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) { //TODO
+            //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
+            //match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
             match mock_routing.lock().unwrap().get(100u64, user_id.clone()) {
                 Ok(id) => {
                     let &(ref lock, ref condition_var) = &*notifier;
