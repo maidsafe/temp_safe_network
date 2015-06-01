@@ -23,13 +23,16 @@ use maidsafe_types;
 use maidsafe_types::TypeTag;
 use routing::sendable::Sendable;
 
+pub mod non_networking_test_framework;
+
 mod user_account;
 mod callback_interface;
-mod non_networking_test_framework;
 
 pub struct Client {
     account:             user_account::Account,
-    routing:             ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>>,
+    //TODO: Toggle depending on if using actual routing or non_networking_test_framework
+    // routing:             ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>>,
+    routing:             ::std::sync::Arc<::std::sync::Mutex<non_networking_test_framework::RoutingClientMock>>,
     response_notifier:   ::ResponseNotifier,
     callback_interface:  ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
     routing_stop_flag:   ::std::sync::Arc<::std::sync::Mutex<bool>>,
@@ -37,14 +40,17 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn create_account(keyword: &String, pin: u32, password: &[u8]) -> Result<Client, ::IoError> {
+    //TODO: data_store parameter should be removed when not testing with non_networking_test_framework.
+    pub fn create_account(keyword: &String, pin: u32, password: &[u8], data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
                                                                             account_packet.get_maid().secret_keys().clone());
 
-        let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), client_id_packet)));
+        //TODO: Toggle depending on if using actual routing or non_networking_test_framework
+        // let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), client_id_packet)));
+        let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(callback_interface.clone(), data_store)));
         let cloned_routing_client = routing_client.clone();
         let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
         let routing_stop_flag_clone = routing_stop_flag.clone();
@@ -113,7 +119,8 @@ impl Client {
         }
     }
 
-    pub fn log_in(keyword: &String, pin: u32, password: &[u8]) -> Result<Client, ::IoError> {
+    //TODO: data_store parameter should be removed when not testing with non_networking_test_framework.
+    pub fn log_in(keyword: &String, pin: u32, password: &[u8], data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let user_network_id = user_account::Account::generate_network_id(keyword, pin);
         let fake_account_packet = user_account::Account::new(None);
@@ -121,7 +128,9 @@ impl Client {
         let fake_client_id_packet = routing::routing_client::ClientIdPacket::new(fake_account_packet.get_maid().public_keys().clone(),
                                                                                  fake_account_packet.get_maid().secret_keys().clone());
 
-        let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), fake_client_id_packet)));
+        //TODO: Toggle depending on if using actual routing or non_networking_test_framework
+        // let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), fake_client_id_packet)));
+        let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(callback_interface.clone(), data_store.clone())));
         let cloned_fake_routing_client = fake_routing_client.clone();
         let fake_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
         let fake_routing_stop_flag_clone = fake_routing_stop_flag.clone();
@@ -194,12 +203,19 @@ impl Client {
                                             Ok(raw_data) => {
                                                 let mut decoder = cbor::Decoder::from_bytes(raw_data);
                                                 let encrypted_account_packet: maidsafe_types::ImmutableData = decoder.decode().next().unwrap().unwrap();
-                                                let account_packet = user_account::Account::decrypt(&encrypted_account_packet.value()[..], &password, pin).ok().unwrap();
+
+                                                let decryption_result = user_account::Account::decrypt(&encrypted_account_packet.value()[..], &password, pin);
+                                                if decryption_result.is_err() {
+                                                    return Err(::IoError::new(::std::io::ErrorKind::Other, "Could Not Decrypt Session Packet !! (Probably Wrong Password)"));
+                                                }
+                                                let account_packet = decryption_result.ok().unwrap();
 
                                                 let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
                                                                                                                     account_packet.get_maid().secret_keys().clone());
 
-                                                let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), client_id_packet)));
+                                                //TODO: Toggle depending on if using actual routing or non_networking_test_framework
+                                                // let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), client_id_packet)));
+                                                let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(callback_interface.clone(), data_store)));
                                                 let cloned_routing_client = routing_client.clone();
                                                 let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
                                                 let routing_stop_flag_clone = routing_stop_flag.clone();
@@ -229,7 +245,7 @@ impl Client {
                             None => Err(::IoError::new(::std::io::ErrorKind::Other, "No Session Packet information in retrieved StructuredData !!")),
                         }
                     },
-                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "StructuredData GET-Response Failure !!")),
+                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "StructuredData GET-Response Failure !! (Probably Invalid User-ID)")),
                 }
             },
             Err(io_error) => Err(io_error),
@@ -244,7 +260,8 @@ impl Client {
     }
 
     pub fn get(&mut self, name: routing::NameType) -> Result<::WaitCondition, ::IoError> {
-        match self.routing.lock().unwrap().get(101u64, name) { //TODO(Spandan) Change this to accept proper type_tag/type_id
+        //TODO(Spandan) Change this to accept proper type_tag/type_id
+        match self.routing.lock().unwrap().get(101u64, name) {
             Ok(id)      => Ok((id, self.response_notifier.clone())),
             Err(io_err) => Err(io_err),
         }
@@ -269,14 +286,49 @@ impl Drop for Client {
 #[cfg(test)]
 mod test {
     use super::*;
-    use routing;
 
     #[test]
     fn account_creation() {
-        // let keyword = "Spandan".to_string();
-        // let password = "Sharma".as_bytes();
-        // let pin = 1234u32;
-        // let mut result = Client::create_account(&keyword, pin, &password);
-        // assert!(result.is_ok());
+        let keyword = "Spandan".to_string();
+        let password = "Sharma".as_bytes();
+        let pin = 1234u32;
+        let data_store = ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()));
+        let result = Client::create_account(&keyword, pin, &password, data_store);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn account_login() {
+        let keyword = "Spandan".to_string();
+        let password = "Sharma".as_bytes();
+        let pin = 1234u32;
+        let data_store = ::client::non_networking_test_framework::get_new_data_store();
+
+        // Without Creation Login Should Fail
+        let mut result = Client::log_in(&keyword, pin, &password, data_store.clone());
+        assert!(result.is_err());
+
+        // Creation should pass
+        result = Client::create_account(&keyword, pin, &password, data_store.clone());
+        assert!(result.is_ok());
+
+        // Wrong Credentials (Password) - Login should Fail
+        let wrong_password = "sharma".as_bytes();
+        result = Client::log_in(&keyword, pin, &wrong_password, data_store.clone());
+        assert!(result.is_err());
+
+        // Wrong Credentials (Keyword) - Login should Fail
+        let wrong_keyword = "spandan".to_string();
+        result = Client::log_in(&wrong_keyword, pin, &password, data_store.clone());
+        assert!(result.is_err());
+
+        // Wrong Credentials (Pin) - Login should Fail
+        let wrong_pin = 1233;
+        result = Client::log_in(&keyword, wrong_pin, &password, data_store.clone());
+        assert!(result.is_err());
+
+        // Correct Credentials - Login Should Pass
+        result = Client::log_in(&keyword, pin, &password, data_store);
+        assert!(result.is_ok());
     }
 }
