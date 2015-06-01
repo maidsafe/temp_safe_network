@@ -59,7 +59,7 @@ impl Writer {
             let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
             directory.get_files().remove(pos);
             directory.get_files().insert(pos, file);
-        } else {            
+        } else {
             directory.add_file(file);
         }
         self.storage.save_directory(self.directory);

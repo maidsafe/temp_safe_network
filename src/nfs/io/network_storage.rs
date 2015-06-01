@@ -76,7 +76,7 @@ impl NetworkStorage {
         }
     }
 
-    fn network_get(&self, tag: u64, name: routing::NameType) -> Result<::WaitCondition, ::IoError>{
+    pub fn network_get(&self, tag: u64, name: routing::NameType) -> Result<::WaitCondition, ::IoError>{
         let lock = self.routing.clone();
         let mut routing = lock.lock().unwrap();
         match routing.get(tag, name) {
