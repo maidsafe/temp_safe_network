@@ -61,8 +61,11 @@ impl Metadata {
         self.user_metadata = user_metadata;
     }
 
-    pub fn get_user_metadata(&self) -> Vec<u8> {
-        self.user_metadata.clone()
+    pub fn get_user_metadata(&self) -> Option<Vec<u8>> {
+        if !self.user_metadata.is_empty() {
+            return Some(self.user_metadata.clone());
+        }
+        None
     }
 
 }
