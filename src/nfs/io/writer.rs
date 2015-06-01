@@ -54,13 +54,12 @@ impl Writer {
     pub fn close(mut self) {
         let mut directory = self.directory.clone();
         let mut file = self.file;
+        file.set_datamap(self.self_encryptor.close());
         if directory.get_files().contains(&file) {
-            file.set_datamap(self.self_encryptor.close());
             let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
             directory.get_files().remove(pos);
             directory.get_files().insert(pos, file);
-        } else {
-            file.set_datamap(self.self_encryptor.close());
+        } else {            
             directory.add_file(file);
         }
         self.storage.save_directory(self.directory);

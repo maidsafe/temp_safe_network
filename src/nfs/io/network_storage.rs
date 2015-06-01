@@ -32,6 +32,7 @@ use cbor;
 use nfs;
 use routing::sendable::Sendable;
 
+// TODO update tag values for SDV and Immutable data
 pub struct NetworkStorage {
     routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
@@ -110,7 +111,12 @@ impl NetworkStorage {
 impl self_encryption::Storage for NetworkStorage {
 
     fn get(&self, name: Vec<u8>) -> Vec<u8> {
-        let get_result = self.network_get(100u64, routing::NameType([0u8;64]));
+        let mut name_id = [0u8;64];
+        assert_eq!(name.len(), 64);
+        for i in 0..64 {
+            name_id[i] = *name.get(i).unwrap();
+        }
+        let get_result = self.network_get(100u64, routing::NameType(name_id));
         if get_result.is_err() {
             return Vec::new();
         }

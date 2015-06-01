@@ -20,31 +20,36 @@ use rustc_serialize::{Decodable, Encodable};
 use routing;
 use routing::sendable::Sendable;
 use cbor;
-use client::Client;
+use client;
 use WaitCondition;
 use self_encryption;
 
 /// File provides helper functions to perform Operations on Files
-pub struct FileHelper<'a> {
-    client: &'a mut Client
+pub struct FileHelper {
+    routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
+    callback_interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
+    response_notifier: ::ResponseNotifier
 }
 
-impl <'a> FileHelper<'a> {
+impl FileHelper {
     /// Create a new FileHelper instance
-    pub fn new(client: &'a mut Client) -> FileHelper<'a> {
+    pub fn new(routing: ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<client::callback_interface::CallbackInterface>>>,
+        callback_interface: ::std::sync::Arc<::std::sync::Mutex<client::callback_interface::CallbackInterface>>,
+        response_notifier: ::ResponseNotifier) -> FileHelper {
         FileHelper {
-            client: client
+            routing: routing,
+            callback_interface: callback_interface,
+            response_notifier: response_notifier
         }
     }
 
     pub fn create(&mut self, name: String, user_metatdata: Vec<u8>,
-            directory: nfs::types::DirectoryListing) -> Option<nfs::io::Writer> {
+            directory: nfs::types::DirectoryListing) -> Result<nfs::io::Writer, &str> {
         if self.file_exists(directory.clone(), name.clone()) {
-            return None;
+            return Err("File already exists");
         }
         let file = nfs::types::File::new(nfs::types::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
-        Some(nfs::io::Writer::new(directory, file, self.client.get_routing_client(), self.client.get_network_response_callback(),
-            self.client.get_response_notifier()))
+        Ok(nfs::io::Writer::new(directory, file, self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone()))
     }
 
     pub fn file_exists(&self, directory: nfs::types::DirectoryListing, file_name: String) -> bool {
