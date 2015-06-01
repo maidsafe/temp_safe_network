@@ -50,6 +50,6 @@
         - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API
     - [ ] [MAID-1101](https://maidsafe.atlassian.net/browse/MAID-1101) Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
 - [ ] Create Example:
-    - [ ] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example
+    - [X] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example
     - [ ] [MAID-1103](https://maidsafe.atlassian.net/browse/MAID-1103) Example to demonstrate Storage API
     - [ ] [MAID-1104](https://maidsafe.atlassian.net/browse/MAID-1104) Validate above example against Local network / droplet
