@@ -108,6 +108,7 @@ impl NetworkStorage {
     }
 }
 
+// FIXME There is no error handling mechanism in self_encryption::Storage?
 impl self_encryption::Storage for NetworkStorage {
 
     fn get(&self, name: Vec<u8>) -> Vec<u8> {
