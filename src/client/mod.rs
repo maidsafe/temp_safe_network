@@ -268,10 +268,6 @@ impl Client {
         }
     }
 
-    pub fn get_response_notifier(&self) -> ResponseNotifier {
-        self.response_notifier.clone()
-    }
-
     pub fn get_network_response_callback(&self) -> ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>> {
         self.callback_interface.clone()
     }
