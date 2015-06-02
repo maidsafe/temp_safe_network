@@ -64,8 +64,11 @@ impl FileHelper {
         Ok(())
     }
 
+    pub fn read(&mut self, file: nfs::types::File) -> nfs::io::Reader {
+        nfs::io::Reader::new(file, self.client.clone())
+    }
 
-    fn file_exists(&self, directory: nfs::types::DirectoryListing, file_name: String) -> bool {
+    pub fn file_exists(&self, directory: nfs::types::DirectoryListing, file_name: String) -> bool {
         directory.get_files().iter().find(|file| {
                 file.get_name() == file_name
             }).is_some()
