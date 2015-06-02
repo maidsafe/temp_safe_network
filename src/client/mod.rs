@@ -17,6 +17,9 @@
 
 use cbor;
 use crypto;
+use rand::Rng;
+use crypto::buffer::ReadBuffer;
+use crypto::buffer::WriteBuffer;
 
 use routing;
 use maidsafe_types;
@@ -252,8 +255,62 @@ impl Client {
         }
     }
 
-    pub fn get_asym_encryption_key(&self) -> Vec<u8> {
-        self.account.get_public_maid().name().0.iter().map(|x| *x).collect()
+    pub fn hybrid_encrypt(&self,
+                          data_to_encrypt: &[u8],
+                          nonce_opt: Option<::sodiumoxide::crypto::asymmetricbox::Nonce>) -> Result<Vec<u8>, ::crypto::symmetriccipher::SymmetricCipherError> {
+        let nonce = match nonce_opt {
+            Some(nonce) => nonce,
+            None => ::sodiumoxide::crypto::asymmetricbox::gen_nonce(),
+        };
+
+        let mut key = [0u8; 32];
+        let mut iv  = [0u8; 16];
+
+        let mut combined_key_iv: [u8; 48] = unsafe { ::std::mem::uninitialized() };
+
+        for it in key.iter().chain(iv.iter()).enumerate() {
+            combined_key_iv[it.0] = *it.1;
+        }
+
+        let mut rand_generator = ::rand::OsRng::new().ok().unwrap();
+        rand_generator.fill_bytes(&mut key);
+        rand_generator.fill_bytes(&mut iv);
+
+        let mut encryptor = ::crypto::aes::cbc_encryptor(::crypto::aes::KeySize::KeySize256, &key, &iv, ::crypto::blockmodes::PkcsPadding);
+
+        let mut symm_encryption_result = Vec::<u8>::with_capacity(data_to_encrypt.len());
+
+        let mut read_buffer = ::crypto::buffer::RefReadBuffer::new(data_to_encrypt);
+        let mut buffer = [0u8; 4096];
+        let mut write_buffer = ::crypto::buffer::RefWriteBuffer::new(&mut buffer);
+
+        loop {
+            let result = try!(encryptor.encrypt(&mut read_buffer, &mut write_buffer, true));
+            symm_encryption_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
+
+            match result {
+                ::crypto::buffer::BufferResult::BufferUnderflow => break,
+                ::crypto::buffer::BufferResult::BufferOverflow  => {},
+            }
+        }
+
+        let asymm_encryption_result = ::sodiumoxide::crypto::asymmetricbox::seal(&combined_key_iv,
+                                                                                 &nonce,
+                                                                                 &self.account.get_public_maid().public_keys().1,
+                                                                                 &self.account.get_maid().secret_keys().1);
+
+        let mut encoder = ::cbor::Encoder::from_memory();
+        encoder.encode(&[asymm_encryption_result, symm_encryption_result]).unwrap();
+
+        Ok(encoder.into_bytes())
+    }
+
+    pub fn get_maid(&self) -> &maidsafe_types::IdType {
+        self.account.get_maid()
+    }
+
+    pub fn get_public_maid(&self) -> &maidsafe_types::PublicIdType {
+        self.account.get_public_maid()
     }
 
     pub fn get_owner(&self) -> routing::NameType {

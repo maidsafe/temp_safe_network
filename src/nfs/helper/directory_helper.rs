@@ -58,7 +58,10 @@ impl DirectoryHelper {
         let mutex_client = self.client.clone();
         let client = mutex_client.lock().unwrap();
         let directory = nfs::types::DirectoryListing::new(directory_name, user_metadata);
-        let serialised_directory = directory.encrypt(client.get_asym_encryption_key());
+        //TODO has to go through SE
+        //let serialised_directory = directory.encrypt(client.get_asym_encryption_key());
+        let serialised_directory = Vec::<u8>::new();
+
         let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
         let save_res = self.network_put(self.client.clone(), immutable_data.clone());
         if save_res.is_err() {
@@ -82,7 +85,10 @@ impl DirectoryHelper {
             return Err("Network IO Error");
         }
         let mut sdv: maidsafe_types::StructuredData = deserialise(result.unwrap());
-        let serialised_directory = directory.encrypt(client.get_asym_encryption_key());
+        //TODO has to go through SE
+        //let serialised_directory = directory.encrypt(client.get_asym_encryption_key());
+        let serialised_directory = Vec::<u8>::new();
+
         let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
         let immutable_data_put_result = self.network_put(self.client.clone(), immutable_data.clone());
         if immutable_data_put_result.is_err() {
@@ -124,8 +130,10 @@ impl DirectoryHelper {
             return Err("Network IO Error");
         }
         let imm: maidsafe_types::ImmutableData = deserialise(get_data.unwrap());
-        let decrypt_result = nfs::types::DirectoryListing::decrypt(imm.value().clone());
-        Ok(decrypt_result.unwrap())
+        //TODO Remove the stuff below - it requires to go through SE
+        //let decrypt_result = nfs::types::DirectoryListing::decrypt(imm.value().clone());
+        //Ok(decrypt_result.unwrap())
+        Err("Unimplemented!!")
     }
 
     /// Return the nfs::types::DirectoryListing for the latest version
@@ -145,8 +153,10 @@ impl DirectoryHelper {
             return Err("Network IO Error");
         }
         let imm: maidsafe_types::ImmutableData = deserialise(imm_data_res.unwrap());
-        let decrypt_result = nfs::types::DirectoryListing::decrypt(imm.value().clone());
-        Ok(decrypt_result.unwrap())
+        //TODO Remove the stuff below - it requires to go through SE
+        //let decrypt_result = nfs::types::DirectoryListing::decrypt(imm.value().clone());
+        //Ok(decrypt_result.unwrap())
+        Err("Unimplemented!!")
     }
 
     fn get_response(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, wait_condition: WaitCondition) -> Result<Vec<u8>, &str> {
