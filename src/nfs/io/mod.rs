@@ -16,7 +16,9 @@
 // relating to use of the SAFE Network Software.
 
 mod writer;
+mod reader;
 mod network_storage;
 
 pub use self::network_storage::*;
 pub use self::writer::*;
+pub use self::reader::*;

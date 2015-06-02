@@ -53,56 +53,18 @@ impl DirectoryHelper {
         }
     }
 
-    fn get_response(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, wait_condition: WaitCondition) -> Result<Vec<u8>, &str> {
-        let waiting_message_id = wait_condition.0.clone();
-        let pair = wait_condition.1.clone();
-        let &(ref lock, ref cvar) = &*pair;
-        loop {
-            let mut message_id = lock.lock().unwrap();
-            message_id = cvar.wait(message_id).unwrap();
-            if *message_id == waiting_message_id {
-                let client_mutex = client.clone();
-                let mut client = client_mutex.lock().unwrap();
-                 return match client.get_response(*message_id) {
-                     Ok(data) => Ok(data),
-                     Err(err) => Err("IO Error")
-                 }
-            }
-        }
-    }
-
-    fn network_get(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, tag_id: u64,
-        name: routing::NameType) -> Result<Vec<u8>, &str> {
-        let client_mutex = client.clone();
-        let mut safe = client_mutex.lock().unwrap();
-        let get_result = safe.get(tag_id, name);
-        if get_result.is_err() {
-            return Err("Network IO Error");
-        }
-        self.get_response(client, get_result.unwrap())
-    }
-
-    fn network_put<T>(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, sendable: T) -> Result<Vec<u8>, &str> where T: Sendable {
-        let client_mutex = client.clone();
-        let mut safe = client_mutex.lock().unwrap();
-        let get_result = safe.put(sendable);
-        if get_result.is_err() {
-            return Err("Network IO Error");
-        }
-        self.get_response(client, get_result.unwrap())
-    }
-
-
     /// Creates a Directory in the network.
-    pub fn create(&mut self, owner: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
+    pub fn create(&mut self, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
+        let mutex_client = self.client.clone();
+        let client = mutex_client.lock().unwrap();
         let directory = nfs::types::DirectoryListing::new(directory_name, user_metadata);
-        let serialised_directory = serialise(directory.clone());
+        let serialised_directory = directory.encrypt(client.get_asym_encryption_key());
         let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
         let save_res = self.network_put(self.client.clone(), immutable_data.clone());
         if save_res.is_err() {
             return Err("Save Failed");
         }
-        let mut sdv: maidsafe_types::StructuredData = maidsafe_types::StructuredData::new(directory.get_id(), owner,
+        let mut sdv: maidsafe_types::StructuredData = maidsafe_types::StructuredData::new(directory.get_id(), client.get_owner(),
             vec![immutable_data.name()]);
         let save_sdv_res = self.network_put(self.client.clone(), sdv);
         if save_res.is_err() {
@@ -113,12 +75,14 @@ impl DirectoryHelper {
 
     /// Updates an existing nfs::types::DirectoryListing in the network.
     pub fn update(&mut self, directory: nfs::types::DirectoryListing) -> Result<(), &str> {
+        let mutex_client = self.client.clone();
+        let client = mutex_client.lock().unwrap();
         let result = self.network_get(self.client.clone(), SDV_TAG, directory.get_id());
         if result.is_err() {
             return Err("Network IO Error");
         }
         let mut sdv: maidsafe_types::StructuredData = deserialise(result.unwrap());
-        let serialised_directory = serialise(directory.clone());
+        let serialised_directory = directory.encrypt(client.get_asym_encryption_key());
         let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
         let immutable_data_put_result = self.network_put(self.client.clone(), immutable_data.clone());
         if immutable_data_put_result.is_err() {
@@ -160,7 +124,8 @@ impl DirectoryHelper {
             return Err("Network IO Error");
         }
         let imm: maidsafe_types::ImmutableData = deserialise(get_data.unwrap());
-        Ok(deserialise(imm.value().clone()))
+        let decrypt_result = nfs::types::DirectoryListing::decrypt(imm.value().clone());
+        Ok(decrypt_result.unwrap())
     }
 
     /// Return the nfs::types::DirectoryListing for the latest version
@@ -180,7 +145,47 @@ impl DirectoryHelper {
             return Err("Network IO Error");
         }
         let imm: maidsafe_types::ImmutableData = deserialise(imm_data_res.unwrap());
-        Ok(deserialise(imm.value().clone()))
+        let decrypt_result = nfs::types::DirectoryListing::decrypt(imm.value().clone());
+        Ok(decrypt_result.unwrap())
+    }
+
+    fn get_response(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, wait_condition: WaitCondition) -> Result<Vec<u8>, &str> {
+        let waiting_message_id = wait_condition.0.clone();
+        let pair = wait_condition.1.clone();
+        let &(ref lock, ref cvar) = &*pair;
+        loop {
+            let mut message_id = lock.lock().unwrap();
+            message_id = cvar.wait(message_id).unwrap();
+            if *message_id == waiting_message_id {
+                let client_mutex = client.clone();
+                let mut client = client_mutex.lock().unwrap();
+                 return match client.get_response(*message_id) {
+                     Ok(data) => Ok(data),
+                     Err(err) => Err("IO Error")
+                 }
+            }
+        }
+    }
+
+    fn network_get(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, tag_id: u64,
+        name: routing::NameType) -> Result<Vec<u8>, &str> {
+        let client_mutex = client.clone();
+        let mut safe = client_mutex.lock().unwrap();
+        let get_result = safe.get(tag_id, name);
+        if get_result.is_err() {
+            return Err("Network IO Error");
+        }
+        self.get_response(client, get_result.unwrap())
+    }
+
+    fn network_put<T>(&self, client_arc: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, sendable: T) -> Result<Vec<u8>, &str> where T: Sendable {
+        let client_mutex = client_arc.clone();
+        let mut client = client_mutex.lock().unwrap();
+        let get_result = client.put(sendable);
+        if get_result.is_err() {
+            return Err("Network IO Error");
+        }
+        self.get_response(client_arc, get_result.unwrap())
     }
 
 }

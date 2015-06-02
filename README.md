@@ -26,7 +26,7 @@
         - [ ] File Helper
             - [X] [MAID-1082](https://maidsafe.atlassian.net/browse/MAID-1082) Create File, update file and Metatdata
             - [ ] [MAID-1083](https://maidsafe.atlassian.net/browse/MAID-1083) Get Versions
-            - [ ] [MAID-1084](https://maidsafe.atlassian.net/browse/MAID-1084) Read File
+            - [X] [MAID-1084](https://maidsafe.atlassian.net/browse/MAID-1084) Read File
         - [ ] [MAID-1085](https://maidsafe.atlassian.net/browse/MAID-1085) Unit test cases for Directory and File Helpers
     - [ ] Implement REST DataTypes
         - [ ] [MAID-1086](https://maidsafe.atlassian.net/browse/MAID-1086) Container & Blob types

@@ -72,6 +72,14 @@ impl DirectoryListing {
     pub fn get_id(&self) -> routing::NameType {
         self.info.get_id().clone()
     }
+
+    pub fn encrypt(&self, enc_key: Vec<u8>) -> Vec<u8> {
+        Vec::new()
+    }
+
+    pub fn decrypt(data: Vec<u8>) -> Result<DirectoryListing, String> {
+        Err("Failed".to_string())
+    }
 }
 
 impl fmt::Debug for DirectoryListing {
