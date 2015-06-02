@@ -41,26 +41,28 @@ impl FileHelper {
         Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
     }
 
-    // pub fn update(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing) -> Result<nfs::io::Writer, &str> {
-    //     if !self.file_exists(directory.clone(), file.get_name()) {
-    //         return Err("File not present in the directory");
-    //     }
-    //     Ok(nfs::io::Writer::new(directory, file, self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone()))
-    // }
-    //
-    // /// Updates the file metadata. Returns the updated DirectoryListing
-    // pub fn update_metadata(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing, user_metadata: Vec<u8>) -> Result<nfs::types::DirectoryListing, &str> {
-    //     if !self.file_exists(directory.clone(), file.get_name()) {
-    //         return Err("File not present in the directory");
-    //     }
-    //     file.get_metadata().set_user_metadata(user_metadata);
-    //     let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
-    //     directory.get_files().remove(pos);
-    //     directory.get_files().insert(pos, file);
-    //     let network_storage = nfs::io::NetworkStorage::new(self.routing.clone(), self.callback_interface.clone(), self.response_notifier.clone());
-    //     network_storage.save_directory(directory.clone());
-    //     Ok(directory)
-    // }
+    pub fn update(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing) -> Result<nfs::io::Writer, &str> {
+        if !self.file_exists(directory.clone(), file.get_name()) {
+            return Err("File not present in the directory");
+        }
+        Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
+    }
+
+    /// Updates the file metadata. Returns the updated DirectoryListing
+    pub fn update_metadata(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), &str> {
+        if !self.file_exists(directory.clone(), file.get_name()) {
+            return Err("File not present in the directory");
+        }
+        file.get_metadata().set_user_metadata(user_metadata);
+        let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
+        directory.get_files().remove(pos);
+        directory.get_files().insert(pos, file);
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+        if directory_helper.update(directory.clone()).is_err() {
+            return Err("Failed to update");
+        }
+        Ok(())
+    }
 
 
     fn file_exists(&self, directory: nfs::types::DirectoryListing, file_name: String) -> bool {

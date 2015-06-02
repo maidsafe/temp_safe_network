@@ -45,22 +45,26 @@ impl Writer {
     }
 
     pub fn write(&mut self, data: &[u8], position: u64) {
+        // let se = self.self_encryptor.clone().lock().unwrap();
         self.self_encryptor.write(data, position);
     }
 
-    pub fn close(mut self) {
+    pub fn close(mut self) -> Result<(), String> {
         let mut directory = self.directory.clone();
-        let mut file = self.file;
+        let ref mut file = self.file;
         file.set_datamap(self.self_encryptor.close());
         if directory.get_files().contains(&file) {
             let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
             directory.get_files().remove(pos);
-            directory.get_files().insert(pos, file);
+            directory.get_files().insert(pos, file.clone());
         } else {
-            directory.add_file(file);
+            directory.add_file(file.clone());
         }
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-        directory_helper.update(directory);
+        if directory_helper.update(directory).is_err() {
+            return Err("Failed to save".to_string());
+        }
+        Ok(())
     }
 
 }
