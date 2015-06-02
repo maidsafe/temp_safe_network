@@ -72,6 +72,18 @@ impl DirectoryListing {
     pub fn get_id(&self) -> routing::NameType {
         self.info.get_id().clone()
     }
+
+    pub fn encrypt(&self, enc_key: Vec<u8>) -> Vec<u8> {
+        Vec::new()
+    }
+
+    pub fn decrypt(data: Vec<u8>) -> DirectoryListing {
+        DirectoryListing {
+            info: DirectoryInfo::new(Metadata::new(String::new(), Vec::new()), routing::test_utils::Random::generate_random()),
+            sub_directories: Vec::new(),
+            files: Vec::new()
+        }
+    }
 }
 
 impl fmt::Debug for DirectoryListing {

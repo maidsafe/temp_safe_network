@@ -255,6 +255,14 @@ impl Client {
         }
     }
 
+    pub fn get_asym_encryption_key(&self) -> Vec<u8> {
+        self.account.get_public_maid().name().0.iter().map(|x| *x).collect()
+    }
+
+    pub fn get_owner(&self) -> routing::NameType {
+        self.account.get_public_maid().name()
+    }
+
     pub fn put<T>(&mut self, sendable: T) -> Result<::WaitCondition, ::IoError> where T: Sendable {
         match self.routing.lock().unwrap().put(sendable) {
             Ok(id)      => Ok((id, self.response_notifier.clone())),
