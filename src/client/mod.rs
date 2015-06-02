@@ -28,8 +28,6 @@ pub mod non_networking_test_framework;
 mod user_account;
 mod callback_interface;
 
-use ResponseNotifier;
-
 pub struct Client {
     account:             user_account::Account,
     //TODO: Toggle depending on if using actual routing or non_networking_test_framework
