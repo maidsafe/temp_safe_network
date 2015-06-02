@@ -15,8 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-mod directory_helper;
-mod file_helper;
+mod writer;
+mod network_storage;
 
-pub use self::directory_helper::*;
-pub use self::file_helper::*;
+pub use self::network_storage::*;
+pub use self::writer::*;

@@ -259,9 +259,8 @@ impl Client {
         }
     }
 
-    pub fn get(&mut self, name: routing::NameType) -> Result<::WaitCondition, ::IoError> {
-        //TODO(Spandan) Change this to accept proper type_tag/type_id
-        match self.routing.lock().unwrap().get(101u64, name) {
+    pub fn get(&mut self, tag_id: u64, name: routing::NameType) -> Result<::WaitCondition, ::IoError> {
+        match self.routing.lock().unwrap().get(tag_id, name) {
             Ok(id)      => Ok((id, self.response_notifier.clone())),
             Err(io_err) => Err(io_err),
         }

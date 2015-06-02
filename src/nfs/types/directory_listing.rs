@@ -23,8 +23,7 @@ use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryListing {
-    id: routing::NameType,
-    metadata: Metadata,
+    info: DirectoryInfo,
     sub_directories: Vec<DirectoryInfo>,
     files: Vec<File>
 }
@@ -32,19 +31,22 @@ pub struct DirectoryListing {
 impl DirectoryListing {
     pub fn new(name: String, user_metadata: Vec<u8>) -> DirectoryListing {
         DirectoryListing {
-            id: routing::test_utils::Random::generate_random(),
-            metadata: Metadata::new(name, user_metadata),
+            info: DirectoryInfo::new(Metadata::new(name, user_metadata), routing::test_utils::Random::generate_random()),
             sub_directories: Vec::new(),
             files: Vec::new()
         }
     }
 
     pub fn get_metadata(&self) -> Metadata {
-        self.metadata.clone()
+        self.info.get_metadata().clone()
     }
 
     pub fn set_metadata(&mut self, metadata: Metadata) {
-        self.metadata = metadata;
+        self.info.set_metadata(metadata);
+    }
+
+    pub fn add_file(&mut self, file: File) {
+        self.files.push(file);
     }
 
     pub fn get_files(&self) -> Vec<File> {
@@ -64,23 +66,23 @@ impl DirectoryListing {
     }
 
     pub fn set_name(&mut self, name: String) {
-        self.metadata.set_name(name);
+        self.info.get_metadata().set_name(name);
     }
 
     pub fn get_id(&self) -> routing::NameType {
-        self.id.clone()
+        self.info.get_id().clone()
     }
 }
 
 impl fmt::Debug for DirectoryListing {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "id: {}, metadata: {}", self.id, self.metadata)
+        write!(f, "id: {}, metadata: {}", self.info.get_id(), self.info.get_metadata())
     }
 }
 
 impl fmt::Display for DirectoryListing {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "id: {}, metadata: {}", self.id, self.metadata)
+        write!(f, "id: {}, metadata: {}", self.info.get_id(), self.info.get_metadata())
     }
 }
 
