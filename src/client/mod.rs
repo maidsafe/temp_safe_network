@@ -305,14 +305,6 @@ impl Client {
         Ok(encoder.into_bytes())
     }
 
-    pub fn get_maid(&self) -> &maidsafe_types::IdType {
-        self.account.get_maid()
-    }
-
-    pub fn get_public_maid(&self) -> &maidsafe_types::PublicIdType {
-        self.account.get_public_maid()
-    }
-
     pub fn get_owner(&self) -> routing::NameType {
         self.account.get_public_maid().name()
     }
