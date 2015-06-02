@@ -26,9 +26,8 @@ use routing::sendable::Sendable;
 pub mod non_networking_test_framework;
 
 mod user_account;
-pub mod callback_interface;
+mod callback_interface;
 
-use self::callback_interface::*;
 use ResponseNotifier;
 
 pub struct Client {
