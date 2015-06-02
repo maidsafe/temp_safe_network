@@ -77,12 +77,8 @@ impl DirectoryListing {
         Vec::new()
     }
 
-    pub fn decrypt(data: Vec<u8>) -> DirectoryListing {
-        DirectoryListing {
-            info: DirectoryInfo::new(Metadata::new(String::new(), Vec::new()), routing::test_utils::Random::generate_random()),
-            sub_directories: Vec::new(),
-            files: Vec::new()
-        }
+    pub fn decrypt(data: Vec<u8>) -> Result<DirectoryListing, String> {
+        Err("Failed".to_string())
     }
 }
 
