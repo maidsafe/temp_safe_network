@@ -37,7 +37,6 @@ pub mod nfs;
 pub mod client;
 
 pub type IoError = std::io::Error;
-pub type WaitCondition = (routing::types::MessageId, ResponseNotifier);
 pub type ResponseNotifier = std::sync::Arc<(std::sync::Mutex<routing::types::MessageId>, std::sync::Condvar)>;
 
 pub enum CryptoError {

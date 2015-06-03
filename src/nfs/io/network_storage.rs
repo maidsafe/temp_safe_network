@@ -16,8 +16,6 @@
 // relating to use of the SAFE Network Software.
 use self_encryption;
 use maidsafe_types;
-use WaitCondition;
-use ResponseNotifier;
 use client;
 use routing;
 use rustc_serialize::{Decodable, Encodable};
@@ -51,21 +49,6 @@ impl NetworkStorage {
             client: client
         }
     }
-
-    fn blocked_read(&self, wait_condition: WaitCondition) -> Result<Vec<u8>, routing::error::ResponseError>{
-        let waiting_message_id = wait_condition.0.clone();
-        let pair = wait_condition.1.clone();
-        let &(ref lock, ref cvar) = &*pair;
-        loop {
-            let mut message_id = lock.lock().unwrap();
-            message_id = cvar.wait(message_id).unwrap();
-            if *message_id == waiting_message_id {
-                let mut client = self.client.clone();
-                return client.lock().unwrap().get_response(*message_id);
-            }
-        }
-    }
-
 }
 
 // FIXME There is no error handling mechanism in self_encryption::Storage?
@@ -84,11 +67,11 @@ impl self_encryption::Storage for NetworkStorage {
         if get_result.is_err() {
             return Vec::new();
         }
-        let data = self.blocked_read(get_result.unwrap());
-        if data.is_err() {
-            return Vec::new();
+
+        match get_result.ok().unwrap().get() {
+            Ok(data) => data,
+            Err(_) => Vec::new(),
         }
-        data.unwrap()
     }
 
     fn put(&self, name: Vec<u8>, data: Vec<u8>) {
