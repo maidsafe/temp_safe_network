@@ -21,7 +21,6 @@ use routing;
 use routing::sendable::Sendable;
 use cbor;
 use client;
-use WaitCondition;
 use std::error::Error;
 use maidsafe_types::TypeTag;
 use self_encryption;
@@ -188,24 +187,6 @@ impl DirectoryHelper {
         Ok(deserialise(se.read(0, size)))
     }
 
-    fn get_response(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, wait_condition: WaitCondition) -> Result<Vec<u8>, &str> {
-        let waiting_message_id = wait_condition.0.clone();
-        let pair = wait_condition.1.clone();
-        let &(ref lock, ref cvar) = &*pair;
-        loop {
-            let mut message_id = lock.lock().unwrap();
-            message_id = cvar.wait(message_id).unwrap();
-            if *message_id == waiting_message_id {
-                let client_mutex = client.clone();
-                let mut client = client_mutex.lock().unwrap();
-                 return match client.get_response(*message_id) {
-                     Ok(data) => Ok(data),
-                     Err(_) => Err("IO Error")
-                 }
-            }
-        }
-    }
-
     fn network_get(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, tag_id: u64,
         name: routing::NameType) -> Result<Vec<u8>, &str> {
         let client_mutex = client.clone();
@@ -214,7 +195,11 @@ impl DirectoryHelper {
         if get_result.is_err() {
             return Err("Network IO Error");
         }
-        self.get_response(client, get_result.unwrap())
+
+        match get_result.ok().unwrap().get() {
+            Ok(data) => Ok(data),
+            Err(_) => Err("TODO(Krishna)"),
+        }
     }
 
     fn network_put<T>(&self, client_arc: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, sendable: T) -> Result<Vec<u8>, &str> where T: Sendable {
@@ -224,7 +209,11 @@ impl DirectoryHelper {
         if get_result.is_err() {
             return Err("Network IO Error");
         }
-        self.get_response(client_arc, get_result.unwrap())
+
+        match get_result.ok().unwrap().get() {
+            Ok(data) => Ok(data),
+            Err(_) => Err("TODO(Krishna)"),
+        }
     }
 
     fn get_nonce(&self, id: routing::NameType, parent_id: routing::NameType) -> Option<::sodiumoxide::crypto::asymmetricbox::Nonce> {

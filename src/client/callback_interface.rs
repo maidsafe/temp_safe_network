@@ -80,8 +80,7 @@ impl CallbackInterface {
     }
 
     pub fn get_response(&mut self,
-                        message_id: routing::types::MessageId) -> Result<Vec<u8>, ResponseError> {
-        let result = self.message_queue.remove(&message_id).unwrap();
-        result
+                        message_id: routing::types::MessageId) -> Option<Result<Vec<u8>, ResponseError>> {
+        self.message_queue.remove(&message_id)
     }
 }

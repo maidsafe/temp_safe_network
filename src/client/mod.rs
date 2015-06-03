@@ -29,6 +29,7 @@ use routing::sendable::Sendable;
 pub mod non_networking_test_framework;
 
 mod user_account;
+mod response_getter;
 mod callback_interface;
 
 pub struct Client {
@@ -82,35 +83,23 @@ impl Client {
         let put_res = client.routing.lock().unwrap().put(encrypted_account.clone());
         match put_res {
             Ok(id) => {
-                {
-                    let &(ref lock, ref condition_var) = &*client.response_notifier;
-                    let mut mutex_guard = lock.lock().unwrap();
-                    while *mutex_guard != id {
-                        mutex_guard = condition_var.wait(mutex_guard).unwrap();
-                    }
-
-                    let mut cb_interface = client.callback_interface.lock().unwrap();
-                    if cb_interface.get_response(id).is_err() {
-                        return Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!"));
-                    }
+                let mut response_getter = response_getter::ResponseGetter::new(id, client.response_notifier.clone(), client.callback_interface.clone());
+                match response_getter.get() {
+                    Ok(_) => {},
+                    Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!")),
                 }
+
                 let account_version = maidsafe_types::StructuredData::new(user_account::Account::generate_network_id(&keyword, pin),
                                                                           client.account.get_public_maid().name(),
                                                                           vec![encrypted_account.name()]);
                 let put_res = client.routing.lock().unwrap().put(account_version);
+
                 match put_res {
                     Ok(id) => {
-                        {
-                            let &(ref lock, ref condition_var) = &*client.response_notifier;
-                            let mut mutex_guard = lock.lock().unwrap();
-                            while *mutex_guard != id {
-                                mutex_guard = condition_var.wait(mutex_guard).unwrap();
-                            }
-
-                            let mut cb_interface = client.callback_interface.lock().unwrap();
-                            if cb_interface.get_response(id).is_err() {
-                                return Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!"));
-                            }
+                        let mut response_getter = response_getter::ResponseGetter::new(id, client.response_notifier.clone(), client.callback_interface.clone());
+                        match response_getter.get() {
+                            Ok(_) => {},
+                            Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
                         }
 
                         Ok(client)
@@ -165,20 +154,8 @@ impl Client {
 
         match get_result {
             Ok(id) => {
-                let mut get_response_result: _;
-
-                {
-                    let &(ref lock, ref condition_var) = &*notifier;
-                    let mut mutex_guard = lock.lock().unwrap();
-                    while *mutex_guard != id {
-                        mutex_guard = condition_var.wait(mutex_guard).unwrap();
-                    }
-
-                    let mut cb_interface = callback_interface.lock().unwrap();
-                    get_response_result = cb_interface.get_response(id);
-                }
-
-                match get_response_result {
+                let mut response_getter = response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                match response_getter.get() {
                     Ok(raw_data) => {
                         let mut decoder = cbor::Decoder::from_bytes(raw_data);
                         let account_version: maidsafe_types::StructuredData = decoder.decode().next().unwrap().unwrap();
@@ -189,18 +166,8 @@ impl Client {
                                 let get_result = fake_routing_client.lock().unwrap().get(immutable_data_type_id.type_tag(), latest_version);
                                 match get_result {
                                     Ok(id) => {
-                                        {
-                                            let &(ref lock, ref condition_var) = &*notifier;
-                                            let mut mutex_guard = lock.lock().unwrap();
-                                            while *mutex_guard != id {
-                                                mutex_guard = condition_var.wait(mutex_guard).unwrap();
-                                            }
-
-                                            let mut cb_interface = callback_interface.lock().unwrap();
-                                            get_response_result = cb_interface.get_response(id);
-                                        }
-
-                                        match get_response_result {
+                                        let mut response_getter = response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                                        match response_getter.get() {
                                             Ok(raw_data) => {
                                                 let mut decoder = cbor::Decoder::from_bytes(raw_data);
                                                 let encrypted_account_packet: maidsafe_types::ImmutableData = decoder.decode().next().unwrap().unwrap();
@@ -382,26 +349,18 @@ impl Client {
         self.account.get_public_maid().name()
     }
 
-    pub fn put<T>(&mut self, sendable: T) -> Result<::WaitCondition, ::IoError> where T: Sendable {
+    pub fn put<T>(&mut self, sendable: T) -> Result<response_getter::ResponseGetter, ::IoError> where T: Sendable {
         match self.routing.lock().unwrap().put(sendable) {
-            Ok(id)      => Ok((id, self.response_notifier.clone())),
+            Ok(id)      => Ok(response_getter::ResponseGetter::new(id, self.response_notifier.clone(), self.callback_interface.clone())),
             Err(io_err) => Err(io_err),
         }
     }
 
-    pub fn get(&mut self, tag_id: u64, name: routing::NameType) -> Result<::WaitCondition, ::IoError> {
+    pub fn get(&mut self, tag_id: u64, name: routing::NameType) -> Result<response_getter::ResponseGetter, ::IoError> {
         match self.routing.lock().unwrap().get(tag_id, name) {
-            Ok(id)      => Ok((id, self.response_notifier.clone())),
+            Ok(id)      => Ok(response_getter::ResponseGetter::new(id, self.response_notifier.clone(), self.callback_interface.clone())),
             Err(io_err) => Err(io_err),
         }
-    }
-
-    pub fn get_network_response_callback(&self) -> ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>> {
-        self.callback_interface.clone()
-    }
-
-    pub fn get_response(&mut self, message_id: routing::types::MessageId) -> Result<Vec<u8>, routing::error::ResponseError> {
-         self.callback_interface.lock().unwrap().get_response(message_id)
     }
 }
 
