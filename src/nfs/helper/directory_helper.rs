@@ -62,9 +62,13 @@ impl DirectoryHelper {
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
         se.write(&serialise(directory.clone())[..], 0);
         let datamap = se.close();
-        // TODO Spandan - add encryption
-        let serialised_directory = serialise(datamap);
-        let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
+
+        let encrypt_result = client.hybrid_encrypt(&serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
+        if encrypt_result.is_err() {
+            return Err("Encryption failed");
+        }
+
+        let immutable_data = maidsafe_types::ImmutableData::new(encrypt_result.unwrap());
         let save_res = self.network_put(self.client.clone(), immutable_data.clone());
         if save_res.is_err() {
             return Err("Save Failed");
@@ -91,10 +95,13 @@ impl DirectoryHelper {
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
         se.write(&serialise(directory.clone())[..], 0);
         let datamap = se.close();
-        // TODO Spandan - add encryption
-        let serialised_directory = serialise(datamap);
 
-        let immutable_data = maidsafe_types::ImmutableData::new(serialised_directory);
+        let encrypt_result = client.hybrid_encrypt(&serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
+        if encrypt_result.is_err() {
+            return Err("Encryption failed");
+        }
+
+        let immutable_data = maidsafe_types::ImmutableData::new(encrypt_result.unwrap());
         let immutable_data_put_result = self.network_put(self.client.clone(), immutable_data.clone());
         if immutable_data_put_result.is_err() {
             return Err("Failed to save directory");
@@ -201,6 +208,17 @@ impl DirectoryHelper {
             return Err("Network IO Error");
         }
         self.get_response(client_arc, get_result.unwrap())
+    }
+
+    fn get_nonce(&self, id: routing::NameType, parent_id: routing::NameType) -> Option<::sodiumoxide::crypto::asymmetricbox::Nonce> {
+        let mut nonce = [0u8;24];
+        for i in 0..24 {
+            if i % 2 == 0 {
+                nonce[i] = id.0[i];
+                nonce[i+1] = parent_id.0[i];
+            }
+        }
+        Some(::sodiumoxide::crypto::asymmetricbox::Nonce(nonce))
     }
 
 }
