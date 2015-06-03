@@ -73,7 +73,7 @@ mod test {
     use super::*;
     use self_encryption;
     use cbor;
-    use super::metadata::Metadata;
+    use nfs::metadata::Metadata;
 
     #[test]
     fn serialise() {

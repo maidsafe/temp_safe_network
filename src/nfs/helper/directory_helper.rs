@@ -55,10 +55,10 @@ impl DirectoryHelper {
     }
 
     /// Creates a Directory in the network.
-    pub fn create(&mut self, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
+    pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
         let mutex_client = self.client.clone();
         let client = mutex_client.lock().unwrap();
-        let directory = nfs::directory_listing::DirectoryListing::new(directory_name, user_metadata);
+        let directory = nfs::directory_listing::DirectoryListing::new(parent_dir_id, directory_name, user_metadata);
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
         se.write(&serialise(directory.clone())[..], 0);
         let datamap = se.close();

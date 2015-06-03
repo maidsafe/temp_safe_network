@@ -17,19 +17,30 @@
 use nfs::metadata::Metadata;
 use routing;
 use std::fmt;
+use routing::test_utils::Random;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryInfo {
+    id: routing::NameType,
+    parent_dir_id: routing::NameType,
     metadata: Metadata,
-    id: routing::NameType
 }
 
 impl DirectoryInfo {
-    pub fn new(metadata: Metadata, id: routing::NameType) -> DirectoryInfo {
+    pub fn new(parent_dir_id: routing::NameType, metadata: Metadata) -> DirectoryInfo {
         DirectoryInfo {
+            id: routing::test_utils::Random::generate_random(),
+            parent_dir_id: parent_dir_id,
             metadata: metadata,
-            id: id
         }
+    }
+
+    pub fn get_id(&self) -> routing::NameType {
+        self.id.clone()
+    }
+
+    pub fn get_parent_dir_id(&self) -> routing::NameType {
+        self.parent_dir_id.clone()
     }
 
     pub fn set_metadata(&mut self, metadata: Metadata) {
@@ -38,10 +49,6 @@ impl DirectoryInfo {
 
     pub fn get_metadata(&self) -> Metadata {
         self.metadata.clone()
-    }
-
-    pub fn get_id(&self) -> routing::NameType {
-        self.id.clone()
     }
 }
 
@@ -61,13 +68,13 @@ impl fmt::Display for DirectoryInfo {
 #[cfg(test)]
 mod test {
     use super::*;
-    use super::metadata::Metadata;
-    use routing;
+    use nfs::metadata::Metadata;
     use cbor;
+    use routing;
 
     #[test]
     fn serialise() {
-        let obj_before = DirectoryInfo::new(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), routing::NameType([1u8;64]));
+        let obj_before = DirectoryInfo::new(routinig::NameType([0u8,64]), Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()));
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();

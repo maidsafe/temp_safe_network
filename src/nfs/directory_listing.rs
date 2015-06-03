@@ -18,7 +18,6 @@ use super::file::File;
 use super::metadata::Metadata;
 use super::directory_info::DirectoryInfo;
 use routing;
-use routing::test_utils::Random;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -29,9 +28,9 @@ pub struct DirectoryListing {
 }
 
 impl DirectoryListing {
-    pub fn new(name: String, user_metadata: Vec<u8>) -> DirectoryListing {
+    pub fn new(parent_dir_id: routing::NameType, name: String, user_metadata: Vec<u8>) -> DirectoryListing {
         DirectoryListing {
-            info: DirectoryInfo::new(Metadata::new(name, user_metadata), routing::test_utils::Random::generate_random()),
+            info: DirectoryInfo::new(parent_dir_id, Metadata::new(name, user_metadata)),
             sub_directories: Vec::new(),
             files: Vec::new()
         }
@@ -43,6 +42,10 @@ impl DirectoryListing {
 
     pub fn set_metadata(&mut self, metadata: Metadata) {
         self.info.set_metadata(metadata);
+    }
+
+    pub fn get_parent_dir_id(&self) -> routing::NameType {
+        self.info.get_parent_dir_id().clone()
     }
 
     pub fn add_file(&mut self, file: File) {
@@ -90,12 +93,13 @@ impl fmt::Display for DirectoryListing {
 #[cfg(test)]
 mod test {
     use super::*;
-    use super::metadata::Metadata;
+    use nfs::metadata::Metadata;
     use cbor;
+    use routing;
 
     #[test]
     fn serialise() {
-        let obj_before = DirectoryListing::new("Home".to_string(), "{mime:\"application/json\"}".to_string().into_bytes());
+        let obj_before = DirectoryListing::new(routing::NameType([1u8; 64]), "Home".to_string(), "{mime:\"application/json\"}".to_string().into_bytes());
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();
