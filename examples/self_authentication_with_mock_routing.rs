@@ -26,7 +26,7 @@ fn validate_pin_is_4_digits(mut pin: u32) -> bool {
             return false;
         }
     }
-    
+
     pin /= 10;
 
     if pin != 0 {
@@ -37,9 +37,9 @@ fn validate_pin_is_4_digits(mut pin: u32) -> bool {
 }
 
 fn main() {
-    let mut keyword = "".to_string();
-    let mut password = "".to_string();
-    let mut pin_str = "".to_string();
+    let mut keyword = String::new();
+    let mut password = String::new();
+    let mut pin_str = String::new();
     let mut pin: u32;
 
     println!("\n\tAccount Creation");

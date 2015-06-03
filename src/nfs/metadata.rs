@@ -90,7 +90,7 @@ impl Encodable for Metadata {
     fn encode<E: Encoder>(&self, e: &mut E)->Result<(), E::Error> {
         let created_time = self.created_time.to_timespec();
         let modified_time = self.modified_time.to_timespec();
-        CborTagEncode::new(5483_000, &(self.name.clone(), self.size, self.user_metadata.clone(),
+        CborTagEncode::new(5483_000, &(self.name.clone(), self.size as usize, self.user_metadata.clone(),
         created_time.sec, created_time.nsec, modified_time.sec, modified_time.nsec)).encode(e)
     }
 }
