@@ -18,13 +18,12 @@
 use time;
 use cbor::CborTagEncode;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
-use std::str;
 use std::fmt;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Metadata {
     name: String,
-    size: i64,
+    size: u64,
     created_time:  time::Tm,
     modified_time: time::Tm,
     user_metadata: Vec<u8>
@@ -49,22 +48,6 @@ impl Metadata {
         self.name.clone()
     }
 
-    pub fn set_size(&mut self, size: i64) {
-        self.size = size;
-    }
-
-    pub fn get_size(&self) -> i64 {
-        self.size
-    }
-
-    pub fn set_modified_time(&mut self, time: time::Tm) {
-        self.modified_time = time;
-    }
-
-    pub fn get_modified_time(&self) -> time::Tm {
-        self.modified_time
-    }
-
     pub fn set_user_metadata(&mut self, user_metadata: Vec<u8>) {
         self.user_metadata = user_metadata;
     }
@@ -77,13 +60,37 @@ impl Metadata {
         }
     }
 
+    pub fn get_created_time(&self) -> time::Tm {
+        self.created_time
+    }
+
+    pub fn get_modified_time(&self) -> time::Tm {
+        self.modified_time
+    }
+
+    pub fn set_created_time(&mut self, created_time: time::Tm) {
+        self.created_time = created_time
+    }
+
+    pub fn set_modified_time(&mut self, modified_time: time::Tm) {
+        self.modified_time = modified_time
+    }
+
+    pub fn get_size(&self) -> u64 {
+        self.size
+    }
+
+    pub fn set_size(&mut self, size: u64) {
+        self.size = size;
+    }
+
 }
 
 impl Encodable for Metadata {
     fn encode<E: Encoder>(&self, e: &mut E)->Result<(), E::Error> {
         let created_time = self.created_time.to_timespec();
         let modified_time = self.modified_time.to_timespec();
-        CborTagEncode::new(5483_000, &(self.name.clone(), self.size, self.user_metadata.clone(),
+        CborTagEncode::new(5483_000, &(self.name.clone(), self.size as usize, self.user_metadata.clone(),
         created_time.sec, created_time.nsec, modified_time.sec, modified_time.nsec)).encode(e)
     }
 }
