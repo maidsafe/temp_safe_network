@@ -18,22 +18,19 @@ use nfs;
 use std::sync;
 use super::network_storage::NetworkStorage;
 use self_encryption;
-use std::fs;
-use rand;
-use rand::Rng;
 use routing;
 use client;
 
 pub struct Writer {
-    file: nfs::types::File,
-    directory: nfs::types::DirectoryListing,
+    file: nfs::file::File,
+    directory: nfs::directory_listing::DirectoryListing,
     self_encryptor: self_encryption::SelfEncryptor<NetworkStorage>,
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
 impl Writer {
 
-    pub fn new(directory: nfs::types::DirectoryListing, file: nfs::types::File,
+    pub fn new(directory: nfs::directory_listing::DirectoryListing, file: nfs::file::File,
         client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> Writer {
         let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
         Writer {

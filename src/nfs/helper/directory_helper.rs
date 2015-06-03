@@ -58,7 +58,7 @@ impl DirectoryHelper {
     pub fn create(&mut self, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
         let mutex_client = self.client.clone();
         let client = mutex_client.lock().unwrap();
-        let directory = nfs::types::DirectoryListing::new(directory_name, user_metadata);
+        let directory = nfs::directory_listing::DirectoryListing::new(directory_name, user_metadata);
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
         se.write(&serialise(directory.clone())[..], 0);
         let datamap = se.close();
@@ -78,8 +78,8 @@ impl DirectoryHelper {
         Ok(())
     }
 
-    /// Updates an existing nfs::types::DirectoryListing in the network.
-    pub fn update(&mut self, directory: nfs::types::DirectoryListing) -> Result<(), &str> {
+    /// Updates an existing DirectoryListing in the network.
+    pub fn update(&mut self, directory: nfs::directory_listing::DirectoryListing) -> Result<(), &str> {
         let mutex_client = self.client.clone();
         let client = mutex_client.lock().unwrap();
         let result = self.network_get(self.client.clone(), SDV_TAG, directory.get_id());
@@ -119,8 +119,8 @@ impl DirectoryHelper {
         Ok(sdv.value())
     }
 
-    /// Return the nfs::types::DirectoryListing for the specified version
-    pub fn get_by_version(&mut self, directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::types::DirectoryListing, &str> {
+    /// Return the DirectoryListing for the specified version
+    pub fn get_by_version(&mut self, directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
         let data_res = self.network_get(self.client.clone(), SDV_TAG, directory_id);
         if data_res.is_err() {
             return Err("Network IO Error");
@@ -141,8 +141,8 @@ impl DirectoryHelper {
         Ok(deserialise(se.read(0, size)))
     }
 
-    /// Return the nfs::types::DirectoryListing for the latest version
-    pub fn get(&mut self, directory_id: routing::NameType) -> Result<nfs::types::DirectoryListing, &str> {
+    /// Return the DirectoryListing for the latest version
+    pub fn get(&mut self, directory_id: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
         let sdv_res = self.network_get(self.client.clone(), SDV_TAG, directory_id);
         if sdv_res.is_err() {
             return Err("Network IO Error");

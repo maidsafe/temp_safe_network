@@ -15,15 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use super::file::File;
-use super::directory_listing::DirectoryListing;
+mod wrapper;
 
-pub trait FileWrapper {
-    fn convert_to_file(&self) -> File;
-    fn convert_from_file(file: File) -> Self;
-}
-
-pub trait DirectoryListingWrapper {
-    fn convert_to_directory_listing(&self) -> DirectoryListing;
-    fn convert_from_directory_listing(directory_listing: DirectoryListing) -> Self;
-}
+pub use self::wrapper::*;

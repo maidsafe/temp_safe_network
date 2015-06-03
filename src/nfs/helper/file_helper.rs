@@ -33,15 +33,15 @@ impl FileHelper {
     }
 
     pub fn create(&mut self, name: String, user_metatdata: Vec<u8>,
-            directory: nfs::types::DirectoryListing) -> Result<nfs::io::Writer, &str> {
+            directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, &str> {
         if self.file_exists(directory.clone(), name.clone()) {
             return Err("File already exists");
         }
-        let file = nfs::types::File::new(nfs::types::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
+        let file = nfs::file::File::new(nfs::metadata::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
         Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
     }
 
-    pub fn update(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing) -> Result<nfs::io::Writer, &str> {
+    pub fn update(&mut self, file: nfs::file::File, directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, &str> {
         if !self.file_exists(directory.clone(), file.get_name()) {
             return Err("File not present in the directory");
         }
@@ -49,7 +49,7 @@ impl FileHelper {
     }
 
     /// Updates the file metadata. Returns the updated DirectoryListing
-    pub fn update_metadata(&mut self, file: nfs::types::File, directory: nfs::types::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), &str> {
+    pub fn update_metadata(&mut self, file: nfs::file::File, directory: nfs::directory_listing::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), &str> {
         if !self.file_exists(directory.clone(), file.get_name()) {
             return Err("File not present in the directory");
         }
@@ -64,11 +64,11 @@ impl FileHelper {
         Ok(())
     }
 
-    pub fn read(&mut self, file: nfs::types::File) -> nfs::io::Reader {
+    pub fn read(&mut self, file: nfs::file::File) -> nfs::io::Reader {
         nfs::io::Reader::new(file, self.client.clone())
     }
 
-    pub fn file_exists(&self, directory: nfs::types::DirectoryListing, file_name: String) -> bool {
+    pub fn file_exists(&self, directory: nfs::directory_listing::DirectoryListing, file_name: String) -> bool {
         directory.get_files().iter().find(|file| {
                 file.get_name() == file_name
             }).is_some()

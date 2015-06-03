@@ -14,15 +14,14 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+use nfs;
 
-mod metadata;
-mod file;
-mod directory_listing;
-mod directory_info;
-mod traits;
+pub trait FileWrapper {
+    fn convert_to_file(&self) -> nfs::file::File;
+    fn convert_from_file(file: nfs::file::File) -> Self;
+}
 
-pub use self::metadata::*;
-pub use self::file::*;
-pub use self::directory_info::*;
-pub use self::directory_listing::*;
-pub use self::traits::*;
+pub trait DirectoryListingWrapper {
+    fn convert_to_directory_listing(&self) -> nfs::directory_listing::DirectoryListing;
+    fn convert_from_directory_listing(directory_listing: nfs::directory_listing::DirectoryListing) -> Self;
+}

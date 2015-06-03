@@ -15,13 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use self_encryption;
-
-use std::fmt;
-use std::fs;
-use std::fs::{File};
-use std::io::prelude::*;
-use std::path::Path;
-use std::string::String;
 use maidsafe_types;
 use WaitCondition;
 use ResponseNotifier;

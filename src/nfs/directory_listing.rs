@@ -90,7 +90,7 @@ impl fmt::Display for DirectoryListing {
 #[cfg(test)]
 mod test {
     use super::*;
-    use super::super::metadata::Metadata;
+    use super::metadata::Metadata;
     use cbor;
 
     #[test]
