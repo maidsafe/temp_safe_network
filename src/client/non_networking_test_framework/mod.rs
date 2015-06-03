@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use routing;
+use maidsafe_types::TypeTag;
 use routing::sendable::Sendable;
 use routing::client_interface::Interface;
 
@@ -74,7 +75,8 @@ impl RoutingClientMock {
         let cb_interface = self.callback_interface.clone();
         let data_store = self.data_store.clone();
 
-        let success: bool = if sendable.type_tag() != 100u64 && data_store.lock().unwrap().contains_key(&sendable.name()) {
+        let structured_data_type_id: ::maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let success: bool = if sendable.type_tag() != structured_data_type_id.type_tag() && data_store.lock().unwrap().contains_key(&sendable.name()) {
             false
         } else {
             data_store.lock().unwrap().insert(sendable.name(), sendable.serialised_contents());
@@ -100,8 +102,8 @@ impl RoutingClientMock {
         let cb_interface = self.callback_interface.clone();
         let data_store = self.data_store.clone();
 
-        //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
-        let success: bool = if sendable.type_tag() != 100u64 && data_store.lock().unwrap().contains_key(&sendable.name()) {
+        let structured_data_type_id: ::maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let success: bool = if sendable.type_tag() != structured_data_type_id.type_tag() && data_store.lock().unwrap().contains_key(&sendable.name()) {
             false
         } else {
             data_store.lock().unwrap().insert(sendable.name(), sendable.serialised_contents());
@@ -247,7 +249,7 @@ mod test {
         };
 
         // Construct ImmutableData
-        let immutable_data_type_id: maidsafe_types::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let orig_data: Vec<u8> = (0u8..100u8).map(|_| ::rand::random::<u8>()).collect();
         let orig_immutable_data = maidsafe_types::ImmutableData::new(orig_data);
 
@@ -370,13 +372,12 @@ mod test {
         };
 
         // Construct ImmutableData
-        let immutable_data_type_id: maidsafe_types::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let orig_data: Vec<u8> = (0u8..100u8).map(|_| ::rand::random::<u8>()).collect();
         let orig_immutable_data = maidsafe_types::ImmutableData::new(orig_data);
 
         // Construct StructuredData, 1st version, for this ImmutableData
-        //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
-        // let structured_data_type_id: maidsafe_types::data::structured_data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let keyword = "Spandan".to_string();
         let pin = 1234u32;
         let user_id = ::client::user_account::Account::generate_network_id(&keyword, pin);
@@ -386,9 +387,7 @@ mod test {
 
         // GET StructuredData should fail
         {
-            //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
-            // match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
-            match mock_routing.lock().unwrap().get(100u64, user_id.clone()) {
+            match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
                 Ok(id) => {
                     let &(ref lock, ref condition_var) = &*notifier;
                     let mut mutex_guard = lock.lock().unwrap();
@@ -447,9 +446,7 @@ mod test {
 
         // GET StructuredData should pass
         {
-            //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
-            //match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
-            match mock_routing.lock().unwrap().get(100u64, user_id.clone()) {
+            match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
                 Ok(id) => {
                     let &(ref lock, ref condition_var) = &*notifier;
                     let mut mutex_guard = lock.lock().unwrap();
@@ -545,9 +542,7 @@ mod test {
 
         // GET for new StructuredData version should pass
         {
-            //TODO(Spandan) Use StructuredDataTypeTag once available in crates.io in maidsafe_types.
-            //match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
-            match mock_routing.lock().unwrap().get(100u64, user_id.clone()) {
+            match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
                 Ok(id) => {
                     let &(ref lock, ref condition_var) = &*notifier;
                     let mut mutex_guard = lock.lock().unwrap();

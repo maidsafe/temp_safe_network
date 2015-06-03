@@ -136,7 +136,7 @@ impl DirectoryHelper {
         if !sdv.value().contains(&version) {
             return Err("Version not found");
         };
-        let immutable_data_type_id: maidsafe_types::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let get_data = self.network_get(self.client.clone(), immutable_data_type_id.type_tag(), version);
         if get_data.is_err() {
             return Err("Network IO Error");
@@ -167,7 +167,7 @@ impl DirectoryHelper {
             Some(data) => routing::NameType(data.0),
             None => return Err("Could not find data")
         };
-        let immutable_data_type_id: maidsafe_types::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let imm_data_res = self.network_get(self.client.clone(), immutable_data_type_id.type_tag(), name);
         if imm_data_res.is_err() {
             return Err("Network IO Error");

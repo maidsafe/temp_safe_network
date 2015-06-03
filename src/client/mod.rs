@@ -160,10 +160,8 @@ impl Client {
             })),
         };
 
-        // let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
-        // let get_result = fake_routing_client.lock().unwrap().get(structured_data_type_id.type_tag(), user_network_id);
-        // TODO(Spandan) Use the above once maidsafe_types is published in crates.io
-        let get_result = fake_routing_client.lock().unwrap().get(100u64, user_network_id);
+        let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let get_result = fake_routing_client.lock().unwrap().get(structured_data_type_id.type_tag(), user_network_id);
 
         match get_result {
             Ok(id) => {
@@ -187,7 +185,7 @@ impl Client {
 
                         match account_version.value().pop() {
                             Some(latest_version) => {
-                                let immutable_data_type_id: maidsafe_types::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+                                let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
                                 let get_result = fake_routing_client.lock().unwrap().get(immutable_data_type_id.type_tag(), latest_version);
                                 match get_result {
                                     Ok(id) => {
