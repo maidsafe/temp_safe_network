@@ -93,35 +93,40 @@ fn main() {
     println!("\n\n\tManual Account Login");
     println!("\t====================");
 
-    password.clear();
-    keyword.clear();
-
-    println!("\n------------ Enter Keyword ---------------");
-    std::io::stdin().read_line(&mut keyword);
-
-    println!("\n\n------------ Enter Password --------------");
-    std::io::stdin().read_line(&mut password);
-
     loop {
-        pin_str.clear();
-        println!("\n\n--------- Enter PIN (4 Digits) -----------");
-        std::io::stdin().read_line(&mut pin_str);
-        let result = pin_str.trim().parse::<u32>();
-        if result.is_ok() {
-            pin = result.ok().unwrap();
-            if validate_pin_is_4_digits(pin) {
-                break;
-            }
-        }
-        println!("ERROR: PIN is not 4 Digits !!");
-    }
+        password.clear();
+        keyword.clear();
 
-    // Log into the created account
-    {
-        println!("\nTrying to log in ...");
-        match maidsafe_client::client::Client::log_in(&keyword, pin, &password.as_bytes(), data_store.clone()) {
-            Ok(_) => println!("Account Login Successful !!"),
-            Err(io_error)  => println!("Account Login Failed !! Reason: {:?}", io_error.description()),
+        println!("\n------------ Enter Keyword ---------------");
+        std::io::stdin().read_line(&mut keyword);
+
+        println!("\n\n------------ Enter Password --------------");
+        std::io::stdin().read_line(&mut password);
+
+        loop {
+            pin_str.clear();
+            println!("\n\n--------- Enter PIN (4 Digits) -----------");
+            std::io::stdin().read_line(&mut pin_str);
+            let result = pin_str.trim().parse::<u32>();
+            if result.is_ok() {
+                pin = result.ok().unwrap();
+                if validate_pin_is_4_digits(pin) {
+                    break;
+                }
+            }
+            println!("ERROR: PIN is not 4 Digits !!");
+        }
+
+        // Log into the created account
+        {
+            println!("\nTrying to log in ...");
+            match maidsafe_client::client::Client::log_in(&keyword, pin, &password.as_bytes(), data_store.clone()) {
+                Ok(_) => {
+                    println!("Account Login Successful !!");
+                    break;
+                }
+                Err(io_error)  => println!("Account Login Failed !! Reason: {:?}\n\n", io_error.description()),
+            }
         }
     }
 }

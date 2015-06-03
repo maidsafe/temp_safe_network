@@ -260,21 +260,25 @@ impl Client {
                           nonce_opt: Option<::sodiumoxide::crypto::asymmetricbox::Nonce>) -> Result<Vec<u8>, ::crypto::symmetriccipher::SymmetricCipherError> {
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
+            //TODO(Spandan) Change this to a fixed deterministic Nonce
             None => ::sodiumoxide::crypto::asymmetricbox::gen_nonce(),
         };
 
         let mut key = [0u8; 32];
         let mut iv  = [0u8; 16];
 
-        let mut combined_key_iv: [u8; 48] = unsafe { ::std::mem::uninitialized() };
-
-        for it in key.iter().chain(iv.iter()).enumerate() {
-            combined_key_iv[it.0] = *it.1;
-        }
-
         let mut rand_generator = ::rand::OsRng::new().ok().unwrap();
         rand_generator.fill_bytes(&mut key);
         rand_generator.fill_bytes(&mut iv);
+
+        let mut combined_key_iv: [u8; 48] = unsafe { ::std::mem::uninitialized() };
+
+        for it in key.iter().enumerate() {
+            combined_key_iv[it.0] = *it.1;
+        }
+        for it in iv.iter().enumerate() {
+            combined_key_iv[it.0 + 32] = *it.1;
+        }
 
         let mut encryptor = ::crypto::aes::cbc_encryptor(::crypto::aes::KeySize::KeySize256, &key, &iv, ::crypto::blockmodes::PkcsPadding);
 
@@ -313,6 +317,7 @@ impl Client {
 
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
+            //TODO(Spandan) Change this to a fixed deterministic Nonce
             None => ::sodiumoxide::crypto::asymmetricbox::gen_nonce(),
         };
 
@@ -442,5 +447,47 @@ mod test {
         // Correct Credentials - Login Should Pass
         result = Client::log_in(&keyword, pin, &password, data_store);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn hybrid_encryption_decryption() {
+        // Construct Client
+        let keyword = "Spandan".to_string();
+        let password = "Sharma".as_bytes();
+        let pin = 1234u32;
+        let data_store = ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()));
+
+        let result = Client::create_account(&keyword, pin, &password, data_store);
+        assert!(result.is_ok());
+        let client = result.ok().unwrap();
+
+        // Identical Plain Texts
+        let plain_text_0 = vec![123u8; 1000];
+        let plain_text_1 = plain_text_0.clone();
+
+        // Encrypt
+        let nonce = ::sodiumoxide::crypto::asymmetricbox::gen_nonce();
+        let hybrid_encrypt_0 = client.hybrid_encrypt(&plain_text_0[..], Some(nonce));
+        let hybrid_encrypt_1 = client.hybrid_encrypt(&plain_text_1[..], Some(nonce));
+
+        assert!(hybrid_encrypt_0.is_ok());
+        assert!(hybrid_encrypt_1.is_ok());
+
+        // Same Plain Texts
+        assert_eq!(plain_text_0, plain_text_1);
+
+        // Different Results because of random "iv"
+        assert!(hybrid_encrypt_0.clone().ok().unwrap() != hybrid_encrypt_1.clone().ok().unwrap());
+
+        // Decrypt
+        let hybrid_decrypt_0 = client.hybrid_decrypt(&hybrid_encrypt_0.ok().unwrap()[..], Some(nonce));
+        let hybrid_decrypt_1 = client.hybrid_decrypt(&hybrid_encrypt_1.ok().unwrap()[..], Some(nonce));
+
+        assert!(hybrid_decrypt_0.is_some());
+        assert!(hybrid_decrypt_1.is_some());
+
+        // Should have decrypted to the same Plain Texts
+        assert_eq!(plain_text_0, hybrid_decrypt_0.unwrap());
+        assert_eq!(plain_text_1, hybrid_decrypt_1.unwrap());
     }
 }
