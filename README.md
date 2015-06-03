@@ -32,8 +32,7 @@
         - [X] [MAID-1086](https://maidsafe.atlassian.net/browse/MAID-1086) Container & Blob types
             - [X] Implement Blob and Container types
             - [X] Implement FileWrapper trait for Blob
-            - [X] Implement DirectoryListingWrapper trait for Container
-            - [X] Unit test cases
+            - [X] Implement DirectoryListingWrapper trait for Container            
         - [ ] REST API methods in Container
             - [ ] [MAID-1087](https://maidsafe.atlassian.net/browse/MAID-1087) Create Container & Get Container
             - [ ] [MAID-1088](https://maidsafe.atlassian.net/browse/MAID-1088) List Containers, Update / Get Container Metadata
