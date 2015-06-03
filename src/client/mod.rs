@@ -300,9 +300,65 @@ impl Client {
                                                                                  &self.account.get_maid().secret_keys().1);
 
         let mut encoder = ::cbor::Encoder::from_memory();
-        encoder.encode(&[asymm_encryption_result, symm_encryption_result]).unwrap();
+        encoder.encode(&[(asymm_encryption_result, symm_encryption_result)]).unwrap();
 
         Ok(encoder.into_bytes())
+    }
+
+    pub fn hybrid_decrypt(&self,
+                          data_to_decrypt: &[u8],
+                          nonce_opt: Option<::sodiumoxide::crypto::asymmetricbox::Nonce>) -> Option<Vec<u8>> {
+        let mut decoder = ::cbor::Decoder::from_bytes(data_to_decrypt);
+        let (asymm_encryption_result, symm_encryption_result): (Vec<u8>, Vec<u8>) = decoder.decode().next().unwrap().unwrap();
+
+        let nonce = match nonce_opt {
+            Some(nonce) => nonce,
+            None => ::sodiumoxide::crypto::asymmetricbox::gen_nonce(),
+        };
+
+        match ::sodiumoxide::crypto::asymmetricbox::open(&asymm_encryption_result[..],
+                                                         &nonce,
+                                                         &self.account.get_public_maid().public_keys().1,
+                                                         &self.account.get_maid().secret_keys().1) {
+            Some(asymm_decryption_result) => {
+                if asymm_decryption_result.len() == 48 {
+                    let mut key: [u8; 32] = unsafe { ::std::mem::uninitialized() };
+                    let mut iv : [u8; 16] = unsafe { ::std::mem::uninitialized() };
+
+                    for it in asymm_decryption_result.iter().take(32).enumerate() {
+                        key[it.0] = *it.1;
+                    }
+                    for it in asymm_decryption_result.iter().skip(32).enumerate() {
+                        iv[it.0] = *it.1;
+                    }
+
+                    let mut decryptor = ::crypto::aes::cbc_decryptor(::crypto::aes::KeySize::KeySize256, &key, &iv, ::crypto::blockmodes::PkcsPadding);
+
+                    let mut symm_decryption_result = Vec::<u8>::with_capacity(symm_encryption_result.len());
+                    let mut read_buffer = ::crypto::buffer::RefReadBuffer::new(&symm_encryption_result[..]);
+                    let mut buffer = [0u8; 4096];
+                    let mut write_buffer = ::crypto::buffer::RefWriteBuffer::new(&mut buffer);
+
+                    loop {
+                        match decryptor.decrypt(&mut read_buffer, &mut write_buffer, true) {
+                            Ok(result) => {
+                                symm_decryption_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
+                                match result {
+                                    ::crypto::buffer::BufferResult::BufferUnderflow => break,
+                                    ::crypto::buffer::BufferResult::BufferOverflow  => {},
+                                }
+                            },
+                            Err(_) => return None,
+                        }
+                    }
+
+                    Some(symm_decryption_result)
+                } else {
+                    None
+                }
+            },
+            None => None,
+        }
     }
 
     pub fn get_owner(&self) -> routing::NameType {

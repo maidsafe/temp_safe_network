@@ -14,6 +14,7 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use nfs::metadata::Metadata;
 use routing;
 use std::fmt;
@@ -74,7 +75,7 @@ mod test {
 
     #[test]
     fn serialise() {
-        let obj_before = DirectoryInfo::new(routinig::NameType([0u8,64]), Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()));
+        let obj_before = DirectoryInfo::new(routing::NameType::new([0u8; 64]), Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()));
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();
