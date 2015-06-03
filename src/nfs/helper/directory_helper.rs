@@ -25,9 +25,6 @@ use std::error::Error;
 use maidsafe_types::TypeTag;
 use self_encryption;
 
-// TODO: Remove the tag_id values and get from maidsafe_types
-const SDV_TAG: u64 = 100u64;
-
 /// DirectoryHelper provides helper functions to perform Operations on Directory
 pub struct DirectoryHelper {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
@@ -85,7 +82,8 @@ impl DirectoryHelper {
     pub fn update(&mut self, directory: nfs::directory_listing::DirectoryListing) -> Result<(), &str> {
         let mutex_client = self.client.clone();
         let client = mutex_client.lock().unwrap();
-        let result = self.network_get(self.client.clone(), SDV_TAG, directory.get_id());
+        let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let result = self.network_get(self.client.clone(), structured_data_type_id.type_tag(), directory.get_id());
         if result.is_err() {
             return Err("Network IO Error");
         }
@@ -117,7 +115,8 @@ impl DirectoryHelper {
 
     /// Return the versions of the directory
     pub fn get_versions(&mut self, directory_id: routing::NameType) -> Result<Vec<routing::NameType>, &str> {
-        let result = self.network_get(self.client.clone(), SDV_TAG, directory_id);
+        let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let result = self.network_get(self.client.clone(), structured_data_type_id.type_tag(), directory_id);
         if result.is_err() {
             return Err("Network IO Error");
         }
@@ -127,7 +126,8 @@ impl DirectoryHelper {
 
     /// Return the DirectoryListing for the specified version
     pub fn get_by_version(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
-        let data_res = self.network_get(self.client.clone(), SDV_TAG, directory_id.clone());
+        let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let data_res = self.network_get(self.client.clone(), structured_data_type_id.type_tag(), directory_id.clone());
         if data_res.is_err() {
             return Err("Network IO Error");
         }
@@ -157,7 +157,8 @@ impl DirectoryHelper {
 
     /// Return the DirectoryListing for the latest version
     pub fn get(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
-        let sdv_res = self.network_get(self.client.clone(), SDV_TAG, directory_id.clone());
+        let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let sdv_res = self.network_get(self.client.clone(), structured_data_type_id.type_tag(), directory_id.clone());
         if sdv_res.is_err() {
             return Err("Network IO Error");
         }
