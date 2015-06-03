@@ -57,6 +57,14 @@ impl Metadata {
         self.size
     }
 
+    pub fn set_modified_time(&mut self, time: time::Tm) {
+        self.modified_time = time;
+    }
+
+    pub fn get_modified_time(&self) -> time::Tm {
+        self.modified_time
+    }
+
     pub fn set_user_metadata(&mut self, user_metadata: Vec<u8>) {
         self.user_metadata = user_metadata;
     }

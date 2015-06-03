@@ -14,7 +14,10 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+use time;
 use nfs;
+use nfs::helper::directory_helper::DirectoryHelper;
+use routing;
 use routing::sendable::Sendable;
 use client;
 use self_encryption;
@@ -62,6 +65,38 @@ impl FileHelper {
             return Err("Failed to update");
         }
         Ok(())
+    }
+
+    /// Return the versions of a directory containing modified versions of a file
+    pub fn get_versions(&mut self, directory_id: routing::NameType, parent_id: routing::NameType, file: nfs::file::File)
+                -> Result<Vec<routing::NameType>, &str> {
+        let mut versions = Vec::<routing::NameType>::new();
+        let mut directory_helper = DirectoryHelper::new(self.client.clone());
+
+        match directory_helper.get_versions(directory_id) {
+            Ok(sdv_versions) => {
+                let mut modified_time = time::empty_tm();
+                for version_id in sdv_versions {
+                    match directory_helper.get(version_id.clone(), parent_id.clone()) {
+                        Ok(directory_listing) => {
+                            match directory_listing.get_files().iter().find(|&entry| entry.get_name() == file.get_name()) {
+                                Some(file) => {
+                                   if file.get_metadata().get_modified_time() != modified_time {
+                                        modified_time = file.get_metadata().get_modified_time();
+                                        versions.push(version_id);
+                                    }
+                                },
+                                None => ()
+                            }
+                        }
+                        Err(_) => { () }
+                    }
+                }
+            },
+            Err(_) => { () }
+        }
+
+        Ok(versions)
     }
 
     pub fn read(&mut self, file: nfs::file::File) -> nfs::io::Reader {
