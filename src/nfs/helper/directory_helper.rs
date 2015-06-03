@@ -199,7 +199,7 @@ impl DirectoryHelper {
                 let mut client = client_mutex.lock().unwrap();
                  return match client.get_response(*message_id) {
                      Ok(data) => Ok(data),
-                     Err(err) => Err("IO Error")
+                     Err(_) => Err("IO Error")
                  }
             }
         }

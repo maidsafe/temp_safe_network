@@ -29,11 +29,11 @@
             - [X] [MAID-1084](https://maidsafe.atlassian.net/browse/MAID-1084) Read File
         - [ ] [MAID-1085](https://maidsafe.atlassian.net/browse/MAID-1085) Unit test cases for Directory and File Helpers
     - [ ] Implement REST DataTypes
-        - [ ] [MAID-1086](https://maidsafe.atlassian.net/browse/MAID-1086) Container & Blob types
-            - [ ] Implement Blob and Container types
-            - [ ] Implement FileWrapper trait for Blob
-            - [ ] Implement DirectoryListingWrapper trait for Container
-            - [ ] Unit test cases
+        - [X] [MAID-1086](https://maidsafe.atlassian.net/browse/MAID-1086) Container & Blob types
+            - [X] Implement Blob and Container types
+            - [X] Implement FileWrapper trait for Blob
+            - [X] Implement DirectoryListingWrapper trait for Container
+            - [X] Unit test cases
         - [ ] REST API methods in Container
             - [ ] [MAID-1087](https://maidsafe.atlassian.net/browse/MAID-1087) Create Container & Get Container
             - [ ] [MAID-1088](https://maidsafe.atlassian.net/browse/MAID-1088) List Containers, Update / Get Container Metadata
