@@ -15,12 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-mod io;
-mod helper;
-mod traits;
-mod file;
-mod metadata;
-mod directory_info;
-mod directory_listing;
+mod container;
+mod blob;
 
-pub mod rest;
+pub use self::container::*;
+pub use self::blob::*;
