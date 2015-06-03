@@ -31,6 +31,7 @@ use rustc_serialize::{Decodable, Encodable};
 use cbor;
 use nfs;
 use routing::sendable::Sendable;
+use maidsafe_types::TypeTag;
 
 const IMMUTABLE_TAG: u64 = 101u64;
 
@@ -85,7 +86,8 @@ impl self_encryption::Storage for NetworkStorage {
         }
         let client_mutex = self.client.clone();
         let mut client = client_mutex.lock().unwrap();
-        let get_result = client.get(IMMUTABLE_TAG, routing::NameType(name_id));
+        let immutable_data_type_id: maidsafe_types::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let get_result = client.get(immutable_data_type_id.type_tag(), routing::NameType(name_id));
         if get_result.is_err() {
             return Vec::new();
         }
