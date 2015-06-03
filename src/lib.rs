@@ -33,7 +33,7 @@ extern crate maidsafe_types;
 extern crate lru_time_cache;
 extern crate self_encryption;
 
-mod nfs;
+pub mod nfs;
 pub mod client;
 
 pub type IoError = std::io::Error;
@@ -73,4 +73,3 @@ impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
         return MaidsafeError::CryptoError(CryptoError::SymmetricCryptoError(error));
     }
 }
-

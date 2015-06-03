@@ -14,22 +14,27 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-use super::metadata::Metadata;
-use routing;
+
+use self_encryption;
 use std::fmt;
+use super::metadata::Metadata;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct DirectoryInfo {
+pub struct File {
     metadata: Metadata,
-    id: routing::NameType
+    datamap: self_encryption::datamap::DataMap
 }
 
-impl DirectoryInfo {
-    pub fn new(metadata: Metadata, id: routing::NameType) -> DirectoryInfo {
-        DirectoryInfo {
+impl File {
+    pub fn new(metadata: Metadata, datamap: self_encryption::datamap::DataMap) -> File {
+        File {
             metadata: metadata,
-            id: id
+            datamap: datamap
         }
+    }
+
+    pub fn get_name(&self) -> String {
+        self.get_metadata().get_name()
     }
 
     pub fn set_metadata(&mut self, metadata: Metadata) {
@@ -40,20 +45,25 @@ impl DirectoryInfo {
         self.metadata.clone()
     }
 
-    pub fn get_id(&self) -> routing::NameType {
-        self.id.clone()
+    pub fn set_datamap(&mut self, datamap: self_encryption::datamap::DataMap) {
+        self.datamap = datamap;
+    }
+
+    pub fn get_datamap(&self) -> self_encryption::datamap::DataMap {
+        self.datamap.clone()
+    }
+
+}
+
+impl fmt::Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "metadata: {}", self.get_metadata())
     }
 }
 
-impl fmt::Debug for DirectoryInfo {
+impl fmt::Display for File {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.get_id())
-    }
-}
-
-impl fmt::Display for DirectoryInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.get_id())
+        write!(f, "metadata: {}", self.get_metadata())
     }
 }
 
@@ -61,19 +71,21 @@ impl fmt::Display for DirectoryInfo {
 #[cfg(test)]
 mod test {
     use super::*;
-    use super::super::metadata::Metadata;
-    use routing;
+    use self_encryption;
     use cbor;
+    use nfs::metadata::Metadata;
 
     #[test]
     fn serialise() {
-        let obj_before = DirectoryInfo::new(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()), routing::NameType([1u8;64]));
+        let obj_before = File::new(Metadata::new("Home".to_string(),
+             "{mime:\"application/json\"}".to_string().into_bytes()),
+              self_encryption::datamap::DataMap::None);
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();
 
         let mut d = cbor::Decoder::from_bytes(e.as_bytes());
-        let obj_after: DirectoryInfo = d.decode().next().unwrap().unwrap();
+        let obj_after: File = d.decode().next().unwrap().unwrap();
 
         assert_eq!(obj_before, obj_after);
     }
