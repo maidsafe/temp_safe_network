@@ -127,8 +127,8 @@ impl DirectoryHelper {
     }
 
     /// Return the DirectoryListing for the specified version
-    pub fn get_by_version(&mut self, directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
-        let data_res = self.network_get(self.client.clone(), SDV_TAG, directory_id);
+    pub fn get_by_version(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
+        let data_res = self.network_get(self.client.clone(), SDV_TAG, directory_id.clone());
         if data_res.is_err() {
             return Err("Network IO Error");
         }
@@ -142,15 +142,23 @@ impl DirectoryHelper {
             return Err("Network IO Error");
         }
         let imm: maidsafe_types::ImmutableData = deserialise(get_data.unwrap());
-        let datamap = self_encryption::datamap::DataMap::None; // TODO should be - decrypt(imm.value().clone());
+
+        let client_mutex = self.client.clone();
+        let client = client_mutex.lock().unwrap();
+        let decrypt_result = client.hybrid_decrypt(&imm.value()[..], self.get_nonce(directory_id.clone(), parent_directory_id.clone()));
+        if decrypt_result.is_none() {
+            return Err("Failed to decrypt");
+        }
+        let datamap = deserialise(decrypt_result.unwrap());
+
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), datamap);
         let size = se.len();
         Ok(deserialise(se.read(0, size)))
     }
 
     /// Return the DirectoryListing for the latest version
-    pub fn get(&mut self, directory_id: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
-        let sdv_res = self.network_get(self.client.clone(), SDV_TAG, directory_id);
+    pub fn get(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
+        let sdv_res = self.network_get(self.client.clone(), SDV_TAG, directory_id.clone());
         if sdv_res.is_err() {
             return Err("Network IO Error");
         }
@@ -165,7 +173,15 @@ impl DirectoryHelper {
             return Err("Network IO Error");
         }
         let imm: maidsafe_types::ImmutableData = deserialise(imm_data_res.unwrap());
-        let datamap = self_encryption::datamap::DataMap::None; // TODO should be - decrypt(imm.value().clone());
+
+        let client_mutex = self.client.clone();
+        let client = client_mutex.lock().unwrap();
+        let decrypt_result = client.hybrid_decrypt(&imm.value()[..], self.get_nonce(directory_id.clone(), parent_directory_id.clone()));
+        if decrypt_result.is_none() {
+            return Err("Failed to decrypt");
+        }
+        let datamap = deserialise(decrypt_result.unwrap());
+
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), datamap);
         let size = se.len();
         Ok(deserialise(se.read(0, size)))
