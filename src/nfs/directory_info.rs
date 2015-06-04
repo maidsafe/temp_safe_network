@@ -52,8 +52,12 @@ impl DirectoryInfo {
         self.metadata = metadata;
     }
 
-    pub fn get_metadata(&self) -> Metadata {
-        self.metadata.clone()
+    pub fn get_mut_metadata(&mut self) -> &mut Metadata {
+        &mut self.metadata
+    }
+
+    pub fn get_metadata(&self) -> &Metadata {
+        &self.metadata
     }
 }
 

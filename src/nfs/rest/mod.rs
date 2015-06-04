@@ -17,6 +17,8 @@
 
 mod container;
 mod blob;
+mod container_info;
 
 pub use self::container::*;
 pub use self::blob::*;
+pub use self::container_info::*;
