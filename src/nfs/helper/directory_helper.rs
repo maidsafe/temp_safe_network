@@ -16,10 +16,8 @@
 // relating to use of the SAFE Network Software.
 use nfs;
 use maidsafe_types;
-use rustc_serialize::{Decodable, Encodable};
 use routing;
 use routing::sendable::Sendable;
-use cbor;
 use client;
 use std::error::Error;
 use maidsafe_types::TypeTag;
@@ -29,18 +27,6 @@ use self_encryption;
 pub struct DirectoryHelper {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
-
-fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
-    let mut e = cbor::Encoder::from_memory();
-    e.encode(&[data]);
-    e.into_bytes()
-}
-
-fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
-    let mut d = cbor::Decoder::from_bytes(data);
-    d.decode().next().unwrap().unwrap()
-}
-
 
 impl DirectoryHelper {
     /// Create a new DirectoryHelper instance
@@ -54,14 +40,14 @@ impl DirectoryHelper {
     pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<::routing::NameType, &str> {
         let directory = nfs::directory_listing::DirectoryListing::new(parent_dir_id, directory_name, user_metadata);
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
-        se.write(&serialise(directory.clone())[..], 0);
+        se.write(&nfs::utils::serialise(directory.clone())[..], 0);
         let datamap = se.close();
 
         let encrypt_result: _;
 
         {
             let client = self.client.lock().unwrap();
-            encrypt_result = client.hybrid_encrypt(&serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
+            encrypt_result = client.hybrid_encrypt(&nfs::utils::serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
         }
 
         if encrypt_result.is_err() {
@@ -89,16 +75,16 @@ impl DirectoryHelper {
         if result.is_err() {
             return Err("Network IO Error");
         }
-        let mut sdv: maidsafe_types::StructuredData = deserialise(result.unwrap());
+        let mut sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(result.unwrap());
 
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
-        se.write(&serialise(directory.clone())[..], 0);
+        se.write(&nfs::utils::serialise(directory.clone())[..], 0);
         let datamap = se.close();
 
         let encrypt_result: _;
         {
             let client = self.client.lock().unwrap();
-            encrypt_result = client.hybrid_encrypt(&serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
+            encrypt_result = client.hybrid_encrypt(&nfs::utils::serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
         }
 
         if encrypt_result.is_err() {
@@ -127,7 +113,7 @@ impl DirectoryHelper {
         if result.is_err() {
             return Err("Network IO Error");
         }
-        let sdv: maidsafe_types::StructuredData = deserialise(result.unwrap());
+        let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(result.unwrap());
         Ok(sdv.value())
     }
 
@@ -138,7 +124,7 @@ impl DirectoryHelper {
         if data_res.is_err() {
             return Err("Network IO Error");
         }
-        let sdv: maidsafe_types::StructuredData = deserialise(data_res.unwrap());
+        let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(data_res.unwrap());
         if !sdv.value().contains(&version) {
             return Err("Version not found");
         };
@@ -147,7 +133,7 @@ impl DirectoryHelper {
         if get_data.is_err() {
             return Err("Network IO Error");
         }
-        let imm: maidsafe_types::ImmutableData = deserialise(get_data.unwrap());
+        let imm: maidsafe_types::ImmutableData = nfs::utils::deserialise(get_data.unwrap());
 
         let decrypt_result: _;
         {
@@ -158,11 +144,11 @@ impl DirectoryHelper {
         if decrypt_result.is_none() {
             return Err("Failed to decrypt");
         }
-        let datamap = deserialise(decrypt_result.unwrap());
+        let datamap = nfs::utils::deserialise(decrypt_result.unwrap());
 
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), datamap);
         let size = se.len();
-        Ok(deserialise(se.read(0, size)))
+        Ok(nfs::utils::deserialise(se.read(0, size)))
     }
 
     /// Return the DirectoryListing for the latest version
@@ -172,7 +158,7 @@ impl DirectoryHelper {
         if sdv_res.is_err() {
             return Err("Network IO Error");
         }
-        let sdv: maidsafe_types::StructuredData = deserialise(sdv_res.unwrap());
+        let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(sdv_res.unwrap());
         let name = match sdv.value().last() {
             Some(data) => routing::NameType(data.0),
             None => return Err("Could not find data")
@@ -182,7 +168,7 @@ impl DirectoryHelper {
         if imm_data_res.is_err() {
             return Err("Network IO Error");
         }
-        let imm: maidsafe_types::ImmutableData = deserialise(imm_data_res.unwrap());
+        let imm: maidsafe_types::ImmutableData = nfs::utils::deserialise(imm_data_res.unwrap());
 
         let client_mutex = self.client.clone();
         let client = client_mutex.lock().unwrap();
@@ -190,11 +176,11 @@ impl DirectoryHelper {
         if decrypt_result.is_none() {
             return Err("Failed to decrypt");
         }
-        let datamap = deserialise(decrypt_result.unwrap());
+        let datamap = nfs::utils::deserialise(decrypt_result.unwrap());
 
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), datamap);
         let size = se.len();
-        Ok(deserialise(se.read(0, size)))
+        Ok(nfs::utils::deserialise(se.read(0, size)))
     }
 
     fn network_get(&self, tag_id: u64,
