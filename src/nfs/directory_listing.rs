@@ -36,6 +36,10 @@ impl DirectoryListing {
         }
     }
 
+    pub fn get_info(&self) -> DirectoryInfo {
+        self.get_info()
+    }
+
     pub fn get_metadata(&self) -> Metadata {
         self.info.get_metadata().clone()
     }
@@ -74,6 +78,10 @@ impl DirectoryListing {
 
     pub fn get_id(&self) -> routing::NameType {
         self.info.get_id().clone()
+    }
+
+    pub fn get_name(&self) -> String {
+        self.info.get_metadata().get_name().clone()
     }
 }
 

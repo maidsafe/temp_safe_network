@@ -51,7 +51,7 @@ impl DirectoryHelper {
     }
 
     /// Creates a Directory in the network.
-    pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
+    pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<::routing::NameType, &str> {
         let directory = nfs::directory_listing::DirectoryListing::new(parent_dir_id, directory_name, user_metadata);
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
         se.write(&serialise(directory.clone())[..], 0);
@@ -79,13 +79,11 @@ impl DirectoryHelper {
         if save_res.is_err() {
             return Err("Failed to create directory");
         }
-        Ok(())
+        Ok(directory.get_id())
     }
 
     /// Updates an existing DirectoryListing in the network.
     pub fn update(&mut self, directory: nfs::directory_listing::DirectoryListing) -> Result<(), &str> {
-        let mutex_client = self.client.clone();
-        let client = mutex_client.lock().unwrap();
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let result = self.network_get(structured_data_type_id.type_tag(), directory.get_id());
         if result.is_err() {
@@ -97,7 +95,12 @@ impl DirectoryHelper {
         se.write(&serialise(directory.clone())[..], 0);
         let datamap = se.close();
 
-        let encrypt_result = client.hybrid_encrypt(&serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
+        let encrypt_result: _;
+        {
+            let client = self.client.lock().unwrap();
+            encrypt_result = client.hybrid_encrypt(&serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
+        }
+
         if encrypt_result.is_err() {
             return Err("Encryption failed");
         }
@@ -146,9 +149,12 @@ impl DirectoryHelper {
         }
         let imm: maidsafe_types::ImmutableData = deserialise(get_data.unwrap());
 
-        let client_mutex = self.client.clone();
-        let client = client_mutex.lock().unwrap();
-        let decrypt_result = client.hybrid_decrypt(&imm.value()[..], self.get_nonce(directory_id.clone(), parent_directory_id.clone()));
+        let decrypt_result: _;
+        {
+            let client = self.client.lock().unwrap();
+            decrypt_result = client.hybrid_decrypt(&imm.value()[..], self.get_nonce(directory_id.clone(), parent_directory_id.clone()));
+        }
+
         if decrypt_result.is_none() {
             return Err("Failed to decrypt");
         }
@@ -255,12 +261,100 @@ mod test {
                                   vec![7u8; 100]).is_ok());
     }
 
+    #[test]
     fn get_dir_listing() {
         let client = ::std::sync::Arc::new(::std::sync::Mutex::new(get_dummy_client()));
         let mut dir_helper = DirectoryHelper::new(client.clone());
 
-        assert!(dir_helper.create(::routing::NameType::new([8u8; 64]),
-                                  "DirName".to_string(),
-                                  vec![7u8; 100]).is_ok());
+        let parent_id = ::routing::NameType::new([8u8; 64]);
+        let created_dir_id: _;
+        {
+            let put_result = dir_helper.create(parent_id.clone(),
+                                               "DirName".to_string(),
+                                               vec![7u8; 100]);
+
+            assert!(put_result.is_ok());
+            created_dir_id = put_result.ok().unwrap();
+        }
+
+        {
+            let get_result_should_pass = dir_helper.get(created_dir_id.clone(), parent_id.clone());
+            assert!(get_result_should_pass.is_ok());
+        }
+
+        {
+            let get_result_wrong_parent_should_fail = dir_helper.get(created_dir_id, ::routing::NameType::new([111u8; 64]));
+            assert!(get_result_wrong_parent_should_fail.is_err());
+        }
+
+        let get_result_wrong_dir_id_should_fail = dir_helper.get(::routing::NameType::new([111u8; 64]), parent_id);
+
+        assert!(get_result_wrong_dir_id_should_fail.is_err());
+    }
+
+    #[test]
+    fn update_and_versioning() {
+        let client = ::std::sync::Arc::new(::std::sync::Mutex::new(get_dummy_client()));
+        let mut dir_helper = DirectoryHelper::new(client.clone());
+
+        let parent_id = ::routing::NameType::new([8u8; 64]);
+        let created_dir_id: _;
+        {
+            let put_result = dir_helper.create(parent_id.clone(),
+                                               "DirName".to_string(),
+                                               vec![7u8; 100]);
+
+            assert!(put_result.is_ok());
+            created_dir_id = put_result.ok().unwrap();
+        }
+
+        let mut dir_listing: _;
+        {
+            let get_result = dir_helper.get(created_dir_id.clone(), parent_id.clone());
+            assert!(get_result.is_ok());
+            dir_listing = get_result.ok().unwrap();
+        }
+
+        let mut versions: _;
+        {
+            let get_result = dir_helper.get_versions(created_dir_id.clone());
+            assert!(get_result.is_ok());
+            versions = get_result.ok().unwrap();
+        }
+
+        assert_eq!(versions.len(), 1);
+
+        {
+            dir_listing.set_name("NewName".to_string());
+            let update_result = dir_helper.update(dir_listing.clone());
+            assert!(update_result.is_ok());
+        }
+
+        {
+            let get_result = dir_helper.get_versions(created_dir_id.clone());
+            assert!(get_result.is_ok());
+            versions = get_result.ok().unwrap();
+        }
+
+        assert_eq!(versions.len(), 2);
+
+        {
+            let get_result = dir_helper.get_by_version(created_dir_id.clone(), parent_id.clone(), versions.clone().last().unwrap().clone());
+            assert!(get_result.is_ok());
+
+            let rxd_dir_listing = get_result.ok().unwrap();
+
+            assert_eq!(rxd_dir_listing, dir_listing);
+        }
+
+        {
+            let get_result = dir_helper.get_by_version(created_dir_id.clone(), parent_id.clone(), versions.first().unwrap().clone());
+            assert!(get_result.is_ok());
+
+            let rxd_dir_listing = get_result.ok().unwrap();
+
+            assert!(rxd_dir_listing != dir_listing);
+            assert_eq!(rxd_dir_listing.get_name(), "DirName".to_string());
+        }
     }
 }

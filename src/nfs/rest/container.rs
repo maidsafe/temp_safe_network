@@ -19,6 +19,7 @@ use routing;
 use time;
 use client;
 use nfs::traits::FileWrapper;
+use nfs::traits::DirectoryListingWrapper;
 
 pub struct Container {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
@@ -29,7 +30,7 @@ impl Container {
 
     /// Authorizes the root directory access and return the Container
     /// Entry point for the Rest API
-    pub fn authorize(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, dir_id: [u8;64], parent_dir_id: [u8;64]) -> Result<Container, String> {
+    pub fn authorise(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, dir_id: [u8;64], parent_dir_id: [u8;64]) -> Result<Container, String> {
         let mut directory_helper = nfs::helper::DirectoryHelper::new(client.clone());
         let result = directory_helper.get(::routing::NameType(dir_id), ::routing::NameType(parent_dir_id));
         if result.is_err() {
@@ -65,8 +66,64 @@ impl Container {
         self.directory_listing.get_files().iter().map(|x| nfs::rest::Blob::convert_from_file(self.client.clone(), x.clone())).collect()
     }
 
+    pub fn create(&mut self, name: String, user_metadata: String) -> Result<(), String> {
+        let parent_dir_id = self.directory_listing.get_parent_dir_id();
+        let mut dir_id;
+        { // Create directory
+            let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+            let result = directory_helper.create(parent_dir_id.clone(), name.clone(), user_metadata.into_bytes());
+            if result.is_err() {
+                return Err(result.unwrap_err().to_string());
+            }
+            dir_id = result.unwrap();
+        }
+        let mut created_directory;
+        { // Retrieve Created directory & add to the sub-folder list
+            let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+            let result = directory_helper.get(dir_id, parent_dir_id);
+            if result.is_err() {
+                return Err(result.unwrap_err().to_string());
+            }
+            let mut sub_dirs = self.directory_listing.get_sub_directories();
+            created_directory = result.unwrap();
+            sub_dirs.push(created_directory.get_info());
+            self.directory_listing.set_sub_directories(sub_dirs);
+        }
+        { // Update the Container
+            let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+            let result = directory_helper.update(created_directory);
+            if result.is_err() {
+                return Err("Failed to create Conatiner".to_string());
+            }
+        }
+        Ok(())
+    }
+
     pub fn get_containers(&self) -> Vec<String> {
         self.directory_listing.get_sub_directories().iter().map(|x| x.get_metadata().get_name()).collect()
+    }
+
+    pub fn get_container(&mut self, name: String, version: Option<[u8; 64]>) -> Result<Container, String> {
+        let sub_dirs = self.directory_listing.get_sub_directories();
+        let dir_info = sub_dirs.iter().find(|&entry| entry.get_name() == name);
+        if dir_info.is_none() {
+            return Err("Container not found".to_string());
+        }
+        let dir_id = dir_info.unwrap().get_id();
+        let parent_id = self.directory_listing.get_id();
+
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+        let mut result;
+        if version.is_some() {
+            let version_id = version.unwrap();
+            result = directory_helper.get_by_version(dir_id, parent_id, routing::NameType(version_id))
+        } else{
+            result = directory_helper.get(dir_id, parent_id)
+        }
+        if result.is_err() {
+            return Err(result.unwrap_err().to_string());
+        }
+        Ok(Container::convert_from_directory_listing(self.client.clone(), result.unwrap()))
     }
 
 }
