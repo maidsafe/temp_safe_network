@@ -36,6 +36,10 @@ impl DirectoryListing {
         }
     }
 
+    pub fn get_info(&self) -> DirectoryInfo {
+        self.get_info()
+    }
+
     pub fn get_metadata(&self) -> Metadata {
         self.info.get_metadata().clone()
     }

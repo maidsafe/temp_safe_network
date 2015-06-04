@@ -69,7 +69,7 @@ impl Container {
     pub fn create(&mut self, name: String, user_metadata: String) -> Result<(), String> {
         let parent_dir_id = self.directory_listing.get_parent_dir_id();
         let mut dir_id;
-        {
+        { // Create directory
             let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
             let result = directory_helper.create(parent_dir_id.clone(), name.clone(), user_metadata.into_bytes());
             if result.is_err() {
@@ -77,14 +77,24 @@ impl Container {
             }
             dir_id = result.unwrap();
         }
-        {
+        let mut created_directory;
+        { // Retrieve Created directory & add to the sub-folder list
             let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
             let result = directory_helper.get(dir_id, parent_dir_id);
-
             if result.is_err() {
                 return Err(result.unwrap_err().to_string());
             }
-            // TODO Update the directory listing and save the directory
+            let mut sub_dirs = self.directory_listing.get_sub_directories();
+            created_directory = result.unwrap();
+            sub_dirs.push(created_directory.get_info());
+            self.directory_listing.set_sub_directories(sub_dirs);
+        }
+        { // Update the Container
+            let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+            let result = directory_helper.update(created_directory);
+            if result.is_err() {
+                return Err("Fialed to create Conatiner".to_string());
+            }
         }
         Ok(())
     }
