@@ -20,6 +20,7 @@ use time;
 use client;
 use nfs::traits::FileWrapper;
 use nfs::traits::DirectoryListingWrapper;
+use nfs::traits::DirectoryInfoWrapper;
 
 pub struct Container {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
@@ -46,8 +47,12 @@ impl Container {
         self.directory_listing.get_id().0
     }
 
-    pub fn get_user_metadata(&self) -> Option<Vec<u8>> {
-        self.directory_listing.get_metadata().get_user_metadata()
+    pub fn get_metadata(&self) -> Option<String> {
+        let metadata = self.directory_listing.get_metadata().get_user_metadata();
+        match metadata {
+            Some(data) => Some(String::from_utf8(data).unwrap()),
+            None => None
+        }
     }
 
     pub fn get_name(&self) -> String {
@@ -66,12 +71,21 @@ impl Container {
         self.directory_listing.get_files().iter().map(|x| nfs::rest::Blob::convert_from_file(self.client.clone(), x.clone())).collect()
     }
 
-    pub fn create(&mut self, name: String, user_metadata: String) -> Result<(), String> {
+    pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
+        let user_metadata = match metadata {
+            Some(data) => {
+                if data.len() == 0 {
+                    return Err("Metadata cannot be empty".to_string());
+                }
+                data.into_bytes()
+            },
+            None => Vec::new()
+        };
         let parent_dir_id = self.directory_listing.get_parent_dir_id();
         let mut dir_id;
         { // Create directory
             let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-            let result = directory_helper.create(parent_dir_id.clone(), name.clone(), user_metadata.into_bytes());
+            let result = directory_helper.create(parent_dir_id.clone(), name.clone(), user_metadata);
             if result.is_err() {
                 return Err(result.unwrap_err().to_string());
             }
@@ -99,8 +113,28 @@ impl Container {
         Ok(())
     }
 
-    pub fn get_containers(&self) -> Vec<String> {
-        self.directory_listing.get_sub_directories().iter().map(|x| x.get_metadata().get_name()).collect()
+    pub fn get_containers(&self) -> Vec<nfs::rest::ContainerInfo> {
+        self.directory_listing.get_sub_directories().iter().map(|info| {
+                nfs::rest::ContainerInfo::convert_from_directory_info(info.clone())
+            }).collect()
+    }
+
+    pub fn update_metadata(&mut self, metadata: Option<String>) -> Result<(), String>{
+        let user_metadata = match metadata {
+            Some(data) => {
+                if data.len() == 0 {
+                    return Err("Metadata cannot be empty".to_string());
+                }
+                data.into_bytes()
+            },
+            None => Vec::new()
+        };
+        self.directory_listing.set_user_metadata(user_metadata);
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+        match directory_helper.update(self.directory_listing.clone()) {
+            Ok(_) => Ok(()),
+            Err(msg) => Err(msg.to_string())
+        }
     }
 
     pub fn get_container(&mut self, name: String, version: Option<[u8; 64]>) -> Result<Container, String> {

@@ -40,12 +40,24 @@ impl DirectoryListing {
         self.get_info()
     }
 
-    pub fn get_metadata(&self) -> Metadata {
-        self.info.get_metadata().clone()
+    pub fn get_mut_metadata(&mut self) -> &mut Metadata {
+        self.info.get_mut_metadata()
+    }
+
+    pub fn get_metadata(&self) -> &Metadata {
+        self.info.get_metadata()
     }
 
     pub fn set_metadata(&mut self, metadata: Metadata) {
         self.info.set_metadata(metadata);
+    }
+
+    pub fn get_user_metadata(&self) -> Option<Vec<u8>> {
+        self.info.get_metadata().get_user_metadata()
+    }
+
+    pub fn set_user_metadata(&mut self, user_metadata: Vec<u8>) {
+        self.info.get_mut_metadata().set_user_metadata(user_metadata);
     }
 
     pub fn get_parent_dir_id(&self) -> routing::NameType {
@@ -73,7 +85,7 @@ impl DirectoryListing {
     }
 
     pub fn set_name(&mut self, name: String) {
-        self.info.get_metadata().set_name(name);
+        self.info.get_mut_metadata().set_name(name);
     }
 
     pub fn get_id(&self) -> routing::NameType {

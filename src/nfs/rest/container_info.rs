@@ -15,21 +15,40 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use nfs;
-use client;
+use time;
 
-pub trait FileWrapper {
-    fn convert_to_file(&self) -> nfs::file::File;
-    fn convert_from_file(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
-        file: nfs::file::File) -> Self;
+pub struct ContainerInfo {
+    info: nfs::directory_info::DirectoryInfo,
 }
 
-pub trait DirectoryListingWrapper {
-    fn convert_to_directory_listing(&self) -> nfs::directory_listing::DirectoryListing;
-    fn convert_from_directory_listing(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
-        directory_listing: nfs::directory_listing::DirectoryListing) -> Self;
+impl ContainerInfo {
+
+    pub fn get_name(&self) -> String {
+        self.info.get_metadata().get_name()
+    }
+
+    pub fn get_metadata(&self) -> Option<String> {
+        let metadata = self.info.get_metadata().get_user_metadata();
+        match metadata {
+            Some(data) => Some(String::from_utf8(data).unwrap()),
+            None => None
+        }
+    }
+
+    pub fn get_created_time(&self) -> time::Tm {
+        self.info.get_metadata().get_created_time()
+    }
+
 }
 
-pub trait DirectoryInfoWrapper {
-    fn convert_to_directory_info(&self) -> nfs::directory_info::DirectoryInfo;
-    fn convert_from_directory_info(info: nfs::directory_info::DirectoryInfo) -> Self;
+impl nfs::traits::DirectoryInfoWrapper for ContainerInfo {
+    fn convert_to_directory_info(&self) -> nfs::directory_info::DirectoryInfo {
+        self.info.clone()
+    }
+
+    fn convert_from_directory_info(info: nfs::directory_info::DirectoryInfo) -> ContainerInfo {
+        ContainerInfo {
+            info: info
+        }
+    }
 }
