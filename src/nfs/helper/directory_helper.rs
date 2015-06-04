@@ -339,7 +339,7 @@ mod test {
         assert_eq!(versions.len(), 2);
 
         {
-            let get_result = dir_helper.get_by_version(created_dir_id.clone(), parent_id.clone(), versions.clone().last().unwrap().clone());
+            let get_result = dir_helper.get_by_version(created_dir_id.clone(), parent_id.clone(), versions.last().unwrap().clone());
             assert!(get_result.is_ok());
 
             let rxd_dir_listing = get_result.ok().unwrap();

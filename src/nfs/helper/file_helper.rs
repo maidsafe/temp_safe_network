@@ -110,3 +110,103 @@ impl FileHelper {
     }
 
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn get_dummy_client() -> ::client::Client {
+        let keyword = "Spandan".to_string();
+        let password = "Sharma".as_bytes();
+        let pin = 1234u32;
+
+        ::client::Client::create_account(&keyword,
+                                         pin,
+                                         &password,
+                                         ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()))).ok().unwrap()
+    }
+
+
+    #[test]
+    fn create_read_update() {
+        let client = ::std::sync::Arc::new(::std::sync::Mutex::new(get_dummy_client()));
+        let mut dir_helper = ::nfs::helper::directory_helper::DirectoryHelper::new(client.clone());
+
+        let parent_id = ::routing::NameType::new([8u8; 64]);
+        let created_dir_id: _;
+        {
+            let put_result = dir_helper.create(parent_id.clone(),
+                                               "DirName".to_string(),
+                                               vec![7u8; 100]);
+
+            assert!(put_result.is_ok());
+            created_dir_id = put_result.ok().unwrap();
+        }
+
+        let mut dir_listing: _;
+        {
+            let get_result = dir_helper.get(created_dir_id.clone(), parent_id.clone());
+            assert!(get_result.is_ok());
+            dir_listing = get_result.ok().unwrap();
+        }
+
+        let mut file_helper = FileHelper::new(client);
+        let mut writer: _;
+        {
+            let result = file_helper.create("Name".to_string(), vec![98u8; 100], dir_listing);
+            assert!(result.is_ok());
+
+            writer = result.ok().unwrap();
+        }
+
+        let data = vec![12u8; 90];
+        writer.write(&data[..], 0);
+        writer.close();
+
+        {
+            let get_result = dir_helper.get(created_dir_id.clone(), parent_id.clone());
+            assert!(get_result.is_ok());
+            dir_listing = get_result.ok().unwrap();
+        }
+
+        {
+            let result = dir_listing.get_files();
+            assert_eq!(result.len(), 1);
+
+            let file = result[0].clone();
+
+            let mut reader = file_helper.read(file);
+            let rxd_data = reader.read(0, data.len() as u64).ok().unwrap();
+
+            assert_eq!(rxd_data, data);
+
+            {
+                let mut writer: _;
+                {
+                    let result = file_helper.update(result[0].clone(), dir_listing);
+                    assert!(result.is_ok());
+
+                    writer = result.ok().unwrap();
+                }
+
+                let data = vec![11u8; 90];
+                writer.write(&data[..], 0);
+                writer.close();
+
+                let get_result = dir_helper.get(created_dir_id.clone(), parent_id.clone());
+                assert!(get_result.is_ok());
+                dir_listing = get_result.ok().unwrap();
+
+                let result = dir_listing.get_files();
+                assert_eq!(result.len(), 2);
+
+                let file = result[0].clone();
+
+                let mut reader = file_helper.read(file);
+                let rxd_data = reader.read(0, data.len() as u64).ok().unwrap();
+
+                //TODO(Krishna) check assert_eq!(rxd_data, data);
+            }
+        }
+    }
+}
