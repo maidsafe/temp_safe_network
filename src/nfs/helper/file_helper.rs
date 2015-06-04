@@ -37,25 +37,25 @@ impl FileHelper {
     }
 
     pub fn create(&mut self, name: String, user_metatdata: Vec<u8>,
-            directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, &str> {
+            directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
         if self.file_exists(directory.clone(), name.clone()) {
-            return Err("File already exists");
+            return Err("File already exists".to_string());
         }
         let file = nfs::file::File::new(nfs::metadata::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
         Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
     }
 
-    pub fn update(&mut self, file: nfs::file::File, directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, &str> {
+    pub fn update(&mut self, file: nfs::file::File, directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
         if !self.file_exists(directory.clone(), file.get_name()) {
-            return Err("File not present in the directory");
+            return Err("File not present in the directory".to_string());
         }
         Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
     }
 
     /// Updates the file metadata. Returns the updated DirectoryListing
-    pub fn update_metadata(&mut self, file: nfs::file::File, directory: &mut nfs::directory_listing::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), &str> {
+    pub fn update_metadata(&mut self, file: nfs::file::File, directory: &mut nfs::directory_listing::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), String> {
         if !self.file_exists(directory.clone(), file.get_name()) {
-            return Err("File not present in the directory");
+            return Err("File not present in the directory".to_string());
         }
         file.get_metadata().set_user_metadata(user_metadata);
         let pos = directory.get_files().binary_search_by(|p| p.get_name().cmp(&file.get_name())).unwrap();
@@ -65,14 +65,14 @@ impl FileHelper {
         directory.set_files(files);
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
         if directory_helper.update(directory.clone()).is_err() {
-            return Err("Failed to update");
+            return Err("Failed to update".to_string());
         }
         Ok(())
     }
 
     /// Return the versions of a directory containing modified versions of a file
     pub fn get_versions(&mut self, directory_id: routing::NameType, parent_id: routing::NameType, file: nfs::file::File)
-                -> Result<Vec<routing::NameType>, &str> {
+                -> Result<Vec<routing::NameType>, String> {
         let mut versions = Vec::<routing::NameType>::new();
         let mut directory_helper = DirectoryHelper::new(self.client.clone());
 

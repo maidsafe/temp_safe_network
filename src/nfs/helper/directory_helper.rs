@@ -2,7 +2,7 @@
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// licence you accepted on initial access to the Software (the "Licences".to_string()).
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
 // bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
@@ -38,7 +38,7 @@ impl DirectoryHelper {
     }
 
     /// Creates a Directory in the network.
-    pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<::routing::NameType, &str> {
+    pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<::routing::NameType, String> {
         let directory = nfs::directory_listing::DirectoryListing::new(parent_dir_id, directory_name, user_metadata);
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
         se.write(&nfs::utils::serialise(directory.clone())[..], 0);
@@ -52,29 +52,29 @@ impl DirectoryHelper {
         }
 
         if encrypt_result.is_err() {
-            return Err("Encryption failed");
+            return Err("Encryption failed".to_string());
         }
 
         let immutable_data = maidsafe_types::ImmutableData::new(encrypt_result.unwrap());
         let save_res = self.network_put(immutable_data.clone());
         if save_res.is_err() {
-            return Err("Save Failed");
+            return Err("Save Failed".to_string());
         }
         let sdv: maidsafe_types::StructuredData = maidsafe_types::StructuredData::new(directory.get_id(), self.client.lock().unwrap().get_owner(),
             vec![immutable_data.name()]);
         let save_sdv_res = self.network_put(sdv);
         if save_sdv_res.is_err() {
-            return Err("Failed to create directory");
+            return Err("Failed to create directory".to_string());
         }
         Ok(directory.get_id())
     }
 
     /// Updates an existing DirectoryListing in the network.
-    pub fn update(&mut self, directory: nfs::directory_listing::DirectoryListing) -> Result<(), &str> {
+    pub fn update(&mut self, directory: nfs::directory_listing::DirectoryListing) -> Result<(), String> {
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let result = self.network_get(structured_data_type_id.type_tag(), directory.get_id());
         if result.is_err() {
-            return Err("Network IO Error");
+            return Err("Network IO Error".to_string());
         }
         let mut sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(result.unwrap());
 
@@ -89,50 +89,50 @@ impl DirectoryHelper {
         }
 
         if encrypt_result.is_err() {
-            return Err("Encryption failed");
+            return Err("Encryption failed".to_string());
         }
 
         let immutable_data = maidsafe_types::ImmutableData::new(encrypt_result.unwrap());
         let immutable_data_put_result = self.network_put(immutable_data.clone());
         if immutable_data_put_result.is_err() {
-            return Err("Failed to save directory");
+            return Err("Failed to save directory".to_string());
         };
         let mut versions = sdv.value();
         versions.push(immutable_data.name());
         sdv.set_value(versions);
         let sdv_put_result = self.network_put(sdv);
         if sdv_put_result.is_err() {
-            return Err("Failed to update directory version");
+            return Err("Failed to update directory version".to_string());
         };
         Ok(())
     }
 
     /// Return the versions of the directory
-    pub fn get_versions(&mut self, directory_id: routing::NameType) -> Result<Vec<routing::NameType>, &str> {
+    pub fn get_versions(&mut self, directory_id: routing::NameType) -> Result<Vec<routing::NameType>, String> {
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let result = self.network_get(structured_data_type_id.type_tag(), directory_id);
         if result.is_err() {
-            return Err("Network IO Error");
+            return Err("Network IO Error".to_string());
         }
         let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(result.unwrap());
         Ok(sdv.value())
     }
 
     /// Return the DirectoryListing for the specified version
-    pub fn get_by_version(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
+    pub fn get_by_version(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, String> {
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let data_res = self.network_get(structured_data_type_id.type_tag(), directory_id.clone());
         if data_res.is_err() {
-            return Err("Network IO Error");
+            return Err("Network IO Error".to_string());
         }
         let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(data_res.unwrap());
         if !sdv.value().contains(&version) {
-            return Err("Version not found");
+            return Err("Version not found".to_string());
         };
         let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let get_data = self.network_get(immutable_data_type_id.type_tag(), version);
         if get_data.is_err() {
-            return Err("Network IO Error");
+            return Err("Network IO Error".to_string());
         }
         let imm: maidsafe_types::ImmutableData = nfs::utils::deserialise(get_data.unwrap());
 
@@ -143,7 +143,7 @@ impl DirectoryHelper {
         }
 
         if decrypt_result.is_none() {
-            return Err("Failed to decrypt");
+            return Err("Failed to decrypt".to_string());
         }
         let datamap = nfs::utils::deserialise(decrypt_result.unwrap());
 
@@ -153,21 +153,21 @@ impl DirectoryHelper {
     }
 
     /// Return the DirectoryListing for the latest version
-    pub fn get(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
+    pub fn get(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, String> {
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let sdv_res = self.network_get(structured_data_type_id.type_tag(), directory_id.clone());
         if sdv_res.is_err() {
-            return Err("Network IO Error");
+            return Err("Network IO Error".to_string());
         }
         let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(sdv_res.unwrap());
         let name = match sdv.value().last() {
             Some(data) => routing::NameType(data.0),
-            None => return Err("Could not find data")
+            None => return Err("Could not find data".to_string())
         };
         let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
         let imm_data_res = self.network_get(immutable_data_type_id.type_tag(), name);
         if imm_data_res.is_err() {
-            return Err("Network IO Error");
+            return Err("Network IO Error".to_string());
         }
         let imm: maidsafe_types::ImmutableData = nfs::utils::deserialise(imm_data_res.unwrap());
 
@@ -175,7 +175,7 @@ impl DirectoryHelper {
         let client = client_mutex.lock().unwrap();
         let decrypt_result = client.hybrid_decrypt(&imm.value()[..], self.get_nonce(directory_id.clone(), parent_directory_id.clone()));
         if decrypt_result.is_none() {
-            return Err("Failed to decrypt");
+            return Err("Failed to decrypt".to_string());
         }
         let datamap = nfs::utils::deserialise(decrypt_result.unwrap());
 
@@ -184,28 +184,27 @@ impl DirectoryHelper {
         Ok(nfs::utils::deserialise(se.read(0, size)))
     }
 
-    fn network_get(&self, tag_id: u64,
-        name: routing::NameType) -> Result<Vec<u8>, &str> {
+    fn network_get(&self, tag_id: u64, name: routing::NameType) -> Result<Vec<u8>, String> {
         let get_result = self.client.lock().unwrap().get(tag_id, name);
         if get_result.is_err() {
-            return Err("Network IO Error");
+            return Err("Network IO Error".to_string());
         }
 
         match get_result.ok().unwrap().get() {
             Ok(data) => Ok(data),
-            Err(_) => Err("TODO(Krishna)"),
+            Err(_) => Err("Failed to fetch data".to_string()),
         }
     }
 
-    fn network_put<T>(&self, sendable: T) -> Result<Vec<u8>, &str> where T: Sendable {
+    fn network_put<T>(&self, sendable: T) -> Result<Vec<u8>, String> where T: Sendable {
         let get_result = self.client.lock().unwrap().put(sendable);
         if get_result.is_err() {
-            return Err("Network IO Error");
+            return Err("Network IO Error".to_string());
         }
 
         match get_result.ok().unwrap().get() {
             Ok(data) => Ok(data),
-            Err(_) => Err("TODO(Krishna)"),
+            Err(_) => Err("Failed to fetch data".to_string()),
         }
     }
 

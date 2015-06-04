@@ -87,7 +87,7 @@ impl Container {
             let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
             let result = directory_helper.create(parent_dir_id.clone(), name.clone(), user_metadata);
             if result.is_err() {
-                return Err(result.unwrap_err().to_string());
+                return Err(result.unwrap_err());
             }
             dir_id = result.unwrap();
         }
@@ -96,7 +96,7 @@ impl Container {
             let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
             let result = directory_helper.get(dir_id, parent_dir_id);
             if result.is_err() {
-                return Err(result.unwrap_err().to_string());
+                return Err(result.unwrap_err());
             }
             let mut sub_dirs = self.directory_listing.get_sub_directories();
             created_directory = result.unwrap();
@@ -133,7 +133,7 @@ impl Container {
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
         match directory_helper.update(self.directory_listing.clone()) {
             Ok(_) => Ok(()),
-            Err(msg) => Err(msg.to_string())
+            Err(msg) => Err(msg)
         }
     }
 
@@ -155,7 +155,7 @@ impl Container {
             result = directory_helper.get(dir_id, parent_id)
         }
         if result.is_err() {
-            return Err(result.unwrap_err().to_string());
+            return Err(result.unwrap_err());
         }
         Ok(Container::convert_from_directory_listing(self.client.clone(), result.unwrap()))
     }
