@@ -93,7 +93,7 @@ impl Container {
             let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
             let result = directory_helper.update(created_directory);
             if result.is_err() {
-                return Err("Fialed to create Conatiner".to_string());
+                return Err("Failed to create Conatiner".to_string());
             }
         }
         Ok(())
