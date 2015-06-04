@@ -61,7 +61,7 @@ impl DirectoryListing {
     }
 
     pub fn get_parent_dir_id(&self) -> routing::NameType {
-        self.info.get_parent_dir_id().clone()
+        self.info.get_parent_dir_id()
     }
 
     pub fn add_file(&mut self, file: File) {
@@ -89,11 +89,11 @@ impl DirectoryListing {
     }
 
     pub fn get_id(&self) -> routing::NameType {
-        self.info.get_id().clone()
+        self.info.get_id()
     }
 
     pub fn get_name(&self) -> String {
-        self.info.get_metadata().get_name().clone()
+        self.info.get_metadata().get_name()
     }
 }
 
