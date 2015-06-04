@@ -75,6 +75,10 @@ impl DirectoryListing {
     pub fn get_id(&self) -> routing::NameType {
         self.info.get_id().clone()
     }
+
+    pub fn get_name(&self) -> String {
+        self.info.get_metadata().get_name().clone()
+    }
 }
 
 impl fmt::Debug for DirectoryListing {
