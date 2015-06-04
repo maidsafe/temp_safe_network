@@ -24,8 +24,6 @@ use nfs;
 use routing::sendable::Sendable;
 use maidsafe_types::TypeTag;
 
-const IMMUTABLE_TAG: u64 = 101u64;
-
 // TODO update tag values for SDV and Immutable data
 pub struct NetworkStorage {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>

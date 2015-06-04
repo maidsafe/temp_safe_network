@@ -32,7 +32,7 @@ pub struct DirectoryHelper {
 
 fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
     let mut e = cbor::Encoder::from_memory();
-    e.encode(&[&data]);
+    e.encode(&[data]);
     e.into_bytes()
 }
 
@@ -52,26 +52,30 @@ impl DirectoryHelper {
 
     /// Creates a Directory in the network.
     pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
-        let mutex_client = self.client.clone();
-        let client = mutex_client.lock().unwrap();
         let directory = nfs::directory_listing::DirectoryListing::new(parent_dir_id, directory_name, user_metadata);
         let mut se = self_encryption::SelfEncryptor::new(::std::sync::Arc::new(nfs::io::NetworkStorage::new(self.client.clone())), self_encryption::datamap::DataMap::None);
         se.write(&serialise(directory.clone())[..], 0);
         let datamap = se.close();
 
-        let encrypt_result = client.hybrid_encrypt(&serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
+        let encrypt_result: _;
+
+        {
+            let client = self.client.lock().unwrap();
+            encrypt_result = client.hybrid_encrypt(&serialise(datamap)[..], self.get_nonce(directory.get_id().clone(), directory.get_parent_dir_id().clone()));
+        }
+
         if encrypt_result.is_err() {
             return Err("Encryption failed");
         }
 
         let immutable_data = maidsafe_types::ImmutableData::new(encrypt_result.unwrap());
-        let save_res = self.network_put(self.client.clone(), immutable_data.clone());
+        let save_res = self.network_put(immutable_data.clone());
         if save_res.is_err() {
             return Err("Save Failed");
         }
-        let mut sdv: maidsafe_types::StructuredData = maidsafe_types::StructuredData::new(directory.get_id(), client.get_owner(),
+        let mut sdv: maidsafe_types::StructuredData = maidsafe_types::StructuredData::new(directory.get_id(), self.client.lock().unwrap().get_owner(),
             vec![immutable_data.name()]);
-        let save_sdv_res = self.network_put(self.client.clone(), sdv);
+        let save_sdv_res = self.network_put(sdv);
         if save_res.is_err() {
             return Err("Failed to create directory");
         }
@@ -83,7 +87,7 @@ impl DirectoryHelper {
         let mutex_client = self.client.clone();
         let client = mutex_client.lock().unwrap();
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
-        let result = self.network_get(self.client.clone(), structured_data_type_id.type_tag(), directory.get_id());
+        let result = self.network_get(structured_data_type_id.type_tag(), directory.get_id());
         if result.is_err() {
             return Err("Network IO Error");
         }
@@ -99,14 +103,14 @@ impl DirectoryHelper {
         }
 
         let immutable_data = maidsafe_types::ImmutableData::new(encrypt_result.unwrap());
-        let immutable_data_put_result = self.network_put(self.client.clone(), immutable_data.clone());
+        let immutable_data_put_result = self.network_put(immutable_data.clone());
         if immutable_data_put_result.is_err() {
             return Err("Failed to save directory");
         };
         let mut versions = sdv.value();
         versions.push(immutable_data.name());
         sdv.set_value(versions);
-        let sdv_put_result = self.network_put(self.client.clone(), sdv);
+        let sdv_put_result = self.network_put(sdv);
         if sdv_put_result.is_err() {
             return Err("Failed to update directory version");
         };
@@ -116,7 +120,7 @@ impl DirectoryHelper {
     /// Return the versions of the directory
     pub fn get_versions(&mut self, directory_id: routing::NameType) -> Result<Vec<routing::NameType>, &str> {
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
-        let result = self.network_get(self.client.clone(), structured_data_type_id.type_tag(), directory_id);
+        let result = self.network_get(structured_data_type_id.type_tag(), directory_id);
         if result.is_err() {
             return Err("Network IO Error");
         }
@@ -127,7 +131,7 @@ impl DirectoryHelper {
     /// Return the DirectoryListing for the specified version
     pub fn get_by_version(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType, version: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
-        let data_res = self.network_get(self.client.clone(), structured_data_type_id.type_tag(), directory_id.clone());
+        let data_res = self.network_get(structured_data_type_id.type_tag(), directory_id.clone());
         if data_res.is_err() {
             return Err("Network IO Error");
         }
@@ -136,7 +140,7 @@ impl DirectoryHelper {
             return Err("Version not found");
         };
         let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
-        let get_data = self.network_get(self.client.clone(), immutable_data_type_id.type_tag(), version);
+        let get_data = self.network_get(immutable_data_type_id.type_tag(), version);
         if get_data.is_err() {
             return Err("Network IO Error");
         }
@@ -158,7 +162,7 @@ impl DirectoryHelper {
     /// Return the DirectoryListing for the latest version
     pub fn get(&mut self, directory_id: routing::NameType, parent_directory_id: routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, &str> {
         let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
-        let sdv_res = self.network_get(self.client.clone(), structured_data_type_id.type_tag(), directory_id.clone());
+        let sdv_res = self.network_get(structured_data_type_id.type_tag(), directory_id.clone());
         if sdv_res.is_err() {
             return Err("Network IO Error");
         }
@@ -168,7 +172,7 @@ impl DirectoryHelper {
             None => return Err("Could not find data")
         };
         let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
-        let imm_data_res = self.network_get(self.client.clone(), immutable_data_type_id.type_tag(), name);
+        let imm_data_res = self.network_get(immutable_data_type_id.type_tag(), name);
         if imm_data_res.is_err() {
             return Err("Network IO Error");
         }
@@ -187,11 +191,9 @@ impl DirectoryHelper {
         Ok(deserialise(se.read(0, size)))
     }
 
-    fn network_get(&self, client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, tag_id: u64,
+    fn network_get(&self, tag_id: u64,
         name: routing::NameType) -> Result<Vec<u8>, &str> {
-        let client_mutex = client.clone();
-        let mut safe = client_mutex.lock().unwrap();
-        let get_result = safe.get(tag_id, name);
+        let get_result = self.client.lock().unwrap().get(tag_id, name);
         if get_result.is_err() {
             return Err("Network IO Error");
         }
@@ -202,10 +204,8 @@ impl DirectoryHelper {
         }
     }
 
-    fn network_put<T>(&self, client_arc: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, sendable: T) -> Result<Vec<u8>, &str> where T: Sendable {
-        let client_mutex = client_arc.clone();
-        let mut client = client_mutex.lock().unwrap();
-        let get_result = client.put(sendable);
+    fn network_put<T>(&self, sendable: T) -> Result<Vec<u8>, &str> where T: Sendable {
+        let get_result = self.client.lock().unwrap().put(sendable);
         if get_result.is_err() {
             return Err("Network IO Error");
         }
@@ -227,4 +227,40 @@ impl DirectoryHelper {
         Some(::sodiumoxide::crypto::asymmetricbox::Nonce(nonce))
     }
 
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn get_dummy_client() -> ::client::Client {
+        let keyword = "Spandan".to_string();
+        let password = "Sharma".as_bytes();
+        let pin = 1234u32;
+
+        ::client::Client::create_account(&keyword,
+                                         pin,
+                                         &password,
+                                         ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()))).ok().unwrap()
+    }
+
+    #[test]
+    fn create_dir_listing() {
+        let client = ::std::sync::Arc::new(::std::sync::Mutex::new(get_dummy_client()));
+        let mut dir_helper = DirectoryHelper::new(client.clone());
+
+        assert!(dir_helper.create(::routing::NameType::new([8u8; 64]),
+                                  "DirName".to_string(),
+                                  vec![7u8; 100]).is_ok());
+    }
+
+    fn get_dir_listing() {
+        let client = ::std::sync::Arc::new(::std::sync::Mutex::new(get_dummy_client()));
+        let mut dir_helper = DirectoryHelper::new(client.clone());
+
+        assert!(dir_helper.create(::routing::NameType::new([8u8; 64]),
+                                  "DirName".to_string(),
+                                  vec![7u8; 100]).is_ok());
+    }
 }
