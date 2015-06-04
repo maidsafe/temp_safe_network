@@ -50,12 +50,17 @@ impl Writer {
         let mut directory = self.directory.clone();
         let ref mut file = self.file;
         file.set_datamap(self.self_encryptor.close());
-        if directory.get_files().contains(&file) {
-            let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
-            directory.get_files().remove(pos);
-            directory.get_files().insert(pos, file.clone());
-        } else {
-            directory.add_file(file.clone());
+        match directory.get_files().iter().find(|file| file.get_name() == file.get_name()) {
+            Some(old_file) => {
+                let pos = directory.get_files().binary_search_by(|p| p.get_name().cmp(&old_file.get_name())).unwrap();
+                let mut files = directory.get_files();
+                files.remove(pos);
+                files.insert(pos, file.clone());
+                directory.set_files(files);
+            },
+            None => {
+                directory.add_file(file.clone());
+            }
         }
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
         if directory_helper.update(directory).is_err() {

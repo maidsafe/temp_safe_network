@@ -52,14 +52,16 @@ impl FileHelper {
     }
 
     /// Updates the file metadata. Returns the updated DirectoryListing
-    pub fn update_metadata(&mut self, file: nfs::file::File, directory: nfs::directory_listing::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), &str> {
+    pub fn update_metadata(&mut self, file: nfs::file::File, directory: &mut nfs::directory_listing::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), &str> {
         if !self.file_exists(directory.clone(), file.get_name()) {
             return Err("File not present in the directory");
         }
         file.get_metadata().set_user_metadata(user_metadata);
-        let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
-        directory.get_files().remove(pos);
-        directory.get_files().insert(pos, file);
+        let pos = directory.get_files().binary_search_by(|p| p.get_name().cmp(&file.get_name())).unwrap();
+        let mut files = directory.get_files();
+        files.remove(pos);
+        files.insert(pos, file);
+        directory.set_files(files);
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
         if directory_helper.update(directory.clone()).is_err() {
             return Err("Failed to update");
@@ -159,7 +161,7 @@ mod test {
             writer = result.ok().unwrap();
         }
 
-        let data = vec![12u8; 90];
+        let data = vec![12u8; 20];
         writer.write(&data[..], 0);
         writer.close();
 
@@ -190,7 +192,7 @@ mod test {
                 }
 
                 let data = vec![11u8; 90];
-                writer.write(&data[..], 0);
+                writer.write(&[11u8; 90], 0);
                 writer.close();
 
                 let get_result = dir_helper.get(created_dir_id.clone(), parent_id.clone());
@@ -198,14 +200,19 @@ mod test {
                 dir_listing = get_result.ok().unwrap();
 
                 let result = dir_listing.get_files();
-                assert_eq!(result.len(), 2);
+                assert_eq!(result.len(), 1);
 
                 let file = result[0].clone();
 
-                let mut reader = file_helper.read(file);
+                let mut reader = file_helper.read(file.clone());
                 let rxd_data = reader.read(0, data.len() as u64).ok().unwrap();
 
-                //TODO(Krishna) check assert_eq!(rxd_data, data);
+                assert_eq!(rxd_data, data);
+
+                {// Get versions
+                    //let versions = file_helper.get_versions(created_dir_id.clone(), parent_id.clone(), file);
+                    // assert_eq!(versions.unwrap().len(), 2);
+                }
             }
         }
     }
