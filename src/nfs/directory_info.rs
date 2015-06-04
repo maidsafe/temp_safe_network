@@ -18,8 +18,8 @@
 use nfs::metadata::Metadata;
 use routing;
 use std::fmt;
-use routing::test_utils::Random;
 
+#[allow(dead_code)]
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryInfo {
     id: routing::NameType,
@@ -27,6 +27,7 @@ pub struct DirectoryInfo {
     metadata: Metadata,
 }
 
+#[allow(dead_code)]
 impl DirectoryInfo {
     pub fn new(parent_dir_id: routing::NameType, metadata: Metadata) -> DirectoryInfo {
         DirectoryInfo {

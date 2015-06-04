@@ -14,13 +14,14 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+#[allow(dead_code)]
 use nfs;
 use std::sync;
 use super::network_storage::NetworkStorage;
 use self_encryption;
-use routing;
 use client;
 
+#[allow(dead_code)]
 pub struct Writer {
     file: nfs::file::File,
     directory: nfs::directory_listing::DirectoryListing,
@@ -28,6 +29,7 @@ pub struct Writer {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
+#[allow(dead_code)]
 impl Writer {
 
     pub fn new(directory: nfs::directory_listing::DirectoryListing, file: nfs::file::File,

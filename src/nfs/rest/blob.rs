@@ -15,11 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use nfs;
-use routing;
-use self_encryption;
 use time;
 use client;
 
+#[allow(dead_code)]
 pub struct Blob {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
     file: nfs::file::File,

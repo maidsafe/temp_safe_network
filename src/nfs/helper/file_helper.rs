@@ -18,15 +18,16 @@ use time;
 use nfs;
 use nfs::helper::directory_helper::DirectoryHelper;
 use routing;
-use routing::sendable::Sendable;
 use client;
 use self_encryption;
 
 /// File provides helper functions to perform Operations on Files
+#[allow(dead_code)]
 pub struct FileHelper {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
+#[allow(dead_code)]
 impl FileHelper {
     /// Create a new FileHelper instance
     pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> FileHelper {

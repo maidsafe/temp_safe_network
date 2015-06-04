@@ -20,6 +20,7 @@ use super::directory_info::DirectoryInfo;
 use routing;
 use std::fmt;
 
+#[allow(dead_code)]
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryListing {
     info: DirectoryInfo,
@@ -27,6 +28,7 @@ pub struct DirectoryListing {
     files: Vec<File>
 }
 
+#[allow(dead_code)]
 impl DirectoryListing {
     pub fn new(parent_dir_id: routing::NameType, name: String, user_metadata: Vec<u8>) -> DirectoryListing {
         DirectoryListing {
@@ -37,7 +39,7 @@ impl DirectoryListing {
     }
 
     pub fn get_info(&self) -> DirectoryInfo {
-        self.get_info()
+        self.info.clone()
     }
 
     pub fn get_mut_metadata(&mut self) -> &mut Metadata {

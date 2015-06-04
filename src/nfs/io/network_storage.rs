@@ -18,10 +18,10 @@ use self_encryption;
 use maidsafe_types;
 use client;
 use routing;
-use nfs;
 use routing::sendable::Sendable;
 use maidsafe_types::TypeTag;
 
+#[allow(dead_code)]
 pub struct NetworkStorage {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
@@ -57,11 +57,15 @@ impl self_encryption::Storage for NetworkStorage {
         }
     }
 
-    fn put(&self, name: Vec<u8>, data: Vec<u8>) {
+    #[allow(unused_must_use)]
+    fn put(&self, _: Vec<u8>, data: Vec<u8>) {
         let sendable = maidsafe_types::ImmutableData::new(data);
         let client_mutex = self.client.clone();
         let mut client = client_mutex.lock().unwrap();
-        client.put(sendable);
+        let put_result = client.put(sendable);
+        if put_result.is_ok() {
+            put_result.ok().unwrap().get();
+        }
     }
 
 }

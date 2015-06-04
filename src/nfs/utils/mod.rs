@@ -17,6 +17,7 @@
 use cbor;
 use rustc_serialize::{Decodable, Encodable};
 
+#[allow(unused_must_use)]
 pub fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
     let mut e = cbor::Encoder::from_memory();
     e.encode(&[data]);

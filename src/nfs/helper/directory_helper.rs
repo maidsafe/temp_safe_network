@@ -19,15 +19,16 @@ use maidsafe_types;
 use routing;
 use routing::sendable::Sendable;
 use client;
-use std::error::Error;
 use maidsafe_types::TypeTag;
 use self_encryption;
 
 /// DirectoryHelper provides helper functions to perform Operations on Directory
+#[allow(dead_code)]
 pub struct DirectoryHelper {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
+#[allow(dead_code)]
 impl DirectoryHelper {
     /// Create a new DirectoryHelper instance
     pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> DirectoryHelper {
@@ -59,10 +60,10 @@ impl DirectoryHelper {
         if save_res.is_err() {
             return Err("Save Failed");
         }
-        let mut sdv: maidsafe_types::StructuredData = maidsafe_types::StructuredData::new(directory.get_id(), self.client.lock().unwrap().get_owner(),
+        let sdv: maidsafe_types::StructuredData = maidsafe_types::StructuredData::new(directory.get_id(), self.client.lock().unwrap().get_owner(),
             vec![immutable_data.name()]);
         let save_sdv_res = self.network_put(sdv);
-        if save_res.is_err() {
+        if save_sdv_res.is_err() {
             return Err("Failed to create directory");
         }
         Ok(directory.get_id())

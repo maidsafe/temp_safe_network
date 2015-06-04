@@ -19,12 +19,14 @@ use self_encryption;
 use std::fmt;
 use super::metadata::Metadata;
 
+#[allow(dead_code)]
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct File {
     metadata: Metadata,
     datamap: self_encryption::datamap::DataMap
 }
 
+#[allow(dead_code)]
 impl File {
     pub fn new(metadata: Metadata, datamap: self_encryption::datamap::DataMap) -> File {
         File {
