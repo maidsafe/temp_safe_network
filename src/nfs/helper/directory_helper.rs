@@ -51,7 +51,7 @@ impl DirectoryHelper {
     }
 
     /// Creates a Directory in the network.
-    pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<(), &str> {
+    pub fn create(&mut self, parent_dir_id: routing::NameType, directory_name: String, user_metadata: Vec<u8>) -> Result<::routing::NameType, &str> {
         let mutex_client = self.client.clone();
         let client = mutex_client.lock().unwrap();
         let directory = nfs::directory_listing::DirectoryListing::new(parent_dir_id, directory_name, user_metadata);
@@ -75,7 +75,7 @@ impl DirectoryHelper {
         if save_res.is_err() {
             return Err("Failed to create directory");
         }
-        Ok(())
+        Ok(directory.get_id())
     }
 
     /// Updates an existing DirectoryListing in the network.

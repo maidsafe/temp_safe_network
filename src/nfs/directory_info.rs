@@ -40,6 +40,10 @@ impl DirectoryInfo {
         self.id.clone()
     }
 
+    pub fn get_name(&self) -> String {
+        self.metadata.get_name().clone()
+    }
+
     pub fn get_parent_dir_id(&self) -> routing::NameType {
         self.parent_dir_id.clone()
     }
