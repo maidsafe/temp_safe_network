@@ -177,7 +177,7 @@ mod test {
             let boxed_public_maid = Box::new(account_packet.get_public_maid().clone());
             match mock_routing.lock().unwrap().unauthorised_put(destination, boxed_public_maid) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => (),
                         Err(error) => panic!("Unauthorised-PUT Response Failure :: {:?}", error.description()),
@@ -194,7 +194,7 @@ mod test {
             let unauthorised_put_result = mock_routing.lock().unwrap().unauthorised_put(destination, boxed_public_maid);
             match unauthorised_put_result {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => panic!("Overwriting of Existing Data Should Not Be Allowed !!"),
                         Err(_) => (),
@@ -247,7 +247,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().get(immutable_data_type_id.type_tag(), orig_immutable_data.name()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => panic!("Should not have found data before a PUT"),
                         Err(_) => (),
@@ -261,7 +261,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().put(orig_immutable_data.clone()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => (),
                         Err(error) => panic!("PUT Response Failure :: {:?}", error.description()),
@@ -275,7 +275,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().get(immutable_data_type_id.type_tag(), orig_immutable_data.name()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
@@ -296,7 +296,7 @@ mod test {
             let put_result = mock_routing.lock().unwrap().put(orig_immutable_data.clone());
             match put_result {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => panic!("Second PUT for same ImmutableData should fail !!"),
                         Err(_) => (),
@@ -359,7 +359,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => panic!("Should not have found data before a PUT"),
                         Err(_) => (),
@@ -373,7 +373,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().put(account_version.clone()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => (),
                         Err(error) => panic!("PUT Response Failure :: {:?}", error.description()),
@@ -387,7 +387,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().put(orig_immutable_data.clone()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => (),
                         Err(error) => panic!("PUT Response Failure :: {:?}", error.description()),
@@ -403,7 +403,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
@@ -422,7 +422,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().get(immutable_data_type_id.type_tag(), received_structured_data.value().pop().unwrap()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
@@ -445,7 +445,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().put(new_immutable_data.clone()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => (),
                         Err(error) => panic!("PUT Response Failure :: {:?}", error.description()),
@@ -465,7 +465,7 @@ mod test {
             let put_result = mock_routing.lock().unwrap().put(account_version.clone());
             match put_result {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(_) => (),
                         Err(_) => panic!("StructuredData should be allowed to be overwritten !!"),
@@ -479,7 +479,7 @@ mod test {
         {
             match mock_routing.lock().unwrap().get(structured_data_type_id.type_tag(), user_id.clone()) {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
@@ -501,7 +501,7 @@ mod test {
             let get_result = mock_routing.lock().unwrap().get(immutable_data_type_id.type_tag(), received_structured_data.value()[1].clone());
             match get_result {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
@@ -521,7 +521,7 @@ mod test {
             let get_result = mock_routing.lock().unwrap().get(immutable_data_type_id.type_tag(), received_structured_data.value()[0].clone());
             match get_result {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
