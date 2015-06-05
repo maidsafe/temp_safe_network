@@ -164,8 +164,8 @@ impl Container {
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
         match directory_helper.get_versions(self.directory_listing.get_id()) {
             Ok(versions) => {
-                    Ok(versions.iter().map(|v| v.0).collect())
-                },
+                Ok(versions.iter().map(|v| v.0).collect())
+            },
             Err(msg) => Err(msg)
         }
     }
