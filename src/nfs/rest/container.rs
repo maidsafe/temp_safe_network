@@ -90,13 +90,7 @@ impl Container {
             None => Err("File not found".to_string())
         }
     }
-
-    pub fn get_blob_by_version(&self, name: String, version: [u8;64]) -> Result<nfs::rest::Blob, String> {
-        match self.directory_listing.get_files().iter().find(|file| file.get_name() == name) {
-            Some(file) => Ok(nfs::rest::Blob::convert_from_file(self.client.clone(), file.clone())),
-            None => Err("File not found".to_string())
-        }
-    }
+    
 
     pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
         match self.validate_metadata(metadata) {
