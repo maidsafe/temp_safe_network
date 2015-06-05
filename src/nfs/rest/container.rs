@@ -28,7 +28,6 @@ pub struct Container {
 }
 
 impl Container {
-
     /// Authorizes the root directory access and return the Container
     /// Entry point for the Rest API
     pub fn authorise(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, dir_id: [u8;64], parent_dir_id: [u8;64]) -> Result<Container, String> {
@@ -196,6 +195,22 @@ impl Container {
                 file_helper.create(name, size, user_metadata, self.directory_listing.clone())
             },
             Err(err) => Err(err),
+        }
+    }
+
+    pub fn delete_blob(&mut self, name: String) -> Result<(), String> {
+        let mut sub_dirs = self.directory_listing.get_sub_directories();
+        match sub_dirs.iter().position(|file| file.get_name() == name) {
+            Some(pos) => {
+                sub_dirs.remove(pos);
+                self.directory_listing.set_sub_directories(sub_dirs);
+                let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+                match directory_helper.update(self.directory_listing.clone()) {
+                    Ok(_) => Ok(()),
+                    Err(msg) => Err(msg)
+                }
+            },
+            None => Err("File not found".to_string())
         }
     }
 
