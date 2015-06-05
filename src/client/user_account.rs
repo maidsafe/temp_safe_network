@@ -245,8 +245,6 @@ impl Account {
 mod test {
     use std;
 
-    use routing::types::{generate_random_vec_u8};
-
     use super::Account;
 
     fn slice_eq(left : &[u8], right : &[u8]) -> bool {

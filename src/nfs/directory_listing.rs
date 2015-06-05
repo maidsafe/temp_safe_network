@@ -14,9 +14,10 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use super::file::File;
-use super::metadata::Metadata;
 use super::directory_info::DirectoryInfo;
+use nfs::metadata::Metadata;
 use routing;
 use std::fmt;
 
@@ -115,7 +116,6 @@ impl fmt::Display for DirectoryListing {
 #[cfg(test)]
 mod test {
     use super::*;
-    use nfs::metadata::Metadata;
     use cbor;
     use routing;
 
