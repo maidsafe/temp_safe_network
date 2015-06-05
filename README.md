@@ -38,8 +38,8 @@
             - [X] [MAID-1088](https://maidsafe.atlassian.net/browse/MAID-1088) List Containers, Update / Get Container Metadata
             - [X] [MAID-1089](https://maidsafe.atlassian.net/browse/MAID-1089) Delete Container
             - [ ] [MAID-1090](https://maidsafe.atlassian.net/browse/MAID-1090) Create Blob
-            - [ ] [MAID-1091](https://maidsafe.atlassian.net/browse/MAID-1091) List Blobs
-            - [ ] [MAID-1092](https://maidsafe.atlassian.net/browse/MAID-1092) Get Blob
+            - [X] [MAID-1091](https://maidsafe.atlassian.net/browse/MAID-1091) List Blobs
+            - [X] [MAID-1092](https://maidsafe.atlassian.net/browse/MAID-1092) Get Blob
             - [ ] [MAID-1098](https://maidsafe.atlassian.net/browse/MAID-1098) Update Blob Content
             - [ ] [MAID-1093](https://maidsafe.atlassian.net/browse/MAID-1093) Get Blob Content
             - [ ] [MAID-1094](https://maidsafe.atlassian.net/browse/MAID-1094) List Blob Version
