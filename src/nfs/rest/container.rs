@@ -71,6 +71,27 @@ impl Container {
         self.directory_listing.get_files().iter().map(|x| nfs::rest::Blob::convert_from_file(self.client.clone(), x.clone())).collect()
     }
 
+    pub fn get_blob(&self, name: String, version: Option<[u8;64]>) -> Result<nfs::rest::Blob, String> {
+        let mut directory_listing;
+        if version.is_some() {
+            let dir_id = self.directory_listing.get_id();
+            let parent_id = self.directory_listing.get_parent_dir_id();
+            let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+            let result = directory_helper.get_by_version(dir_id, parent_id, routing::NameType(version.unwrap()));
+            if result.is_err() {
+                return Err(result.unwrap_err());
+            }
+            directory_listing = result.unwrap();
+        } else {
+            directory_listing = self.directory_listing.clone();
+        }
+        match directory_listing.get_files().iter().find(|file| file.get_name() == name) {
+            Some(file) => Ok(nfs::rest::Blob::convert_from_file(self.client.clone(), file.clone())),
+            None => Err("File not found".to_string())
+        }
+    }
+    
+
     pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
