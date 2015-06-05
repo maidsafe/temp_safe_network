@@ -366,8 +366,14 @@ impl Client {
             }
         }
 
+        let mut data_name: Option<routing::NameType> = None;
+        if tag_id == immutable_data_tag.type_tag() {
+            data_name = Some(name.clone());
+        }
+
         match self.routing.lock().unwrap().get(tag_id, name) {
-            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
+            Ok(id) => Ok(response_getter::ResponseGetter::new(
+                    self.response_notifier.clone(), self.callback_interface.clone(), Some(id), data_name)),
             Err(io_err) => Err(io_err),
         }
     }
