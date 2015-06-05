@@ -36,6 +36,7 @@ fn validate_pin_is_4_digits(mut pin: u32) -> bool {
     }
 }
 
+#[allow(unused_must_use)]
 fn main() {
     let mut keyword = String::new();
     let mut password = String::new();

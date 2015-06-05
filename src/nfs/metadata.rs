@@ -20,6 +20,7 @@ use cbor::CborTagEncode;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::fmt;
 
+#[allow(dead_code)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Metadata {
     name: String,
@@ -29,6 +30,7 @@ pub struct Metadata {
     user_metadata: Vec<u8>
 }
 
+#[allow(dead_code)]
 impl Metadata {
     pub fn new(name: String, user_metadata: Vec<u8>) -> Metadata {
         Metadata {

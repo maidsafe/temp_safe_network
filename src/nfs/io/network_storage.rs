@@ -18,28 +18,13 @@ use self_encryption;
 use maidsafe_types;
 use client;
 use routing;
-use rustc_serialize::{Decodable, Encodable};
-use cbor;
-use nfs;
 use routing::sendable::Sendable;
 use maidsafe_types::TypeTag;
 
-// TODO update tag values for SDV and Immutable data
+#[allow(dead_code)]
 pub struct NetworkStorage {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
-
-fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
-    let mut e = cbor::Encoder::from_memory();
-    e.encode(&[&data]);
-    e.into_bytes()
-}
-
-fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
-    let mut d = cbor::Decoder::from_bytes(data);
-    d.decode().next().unwrap().unwrap()
-}
-
 
 impl NetworkStorage {
     pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> NetworkStorage {
@@ -72,11 +57,15 @@ impl self_encryption::Storage for NetworkStorage {
         }
     }
 
-    fn put(&self, name: Vec<u8>, data: Vec<u8>) {
+    #[allow(unused_must_use)]
+    fn put(&self, _: Vec<u8>, data: Vec<u8>) {
         let sendable = maidsafe_types::ImmutableData::new(data);
         let client_mutex = self.client.clone();
         let mut client = client_mutex.lock().unwrap();
-        client.put(sendable);
+        let put_result = client.put(sendable);
+        if put_result.is_ok() {
+            put_result.ok().unwrap().get();
+        }
     }
 
 }

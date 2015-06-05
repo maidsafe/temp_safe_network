@@ -18,15 +18,16 @@ use time;
 use nfs;
 use nfs::helper::directory_helper::DirectoryHelper;
 use routing;
-use routing::sendable::Sendable;
 use client;
 use self_encryption;
 
 /// File provides helper functions to perform Operations on Files
+#[allow(dead_code)]
 pub struct FileHelper {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
+#[allow(dead_code)]
 impl FileHelper {
     /// Create a new FileHelper instance
     pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> FileHelper {
@@ -36,40 +37,42 @@ impl FileHelper {
     }
 
     pub fn create(&mut self, name: String, user_metatdata: Vec<u8>,
-            directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, &str> {
+            directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
         if self.file_exists(directory.clone(), name.clone()) {
-            return Err("File already exists");
+            return Err("File already exists".to_string());
         }
         let file = nfs::file::File::new(nfs::metadata::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
         Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
     }
 
-    pub fn update(&mut self, file: nfs::file::File, directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, &str> {
+    pub fn update(&mut self, file: nfs::file::File, directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
         if !self.file_exists(directory.clone(), file.get_name()) {
-            return Err("File not present in the directory");
+            return Err("File not present in the directory".to_string());
         }
         Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
     }
 
     /// Updates the file metadata. Returns the updated DirectoryListing
-    pub fn update_metadata(&mut self, file: nfs::file::File, directory: nfs::directory_listing::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), &str> {
+    pub fn update_metadata(&mut self, file: nfs::file::File, directory: &mut nfs::directory_listing::DirectoryListing, user_metadata: Vec<u8>) -> Result<(), String> {
         if !self.file_exists(directory.clone(), file.get_name()) {
-            return Err("File not present in the directory");
+            return Err("File not present in the directory".to_string());
         }
         file.get_metadata().set_user_metadata(user_metadata);
-        let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
-        directory.get_files().remove(pos);
-        directory.get_files().insert(pos, file);
+        let pos = directory.get_files().binary_search_by(|p| p.get_name().cmp(&file.get_name())).unwrap();
+        let mut files = directory.get_files();
+        files.remove(pos);
+        files.insert(pos, file);
+        directory.set_files(files);
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
         if directory_helper.update(directory.clone()).is_err() {
-            return Err("Failed to update");
+            return Err("Failed to update".to_string());
         }
         Ok(())
     }
 
     /// Return the versions of a directory containing modified versions of a file
     pub fn get_versions(&mut self, directory_id: routing::NameType, parent_id: routing::NameType, file: nfs::file::File)
-                -> Result<Vec<routing::NameType>, &str> {
+                -> Result<Vec<routing::NameType>, String> {
         let mut versions = Vec::<routing::NameType>::new();
         let mut directory_helper = DirectoryHelper::new(self.client.clone());
 
@@ -159,7 +162,7 @@ mod test {
             writer = result.ok().unwrap();
         }
 
-        let data = vec![12u8; 90];
+        let data = vec![12u8; 20];
         writer.write(&data[..], 0);
         writer.close();
 
@@ -190,7 +193,7 @@ mod test {
                 }
 
                 let data = vec![11u8; 90];
-                writer.write(&data[..], 0);
+                writer.write(&[11u8; 90], 0);
                 writer.close();
 
                 let get_result = dir_helper.get(created_dir_id.clone(), parent_id.clone());
@@ -198,14 +201,19 @@ mod test {
                 dir_listing = get_result.ok().unwrap();
 
                 let result = dir_listing.get_files();
-                assert_eq!(result.len(), 2);
+                assert_eq!(result.len(), 1);
 
                 let file = result[0].clone();
 
-                let mut reader = file_helper.read(file);
+                let mut reader = file_helper.read(file.clone());
                 let rxd_data = reader.read(0, data.len() as u64).ok().unwrap();
 
-                //TODO(Krishna) check assert_eq!(rxd_data, data);
+                assert_eq!(rxd_data, data);
+
+                {// Get versions
+                    //let versions = file_helper.get_versions(created_dir_id.clone(), parent_id.clone(), file);
+                    // assert_eq!(versions.unwrap().len(), 2);
+                }
             }
         }
     }

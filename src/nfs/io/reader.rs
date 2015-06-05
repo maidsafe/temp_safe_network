@@ -18,15 +18,16 @@ use nfs;
 use std::sync;
 use super::network_storage::NetworkStorage;
 use self_encryption;
-use routing;
 use client;
 
+#[allow(dead_code)]
 pub struct Reader {
     file: nfs::file::File,
     self_encryptor: self_encryption::SelfEncryptor<NetworkStorage>,
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
+#[allow(dead_code)]
 impl Reader {
 
     pub fn new(file: nfs::file::File,
