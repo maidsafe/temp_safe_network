@@ -52,6 +52,11 @@ impl Writer {
         let mut directory = self.directory.clone();
         let ref mut file = self.file;
         file.set_datamap(self.self_encryptor.close());
+
+        let mut metadata = file.get_metadata();
+        metadata.set_modified_time(::time::now_utc());
+        file.set_metadata(metadata);
+
         match directory.get_files().iter().find(|file| file.get_name() == file.get_name()) {
             Some(old_file) => {
                 let pos = directory.get_files().binary_search_by(|p| p.get_name().cmp(&old_file.get_name())).unwrap();

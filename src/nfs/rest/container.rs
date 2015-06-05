@@ -99,45 +99,53 @@ impl Container {
     }
 
     pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
-        let user_metadata = match metadata {
-            Some(data) => {
-                if data.len() == 0 {
-                    return Err("Metadata cannot be empty".to_string());
+        match self.validate_metadata(metadata) {
+            Ok(user_metadata) => {
+                let parent_dir_id = self.directory_listing.get_parent_dir_id();
+                let mut dir_id;
+
+                // Create directory
+                {
+                    let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+                    let result = directory_helper.create(parent_dir_id.clone(), name.clone(), user_metadata);
+
+                    if result.is_err() {
+                        return Err(result.unwrap_err());
+                    }
+
+                    dir_id = result.unwrap();
                 }
-                data.into_bytes()
+
+                let mut created_directory;
+
+                // Retrieve Created directory & add to the sub-folder list
+                {
+                    let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+                    let result = directory_helper.get(dir_id, parent_dir_id);
+
+                    if result.is_err() {
+                        return Err(result.unwrap_err());
+                    }
+
+                    let mut sub_dirs = self.directory_listing.get_sub_directories();
+                    created_directory = result.unwrap();
+                    sub_dirs.push(created_directory.get_info());
+                    self.directory_listing.set_sub_directories(sub_dirs);
+                }
+
+                // Update the Container
+                {
+                    let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+                    let result = directory_helper.update(created_directory);
+                    if result.is_err() {
+                        return Err("Failed to create Conatiner".to_string());
+                    }
+                }
+
+                Ok(())
             },
-            None => Vec::new()
-        };
-        let parent_dir_id = self.directory_listing.get_parent_dir_id();
-        let mut dir_id;
-        { // Create directory
-            let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-            let result = directory_helper.create(parent_dir_id.clone(), name.clone(), user_metadata);
-            if result.is_err() {
-                return Err(result.unwrap_err());
-            }
-            dir_id = result.unwrap();
+            Err(err) => Err(err),
         }
-        let mut created_directory;
-        { // Retrieve Created directory & add to the sub-folder list
-            let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-            let result = directory_helper.get(dir_id, parent_dir_id);
-            if result.is_err() {
-                return Err(result.unwrap_err());
-            }
-            let mut sub_dirs = self.directory_listing.get_sub_directories();
-            created_directory = result.unwrap();
-            sub_dirs.push(created_directory.get_info());
-            self.directory_listing.set_sub_directories(sub_dirs);
-        }
-        { // Update the Container
-            let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-            let result = directory_helper.update(created_directory);
-            if result.is_err() {
-                return Err("Failed to create Conatiner".to_string());
-            }
-        }
-        Ok(())
     }
 
     pub fn get_containers(&self) -> Vec<nfs::rest::ContainerInfo> {
@@ -147,20 +155,16 @@ impl Container {
     }
 
     pub fn update_metadata(&mut self, metadata: Option<String>) -> Result<(), String>{
-        let user_metadata = match metadata {
-            Some(data) => {
-                if data.len() == 0 {
-                    return Err("Metadata cannot be empty".to_string());
+        match self.validate_metadata(metadata) {
+            Ok(user_metadata) => {
+                self.directory_listing.set_user_metadata(user_metadata);
+                let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+                match directory_helper.update(self.directory_listing.clone()) {
+                    Ok(_) => Ok(()),
+                    Err(msg) => Err(msg),
                 }
-                data.into_bytes()
             },
-            None => Vec::new()
-        };
-        self.directory_listing.set_user_metadata(user_metadata);
-        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-        match directory_helper.update(self.directory_listing.clone()) {
-            Ok(_) => Ok(()),
-            Err(msg) => Err(msg)
+            Err(err) => Err(err),
         }
     }
 
@@ -212,6 +216,28 @@ impl Container {
         }
     }
 
+    pub fn create_blob(&mut self, name: String, metadata: Option<String>, size: u64) -> Result<nfs::io::Writer, String> {
+        match self.validate_metadata(metadata) {
+            Ok(user_metadata) => {
+                let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
+                file_helper.create(name, size, user_metadata, self.directory_listing.clone())
+            },
+            Err(err) => Err(err),
+        }
+    }
+
+    fn validate_metadata(&self, metadata: Option<String>) -> Result<Vec<u8>, String> {
+        match metadata {
+            Some(data) => {
+                if data.len() == 0 {
+                    Err("Metadata cannot be empty".to_string())
+                } else {
+                    Ok(data.into_bytes())
+                }
+            },
+            None => Ok(Vec::new()),
+        }
+    }
 }
 
 impl nfs::traits::DirectoryListingWrapper for Container {
@@ -226,5 +252,4 @@ impl nfs::traits::DirectoryListingWrapper for Container {
             directory_listing: directory_listing
         }
     }
-
 }
