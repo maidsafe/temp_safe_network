@@ -36,12 +36,14 @@ impl FileHelper {
         }
     }
 
-    pub fn create(&mut self, name: String, user_metatdata: Vec<u8>,
+    pub fn create(&mut self, name: String, size: u64, user_metatdata: Vec<u8>,
             directory: nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
         if self.file_exists(directory.clone(), name.clone()) {
             return Err("File already exists".to_string());
         }
-        let file = nfs::file::File::new(nfs::metadata::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
+        let mut metadata = nfs::metadata::Metadata::new(name, user_metatdata);
+        metadata.set_size(size);
+        let file = nfs::file::File::new(metadata, self_encryption::datamap::DataMap::None);
         Ok(nfs::io::Writer::new(directory, file, self.client.clone()))
     }
 
@@ -156,7 +158,7 @@ mod test {
         let mut file_helper = FileHelper::new(client);
         let mut writer: _;
         {
-            let result = file_helper.create("Name".to_string(), vec![98u8; 100], dir_listing);
+            let result = file_helper.create("Name".to_string(), 0, vec![98u8; 100], dir_listing);
             assert!(result.is_ok());
 
             writer = result.ok().unwrap();
