@@ -76,11 +76,11 @@ impl FileHelper {
         let mut versions = Vec::<routing::NameType>::new();
         let mut directory_helper = DirectoryHelper::new(self.client.clone());
 
-        match directory_helper.get_versions(directory_id) {
+        match directory_helper.get_versions(directory_id.clone()) {
             Ok(sdv_versions) => {
                 let mut modified_time = time::empty_tm();
                 for version_id in sdv_versions {
-                    match directory_helper.get(version_id.clone(), parent_id.clone()) {
+                    match directory_helper.get_by_version(directory_id.clone(), parent_id.clone(), version_id.clone()) {
                         Ok(directory_listing) => {
                             match directory_listing.get_files().iter().find(|&entry| entry.get_name() == file.get_name()) {
                                 Some(file) => {
@@ -210,9 +210,9 @@ mod test {
 
                 assert_eq!(rxd_data, data);
 
-                {// Get versions
-                    //let versions = file_helper.get_versions(created_dir_id.clone(), parent_id.clone(), file);
-                    // assert_eq!(versions.unwrap().len(), 2);
+                {
+                    let versions = file_helper.get_versions(created_dir_id.clone(), parent_id.clone(), file);
+                    assert_eq!(versions.unwrap().len(), 2);
                 }
             }
         }
