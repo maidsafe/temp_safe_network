@@ -160,30 +160,30 @@ impl Container {
         Ok(Container::convert_from_directory_listing(self.client.clone(), result.unwrap()))
     }
 
-    // pub fn get_versions(&mut self) -> Vec<[u8;64]> {
-    //     let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-    //     match directory_helper.get_versions(self.directory_listing.get_id()) {
-    //         Ok(versions) => {
-    //                 Ok(versions)
-    //             },
-    //         Err(msg) => Err(msg)
-    //     }
-    // }
+    pub fn get_versions(&mut self) -> Result<Vec<[u8;64]>, String> {
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+        match directory_helper.get_versions(self.directory_listing.get_id()) {
+            Ok(versions) => {
+                    Ok(versions.iter().map(|v| v.0).collect())
+                },
+            Err(msg) => Err(msg)
+        }
+    }
 
-    // pub fn delete_container(&mut self, name: String) -> Result<(), String> {
-    //     let mut sub_dirs = self.directory_listing.get_sub_directories();
-    //     let find_result = sub_dirs.binary_search_by(|&info| &info.get_name().cmp(name));
-    //     if find_result.is_err() {
-    //         return Err("Container not found".to_string());
-    //     }
-    //     sub_dirs.remove(find_result.unwrap());
-    //     self.directory_listing.set_sub_directories(sub_dirs);
-    //     let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-    //     match directory_helper.update(self.directory_listing.clone()) {
-    //         Ok(_) => Ok(()),
-    //         Err(msg) => Err(msg)
-    //     }
-    // }
+    pub fn delete_container(&mut self, name: String) -> Result<(), String> {
+        let mut sub_dirs = self.directory_listing.get_sub_directories();
+        let find_result = sub_dirs.binary_search_by(|info| info.get_name().cmp(&name));
+        if find_result.is_err() {
+            return Err("Container not found".to_string());
+        }
+        sub_dirs.remove(find_result.unwrap());
+        self.directory_listing.set_sub_directories(sub_dirs);
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+        match directory_helper.update(self.directory_listing.clone()) {
+            Ok(_) => Ok(()),
+            Err(msg) => Err(msg)
+        }
+    }
 
 }
 
