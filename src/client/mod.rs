@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use cbor;
+use crypto;
 use rand::Rng;
 use crypto::buffer::ReadBuffer;
 use crypto::buffer::WriteBuffer;
@@ -44,12 +45,11 @@ pub struct Client {
 
 impl Client {
     //TODO: data_store parameter should be removed when not testing with non_networking_test_framework.
-    #[allow(unused_must_use)]
     pub fn create_account(keyword: &String, pin: u32, password: &[u8], data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
-        let _ = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
+        let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
                                                                             account_packet.get_maid().secret_keys().clone());
 
         //TODO: Toggle depending on if using actual routing or non_networking_test_framework
@@ -117,7 +117,7 @@ impl Client {
         let user_network_id = user_account::Account::generate_network_id(keyword, pin);
         let fake_account_packet = user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
-        let _ = routing::routing_client::ClientIdPacket::new(fake_account_packet.get_maid().public_keys().clone(),
+        let fake_client_id_packet = routing::routing_client::ClientIdPacket::new(fake_account_packet.get_maid().public_keys().clone(),
                                                                                  fake_account_packet.get_maid().secret_keys().clone());
 
         //TODO: Toggle depending on if using actual routing or non_networking_test_framework
@@ -178,7 +178,7 @@ impl Client {
                                                 }
                                                 let account_packet = decryption_result.ok().unwrap();
 
-                                                let _ = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
+                                                let client_id_packet = routing::routing_client::ClientIdPacket::new(account_packet.get_maid().public_keys().clone(),
                                                                                                                     account_packet.get_maid().secret_keys().clone());
 
                                                 //TODO: Toggle depending on if using actual routing or non_networking_test_framework
