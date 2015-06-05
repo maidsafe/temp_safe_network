@@ -36,7 +36,7 @@
         - [ ] REST API methods in Container
             - [X] [MAID-1087](https://maidsafe.atlassian.net/browse/MAID-1087) Create Container & Get Container
             - [X] [MAID-1088](https://maidsafe.atlassian.net/browse/MAID-1088) List Containers, Update / Get Container Metadata
-            - [ ] [MAID-1089](https://maidsafe.atlassian.net/browse/MAID-1089) Delete Container
+            - [X] [MAID-1089](https://maidsafe.atlassian.net/browse/MAID-1089) Delete Container
             - [ ] [MAID-1090](https://maidsafe.atlassian.net/browse/MAID-1090) Create Blob
             - [ ] [MAID-1091](https://maidsafe.atlassian.net/browse/MAID-1091) List Blobs
             - [ ] [MAID-1092](https://maidsafe.atlassian.net/browse/MAID-1092) Get Blob
