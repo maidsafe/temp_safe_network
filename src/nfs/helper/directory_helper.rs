@@ -122,22 +122,24 @@ impl DirectoryHelper {
             encrypt_result = client.hybrid_encrypt(&nfs::utils::serialise(datamap)[..], self.get_nonce(directory.get_id()));
         }
 
-        if encrypt_result.is_err() {
-            return Err("Encryption failed".to_string());
-        }
-
-        let immutable_data = maidsafe_types::ImmutableData::new(encrypt_result.unwrap());
-        match self.network_put(immutable_data.clone()) {
-            Ok(_) => {
-                let mut versions = sdv.value();
-                versions.push(immutable_data.name());
-                sdv.set_value(versions);
-                match self.network_put(sdv.clone()){
-                    Ok(_) => Ok(()),
-                    Err(_) => Err("Failed to update directory version".to_string())
+        match encrypt_result {
+            Ok(encrypted_data) => {
+                let immutable_data = maidsafe_types::ImmutableData::new(encrypted_data);
+                let name = immutable_data.name();
+                match self.network_put(immutable_data) {
+                    Ok(_) => {
+                        let mut versions = sdv.value();
+                        versions.push(name);
+                        sdv.set_value(versions);
+                        match self.network_put(sdv.clone()){
+                            Ok(_) => Ok(()),
+                            Err(_) => Err("Failed to update directory version".to_string())
+                        }
+                    },
+                    Err(_) => Err("IO Error".to_string())
                 }
             },
-            Err(_) => Err("IO Error".to_string())
+            Err(_) => Err("Encryption failed".to_string())
         }
     }
 
