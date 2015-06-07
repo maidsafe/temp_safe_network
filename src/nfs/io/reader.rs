@@ -20,14 +20,12 @@ use super::network_storage::NetworkStorage;
 use self_encryption;
 use client;
 
-#[allow(dead_code)]
 pub struct Reader {
     file: nfs::file::File,
     self_encryptor: self_encryption::SelfEncryptor<NetworkStorage>,
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
-#[allow(dead_code)]
 impl Reader {
 
     pub fn new(file: nfs::file::File,
@@ -35,7 +33,7 @@ impl Reader {
         let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
         Reader {
             file: file.clone(),
-            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap()),
+            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap().clone()),
             client: client
         }
     }

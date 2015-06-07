@@ -17,16 +17,14 @@
 
 use self_encryption;
 use std::fmt;
-use super::metadata::Metadata;
+use nfs::metadata::Metadata;
 
-#[allow(dead_code)]
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct File {
     metadata: Metadata,
     datamap: self_encryption::datamap::DataMap
 }
 
-#[allow(dead_code)]
 impl File {
     pub fn new(metadata: Metadata, datamap: self_encryption::datamap::DataMap) -> File {
         File {
@@ -35,24 +33,31 @@ impl File {
         }
     }
 
-    pub fn get_name(&self) -> String {
+    pub fn get_name(&self) -> &String {
         self.get_metadata().get_name()
     }
-
-    pub fn set_metadata(&mut self, metadata: Metadata) {
-        self.metadata = metadata;
+    pub fn get_metadata(&self) -> &Metadata {
+        &self.metadata
     }
 
-    pub fn get_metadata(&self) -> Metadata {
-        self.metadata.clone()
+    pub fn get_mut_metadata(&mut self) -> &mut Metadata {
+        &mut self.metadata
+    }
+
+    pub fn get_datamap(&self) -> &self_encryption::datamap::DataMap {
+        &self.datamap
     }
 
     pub fn set_datamap(&mut self, datamap: self_encryption::datamap::DataMap) {
         self.datamap = datamap;
     }
 
-    pub fn get_datamap(&self) -> self_encryption::datamap::DataMap {
-        self.datamap.clone()
+    pub fn set_metadata(&mut self, metadata: Metadata) {
+        self.metadata = metadata;
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.metadata.set_name(name)
     }
 
 }

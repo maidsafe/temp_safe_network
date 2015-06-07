@@ -23,14 +23,14 @@ pub struct ContainerInfo {
 
 impl ContainerInfo {
 
-    pub fn get_name(&self) -> String {
+    pub fn get_name(&self) -> &String {
         self.info.get_metadata().get_name()
     }
 
     pub fn get_metadata(&self) -> Option<String> {
         let metadata = self.info.get_metadata().get_user_metadata();
         match metadata {
-            Some(data) => Some(String::from_utf8(data).unwrap()),
+            Some(data) => Some(String::from_utf8(data.clone()).unwrap()),
             None => None
         }
     }

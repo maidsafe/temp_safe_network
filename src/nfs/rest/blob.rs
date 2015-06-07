@@ -26,11 +26,11 @@ pub struct Blob {
 
 impl Blob {
 
-    pub fn get_name(&self) -> String {
+    pub fn get_name(&self) -> &String {
         self.file.get_metadata().get_name()
     }
 
-    pub fn get_user_metadata(&self) -> Option<Vec<u8>> {
+    pub fn get_user_metadata(&self) -> Option<&Vec<u8>> {
         self.file.get_metadata().get_user_metadata()
     }
 
