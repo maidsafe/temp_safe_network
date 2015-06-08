@@ -50,10 +50,10 @@ impl FileHelper {
     }
 
     pub fn update(&mut self,
-        file: nfs::file::File,
+        file: &nfs::file::File,
         directory: &nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
         match self.file_exists(directory, file.get_name()) {
-            Some(_) => Ok(nfs::io::Writer::new(directory.clone(), file, self.client.clone())),
+            Some(_) => Ok(nfs::io::Writer::new(directory.clone(), file.clone(), self.client.clone())),
             None => Err("File not present in the directory".to_string())
         }
     }
@@ -129,6 +129,7 @@ impl FileHelper {
 #[cfg(test)]
 mod test {
     use super::*;
+    use ::std::ops::Index;
 
     fn get_dummy_client() -> ::client::Client {
         let keyword = "Spandan".to_string();
@@ -196,7 +197,7 @@ mod test {
             {
                 let mut writer: _;
                 {
-                    let result = file_helper.update(result[0].clone(), &dir_listing);
+                    let result = file_helper.update(result.index(0), &dir_listing);
                     assert!(result.is_ok());
 
                     writer = result.ok().unwrap();
