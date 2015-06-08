@@ -41,8 +41,7 @@ impl Writer {
         }
     }
 
-    pub fn write(&mut self, data: &[u8], position: u64) {
-        // let se = self.self_encryptor.clone().lock().unwrap();
+    pub fn write(&mut self, data: &[u8], position: u64) {        
         self.self_encryptor.write(data, position);
     }
 

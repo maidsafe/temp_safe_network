@@ -46,19 +46,16 @@ impl Blob {
         self.file.get_metadata().get_size()
     }
 
-}
-
-impl nfs::traits::FileWrapper for Blob {
-
     fn convert_to_file(&self) -> nfs::file::File {
         self.file.clone()
     }
 
-    fn convert_from_file(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
+    pub fn convert_from_file(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
         file: nfs::file::File) -> Blob {
         Blob {
             client: client,
             file: file
         }
     }
+
 }

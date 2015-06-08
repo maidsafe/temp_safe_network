@@ -18,9 +18,6 @@ use nfs;
 use routing;
 use time;
 use client;
-use nfs::traits::FileWrapper;
-use nfs::traits::DirectoryListingWrapper;
-use nfs::traits::DirectoryInfoWrapper;
 
 pub struct Container {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
@@ -223,15 +220,13 @@ impl Container {
             None => Ok(Vec::new()),
         }
     }
-}
-
-impl nfs::traits::DirectoryListingWrapper for Container {
 
     fn convert_to_directory_listing(&self) -> nfs::directory_listing::DirectoryListing {
         self.directory_listing.clone()
     }
 
-    fn convert_from_directory_listing(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, directory_listing: nfs::directory_listing::DirectoryListing) -> Container {
+    pub fn convert_from_directory_listing(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
+         directory_listing: nfs::directory_listing::DirectoryListing) -> Container {
         Container {
             client: client,
             directory_listing: directory_listing
