@@ -185,21 +185,7 @@ impl Container {
             },
             Err(err) => Err(err),
         }
-    }
-
-    pub fn update_blob_content(&mut self, blob: &nfs::rest::Blob, data: &[u8]) -> Result<(), String> {
-        match self.get_writer_for_blob(blob) {
-            Ok(mut writer) => {
-                writer.write(data, 0);
-                Ok(())
-            },
-            Err(err) => Err(err),
-        }
-    }
-
-    pub fn get_blob_writer(&mut self, blob: &nfs::rest::Blob, data: Vec<u8>) -> Result<nfs::io::Writer, String> {
-        self.get_writer_for_blob(blob)
-    }
+    }    
 
     pub fn get_blob_content(&mut self, blob: nfs::rest::Blob) -> Result<Vec<u8>, String> {
         match self.get_reader_for_blob(blob) {
@@ -213,6 +199,17 @@ impl Container {
 
     pub fn get_blob_reader(&mut self, blob: nfs::rest::blob::Blob) -> Result<nfs::io::reader::Reader, String> {
         self.get_reader_for_blob(blob)
+    }
+
+    pub fn get_blob_versions(&mut self, name: &String) -> Result<Vec<[u8;64]>, String>{
+        match self.find_file(name, &self.directory_listing) {
+            Some(blob) => {
+                let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
+                let versions = file_helper.get_versions(self.directory_listing.get_id(), &blob.convert_to_file());
+                Ok(Vec::new())
+            },
+            None=> Err("Blob not found".to_string())
+        }
     }
 
     pub fn delete_blob(&mut self, name: &String) -> Result<(), String> {
