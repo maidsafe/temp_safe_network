@@ -281,6 +281,32 @@ impl Container {
         }
     }
 
+    pub fn copy_blob(&mut self, blob_name: String, to_container: [u8;64]) -> Result<(), String> {
+        let to_dir_id = ::routing::NameType(to_container);
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+        match self.directory_listing.get_files().iter().position(|file| *file.get_name() == blob_name) {
+            Some(file_pos) => {
+                match directory_helper.get(&to_dir_id) {
+                    Ok(mut to_dir_listing) => {
+                        match self.find_file(&blob_name, &to_dir_listing) {
+                            Some(_) => Err("File already exists in the destination Conatiner".to_string()),
+                            None => {
+                                let file = self.directory_listing.get_files()[file_pos].clone();
+                                to_dir_listing.get_mut_files().push(file);
+                                match  directory_helper.update(&to_dir_listing) {
+                                    Ok(_) => Ok(()),
+                                    Err(msg) => Err(msg),
+                                }
+                            }
+                        }
+                    },
+                    Err(msg) => Err(msg),
+                }
+            },
+            None => Err("Blob not found".to_string()),
+        }
+    }
+
     fn get_writer_for_blob(&self, blob: &nfs::rest::blob::Blob) -> Result<nfs::io::Writer, String> {
         let mut helper = nfs::helper::FileHelper::new(self.client.clone());
         match helper.update(blob.convert_to_file(), &self.directory_listing) {
