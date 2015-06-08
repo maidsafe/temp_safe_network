@@ -165,7 +165,10 @@ impl Container {
                     None =>  directory_helper.get(dir_info.get_id())
                 };
                 match get_dir_listing_result {
-                    Ok(dir_listing) => Ok(Container::convert_from_directory_listing(self.client.clone(), dir_listing)),
+                    Ok(dir_listing) => Ok(Container {
+                        client: self.client.clone(),
+                        directory_listing: dir_listing
+                    }),
                     Err(msg) => Err(msg)
                 }
             },
@@ -352,17 +355,6 @@ impl Container {
             },
             Err(msg) => Err(msg)
         }
-    }
+    }    
 
-    pub fn convert_to_directory_listing(&self) -> nfs::directory_listing::DirectoryListing {
-        self.directory_listing.clone()
-    }
-
-    pub fn convert_from_directory_listing(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
-         directory_listing: nfs::directory_listing::DirectoryListing) -> Container {
-        Container {
-            client: client,
-            directory_listing: directory_listing
-        }
-    }
 }
