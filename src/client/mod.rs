@@ -23,6 +23,7 @@ use crypto::buffer::WriteBuffer;
 use routing;
 use maidsafe_types;
 use maidsafe_types::TypeTag;
+use maidsafe_types::data::{ImmutableDataTypeTag};
 use routing::sendable::Sendable;
 
 pub mod non_networking_test_framework;
@@ -82,7 +83,7 @@ impl Client {
         let put_res = client.routing.lock().unwrap().put(encrypted_account.clone());
         match put_res {
             Ok(id) => {
-                let mut response_getter = response_getter::ResponseGetter::new(id, client.response_notifier.clone(), client.callback_interface.clone());
+                let mut response_getter = response_getter::ResponseGetter::new(client.response_notifier.clone(), client.callback_interface.clone(), Some(id), None);
                 match response_getter.get() {
                     Ok(_) => {},
                     Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!")),
@@ -95,7 +96,7 @@ impl Client {
 
                 match put_res {
                     Ok(id) => {
-                        let mut response_getter = response_getter::ResponseGetter::new(id, client.response_notifier.clone(), client.callback_interface.clone());
+                        let mut response_getter = response_getter::ResponseGetter::new(client.response_notifier.clone(), client.callback_interface.clone(), Some(id), None);
                         match response_getter.get() {
                             Ok(_) => {},
                             Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
@@ -153,7 +154,7 @@ impl Client {
 
         match get_result {
             Ok(id) => {
-                let mut response_getter = response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                let mut response_getter = response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                 match response_getter.get() {
                     Ok(raw_data) => {
                         let mut decoder = cbor::Decoder::from_bytes(raw_data);
@@ -165,7 +166,7 @@ impl Client {
                                 let get_result = fake_routing_client.lock().unwrap().get(immutable_data_type_id.type_tag(), latest_version);
                                 match get_result {
                                     Ok(id) => {
-                                        let mut response_getter = response_getter::ResponseGetter::new(id, notifier.clone(), callback_interface.clone());
+                                        let mut response_getter = response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
                                         match response_getter.get() {
                                             Ok(raw_data) => {
                                                 let mut decoder = cbor::Decoder::from_bytes(raw_data);
@@ -350,14 +351,28 @@ impl Client {
 
     pub fn put<T>(&mut self, sendable: T) -> Result<response_getter::ResponseGetter, ::IoError> where T: Sendable {
         match self.routing.lock().unwrap().put(sendable) {
-            Ok(id)      => Ok(response_getter::ResponseGetter::new(id, self.response_notifier.clone(), self.callback_interface.clone())),
+            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
             Err(io_err) => Err(io_err),
         }
     }
 
     pub fn get(&mut self, tag_id: u64, name: routing::NameType) -> Result<response_getter::ResponseGetter, ::IoError> {
+        let immutable_data_tag = ImmutableDataTypeTag;
+        if tag_id == immutable_data_tag.type_tag() {
+            let mut cb_interface = self.callback_interface.lock().unwrap();
+            if cb_interface.cache_check(&name) {
+                return Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), None, Some(name)))
+            }
+        }
+
+        let mut data_name: Option<routing::NameType> = None;
+        if tag_id == immutable_data_tag.type_tag() {
+            data_name = Some(name.clone());
+        }
+
         match self.routing.lock().unwrap().get(tag_id, name) {
-            Ok(id)      => Ok(response_getter::ResponseGetter::new(id, self.response_notifier.clone(), self.callback_interface.clone())),
+            Ok(id) => Ok(response_getter::ResponseGetter::new(
+                    self.response_notifier.clone(), self.callback_interface.clone(), Some(id), data_name)),
             Err(io_err) => Err(io_err),
         }
     }

@@ -15,40 +15,61 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use routing;
+
 pub struct ResponseGetter {
-    message_id:         ::routing::types::MessageId,
     response_notifier:  ::ResponseNotifier,
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
+    message_id:         Option<routing::types::MessageId>,
+    name:               Option<routing::NameType>,
 }
 
 impl ResponseGetter {
-    pub fn new(msg_id: ::routing::types::MessageId,
-               notifier: ::ResponseNotifier,
-               cb_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>) -> ResponseGetter {
+    pub fn new(notifier: ::ResponseNotifier,
+               cb_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
+               msg_id: Option<routing::types::MessageId>,
+               name: Option<routing::NameType>) -> ResponseGetter {
         ResponseGetter {
-            message_id: msg_id,
             response_notifier: notifier,
             callback_interface: cb_interface,
+            message_id: msg_id,
+            name: name
         }
     }
 
-    pub fn get(&mut self) -> Result<Vec<u8>, ::routing::error::ResponseError> {
+    pub fn get(&mut self) -> Result<Vec<u8>, routing::error::ResponseError> {
         let &(ref lock, ref condition_var) = &*self.response_notifier;
         let mut mutex_guard: _;
 
+        if self.name.is_some() {
+            let mut cb_interface = self.callback_interface.lock().unwrap();
+            if cb_interface.cache_check(&self.name.clone().unwrap()) {
+                match cb_interface.cache_get(&self.name.clone().unwrap()) {
+                    Some(data) => return data,
+                    None => (),
+                }
+            }
+        }
+
         {
             let mut cb_interface = self.callback_interface.lock().unwrap();
-            match cb_interface.get_response(self.message_id) {
+            match cb_interface.get_response(self.message_id.unwrap()) {
                 Some(response_result) => return response_result,
                 None                  => mutex_guard = lock.lock().unwrap(),
             }
         }
 
-        while *mutex_guard != self.message_id {
+        while *mutex_guard != self.message_id.unwrap() {
             mutex_guard = condition_var.wait(mutex_guard).unwrap();
         }
 
         let mut cb_interface = self.callback_interface.lock().unwrap();
-        cb_interface.get_response(self.message_id).unwrap()
+        let response = cb_interface.get_response(self.message_id.unwrap()).unwrap();
+
+        if self.name.is_some() && response.is_ok() {
+            cb_interface.cache_insert(self.name.clone().unwrap(), response.clone().unwrap().clone());
+        }
+
+        response
     }
 }
