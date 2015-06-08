@@ -87,11 +87,11 @@ impl Container {
         }
     }
 
-    pub fn create(&mut self, name: &String, metadata: Option<String>) -> Result<(), String> {
+    pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-                match directory_helper.create(name.clone(), user_metadata) {
+                match directory_helper.create(name, user_metadata) {
                     Ok(dir_id) => {
                         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                         match directory_helper.get(&dir_id) {
@@ -133,9 +133,9 @@ impl Container {
         }
     }
 
-    pub fn get_container(&mut self, name: &String, version: Option<[u8; 64]>) -> Result<Container, String> {
+    pub fn get_container(&mut self, name: String, version: Option<[u8; 64]>) -> Result<Container, String> {
         let sub_dirs = self.directory_listing.get_sub_directories();
-        match sub_dirs.iter().find(|&entry| *entry.get_name() == *name) {
+        match sub_dirs.iter().find(|&entry| *entry.get_name() == name) {
             Some(dir_info) => {
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                 let get_dir_listing_result = match version {
@@ -161,8 +161,8 @@ impl Container {
         }
     }
 
-    pub fn delete_container(&mut self, name: &String) -> Result<(), String> {
-        match self.directory_listing.get_sub_directories().iter().position(|entry| *entry.get_name() == *name) {
+    pub fn delete_container(&mut self, name: String) -> Result<(), String> {
+        match self.directory_listing.get_sub_directories().iter().position(|entry| *entry.get_name() == name) {
             Some(pos) => {
                 self.directory_listing.get_mut_sub_directories().remove(pos);
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
@@ -186,7 +186,7 @@ impl Container {
             Err(err) => Err(err),
         }
     }
-        
+
     pub fn update_blob_content(&mut self, blob: &nfs::rest::Blob, data: &[u8]) -> Result<(), String> {
         match self.get_writer_for_blob(blob) {
             Ok(mut writer) => {
@@ -215,8 +215,8 @@ impl Container {
         self.get_reader_for_blob(blob)
     }
 
-    pub fn get_blob_versions(&mut self, name: &String) -> Result<Vec<[u8;64]>, String>{
-        match self.find_file(name, &self.directory_listing) {
+    pub fn get_blob_versions(&mut self, name: String) -> Result<Vec<[u8;64]>, String>{
+        match self.find_file(&name, &self.directory_listing) {
             Some(blob) => {
                 let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
                 let versions = file_helper.get_versions(self.directory_listing.get_id(), &blob.convert_to_file());
@@ -226,8 +226,8 @@ impl Container {
         }
     }
 
-    pub fn delete_blob(&mut self, name: &String) -> Result<(), String> {
-        match self.directory_listing.get_sub_directories().iter().position(|file| *file.get_name() == *name) {
+    pub fn delete_blob(&mut self, name: String) -> Result<(), String> {
+        match self.directory_listing.get_sub_directories().iter().position(|file| *file.get_name() == name) {
             Some(pos) => {
                 self.directory_listing.get_mut_sub_directories().remove(pos);
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
