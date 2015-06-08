@@ -284,6 +284,7 @@ impl Container {
         }
     }
 
+    /// Copies the latest blob version from the conatiner to the specified destination container
     pub fn copy_blob(&mut self, blob_name: String, to_container: [u8;64]) -> Result<(), String> {
         let to_dir_id = ::routing::NameType(to_container);
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
@@ -355,6 +356,6 @@ impl Container {
             },
             Err(msg) => Err(msg)
         }
-    }    
+    }
 
 }
