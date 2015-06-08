@@ -47,7 +47,7 @@
             - [X] [MAID-1096](https://maidsafe.atlassian.net/browse/MAID-1096) Copy Blob
             - [X] [MAID-1097](https://maidsafe.atlassian.net/browse/MAID-1097) Update / Get Blob Metadata
         - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API
-    - [ ] [MAID-1101](https://maidsafe.atlassian.net/browse/MAID-1101) Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
+    - [X] [MAID-1101](https://maidsafe.atlassian.net/browse/MAID-1101) Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
 - [ ] Create Example:
     - [X] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example
     - [ ] [MAID-1103](https://maidsafe.atlassian.net/browse/MAID-1103) Example to demonstrate Storage API
