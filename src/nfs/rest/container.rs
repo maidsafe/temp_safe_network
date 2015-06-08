@@ -215,17 +215,6 @@ impl Container {
         self.get_reader_for_blob(blob)
     }
 
-    pub fn get_blob_versions(&mut self, name: &String) -> Result<Vec<[u8;64]>, String>{
-        match self.find_file(name, &self.directory_listing) {
-            Some(blob) => {
-                let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
-                let versions = file_helper.get_versions(self.directory_listing.get_id(), &blob.convert_to_file());
-                Ok(Vec::new())
-            },
-            None=> Err("Blob not found".to_string())
-        }
-    }
-
     pub fn delete_blob(&mut self, name: &String) -> Result<(), String> {
         match self.directory_listing.get_sub_directories().iter().position(|file| *file.get_name() == *name) {
             Some(pos) => {
