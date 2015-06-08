@@ -43,9 +43,11 @@ impl ResponseGetter {
 
         if self.name.is_some() {
             let mut cb_interface = self.callback_interface.lock().unwrap();
-            match cb_interface.cache_get(&self.name.clone().unwrap()) {
-                Some(data) => return data,
-                None => mutex_guard = lock.lock().unwrap(),
+            if cb_interface.cache_check(&self.name.clone().unwrap()) {
+                match cb_interface.cache_get(&self.name.clone().unwrap()) {
+                    Some(data) => return data,
+                    None => (),
+                }
             }
         }
 
@@ -65,7 +67,6 @@ impl ResponseGetter {
         let response = cb_interface.get_response(self.message_id.unwrap()).unwrap();
 
         if self.name.is_some() && response.is_ok() {
-            let mut cb_interface = self.callback_interface.lock().unwrap();
             cb_interface.cache_insert(self.name.clone().unwrap(), response.clone().unwrap().clone());
         }
 
