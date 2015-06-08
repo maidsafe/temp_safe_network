@@ -185,7 +185,21 @@ impl Container {
             },
             Err(err) => Err(err),
         }
-    }    
+    }
+        
+    pub fn update_blob_content(&mut self, blob: &nfs::rest::Blob, data: &[u8]) -> Result<(), String> {
+        match self.get_writer_for_blob(blob) {
+            Ok(mut writer) => {
+                writer.write(data, 0);
+                Ok(())
+            },
+            Err(err) => Err(err),
+        }
+    }
+
+    pub fn get_blob_writer(&mut self, blob: &nfs::rest::Blob, data: Vec<u8>) -> Result<nfs::io::Writer, String> {
+        self.get_writer_for_blob(blob)
+    }
 
     pub fn get_blob_content(&mut self, blob: nfs::rest::Blob) -> Result<Vec<u8>, String> {
         match self.get_reader_for_blob(blob) {
