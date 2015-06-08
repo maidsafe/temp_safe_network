@@ -219,7 +219,7 @@ impl Container {
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                 match directory_helper.update(&self.directory_listing) {
                     Ok(_) => Ok(()),
-                    Err(msg) => Err(msg)
+                    Err(msg) => Err(msg),
                 }
             },
             None => Err("Blob not found".to_string())
@@ -237,9 +237,19 @@ impl Container {
     fn get_reader_for_blob(&self, blob: nfs::rest::blob::Blob) -> Result<nfs::io::Reader, String> {
         match self.find_file(blob.get_name(), &self.directory_listing) {
             Some(_) => {
-                Ok(nfs::io::Reader::new(blob.convert_to_file(), self.client.clone()))
+                Ok(nfs::io::Reader::new(blob.convert_to_file().clone(), self.client.clone()))
             },
             None => Err("Blob not found".to_string())
+        }
+    }
+
+    pub fn update_blob_metadata(&mut self, blob: &mut nfs::rest::Blob, metadata: Option<String>) ->Result<(), String> {
+        match self.validate_metadata(metadata) {
+            Ok(user_metadata) => {
+                let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
+                file_helper.update_metadata(blob.convert_to_mut_file(), &mut self.directory_listing, &user_metadata)
+            },
+            Err(msg) => Err(msg),
         }
     }
 

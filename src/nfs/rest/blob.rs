@@ -54,8 +54,12 @@ impl Blob {
         self.file.get_metadata().get_size()
     }
 
-    pub fn convert_to_file(&self) -> nfs::file::File {
-        self.file.clone()
+    pub fn convert_to_file(&self) -> &nfs::file::File {
+        &self.file
+    }
+
+    pub fn convert_to_mut_file(&mut self) -> &mut nfs::file::File {
+        &mut self.file
     }
 
     pub fn convert_from_file(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
