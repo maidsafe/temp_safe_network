@@ -62,7 +62,7 @@ impl Blob {
     }
 
     pub fn convert_from_file(file: nfs::file::File) -> Blob {
-        Blob {            
+        Blob {
             file: file
         }
     }
