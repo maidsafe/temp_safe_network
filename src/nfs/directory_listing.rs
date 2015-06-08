@@ -63,18 +63,17 @@ impl DirectoryListing {
 
     pub fn upsert_file(&mut self, file: File) {
         match self.files.iter().position(|entry| entry.get_name() == file.get_name()) {
-            Some(pos) => {
-                self.files.remove(pos);
-                self.files.insert(pos, file);
-            },
-            None => {
-                self.files.push(file);
-            }
+            Some(pos) => *self.files.get_mut(pos).unwrap() = file,
+            None => self.files.push(file),
         }
     }
 
     pub fn get_files(&self) -> &Vec<File> {
         &self.files
+    }
+
+    pub fn get_mut_files(&mut self) -> &mut Vec<File> {
+        &mut self.files
     }
 
     pub fn get_sub_directories(&self) -> &Vec<DirectoryInfo> {
