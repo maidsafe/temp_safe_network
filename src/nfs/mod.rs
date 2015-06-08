@@ -17,7 +17,6 @@
 
 mod io;
 mod helper;
-mod traits;
 mod file;
 mod metadata;
 mod directory_info;

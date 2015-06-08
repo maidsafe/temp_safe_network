@@ -21,7 +21,6 @@ use routing;
 use routing::sendable::Sendable;
 use maidsafe_types::TypeTag;
 
-#[allow(dead_code)]
 pub struct NetworkStorage {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }

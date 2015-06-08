@@ -21,7 +21,6 @@ use super::network_storage::NetworkStorage;
 use self_encryption;
 use client;
 
-#[allow(dead_code)]
 pub struct Writer {
     file: nfs::file::File,
     directory: nfs::directory_listing::DirectoryListing,
@@ -29,7 +28,6 @@ pub struct Writer {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
 
-#[allow(dead_code)]
 impl Writer {
 
     pub fn new(directory: nfs::directory_listing::DirectoryListing, file: nfs::file::File,
@@ -38,42 +36,35 @@ impl Writer {
         Writer {
             file: file.clone(),
             directory: directory,
-            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap()),
+            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap().clone()),
             client: client
         }
     }
 
     pub fn write(&mut self, data: &[u8], position: u64) {
-        // let se = self.self_encryptor.clone().lock().unwrap();
         self.self_encryptor.write(data, position);
     }
 
     pub fn close(mut self) -> Result<(), String> {
-        let mut directory = self.directory.clone();
         let ref mut file = self.file;
+        let ref mut directory = self.directory;
         file.set_datamap(self.self_encryptor.close());
 
-        let mut metadata = file.get_metadata();
-        metadata.set_modified_time(::time::now_utc());
-        file.set_metadata(metadata);
+        file.get_mut_metadata().set_modified_time(::time::now_utc());
 
-        match directory.get_files().iter().find(|file| file.get_name() == file.get_name()) {
-            Some(old_file) => {
-                let pos = directory.get_files().binary_search_by(|p| p.get_name().cmp(&old_file.get_name())).unwrap();
-                let mut files = directory.get_files();
-                files.remove(pos);
-                files.insert(pos, file.clone());
-                directory.set_files(files);
+        match directory.get_files().iter().find(|entry| entry.get_name() == file.get_name()) {
+            Some(_) => {
+                directory.upsert_file(file.clone());
             },
             None => {
                 directory.add_file(file.clone());
             }
-        }
+        };
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-        if directory_helper.update(directory).is_err() {
-            return Err("Failed to save".to_string());
+        match directory_helper.update(directory) {
+            Ok(_) => Ok(()),
+            Err(_) => Err("Failed to save".to_string())
         }
-        Ok(())
     }
 
 }

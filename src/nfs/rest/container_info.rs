@@ -23,14 +23,14 @@ pub struct ContainerInfo {
 
 impl ContainerInfo {
 
-    pub fn get_name(&self) -> String {
+    pub fn get_name(&self) -> &String {
         self.info.get_metadata().get_name()
     }
 
     pub fn get_metadata(&self) -> Option<String> {
         let metadata = self.info.get_metadata().get_user_metadata();
         match metadata {
-            Some(data) => Some(String::from_utf8(data).unwrap()),
+            Some(data) => Some(String::from_utf8(data.clone()).unwrap()),
             None => None
         }
     }
@@ -39,16 +39,14 @@ impl ContainerInfo {
         self.info.get_metadata().get_created_time()
     }
 
-}
-
-impl nfs::traits::DirectoryInfoWrapper for ContainerInfo {
     fn convert_to_directory_info(&self) -> nfs::directory_info::DirectoryInfo {
         self.info.clone()
     }
 
-    fn convert_from_directory_info(info: nfs::directory_info::DirectoryInfo) -> ContainerInfo {
+    pub fn convert_from_directory_info(info: nfs::directory_info::DirectoryInfo) -> ContainerInfo {
         ContainerInfo {
             info: info
         }
     }
+
 }
