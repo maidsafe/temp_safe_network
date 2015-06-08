@@ -228,10 +228,20 @@ impl Container {
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                 match directory_helper.update(self.directory_listing.clone()) {
                     Ok(_) => Ok(()),
-                    Err(msg) => Err(msg)
+                    Err(msg) => Err(msg),
                 }
             },
             None => Err("File not found".to_string())
+        }
+    }
+
+    pub fn update_blob_metadata(&mut self, blob: &nfs::rest::Blob, metadata: Option<String>) ->Result<(), String> {
+        match self.validate_metadata(metadata) {
+            Ok(user_metadata) => {
+                let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
+                file_helper.update_metadata(&mut blob.convert_to_file(), &mut self.directory_listing, &user_metadata)
+            },
+            Err(msg) => Err(msg),
         }
     }
 
