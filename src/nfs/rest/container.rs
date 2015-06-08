@@ -227,9 +227,9 @@ impl Container {
     }
 
     pub fn delete_blob(&mut self, name: String) -> Result<(), String> {
-        match self.directory_listing.get_sub_directories().iter().position(|file| *file.get_name() == name) {
+        match self.directory_listing.get_files().iter().position(|file| *file.get_name() == name) {
             Some(pos) => {
-                self.directory_listing.get_mut_sub_directories().remove(pos);
+                self.directory_listing.get_mut_files().remove(pos);
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                 match directory_helper.update(&self.directory_listing) {
                     Ok(_) => Ok(()),

@@ -77,6 +77,10 @@ impl DirectoryListing {
         &self.files
     }
 
+    pub fn get_mut_files(&mut self) -> &mut Vec<File> {
+        &mut self.files
+    }
+
     pub fn get_sub_directories(&self) -> &Vec<DirectoryInfo> {
         &self.sub_directories
     }
