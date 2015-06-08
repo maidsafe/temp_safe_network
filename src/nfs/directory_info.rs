@@ -18,50 +18,57 @@
 use nfs::metadata::Metadata;
 use routing;
 use std::fmt;
-use routing::test_utils::Random;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryInfo {
     id: routing::NameType,
-    parent_dir_id: routing::NameType,
+    // parent_dir_id: routing::NameType,
     metadata: Metadata,
 }
 
 impl DirectoryInfo {
-    pub fn new(parent_dir_id: routing::NameType, metadata: Metadata) -> DirectoryInfo {
+    pub fn new(metadata: Metadata) -> DirectoryInfo {
         DirectoryInfo {
             id: routing::test_utils::Random::generate_random(),
-            parent_dir_id: parent_dir_id,
+            // parent_dir_id: parent_dir_id,
             metadata: metadata,
         }
     }
 
-    pub fn get_id(&self) -> routing::NameType {
-        self.id.clone()
+    pub fn get_id(&self) -> &routing::NameType {
+        &self.id
     }
 
-    pub fn get_parent_dir_id(&self) -> routing::NameType {
-        self.parent_dir_id.clone()
+    pub fn get_mut_metadata(&mut self) -> &mut Metadata {
+        &mut self.metadata
     }
+
+    pub fn get_metadata(&self) -> &Metadata {
+        &self.metadata
+    }
+
+    pub fn get_name(&self) -> &String {
+        self.metadata.get_name()
+    }
+
+    // pub fn get_parent_dir_id(&self) -> &routing::NameType {
+    //     &self.parent_dir_id
+    // }
 
     pub fn set_metadata(&mut self, metadata: Metadata) {
         self.metadata = metadata;
-    }
-
-    pub fn get_metadata(&self) -> Metadata {
-        self.metadata.clone()
     }
 }
 
 impl fmt::Debug for DirectoryInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.get_id())
+        write!(f, "metadata: {}, id: {}", *self.get_metadata(), *self.get_id())
     }
 }
 
 impl fmt::Display for DirectoryInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "metadata: {}, id: {}", self.get_metadata(), self.get_id())
+        write!(f, "metadata: {}, id: {}", *self.get_metadata(), *self.get_id())
     }
 }
 
@@ -75,7 +82,7 @@ mod test {
 
     #[test]
     fn serialise() {
-        let obj_before = DirectoryInfo::new(routing::NameType::new([0u8; 64]), Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()));
+        let obj_before = DirectoryInfo::new(Metadata::new("hello.txt".to_string(), "{mime:\"application/json\"}".to_string().into_bytes()));
 
         let mut e = cbor::Encoder::from_memory();
         e.encode(&[&obj_before]).unwrap();

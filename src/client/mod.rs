@@ -16,7 +16,6 @@
 // relating to use of the SAFE Network Software.
 
 use cbor;
-use crypto;
 use rand::Rng;
 use crypto::buffer::ReadBuffer;
 use crypto::buffer::WriteBuffer;
@@ -482,7 +481,6 @@ mod test {
         // Decrypt without Nonce
         let hybrid_decrypt_2 = client.hybrid_decrypt(&hybrid_encrypt_2.ok().unwrap()[..], None);
         let hybrid_decrypt_3 = client.hybrid_decrypt(&hybrid_encrypt_3.clone().ok().unwrap()[..], None);
-
 
         // Decryption without passing Nonce for something encrypted with passing Nonce - Should Fail
         let hybrid_decrypt_4 = client.hybrid_decrypt(&hybrid_encrypt_0.ok().unwrap()[..], None);

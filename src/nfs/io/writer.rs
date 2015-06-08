@@ -14,11 +14,11 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+#[allow(dead_code)]
 use nfs;
 use std::sync;
 use super::network_storage::NetworkStorage;
 use self_encryption;
-use routing;
 use client;
 
 pub struct Writer {
@@ -36,32 +36,38 @@ impl Writer {
         Writer {
             file: file.clone(),
             directory: directory,
-            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap()),
+            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap().clone()),
             client: client
         }
     }
 
     pub fn write(&mut self, data: &[u8], position: u64) {
-        // let se = self.self_encryptor.clone().lock().unwrap();
         self.self_encryptor.write(data, position);
     }
 
     pub fn close(mut self) -> Result<(), String> {
-        let mut directory = self.directory.clone();
         let ref mut file = self.file;
+        let ref mut directory = self.directory;
+        let size = self.self_encryptor.len();
+
         file.set_datamap(self.self_encryptor.close());
-        if directory.get_files().contains(&file) {
-            let pos = directory.get_files().binary_search_by(|p| p.cmp(&file)).unwrap();
-            directory.get_files().remove(pos);
-            directory.get_files().insert(pos, file.clone());
-        } else {
-            directory.add_file(file.clone());
-        }
+
+        file.get_mut_metadata().set_modified_time(::time::now_utc());
+        file.get_mut_metadata().set_size(size);
+
+        match directory.get_files().iter().find(|entry| entry.get_name() == file.get_name()) {
+            Some(_) => {
+                directory.upsert_file(file.clone());
+            },
+            None => {
+                directory.add_file(file.clone());
+            }
+        };
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-        if directory_helper.update(directory).is_err() {
-            return Err("Failed to save".to_string());
+        match directory_helper.update(directory) {
+            Ok(_) => Ok(()),
+            Err(_) => Err("Failed to save".to_string())
         }
-        Ok(())
     }
 
 }

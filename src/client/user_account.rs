@@ -16,7 +16,6 @@
 // relating to use of the SAFE Network Software.                                                                */
 
 use cbor;
-use sodiumoxide::crypto;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 
 use routing;
@@ -37,6 +36,7 @@ pub struct Account {
     root_dir_id: Option<routing::NameType>,
 }
 
+#[allow(dead_code)]
 impl Account {
     pub fn new(root_dir_id: Option<routing::NameType>) -> Account {
         let an_maid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MaidTypeTags>();
@@ -244,8 +244,6 @@ impl Account {
 #[cfg(test)]
 mod test {
     use std;
-
-    use routing::types::{generate_random_vec_u8};
 
     use super::Account;
 

@@ -40,23 +40,23 @@ impl Metadata {
         }
     }
 
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
 
-    pub fn get_name(&self) -> String {
-        self.name.clone()
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
     }
 
     pub fn set_user_metadata(&mut self, user_metadata: Vec<u8>) {
         self.user_metadata = user_metadata;
     }
 
-    pub fn get_user_metadata(&self) -> Option<Vec<u8>> {
-        if !self.user_metadata.is_empty() {
-            Some(self.user_metadata.clone())
-        } else {
+    pub fn get_user_metadata(&self) -> Option<&Vec<u8>> {
+        if self.user_metadata.is_empty() {
             None
+        } else {
+            Some(&self.user_metadata)
         }
     }
 

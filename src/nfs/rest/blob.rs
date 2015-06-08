@@ -15,11 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 use nfs;
-use routing;
-use self_encryption;
 use time;
 use client;
 
+#[allow(dead_code)]
 pub struct Blob {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
     file: nfs::file::File,
@@ -27,12 +26,20 @@ pub struct Blob {
 
 impl Blob {
 
-    pub fn get_name(&self) -> String {
+    pub fn get_name(&self) -> &String {
         self.file.get_metadata().get_name()
     }
 
-    pub fn get_user_metadata(&self) -> Option<Vec<u8>> {
-        self.file.get_metadata().get_user_metadata()
+    pub fn get_user_metadata(&self) -> Option<String> {
+        match self.file.get_metadata().get_user_metadata() {
+            Some(data) => {
+                match String::from_utf8(data.clone()) {
+                    Ok(metadata) => Some(metadata),
+                    Err(_) => None
+                }
+            },
+            None => None
+        }
     }
 
     pub fn get_created_time(&self) -> time::Tm {
@@ -47,19 +54,20 @@ impl Blob {
         self.file.get_metadata().get_size()
     }
 
-}
-
-impl nfs::traits::FileWrapper for Blob {
-
-    fn convert_to_file(&self) -> nfs::file::File {
-        self.file.clone()
+    pub fn convert_to_file(&self) -> &nfs::file::File {
+        &self.file
     }
 
-    fn convert_from_file(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
+    pub fn convert_to_mut_file(&mut self) -> &mut nfs::file::File {
+        &mut self.file
+    }
+
+    pub fn convert_from_file(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
         file: nfs::file::File) -> Blob {
         Blob {
             client: client,
             file: file
         }
     }
+
 }

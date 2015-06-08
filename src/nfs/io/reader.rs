@@ -18,7 +18,6 @@ use nfs;
 use std::sync;
 use super::network_storage::NetworkStorage;
 use self_encryption;
-use routing;
 use client;
 
 pub struct Reader {
@@ -34,7 +33,7 @@ impl Reader {
         let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
         Reader {
             file: file.clone(),
-            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap()),
+            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap().clone()),
             client: client
         }
     }
@@ -43,9 +42,9 @@ impl Reader {
         self.self_encryptor.len()
     }
 
-    pub fn read(&mut self,  position: u64, length: u64) -> Result<Vec<u8>, &str> {
-        if position > self.size() || length > self.size() {
-            return Err("Invalid range specified");
+    pub fn read(&mut self,  position: u64, length: u64) -> Result<Vec<u8>, String> {
+        if (position + length) > self.size() {
+            return Err("Invalid range specified".to_string());
         }
         Ok(self.self_encryptor.read(position, length))
     }

@@ -18,32 +18,32 @@
     - [X] [MAID-1080](https://maidsafe.atlassian.net/browse/MAID-1080) Implement types
         - [X] Implement MetaData, File and DirectoryListing types
         - [X] Implement wrapper traits
-    - [ ] Implement Helpers
+    - [X] Implement Helpers
         - [X] [MAID-1081](https://maidsafe.atlassian.net/browse/MAID-1081) Directory Helper
             - [X] Save DirectoryListing
             - [X] Get Directory
             - [X] Get Directory Versions
-        - [ ] File Helper
+        - [X] File Helper
             - [X] [MAID-1082](https://maidsafe.atlassian.net/browse/MAID-1082) Create File, update file and Metatdata
-            - [ ] [MAID-1083](https://maidsafe.atlassian.net/browse/MAID-1083) Get Versions
+            - [X] [MAID-1083](https://maidsafe.atlassian.net/browse/MAID-1083) Get Versions
             - [X] [MAID-1084](https://maidsafe.atlassian.net/browse/MAID-1084) Read File
-        - [ ] [MAID-1085](https://maidsafe.atlassian.net/browse/MAID-1085) Unit test cases for Directory and File Helpers
+        - [X] [MAID-1085](https://maidsafe.atlassian.net/browse/MAID-1085) Unit test cases for Directory and File Helpers
     - [ ] Implement REST DataTypes
         - [X] [MAID-1086](https://maidsafe.atlassian.net/browse/MAID-1086) Container & Blob types
             - [X] Implement Blob and Container types
             - [X] Implement FileWrapper trait for Blob
-            - [X] Implement DirectoryListingWrapper trait for Container            
+            - [X] Implement DirectoryListingWrapper trait for Container
         - [ ] REST API methods in Container
-            - [ ] [MAID-1087](https://maidsafe.atlassian.net/browse/MAID-1087) Create Container & Get Container
-            - [ ] [MAID-1088](https://maidsafe.atlassian.net/browse/MAID-1088) List Containers, Update / Get Container Metadata
-            - [ ] [MAID-1089](https://maidsafe.atlassian.net/browse/MAID-1089) Delete Container
-            - [ ] [MAID-1090](https://maidsafe.atlassian.net/browse/MAID-1090) Create Blob
-            - [ ] [MAID-1091](https://maidsafe.atlassian.net/browse/MAID-1091) List Blobs
-            - [ ] [MAID-1092](https://maidsafe.atlassian.net/browse/MAID-1092) Get Blob
+            - [X] [MAID-1087](https://maidsafe.atlassian.net/browse/MAID-1087) Create Container & Get Container
+            - [X] [MAID-1088](https://maidsafe.atlassian.net/browse/MAID-1088) List Containers, Update / Get Container Metadata
+            - [X] [MAID-1089](https://maidsafe.atlassian.net/browse/MAID-1089) Delete Container
+            - [X] [MAID-1090](https://maidsafe.atlassian.net/browse/MAID-1090) Create Blob
+            - [X] [MAID-1091](https://maidsafe.atlassian.net/browse/MAID-1091) List Blobs
+            - [X] [MAID-1092](https://maidsafe.atlassian.net/browse/MAID-1092) Get Blob
             - [ ] [MAID-1098](https://maidsafe.atlassian.net/browse/MAID-1098) Update Blob Content
-            - [ ] [MAID-1093](https://maidsafe.atlassian.net/browse/MAID-1093) Get Blob Content
-            - [ ] [MAID-1094](https://maidsafe.atlassian.net/browse/MAID-1094) List Blob Version
-            - [ ] [MAID-1095](https://maidsafe.atlassian.net/browse/MAID-1095) Delete Blob
+            - [X] [MAID-1093](https://maidsafe.atlassian.net/browse/MAID-1093) Get Blob Content
+            - [X] [MAID-1094](https://maidsafe.atlassian.net/browse/MAID-1094) List Blob Version
+            - [X] [MAID-1095](https://maidsafe.atlassian.net/browse/MAID-1095) Delete Blob
             - [ ] [MAID-1096](https://maidsafe.atlassian.net/browse/MAID-1096) Copy Blob
             - [ ] [MAID-1097](https://maidsafe.atlassian.net/browse/MAID-1097) Update / Get Blob Metadata
         - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API

@@ -17,10 +17,10 @@
 
 mod io;
 mod helper;
-mod traits;
 mod file;
 mod metadata;
 mod directory_info;
 mod directory_listing;
+mod utils;
 
 pub mod rest;
