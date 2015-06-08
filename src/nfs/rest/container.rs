@@ -28,7 +28,7 @@ pub struct Container {
 
 impl Container {
 
-    /// Authorizes the directory access and returns the Container if successful.
+    /// Authorises the directory access and returns the Container, if authorisation is successful.
     /// Operations can be performed only after the authorisation is successful.
     pub fn authorise(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, dir_id: [u8;64]) -> Result<Container, String> {
         let mut directory_helper = nfs::helper::DirectoryHelper::new(client.clone());
@@ -69,7 +69,7 @@ impl Container {
 
     /// Returns the list of Blobs in the container
     pub fn get_blobs(&self) -> Vec<nfs::rest::Blob> {
-        self.directory_listing.get_files().iter().map(|x| nfs::rest::Blob::convert_from_file(self.client.clone(), x.clone())).collect()
+        self.directory_listing.get_files().iter().map(|x| nfs::rest::Blob::convert_from_file(x.clone())).collect()
     }
 
     /// Returns a Blob from the container
@@ -313,7 +313,7 @@ impl Container {
 
     fn find_file(&self, name: &String, directory_listing: &nfs::directory_listing::DirectoryListing) -> Option<nfs::rest::Blob> {
         match directory_listing.get_files().iter().find(|file| file.get_name() == name) {
-            Some(file) => Some(nfs::rest::Blob::convert_from_file(self.client.clone(), file.clone())),
+            Some(file) => Some(nfs::rest::Blob::convert_from_file(file.clone())),
             None => None
         }
     }
