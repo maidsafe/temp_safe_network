@@ -20,7 +20,6 @@ use client;
 
 #[allow(dead_code)]
 pub struct Blob {
-    client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
     file: nfs::file::File,
 }
 
@@ -62,10 +61,8 @@ impl Blob {
         &mut self.file
     }
 
-    pub fn convert_from_file(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
-        file: nfs::file::File) -> Blob {
+    pub fn convert_from_file(file: nfs::file::File) -> Blob {
         Blob {
-            client: client,
             file: file
         }
     }

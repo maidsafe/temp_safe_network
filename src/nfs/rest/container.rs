@@ -19,14 +19,17 @@ use routing;
 use time;
 use client;
 
+/// Container Repersents a Directory.
+/// Container can have its own metadata, sub-containers and files
 pub struct Container {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
     directory_listing: nfs::directory_listing::DirectoryListing
 }
 
 impl Container {
-    /// Authorizes the root directory access and return the Container
-    /// Entry point for the Rest API
+
+    /// Authorises the directory access and returns the Container, if authorisation is successful.
+    /// Operations can be performed only after the authorisation is successful.
     pub fn authorise(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, dir_id: [u8;64]) -> Result<Container, String> {
         let mut directory_helper = nfs::helper::DirectoryHelper::new(client.clone());
         let result = directory_helper.get(&::routing::NameType(dir_id));
@@ -39,10 +42,13 @@ impl Container {
         }
     }
 
+    /// Return the unique id of the conatiner
     pub fn get_id(&self) -> [u8;64] {
         self.directory_listing.get_id().0
     }
 
+    /// Returns the user metadata saved as String.
+    /// None can be passed to clear the metadata
     pub fn get_metadata(&self) -> Option<String> {
         let metadata = self.directory_listing.get_metadata().get_user_metadata();
         match metadata {
@@ -51,22 +57,22 @@ impl Container {
         }
     }
 
+    /// Returns the name of the container
     pub fn get_name(&self) -> &String {
         self.directory_listing.get_metadata().get_name()
     }
 
+    /// Returns the Created time of the container
     pub fn get_created_time(&self) -> time::Tm {
         self.directory_listing.get_metadata().get_created_time()
     }
 
-    pub fn get_modified_time(&self) -> time::Tm {
-        self.directory_listing.get_metadata().get_modified_time()
-    }
-
+    /// Returns the list of Blobs in the container
     pub fn get_blobs(&self) -> Vec<nfs::rest::Blob> {
-        self.directory_listing.get_files().iter().map(|x| nfs::rest::Blob::convert_from_file(self.client.clone(), x.clone())).collect()
+        self.directory_listing.get_files().iter().map(|x| nfs::rest::Blob::convert_from_file(x.clone())).collect()
     }
 
+    /// Returns a Blob from the container
     pub fn get_blob(&self, name: String, version: Option<[u8;64]>) -> Result<nfs::rest::Blob, String> {
         match version {
             Some(version_id) => {
@@ -87,11 +93,12 @@ impl Container {
         }
     }
 
-    pub fn create(&mut self, name: &String, metadata: Option<String>) -> Result<(), String> {
+    /// Creates a Conatiner
+    pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-                match directory_helper.create(name.clone(), user_metadata) {
+                match directory_helper.create(name, user_metadata) {
                     Ok(dir_id) => {
                         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                         match directory_helper.get(&dir_id) {
@@ -113,12 +120,14 @@ impl Container {
         }
     }
 
+    /// Returns the list of child containers
     pub fn get_containers(&self) -> Vec<nfs::rest::ContainerInfo> {
         self.directory_listing.get_sub_directories().iter().map(|info| {
                 nfs::rest::ContainerInfo::convert_from_directory_info(info.clone())
             }).collect()
     }
 
+    /// Updates the metadata of the container
     pub fn update_metadata(&mut self, metadata: Option<String>) -> Result<(), String>{
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
@@ -133,9 +142,22 @@ impl Container {
         }
     }
 
-    pub fn get_container(&mut self, name: &String, version: Option<[u8; 64]>) -> Result<Container, String> {
+    /// Retrieves Versions for the container
+    pub fn get_versions(&mut self) -> Result<Vec<[u8;64]>, String> {
+        let id = self.directory_listing.get_id().0;
+        self.list_container_versions(&::routing::NameType(id))
+    }
+
+    /// Retrieves Versions for the container being referred by the conatiner_id
+    pub fn get_container_versions(&mut self, container_id: [u8;64]) -> Result<Vec<[u8;64]>, String> {
+        self.list_container_versions(&::routing::NameType(container_id))
+    }
+
+    /// Fetches the latest version of the child container.
+    /// Can fetch a specific version of the Container by passing the corresponding VersionId.
+    pub fn get_container(&mut self, name: String, version: Option<[u8; 64]>) -> Result<Container, String> {
         let sub_dirs = self.directory_listing.get_sub_directories();
-        match sub_dirs.iter().find(|&entry| *entry.get_name() == *name) {
+        match sub_dirs.iter().find(|&entry| *entry.get_name() == name) {
             Some(dir_info) => {
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                 let get_dir_listing_result = match version {
@@ -143,7 +165,10 @@ impl Container {
                     None =>  directory_helper.get(dir_info.get_id())
                 };
                 match get_dir_listing_result {
-                    Ok(dir_listing) => Ok(Container::convert_from_directory_listing(self.client.clone(), dir_listing)),
+                    Ok(dir_listing) => Ok(Container {
+                        client: self.client.clone(),
+                        directory_listing: dir_listing
+                    }),
                     Err(msg) => Err(msg)
                 }
             },
@@ -151,18 +176,9 @@ impl Container {
         }
     }
 
-    pub fn get_versions(&mut self) -> Result<Vec<[u8;64]>, String> {
-        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-        match directory_helper.get_versions(self.directory_listing.get_id()) {
-            Ok(versions) => {
-                Ok(versions.iter().map(|v| v.0).collect())
-            },
-            Err(msg) => Err(msg)
-        }
-    }
-
-    pub fn delete_container(&mut self, name: &String) -> Result<(), String> {
-        match self.directory_listing.get_sub_directories().iter().position(|entry| *entry.get_name() == *name) {
+    /// Deletes the child container
+    pub fn delete_container(&mut self, name: String) -> Result<(), String> {
+        match self.directory_listing.get_sub_directories().iter().position(|entry| *entry.get_name() == name) {
             Some(pos) => {
                 self.directory_listing.get_mut_sub_directories().remove(pos);
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
@@ -177,6 +193,10 @@ impl Container {
         }
     }
 
+    /// Creates a Blob within the container
+    /// Returns a Writter object
+    /// The content of the blob is written using the writter.
+    /// The blob is created only after the writter.close() is invoked
     pub fn create_blob(&mut self, name: String, metadata: Option<String>, size: u64) -> Result<nfs::io::Writer, String> {
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
@@ -185,8 +205,26 @@ impl Container {
             },
             Err(err) => Err(err),
         }
-    }    
+    }
 
+    /// Updates the blob content. Writes the complete data and updates the Blob
+    pub fn update_blob_content(&mut self, blob: &nfs::rest::Blob, data: &[u8]) -> Result<(), String> {
+        match self.get_writer_for_blob(blob) {
+            Ok(mut writer) => {
+                writer.write(data, 0);
+                Ok(())
+            },
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Return a writter object for the Blob, through which the content of the blob can be updated
+    /// This is useful while handling larger files, to enable writting content in parts
+    pub fn get_blob_writer(&mut self, blob: &nfs::rest::Blob, data: Vec<u8>) -> Result<nfs::io::Writer, String> {
+        self.get_writer_for_blob(blob)
+    }
+
+    /// Reads the content of the blob and returns the complete content
     pub fn get_blob_content(&mut self, blob: nfs::rest::Blob) -> Result<Vec<u8>, String> {
         match self.get_reader_for_blob(blob) {
             Ok(mut reader) => {
@@ -197,25 +235,45 @@ impl Container {
         }
     }
 
+    /// Returns a reader for the blob
+    /// Using a Reader helps in handling large file contents and also fetch data in a specific range
     pub fn get_blob_reader(&mut self, blob: nfs::rest::blob::Blob) -> Result<nfs::io::reader::Reader, String> {
         self.get_reader_for_blob(blob)
     }
 
-    pub fn get_blob_versions(&mut self, name: &String) -> Result<Vec<[u8;64]>, String>{
-        match self.find_file(name, &self.directory_listing) {
+    /// Returns the list of versions_id for the blob
+    pub fn get_blob_versions(&mut self, name: String) -> Result<Vec<[u8;64]>, String>{
+        match self.find_file(&name, &self.directory_listing) {
             Some(blob) => {
                 let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
                 let versions = file_helper.get_versions(self.directory_listing.get_id(), &blob.convert_to_file());
                 Ok(Vec::new())
             },
-            None=> Err("Blob not found".to_string())
+            None => Err("Blob not found".to_string())
         }
     }
 
-    pub fn delete_blob(&mut self, name: &String) -> Result<(), String> {
-        match self.directory_listing.get_sub_directories().iter().position(|file| *file.get_name() == *name) {
+    /// Update the metadata of the Blob in the conatiner
+    pub fn update_blob_metadata(&mut self, name: String, metadata: Option<String>) ->Result<(), String> {
+        match self.validate_metadata(metadata) {
+            Ok(user_metadata) => {
+                match self.find_file(&name, &self.directory_listing) {
+                    Some(mut blob) => {
+                        let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
+                        file_helper.update_metadata(blob.convert_to_mut_file(), &mut self.directory_listing, &user_metadata)
+                    },
+                    None => Err("Blob not found".to_string())
+                }
+            },
+            Err(msg) => Err(msg),
+        }
+    }
+
+    /// Delete blob from the conatiner
+    pub fn delete_blob(&mut self, name: String) -> Result<(), String> {
+        match self.directory_listing.get_files().iter().position(|file| *file.get_name() == name) {
             Some(pos) => {
-                self.directory_listing.get_mut_sub_directories().remove(pos);
+                self.directory_listing.get_mut_files().remove(pos);
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                 match directory_helper.update(&self.directory_listing) {
                     Ok(_) => Ok(()),
@@ -226,6 +284,7 @@ impl Container {
         }
     }
 
+    /// Copies the latest blob version from the conatiner to the specified destination container
     pub fn copy_blob(&mut self, blob_name: String, to_container: [u8;64]) -> Result<(), String> {
         let to_dir_id = ::routing::NameType(to_container);
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
@@ -260,16 +319,6 @@ impl Container {
         }
     }
 
-    pub fn update_blob_metadata(&mut self, blob: &mut nfs::rest::Blob, metadata: Option<String>) ->Result<(), String> {
-        match self.validate_metadata(metadata) {
-            Ok(user_metadata) => {
-                let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
-                file_helper.update_metadata(blob.convert_to_mut_file(), &mut self.directory_listing, &user_metadata)
-            },
-            Err(msg) => Err(msg),
-        }
-    }
-
     fn get_reader_for_blob(&self, blob: nfs::rest::blob::Blob) -> Result<nfs::io::Reader, String> {
         match self.find_file(blob.get_name(), &self.directory_listing) {
             Some(_) => {
@@ -294,20 +343,19 @@ impl Container {
 
     fn find_file(&self, name: &String, directory_listing: &nfs::directory_listing::DirectoryListing) -> Option<nfs::rest::Blob> {
         match directory_listing.get_files().iter().find(|file| file.get_name() == name) {
-            Some(file) => Some(nfs::rest::Blob::convert_from_file(self.client.clone(), file.clone())),
+            Some(file) => Some(nfs::rest::Blob::convert_from_file(file.clone())),
             None => None
         }
     }
 
-    pub fn convert_to_directory_listing(&self) -> nfs::directory_listing::DirectoryListing {
-        self.directory_listing.clone()
-    }
-
-    pub fn convert_from_directory_listing(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>,
-         directory_listing: nfs::directory_listing::DirectoryListing) -> Container {
-        Container {
-            client: client,
-            directory_listing: directory_listing
+    fn list_container_versions(&mut self, container_id: &::routing::NameType) -> Result<Vec<[u8;64]>, String> {
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+        match directory_helper.get_versions(container_id) {
+            Ok(versions) => {
+                Ok(versions.iter().map(|v| v.0).collect())
+            },
+            Err(msg) => Err(msg)
         }
     }
+
 }
