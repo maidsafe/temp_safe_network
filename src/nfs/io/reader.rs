@@ -42,9 +42,9 @@ impl Reader {
         self.self_encryptor.len()
     }
 
-    pub fn read(&mut self,  position: u64, length: u64) -> Result<Vec<u8>, &str> {
-        if position > self.size() || length > self.size() {
-            return Err("Invalid range specified");
+    pub fn read(&mut self,  position: u64, length: u64) -> Result<Vec<u8>, String> {
+        if (position + length) > self.size() {
+            return Err("Invalid range specified".to_string());
         }
         Ok(self.self_encryptor.read(position, length))
     }

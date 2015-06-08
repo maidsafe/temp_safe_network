@@ -39,7 +39,7 @@ impl ContainerInfo {
         self.info.get_metadata().get_created_time()
     }
 
-    fn convert_to_directory_info(&self) -> nfs::directory_info::DirectoryInfo {
+    pub fn convert_to_directory_info(&self) -> nfs::directory_info::DirectoryInfo {
         self.info.clone()
     }
 

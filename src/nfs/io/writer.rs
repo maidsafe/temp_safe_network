@@ -48,9 +48,12 @@ impl Writer {
     pub fn close(mut self) -> Result<(), String> {
         let ref mut file = self.file;
         let ref mut directory = self.directory;
+        let size = self.self_encryptor.len();
+
         file.set_datamap(self.self_encryptor.close());
 
         file.get_mut_metadata().set_modified_time(::time::now_utc());
+        file.get_mut_metadata().set_size(size);
 
         match directory.get_files().iter().find(|entry| entry.get_name() == file.get_name()) {
             Some(_) => {

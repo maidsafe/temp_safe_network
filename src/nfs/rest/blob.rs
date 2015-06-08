@@ -30,8 +30,16 @@ impl Blob {
         self.file.get_metadata().get_name()
     }
 
-    pub fn get_user_metadata(&self) -> Option<&Vec<u8>> {
-        self.file.get_metadata().get_user_metadata()
+    pub fn get_user_metadata(&self) -> Option<String> {
+        match self.file.get_metadata().get_user_metadata() {
+            Some(data) => {
+                match String::from_utf8(data.clone()) {
+                    Ok(metadata) => Some(metadata),
+                    Err(_) => None
+                }
+            },
+            None => None
+        }
     }
 
     pub fn get_created_time(&self) -> time::Tm {
@@ -46,7 +54,7 @@ impl Blob {
         self.file.get_metadata().get_size()
     }
 
-    fn convert_to_file(&self) -> nfs::file::File {
+    pub fn convert_to_file(&self) -> nfs::file::File {
         self.file.clone()
     }
 

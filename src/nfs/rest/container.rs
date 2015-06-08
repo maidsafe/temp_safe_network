@@ -75,22 +75,15 @@ impl Container {
                 match directory_helper.get_by_version(dir_id, &routing::NameType(version_id)) {
                     Ok(listing) => match self.find_file(&name, &listing){
                         Some(blob) => Ok(blob),
-                        None => Err("File not found for the version specified".to_string())
+                        None => Err("Blob not found for the version specified".to_string())
                     },
                     Err(msg) => Err(msg)
                 }
             },
             None => match self.find_file(&name, &self.directory_listing) {
                 Some(blob) => Ok(blob),
-                None => Err("File not found for the version specified".to_string())
+                None => Err("Blob not found for the version specified".to_string())
             },
-        }
-    }
-
-    fn find_file(&self, name: &String, directory_listing: &nfs::directory_listing::DirectoryListing) -> Option<nfs::rest::Blob> {
-        match directory_listing.get_files().iter().find(|file| file.get_name() == name) {
-            Some(file) => Some(nfs::rest::Blob::convert_from_file(self.client.clone(), file.clone())),
-            None => None
         }
     }
 
@@ -192,9 +185,34 @@ impl Container {
             },
             Err(err) => Err(err),
         }
+    }    
+
+    pub fn get_blob_content(&mut self, blob: nfs::rest::Blob) -> Result<Vec<u8>, String> {
+        match self.get_reader_for_blob(blob) {
+            Ok(mut reader) => {
+                let size = reader.size();
+                reader.read(0, size)
+            },
+            Err(msg) => Err(msg)
+        }
     }
 
-    pub fn delete_blob(&mut self, name: String) -> Result<(), String> {
+    pub fn get_blob_reader(&mut self, blob: nfs::rest::blob::Blob) -> Result<nfs::io::reader::Reader, String> {
+        self.get_reader_for_blob(blob)
+    }
+
+    pub fn get_blob_versions(&mut self, name: &String) -> Result<Vec<[u8;64]>, String>{
+        match self.find_file(name, &self.directory_listing) {
+            Some(blob) => {
+                let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
+                let versions = file_helper.get_versions(self.directory_listing.get_id(), &blob.convert_to_file());
+                Ok(Vec::new())
+            },
+            None=> Err("Blob not found".to_string())
+        }
+    }
+
+    pub fn delete_blob(&mut self, name: &String) -> Result<(), String> {
         match self.directory_listing.get_sub_directories().iter().position(|file| *file.get_name() == *name) {
             Some(pos) => {
                 self.directory_listing.get_mut_sub_directories().remove(pos);
@@ -204,7 +222,24 @@ impl Container {
                     Err(msg) => Err(msg),
                 }
             },
-            None => Err("File not found".to_string())
+            None => Err("Blob not found".to_string())
+        }
+    }
+
+    fn get_writer_for_blob(&self, blob: &nfs::rest::blob::Blob) -> Result<nfs::io::Writer, String> {
+        let mut helper = nfs::helper::FileHelper::new(self.client.clone());
+        match helper.update(blob.convert_to_file(), &self.directory_listing) {
+            Ok(writter) => Ok(writter),
+            Err(_) => Err("Blob not found".to_string())
+        }
+    }
+
+    fn get_reader_for_blob(&self, blob: nfs::rest::blob::Blob) -> Result<nfs::io::Reader, String> {
+        match self.find_file(blob.get_name(), &self.directory_listing) {
+            Some(_) => {
+                Ok(nfs::io::Reader::new(blob.convert_to_file(), self.client.clone()))
+            },
+            None => Err("Blob not found".to_string())
         }
     }
 
@@ -231,7 +266,14 @@ impl Container {
         }
     }
 
-    fn convert_to_directory_listing(&self) -> nfs::directory_listing::DirectoryListing {
+    fn find_file(&self, name: &String, directory_listing: &nfs::directory_listing::DirectoryListing) -> Option<nfs::rest::Blob> {
+        match directory_listing.get_files().iter().find(|file| file.get_name() == name) {
+            Some(file) => Some(nfs::rest::Blob::convert_from_file(self.client.clone(), file.clone())),
+            None => None
+        }
+    }
+
+    pub fn convert_to_directory_listing(&self) -> nfs::directory_listing::DirectoryListing {
         self.directory_listing.clone()
     }
 
