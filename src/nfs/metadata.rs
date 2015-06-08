@@ -53,10 +53,10 @@ impl Metadata {
     }
 
     pub fn get_user_metadata(&self) -> Option<&Vec<u8>> {
-        if !self.user_metadata.is_empty() {
-            Some(&self.user_metadata)
-        } else {
+        if self.user_metadata.is_empty() {
             None
+        } else {
+            Some(&self.user_metadata)
         }
     }
 
