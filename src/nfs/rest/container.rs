@@ -220,12 +220,12 @@ impl Container {
 
     /// Return a writter object for the Blob, through which the content of the blob can be updated
     /// This is useful while handling larger files, to enable writting content in parts
-    pub fn get_blob_writer(&mut self, blob: &nfs::rest::Blob, data: Vec<u8>) -> Result<nfs::io::Writer, String> {
+    pub fn get_blob_writer(&mut self, blob: &nfs::rest::Blob) -> Result<nfs::io::Writer, String> {
         self.get_writer_for_blob(blob)
     }
 
     /// Reads the content of the blob and returns the complete content
-    pub fn get_blob_content(&mut self, blob: nfs::rest::Blob) -> Result<Vec<u8>, String> {
+    pub fn get_blob_content(&mut self, blob: &nfs::rest::Blob) -> Result<Vec<u8>, String> {
         match self.get_reader_for_blob(blob) {
             Ok(mut reader) => {
                 let size = reader.size();
@@ -237,7 +237,7 @@ impl Container {
 
     /// Returns a reader for the blob
     /// Using a Reader helps in handling large file contents and also fetch data in a specific range
-    pub fn get_blob_reader(&mut self, blob: nfs::rest::blob::Blob) -> Result<nfs::io::reader::Reader, String> {
+    pub fn get_blob_reader(&mut self, blob: &nfs::rest::blob::Blob) -> Result<nfs::io::reader::Reader, String> {
         self.get_reader_for_blob(blob)
     }
 
@@ -319,7 +319,7 @@ impl Container {
         }
     }
 
-    fn get_reader_for_blob(&self, blob: nfs::rest::blob::Blob) -> Result<nfs::io::Reader, String> {
+    fn get_reader_for_blob(&self, blob: &nfs::rest::blob::Blob) -> Result<nfs::io::Reader, String> {
         match self.find_file(blob.get_name(), &self.directory_listing) {
             Some(_) => {
                 Ok(nfs::io::Reader::new(blob.convert_to_file().clone(), self.client.clone()))

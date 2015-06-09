@@ -94,24 +94,26 @@ fn create_account() -> Result<maidsafe_client::client::Client, String> {
     }
 }
 
-fn get_container_name() -> String {
-    let mut container_name = String::new();
-    println!("------Enter Container name--------");
-    std::io::stdin().read_line(&mut container_name);
-    while container_name.is_empty() {
-        println!("Name can not be empty");
+fn get_user_string(placeholder: &str) -> String {
+    let mut txt = String::new();
+    println!("------Enter {}--------", placeholder);
+    std::io::stdin().read_line(&mut txt);
+    while txt.is_empty() {
+        println!("{} can not be empty", placeholder);
         println!("------Enter Container name--------");
-        std::io::stdin().read_line(&mut container_name);
+        std::io::stdin().read_line(&mut txt);
     }
-    container_name
+    txt
 }
 
 fn container_operation(option: u32, container: &mut nfs::rest::Container) {
     match option {
         1 => {// Create container
-            let name = get_container_name();
-            container.create(name.clone(), None);
-            println!("Container - {} has been created", name);
+            let name = get_user_string("Container name");
+            match container.create(name.clone(), None) {
+                Ok(_) => println!("Container - {} has been created", name),
+                Err(msg) => println!("Failed :: {}", msg)
+            }
         },
         2 => { // List containers
             let containers = container.get_containers();
@@ -143,8 +145,7 @@ fn container_operation(option: u32, container: &mut nfs::rest::Container) {
             }
         },
         4 => { // Delete container
-            let name = get_container_name();
-            match container.delete_container(name.clone()) {
+            match container.delete_container(get_user_string("Container name")) {
                 Ok(_) => {
                     println!("Container deleted");
                 },
@@ -155,10 +156,138 @@ fn container_operation(option: u32, container: &mut nfs::rest::Container) {
     }
 }
 
-fn blob_operation(option: u32, container: &nfs::rest::Container) {
+fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
     match option {
-        5 => {
-
+        5 => { // List blobs
+            match container.get_container(get_user_string("Container name"), None) {
+                Ok(mut container) => {
+                    let blobs: Vec<nfs::rest::Blob> = container.get_blobs();
+                    if blobs.is_empty() {
+                        println!("No blobs found");
+                    } else {
+                        println!("List of Blobs");
+                        println!("\t Name \t Modified On");
+                        println!("\t ____ \t ___________");
+                        for blob in blobs {
+                            println!("\t {} \t {:?}", blob.get_name(), blob.get_modified_time());
+                        }
+                    }
+                },
+                Err(msg) => println!("Failed :: {}", msg)
+            }
+        },
+        6 => { // Create blob
+            match container.get_container(get_user_string("Container name"), None) {
+                Ok(mut conatiner) => {
+                    let data = get_user_string("text to be saved as a file").into_bytes();
+                    match container.create_blob(get_user_string("Blob name"), None, data.len() as u64) {
+                        Ok(mut writer) => {
+                            writer.write(&data[..], 0);
+                            match writer.close() {
+                                Ok(_) => {
+                                    println!("Blob created");
+                                },
+                                Err(msg) => println!("Failed :: {}", msg)
+                            }
+                        },
+                        Err(msg) => println!("Failed :: {}", msg)
+                    }
+                },
+                Err(msg) => println!("Failed :: {}", msg)
+            }
+        },
+        7 => { // Update blob
+            match container.get_container(get_user_string("Container name"), None) {
+                Ok(mut conatiner) => {
+                    match container.get_blob(get_user_string("Blob name"), None) {
+                        Ok(blob) => {
+                            let data = get_user_string("text to be saved as a file").into_bytes();
+                            match container.get_blob_writer(&blob) {
+                                Ok(mut writer) => {
+                                    writer.write(&data[..], 0);
+                                    match writer.close() {
+                                        Ok(_) => {
+                                            println!("Blob Updated");
+                                        },
+                                        Err(msg) => println!("Failed :: {}", msg)
+                                    }
+                                },
+                                Err(msg) => println!("Failed :: {}", msg)
+                            }
+                        },
+                        Err(msg) => println!("Failed :: {}", msg)
+                    }
+                },
+                Err(msg) => println!("Failed :: {}", msg)
+            }
+        },
+        8 => { // Read blob
+            match container.get_container(get_user_string("Container name"), None) {
+                Ok(mut conatiner) => {
+                    match container.get_blob(get_user_string("Blob name"), None) {
+                        Ok(blob) => {
+                            match container.get_blob_reader(&blob) {
+                                Ok(mut reader) => {
+                                    match reader.read(0, blob.get_size()) {
+                                        Ok(data) => {
+                                            println!("Content Read: ");
+                                            println!("{}\n", String::from_utf8(data).unwrap());
+                                        },
+                                        Err(msg) => println!("Failed :: {}", msg)
+                                    }
+                                },
+                                Err(msg) => println!("Failed :: {}", msg)
+                            }
+                        },
+                        Err(msg) => println!("Failed :: {}", msg)
+                    }
+                },
+                Err(msg) => println!("Failed :: {}", msg)
+            }
+        },
+        9 => { // Read blob by version
+            match container.get_container(get_user_string("Container name"), None) {
+                Ok(mut conatiner) => {
+                    let blob_name = get_user_string("Blob name");
+                    match container.get_blob_versions(blob_name.clone()) {
+                        Ok(versions) => {
+                            let mut version_id;
+                            if versions.len() == 1 {
+                                version_id = versions[0];
+                            } else{
+                                println!("Available Versions::");
+                                for i in 0..versions.len() {
+                                    println!("\t{} {:?}..{:?}", i, &versions[i][0..4], &versions[i][60..64])
+                                }
+                                match get_user_string("Number corresponding to the version").trim().parse::<usize>() {
+                                    Ok(index) => {
+                                        match container.get_blob(blob_name, Some(versions[index])) {
+                                            Ok(blob) => {
+                                                match container.get_blob_reader(&blob) {
+                                                    Ok(mut reader) => {
+                                                        match reader.read(0, blob.get_size()) {
+                                                            Ok(data) => {
+                                                                println!("Content Read: ");
+                                                                println!("{}\n", String::from_utf8(data).unwrap());
+                                                            },
+                                                            Err(msg) => println!("Failed :: {}", msg)
+                                                        }
+                                                    },
+                                                    Err(msg) => println!("Failed :: {}", msg)
+                                                }
+                                            },
+                                            Err(msg) => println!("Failed :: {}", msg)
+                                        }
+                                    },
+                                    Err(msg) =>  println!("{}", msg)
+                                }
+                            }
+                        },
+                        Err(msg) => println!("{}", msg)
+                    }
+                },
+                Err(msg) => println!("Failed :: {}", msg)
+            }
         }
         _ => {}
     }
@@ -189,11 +318,12 @@ fn main() {
             println!("2. List Containers");
             println!("3. Get Conatiner Versions");
             println!("4. Delete Conatiner");
-            println!("5. List Blobs");
+            println!("5. List Blobs from container");
             println!("6. Create Blob");
             println!("7. Update Blob");
-            println!("8. Get blob by version");
-            println!("9. Delete blob");
+            println!("8. Get blob content");
+            println!("9. Get blob content by version");
+            println!("10. Delete blob");
 
             println!("------Enter number correspoding the operation--------------------");
             std::io::stdin().read_line(&mut option);
@@ -202,7 +332,7 @@ fn main() {
                 Ok(selection) => {
                     match selection {
                         1...4 => container_operation(selection, &mut root_container),
-                        5...9 => blob_operation(selection, &mut root_container),
+                        5...10 => blob_operation(selection, &mut root_container),
                         _ => println!("Invalid option"),
                     }
                 },
