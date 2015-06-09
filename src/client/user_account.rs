@@ -82,8 +82,21 @@ impl Account {
         &self.public_mpid
     }
 
-    pub fn get_root_dir_id(&self) -> &Option<routing::NameType> {
-        &self.root_dir_id
+    pub fn get_root_dir_id(&self) -> Option<&routing::NameType> {
+        match self.root_dir_id {
+            Some(ref dir_id) => Some(dir_id),
+            None => None,
+        }
+    }
+
+    pub fn set_root_dir_id(&mut self, root_dir_id: routing::NameType) -> bool {
+        match self.root_dir_id {
+            Some(_) => false,
+            None => {
+                self.root_dir_id = Some(root_dir_id);
+                true
+            },
+        }
     }
 
     pub fn generate_network_id(keyword: &String, pin: u32) -> routing::NameType {
