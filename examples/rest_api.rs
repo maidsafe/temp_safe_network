@@ -260,30 +260,44 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                                     println!("\t{} {:?}..{:?}", i, &versions[i][0..4], &versions[i][60..64])
                                 }
                                 match get_user_string("Number corresponding to the version").trim().parse::<usize>() {
-                                    Ok(index) => {
-                                        match container.get_blob(blob_name, Some(versions[index])) {
-                                            Ok(blob) => {
-                                                match container.get_blob_reader(&blob) {
-                                                    Ok(mut reader) => {
-                                                        match reader.read(0, blob.get_size()) {
-                                                            Ok(data) => {
-                                                                println!("Content Read: ");
-                                                                println!("{}\n", String::from_utf8(data).unwrap());
-                                                            },
-                                                            Err(msg) => println!("Failed :: {}", msg)
-                                                        }
-                                                    },
-                                                    Err(msg) => println!("Failed :: {}", msg)
-                                                }
-                                            },
-                                            Err(msg) => println!("Failed :: {}", msg)
-                                        }
-                                    },
-                                    Err(msg) =>  println!("{}", msg)
+                                    Ok(index) => version_id = versions[index],
+                                    Err(_) =>  {
+                                        println!("Invalid input : Fetching latest version");
+                                        version_id = versions[0];
+
+                                    }
                                 }
+                            }
+                            match container.get_blob(blob_name, Some(version_id)) {
+                                Ok(blob) => {
+                                    match container.get_blob_reader(&blob) {
+                                        Ok(mut reader) => {
+                                            match reader.read(0, blob.get_size()) {
+                                                Ok(data) => {
+                                                    println!("Content Read: ");
+                                                    println!("{}\n", String::from_utf8(data).unwrap());
+                                                },
+                                                Err(msg) => println!("Failed :: {}", msg)
+                                            }
+                                        },
+                                        Err(msg) => println!("Failed :: {}", msg)
+                                    }
+                                },
+                                Err(msg) => println!("Failed :: {}", msg)
                             }
                         },
                         Err(msg) => println!("{}", msg)
+                    }
+                },
+                Err(msg) => println!("Failed :: {}", msg)
+            }
+        },
+        10 => { // Delete Container
+            match container.get_container(get_user_string("Container name"), None) {
+                Ok(mut container) => {
+                    match container.delete_blob(get_user_string("Blob name")) {
+                        Ok(_) => println!("Blob deleted"),
+                        Err(msg) => println!("Failed :: {}", msg)
                     }
                 },
                 Err(msg) => println!("Failed :: {}", msg)
