@@ -48,7 +48,10 @@
             - [X] [MAID-1097](https://maidsafe.atlassian.net/browse/MAID-1097) Update / Get Blob Metadata
         - [ ] [MAID-1099](https://maidsafe.atlassian.net/browse/MAID-1099) Unit test cases for API
     - [X] [MAID-1101](https://maidsafe.atlassian.net/browse/MAID-1101) Implement Version Cache (cache key,(blob/container) info to reduce network traffic)
+    - [X] [MAID-1133](https://maidsafe.atlassian.net/browse/MAID-1133) Root Directory handling
 - [ ] Create Example:
     - [X] [MAID-1102](https://maidsafe.atlassian.net/browse/MAID-1102) Self authentication Example
-    - [ ] [MAID-1103](https://maidsafe.atlassian.net/browse/MAID-1103) Example to demonstrate Storage API
+    - [X] [MAID-1103](https://maidsafe.atlassian.net/browse/MAID-1103) Example to demonstrate Storage API
+
+    ## [0.1] Finish sprint
     - [ ] [MAID-1104](https://maidsafe.atlassian.net/browse/MAID-1104) Validate above example against Local network / droplet
