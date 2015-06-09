@@ -75,7 +75,7 @@ impl RoutingClientMock {
         let cb_interface = self.callback_interface.clone();
         let data_store = self.data_store.clone();
 
-        let structured_data_type_id: ::maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let structured_data_type_id = ::maidsafe_types::data::StructuredDataTypeTag;
         let success: bool = if sendable.type_tag() != structured_data_type_id.type_tag() && data_store.lock().unwrap().contains_key(&sendable.name()) {
             false
         } else {
@@ -102,7 +102,7 @@ impl RoutingClientMock {
         let cb_interface = self.callback_interface.clone();
         let data_store = self.data_store.clone();
 
-        let structured_data_type_id: ::maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let structured_data_type_id = ::maidsafe_types::data::StructuredDataTypeTag;
         let success: bool = if sendable.type_tag() != structured_data_type_id.type_tag() && data_store.lock().unwrap().contains_key(&sendable.name()) {
             false
         } else {
@@ -239,7 +239,7 @@ mod test {
         };
 
         // Construct ImmutableData
-        let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let immutable_data_type_id = maidsafe_types::data::ImmutableDataTypeTag;
         let orig_data: Vec<u8> = (0u8..100u8).map(|_| ::rand::random::<u8>()).collect();
         let orig_immutable_data = maidsafe_types::ImmutableData::new(orig_data);
 
@@ -342,12 +342,12 @@ mod test {
         };
 
         // Construct ImmutableData
-        let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let immutable_data_type_id = maidsafe_types::data::ImmutableDataTypeTag;
         let orig_data: Vec<u8> = (0u8..100u8).map(|_| ::rand::random::<u8>()).collect();
         let orig_immutable_data = maidsafe_types::ImmutableData::new(orig_data);
 
         // Construct StructuredData, 1st version, for this ImmutableData
-        let structured_data_type_id: maidsafe_types::data::StructuredDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
         let keyword = "Spandan".to_string();
         let pin = 1234u32;
         let user_id = ::client::user_account::Account::generate_network_id(&keyword, pin);
