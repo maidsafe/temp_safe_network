@@ -181,7 +181,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                 Ok(mut container) => {
                     println!("Creating blob in {} Container", container.get_name());
                     let data = get_user_string("text to be saved as a file").into_bytes();
-                    match container.create_blob(get_user_string("Blob name"), None, data.len() as u64) {
+                    match container.create_blob(get_user_string("Blob name"), None) {
                         Ok(mut writer) => {
                             writer.write(&data[..], 0);
                             match writer.close() {
@@ -252,7 +252,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                     let blob_name = get_user_string("Blob name");
                     match container.get_blob_versions(blob_name.clone()) {
                         Ok(versions) => {
-                            let mut version_id;                            
+                            let mut version_id;
                             if versions.len() == 1 {
                                 version_id = versions[0];
                             } else{

@@ -130,23 +130,28 @@ impl Container {
     pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
-                let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-                match directory_helper.create(name, user_metadata) {
-                    Ok(dir_id) => {
+                match self.directory_listing.get_sub_directories().iter().find(|&entry| *entry.get_name() == name) {
+                    Some(_) => Err("Conatiner already exists".to_string()),
+                    None => {
                         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-                        match directory_helper.get(&dir_id) {
-                            Ok(created_directory) => {
-                                self.directory_listing.get_mut_sub_directories().push(created_directory.get_info().clone());
+                        match directory_helper.create(name, user_metadata) {
+                            Ok(dir_id) => {
                                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-                                match directory_helper.update(&self.directory_listing) {
-                                    Ok(_) => Ok(()),
+                                match directory_helper.get(&dir_id) {
+                                    Ok(created_directory) => {
+                                        self.directory_listing.get_mut_sub_directories().push(created_directory.get_info().clone());
+                                        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
+                                        match directory_helper.update(&self.directory_listing) {
+                                            Ok(_) => Ok(()),
+                                            Err(msg) => Err(msg)
+                                        }
+                                    },
                                     Err(msg) => Err(msg)
                                 }
                             },
                             Err(msg) => Err(msg)
                         }
-                    },
-                    Err(msg) => Err(msg)
+                    }
                 }
             },
             Err(err) => Err(err),
@@ -230,11 +235,11 @@ impl Container {
     /// Returns a Writter object
     /// The content of the blob is written using the writter.
     /// The blob is created only after the writter.close() is invoked
-    pub fn create_blob(&mut self, name: String, metadata: Option<String>, size: u64) -> Result<nfs::io::Writer, String> {
+    pub fn create_blob(&mut self, name: String, metadata: Option<String>) -> Result<nfs::io::Writer, String> {
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
                 let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
-                file_helper.create(name, size, user_metadata, &self.directory_listing)
+                file_helper.create(name, user_metadata, &self.directory_listing)
             },
             Err(err) => Err(err),
         }
