@@ -99,7 +99,7 @@ impl FileHelper {
                                 },
                                 None => ()
                             }
-                        }
+                        },
                         Err(_) => { () }
                     }
                 }

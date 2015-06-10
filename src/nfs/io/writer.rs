@@ -55,14 +55,8 @@ impl Writer {
         file.get_mut_metadata().set_modified_time(::time::now_utc());
         file.get_mut_metadata().set_size(size);
 
-        match directory.get_files().iter().find(|entry| entry.get_name() == file.get_name()) {
-            Some(_) => {
-                directory.upsert_file(file.clone());
-            },
-            None => {
-                directory.add_file(file.clone());
-            }
-        };
+        directory.upsert_file(file.clone());
+
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
         match directory_helper.update(directory) {
             Ok(_) => Ok(()),

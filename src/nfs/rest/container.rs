@@ -30,18 +30,51 @@ impl Container {
 
     /// Authorises the directory access and returns the Container, if authorisation is successful.
     /// Operations can be performed only after the authorisation is successful.
-    pub fn authorise(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, dir_id: [u8;64]) -> Result<Container, String> {
+    pub fn authorise(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, dir_id: Option<[u8;64]>) -> Result<Container, String> {
         let mut directory_helper = nfs::helper::DirectoryHelper::new(client.clone());
-        let result = directory_helper.get(&::routing::NameType(dir_id));
-        match result {
-            Ok(listing) => Ok(Container {
-                client: client,
-                directory_listing: listing
-            }),
-            Err(msg) => Err(msg)
+        let fake_id = ::routing::NameType([0u8; 64]);
+        let mut directory_id: ::routing::NameType = fake_id.clone();
+        match dir_id {
+            Some(id) => directory_id = ::routing::NameType(id),
+            None => {
+                let mut set_root_id = false;
+                 {
+                     let arc_client = client.clone();
+                     let mut mutex_client = arc_client.lock().unwrap();
+                     if mutex_client.get_root_directory_id().is_none() {
+                         set_root_id = true;
+                     }
+                 }
+                 if set_root_id {
+                     match directory_helper.create("root".to_string(), Vec::new()) {
+                         Ok(dir_id) =>  {
+                             let arc_client = client.clone();
+                             let mut mutex_client = arc_client.lock().unwrap();
+                             mutex_client.set_root_directory_id(dir_id.clone());
+                             directory_id = dir_id;
+                         },
+                         Err(msg) => println!("Error:: {}", msg)
+                     }
+                 } else {
+                     let arc_client = client.clone();
+                     let mut mutex_client = arc_client.lock().unwrap();
+                     directory_id = mutex_client.get_root_directory_id().unwrap().clone();
+                 }
+            }
+        };
+        if directory_id == fake_id {
+            Err("Directory initialisation failed".to_string())
+        } else {
+            let result = directory_helper.get(&directory_id);
+            match result {
+               Ok(listing) => Ok(Container {
+                   client: client,
+                   directory_listing: listing
+               }),
+               Err(msg) => Err(msg)
+           }
         }
     }
-
     /// Return the unique id of the conatiner
     pub fn get_id(&self) -> [u8;64] {
         self.directory_listing.get_id().0
@@ -105,7 +138,7 @@ impl Container {
                             Ok(created_directory) => {
                                 self.directory_listing.get_mut_sub_directories().push(created_directory.get_info().clone());
                                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
-                                match directory_helper.update(&created_directory) {
+                                match directory_helper.update(&self.directory_listing) {
                                     Ok(_) => Ok(()),
                                     Err(msg) => Err(msg)
                                 }
@@ -246,8 +279,12 @@ impl Container {
         match self.find_file(&name, &self.directory_listing) {
             Some(blob) => {
                 let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
-                let versions = file_helper.get_versions(self.directory_listing.get_id(), &blob.convert_to_file());
-                Ok(Vec::new())
+                match file_helper.get_versions(self.directory_listing.get_id(), &blob.convert_to_file()) {
+                    Ok(versions) => {
+                        Ok(versions.iter().map(|x| x.0).collect())
+                    },
+                    Err(msg) => Err(msg)
+                }
             },
             None => Err("Blob not found".to_string())
         }

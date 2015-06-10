@@ -163,7 +163,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                 Ok(mut container) => {
                     let blobs: Vec<nfs::rest::Blob> = container.get_blobs();
                     if blobs.is_empty() {
-                        println!("No blobs found");
+                        println!("No blobs found in Container - {}", container.get_name());
                     } else {
                         println!("List of Blobs");
                         println!("\t Name \t Modified On");
@@ -178,7 +178,8 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
         },
         6 => { // Create blob
             match container.get_container(get_user_string("Container name"), None) {
-                Ok(mut conatiner) => {
+                Ok(mut container) => {
+                    println!("Creating blob in {} Container", container.get_name());
                     let data = get_user_string("text to be saved as a file").into_bytes();
                     match container.create_blob(get_user_string("Blob name"), None, data.len() as u64) {
                         Ok(mut writer) => {
@@ -198,7 +199,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
         },
         7 => { // Update blob
             match container.get_container(get_user_string("Container name"), None) {
-                Ok(mut conatiner) => {
+                Ok(mut container) => {
                     match container.get_blob(get_user_string("Blob name"), None) {
                         Ok(blob) => {
                             let data = get_user_string("text to be saved as a file").into_bytes();
@@ -223,7 +224,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
         },
         8 => { // Read blob
             match container.get_container(get_user_string("Container name"), None) {
-                Ok(mut conatiner) => {
+                Ok(mut container) => {
                     match container.get_blob(get_user_string("Blob name"), None) {
                         Ok(blob) => {
                             match container.get_blob_reader(&blob) {
@@ -247,11 +248,11 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
         },
         9 => { // Read blob by version
             match container.get_container(get_user_string("Container name"), None) {
-                Ok(mut conatiner) => {
+                Ok(mut container) => {
                     let blob_name = get_user_string("Blob name");
                     match container.get_blob_versions(blob_name.clone()) {
                         Ok(versions) => {
-                            let mut version_id;
+                            let mut version_id;                            
                             if versions.len() == 1 {
                                 version_id = versions[0];
                             } else{
@@ -309,7 +310,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
 
 fn get_root_container(client: &::std::sync::Arc<::std::sync::Mutex<maidsafe_client::client::Client>>) -> nfs::rest::Container {
     let mut root_container;
-    match nfs::rest::Container::authorise(client.clone(), [0u8;64]) {
+    match nfs::rest::Container::authorise(client.clone(), None) {
         Ok(mut container) => root_container = container,
         Err(msg) => panic!(msg)
     };
