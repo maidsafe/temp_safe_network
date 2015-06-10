@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-#[allow(dead_code)]
 use nfs;
 use std::sync;
 use super::network_storage::NetworkStorage;

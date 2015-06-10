@@ -40,7 +40,7 @@ impl Container {
                 let mut set_root_id = false;
                  {
                      let arc_client = client.clone();
-                     let mut mutex_client = arc_client.lock().unwrap();
+                     let mutex_client = arc_client.lock().unwrap();
                      if mutex_client.get_root_directory_id().is_none() {
                          set_root_id = true;
                      }
@@ -50,14 +50,14 @@ impl Container {
                          Ok(dir_id) =>  {
                              let arc_client = client.clone();
                              let mut mutex_client = arc_client.lock().unwrap();
-                             mutex_client.set_root_directory_id(dir_id.clone());
+                             let _ = mutex_client.set_root_directory_id(dir_id.clone());
                              directory_id = dir_id;
                          },
                          Err(msg) => println!("Error:: {}", msg)
                      }
                  } else {
                      let arc_client = client.clone();
-                     let mut mutex_client = arc_client.lock().unwrap();
+                     let mutex_client = arc_client.lock().unwrap();
                      directory_id = mutex_client.get_root_directory_id().unwrap().clone();
                  }
             }
@@ -174,7 +174,7 @@ impl Container {
     pub fn update_metadata(&mut self, metadata: Option<String>) -> Result<(), String>{
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
-                self.directory_listing.set_user_metadata(user_metadata);
+                self.directory_listing.get_mut_metadata().set_user_metadata(user_metadata);
                 let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                 match directory_helper.update(&self.directory_listing) {
                     Ok(_) => Ok(()),

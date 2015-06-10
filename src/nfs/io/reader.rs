@@ -20,6 +20,7 @@ use super::network_storage::NetworkStorage;
 use self_encryption;
 use client;
 
+#[allow(dead_code)]
 pub struct Reader {
     file: nfs::file::File,
     self_encryptor: self_encryption::SelfEncryptor<NetworkStorage>,

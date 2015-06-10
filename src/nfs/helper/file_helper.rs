@@ -41,8 +41,7 @@ impl FileHelper {
         match self.file_exists(directory, &name) {
             Some(_) => Err("File already exists".to_string()),
             None => {
-                let mut metadata = nfs::metadata::Metadata::new(name, user_metatdata);
-                let file = nfs::file::File::new(metadata, self_encryption::datamap::DataMap::None);
+                let file = nfs::file::File::new(nfs::metadata::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
                 Ok(nfs::io::Writer::new(directory.clone(), file, self.client.clone()))
             }
         }
@@ -109,16 +108,16 @@ impl FileHelper {
         Ok(versions)
     }
 
-    pub fn read(&mut self, file: nfs::file::File) -> nfs::io::Reader {
-        nfs::io::Reader::new(file, self.client.clone())
-    }
+    // pub fn read(&mut self, file: nfs::file::File) -> nfs::io::Reader {
+    //     nfs::io::Reader::new(file, self.client.clone())
+    // }
 
     fn file_exists(&self, directory: &nfs::directory_listing::DirectoryListing, file_name: &String) -> Option<String> {
         let result = directory.get_files().iter().find(|file| {
                 *file.get_name() == *file_name
             });
         match result {
-            Some(file) => Some(file_name.clone()),
+            Some(_) => Some(file_name.clone()),
             None => None
         }
     }
@@ -128,6 +127,7 @@ impl FileHelper {
 #[cfg(test)]
 mod test {
     use super::*;
+    use nfs;
     use ::std::ops::Index;
 
     fn get_dummy_client() -> ::client::Client {
@@ -163,7 +163,7 @@ mod test {
             dir_listing = get_result.ok().unwrap();
         }
 
-        let mut file_helper = FileHelper::new(client);
+        let mut file_helper = FileHelper::new(client.clone());
         let mut writer: _;
         {
             let result = file_helper.create("Name".to_string(), vec![98u8; 100], &dir_listing);
@@ -174,7 +174,7 @@ mod test {
 
         let data = vec![12u8; 20];
         writer.write(&data[..], 0);
-        writer.close();
+        let _ = writer.close();
 
         {
             let get_result = dir_helper.get(&created_dir_id);
@@ -188,7 +188,7 @@ mod test {
 
             let file = result[0].clone();
 
-            let mut reader = file_helper.read(file);
+            let mut reader = nfs::io::Reader::new(file.clone(), client.clone());
             let rxd_data = reader.read(0, data.len() as u64).ok().unwrap();
 
             assert_eq!(rxd_data, data);
@@ -204,7 +204,7 @@ mod test {
 
                 let data = vec![11u8; 90];
                 writer.write(&[11u8; 90], 0);
-                writer.close();
+                let _ = writer.close();
 
                 let get_result = dir_helper.get(&created_dir_id);
                 assert!(get_result.is_ok());
@@ -215,7 +215,7 @@ mod test {
 
                 let file = result[0].clone();
 
-                let mut reader = file_helper.read(file.clone());
+                let mut reader =  nfs::io::Reader::new(file.clone(), client.clone());
                 let rxd_data = reader.read(0, data.len() as u64).ok().unwrap();
 
                 assert_eq!(rxd_data, data);

@@ -55,9 +55,6 @@ impl DirectoryInfo {
     //     &self.parent_dir_id
     // }
 
-    pub fn set_metadata(&mut self, metadata: Metadata) {
-        self.metadata = metadata;
-    }
 }
 
 impl fmt::Debug for DirectoryInfo {
@@ -77,8 +74,7 @@ impl fmt::Display for DirectoryInfo {
 mod test {
     use super::*;
     use nfs::metadata::Metadata;
-    use cbor;
-    use routing;
+    use cbor;    
 
     #[test]
     fn serialise() {
