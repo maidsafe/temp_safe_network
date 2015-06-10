@@ -111,12 +111,12 @@ fn get_user_string(placeholder: &str) -> String {
 fn format_version_id(version_id: &[u8; 64]) -> String {
     let mut version = String::new();
     for j in 0..4 {
-        version.push(version_id[j] as char)
+        version.push((version_id[j] + 48) as char)
     }
     version.push('.');
     version.push('.');
     for j in 60..64 {
-        version.push(version_id[j] as char)
+        version.push((version_id[j] + 48) as char)
     }
     version
 }
@@ -182,10 +182,10 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                         println!("No blobs found in Container - {}", container.get_name());
                     } else {
                         println!("List of Blobs");
-                        println!("\t        Modified On             Name ");
-                        println!("\t =========================   ===========");
+                        println!("\t        Modified On                Name ");
+                        println!("\t =========================      ===========");
                         for blob in blobs {
-                            println!("\t {:?} \t {}", time::strftime("%d-%m-%Y %H:%M UTC", &blob.get_modified_time()), blob.get_name());
+                            println!("\t {:?} \t {}", time::strftime("%d-%m-%Y %H:%M UTC", &blob.get_modified_time()).unwrap(), blob.get_name());
                         }
                     }
                 },
@@ -195,7 +195,6 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
         6 => { // Create blob
             match container.get_container(get_user_string("Container name"), None) {
                 Ok(mut container) => {
-                    println!("Creating blob in {} Container", container.get_name());
                     let data = get_user_string("text to be saved as a file").into_bytes();
                     match container.create_blob(get_user_string("Blob name"), None) {
                         Ok(mut writer) => {
@@ -309,7 +308,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                 Err(msg) => println!("Failed :: {}", msg)
             }
         },
-        10 => { // Delete Container
+        10 => { // Delete blob
             match container.get_container(get_user_string("Container name"), None) {
                 Ok(mut container) => {
                     match container.delete_blob(get_user_string("Blob name")) {
@@ -319,7 +318,30 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                 },
                 Err(msg) => println!("Failed :: {}", msg)
             }
-        }
+        },
+        11 => { // Copy blob
+            match container.get_container(get_user_string("Container name to copy blob from (Source Conatiner)"), None) {
+                Ok(mut from_container) => {
+                    let to_dir_name = get_user_string("Select the Container to copy blob to (Destination Container)");
+                    let containers = container.get_containers();
+                    if containers.is_empty() || containers.len() == 1 {
+                        println!("No containers found");
+                        return;
+                    } else {
+                        match containers.iter().find(|dir| *dir.get_name() == to_dir_name) {
+                            Some(info) => {
+                                match from_container.copy_blob(get_user_string("Blob name"), info.get_id()) {
+                                    Ok(_) => println!("Blob copied"),
+                                    Err(msg) => println!("Failed :: {}", msg)
+                                }
+                            },
+                            None => println!("Destination conatiner not found")
+                        }
+                    }
+                },
+                Err(msg) => println!("Failed :: {}", msg)
+            }
+        },
         _ => {}
     }
 }
@@ -339,6 +361,7 @@ fn main() {
         Ok(authorised_client) => client = ::std::sync::Arc::new(::std::sync::Mutex::new(authorised_client)),
         Err(msg) => panic!(msg)
     }
+    println!("-- initializing storage ----\n");
     let mut root_container = get_root_container(&client);
     println!("\n\n------  (Tip) Start by creating a container and then store blob, modify blob within the container --------------------");
     loop {
@@ -355,6 +378,7 @@ fn main() {
             println!("8. Get blob content");
             println!("9. Get blob content by version");
             println!("10. Delete blob");
+            println!("11. Copy blob");
             println!("------ Enter a number --------------------");
             std::io::stdin().read_line(&mut option);
             println!("\n");
@@ -362,7 +386,7 @@ fn main() {
                 Ok(selection) => {
                     match selection {
                         1...4 => container_operation(selection, &mut root_container),
-                        5...10 => blob_operation(selection, &mut root_container),
+                        5...11 => blob_operation(selection, &mut root_container),
                         _ => println!("Invalid option"),
                     }
                 },
