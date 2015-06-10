@@ -320,7 +320,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
             }
         },
         11 => { // Copy blob
-            match container.get_container(get_user_string("Container name to copy blob from (Source Conatiner)"), None) {
+            match container.get_container(get_user_string("Container name to copy blob from (Source Container)"), None) {
                 Ok(mut from_container) => {
                     let to_dir_name = get_user_string("Select the Container to copy blob to (Destination Container)");
                     let containers = container.get_containers();
@@ -335,7 +335,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                                     Err(msg) => println!("Failed :: {}", msg)
                                 }
                             },
-                            None => println!("Destination conatiner not found")
+                            None => println!("Destination Container not found")
                         }
                     }
                 },
@@ -370,8 +370,8 @@ fn main() {
             println!("\n----------Choose an Operation----------------");
             println!("1. Create Container");
             println!("2. List Containers");
-            println!("3. Get Conatiner Versions");
-            println!("4. Delete Conatiner");
+            println!("3. Get Container Versions");
+            println!("4. Delete Container");
             println!("5. List Blobs from container");
             println!("6. Create Blob");
             println!("7. Update Blob");
