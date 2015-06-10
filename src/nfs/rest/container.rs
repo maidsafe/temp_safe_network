@@ -337,6 +337,9 @@ impl Container {
     /// Copies the latest blob version from the container to the specified destination container
     pub fn copy_blob(&mut self, blob_name: String, to_container: [u8;64]) -> Result<(), String> {
         let to_dir_id = ::routing::NameType(to_container);
+        if *self.directory_listing.get_id() == to_dir_id {
+            return Err("Destination and Source containers are the same".to_string());
+        }
         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
         match self.directory_listing.get_files().iter().position(|file| *file.get_name() == blob_name) {
             Some(file_pos) => {

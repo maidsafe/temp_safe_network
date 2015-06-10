@@ -16,9 +16,10 @@
 // relating to use of the SAFE Network Software.
 
 extern crate maidsafe_client;
+extern crate time;
 
-use std::error::Error;
 use maidsafe_client::nfs;
+
 
 fn validate_pin_is_4_digits(mut pin: u32) -> bool {
     for _ in 0..3 {
@@ -77,7 +78,7 @@ fn create_account() -> Result<maidsafe_client::client::Client, String> {
         Ok(_) => {
             println!("Account Created Successfully !!");
         },
-        Err(io_error) => panic!("Account Created failed"),
+        Err(_) => panic!("Account Created failed"),
     }
 
     println!("\n\n\tAuto Account Login");
@@ -90,10 +91,11 @@ fn create_account() -> Result<maidsafe_client::client::Client, String> {
             println!("Account Login Successful !!");
             Ok(client)
         },
-        Err(io_error)  => Err("Account Login Failed !!".to_string()),
+        Err(_)  => Err("Account Login Failed !!".to_string()),
     }
 }
 
+#[allow(unused_must_use)]
 fn get_user_string(placeholder: &str) -> String {
     let mut txt = String::new();
     println!("------Enter {}--------", placeholder);
@@ -106,12 +108,25 @@ fn get_user_string(placeholder: &str) -> String {
     txt
 }
 
+fn format_version_id(version_id: &[u8; 64]) -> String {
+    let mut version = String::new();
+    for j in 0..4 {
+        version.push(version_id[j] as char)
+    }
+    version.push('.');
+    version.push('.');
+    for j in 60..64 {
+        version.push(version_id[j] as char)
+    }
+    version
+}
+
 fn container_operation(option: u32, container: &mut nfs::rest::Container) {
     match option {
         1 => {// Create container
             let name = get_user_string("Container name");
             match container.create(name.clone(), None) {
-                Ok(_) => println!("Container - {} has been created", name),
+                Ok(_) => println!("Created Container - {}", name),
                 Err(msg) => println!("Failed :: {}", msg)
             }
         },
@@ -121,9 +136,10 @@ fn container_operation(option: u32, container: &mut nfs::rest::Container) {
                 println!("No containers found");
             } else {
                 println!("List of containers");
-                println!("\t Name \t Created On");
+                println!("\t        Created On                  Name ");
+                println!("\t =========================       ==========");
                 for container_info in containers {
-                    println!("\t {} \t {:?}", container_info.get_name(), container_info.get_created_time());
+                    println!("\t {:?} \t {}", time::strftime("%d-%m-%Y %H:%M UTC", &container_info.get_created_time()).unwrap(), container_info.get_name());
                 }
             }
         }
@@ -135,9 +151,9 @@ fn container_operation(option: u32, container: &mut nfs::rest::Container) {
                     } else {
                         println!("List of container versions");
                         println!("\t No. \t Version Id");
-                        println!("\t ___ \t __________");
+                        println!("\t === \t ==========");
                         for i in 0..versions.len() {
-                            println!("\t {} \t {:?}..{:?}", i+1, &versions[i][0..4], &versions[i][60..64]);
+                            println!("\t {} \t {:?}", i+1, format_version_id(&versions[i]));
                         }
                     }
                 },
@@ -160,16 +176,16 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
     match option {
         5 => { // List blobs
             match container.get_container(get_user_string("Container name"), None) {
-                Ok(mut container) => {
+                Ok(container) => {
                     let blobs: Vec<nfs::rest::Blob> = container.get_blobs();
                     if blobs.is_empty() {
                         println!("No blobs found in Container - {}", container.get_name());
                     } else {
                         println!("List of Blobs");
-                        println!("\t Name \t Modified On");
-                        println!("\t ____ \t ___________");
+                        println!("\t        Modified On             Name ");
+                        println!("\t =========================   ===========");
                         for blob in blobs {
-                            println!("\t {} \t {:?}", blob.get_name(), blob.get_modified_time());
+                            println!("\t {:?} \t {}", time::strftime("%d-%m-%Y %H:%M UTC", &blob.get_modified_time()), blob.get_name());
                         }
                     }
                 },
@@ -258,10 +274,10 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                             } else{
                                 println!("Available Versions::");
                                 for i in 0..versions.len() {
-                                    println!("\t{} {:?}..{:?}", i, &versions[i][0..4], &versions[i][60..64])
+                                    println!("\t{} {:?}", i+1, format_version_id(&versions[i]))
                                 }
                                 match get_user_string("Number corresponding to the version").trim().parse::<usize>() {
-                                    Ok(index) => version_id = versions[index],
+                                    Ok(index) => version_id = versions[index - 1],
                                     Err(_) =>  {
                                         println!("Invalid input : Fetching latest version");
                                         version_id = versions[0];
@@ -311,7 +327,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
 fn get_root_container(client: &::std::sync::Arc<::std::sync::Mutex<maidsafe_client::client::Client>>) -> nfs::rest::Container {
     let mut root_container;
     match nfs::rest::Container::authorise(client.clone(), None) {
-        Ok(mut container) => root_container = container,
+        Ok(container) => root_container = container,
         Err(msg) => panic!(msg)
     };
     root_container
@@ -324,9 +340,9 @@ fn main() {
         Err(msg) => panic!(msg)
     }
     let mut root_container = get_root_container(&client);
+    println!("\n\n------  (Tip) Start by creating a container and then store blob, modify blob within the container --------------------");
     loop {
         let mut option = String::new();
-
         {
             println!("\n----------Choose an Operation----------------");
             println!("1. Create Container");
@@ -339,8 +355,7 @@ fn main() {
             println!("8. Get blob content");
             println!("9. Get blob content by version");
             println!("10. Delete blob");
-
-            println!("------Enter number correspoding the operation--------------------");
+            println!("------ Enter a number --------------------");
             std::io::stdin().read_line(&mut option);
             println!("\n");
             match option.trim().parse::<u32>() {
