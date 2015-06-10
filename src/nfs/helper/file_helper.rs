@@ -191,7 +191,7 @@ mod test {
             let mut reader = file_helper.read(file);
             let rxd_data = reader.read(0, data.len() as u64).ok().unwrap();
 
-            assert_eq!(rxd_data, Vec::new());
+            assert_eq!(rxd_data, data);
 
             {
                 let mut writer: _;

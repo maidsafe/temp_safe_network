@@ -128,6 +128,9 @@ impl Container {
 
     /// Creates a Conatiner
     pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
+        if name.is_empty() {
+            return Err("Name can not be empty".to_string());
+        }
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
                 match self.directory_listing.get_sub_directories().iter().find(|&entry| *entry.get_name() == name) {
@@ -236,6 +239,9 @@ impl Container {
     /// The content of the blob is written using the writter.
     /// The blob is created only after the writter.close() is invoked
     pub fn create_blob(&mut self, name: String, metadata: Option<String>) -> Result<nfs::io::Writer, String> {
+        if name.is_empty() {
+            return Err("Name can not be empty".to_string());
+        }
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
                 let mut file_helper = nfs::helper::FileHelper::new(self.client.clone());
