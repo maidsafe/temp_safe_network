@@ -76,7 +76,7 @@ impl Container {
         }
     }
 
-    /// Creates a Conatiner
+    /// Creates a Container
     pub fn create(&mut self, name: String, metadata: Option<String>) -> Result<(), String> {
         if name.is_empty() {
             return Err("Name can not be empty".to_string());
@@ -84,7 +84,7 @@ impl Container {
         match self.validate_metadata(metadata) {
             Ok(user_metadata) => {
                 match self.directory_listing.get_sub_directories().iter().find(|&entry| *entry.get_name() == name) {
-                    Some(_) => Err("Conatiner already exists".to_string()),
+                    Some(_) => Err("Container already exists".to_string()),
                     None => {
                         let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
                         match directory_helper.create(name, user_metadata) {
@@ -346,7 +346,7 @@ impl Container {
                 match directory_helper.get(&to_dir_id) {
                     Ok(mut to_dir_listing) => {
                         match self.find_file(&blob_name, &to_dir_listing) {
-                            Some(_) => Err("File already exists in the destination Conatiner".to_string()),
+                            Some(_) => Err("File already exists in the destination Container".to_string()),
                             None => {
                                 let file = self.directory_listing.get_files()[file_pos].clone();
                                 to_dir_listing.get_mut_files().push(file);
