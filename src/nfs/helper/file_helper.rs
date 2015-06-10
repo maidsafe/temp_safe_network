@@ -34,6 +34,9 @@ impl FileHelper {
         }
     }
 
+    /// Helper function to create a file in a directory listing
+    /// A writer object is returned, through which the data for the file can be written to the network
+    /// The file is actually saved in the directory listing only after `writer.close()` is invoked
     pub fn create(&mut self,
         name: String,
         user_metatdata: Vec<u8>,
@@ -47,6 +50,9 @@ impl FileHelper {
         }
     }
 
+    /// Helper function to Update content of a file in a directory listing
+    /// A writer object is returned, through which the data for the file can be written to the network
+    /// The file is actually saved in the directory listing only after `writer.close()` is invoked
     pub fn update(&mut self,
         file: &nfs::file::File,
         directory: &nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {

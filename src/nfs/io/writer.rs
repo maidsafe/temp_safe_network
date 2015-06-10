@@ -29,6 +29,7 @@ pub struct Writer {
 
 impl Writer {
 
+    /// Create new instance of Writer
     pub fn new(directory: nfs::directory_listing::DirectoryListing, file: nfs::file::File,
         client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> Writer {
         let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
@@ -40,10 +41,13 @@ impl Writer {
         }
     }
 
+    /// Data of a file/blob can be written in smaller chunks
     pub fn write(&mut self, data: &[u8], position: u64) {
         self.self_encryptor.write(data, position);
     }
 
+    /// close is invoked only after alll the data is completely written
+    /// The file/blob is saved only when the close is invoked.
     pub fn close(mut self) -> Result<(), String> {
         let ref mut file = self.file;
         let ref mut directory = self.directory;

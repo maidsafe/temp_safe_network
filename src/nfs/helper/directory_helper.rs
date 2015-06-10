@@ -232,7 +232,7 @@ mod test {
     fn get_dir_listing() {
         let client = ::std::sync::Arc::new(::std::sync::Mutex::new(get_dummy_client()));
         let mut dir_helper = DirectoryHelper::new(client.clone());
-        
+
         let created_dir_id: _;
         {
             let put_result = dir_helper.create("DirName".to_string(),
