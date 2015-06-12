@@ -111,12 +111,11 @@ fn get_user_string(placeholder: &str) -> String {
 fn format_version_id(version_id: &[u8; 64]) -> String {
     let mut version = String::new();
     for j in 0..4 {
-        version.push((version_id[j] + 48) as char)
-    }
-    version.push('.');
-    version.push('.');
+        version.push_str(&version_id[j].to_string()[..]);
+    };
+    version.push_str("..");
     for j in 60..64 {
-        version.push((version_id[j] + 48) as char)
+        version.push_str(&version_id[j].to_string()[..]);
     }
     version
 }
@@ -179,7 +178,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                 Ok(container) => {
                     let blobs: Vec<nfs::rest::Blob> = container.get_blobs();
                     if blobs.is_empty() {
-                        println!("No blobs found in Container - {}", container.get_name());
+                        println!("No Blobs found in Container - {}", container.get_name());
                     } else {
                         println!("List of Blobs");
                         println!("\t        Modified On                Name ");
@@ -370,7 +369,7 @@ fn main() {
             println!("\n----------Choose an Operation----------------");
             println!("1. Create Container");
             println!("2. List Containers");
-            println!("3. Get Container Versions");
+            println!("3. Get Root Container Versions");
             println!("4. Delete Container");
             println!("5. List Blobs from container");
             println!("6. Create Blob");
