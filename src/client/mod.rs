@@ -100,13 +100,13 @@ impl Client {
                                 let mut response_getter = response_getter::ResponseGetter::new(client.response_notifier.clone(), client.callback_interface.clone(), Some(id), None);
                                 match response_getter.get() {
                                     Ok(_) => Ok(client),
-                                    Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
+                                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
                                 }
                             },
                             Err(io_error) => Err(io_error),
                         }
                     },
-                    Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!")),
+                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!")),
                 }
             },
             Err(io_error) => Err(io_error),
