@@ -88,26 +88,25 @@ impl Client {
             Ok(id) => {
                 let mut response_getter = response_getter::ResponseGetter::new(client.response_notifier.clone(), client.callback_interface.clone(), Some(id), None);
                 match response_getter.get() {
-                    Ok(_) => {},
-                    Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!")),
-                }
+                    Ok(_) => {
+                        let account_versions = maidsafe_types::StructuredData::new(client.session_packet_id.clone(),
+                                                                                  client.account.get_public_maid().name(),
+                                                                                  vec![encrypted_account.name()]);
 
-                let account_versions = maidsafe_types::StructuredData::new(client.session_packet_id.clone(),
-                                                                          client.account.get_public_maid().name(),
-                                                                          vec![encrypted_account.name()]);
-                let put_res = client.routing.lock().unwrap().put(account_versions);
+                        let put_res = client.routing.lock().unwrap().put(account_versions);
 
-                match put_res {
-                    Ok(id) => {
-                        let mut response_getter = response_getter::ResponseGetter::new(client.response_notifier.clone(), client.callback_interface.clone(), Some(id), None);
-                        match response_getter.get() {
-                            Ok(_) => {},
-                            Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
+                        match put_res {
+                            Ok(id) => {
+                                let mut response_getter = response_getter::ResponseGetter::new(client.response_notifier.clone(), client.callback_interface.clone(), Some(id), None);
+                                match response_getter.get() {
+                                    Ok(_) => Ok(client),
+                                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
+                                }
+                            },
+                            Err(io_error) => Err(io_error),
                         }
-
-                        Ok(client)
                     },
-                    Err(io_error) => Err(io_error),
+                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!")),
                 }
             },
             Err(io_error) => Err(io_error),
@@ -124,7 +123,7 @@ impl Client {
                                                            fake_account_packet.get_maid().secret_keys().clone());
 
         //TODO: Toggle depending on if using actual routing or non_networking_test_framework
-        // let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), fake_client_id_packet)));
+        // let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), fake_id_packet)));
         let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(callback_interface.clone(), data_store.clone())));
         let cloned_fake_routing_client = fake_routing_client.clone();
         let fake_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
