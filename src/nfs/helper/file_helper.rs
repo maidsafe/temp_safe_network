@@ -143,8 +143,7 @@ mod test {
 
         ::client::Client::create_account(&keyword,
                                          pin,
-                                         &password,
-                                         ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()))).ok().unwrap()
+                                         &password).ok().unwrap()
     }
 
 

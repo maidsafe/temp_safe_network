@@ -71,11 +71,7 @@ impl Blob {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ::std::sync::Arc;
-    use ::std::sync::Mutex;
-    use ::std::collections::BTreeMap;
     use std::thread::sleep_ms;
-    use ::client::Client;
     use nfs::file::File;
     use nfs::metadata::Metadata;
     use self_encryption::datamap::DataMap;

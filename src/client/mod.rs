@@ -25,19 +25,32 @@ use maidsafe_types;
 use maidsafe_types::TypeTag;
 use routing::sendable::Sendable;
 
-pub mod non_networking_test_framework;
-
 mod user_account;
 mod response_getter;
 mod callback_interface;
+
+#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
+mod non_networking_test_framework;
+#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
+type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<non_networking_test_framework::RoutingClientMock>>;
+#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
+fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>, id_packet: routing::types::Id) -> RoutingClient {
+    ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(cb_interface, id_packet)))
+}
+
+#[cfg(feature = "USE_ACTUAL_ROUTING")]
+type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>>;
+#[cfg(feature = "USE_ACTUAL_ROUTING")]
+fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>, id_packet: routing::types::Id) -> RoutingClient {
+    ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(cb_interface, id_packet)))
+}
+
 
 pub struct Client {
     account:             user_account::Account,
     session_packet_id:   ::routing::NameType,
     session_packet_keys: SessionPacketEncryptionKeys,
-    //TODO: Toggle depending on if using actual routing or non_networking_test_framework
-    // routing:             ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>>,
-    routing:             ::std::sync::Arc<::std::sync::Mutex<non_networking_test_framework::RoutingClientMock>>,
+    routing:             RoutingClient,
     response_notifier:   ::ResponseNotifier,
     callback_interface:  ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
     routing_stop_flag:   ::std::sync::Arc<::std::sync::Mutex<bool>>,
@@ -45,8 +58,7 @@ pub struct Client {
 }
 
 impl Client {
-    //TODO: data_store parameter should be removed when not testing with non_networking_test_framework.
-    pub fn create_account(keyword: &String, pin: u32, password_str: &String, data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
+    pub fn create_account(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::IoError> {
         let password = password_str.as_bytes();
 
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
@@ -55,9 +67,7 @@ impl Client {
         let id_packet = routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
                                                       account_packet.get_maid().secret_keys().clone());
 
-        //TODO: Toggle depending on if using actual routing or non_networking_test_framework
-        // let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), id_packet)));
-        let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(callback_interface.clone(), data_store)));
+        let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
         let cloned_routing_client = routing_client.clone();
         let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
         let routing_stop_flag_clone = routing_stop_flag.clone();
@@ -92,8 +102,8 @@ impl Client {
                 match response_getter.get() {
                     Ok(_) => {
                         let account_versions = maidsafe_types::StructuredData::new(client.session_packet_id.clone(),
-                                                                                  client.account.get_public_maid().name(),
-                                                                                  vec![encrypted_account.name()]);
+                                                                                   client.account.get_public_maid().name(),
+                                                                                   vec![encrypted_account.name()]);
 
                         let put_res = client.routing.lock().unwrap().put(account_versions);
 
@@ -115,8 +125,7 @@ impl Client {
         }
     }
 
-    //TODO: data_store parameter should be removed when not testing with non_networking_test_framework.
-    pub fn log_in(keyword: &String, pin: u32, password_str: &String, data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
+    pub fn log_in(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::IoError> {
         let password = password_str.as_bytes();
 
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
@@ -126,9 +135,7 @@ impl Client {
         let fake_id_packet = routing::types::Id::with_keys(fake_account_packet.get_maid().public_keys().clone(),
                                                            fake_account_packet.get_maid().secret_keys().clone());
 
-        //TODO: Toggle depending on if using actual routing or non_networking_test_framework
-        // let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), fake_id_packet)));
-        let fake_routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(callback_interface.clone(), data_store.clone())));
+        let fake_routing_client = get_new_routing_client(callback_interface.clone(), fake_id_packet);
         let cloned_fake_routing_client = fake_routing_client.clone();
         let fake_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
         let fake_routing_stop_flag_clone = fake_routing_stop_flag.clone();
@@ -187,9 +194,7 @@ impl Client {
                                                 let id_packet = routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
                                                                                               account_packet.get_maid().secret_keys().clone());
 
-                                                //TODO: Toggle depending on if using actual routing or non_networking_test_framework
-                                                // let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(callback_interface.clone(), id_packet)));
-                                                let routing_client = ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(callback_interface.clone(), data_store)));
+                                                let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
                                                 let cloned_routing_client = routing_client.clone();
                                                 let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
                                                 let routing_stop_flag_clone = routing_stop_flag.clone();
@@ -491,8 +496,7 @@ mod test {
         let keyword = ::utility::generate_random_string(10);
         let password = ::utility::generate_random_string(10);
         let pin = ::utility::generate_random_pin();
-        let data_store = ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()));
-        let result = Client::create_account(&keyword, pin, &password, data_store);
+        let result = Client::create_account(&keyword, pin, &password);
         assert!(result.is_ok());
     }
 
@@ -501,26 +505,25 @@ mod test {
         let keyword = ::utility::generate_random_string(10);
         let password = ::utility::generate_random_string(10);
         let pin = ::utility::generate_random_pin();
-        let data_store = ::client::non_networking_test_framework::get_new_data_store();
 
         // Without Creation Login Should Fail
-        let mut result = Client::log_in(&keyword, pin, &password, data_store.clone());
+        let mut result = Client::log_in(&keyword, pin, &password);
         assert!(result.is_err());
 
         // Creation should pass
-        result = Client::create_account(&keyword, pin, &password, data_store.clone());
+        result = Client::create_account(&keyword, pin, &password);
         assert!(result.is_ok());
 
         // Wrong Credentials (Password) - Login should Fail
         let wrong_password = "Spandan".to_string();
         assert!(password != wrong_password);
-        result = Client::log_in(&keyword, pin, &wrong_password, data_store.clone());
+        result = Client::log_in(&keyword, pin, &wrong_password);
         assert!(result.is_err());
 
         // Wrong Credentials (Keyword) - Login should Fail
         let wrong_keyword = "Spandan".to_string();
         assert!(keyword != wrong_keyword);
-        result = Client::log_in(&wrong_keyword, pin, &password, data_store.clone());
+        result = Client::log_in(&wrong_keyword, pin, &password);
         assert!(result.is_err());
 
         // Wrong Credentials (Pin) - Login should Fail
@@ -529,11 +532,11 @@ mod test {
         } else {
             pin - 1
         };
-        result = Client::log_in(&keyword, wrong_pin, &password, data_store.clone());
+        result = Client::log_in(&keyword, wrong_pin, &password);
         assert!(result.is_err());
 
         // Correct Credentials - Login Should Pass
-        result = Client::log_in(&keyword, pin, &password, data_store);
+        result = Client::log_in(&keyword, pin, &password);
         assert!(result.is_ok());
     }
 
@@ -543,9 +546,8 @@ mod test {
         let keyword = ::utility::generate_random_string(10);
         let password = ::utility::generate_random_string(10);
         let pin = ::utility::generate_random_pin();
-        let data_store = ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()));
 
-        let result = Client::create_account(&keyword, pin, &password, data_store.clone());
+        let result = Client::create_account(&keyword, pin, &password);
         assert!(result.is_ok());
         let mut client = result.ok().unwrap();
 
@@ -555,7 +557,7 @@ mod test {
         match client.set_root_directory_id(root_dir_id.clone()) {
             Ok(_) => {
                 // Correct Credentials - Login Should Pass
-                let result = Client::log_in(&keyword, pin, &password, data_store);
+                let result = Client::log_in(&keyword, pin, &password);
                 assert!(result.is_ok());
 
                 let client = result.ok().unwrap();
@@ -574,9 +576,8 @@ mod test {
         let keyword = ::utility::generate_random_string(10);
         let password = ::utility::generate_random_string(10);
         let pin = ::utility::generate_random_pin();
-        let data_store = ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()));
 
-        let result = Client::create_account(&keyword, pin, &password, data_store);
+        let result = Client::create_account(&keyword, pin, &password);
         assert!(result.is_ok());
         let client = result.ok().unwrap();
 
