@@ -424,18 +424,18 @@ mod test {
     use routing::NameType;
 
     fn dummy_client() -> Client {
-        let keyword = "keyword".to_string();
-        let password = "password".as_bytes();
-        let pin = 1234u32;
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
         let map = Arc::new(Mutex::new(BTreeMap::new()));
 
         Client::create_account(&keyword, pin, &password, map).ok().unwrap()
     }
 
     fn test_client() -> Client {
-        let keyword = "keyword".to_string();
-        let password = "password".as_bytes();
-        let pin = 1234u32;
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
         let data_store = client::non_networking_test_framework::get_new_data_store();
 
         Client::create_account(&keyword, pin, &password, data_store.clone()).ok().unwrap()

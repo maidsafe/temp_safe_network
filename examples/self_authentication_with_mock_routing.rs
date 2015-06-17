@@ -54,7 +54,7 @@ fn main() {
     {
         println!("\nTrying to create an account ...");
 
-        match maidsafe_client::client::Client::create_account(&keyword, pin, &password.as_bytes(), data_store.clone()) {
+        match maidsafe_client::client::Client::create_account(&keyword, pin, &password, data_store.clone()) {
             Ok(_) => println!("Account Created Successfully !!"),
             Err(io_error)  => println!("Account Creation Failed !! Reason: {:?}", io_error.description()),
         }
@@ -66,7 +66,7 @@ fn main() {
     // Log into the created account
     {
         println!("\nTrying to log into the created account using supplied credentials ...");
-        match maidsafe_client::client::Client::log_in(&keyword, pin, &password.as_bytes(), data_store.clone()) {
+        match maidsafe_client::client::Client::log_in(&keyword, pin, &password, data_store.clone()) {
             Ok(_) => println!("Account Login Successful !!"),
             Err(io_error)  => println!("Account Login Failed !! Reason: {:?}", io_error.description()),
         }
@@ -100,7 +100,7 @@ fn main() {
         // Log into the created account
         {
             println!("\nTrying to log in ...");
-            match maidsafe_client::client::Client::log_in(&keyword, pin, &password.as_bytes(), data_store.clone()) {
+            match maidsafe_client::client::Client::log_in(&keyword, pin, &password, data_store.clone()) {
                 Ok(_) => {
                     println!("Account Login Successful !!");
                     break;

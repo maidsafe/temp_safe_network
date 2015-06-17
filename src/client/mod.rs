@@ -46,7 +46,9 @@ pub struct Client {
 
 impl Client {
     //TODO: data_store parameter should be removed when not testing with non_networking_test_framework.
-    pub fn create_account(keyword: &String, pin: u32, password: &[u8], data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
+    pub fn create_account(keyword: &String, pin: u32, password_str: &String, data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
+        let password = password_str.as_bytes();
+
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
@@ -114,7 +116,9 @@ impl Client {
     }
 
     //TODO: data_store parameter should be removed when not testing with non_networking_test_framework.
-    pub fn log_in(keyword: &String, pin: u32, password: &[u8], data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
+    pub fn log_in(keyword: &String, pin: u32, password_str: &String, data_store: non_networking_test_framework::DataStore) -> Result<Client, ::IoError> {
+        let password = password_str.as_bytes();
+
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let user_network_id = user_account::Account::generate_network_id(keyword, pin);
         let fake_account_packet = user_account::Account::new(None);
@@ -484,9 +488,9 @@ mod test {
 
     #[test]
     fn account_creation() {
-        let keyword = "Spandan".to_string();
-        let password = "Sharma".as_bytes();
-        let pin = 1234u32;
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
         let data_store = ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()));
         let result = Client::create_account(&keyword, pin, &password, data_store);
         assert!(result.is_ok());
@@ -494,9 +498,9 @@ mod test {
 
     #[test]
     fn account_login() {
-        let keyword = "Spandan".to_string();
-        let password = "Sharma".as_bytes();
-        let pin = 1234u32;
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
         let data_store = ::client::non_networking_test_framework::get_new_data_store();
 
         // Without Creation Login Should Fail
@@ -508,17 +512,23 @@ mod test {
         assert!(result.is_ok());
 
         // Wrong Credentials (Password) - Login should Fail
-        let wrong_password = "sharma".as_bytes();
+        let wrong_password = "Spandan".to_string();
+        assert!(password != wrong_password);
         result = Client::log_in(&keyword, pin, &wrong_password, data_store.clone());
         assert!(result.is_err());
 
         // Wrong Credentials (Keyword) - Login should Fail
-        let wrong_keyword = "spandan".to_string();
+        let wrong_keyword = "Spandan".to_string();
+        assert!(keyword != wrong_keyword);
         result = Client::log_in(&wrong_keyword, pin, &password, data_store.clone());
         assert!(result.is_err());
 
         // Wrong Credentials (Pin) - Login should Fail
-        let wrong_pin = 1233;
+        let wrong_pin = if pin == 0 {
+            pin + 1
+        } else {
+            pin - 1
+        };
         result = Client::log_in(&keyword, wrong_pin, &password, data_store.clone());
         assert!(result.is_err());
 
@@ -530,9 +540,9 @@ mod test {
     #[test]
     fn root_dir_id_creation() {
         // Construct Client
-        let keyword = "Spandan".to_string();
-        let password = "Sharma".as_bytes();
-        let pin = 1234u32;
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
         let data_store = ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()));
 
         let result = Client::create_account(&keyword, pin, &password, data_store.clone());
@@ -561,9 +571,9 @@ mod test {
     #[test]
     fn hybrid_encryption_decryption() {
         // Construct Client
-        let keyword = "Spandan".to_string();
-        let password = "Sharma".as_bytes();
-        let pin = 1234u32;
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
         let data_store = ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new()));
 
         let result = Client::create_account(&keyword, pin, &password, data_store);

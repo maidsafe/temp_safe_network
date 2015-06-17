@@ -15,20 +15,18 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use routing;
-
 pub struct ResponseGetter {
     response_notifier:  ::ResponseNotifier,
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
-    message_id:         Option<routing::types::MessageId>,
-    name:               Option<routing::NameType>,
+    message_id:         Option<::routing::types::MessageId>,
+    name:               Option<::routing::NameType>,
 }
 
 impl ResponseGetter {
     pub fn new(notifier: ::ResponseNotifier,
                cb_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
-               msg_id: Option<routing::types::MessageId>,
-               name: Option<routing::NameType>) -> ResponseGetter {
+               msg_id: Option<::routing::types::MessageId>,
+               name: Option<::routing::NameType>) -> ResponseGetter {
         ResponseGetter {
             response_notifier: notifier,
             callback_interface: cb_interface,
@@ -37,7 +35,7 @@ impl ResponseGetter {
         }
     }
 
-    pub fn get(&mut self) -> Result<Vec<u8>, routing::error::ResponseError> {
+    pub fn get(&mut self) -> Result<Vec<u8>, ::routing::error::ResponseError> {
         let &(ref lock, ref condition_var) = &*self.response_notifier;
         let mut mutex_guard: _;
 

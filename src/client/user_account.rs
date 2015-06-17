@@ -358,5 +358,4 @@ mod test {
             Err(_) => panic!("Account Encryption Failed !!"),
         }
     }
-
 }

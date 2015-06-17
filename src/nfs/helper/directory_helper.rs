@@ -208,9 +208,9 @@ mod test {
     use super::*;
 
     fn get_dummy_client() -> ::client::Client {
-        let keyword = "Spandan".to_string();
-        let password = "Sharma".as_bytes();
-        let pin = 1234u32;
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
 
         ::client::Client::create_account(&keyword,
                                          pin,
