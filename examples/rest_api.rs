@@ -20,24 +20,6 @@ extern crate time;
 
 use maidsafe_client::nfs;
 
-
-fn validate_pin_is_4_digits(mut pin: u32) -> bool {
-    for _ in 0..3 {
-        pin /= 10;
-        if pin == 0 {
-            return false;
-        }
-    }
-
-    pin /= 10;
-
-    if pin != 0 {
-        false
-    } else {
-        true
-    }
-}
-
 #[allow(unused_must_use)]
 fn create_account() -> Result<maidsafe_client::client::Client, String> {
     let mut keyword = String::new();
@@ -58,11 +40,9 @@ fn create_account() -> Result<maidsafe_client::client::Client, String> {
         println!("\n\n--------- Enter PIN (4 Digits) -----------");
         std::io::stdin().read_line(&mut pin_str);
         let result = pin_str.trim().parse::<u32>();
-        if result.is_ok() {
+        if result.is_ok() && pin_str.trim().len() == 4 {
             pin = result.ok().unwrap();
-            if validate_pin_is_4_digits(pin) {
-                break;
-            }
+            break;
         }
         println!("ERROR: PIN is not 4 Digits !!");
         pin_str.clear();
