@@ -348,8 +348,8 @@ mod test {
 
         // Construct StructuredData, 1st version, for this ImmutableData
         let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
-        let keyword = "Spandan".to_string();
-        let pin = 1234u32;
+        let keyword = (0..100).map(|_| ::rand::random::<char>()).collect();
+        let pin = ::rand::random::<u32>() % 10000u32;
         let user_id = ::client::user_account::Account::generate_network_id(&keyword, pin);
         let mut account_version = maidsafe_types::StructuredData::new(user_id.clone(),
                                                                       account_packet.get_public_maid().name(),

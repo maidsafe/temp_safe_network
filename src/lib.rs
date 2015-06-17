@@ -72,3 +72,13 @@ impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
         return MaidsafeError::CryptoError(CryptoError::SymmetricCryptoError(error));
     }
 }
+
+mod utility {
+    pub fn generate_random_string(length: usize) -> String {
+        (0..length).map(|_| ::rand::random::<char>()).collect()
+    }
+
+    pub fn generate_random_pin() -> u32 {
+        ::rand::random::<u32>() % 10000
+    }
+}
