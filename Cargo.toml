@@ -21,3 +21,6 @@ sodiumoxide = "0.0.4"
 time = "0.1.25"
 rand = "*"
 self_encryption = "0.1.3"
+
+[features]
+USE_ACTUAL_ROUTING = []

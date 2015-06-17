@@ -48,13 +48,10 @@ fn create_account() -> Result<maidsafe_client::client::Client, String> {
         pin_str.clear();
     }
 
-    //TODO Not to be used if not using non_networking_test_framework.
-    let data_store = maidsafe_client::client::non_networking_test_framework::get_new_data_store();
-
     // Account Creation
     println!("\nTrying to create an account ...");
 
-    match maidsafe_client::client::Client::create_account(&keyword, pin, &password, data_store.clone()) {
+    match maidsafe_client::client::Client::create_account(&keyword, pin, &password) {
         Ok(_) => {
             println!("Account Created Successfully !!");
         },
@@ -66,7 +63,7 @@ fn create_account() -> Result<maidsafe_client::client::Client, String> {
 
     // Log into the created account
     println!("\nTrying to log into the created account using supplied credentials ...");
-    match maidsafe_client::client::Client::log_in(&keyword, pin, &password, data_store.clone()) {
+    match maidsafe_client::client::Client::log_in(&keyword, pin, &password) {
         Ok(client) => {
             println!("Account Login Successful !!");
             Ok(client)

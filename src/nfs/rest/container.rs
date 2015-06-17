@@ -415,42 +415,25 @@ mod test {
     use super::*;
     use ::std::sync::Arc;
     use ::std::sync::Mutex;
-    use ::std::collections::BTreeMap;
-    use std::thread::sleep_ms;
-    use ::client;
     use ::client::Client;
-    use nfs::directory_listing::DirectoryListing;
-    use nfs::helper::DirectoryHelper;
-    use routing::NameType;
-
-    fn dummy_client() -> Client {
-        let keyword = ::utility::generate_random_string(10);
-        let password = ::utility::generate_random_string(10);
-        let pin = ::utility::generate_random_pin();
-        let map = Arc::new(Mutex::new(BTreeMap::new()));
-
-        Client::create_account(&keyword, pin, &password, map).ok().unwrap()
-    }
 
     fn test_client() -> Client {
         let keyword = ::utility::generate_random_string(10);
         let password = ::utility::generate_random_string(10);
         let pin = ::utility::generate_random_pin();
-        let data_store = client::non_networking_test_framework::get_new_data_store();
 
-        Client::create_account(&keyword, pin, &password, data_store.clone()).ok().unwrap()
+        Client::create_account(&keyword, pin, &password).ok().unwrap()
     }
 
     #[test]
     fn authorise_container() {
-        let mut client = Arc::new(Mutex::new(test_client()));
+        let client = Arc::new(Mutex::new(test_client()));
         assert!(Container::authorise(client.clone(), None).is_ok(), true);
     }
 
-
     #[test]
     fn create_container() {
-        let mut client = Arc::new(Mutex::new(test_client()));
+        let client = Arc::new(Mutex::new(test_client()));
         let mut container = Container::authorise(client.clone(), None).unwrap();
         container.create("Home".to_string()).unwrap();
 
@@ -461,7 +444,7 @@ mod test {
 
     #[test]
     fn delete_container() {
-        let mut client = Arc::new(Mutex::new(test_client()));
+        let client = Arc::new(Mutex::new(test_client()));
         let mut container = Container::authorise(client.clone(), None).unwrap();
         container.create("Home".to_string()).unwrap();
 
@@ -477,7 +460,7 @@ mod test {
 
     #[test]
     fn create_update_delete_blob() {
-        let mut client = Arc::new(Mutex::new(test_client()));
+        let client = Arc::new(Mutex::new(test_client()));
         let mut container = Container::authorise(client.clone(), None).unwrap();
         container.create("Home".to_string()).unwrap();
 
@@ -519,11 +502,11 @@ mod test {
         container.create("Public".to_string()).unwrap();
         let mut public_container = container.get_container("Public".to_string(), None).unwrap();
         assert_eq!(public_container.get_blobs().len(), 0);
-        home_container.copy_blob("sample.txt".to_string(), public_container.get_id());
+        let _ = home_container.copy_blob("sample.txt".to_string(), public_container.get_id());
         public_container = container.get_container("Public".to_string(), None).unwrap();
         assert_eq!(public_container.get_blobs().len(), 1);
 
-        home_container.delete_blob("sample.txt".to_string());
+        let _ = home_container.delete_blob("sample.txt".to_string());
         assert_eq!(home_container.get_blobs().len(), 0);
     }
 }
