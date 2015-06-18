@@ -17,6 +17,22 @@ libsodium is a native dependency for [sodiumxoide](https://github.com/dnaq/sodiu
 For windows, download and use the [prebuilt mingw library](https://download.libsodium.org/libsodium/releases/libsodium-1.0.2-mingw.tar.gz).
 Extract and place the libsodium.a file in "bin\x86_64-pc-windows-gnu" for 64bit System, or "bin\i686-pc-windows-gnu" for a 32bit system.
 
+###Build Instructions:
+Maidsafe-Client interfaces conditionally with either the actual routing crate or the Mock used for efficient local testing.
+
+To use it with the Mock (default) do:
+```
+cargo build
+cargo test
+etc
+```
+
+To interface it with actual routing, do:
+```
+cargo build features "USE_ACTUAL_ROUTING"
+cargo test features "USE_ACTUAL_ROUTING"
+etc
+```
 
 #Todo
 - [X] [MAID-1077](https://maidsafe.atlassian.net/browse/MAID-1077) Account Creation
