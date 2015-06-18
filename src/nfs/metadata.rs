@@ -21,6 +21,7 @@ use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::fmt;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+/// Metadata about a File or a Directory
 pub struct Metadata {
     name: String,
     size: u64,
@@ -30,6 +31,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    /// Create a new instance of Metadata
     pub fn new(name: String, user_metadata: Vec<u8>) -> Metadata {
         Metadata {
             name: name,
@@ -40,19 +42,25 @@ impl Metadata {
         }
     }
 
+    /// Get name associated with the structure (file or directory) that this metadata is a part
+    /// of
     pub fn get_name(&self) -> &String {
         &self.name
     }
 
     #[allow(dead_code)]
+    /// Set name associated with the structure (file or directory) that this metadata is a part
+    /// of
     pub fn set_name(&mut self, name: String) {
         self.name = name;
     }
 
+    /// User setteble metadata for custom metadata
     pub fn set_user_metadata(&mut self, user_metadata: Vec<u8>) {
         self.user_metadata = user_metadata;
     }
 
+    /// Get user setteble custom metadata
     pub fn get_user_metadata(&self) -> Option<&Vec<u8>> {
         if self.user_metadata.is_empty() {
             None
@@ -61,26 +69,30 @@ impl Metadata {
         }
     }
 
+    /// Get time of creation
     pub fn get_created_time(&self) -> time::Tm {
         self.created_time
     }
 
+    /// Get time of modification
     pub fn get_modified_time(&self) -> time::Tm {
         self.modified_time
     }
 
+    /// Set time of modification
     pub fn set_modified_time(&mut self, modified_time: time::Tm) {
         self.modified_time = modified_time
     }
 
+    /// Get size information
     pub fn get_size(&self) -> u64 {
         self.size
     }
 
+    /// Set size information
     pub fn set_size(&mut self, size: u64) {
         self.size = size;
     }
-
 }
 
 impl Encodable for Metadata {

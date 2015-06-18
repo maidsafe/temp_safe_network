@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                */
 
+#![allow(unsafe_code)]
+
 use cbor;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 
@@ -24,6 +26,9 @@ use maidsafe_types;
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
 
 #[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
+/// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
+/// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also his Root
+/// Directory ID if he has put data onto the network.
 pub struct Account {
     an_maid: maidsafe_types::RevocationIdType,
     maid: maidsafe_types::IdType,
@@ -38,6 +43,7 @@ pub struct Account {
 
 #[allow(dead_code)]
 impl Account {
+    /// Create a new Session Packet with Randomly generated Maid keys for the user
     pub fn new(root_dir_id: Option<routing::NameType>) -> Account {
         let an_maid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MaidTypeTags>();
         let maid = maidsafe_types::IdType::new(&an_maid);
@@ -58,30 +64,37 @@ impl Account {
         }
     }
 
+    /// Get user's AnMAID
     pub fn get_an_maid(&self) -> &maidsafe_types::RevocationIdType {
         &self.an_maid
     }
 
+    /// Get user's MAID
     pub fn get_maid(&self) -> &maidsafe_types::IdType {
         &self.maid
     }
 
+    /// Get user's Public-MAID
     pub fn get_public_maid(&self) -> &maidsafe_types::PublicIdType {
         &self.public_maid
     }
 
+    /// Get user's AnMPID
     pub fn get_an_mpid(&self) -> &maidsafe_types::RevocationIdType {
         &self.an_mpid
     }
 
+    /// Get user's MPID
     pub fn get_mpid(&self) -> &maidsafe_types::IdType {
         &self.mpid
     }
 
+    /// Get user's Public-MPID
     pub fn get_public_mpid(&self) -> &maidsafe_types::PublicIdType {
         &self.public_mpid
     }
 
+    /// Get user's root directory ID
     pub fn get_root_dir_id(&self) -> Option<&routing::NameType> {
         match self.root_dir_id {
             Some(ref dir_id) => Some(dir_id),
@@ -89,6 +102,7 @@ impl Account {
         }
     }
 
+    /// Set user's root directory ID
     pub fn set_root_dir_id(&mut self, root_dir_id: routing::NameType) -> bool {
         match self.root_dir_id {
             Some(_) => false,
@@ -99,6 +113,8 @@ impl Account {
         }
     }
 
+    /// Generate User's Identity for the network using supplied credentials in a deterministic way.
+    /// This is similary to the username in various places.
     pub fn generate_network_id(keyword: &String, pin: u32) -> routing::NameType {
         use crypto::digest::Digest;
 
@@ -124,6 +140,8 @@ impl Account {
         routing::NameType::new(name)
     }
 
+    /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
+    /// through PBKDF2 first
     pub fn encrypt(&self, password: &[u8], pin: u32) -> Result<Vec<u8>, ::MaidsafeError> {
         let serialised = try!(self.serialise());
 
@@ -161,6 +179,8 @@ impl Account {
         return Ok(encrypted);
     }
 
+    /// Symmetric decryption of Session Packet using User's credentials. Credentials are passed
+    /// through PBKDF2 first
     pub fn decrypt(encrypted: &[u8], password: &[u8], pin: u32) -> Result<Account, ::MaidsafeError> {
         let mut decrypted : Vec<u8> = Vec::new();
         {

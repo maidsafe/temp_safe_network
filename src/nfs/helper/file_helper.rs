@@ -14,9 +14,9 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use time;
 use nfs;
-use nfs::helper::directory_helper::DirectoryHelper;
 use routing;
 use client;
 use self_encryption;
@@ -38,9 +38,9 @@ impl FileHelper {
     /// A writer object is returned, through which the data for the file can be written to the network
     /// The file is actually saved in the directory listing only after `writer.close()` is invoked
     pub fn create(&mut self,
-        name: String,
-        user_metatdata: Vec<u8>,
-        directory: &nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
+                  name: String,
+                  user_metatdata: Vec<u8>,
+                  directory: &nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
         match self.file_exists(directory, &name) {
             Some(_) => Err("File already exists".to_string()),
             None => {
@@ -54,8 +54,8 @@ impl FileHelper {
     /// A writer object is returned, through which the data for the file can be written to the network
     /// The file is actually saved in the directory listing only after `writer.close()` is invoked
     pub fn update(&mut self,
-        file: &nfs::file::File,
-        directory: &nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
+                  file: &nfs::file::File,
+                  directory: &nfs::directory_listing::DirectoryListing) -> Result<nfs::io::Writer, String> {
         match self.file_exists(directory, file.get_name()) {
             Some(_) => Ok(nfs::io::Writer::new(directory.clone(), file.clone(), self.client.clone())),
             None => Err("File not present in the directory".to_string())
@@ -64,9 +64,9 @@ impl FileHelper {
 
     /// Updates the file metadata. Returns the updated DirectoryListing
     pub fn update_metadata(&mut self,
-        file: &mut nfs::file::File,
-        directory: &mut nfs::directory_listing::DirectoryListing,
-        user_metadata: &Vec<u8>) -> Result<(), String> {
+                           file: &mut nfs::file::File,
+                           directory: &mut nfs::directory_listing::DirectoryListing,
+                           user_metadata: &Vec<u8>) -> Result<(), String> {
         match self.file_exists(directory, file.get_name()) {
             Some(_) => {
                 file.get_mut_metadata().set_user_metadata(user_metadata.clone());
@@ -83,10 +83,10 @@ impl FileHelper {
 
     /// Return the versions of a directory containing modified versions of a file
     pub fn get_versions(&mut self,
-        directory_id: &routing::NameType,
-        file: &nfs::file::File) -> Result<Vec<routing::NameType>, String> {
+                        directory_id: &routing::NameType,
+                        file: &nfs::file::File) -> Result<Vec<routing::NameType>, String> {
         let mut versions = Vec::<routing::NameType>::new();
-        let mut directory_helper = DirectoryHelper::new(self.client.clone());
+        let mut directory_helper = nfs::helper::DirectoryHelper::new(self.client.clone());
 
         match directory_helper.get_versions(directory_id) {
             Ok(sdv_versions) => {
@@ -118,7 +118,9 @@ impl FileHelper {
     //     nfs::io::Reader::new(file, self.client.clone())
     // }
 
-    fn file_exists(&self, directory: &nfs::directory_listing::DirectoryListing, file_name: &String) -> Option<String> {
+    fn file_exists(&self,
+                   directory: &nfs::directory_listing::DirectoryListing,
+                   file_name: &String) -> Option<String> {
         let result = directory.get_files().iter().find(|file| {
                 *file.get_name() == *file_name
             });
@@ -132,8 +134,8 @@ impl FileHelper {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use nfs;
+    use super::*;
     use ::std::ops::Index;
 
     fn get_dummy_client() -> ::client::Client {

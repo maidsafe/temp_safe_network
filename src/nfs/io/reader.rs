@@ -14,6 +14,7 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use nfs;
 use std::sync;
 use super::network_storage::NetworkStorage;
@@ -21,6 +22,8 @@ use self_encryption;
 use client;
 
 #[allow(dead_code)]
+/// Reader is used to read contents of a File. It can read in chunks if the file happens to be very
+/// large
 pub struct Reader {
     file: nfs::file::File,
     self_encryptor: self_encryption::SelfEncryptor<NetworkStorage>,
@@ -28,9 +31,9 @@ pub struct Reader {
 }
 
 impl Reader {
-
+    /// Create a new instance of Reader
     pub fn new(file: nfs::file::File,
-        client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> Reader {
+               client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> Reader {
         let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
         Reader {
             file: file.clone(),
@@ -51,5 +54,4 @@ impl Reader {
         }
         Ok(self.self_encryptor.read(position, length))
     }
-
 }
