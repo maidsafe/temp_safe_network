@@ -14,20 +14,23 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use nfs;
 use time;
 
 #[allow(dead_code)]
+/// Blob represents a File - Music, Video, Text etc
 pub struct Blob {
     file: nfs::file::File,
 }
 
 impl Blob {
-
+    /// Get the name of the Blob
     pub fn get_name(&self) -> &String {
         self.file.get_metadata().get_name()
     }
 
+    /// Get the user settable Metadata of the Blob
     pub fn get_metadata(&self) -> Option<String> {
         match self.file.get_metadata().get_user_metadata() {
             Some(data) => {
@@ -40,42 +43,48 @@ impl Blob {
         }
     }
 
+    /// Get the creation time for Blob
     pub fn get_created_time(&self) -> time::Tm {
         self.file.get_metadata().get_created_time()
     }
 
+    /// Get the last modified time for the Blob
     pub fn get_modified_time(&self) -> time::Tm {
         self.file.get_metadata().get_modified_time()
     }
 
+    /// Get the Blob size in bytes
     pub fn get_size(&self) -> u64 {
         self.file.get_metadata().get_size()
     }
 
+    /// Convert the Blob to the format acceptable to the lower level Api's
     pub fn convert_to_file(&self) -> &nfs::file::File {
         &self.file
     }
 
+    /// Convert the Blob to the format acceptable to the lower level Api's
+    /// This can also be modified on the fly as the return is a mutable value
     pub fn convert_to_mut_file(&mut self) -> &mut nfs::file::File {
         &mut self.file
     }
 
+    /// Convert the format acceptable to the lower level Api's into a Blob for more restful
+    /// interface
     pub fn convert_from_file(file: nfs::file::File) -> Blob {
         Blob {
             file: file
         }
     }
-
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::thread::sleep_ms;
     use nfs::file::File;
+    use std::thread::sleep_ms;
     use nfs::metadata::Metadata;
     use self_encryption::datamap::DataMap;
-
 
     #[test]
     fn create() {

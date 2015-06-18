@@ -20,6 +20,7 @@ use routing;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
+/// Contains Information pertaining to a Directory
 pub struct DirectoryInfo {
     id: routing::NameType,
     // parent_dir_id: routing::NameType,
@@ -27,6 +28,7 @@ pub struct DirectoryInfo {
 }
 
 impl DirectoryInfo {
+    /// Create a new DirectoryInfo
     pub fn new(metadata: Metadata) -> DirectoryInfo {
         DirectoryInfo {
             id: routing::test_utils::Random::generate_random(),
@@ -35,18 +37,24 @@ impl DirectoryInfo {
         }
     }
 
+    /// Get the unique ID representing this directory in the network
     pub fn get_id(&self) -> &routing::NameType {
         &self.id
     }
 
+    #[allow(dead_code)]
+    /// Get the metadata of this directory. Since return value is mutable it can also be used to
+    /// update the metadata
     pub fn get_mut_metadata(&mut self) -> &mut Metadata {
         &mut self.metadata
     }
 
+    /// Get the metadata of this directory
     pub fn get_metadata(&self) -> &Metadata {
         &self.metadata
     }
 
+    /// Get the name of this directory
     pub fn get_name(&self) -> &String {
         self.metadata.get_name()
     }
@@ -54,7 +62,6 @@ impl DirectoryInfo {
     // pub fn get_parent_dir_id(&self) -> &routing::NameType {
     //     &self.parent_dir_id
     // }
-
 }
 
 impl fmt::Debug for DirectoryInfo {
@@ -68,7 +75,6 @@ impl fmt::Display for DirectoryInfo {
         write!(f, "metadata: {}, id: {}", *self.get_metadata(), *self.get_id())
     }
 }
-
 
 #[cfg(test)]
 mod test {

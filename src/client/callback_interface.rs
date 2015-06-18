@@ -20,8 +20,10 @@ use lru_time_cache;
 
 use routing::error::ResponseError;
 
+/// CallbackInterface is the concrete type that the routing layer will use to notify of network
+/// responses. It is nonblocking in nature.
 pub struct CallbackInterface {
-    response_notifier: ::ResponseNotifier,
+    response_notifier: ::client::misc::ResponseNotifier,
     message_queue:     lru_time_cache::LruCache<routing::types::MessageId, Result<Vec<u8>, ResponseError>>,
     cache:             lru_time_cache::LruCache<routing::NameType, Vec<u8>>,
 }
@@ -73,7 +75,8 @@ impl routing::client_interface::Interface for CallbackInterface {
 }
 
 impl CallbackInterface {
-    pub fn new(notifier: ::ResponseNotifier) -> CallbackInterface {
+    /// Create a new instance of CallbackInterface
+    pub fn new(notifier: ::client::misc::ResponseNotifier) -> CallbackInterface {
         CallbackInterface {
             response_notifier: notifier,
             message_queue:     lru_time_cache::LruCache::with_capacity(10000),
@@ -81,19 +84,23 @@ impl CallbackInterface {
         }
     }
 
+    /// Check if data is already in local cache
     pub fn cache_check(&mut self, name: &routing::NameType) -> bool {
         self.cache.check(name)
     }
 
+    /// Get data if already in local cache.
     pub fn cache_get(&mut self, name: &routing::NameType)
             -> Option<Result<Vec<u8>, ResponseError>> {
         Some(Ok(self.cache.get(name).unwrap().clone()))
     }
 
+    /// Put data into local cache
     pub fn cache_insert(&mut self, name: routing::NameType, data: Vec<u8>) {
         self.cache.insert(name, data);
     }
 
+    /// Get data from cache filled by the response from routing
     pub fn get_response(&mut self, message_id: routing::types::MessageId)
             -> Option<Result<Vec<u8>, ResponseError>> {
         self.message_queue.remove(&message_id)

@@ -22,6 +22,7 @@ use routing;
 use std::fmt;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
+/// DirectoryListing is the representation of a deserialised Directory in the network
 pub struct DirectoryListing {
     info: DirectoryInfo,
     sub_directories: Vec<DirectoryInfo>,
@@ -29,6 +30,7 @@ pub struct DirectoryListing {
 }
 
 impl DirectoryListing {
+    /// Create a new DirectoryListing
     pub fn new(name: String, user_metadata: Vec<u8>) -> DirectoryListing {
         DirectoryListing {
             info: DirectoryInfo::new(Metadata::new(name, user_metadata)),
@@ -37,14 +39,18 @@ impl DirectoryListing {
         }
     }
 
+    /// Get DirectoryInfo
     pub fn get_info(&self) -> &DirectoryInfo {
         &self.info
     }
 
+    #[allow(dead_code)]
+    /// Get Directory metadata in mutable format so that it can also be updated
     pub fn get_mut_metadata(&mut self) -> &mut Metadata {
         self.info.get_mut_metadata()
     }
 
+    /// Get Directory metadata
     pub fn get_metadata(&self) -> &Metadata {
         self.info.get_metadata()
     }
@@ -53,6 +59,7 @@ impl DirectoryListing {
     //     self.info.get_parent_dir_id()
     // }
 
+    /// If file is present in the DirectoryListing then replace it else insert it
     pub fn upsert_file(&mut self, file: File) {
         match self.files.iter().position(|entry| entry.get_name() == file.get_name()) {
             Some(pos) => *self.files.get_mut(pos).unwrap() = file,
@@ -60,26 +67,30 @@ impl DirectoryListing {
         }
     }
 
+    /// Get all files in this DirectoryListing
     pub fn get_files(&self) -> &Vec<File> {
         &self.files
     }
 
+    /// Get all files in this DirectoryListing with mutability to update the listing of files
     pub fn get_mut_files(&mut self) -> &mut Vec<File> {
         &mut self.files
     }
 
+    /// Get all subdirectories in this DirectoryListing
     pub fn get_sub_directories(&self) -> &Vec<DirectoryInfo> {
         &self.sub_directories
     }
 
+    /// Get all subdirectories in this DirectoryListing with mutability to update the listing of subdirectories
     pub fn get_mut_sub_directories(&mut self) -> &mut Vec<DirectoryInfo> {
         &mut self.sub_directories
     }
 
+    /// Get the unique ID that represents this DirectoryListing in the network
     pub fn get_id(&self) -> &routing::NameType {
         self.info.get_id()
     }
-
 }
 
 impl fmt::Debug for DirectoryListing {
@@ -93,7 +104,6 @@ impl fmt::Display for DirectoryListing {
         write!(f, "id: {}, metadata: {}", *self.info.get_id(), *self.info.get_metadata())
     }
 }
-
 
 #[cfg(test)]
 mod test {

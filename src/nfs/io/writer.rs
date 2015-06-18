@@ -14,12 +14,15 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use nfs;
 use std::sync;
 use super::network_storage::NetworkStorage;
 use self_encryption;
 use client;
 
+/// Writer is used to write contents to a File and especially in chunks if the file happens to be
+/// too large
 pub struct Writer {
     file: nfs::file::File,
     directory: nfs::directory_listing::DirectoryListing,
@@ -28,7 +31,6 @@ pub struct Writer {
 }
 
 impl Writer {
-
     /// Create new instance of Writer
     pub fn new(directory: nfs::directory_listing::DirectoryListing, file: nfs::file::File,
         client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> Writer {
@@ -66,5 +68,4 @@ impl Writer {
             Err(_) => Err("Failed to save".to_string())
         }
     }
-
 }

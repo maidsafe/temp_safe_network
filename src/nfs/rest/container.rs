@@ -14,6 +14,7 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use nfs;
 use routing;
 use time;
@@ -27,7 +28,6 @@ pub struct Container {
 }
 
 impl Container {
-
     /// Authorises the directory access and returns the Container, if authorisation is successful.
     /// Operations can be performed only after the authorisation is successful.
     pub fn authorise(client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, dir_id: Option<[u8;64]>) -> Result<Container, String> {
@@ -56,6 +56,7 @@ impl Container {
                  }
             }
         };
+
         if directory_id == fake_id {
             Err("Directory initialisation failed".to_string())
         } else {
@@ -106,7 +107,6 @@ impl Container {
             Err(err) => Err(err),
         }
     }
-
 
     /// Returns the Created time of the container
     pub fn get_created_time(&self) -> time::Tm {
@@ -406,16 +406,14 @@ impl Container {
             Err(msg) => Err(msg)
         }
     }
-
 }
-
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use ::client::Client;
     use ::std::sync::Arc;
     use ::std::sync::Mutex;
-    use ::client::Client;
 
     fn test_client() -> Client {
         let keyword = ::utility::generate_random_string(10);
@@ -445,7 +443,7 @@ mod test {
     #[test]
     fn delete_container() {
         let client = Arc::new(Mutex::new(test_client()));
-        let mut container = Container::authorise(client.clone(), None).unwrap();
+        let mut container = Container::authorise(client, None).unwrap();
         container.create("Home".to_string()).unwrap();
 
         assert_eq!(container.get_containers().len(), 1);
@@ -456,7 +454,6 @@ mod test {
         assert_eq!(container.get_containers().len(), 0);
         assert_eq!(container.get_versions().unwrap().len(), 3);
     }
-
 
     #[test]
     fn create_update_delete_blob() {

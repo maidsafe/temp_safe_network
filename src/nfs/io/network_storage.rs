@@ -14,6 +14,7 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use self_encryption;
 use maidsafe_types;
 use client;
@@ -21,6 +22,8 @@ use routing;
 use routing::sendable::Sendable;
 use maidsafe_types::TypeTag;
 
+/// Network storage is the concrete type which self-encryption crate will use to put or get data
+/// from the network
 pub struct NetworkStorage {
     client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>
 }
@@ -34,9 +37,7 @@ impl NetworkStorage {
     }
 }
 
-
 impl self_encryption::Storage for NetworkStorage {
-
     fn get(&self, name: Vec<u8>) -> Vec<u8> {
         let mut name_id = [0u8;64];
         assert_eq!(name.len(), 64);
@@ -45,7 +46,7 @@ impl self_encryption::Storage for NetworkStorage {
         }
         let client_mutex = self.client.clone();
         let mut client = client_mutex.lock().unwrap();
-        let immutable_data_type_id: maidsafe_types::data::ImmutableDataTypeTag = unsafe { ::std::mem::uninitialized() };
+        let immutable_data_type_id = maidsafe_types::data::ImmutableDataTypeTag;
         let get_result = client.get(immutable_data_type_id.type_tag(), routing::NameType(name_id));
         if get_result.is_err() {
             return Vec::new();
@@ -66,5 +67,4 @@ impl self_encryption::Storage for NetworkStorage {
             let _ = put_result.ok().unwrap().get();
         }
     }
-
 }

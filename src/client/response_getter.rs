@@ -15,15 +15,18 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+/// ResponseGetter is a lazy evaluated response getter. It will fetch either from local cache or
+/// wait for the CallbackInterface to notify it of the incoming response from the network.
 pub struct ResponseGetter {
-    response_notifier:  ::ResponseNotifier,
+    response_notifier:  ::client::misc::ResponseNotifier,
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
     message_id:         Option<::routing::types::MessageId>,
     name:               Option<::routing::NameType>,
 }
 
 impl ResponseGetter {
-    pub fn new(notifier: ::ResponseNotifier,
+    /// Create a new instance of ResponseGetter
+    pub fn new(notifier: ::client::misc::ResponseNotifier,
                cb_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
                msg_id: Option<::routing::types::MessageId>,
                name: Option<::routing::NameType>) -> ResponseGetter {
@@ -35,6 +38,8 @@ impl ResponseGetter {
         }
     }
 
+    /// Get either from local cache or (if not available there) get it when it comes from the
+    /// network as informed by CallbackInterface. This is blocking.
     pub fn get(&mut self) -> Result<Vec<u8>, ::routing::error::ResponseError> {
         let &(ref lock, ref condition_var) = &*self.response_notifier;
         let mut mutex_guard: _;

@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+#![allow(unsafe_code)]
+
 use routing;
 use maidsafe_types::TypeTag;
 use routing::sendable::Sendable;
@@ -45,6 +47,8 @@ fn get_storage() -> DataStore {
     }
 }
 
+/// RoutingClient Mock mimics routing interface to store data locally for testing instead of actual
+/// networking with vaults etc.
 pub struct RoutingClientMock {
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
     msg_id: routing::types::MessageId,
@@ -52,6 +56,7 @@ pub struct RoutingClientMock {
 }
 
 impl RoutingClientMock {
+    /// Create a new instance of RoutingClientMock
     pub fn new(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
                _: routing::types::Id) -> RoutingClientMock {
         RoutingClientMock {
@@ -61,6 +66,7 @@ impl RoutingClientMock {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_network_delay_for_delay_simulation(&mut self, delay_ms: u32) {
         self.network_delay_ms = delay_ms;
     }
@@ -83,7 +89,7 @@ impl RoutingClientMock {
         Ok(self.msg_id)
     }
 
-    pub fn put<T>(&mut self, sendable: T) -> Result<routing::types::MessageId, ::IoError> where T: routing::sendable::Sendable {
+    pub fn put<T>(&mut self, sendable: T) -> Result<routing::types::MessageId, ::IoError> where T: Sendable {
         self.msg_id += 1;
         let msg_id = self.msg_id;
         let delay_ms = self.network_delay_ms;

@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+#![allow(unsafe_code, unused)]
+
 use cbor;
 use rand::Rng;
 use crypto::buffer::ReadBuffer;
@@ -45,19 +47,29 @@ fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<call
     ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(cb_interface, id_packet)))
 }
 
+mod misc {
+    pub type ResponseNotifier = ::std::sync::Arc<(::std::sync::Mutex<::routing::types::MessageId>, ::std::sync::Condvar)>;
+}
 
+/// The main self-authentication client instance that will interface all the request from high
+/// level API's to the actual routing layer and manage all interactions with it. This is
+/// essentially a non-blocking Client with upper layers having an option to either block and wait
+/// on the returned ResponseGetter for receiving network response or spawn a new thread. The Client
+/// itself is however well equipped for parallel and non-blocking PUTs and GETS.
 pub struct Client {
     account:             user_account::Account,
     session_packet_id:   ::routing::NameType,
     session_packet_keys: SessionPacketEncryptionKeys,
     routing:             RoutingClient,
-    response_notifier:   ::ResponseNotifier,
+    response_notifier:   misc::ResponseNotifier,
     callback_interface:  ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
     routing_stop_flag:   ::std::sync::Arc<::std::sync::Mutex<bool>>,
     routing_join_handle: Option<::std::thread::JoinHandle<()>>,
 }
 
 impl Client {
+    /// This is one of the two Gateway functions to the Maidsafe network, the other being the
+    /// log_in. This will help create a fresh account for the user in the SAFE-network.
     pub fn create_account(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::IoError> {
         let password = password_str.as_bytes();
 
@@ -125,6 +137,9 @@ impl Client {
         }
     }
 
+    /// This is one of the two Gateway functions to the Maidsafe network, the other being the
+    /// create_account. This will help log into an already created account for the user in the
+    /// SAFE-network.
     pub fn log_in(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::IoError> {
         let password = password_str.as_bytes();
 
@@ -233,6 +248,10 @@ impl Client {
         }
     }
 
+    /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
+    /// store it. It will be retireved when the user logs into his account. Root directory ID is
+    /// necessary to fetch all of user's data as all further data is encoded as meta-information
+    /// into the Root Directory or one of its subdirectories.
     pub fn set_root_directory_id(&mut self, root_dir_id: routing::NameType) -> Result<(), ::IoError> {
         if self.account.set_root_dir_id(root_dir_id.clone()) {
             let encrypted_account = maidsafe_types::ImmutableData::new(self.account.encrypt(self.session_packet_keys.get_password(), self.session_packet_keys.get_pin()).ok().unwrap());
@@ -288,10 +307,15 @@ impl Client {
         }
     }
 
+    /// Get Root Directory ID if available in session packet used for current login
     pub fn get_root_directory_id(&self) -> Option<&routing::NameType> {
         self.account.get_root_dir_id()
     }
 
+    /// Combined Asymmectric and Symmetric encryption. The data is encrypted using random Key and
+    /// IV with AES-symmetric encryption. Random IV ensures that same plain text produces different
+    /// cipher-texts for each fresh symmetric encryption. The Key and IV are then asymmetrically
+    /// enrypted using Public-MAID and the whole thing is then serialised into a single Vec<u8>.
     pub fn hybrid_encrypt(&self,
                           data_to_encrypt: &[u8],
                           nonce_opt: Option<::sodiumoxide::crypto::asymmetricbox::Nonce>) -> Result<Vec<u8>, ::crypto::symmetriccipher::SymmetricCipherError> {
@@ -353,6 +377,7 @@ impl Client {
         Ok(encoder.into_bytes())
     }
 
+    /// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
     pub fn hybrid_decrypt(&self,
                           data_to_decrypt: &[u8],
                           nonce_opt: Option<::sodiumoxide::crypto::asymmetricbox::Nonce>) -> Option<Vec<u8>> {
@@ -417,10 +442,12 @@ impl Client {
         }
     }
 
+    /// Owner of this client is the name of Public-MAID
     pub fn get_owner(&self) -> routing::NameType {
         self.account.get_public_maid().name()
     }
 
+    /// Put data onto the network. This is non-blocking.
     pub fn put<T>(&mut self, sendable: T) -> Result<response_getter::ResponseGetter, ::IoError> where T: Sendable {
         match self.routing.lock().unwrap().put(sendable) {
             Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
@@ -428,6 +455,10 @@ impl Client {
         }
     }
 
+    /// Get data from the network. This is non-blocking. Additionally this incorporates a mechanism
+    /// of local caching. So if data already exists in the local cache, it is immediately returned
+    /// via ResponseGetter and no networking penatly is payed. The functionality is abstracted to
+    /// the user and is baked entirely into ResponseGetter.
     pub fn get(&mut self, tag_id: u64, name: routing::NameType) -> Result<response_getter::ResponseGetter, ::IoError> {
         let immutable_data_tag = maidsafe_types::data::ImmutableDataTypeTag;
         if tag_id == immutable_data_tag.type_tag() {

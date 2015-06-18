@@ -14,19 +14,23 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use nfs;
 use time;
 
+/// Wrapper over DirectoryInfo to present Rest-friendly name to the Restful interface users
 pub struct ContainerInfo {
     info: nfs::directory_info::DirectoryInfo,
 }
 
 impl ContainerInfo {
-
+    /// Get Container ID. This is the directory ID which is unique for every directory and is the
+    /// only way to retrieve that directory (DirectoryListing) from the network
     pub fn get_id(&self) -> [u8;64] {
         self.info.get_id().0
     }
 
+    /// Get the name of the Container
     pub fn get_name(&self) -> &String {
         self.info.get_metadata().get_name()
     }
@@ -39,22 +43,25 @@ impl ContainerInfo {
     //     }
     // }
 
+    /// Get the creation time for this Container
     pub fn get_created_time(&self) -> time::Tm {
         self.info.get_metadata().get_created_time()
     }
 
+    /// Convert the ContainerInfo to the format of DirectoryInfo that lower levels understand and
+    /// operate on
     pub fn convert_to_directory_info(&self) -> nfs::directory_info::DirectoryInfo {
         self.info.clone()
     }
 
+    /// Convert from the format of DirectoryInfo that the lower levels understand to the rest
+    /// friendly ContainerInfo
     pub fn convert_from_directory_info(info: nfs::directory_info::DirectoryInfo) -> ContainerInfo {
         ContainerInfo {
             info: info
         }
     }
-
 }
-
 
 #[cfg(test)]
 mod test {
@@ -64,20 +71,20 @@ mod test {
 
     #[test]
     fn create() {
-        let name = "directory".to_string();
+        let name = ::utility::generate_random_string(10);
         let metadata = Metadata::new(name.clone(), Vec::new());
         let container_info = ContainerInfo{ info: DirectoryInfo::new(metadata) };
 
-        assert_eq!(container_info.get_name(), &name.clone());
+        assert_eq!(*container_info.get_name(), name);
     }
 
     #[test]
     fn convert_from() {
-        let name = "directory".to_string();
+        let name = ::utility::generate_random_string(10);
         let metadata = Metadata::new(name.clone(), Vec::new());
         let directory_info = DirectoryInfo::new(metadata);
 
-        assert_eq!(directory_info.get_name(), &name.clone());
+        assert_eq!(*directory_info.get_name(), name);
 
         let container_info = ContainerInfo::convert_from_directory_info(directory_info.clone());
 
@@ -87,11 +94,11 @@ mod test {
 
     #[test]
     fn convert_to() {
-        let name = "directory".to_string();
+        let name = ::utility::generate_random_string(10);
         let metadata = Metadata::new(name.clone(), Vec::new());
         let container_info = ContainerInfo{ info: DirectoryInfo::new(metadata) };
 
-        assert_eq!(container_info.get_name(), &name.clone());
+        assert_eq!(*container_info.get_name(), name);
 
         let directory_info = container_info.convert_to_directory_info();
 

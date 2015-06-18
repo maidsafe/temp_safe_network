@@ -23,5 +23,7 @@ mod directory_info;
 mod directory_listing;
 mod utils;
 
+/// Module for Restful interfaces for storage
 pub mod rest;
+/// Module for input/output to network/file
 pub mod io;

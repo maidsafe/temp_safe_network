@@ -14,16 +14,19 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use cbor;
 use rustc_serialize::{Decodable, Encodable};
 
 #[allow(unused_must_use)]
+/// utility function to serialise an Encodable type
 pub fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
     let mut e = cbor::Encoder::from_memory();
     e.encode(&[data]);
     e.into_bytes()
 }
 
+/// utility function to deserialise a Decodable type
 pub fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
     let mut d = cbor::Decoder::from_bytes(data);
     d.decode().next().unwrap().unwrap()
