@@ -1,5 +1,8 @@
 # maidsafe_client
 
+[![](https://img.shields.io/badge/Project%20SAFE-Approved-green.svg)](http://maidsafe.net/applications) [![](https://img.shields.io/badge/License-GPL3-green.svg)](https://github.com/maidsafe/crust/blob/master/COPYING)
+
+
 **Primary Maintainer:**     Spandan Sharma (spandan.sharma@maidsafe.net)
 
 **Secondary Maintainer:**   Krishna Kumar (krishna.kumar@maidsafe.net)
@@ -8,7 +11,7 @@
 |:------:|:-------:|:-------:|:-------:|:-------:|
 |[![](http://meritbadge.herokuapp.com/maidsafe_client)](https://crates.io/crates/maidsafe_client)|[![Build Status](https://travis-ci.org/maidsafe/maidsafe_client.svg?branch=master)](https://travis-ci.org/maidsafe/maidsafe_client)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=maidsafe_client_win64_status_badge)](http://ci.maidsafe.net:8080/job/maidsafe_client_win64_status_badge/)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=maidsafe_client_osx_status_badge)](http://ci.maidsafe.net:8080/job/maidsafe_client_osx_status_badge/)|[![Coverage Status](https://coveralls.io/repos/maidsafe/maidsafe_client/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/maidsafe_client?branch=master)|
 
-| [API Documentation](http://maidsafe.github.io/maidsafe_client/)| [SAFENetwork System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe website](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
+| [API Documentation - Master branch](http://maidsafe.github.io/maidsafe_client/)| [SAFENetwork System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe website](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 
 
 ###Pre-requisite:
@@ -29,8 +32,8 @@ etc
 
 To interface it with actual routing, do:
 ```
-cargo build features "USE_ACTUAL_ROUTING"
-cargo test features "USE_ACTUAL_ROUTING"
+cargo build --features "USE_ACTUAL_ROUTING"
+cargo test --features "USE_ACTUAL_ROUTING"
 etc
 ```
 
