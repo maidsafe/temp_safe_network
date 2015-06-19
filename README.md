@@ -1,5 +1,8 @@
 # maidsafe_client
 
+[![](https://img.shields.io/badge/Project%20SAFE-Approved-green.svg)](http://maidsafe.net/applications) [![](https://img.shields.io/badge/License-GPL3-green.svg)](https://github.com/maidsafe/crust/blob/master/COPYING)
+
+
 **Primary Maintainer:**     Spandan Sharma (spandan.sharma@maidsafe.net)
 
 **Secondary Maintainer:**   Krishna Kumar (krishna.kumar@maidsafe.net)
@@ -29,8 +32,8 @@ etc
 
 To interface it with actual routing, do:
 ```
-cargo build features "USE_ACTUAL_ROUTING"
-cargo test features "USE_ACTUAL_ROUTING"
+cargo build --features "USE_ACTUAL_ROUTING"
+cargo test --features "USE_ACTUAL_ROUTING"
 etc
 ```
 
