@@ -147,6 +147,21 @@ impl RoutingClientMock {
         // let data_store = get_storage();
         // println!("Amount Of Chunks Stored: {:?}", data_store.lock().unwrap().len());
     }
+
+    pub fn bootstrap(&mut self,
+                     endpoints: Option<Vec<::routing::routing_client::Endpoint>>,
+                     _: Option<u16>) -> Result<(), routing::error::RoutingError> {
+        match endpoints {
+            Some(vec_endpoints) => {
+                for endpoint in vec_endpoints {
+                    println!("Endpoint: {:?}", endpoint);
+                }
+
+                Ok(())
+            },
+            None => Ok(()),
+        }
+    }
 }
 
 #[cfg(test)]

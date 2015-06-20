@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(unsafe_code, unused)]
+#![allow(unsafe_code)]
 
 use cbor;
 use rand::Rng;
@@ -93,6 +93,7 @@ impl Client {
             response_notifier: notifier,
             routing_stop_flag: routing_stop_flag,
             routing_join_handle: Some(::std::thread::spawn(move || {
+                let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
                 while !*routing_stop_flag_clone.lock().unwrap() {
                     ::std::thread::sleep_ms(10);
                     cloned_routing_client.lock().unwrap().run();
@@ -103,7 +104,7 @@ impl Client {
         {
             let destination = client.account.get_public_maid().name();
             let boxed_public_maid = Box::new(client.account.get_public_maid().clone());
-            client.routing.lock().unwrap().unauthorised_put(destination, boxed_public_maid);
+            let _ = client.routing.lock().unwrap().unauthorised_put(destination, boxed_public_maid);
         }
 
         let encrypted_account = maidsafe_types::ImmutableData::new(client.account.encrypt(password, pin).ok().unwrap());
@@ -170,6 +171,7 @@ impl Client {
         let _managed_thread = RAIIThreadExit {
             routing_stop_flag: fake_routing_stop_flag,
             join_handle: Some(::std::thread::spawn(move || {
+                let _ = cloned_fake_routing_client.lock().unwrap().bootstrap(None, None);
                 while !*fake_routing_stop_flag_clone.lock().unwrap() {
                     ::std::thread::sleep_ms(10);
                     cloned_fake_routing_client.lock().unwrap().run();
@@ -223,6 +225,7 @@ impl Client {
                                                     response_notifier: notifier,
                                                     routing_stop_flag: routing_stop_flag,
                                                     routing_join_handle: Some(::std::thread::spawn(move || {
+                                                        let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
                                                         while !*routing_stop_flag_clone.lock().unwrap() {
                                                             ::std::thread::sleep_ms(10);
                                                             cloned_routing_client.lock().unwrap().run();
