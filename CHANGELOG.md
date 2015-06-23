@@ -1,5 +1,5 @@
 maidsafe_client Change Log :
-
+[0.1.0] - Finish Rust-2
 - Account Creation
     - Register
     - Login
