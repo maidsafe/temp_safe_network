@@ -1,6 +1,6 @@
 ## maidsafe_client Change Log :
 
-### [0.1] RUST-2 sprint
+### [0.1.0] RUST-2 sprint
 - Account Creation
     - Register
     - Login
