@@ -194,12 +194,12 @@ impl DirectoryHelper {
         }
     }
 
-    fn get_nonce(&self, id: &routing::NameType) -> Option<::sodiumoxide::crypto::asymmetricbox::Nonce> {
+    fn get_nonce(&self, id: &routing::NameType) -> Option<::sodiumoxide::crypto::box_::Nonce> {
         let mut nonce = [0u8;24];
         for i in 0..24 {
             nonce[i] = id.0[i * 2]
         }
-        Some(::sodiumoxide::crypto::asymmetricbox::Nonce(nonce))
+        Some(::sodiumoxide::crypto::box_::Nonce(nonce))
     }
 }
 

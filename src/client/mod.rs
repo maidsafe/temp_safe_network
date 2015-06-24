@@ -321,13 +321,13 @@ impl Client {
     /// enrypted using Public-MAID and the whole thing is then serialised into a single Vec<u8>.
     pub fn hybrid_encrypt(&self,
                           data_to_encrypt: &[u8],
-                          nonce_opt: Option<::sodiumoxide::crypto::asymmetricbox::Nonce>) -> Result<Vec<u8>, ::crypto::symmetriccipher::SymmetricCipherError> {
+                          nonce_opt: Option<::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::crypto::symmetriccipher::SymmetricCipherError> {
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
             None => {
                 let digest = ::sodiumoxide::crypto::hash::sha256::hash(&self.account.get_public_maid().name().0);
-                let mut nonce = ::sodiumoxide::crypto::asymmetricbox::Nonce([0u8; ::sodiumoxide::crypto::asymmetricbox::NONCEBYTES]);
-                let min_length = ::std::cmp::min(::sodiumoxide::crypto::asymmetricbox::NONCEBYTES, digest.0.len());
+                let mut nonce = ::sodiumoxide::crypto::box_::Nonce([0u8; ::sodiumoxide::crypto::box_::NONCEBYTES]);
+                let min_length = ::std::cmp::min(::sodiumoxide::crypto::box_::NONCEBYTES, digest.0.len());
                 for it in digest.0.iter().take(min_length).enumerate() {
                     nonce.0[it.0] = *it.1;
                 }
@@ -369,7 +369,7 @@ impl Client {
             }
         }
 
-        let asymm_encryption_result = ::sodiumoxide::crypto::asymmetricbox::seal(&combined_key_iv,
+        let asymm_encryption_result = ::sodiumoxide::crypto::box_::seal(&combined_key_iv,
                                                                                  &nonce,
                                                                                  &self.account.get_public_maid().public_keys().1,
                                                                                  &self.account.get_maid().secret_keys().1);
@@ -383,7 +383,7 @@ impl Client {
     /// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
     pub fn hybrid_decrypt(&self,
                           data_to_decrypt: &[u8],
-                          nonce_opt: Option<::sodiumoxide::crypto::asymmetricbox::Nonce>) -> Option<Vec<u8>> {
+                          nonce_opt: Option<::sodiumoxide::crypto::box_::Nonce>) -> Option<Vec<u8>> {
         let mut decoder = ::cbor::Decoder::from_bytes(data_to_decrypt);
         let (asymm_encryption_result, symm_encryption_result): (Vec<u8>, Vec<u8>) = decoder.decode().next().unwrap().unwrap();
 
@@ -391,8 +391,8 @@ impl Client {
             Some(nonce) => nonce,
             None => {
                 let digest = ::sodiumoxide::crypto::hash::sha256::hash(&self.account.get_public_maid().name().0);
-                let mut nonce = ::sodiumoxide::crypto::asymmetricbox::Nonce([0u8; ::sodiumoxide::crypto::asymmetricbox::NONCEBYTES]);
-                let min_length = ::std::cmp::min(::sodiumoxide::crypto::asymmetricbox::NONCEBYTES, digest.0.len());
+                let mut nonce = ::sodiumoxide::crypto::box_::Nonce([0u8; ::sodiumoxide::crypto::box_::NONCEBYTES]);
+                let min_length = ::std::cmp::min(::sodiumoxide::crypto::box_::NONCEBYTES, digest.0.len());
                 for it in digest.0.iter().take(min_length).enumerate() {
                     nonce.0[it.0] = *it.1;
                 }
@@ -400,7 +400,7 @@ impl Client {
             },
         };
 
-        match ::sodiumoxide::crypto::asymmetricbox::open(&asymm_encryption_result[..],
+        match ::sodiumoxide::crypto::box_::open(&asymm_encryption_result[..],
                                                          &nonce,
                                                          &self.account.get_public_maid().public_keys().1,
                                                          &self.account.get_maid().secret_keys().1) {
@@ -620,7 +620,7 @@ mod test {
         let plain_text_1 = plain_text_0.clone();
 
         // Encrypt passing Nonce
-        let nonce = ::sodiumoxide::crypto::asymmetricbox::gen_nonce();
+        let nonce = ::sodiumoxide::crypto::box_::gen_nonce();
         let hybrid_encrypt_0 = client.hybrid_encrypt(&plain_text_0[..], Some(nonce));
         let hybrid_encrypt_1 = client.hybrid_encrypt(&plain_text_1[..], Some(nonce));
 
