@@ -7,7 +7,6 @@
 - Implement Storage API
     - Implement types
         - Implement MetaData, File and DirectoryListing types
-        - Implement wrapper traits
     - Implement Helpers
         - Directory Helper
             - Save DirectoryListing
@@ -21,8 +20,6 @@
     - Implement REST DataTypes
         - Container & Blob types
             - Implement Blob and Container types
-            - Implement FileWrapper trait for Blob
-            - Implement DirectoryListingWrapper trait for Container
         - REST API methods in Container
             - Create Container & Get Container
             - List Containers, Update / Get Container Metadata
