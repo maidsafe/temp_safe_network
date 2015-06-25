@@ -303,10 +303,67 @@ impl Account {
     }
 
     fn deserialise(source : &[u8]) -> cbor::CborResult<Account> {
-        match cbor::Decoder::from_bytes(source).decode::<Account>().next() {
-            Some(result) => return result,
-            None => return Err(cbor::CborError::UnexpectedEOF)
+        use ::std::io::Error;
+        use ::std::io::ErrorKind;
+
+        let mut decoder = cbor::Decoder::from_bytes(source);
+        let (encoded_an_maid, encoded_maid, encoded_public_maid, encoded_an_mpid, encoded_mpid, encoded_public_mpid, encoded_root_dir_id):
+            (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = decoder.decode().next().unwrap().unwrap();
+
+        let an_maid: _;
+        decoder = cbor::Decoder::from_bytes(&encoded_an_maid[..]);
+        match decoder.decode().next().unwrap().unwrap() {
+            ::data_parser::Parser::AnMaid(obj) => an_maid = obj,
+            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
         }
+
+        let maid: _;
+        decoder = cbor::Decoder::from_bytes(&encoded_maid[..]);
+        match decoder.decode().next().unwrap().unwrap() {
+            ::data_parser::Parser::Maid(obj) => maid = obj,
+            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
+        }
+
+        let public_maid: _;
+        decoder = cbor::Decoder::from_bytes(&encoded_public_maid[..]);
+        match decoder.decode().next().unwrap().unwrap() {
+            ::data_parser::Parser::PublicMaid(obj) => public_maid = obj,
+            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
+        }
+
+        let an_mpid: _;
+        decoder = cbor::Decoder::from_bytes(&encoded_an_mpid[..]);
+        match decoder.decode().next().unwrap().unwrap() {
+            ::data_parser::Parser::AnMpid(obj) => an_mpid = obj,
+            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
+        }
+
+        let mpid: _;
+        decoder = cbor::Decoder::from_bytes(&encoded_mpid[..]);
+        match decoder.decode().next().unwrap().unwrap() {
+            ::data_parser::Parser::Mpid(obj) => mpid = obj,
+            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
+        }
+
+        let public_mpid: _;
+        decoder = cbor::Decoder::from_bytes(&encoded_public_mpid[..]);
+        match decoder.decode().next().unwrap().unwrap() {
+            ::data_parser::Parser::PublicMpid(obj) => public_mpid = obj,
+            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
+        }
+
+        decoder = cbor::Decoder::from_bytes(&encoded_root_dir_id[..]);
+        let root_dir_id: Option<routing::NameType> = decoder.decode().next().unwrap().unwrap();
+
+        Ok(Account {
+            an_maid: an_maid,
+            maid: maid,
+            public_maid: public_maid,
+            an_mpid: an_mpid,
+            mpid: mpid,
+            public_mpid: public_mpid,
+            root_dir_id: root_dir_id,
+        })
     }
 }
 
