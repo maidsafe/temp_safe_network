@@ -263,7 +263,43 @@ impl Account {
 
     fn serialise(&self) -> cbor::CborResult<Vec<u8>> {
         let mut encoder = cbor::Encoder::from_memory();
-        return encoder.encode(&[&self]).map(|()| encoder.into_bytes());
+        try!(encoder.encode(&[&self.an_maid]));
+        let encoded_an_maid = encoder.into_bytes();
+
+        encoder = cbor::Encoder::from_memory();
+        try!(encoder.encode(&[&self.maid]));
+        let encoded_maid = encoder.into_bytes();
+
+        encoder = cbor::Encoder::from_memory();
+        try!(encoder.encode(&[&self.public_maid]));
+        let encoded_public_maid = encoder.into_bytes();
+
+        encoder = cbor::Encoder::from_memory();
+        try!(encoder.encode(&[&self.an_mpid]));
+        let encoded_an_mpid = encoder.into_bytes();
+
+        encoder = cbor::Encoder::from_memory();
+        try!(encoder.encode(&[&self.mpid]));
+        let encoded_mpid = encoder.into_bytes();
+
+        encoder = cbor::Encoder::from_memory();
+        try!(encoder.encode(&[&self.public_mpid]));
+        let encoded_public_mpid = encoder.into_bytes();
+
+        encoder = cbor::Encoder::from_memory();
+        try!(encoder.encode(&[&self.root_dir_id]));
+        let encoded_root_dir_id = encoder.into_bytes();
+
+        encoder = cbor::Encoder::from_memory();
+        try!(encoder.encode(&[(encoded_an_maid,
+                               encoded_maid,
+                               encoded_public_maid,
+                               encoded_an_mpid,
+                               encoded_mpid,
+                               encoded_public_mpid,
+                               encoded_root_dir_id)]));
+
+        Ok(encoder.into_bytes())
     }
 
     fn deserialise(source : &[u8]) -> cbor::CborResult<Account> {
