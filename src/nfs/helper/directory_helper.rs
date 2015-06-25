@@ -55,7 +55,10 @@ impl DirectoryHelper {
         let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
         match self.network_get(structured_data_type_id.type_tag(), directory.get_id()) {
             Ok(serialised_sdv) => {
-                let mut sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(serialised_sdv);
+                let mut sdv: maidsafe_types::StructuredData = match nfs::utils::deserialise_parser(serialised_sdv) {
+                    ::data_parser::Parser::StructuredData(obj) => obj,
+                    _ => return Err("Unexpected type".to_string())
+                };
                 self.save_directory(&mut sdv, directory)
             },
             Err(_) => Err("Network IO Error".to_string())
@@ -67,7 +70,10 @@ impl DirectoryHelper {
         let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
         match self.network_get(structured_data_type_id.type_tag(), directory_id) {
             Ok(serialised_sdv) => {
-                let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(serialised_sdv);
+                let sdv: maidsafe_types::StructuredData = match nfs::utils::deserialise_parser(serialised_sdv) {
+                    ::data_parser::Parser::StructuredData(obj) => obj,
+                    _ => return Err("Unexpected type".to_string())
+                };
                 Ok(sdv.value())
             },
             Err(_) => Err("Network IO Error".to_string()),
@@ -81,7 +87,10 @@ impl DirectoryHelper {
         let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
         match self.network_get(structured_data_type_id.type_tag(), directory_id) {
             Ok(serialised_sdv) => {
-                let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(serialised_sdv);
+                let sdv: maidsafe_types::StructuredData = match nfs::utils::deserialise_parser(serialised_sdv) {
+                    ::data_parser::Parser::StructuredData(obj) => obj,
+                    _ => return Err("Unexpected type".to_string())
+                };
                 match sdv.value().iter().find(|v| *v == version) {
                     Some(version) => {
                             self.get_directory_version(directory_id, version)
@@ -95,10 +104,13 @@ impl DirectoryHelper {
 
     /// Return the DirectoryListing for the latest version
     pub fn get(&mut self, directory_id: &routing::NameType) -> Result<nfs::directory_listing::DirectoryListing, String> {
-        let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;        
+        let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
         match self.network_get(structured_data_type_id.type_tag(), directory_id) {
             Ok(serialised_sdv) => {
-                let sdv: maidsafe_types::StructuredData = nfs::utils::deserialise(serialised_sdv);
+                let sdv: maidsafe_types::StructuredData = match nfs::utils::deserialise_parser(serialised_sdv) {
+                    ::data_parser::Parser::StructuredData(obj) => obj,
+                    _ => return Err("Unexpected type".to_string())
+                };
                 match sdv.value().last() {
                     Some(version) => {
                             self.get_directory_version(directory_id, version)
@@ -149,7 +161,10 @@ impl DirectoryHelper {
         let immutable_data_type_id = maidsafe_types::data::ImmutableDataTypeTag;
         match self.network_get(immutable_data_type_id.type_tag(), &version) {
             Ok(serialised_data) => {
-                let imm: maidsafe_types::ImmutableData = nfs::utils::deserialise(serialised_data);
+                let imm: maidsafe_types::ImmutableData = match nfs::utils::deserialise_parser(serialised_data) {
+                    ::data_parser::Parser::ImmutableData(obj) => obj,
+                    _ => return Err("Unexpected type".to_string())
+                };
                 let client_mutex = self.client.clone();
                 let client = client_mutex.lock().unwrap();
                 match client.hybrid_decrypt(&imm.value()[..], self.get_nonce(directory_id)) {

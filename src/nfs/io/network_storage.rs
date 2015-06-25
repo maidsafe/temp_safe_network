@@ -53,7 +53,12 @@ impl self_encryption::Storage for NetworkStorage {
         }
 
         match get_result.ok().unwrap().get() {
-            Ok(data) => data,
+            Ok(data) => {
+                match ::nfs::utils::deserialise_parser(data) {
+                    ::data_parser::Parser::ImmutableData(obj) => obj.value().clone(),
+                    _ => Vec::new()
+                }
+            },
             Err(_) => Vec::new(),
         }
     }
