@@ -59,6 +59,8 @@ extern crate self_encryption;
 pub mod nfs;
 /// Self-Auth and Gateway Module
 pub mod client;
+/// Parse incoming data
+pub mod data_parser;
 
 /// Representation of input/output error
 pub type IoError = std::io::Error;

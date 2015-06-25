@@ -188,60 +188,64 @@ impl Client {
                 match response_getter.get() {
                     Ok(raw_data) => {
                         let mut decoder = cbor::Decoder::from_bytes(raw_data);
-                        let account_versions: maidsafe_types::StructuredData = decoder.decode().next().unwrap().unwrap();
-
-                        match account_versions.value().pop() {
-                            Some(latest_version) => {
-                                let immutable_data_type_id = maidsafe_types::data::ImmutableDataTypeTag;
-                                let get_result = fake_routing_client.lock().unwrap().get(immutable_data_type_id.type_tag(), latest_version);
-                                match get_result {
-                                    Ok(id) => {
-                                        let mut response_getter = response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                                        match response_getter.get() {
-                                            Ok(raw_data) => {
-                                                let mut decoder = cbor::Decoder::from_bytes(raw_data);
-                                                let encrypted_account_packet: maidsafe_types::ImmutableData = decoder.decode().next().unwrap().unwrap();
-
-                                                let decryption_result = user_account::Account::decrypt(&encrypted_account_packet.value()[..], password, pin);
-                                                if decryption_result.is_err() {
-                                                    return Err(::IoError::new(::std::io::ErrorKind::Other, "Could Not Decrypt Session Packet !! (Probably Wrong Password)"));
-                                                }
-                                                let account_packet = decryption_result.ok().unwrap();
-
-                                                let id_packet = routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
-                                                                                              account_packet.get_maid().secret_keys().clone());
-
-                                                let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
-                                                let cloned_routing_client = routing_client.clone();
-                                                let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
-                                                let routing_stop_flag_clone = routing_stop_flag.clone();
-
-                                                let client = Client {
-                                                    account: account_packet,
-                                                    session_packet_id: user_account::Account::generate_network_id(keyword, pin),
-                                                    session_packet_keys: SessionPacketEncryptionKeys::new(password, pin),
-                                                    routing: routing_client,
-                                                    callback_interface: callback_interface,
-                                                    response_notifier: notifier,
-                                                    routing_stop_flag: routing_stop_flag,
-                                                    routing_join_handle: Some(::std::thread::spawn(move || {
-                                                        let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
-                                                        while !*routing_stop_flag_clone.lock().unwrap() {
-                                                            ::std::thread::sleep_ms(10);
-                                                            cloned_routing_client.lock().unwrap().run();
+                        if let ::data_parser::Parser::StructuredData(account_versions) = decoder.decode().next().unwrap().unwrap() {
+                            match account_versions.value().pop() {
+                                Some(latest_version) => {
+                                    let immutable_data_type_id = maidsafe_types::data::ImmutableDataTypeTag;
+                                    let get_result = fake_routing_client.lock().unwrap().get(immutable_data_type_id.type_tag(), latest_version);
+                                    match get_result {
+                                        Ok(id) => {
+                                            let mut response_getter = response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+                                            match response_getter.get() {
+                                                Ok(raw_data) => {
+                                                    let mut decoder = cbor::Decoder::from_bytes(raw_data);
+                                                    if let ::data_parser::Parser::ImmutableData(encrypted_account_packet) = decoder.decode().next().unwrap().unwrap() {
+                                                        let decryption_result = user_account::Account::decrypt(&encrypted_account_packet.value()[..], password, pin);
+                                                        if decryption_result.is_err() {
+                                                            return Err(::IoError::new(::std::io::ErrorKind::Other, "Could Not Decrypt Session Packet !! (Probably Wrong Password)"));
                                                         }
-                                                    })),
-                                                };
+                                                        let account_packet = decryption_result.ok().unwrap();
 
-                                                Ok(client)
-                                            },
-                                            Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Session Packet (ImmutableData) GET-Response Failure !!")),
-                                        }
-                                    },
-                                    Err(io_error) => Err(io_error),
-                                }
-                            },
-                            None => Err(::IoError::new(::std::io::ErrorKind::Other, "No Session Packet information in retrieved StructuredData !!")),
+                                                        let id_packet = routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
+                                                                                                      account_packet.get_maid().secret_keys().clone());
+
+                                                        let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
+                                                        let cloned_routing_client = routing_client.clone();
+                                                        let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
+                                                        let routing_stop_flag_clone = routing_stop_flag.clone();
+
+                                                        let client = Client {
+                                                            account: account_packet,
+                                                            session_packet_id: user_account::Account::generate_network_id(keyword, pin),
+                                                            session_packet_keys: SessionPacketEncryptionKeys::new(password, pin),
+                                                            routing: routing_client,
+                                                            callback_interface: callback_interface,
+                                                            response_notifier: notifier,
+                                                            routing_stop_flag: routing_stop_flag,
+                                                            routing_join_handle: Some(::std::thread::spawn(move || {
+                                                                let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
+                                                                while !*routing_stop_flag_clone.lock().unwrap() {
+                                                                    ::std::thread::sleep_ms(10);
+                                                                    cloned_routing_client.lock().unwrap().run();
+                                                                }
+                                                            })),
+                                                        };
+
+                                                        Ok(client)
+                                                    } else {
+                                                        Err(::IoError::new(::std::io::ErrorKind::Other, "Session Packet (ImmutableData) GET-Response Failure - Not ImmutData !!"))
+                                                    }
+                                                },
+                                                Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Session Packet (ImmutableData) GET-Response Failure !!")),
+                                            }
+                                        },
+                                        Err(io_error) => Err(io_error),
+                                    }
+                                },
+                                None => Err(::IoError::new(::std::io::ErrorKind::Other, "No Session Packet information in retrieved StructuredData !!")),
+                            }
+                        } else {
+                            Err(::IoError::new(::std::io::ErrorKind::Other, "StructuredData GET-Response Failure !! Not SD !!"))
                         }
                     },
                     Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "StructuredData GET-Response Failure !! (Probably Invalid User-ID)")),
@@ -276,25 +280,28 @@ impl Client {
                             match response_getter.get() {
                                 Ok(raw_data) => {
                                     let mut decoder = cbor::Decoder::from_bytes(raw_data);
-                                    let account_versions: maidsafe_types::StructuredData = decoder.decode().next().unwrap().unwrap();
-                                    let mut vec_accounts = account_versions.value();
-                                    vec_accounts.push(encrypted_account.name());
+                                    if let ::data_parser::Parser::StructuredData(account_versions) = decoder.decode().next().unwrap().unwrap() {
+                                        let mut vec_accounts = account_versions.value();
+                                        vec_accounts.push(encrypted_account.name());
 
-                                    let new_account_versions = maidsafe_types::StructuredData::new(self.session_packet_id.clone(),
-                                                                                                   self.account.get_public_maid().name(),
-                                                                                                   vec_accounts);
+                                        let new_account_versions = maidsafe_types::StructuredData::new(self.session_packet_id.clone(),
+                                                                                                       self.account.get_public_maid().name(),
+                                                                                                       vec_accounts);
 
-                                    let put_res = self.routing.lock().unwrap().put(new_account_versions);
+                                        let put_res = self.routing.lock().unwrap().put(new_account_versions);
 
-                                    match put_res {
-                                        Ok(id) => {
-                                            let mut response_getter = response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None);
-                                            match response_getter.get() {
-                                                Ok(_) => Ok(()),
-                                                Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
-                                            }
-                                        },
-                                        Err(io_error) => Err(io_error),
+                                        match put_res {
+                                            Ok(id) => {
+                                                let mut response_getter = response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None);
+                                                match response_getter.get() {
+                                                    Ok(_) => Ok(()),
+                                                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
+                                                }
+                                            },
+                                            Err(io_error) => Err(io_error),
+                                        }
+                                    } else {
+                                        Err(::IoError::new(::std::io::ErrorKind::Other, "SD-GET-Resp Failure - Did not get SD !!"))
                                     }
                                 },
                                 Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "SD-GET-Resp Failure - Could Not Retrieve Existing Account Versions !!")),
