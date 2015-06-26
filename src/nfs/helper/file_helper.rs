@@ -45,7 +45,7 @@ impl FileHelper {
             Some(_) => Err("File already exists".to_string()),
             None => {
                 let file = nfs::file::File::new(nfs::metadata::Metadata::new(name, user_metatdata), self_encryption::datamap::DataMap::None);
-                Ok(nfs::io::Writer::new(directory.clone(), file, self.client.clone(), nfs::io::writer::MODE::NEW))
+                Ok(nfs::io::Writer::new(directory.clone(), file, self.client.clone(), nfs::io::writer::Mode::Overwrite))
             }
         }
     }
@@ -56,7 +56,7 @@ impl FileHelper {
     pub fn update(&mut self,
                   file: &nfs::file::File,
                   directory: &nfs::directory_listing::DirectoryListing,
-                  mode: nfs::io::writer::MODE) -> Result<nfs::io::Writer, String> {
+                  mode: nfs::io::writer::Mode) -> Result<nfs::io::Writer, String> {
         match self.file_exists(directory, file.get_name()) {
             Some(_) => Ok(nfs::io::Writer::new(directory.clone(), file.clone(), self.client.clone(), mode)),
             None => Err("File not present in the directory".to_string())
@@ -204,7 +204,7 @@ mod test {
             {
                 let mut writer: _;
                 {
-                    let result = file_helper.update(result.index(0), &dir_listing, nfs::io::writer::MODE::NEW);
+                    let result = file_helper.update(result.index(0), &dir_listing, nfs::io::writer::Mode::Overwrite);
                     assert!(result.is_ok());
 
                     writer = result.ok().unwrap();

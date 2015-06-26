@@ -21,11 +21,11 @@ use super::network_storage::NetworkStorage;
 use self_encryption;
 use client;
 /// Mode of the writter
-pub enum MODE {
+pub enum Mode {
     /// Will create a new data
-    NEW,
+    Overwrite,
     /// Will modify the existing data
-    MODIFY,
+    Modify,
 }
 
 /// Writer is used to write contents to a File and especially in chunks if the file happens to be
@@ -40,11 +40,11 @@ pub struct Writer {
 impl Writer {
     /// Create new instance of Writer
     pub fn new(directory: nfs::directory_listing::DirectoryListing, file: nfs::file::File,
-        client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, mode: MODE) -> Writer {  
+        client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, mode: Mode) -> Writer {
         let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
         let datamap = match mode {
-                MODE::NEW => self_encryption::datamap::DataMap::None,
-                MODE::MODIFY => file.get_datamap().clone()
+                Mode::Overwrite => self_encryption::datamap::DataMap::None,
+                Mode::Modify => file.get_datamap().clone()
         };
         Writer {
             file: file.clone(),
