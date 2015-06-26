@@ -51,6 +51,8 @@ mod misc {
     pub type ResponseNotifier = ::std::sync::Arc<(::std::sync::Mutex<::routing::types::MessageId>, ::std::sync::Condvar)>;
 }
 
+const POLL_DURATION_IN_MILLISEC: u32 = 1;
+
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
 /// essentially a non-blocking Client with upper layers having an option to either block and wait
@@ -95,7 +97,7 @@ impl Client {
             routing_join_handle: Some(::std::thread::spawn(move || {
                 let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
                 while !*routing_stop_flag_clone.lock().unwrap() {
-                    ::std::thread::sleep_ms(10);
+                    ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
                     cloned_routing_client.lock().unwrap().run();
                 }
             })),
@@ -173,11 +175,14 @@ impl Client {
             join_handle: Some(::std::thread::spawn(move || {
                 let _ = cloned_fake_routing_client.lock().unwrap().bootstrap(None, None);
                 while !*fake_routing_stop_flag_clone.lock().unwrap() {
-                    ::std::thread::sleep_ms(10);
+                    ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
                     cloned_fake_routing_client.lock().unwrap().run();
                 }
             })),
         };
+
+        // TODO - Remove This thread::sleep Hack
+        ::std::thread::sleep_ms(10000);
 
         let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
         let get_result = fake_routing_client.lock().unwrap().get(structured_data_type_id.type_tag(), user_network_id);
@@ -225,7 +230,7 @@ impl Client {
                                                             routing_join_handle: Some(::std::thread::spawn(move || {
                                                                 let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
                                                                 while !*routing_stop_flag_clone.lock().unwrap() {
-                                                                    ::std::thread::sleep_ms(10);
+                                                                    ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
                                                                     cloned_routing_client.lock().unwrap().run();
                                                                 }
                                                             })),
