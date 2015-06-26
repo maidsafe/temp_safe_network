@@ -22,5 +22,5 @@ pub mod reader;
 mod network_storage;
 
 pub use self::network_storage::*;
-pub use self::writer::*;
+pub use self::writer::Writer;
 pub use self::reader::*;

@@ -20,6 +20,13 @@ use std::sync;
 use super::network_storage::NetworkStorage;
 use self_encryption;
 use client;
+/// Mode of the writter
+pub enum MODE {
+    /// Will create a new data
+    NEW,
+    /// Will modify the existing data
+    MODIFY,
+}
 
 /// Writer is used to write contents to a File and especially in chunks if the file happens to be
 /// too large
@@ -33,12 +40,16 @@ pub struct Writer {
 impl Writer {
     /// Create new instance of Writer
     pub fn new(directory: nfs::directory_listing::DirectoryListing, file: nfs::file::File,
-        client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>) -> Writer {
+        client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, mode: MODE) -> Writer {        
         let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
+        let datamap = match mode {
+                MODE::NEW => self_encryption::datamap::DataMap::None,
+                MODE::MODIFY => file.get_datamap().clone()
+        };
         Writer {
             file: file.clone(),
             directory: directory,
-            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), file.get_datamap().clone()),
+            self_encryptor: self_encryption::SelfEncryptor::new(storage.clone(), datamap),
             client: client
         }
     }

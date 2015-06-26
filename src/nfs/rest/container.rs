@@ -251,7 +251,7 @@ impl Container {
 
     /// Updates the blob content. Writes the complete data and updates the Blob
     pub fn update_blob_content(&mut self, blob: &nfs::rest::Blob, data: &[u8]) -> Result<(), String> {
-        match self.get_writer_for_blob(blob) {
+        match self.get_writer_for_blob(blob, nfs::io::writer::MODE::NEW) {
             Ok(mut writer) => {
                 writer.write(data, 0);
                 writer.close()
@@ -263,7 +263,7 @@ impl Container {
     /// Return a writter object for the Blob, through which the content of the blob can be updated
     /// This is useful while handling larger files, to enable writting content in parts
     pub fn get_blob_writer(&mut self, blob: &nfs::rest::Blob) -> Result<nfs::io::Writer, String> {
-        self.get_writer_for_blob(blob)
+        self.get_writer_for_blob(blob, nfs::io::writer::MODE::MODIFY)
     }
 
     /// Reads the content of the blob and returns the complete content
@@ -360,9 +360,9 @@ impl Container {
         }
     }
 
-    fn get_writer_for_blob(&self, blob: &nfs::rest::blob::Blob) -> Result<nfs::io::Writer, String> {
+    fn get_writer_for_blob(&self, blob: &nfs::rest::blob::Blob, mode: nfs::io::writer::MODE) -> Result<nfs::io::Writer, String> {
         let mut helper = nfs::helper::FileHelper::new(self.client.clone());
-        match helper.update(blob.convert_to_file(), &self.directory_listing) {
+        match helper.update(blob.convert_to_file(), &self.directory_listing, mode) {
             Ok(writter) => Ok(writter),
             Err(_) => Err("Blob not found".to_string())
         }
