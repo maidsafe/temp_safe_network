@@ -196,7 +196,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                             let data = get_user_string("text to be saved as a file").into_bytes();
                             match container.update_blob_content(&blob, &data[..]) {
                                 Ok(_) => {
-                                    println!("Blob Updated");                                    
+                                    println!("Blob Updated");
                                 },
                                 Err(msg) => println!("Failed :: {}", msg)
                             }
