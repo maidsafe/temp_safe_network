@@ -40,7 +40,7 @@ pub struct Writer {
 impl Writer {
     /// Create new instance of Writer
     pub fn new(directory: nfs::directory_listing::DirectoryListing, file: nfs::file::File,
-        client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, mode: MODE) -> Writer {        
+        client: ::std::sync::Arc<::std::sync::Mutex<client::Client>>, mode: MODE) -> Writer {  
         let storage = sync::Arc::new(NetworkStorage::new(client.clone()));
         let datamap = match mode {
                 MODE::NEW => self_encryption::datamap::DataMap::None,
