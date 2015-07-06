@@ -27,7 +27,17 @@ pub fn serialise<T>(data: T) -> Vec<u8> where T : Encodable {
 }
 
 /// utility function to deserialise a Decodable type
+pub fn deserialise_parser(data: Vec<u8>) -> ::data_parser::Parser {
+    let mut d = cbor::Decoder::from_bytes(data);
+    d.decode().next().unwrap().unwrap()
+}
+
+/// utility function to deserialise a Decodable type
 pub fn deserialise<T>(data: Vec<u8>) -> T where T : Decodable {
     let mut d = cbor::Decoder::from_bytes(data);
     d.decode().next().unwrap().unwrap()
+    // match d.decode().next().unwrap().unwrap() {
+    //     ::data_parser::Parser::StructuredData(obj) => obj,
+    //     ::data_parser::Parser::ImmutableData(obj) => obj,
+    // }
 }

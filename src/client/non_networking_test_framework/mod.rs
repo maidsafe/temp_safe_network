@@ -323,9 +323,10 @@ mod test {
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
-                            let received_immutable_data: maidsafe_types::ImmutableData = decoder.decode().next().unwrap().unwrap();
-
-                            assert_eq!(orig_immutable_data, received_immutable_data);
+                            match decoder.decode().next().unwrap().unwrap() {
+                                ::data_parser::Parser::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data),
+                                _ => panic!("Unexpected!"),
+                            }
                         },
                         Err(_) => panic!("Should have found data put before by a PUT"),
                     }
@@ -454,9 +455,13 @@ mod test {
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
-                            received_structured_data = decoder.decode().next().unwrap().unwrap();
-
-                            assert_eq!(account_version, received_structured_data);
+                            match decoder.decode().next().unwrap().unwrap() {
+                                ::data_parser::Parser::StructuredData(obj) => {
+                                    received_structured_data = obj;
+                                    assert_eq!(account_version, received_structured_data)
+                                },
+                                _ => panic!("Unexpected!"),
+                            }
                         },
                         Err(_) => panic!("Should have found data put before by a PUT"),
                     }
@@ -473,9 +478,10 @@ mod test {
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
-                            let received_immutable_data: maidsafe_types::ImmutableData = decoder.decode().next().unwrap().unwrap();
-
-                            assert_eq!(orig_immutable_data, received_immutable_data);
+                            match decoder.decode().next().unwrap().unwrap() {
+                                ::data_parser::Parser::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data),
+                                _ => panic!("Unexpected!"),
+                            }
                         },
                         Err(_) => panic!("Should have found data put before by a PUT"),
                     }
@@ -530,9 +536,13 @@ mod test {
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
-                            received_structured_data = decoder.decode().next().unwrap().unwrap();
-
-                            assert_eq!(account_version, received_structured_data);
+                            match decoder.decode().next().unwrap().unwrap() {
+                                ::data_parser::Parser::StructuredData(obj) => {
+                                    received_structured_data = obj;
+                                    assert_eq!(account_version, received_structured_data)
+                                },
+                                _ => panic!("Unexpected!"),
+                            }
                         },
                         Err(_) => (),
                     }
@@ -552,9 +562,10 @@ mod test {
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
-                            let received_immutable_data: maidsafe_types::ImmutableData = decoder.decode().next().unwrap().unwrap();
-
-                            assert_eq!(new_immutable_data, received_immutable_data);
+                            match decoder.decode().next().unwrap().unwrap() {
+                                ::data_parser::Parser::ImmutableData(received_immutable_data) => assert_eq!(new_immutable_data, received_immutable_data),
+                                _ => panic!("Unexpected!"),
+                            }
                         },
                         Err(_) => panic!("Should have found data put before by a PUT"),
                     }
@@ -572,9 +583,10 @@ mod test {
                     match response_getter.get() {
                         Ok(data) => {
                             let mut decoder = ::cbor::Decoder::from_bytes(&data[..]);
-                            let received_immutable_data: maidsafe_types::ImmutableData = decoder.decode().next().unwrap().unwrap();
-
-                            assert_eq!(orig_immutable_data, received_immutable_data);
+                            match decoder.decode().next().unwrap().unwrap() {
+                                ::data_parser::Parser::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data),
+                                _ => panic!("Unexpected!"),
+                            }
                         },
                         Err(_) => panic!("Should have found data put before by a PUT"),
                     }
