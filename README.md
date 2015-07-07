@@ -37,18 +37,18 @@ cargo test --features "USE_ACTUAL_ROUTING"
 etc
 ```
 
-###TODO (rust_3 sprint)
-##Version 0.1.1 (NFS seperation)
+##TODO (rust_3 sprint)
+###Version 0.1.1 (NFS seperation)
 - [ ] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
 
-##Version 0.1.2 ( Types implementation )
+###Version 0.1.2 ( Types implementation )
 - [ ] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
 
-##Version 0.1.3 ( Routing Client update )
+###Version 0.1.3 ( Routing Client update )
 - [ ] [MAID-1248](https://maidsafe.atlassian.net/browse/MAID-1248) Name the spawned rust threads
 - [ ] [MAID-1218](https://maidsafe.atlassian.net/browse/MAID-1218) No restarting of routing-client
 
-##Version 0.1.4 ( UnVersioned StructuredData )
+###Version 0.1.4 ( UnVersioned StructuredData )
 - [ ] [MAID-1249](https://maidsafe.atlassian.net/browse/MAID-1249) Implement Unified Structured Datatype
     - [ ] [MAID-1220](https://maidsafe.atlassian.net/browse/MAID-1220) Update the SessionPacket struct
     - [ ] [MAID-1221](https://maidsafe.atlassian.net/browse/MAID-1221) Update client API to get and set configuration directory ids
