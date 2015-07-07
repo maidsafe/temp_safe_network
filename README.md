@@ -38,7 +38,7 @@ etc
 ```
 
 ##TODO (rust_3 sprint)
-###Version 0.1.1 (NFS seperation)
+###Version 0.1.1 (NFS separation)
 - [ ] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
 
 ###Version 0.1.2 ( Types implementation )
