@@ -1,6 +1,10 @@
-## maidsafe_client Change Log :
+# MaidSafe Client - Change Log
 
-### [0.1.0] RUST-2 sprint
+## [0.1.1]
+- Updated dependencies' versions
+- Fixed lint warnings caused by latest Rust nightly
+
+## [0.1.0] RUST-2 sprint
 - Account Creation
     - Register
     - Login
