@@ -25,7 +25,7 @@ fn create_account() -> Result<maidsafe_client::client::Client, String> {
     let mut keyword = String::new();
     let mut password = String::new();
     let mut pin_str = String::new();
-    let mut pin: u32;
+    let pin: u32;
 
     println!("\n\tAccount Creation");
     println!("\t================");
@@ -237,7 +237,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
                     let blob_name = get_user_string("Blob name");
                     match container.get_blob_versions(blob_name.clone()) {
                         Ok(versions) => {
-                            let mut version_id;
+                            let version_id;
                             if versions.len() == 1 {
                                 version_id = versions[0];
                             } else{
@@ -317,7 +317,7 @@ fn blob_operation(option: u32, container: &mut nfs::rest::Container) {
 }
 
 fn get_root_container(client: &::std::sync::Arc<::std::sync::Mutex<maidsafe_client::client::Client>>) -> nfs::rest::Container {
-    let mut root_container;
+    let root_container;
     match nfs::rest::Container::authorise(client.clone(), None) {
         Ok(container) => root_container = container,
         Err(msg) => panic!(msg)
@@ -326,7 +326,7 @@ fn get_root_container(client: &::std::sync::Arc<::std::sync::Mutex<maidsafe_clie
 }
 #[allow(unused_must_use)]
 fn main() {
-    let mut client;
+    let client;
     match create_account() {
         Ok(authorised_client) => client = ::std::sync::Arc::new(::std::sync::Mutex::new(authorised_client)),
         Err(msg) => panic!(msg)
