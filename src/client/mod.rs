@@ -31,6 +31,8 @@ mod user_account;
 mod response_getter;
 mod callback_interface;
 
+mod mock_routing_types;
+
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 mod non_networking_test_framework;
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
