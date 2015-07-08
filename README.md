@@ -38,17 +38,17 @@ etc
 ```
 
 ##TODO (rust_3 sprint)
-### 0.1.1 (NFS separation)
+### [0.1.1]
 - [ ] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
 
-### 0.1.2 ( Types implementation )
+### [0.1.2]
 - [ ] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
 
-### 0.1.3 ( Routing Client update )
+### [0.1.3]
 - [ ] [MAID-1248](https://maidsafe.atlassian.net/browse/MAID-1248) Name the spawned rust threads
 - [ ] [MAID-1218](https://maidsafe.atlassian.net/browse/MAID-1218) No restarting of routing-client
 
-### 0.1.4 ( UnVersioned StructuredData )
+### [0.1.4]
 - [ ] [MAID-1249](https://maidsafe.atlassian.net/browse/MAID-1249) Implement Unified Structured Datatype
     - [ ] [MAID-1252](https://maidsafe.atlassian.net/browse/MAID-1252) Mock Unified StructuredData and ImmutableData
     - [ ] [MAID-1253](https://maidsafe.atlassian.net/browse/MAID-1253) Update Mock Routing to support Mock Unified SturcturedData and ImmutableData
