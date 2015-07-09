@@ -31,7 +31,7 @@
 pub struct RevocationIdType {
     type_tags: (u64, u64, u64),  // type tags for revocation, id and public ids
     public_key: ::sodiumoxide::crypto::sign::PublicKey,
-    secret_key: ::sodiumoxide::crypto::sign::SecretKey
+    secret_key: ::sodiumoxide::crypto::sign::SecretKey,
 }
 
 impl PartialEq for RevocationIdType {
@@ -60,7 +60,7 @@ impl RevocationIdType {
         RevocationIdType {
             type_tags: (type_tags.revocation_id_type_tag(), type_tags.id_type_tag(), type_tags.public_id_type_tag()),
             public_key: pub_sign_key,
-            secret_key: sec_sign_key
+            secret_key: sec_sign_key,
         }
     }
 
@@ -105,10 +105,10 @@ fn convert_to_u64(num_vec: Vec<u8>) -> Option<u64> {
          Ok(string) =>  {
              match string.parse::<u64>() {
                  Ok(type_tag) => Some(type_tag),
-                 Err(_) => None
+                 Err(_) => None,
              }
          },
-         Err(_) => None
+         Err(_) => None,
      }
 }
 
@@ -143,9 +143,11 @@ impl ::rustc_serialize::Decodable for RevocationIdType {
             return Err(d.error("Bad RevocationIdType size"));
         }
 
-        Ok(RevocationIdType{ type_tags: (revocation_type_tag.unwrap(), id_type_tag.unwrap(), public_id_type_tag.unwrap()),
-             public_key: ::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr.unwrap()),
-             secret_key: ::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr.unwrap()) })
+        Ok(RevocationIdType {
+                type_tags: (revocation_type_tag.unwrap(), id_type_tag.unwrap(), public_id_type_tag.unwrap()),
+                public_key: ::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr.unwrap()),
+                secret_key: ::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr.unwrap()),
+            })
     }
 }
 
@@ -156,7 +158,7 @@ mod test {
     use super::RevocationIdType;
     use self::rand::Rng;
     use ::id::Random;
-    
+
     impl Random for RevocationIdType {
         fn generate_random() -> RevocationIdType {
             RevocationIdType::new::<::id::MaidTypeTags>()
