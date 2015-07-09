@@ -27,12 +27,16 @@ use maidsafe_types;
 use maidsafe_types::TypeTag;
 use routing::sendable::Sendable;
 
-mod user_account;
 /// ResponseGetter is a lazy evaluated response getter.
 pub mod response_getter;
+
+mod user_account;
 mod callback_interface;
 
+#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 mod mock_routing_types;
+#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
+pub use self::mock_routing_types::*;
 
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 mod non_networking_test_framework;
@@ -463,6 +467,41 @@ impl Client {
     /// Owner of this client is the name of Public-MAID
     pub fn get_owner(&self) -> routing::NameType {
         self.account.get_public_maid().name()
+    }
+
+    /// Put data onto the network. This is non-blocking.
+    pub fn put_new(&mut self, location: ::routing::NameType, data: Data) -> Result<response_getter::ResponseGetter, ::IoError> {
+        match self.routing.lock().unwrap().put_new(location, data) {
+            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
+            Err(io_err) => Err(io_err),
+        }
+    }
+
+    /// Get data onto the network. This is non-blocking.
+    pub fn get_new(&mut self, location: ::routing::NameType, request_for: DataRequest) -> Result<response_getter::ResponseGetter, ::IoError> {
+        let mut data_name: Option<routing::NameType> = None;
+
+        if let DataRequest::ImmutableData(_) = request_for {
+            let mut cb_interface = self.callback_interface.lock().unwrap();
+            if cb_interface.cache_check(&location) {
+                return Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), None, Some(location)))
+            }
+
+            data_name = Some(location.clone());
+        }
+
+        match self.routing.lock().unwrap().get_new(location, request_for) {
+            Ok(id) => Ok(response_getter::ResponseGetter::new( self.response_notifier.clone(), self.callback_interface.clone(), Some(id), data_name)),
+            Err(io_err) => Err(io_err),
+        }
+    }
+
+    /// Post data onto the network
+    pub fn post(&mut self, location: ::routing::NameType, data: Data) -> Result<response_getter::ResponseGetter, ::IoError> {
+        match self.routing.lock().unwrap().post(location, data) {
+            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
+            Err(io_err) => Err(io_err),
+        }
     }
 
     /// Put data onto the network. This is non-blocking.

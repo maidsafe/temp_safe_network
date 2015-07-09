@@ -47,8 +47,6 @@ fn get_storage() -> DataStore {
     }
 }
 
-/// RoutingClient Mock mimics routing interface to store data locally for testing instead of actual
-/// networking with vaults etc.
 pub struct RoutingClientMock {
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
     msg_id: routing::types::MessageId,
@@ -56,7 +54,6 @@ pub struct RoutingClientMock {
 }
 
 impl RoutingClientMock {
-    /// Create a new instance of RoutingClientMock
     pub fn new(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
                _: routing::types::Id) -> RoutingClientMock {
         RoutingClientMock {
@@ -69,6 +66,83 @@ impl RoutingClientMock {
     #[allow(dead_code)]
     pub fn set_network_delay_for_delay_simulation(&mut self, delay_ms: u32) {
         self.network_delay_ms = delay_ms;
+    }
+
+    pub fn get_new(&mut self, location: ::routing::NameType, _request_for: ::client::DataRequest) -> Result<routing::types::MessageId, ::IoError> {
+        self.msg_id += 1;
+        let msg_id = self.msg_id;
+        let delay_ms = self.network_delay_ms;
+        let cb_interface = self.callback_interface.clone();
+        let data_store = get_storage();
+
+        ::std::thread::spawn(move || {
+            ::std::thread::sleep_ms(delay_ms);
+            match data_store.lock().unwrap().get(&location).clone() {
+                Some(data) => {
+                    let _data_decoded: ::client::Data = ::utility::deserialise(data.clone());
+                    cb_interface.lock().unwrap().handle_get_response(msg_id, Ok(data.clone()));
+                },
+                None => cb_interface.lock().unwrap().handle_get_response(msg_id, Err(routing::error::ResponseError::NoData)),
+            };
+        });
+
+        Ok(self.msg_id)
+    }
+
+    pub fn put_new(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<routing::types::MessageId, ::IoError> {
+        self.msg_id += 1;
+        let msg_id = self.msg_id;
+        let delay_ms = self.network_delay_ms;
+        let cb_interface = self.callback_interface.clone();
+        let data_store = get_storage();
+
+        let success = if data_store.lock().unwrap().contains_key(&location) {
+            false
+        } else {
+            data_store.lock().unwrap().insert(location, ::utility::serialise(data));
+            true
+        };
+
+        ::std::thread::spawn(move || {
+            ::std::thread::sleep_ms(delay_ms);
+            if success {
+                cb_interface.lock().unwrap().handle_put_response(msg_id, Ok(Vec::<u8>::new()));
+            } else {
+                cb_interface.lock().unwrap().handle_put_response(msg_id, Err(routing::error::ResponseError::InvalidRequest));
+            }
+        });
+
+        Ok(self.msg_id)
+    }
+
+    pub fn post(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<routing::types::MessageId, ::IoError> {
+        self.msg_id += 1;
+        let msg_id = self.msg_id;
+        let delay_ms = self.network_delay_ms;
+        let cb_interface = self.callback_interface.clone();
+        let data_store = get_storage();
+
+        let success = if data_store.lock().unwrap().contains_key(&location) {
+            if let ::client::Data::ImmutableData(_) = data {
+                false
+            } else {
+                data_store.lock().unwrap().insert(location, ::utility::serialise(data));
+                true
+            }
+        } else {
+            false
+        };
+
+        ::std::thread::spawn(move || {
+            ::std::thread::sleep_ms(delay_ms);
+            if success {
+                cb_interface.lock().unwrap().handle_put_response(msg_id, Ok(Vec::<u8>::new()));
+            } else {
+                cb_interface.lock().unwrap().handle_put_response(msg_id, Err(routing::error::ResponseError::InvalidRequest));
+            }
+        });
+
+        Ok(self.msg_id)
     }
 
     pub fn get(&mut self, _type_id: u64, name: routing::NameType) -> Result<routing::types::MessageId, ::IoError> {

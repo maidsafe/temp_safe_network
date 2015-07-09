@@ -15,13 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(unused, dead_code)]
-
-#[derive(Clone, RustcEncodable, RustcDecodable)]
-pub enum Data {
-    StructuredData(StructuredData),
-    ImmutableData(ImmutableData),
-}
+#![allow(unused, dead_code, missing_docs)]
 
 #[derive(Clone, RustcEncodable, RustcDecodable, PartialEq, Debug)]
 pub enum ImmutableDataType {
@@ -69,7 +63,7 @@ pub struct StructuredData {
     data: Vec<u8>,
     current_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
     previous_owner_keys: Option<Vec<::sodiumoxide::crypto::sign::PublicKey>>,
-    signatures: Vec<::sodiumoxide::crypto::sign::Signature>,
+    previous_owner_signatures: Vec<::sodiumoxide::crypto::sign::Signature>,
 }
 
 impl StructuredData {
@@ -87,7 +81,7 @@ impl StructuredData {
             data: data,
             current_owner_keys: current_owner_keys,
             previous_owner_keys: previous_owner_keys,
-            signatures: vec![],
+            previous_owner_signatures: vec![],
         };
 
         structured_data.add_signature(sign_key);
@@ -95,11 +89,11 @@ impl StructuredData {
     }
 
     pub fn add_signature(&mut self, sign_key: &::sodiumoxide::crypto::sign::SecretKey) {
-        let signable = self.get_signable_data();
-        self.signatures.push(::sodiumoxide::crypto::sign::sign_detached(&signable[..], sign_key));
+        let signable = self.data_to_sign();
+        self.previous_owner_signatures.push(::sodiumoxide::crypto::sign::sign_detached(&signable[..], sign_key));
     }
 
-    pub fn get_signable_data(&self) -> Vec<u8> {
+    pub fn data_to_sign(&self) -> Vec<u8> {
         let mut vec = self.data.iter().chain( self.version.to_string().as_bytes().iter().chain(
                 self.current_owner_keys.iter().fold(
                     Vec::<u8>::new(), |mut key_vec, key| { key_vec.extend(key.0.iter().map(|a| *a).collect::<Vec<u8>>()); key_vec }
@@ -138,9 +132,9 @@ impl ::rustc_serialize::Encodable for StructuredData {
             opt_prev_owner_keys = None;
         }
 
-        let mut signatures = Vec::<Vec<u8>>::new();
-        for it in self.signatures.iter() {
-            signatures.push(it.0.iter().map(|a| *a).collect());
+        let mut previous_owner_signatures = Vec::<Vec<u8>>::new();
+        for it in self.previous_owner_signatures.iter() {
+            previous_owner_signatures.push(it.0.iter().map(|a| *a).collect());
         }
 
         ::cbor::CborTagEncode::new(100_001, &(&self.identifier,
@@ -149,7 +143,7 @@ impl ::rustc_serialize::Encodable for StructuredData {
                                            &self.data,
                                            curr_owner,
                                            opt_prev_owner_keys,
-                                           signatures)).encode(e)
+                                           previous_owner_signatures)).encode(e)
     }
 }
 
@@ -163,7 +157,7 @@ impl ::rustc_serialize::Decodable for StructuredData {
              data,
              curr_owner,
              opt_prev_owner_keys,
-             signatures):
+             previous_owner_signatures):
             (::routing::NameType,
              u64,
              u64,
@@ -200,7 +194,7 @@ impl ::rustc_serialize::Decodable for StructuredData {
         }
 
         let mut signatures_decoded = Vec::<::sodiumoxide::crypto::sign::Signature>::new();
-        for it in signatures.iter() {
+        for it in previous_owner_signatures.iter() {
             let mut arr_current = [0u8; 64];
             for it_inner in it.iter().enumerate() {
                 arr_current[it_inner.0] = *it_inner.1;
@@ -216,20 +210,32 @@ impl ::rustc_serialize::Decodable for StructuredData {
             data: data,
             current_owner_keys: vec_current_owner,
             previous_owner_keys: opt_prev_owner_keys_decoded,
-            signatures: signatures_decoded,
+            previous_owner_signatures: signatures_decoded,
         })
     }
 }
 
 impl ::std::cmp::PartialEq for StructuredData {
     fn eq(&self, other: &StructuredData) -> bool {
-        let lhs_signable = self.get_signable_data();
-        let rhs_signable = other.get_signable_data();
+        let lhs_signable = self.data_to_sign();
+        let rhs_signable = other.data_to_sign();
 
         lhs_signable == rhs_signable &&
             self.tag_type == other.tag_type &&
             self.identifier == other.identifier
     }
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable)]
+pub enum DataRequest {
+    StructuredData(u64),
+    ImmutableData(ImmutableDataType),
+}
+
+#[derive(Clone, RustcEncodable, RustcDecodable)]
+pub enum Data {
+    StructuredData(StructuredData),
+    ImmutableData(ImmutableData),
 }
 
 #[cfg(test)]
@@ -242,20 +248,20 @@ mod test {
         let (public_key, secret_key) = ::sodiumoxide::crypto::sign::gen_keypair();
 
         let sd0 = StructuredData::new(0,
-                                  ::routing::NameType::new([0u8; 64]),
-                                  0,
-                                  data.clone(),
-                                  vec![public_key.clone()],
-                                  Some(vec![public_key.clone()]),
-                                  &secret_key);
+                                      ::routing::NameType::new([0u8; 64]),
+                                      0,
+                                      data.clone(),
+                                      vec![public_key.clone()],
+                                      Some(vec![public_key.clone()]),
+                                      &secret_key);
 
         let sd1 = StructuredData::new(0,
-                                  ::routing::NameType::new([0u8; 64]),
-                                  0,
-                                  data,
-                                  vec![public_key.clone()],
-                                  None,
-                                  &secret_key);
+                                      ::routing::NameType::new([0u8; 64]),
+                                      0,
+                                      data,
+                                      vec![public_key.clone()],
+                                      None,
+                                      &secret_key);
 
         let mut encoder0 = ::cbor::Encoder::from_memory();
         encoder0.encode(&[&(sd0)]).unwrap();
@@ -307,12 +313,12 @@ mod test {
         let (public_key, secret_key) = ::sodiumoxide::crypto::sign::gen_keypair();
 
         let sd0 = StructuredData::new(0,
-                                  ::routing::NameType::new([0u8; 64]),
-                                  0,
-                                  data.clone(),
-                                  vec![public_key.clone()],
-                                  Some(vec![public_key.clone()]),
-                                  &secret_key);
+                                      ::routing::NameType::new([0u8; 64]),
+                                      0,
+                                      data.clone(),
+                                      vec![public_key.clone()],
+                                      Some(vec![public_key.clone()]),
+                                      &secret_key);
 
         let data0 = Data::StructuredData(sd0.clone());
 
