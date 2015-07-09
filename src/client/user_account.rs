@@ -234,7 +234,7 @@ impl Account {
         let iv_size = key_size / 2;
 
         let iterations : u16 = ((pin % 10000) + 10000) as u16;
-        let mut salt : Vec<u8>;
+        let salt : Vec<u8>;
         {
             let mut salt_partial = vec![0u8; digest_size];
 
