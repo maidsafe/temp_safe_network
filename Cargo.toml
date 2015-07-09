@@ -1,6 +1,6 @@
 [package]
 name = "maidsafe_client"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "Maidsafe Client API library"
 documentation = "http://maidsafe.github.io/maidsafe_client/latest/"
