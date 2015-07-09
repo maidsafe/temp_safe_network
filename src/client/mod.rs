@@ -28,7 +28,8 @@ use maidsafe_types::TypeTag;
 use routing::sendable::Sendable;
 
 mod user_account;
-mod response_getter;
+/// ResponseGetter is a lazy evaluated response getter.
+pub mod response_getter;
 mod callback_interface;
 
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
