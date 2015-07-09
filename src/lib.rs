@@ -29,7 +29,7 @@
 
 #![deny(deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
 overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
-raw_pointer_derive, stable_features, unconditional_recursion, unknown_lints, unsafe_code,
+raw_pointer_derive, stable_features, unconditional_recursion, unknown_lints,
 unsigned_negation, unused, unused_allocation, unused_attributes, unused_comparisons,
 unused_features, unused_parens, while_true)]
 
@@ -51,11 +51,18 @@ extern crate sodiumoxide;
 extern crate rustc_serialize;
 extern crate maidsafe_types;
 extern crate lru_time_cache;
+
+/// Macros defined for usage
+#[macro_use]
+mod macros;
 /// Self-Auth and Gateway Module
 pub mod client;
 /// Parse incoming data
 pub mod data_parser;
-
+/// Public and Private Id types
+pub mod id;
+/// All Maidsafe tagging should offset from this
+pub const MAIDSAFE_TAG: u64 = 5483_000;
 /// Representation of input/output error
 pub type IoError = std::io::Error;
 
@@ -64,7 +71,9 @@ pub enum CryptoError {
     /// TODO
     SymmetricCryptoError(crypto::symmetriccipher::SymmetricCipherError),
     /// TODO
-    BadBuffer
+    BadBuffer,
+    /// TODO
+    Unknown,
 }
 
 impl From<crypto::symmetriccipher::SymmetricCipherError> for CryptoError {
@@ -134,5 +143,12 @@ pub mod utility {
     /// Generates a random PIN number
     pub fn generate_random_pin() -> u32 {
         ::rand::random::<u32>() % 10000
+    }
+
+    ///
+    /// Returns true if both slices are equal in length, and have equal contents
+    ///
+    pub fn slice_equal<T: PartialEq>(lhs: &[T], rhs: &[T]) -> bool {
+        lhs.len() == rhs.len() && lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b)
     }
 }

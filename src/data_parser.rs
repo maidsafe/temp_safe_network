@@ -22,17 +22,17 @@ pub enum Parser {
     /// Parser Variant
     StructuredData(::maidsafe_types::StructuredData),
     /// Parser Variant
-    Maid(::maidsafe_types::IdType),
+    Maid(::id::IdType),
     /// Parser Variant
-    Mpid(::maidsafe_types::IdType),
+    Mpid(::id::IdType),
     /// Parser Variant
-    AnMaid(::maidsafe_types::RevocationIdType),
+    AnMaid(::id::RevocationIdType),
     /// Parser Variant
-    AnMpid(::maidsafe_types::RevocationIdType),
+    AnMpid(::id::RevocationIdType),
     /// Parser Variant
-    PublicMaid(::maidsafe_types::PublicIdType),
+    PublicMaid(::id::PublicIdType),
     /// Parser Variant
-    PublicMpid(::maidsafe_types::PublicIdType),
+    PublicMpid(::id::PublicIdType),
     /// Parser Variant
     Unknown(u64),
 }
@@ -44,12 +44,12 @@ impl ::rustc_serialize::Decodable for Parser {
         match tag {
             ::maidsafe_types::data_tags::IMMUTABLE_DATA_TAG  => Ok(Parser::ImmutableData(try!(::rustc_serialize::Decodable::decode(d)))),
             ::maidsafe_types::data_tags::STRUCTURED_DATA_TAG => Ok(Parser::StructuredData(try!(::rustc_serialize::Decodable::decode(d)))),
-            ::maidsafe_types::data_tags::MAID_TAG            => Ok(Parser::Maid(try!(::rustc_serialize::Decodable::decode(d)))),
-            ::maidsafe_types::data_tags::MPID_TAG            => Ok(Parser::Mpid(try!(::rustc_serialize::Decodable::decode(d)))),
-            ::maidsafe_types::data_tags::AN_MAID_TAG         => Ok(Parser::AnMaid(try!(::rustc_serialize::Decodable::decode(d)))),
-            ::maidsafe_types::data_tags::AN_MPID_TAG         => Ok(Parser::AnMpid(try!(::rustc_serialize::Decodable::decode(d)))),
-            ::maidsafe_types::data_tags::PUBLIC_MAID_TAG     => Ok(Parser::PublicMaid(try!(::rustc_serialize::Decodable::decode(d)))),
-            ::maidsafe_types::data_tags::PUBLIC_MPID_TAG     => Ok(Parser::PublicMpid(try!(::rustc_serialize::Decodable::decode(d)))),
+            ::id::data_tags::MAID_TAG            => Ok(Parser::Maid(try!(::rustc_serialize::Decodable::decode(d)))),
+            ::id::data_tags::MPID_TAG            => Ok(Parser::Mpid(try!(::rustc_serialize::Decodable::decode(d)))),
+            ::id::data_tags::AN_MAID_TAG         => Ok(Parser::AnMaid(try!(::rustc_serialize::Decodable::decode(d)))),
+            ::id::data_tags::AN_MPID_TAG         => Ok(Parser::AnMpid(try!(::rustc_serialize::Decodable::decode(d)))),
+            ::id::data_tags::PUBLIC_MAID_TAG     => Ok(Parser::PublicMaid(try!(::rustc_serialize::Decodable::decode(d)))),
+            ::id::data_tags::PUBLIC_MPID_TAG     => Ok(Parser::PublicMpid(try!(::rustc_serialize::Decodable::decode(d)))),
             _ => Ok(Parser::Unknown(tag)),
         }
     }

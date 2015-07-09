@@ -21,7 +21,6 @@ use cbor;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 
 use routing;
-use maidsafe_types;
 
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
 
@@ -30,13 +29,13 @@ static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivatio
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also his Root
 /// Directory ID if he has put data onto the network.
 pub struct Account {
-    an_maid: maidsafe_types::RevocationIdType,
-    maid: maidsafe_types::IdType,
-    public_maid: maidsafe_types::PublicIdType,
+    an_maid: ::id::RevocationIdType,
+    maid: ::id::IdType,
+    public_maid: ::id::PublicIdType,
 
-    an_mpid: maidsafe_types::RevocationIdType,
-    mpid: maidsafe_types::IdType,
-    public_mpid: maidsafe_types::PublicIdType,
+    an_mpid: ::id::RevocationIdType,
+    mpid: ::id::IdType,
+    public_mpid: ::id::PublicIdType,
 
     root_dir_id: Option<routing::NameType>,
 }
@@ -45,13 +44,13 @@ pub struct Account {
 impl Account {
     /// Create a new Session Packet with Randomly generated Maid keys for the user
     pub fn new(root_dir_id: Option<routing::NameType>) -> Account {
-        let an_maid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MaidTypeTags>();
-        let maid = maidsafe_types::IdType::new(&an_maid);
-        let public_maid = maidsafe_types::PublicIdType::new(&maid, &an_maid);
+        let an_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();
+        let maid = ::id::IdType::new(&an_maid);
+        let public_maid = ::id::PublicIdType::new(&maid, &an_maid);
 
-        let an_mpid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MpidTypeTags>();
-        let mpid = maidsafe_types::IdType::new(&an_mpid);
-        let public_mpid = maidsafe_types::PublicIdType::new(&mpid, &an_mpid);
+        let an_mpid = ::id::RevocationIdType::new::<::id::MpidTypeTags>();
+        let mpid = ::id::IdType::new(&an_mpid);
+        let public_mpid = ::id::PublicIdType::new(&mpid, &an_mpid);
 
         Account {
             an_maid: an_maid,
@@ -65,32 +64,32 @@ impl Account {
     }
 
     /// Get user's AnMAID
-    pub fn get_an_maid(&self) -> &maidsafe_types::RevocationIdType {
+    pub fn get_an_maid(&self) -> &::id::RevocationIdType {
         &self.an_maid
     }
 
     /// Get user's MAID
-    pub fn get_maid(&self) -> &maidsafe_types::IdType {
+    pub fn get_maid(&self) -> &::id::IdType {
         &self.maid
     }
 
     /// Get user's Public-MAID
-    pub fn get_public_maid(&self) -> &maidsafe_types::PublicIdType {
+    pub fn get_public_maid(&self) -> &::id::PublicIdType {
         &self.public_maid
     }
 
     /// Get user's AnMPID
-    pub fn get_an_mpid(&self) -> &maidsafe_types::RevocationIdType {
+    pub fn get_an_mpid(&self) -> &::id::RevocationIdType {
         &self.an_mpid
     }
 
     /// Get user's MPID
-    pub fn get_mpid(&self) -> &maidsafe_types::IdType {
+    pub fn get_mpid(&self) -> &::id::IdType {
         &self.mpid
     }
 
     /// Get user's Public-MPID
-    pub fn get_public_mpid(&self) -> &maidsafe_types::PublicIdType {
+    pub fn get_public_mpid(&self) -> &::id::PublicIdType {
         &self.public_mpid
     }
 
