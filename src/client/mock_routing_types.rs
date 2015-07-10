@@ -44,6 +44,11 @@ impl ImmutableData {
         &self.value
     }
 
+    /// Returns the value
+    pub fn get_tag_type(&self) -> &ImmutableDataType {
+        &self.type_tag
+    }
+
     /// Returns name ensuring invariant
     pub fn name(&self) -> ::routing::NameType {
         let digest = ::sodiumoxide::crypto::hash::sha512::hash(&self.value);
@@ -62,7 +67,7 @@ pub struct StructuredData {
     version: u64,
     data: Vec<u8>,
     current_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-    previous_owner_keys: Option<Vec<::sodiumoxide::crypto::sign::PublicKey>>,
+    previous_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
     previous_owner_signatures: Vec<::sodiumoxide::crypto::sign::Signature>,
 }
 
@@ -72,7 +77,7 @@ impl StructuredData {
                version: u64,
                data: Vec<u8>,
                current_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-               previous_owner_keys: Option<Vec<::sodiumoxide::crypto::sign::PublicKey>>,
+               previous_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                sign_key: &::sodiumoxide::crypto::sign::SecretKey) -> StructuredData {
         let mut structured_data = StructuredData {
             tag_type: tag_type,
@@ -88,22 +93,39 @@ impl StructuredData {
         structured_data
     }
 
+    pub fn get_data(&self) -> &Vec<u8> {
+        &self.data
+    }
+
+    pub fn get_version(&self) -> u64 {
+        self.version
+    }
+
+    pub fn get_signatures(&self) -> &Vec<::sodiumoxide::crypto::sign::Signature> {
+        &self.previous_owner_signatures
+    }
+
+    pub fn get_owners(&self) -> &Vec<::sodiumoxide::crypto::sign::PublicKey> {
+        &self.current_owner_keys
+    }
+
     pub fn add_signature(&mut self, sign_key: &::sodiumoxide::crypto::sign::SecretKey) {
         let signable = self.data_to_sign();
         self.previous_owner_signatures.push(::sodiumoxide::crypto::sign::sign_detached(&signable[..], sign_key));
     }
 
     pub fn data_to_sign(&self) -> Vec<u8> {
-        let mut vec = self.data.iter().chain( self.version.to_string().as_bytes().iter().chain(
+        self.data.iter().chain(self.version.to_string().as_bytes().iter().chain(
                 self.current_owner_keys.iter().fold(
                     Vec::<u8>::new(), |mut key_vec, key| { key_vec.extend(key.0.iter().map(|a| *a).collect::<Vec<u8>>()); key_vec }
-                    ).iter())).map(|a| *a).collect::<Vec<u8>>();
+                    ).iter().chain(
+                        self.previous_owner_keys.iter().fold(
+                            Vec::<u8>::new(), |mut key_vec, key| { key_vec.extend(key.0.iter().map(|a| *a).collect::<Vec<u8>>()); key_vec }
+                            ).iter()))).map(|a| *a).collect::<Vec<u8>>()
+    }
 
-        if let Some(ref previous_owner_keys) = self.previous_owner_keys {
-            vec.extend(previous_owner_keys.iter().fold(Vec::<u8>::new(), |mut key_vec, key| { key_vec.extend(key.0.iter().map(|a| *a).collect::<Vec<u8>>()); key_vec }));
-        }
-
-        vec
+    pub fn get_tag_type(&self) -> u64 {
+        self.tag_type
     }
 
     pub fn name(&self) -> ::routing::NameType {
@@ -120,16 +142,9 @@ impl ::rustc_serialize::Encodable for StructuredData {
             curr_owner.push(it.0.iter().map(|a| *a).collect());
         }
 
-        let opt_prev_owner_keys: Option<Vec<Vec<u8>>>;
-        if let Some(ref previous_owner_keys) = self.previous_owner_keys {
-            let mut prev_owner = Vec::<Vec<u8>>::new();
-            for it in previous_owner_keys.iter() {
-                prev_owner.push(it.0.iter().map(|a| *a).collect());
-            }
-
-            opt_prev_owner_keys = Some(prev_owner);
-        } else {
-            opt_prev_owner_keys = None;
+        let mut prev_owner = Vec::<Vec<u8>>::new();
+        for it in self.previous_owner_keys.iter() {
+            prev_owner.push(it.0.iter().map(|a| *a).collect());
         }
 
         let mut previous_owner_signatures = Vec::<Vec<u8>>::new();
@@ -142,7 +157,7 @@ impl ::rustc_serialize::Encodable for StructuredData {
                                            self.version,
                                            &self.data,
                                            curr_owner,
-                                           opt_prev_owner_keys,
+                                           prev_owner,
                                            previous_owner_signatures)).encode(e)
     }
 }
@@ -156,14 +171,14 @@ impl ::rustc_serialize::Decodable for StructuredData {
              version,
              data,
              curr_owner,
-             opt_prev_owner_keys,
+             previous_owner_keys,
              previous_owner_signatures):
             (::routing::NameType,
              u64,
              u64,
              Vec<u8>,
              Vec<Vec<u8>>,
-             Option<Vec<Vec<u8>>>,
+             Vec<Vec<u8>>,
              Vec<Vec<u8>>) = try!(::rustc_serialize::Decodable::decode(d));
 
         let mut vec_current_owner = Vec::<::sodiumoxide::crypto::sign::PublicKey>::new();
@@ -176,21 +191,14 @@ impl ::rustc_serialize::Decodable for StructuredData {
             vec_current_owner.push(::sodiumoxide::crypto::sign::PublicKey(arr_current));
         }
 
-        let opt_prev_owner_keys_decoded: Option<Vec<::sodiumoxide::crypto::sign::PublicKey>>;
-        if let Some(previous_owner_keys) = opt_prev_owner_keys {
-            let mut vec_prev_owner = Vec::<::sodiumoxide::crypto::sign::PublicKey>::new();
-            for it in previous_owner_keys.iter() {
-                let mut arr_current = [0u8; 32];
-                for it_inner in it.iter().enumerate() {
-                    arr_current[it_inner.0] = *it_inner.1;
-                }
-
-                vec_prev_owner.push(::sodiumoxide::crypto::sign::PublicKey(arr_current));
+        let mut vec_prev_owner = Vec::<::sodiumoxide::crypto::sign::PublicKey>::new();
+        for it in previous_owner_keys.iter() {
+            let mut arr_current = [0u8; 32];
+            for it_inner in it.iter().enumerate() {
+                arr_current[it_inner.0] = *it_inner.1;
             }
 
-            opt_prev_owner_keys_decoded = Some(vec_prev_owner);
-        } else {
-            opt_prev_owner_keys_decoded = None;
+            vec_prev_owner.push(::sodiumoxide::crypto::sign::PublicKey(arr_current));
         }
 
         let mut signatures_decoded = Vec::<::sodiumoxide::crypto::sign::Signature>::new();
@@ -209,7 +217,7 @@ impl ::rustc_serialize::Decodable for StructuredData {
             version: version,
             data: data,
             current_owner_keys: vec_current_owner,
-            previous_owner_keys: opt_prev_owner_keys_decoded,
+            previous_owner_keys: vec_prev_owner,
             previous_owner_signatures: signatures_decoded,
         })
     }
@@ -252,7 +260,7 @@ mod test {
                                       0,
                                       data.clone(),
                                       vec![public_key.clone()],
-                                      Some(vec![public_key.clone()]),
+                                      vec![public_key.clone()],
                                       &secret_key);
 
         let sd1 = StructuredData::new(0,
@@ -260,7 +268,7 @@ mod test {
                                       0,
                                       data,
                                       vec![public_key.clone()],
-                                      None,
+                                      Vec::new(),
                                       &secret_key);
 
         let mut encoder0 = ::cbor::Encoder::from_memory();
@@ -317,7 +325,7 @@ mod test {
                                       0,
                                       data.clone(),
                                       vec![public_key.clone()],
-                                      Some(vec![public_key.clone()]),
+                                      vec![public_key.clone()],
                                       &secret_key);
 
         let data0 = Data::StructuredData(sd0.clone());
