@@ -39,10 +39,10 @@ etc
 
 ##TODO (rust_3 sprint)
 ### [0.1.2]
-- [ ] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
+- [X] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
 
 ### [0.1.3]
-- [ ] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
+- [X] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
 
 ### [0.1.4]
 - [ ] [MAID-1248](https://maidsafe.atlassian.net/browse/MAID-1248) Name the spawned rust threads
@@ -52,8 +52,6 @@ etc
 - [ ] [MAID-1249](https://maidsafe.atlassian.net/browse/MAID-1249) Implement Unified Structured Datatype
     - [ ] [MAID-1252](https://maidsafe.atlassian.net/browse/MAID-1252) Mock Unified StructuredData and ImmutableData
     - [ ] [MAID-1253](https://maidsafe.atlassian.net/browse/MAID-1253) Update Mock Routing to support Mock Unified SturcturedData and ImmutableData
-    - [ ] [MAID-1220](https://maidsafe.atlassian.net/browse/MAID-1220) Update the SessionPacket struct
-    - [ ] [MAID-1221](https://maidsafe.atlassian.net/browse/MAID-1221) Update client API to get and set configuration directory ids
     - [ ] [MAID-1222](https://maidsafe.atlassian.net/browse/MAID-1222) Compute size of Structured Data
     - [ ] [MAID-1223](https://maidsafe.atlassian.net/browse/MAID-1223) Implement a handler for Storing UnVersioned Structured Data
     - [ ] [MAID-1224](https://maidsafe.atlassian.net/browse/MAID-1224) Implement a handler for Retrieving Content of UnVersioned Structured Data
