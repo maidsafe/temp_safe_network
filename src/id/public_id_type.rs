@@ -129,13 +129,11 @@ impl ::rustc_serialize::Encodable for PublicIdType {
         let ::sodiumoxide::crypto::sign::PublicKey(ref revocation_public_key_vec) = self.revocation_public_key;
         let ::sodiumoxide::crypto::sign::Signature(ref signature) = self.signature;
         let type_vec = self.type_tag.to_string().into_bytes();
-        ::cbor::CborTagEncode::new(self.type_tag, &(
-                type_vec,
-                pub_sign_vec.as_ref(),
-                pub_asym_vec.as_ref(),
-                revocation_public_key_vec.as_ref(),
-                signature.as_ref())
-            ).encode(e)
+        ::cbor::CborTagEncode::new(self.type_tag, &(type_vec,
+                                                    pub_sign_vec.as_ref(),
+                                                    pub_asym_vec.as_ref(),
+                                                    revocation_public_key_vec.as_ref(),
+                                                    signature.as_ref())).encode(e)
     }
 }
 
@@ -177,7 +175,7 @@ mod test {
     use super::PublicIdType;
     use routing::types::array_as_vector;
     use ::id::Random;
-    
+
     impl Random for PublicIdType {
         fn generate_random() -> PublicIdType {
             let revocation_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();

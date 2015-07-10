@@ -132,11 +132,9 @@ impl ::rustc_serialize::Decodable for RevocationIdType {
             (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = try!(::rustc_serialize::Decodable::decode(d));
         let pub_sign_arr = convert_to_array!(pub_sign_vec, ::sodiumoxide::crypto::sign::PUBLICKEYBYTES);
         let sec_sign_arr = convert_to_array!(sec_sign_vec, ::sodiumoxide::crypto::sign::SECRETKEYBYTES);
-        let (revocation_type_tag, id_type_tag, public_id_type_tag) = (
-                convert_to_u64(revocation_type_tag_vec),
-                convert_to_u64(id_type_tag_vec),
-                convert_to_u64(public_id_type_tag_vec)
-            );
+        let (revocation_type_tag, id_type_tag, public_id_type_tag) = (convert_to_u64(revocation_type_tag_vec),
+                                                                      convert_to_u64(id_type_tag_vec),
+                                                                      convert_to_u64(public_id_type_tag_vec));
 
         if pub_sign_arr.is_none() || sec_sign_arr.is_none() || revocation_type_tag.is_none() ||
             id_type_tag.is_none() ||  public_id_type_tag.is_none() {

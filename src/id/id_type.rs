@@ -104,12 +104,11 @@ impl ::rustc_serialize::Encodable for IdType {
         let (::sodiumoxide::crypto::sign::SecretKey(sec_sign_vec), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_vec)) = self.secret_keys;
         let type_vec = self.type_tag.to_string().into_bytes();
 
-        ::cbor::CborTagEncode::new(self.type_tag, &(
-            type_vec,
-            pub_sign_vec.as_ref(),
-            pub_asym_vec.as_ref(),
-            sec_sign_vec.as_ref(),
-            sec_asym_vec.as_ref())).encode(e)
+        ::cbor::CborTagEncode::new(self.type_tag, &(type_vec,
+                                                    pub_sign_vec.as_ref(),
+                                                    pub_asym_vec.as_ref(),
+                                                    sec_sign_vec.as_ref(),
+                                                    sec_asym_vec.as_ref())).encode(e)
     }
 }
 
