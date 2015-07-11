@@ -1,6 +1,7 @@
 *.exe
 *.lock
 *.swp
+*.bootstrap.cache
 tags*
 build/
 build-tests/
