@@ -504,6 +504,14 @@ impl Client {
         }
     }
 
+    /// Delete data from the network
+    pub fn delete(&mut self, location: ::routing::NameType, data: Data) -> Result<response_getter::ResponseGetter, ::IoError> {
+        match self.routing.lock().unwrap().delete(location, data) {
+            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
+            Err(io_err) => Err(io_err),
+        }
+    }
+
     /// Put data onto the network. This is non-blocking.
     pub fn put<T>(&mut self, sendable: T) -> Result<response_getter::ResponseGetter, ::IoError> where T: Sendable {
         match self.routing.lock().unwrap().put(sendable) {
