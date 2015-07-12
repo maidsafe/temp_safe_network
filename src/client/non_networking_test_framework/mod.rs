@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(unsafe_code)]
+#![allow(unsafe_code, unused)] // TODO Remove the unused attribute later
 
 use routing;
 use maidsafe_types::TypeTag;
@@ -177,6 +177,49 @@ impl RoutingClientMock {
         Ok(self.msg_id)
     }
 
+    pub fn delete(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<routing::types::MessageId, ::IoError> {
+        self.msg_id += 1;
+        let msg_id = self.msg_id;
+        let delay_ms = self.network_delay_ms;
+        let cb_interface = self.callback_interface.clone();
+        let data_store = get_storage();
+
+        let mut data_store_mutex_guard = data_store.lock().unwrap();
+        let success = if data_store_mutex_guard.contains_key(&location) {
+            match (data, ::utility::deserialise(data_store_mutex_guard.get(&location).unwrap().clone())) {
+                (::client::Data::StructuredData(struct_data_new), ::client::Data::StructuredData(struct_data_stored)) => {
+                    let mut count = 0usize;
+                    if struct_data_stored.get_owners().iter().any(|key| { // This is more efficient than filter as it will stop whenever sign count reaches >= 50%
+                        if struct_data_new.get_signatures().iter().any(|sig| ::sodiumoxide::crypto::sign::verify_detached(sig, &struct_data_new.data_to_sign(), key)) {
+                            count += 1;
+                        }
+
+                        count >= struct_data_stored.get_owners().len() / 2 + struct_data_stored.get_owners().len() % 2
+                    }) {
+                        let _ = data_store_mutex_guard.remove(&location);
+                        true
+                    } else {
+                        false
+                    }
+                },
+                _ => false,
+            }
+        } else {
+            false
+        };
+
+        ::std::thread::spawn(move || {
+            ::std::thread::sleep_ms(delay_ms);
+            if success {
+                cb_interface.lock().unwrap().handle_put_response(msg_id, Ok(Vec::<u8>::new()));
+            } else {
+                cb_interface.lock().unwrap().handle_put_response(msg_id, Err(routing::error::ResponseError::InvalidRequest));
+            }
+        });
+
+        Ok(self.msg_id)
+    }
+
     pub fn get(&mut self, _type_id: u64, name: routing::NameType) -> Result<routing::types::MessageId, ::IoError> {
         self.msg_id += 1;
         let msg_id = self.msg_id;
@@ -277,7 +320,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn check_put_and_get_for_immutable_data() {
+    fn check_put_post_get_delete_for_immutable_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
@@ -366,7 +409,6 @@ mod test {
             }
         }
 
-
         // Subsequent PUTs for same ImmutableData should succeed - De-duplication
         {
             let put_result = mock_routing.lock().unwrap().put_new(orig_immutable_data.name(), orig_data.clone());
@@ -400,10 +442,61 @@ mod test {
                 Err(_) => panic!("Failure in PUT !!"),
             }
         }
+
+        // POSTs for ImmutableData should fail
+        {
+            let post_result = mock_routing.lock().unwrap().post(orig_immutable_data.name(), orig_data.clone());
+            match post_result {
+                Ok(id) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+                    match response_getter.get() {
+                        Ok(_) => panic!("POST for ImmutableData should fail !!"),
+                        Err(_) => (),
+                    }
+                },
+                Err(_) => panic!("Failure in PUT !!"),
+            }
+        }
+
+        // DELETEs of ImmutableData should fail
+        {
+            let delete_result = mock_routing.lock().unwrap().delete(orig_immutable_data.name(), orig_data);
+            match delete_result {
+                Ok(id) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+                    match response_getter.get() {
+                        Ok(_) => panic!("DELETE for ImmutableData should fail !!"),
+                        Err(_) => (),
+                    }
+                },
+                Err(_) => panic!("Failure in PUT !!"),
+            }
+        }
+
+        // GET ImmutableData should pass
+        {
+            let mut mock_routing_mutex_guard = mock_routing.lock().unwrap();
+            match mock_routing_mutex_guard.get_new(orig_immutable_data.name(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
+                Ok(id) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+                    match response_getter.get() {
+                        Ok(raw_data) => {
+                            let data = ::utility::deserialise::<::client::Data>(raw_data);
+                            match data {
+                                ::client::Data::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data),
+                                _ => panic!("Unexpected!"),
+                            }
+                        },
+                        Err(_) => panic!("Should have found data put before by a PUT"),
+                    }
+                },
+                Err(_) => panic!("Failure in GET !!"),
+            }
+        }
     }
 
     #[test]
-    fn check_put_and_get_for_structured_data() {
+    fn check_put_post_get_delete_for_structured_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
@@ -665,10 +758,10 @@ mod test {
                                     received_structured_data = structured_data;
                                     assert!(received_structured_data == account_version);
                                 },
-                                _ => ()
+                                _ => panic!("Unexpected!"),
                             }
                         },
-                        Err(_) => (),
+                        Err(_) => panic!("Should have found data put before by a PUT"),
                     }
                 },
                 Err(_) => panic!("Failure in GET !!"),
@@ -712,6 +805,36 @@ mod test {
                             }
                         },
                         Err(_) => panic!("Should have found data put before by a PUT"),
+                    }
+                },
+                Err(_) => panic!("Failure in GET !!"),
+            }
+        }
+
+        // DELETE of Structured Data should succeed
+        {
+            let delete_result = mock_routing.lock().unwrap().delete(account_version.name(), data_account_version.clone());
+            match delete_result {
+                Ok(id) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+                    match response_getter.get() {
+                        Ok(_) => (),
+                        Err(_) => panic!("StructuredData should be allowed to be deleted !!"),
+                    }
+                },
+                Err(_) => panic!("Failure in DELETE !!"),
+            }
+        }
+
+        // GET for DELETEd StructuredData version should fail
+        {
+            let get_result = mock_routing.lock().unwrap().get_new(account_version.name(), ::client::DataRequest::StructuredData(TYPE_TAG));
+            match get_result {
+                Ok(id) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+                    match response_getter.get() {
+                        Ok(raw_data) => panic!("GET for DELETEd StructuredData version should fail !!"),
+                        Err(_) => (),
                     }
                 },
                 Err(_) => panic!("Failure in GET !!"),
