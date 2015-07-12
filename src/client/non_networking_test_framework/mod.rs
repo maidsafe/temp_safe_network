@@ -300,16 +300,13 @@ impl RoutingClientMock {
     pub fn bootstrap(&mut self,
                      endpoints: Option<Vec<::routing::routing_client::Endpoint>>,
                      _: Option<u16>) -> Result<(), routing::error::RoutingError> {
-        match endpoints {
-            Some(vec_endpoints) => {
-                for endpoint in vec_endpoints {
-                    println!("Endpoint: {:?}", endpoint);
-                }
-
-                Ok(())
-            },
-            None => Ok(()),
+        if let Some(vec_endpoints) = endpoints {
+            for endpoint in vec_endpoints {
+                println!("Endpoint: {:?}", endpoint);
+            }
         }
+
+        Ok(())
     }
 }
 
