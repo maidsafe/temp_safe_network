@@ -120,7 +120,7 @@ fn convert_to_u64(num_vec: Vec<u8>) -> Option<u64> {
 
 impl ::rustc_serialize::Encodable for RevocationIdType {
 
-    fn encode<E: ::rustc_serialize::Encoder>(&self, e: &mut E)->Result<(), E::Error> {
+    fn encode<E: ::rustc_serialize::Encoder>(&self, e: &mut E) -> Result<(), E::Error> {
         let revocation_type_tag_vec = self.type_tags.0.to_string().into_bytes();
         let id_type_tag_vec = self.type_tags.1.to_string().into_bytes();
         let public_id_type_tag_vec = self.type_tags.2.to_string().into_bytes();
@@ -136,7 +136,7 @@ impl ::rustc_serialize::Encodable for RevocationIdType {
 
 impl ::rustc_serialize::Decodable for RevocationIdType {
 
-    fn decode<D: ::rustc_serialize::Decoder>(d: &mut D)-> Result<RevocationIdType, D::Error> {
+    fn decode<D: ::rustc_serialize::Decoder>(d: &mut D) -> Result<RevocationIdType, D::Error> {
         let _ = try!(d.read_u64());
         let (revocation_type_tag_vec, id_type_tag_vec, public_id_type_tag_vec , pub_sign_vec, sec_sign_vec):
             (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = try!(::rustc_serialize::Decodable::decode(d));

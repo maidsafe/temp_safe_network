@@ -113,7 +113,7 @@ impl PublicIdType {
 
 impl ::rustc_serialize::Encodable for PublicIdType {
 
-    fn encode<E: ::rustc_serialize::Encoder>(&self, e: &mut E)->Result<(), E::Error> {
+    fn encode<E: ::rustc_serialize::Encoder>(&self, e: &mut E) -> Result<(), E::Error> {
         let (::sodiumoxide::crypto::sign::PublicKey(ref pub_sign_vec), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_vec)) = self.public_keys;
         let ::sodiumoxide::crypto::sign::PublicKey(ref revocation_public_key_vec) = self.revocation_public_key;
         let ::sodiumoxide::crypto::sign::Signature(ref signature) = self.signature;
