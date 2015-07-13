@@ -15,10 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-///// Unversioned-Structured Data
-//pub mod unversioned
+/// Unversioned-Structured Data
+pub mod unversioned;
 ///// Versioned-Structured Data
-//pub mod versioned
+//pub mod versioned;
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
 const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 64;
@@ -35,10 +35,7 @@ pub enum DataFitResult {
 
 /// Calculates approximate space available for data. Calculates the worst case scenario in which
 /// all owners must sign this StructuredData.
-pub fn get_approximate_space_for_data(tag_type: u64,
-                                      id: ::routing::NameType,//::sodiumoxide::crypto::hash::sha512::Digest,
-                                      version: u64,
-                                      owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
+pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                                       prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> usize {
     let max_signatures_possible = if prev_owner_keys.is_empty() {
         owner_keys.len()
@@ -47,9 +44,9 @@ pub fn get_approximate_space_for_data(tag_type: u64,
     };
 
     let (_, fake_signer) = ::sodiumoxide::crypto::sign::gen_keypair();
-    let mut structured_data = ::client::StructuredData::new(tag_type,
-                                                            id,
-                                                            version,
+    let mut structured_data = ::client::StructuredData::new(::std::u64::MAX,
+                                                            ::routing::NameType::new([0; 64]),
+                                                            ::std::u64::MAX,
                                                             Vec::new(),
                                                             owner_keys,
                                                             prev_owner_keys,
@@ -70,17 +67,10 @@ pub fn get_approximate_space_for_data(tag_type: u64,
 }
 
 /// Check if it is possible to fit the given data into the given StructuredData
-pub fn check_if_data_can_fit_in_structured_data(tag_type: u64,
-                                                id: ::routing::NameType,//::sodiumoxide::crypto::hash::sha512::Digest,
-                                                version: u64,
-                                                data: Vec<u8>,
+pub fn check_if_data_can_fit_in_structured_data(data: Vec<u8>,
                                                 owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                                                 prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> DataFitResult {
-    let available_size = get_approximate_space_for_data(tag_type,
-                                                        id,
-                                                        version,
-                                                        owner_keys,
-                                                        prev_owner_keys);
+    let available_size = get_approximate_space_for_data(owner_keys, prev_owner_keys);
 
     if available_size <= MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES {
         DataFitResult::NoDataCanFit
