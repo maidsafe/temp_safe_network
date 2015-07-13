@@ -15,26 +15,30 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// Parser for verifying incoming encoded data
-pub enum Parser {
-    /// Parser Variant
-    ImmutableData(::maidsafe_types::ImmutableData),
-    /// Parser Variant
-    StructuredData(::maidsafe_types::StructuredData),
-    /// Parser Variant
-    Unknown(u64),
-}
+///
+/// Convert a container to an array. If the container is not the exact size specified, None is
+/// returned. Otherwise, all of the elements are moved into the array.
+///
+/// ```
+/// let mut data = Vec::<usize>::new();
+/// data.push(1);
+/// data.push(2);
+/// assert!(convert_to_array(data, 2).is_some());
+/// assert!(convert_to_array(data, 3).is_none());
+/// ```
 
-impl ::rustc_serialize::Decodable for Parser {
-
-    fn decode<D: ::rustc_serialize::Decoder>(d: &mut D) -> Result<Parser, D::Error> {
-        let tag = try!(d.read_u64());
-
-        match tag {
-            ::maidsafe_types::data_tags::IMMUTABLE_DATA_TAG  => Ok(Parser::ImmutableData(try!(::rustc_serialize::Decodable::decode(d)))),
-            ::maidsafe_types::data_tags::STRUCTURED_DATA_TAG => Ok(Parser::StructuredData(try!(::rustc_serialize::Decodable::decode(d)))),
-            _ => Ok(Parser::Unknown(tag)),
+macro_rules! convert_to_array {
+    ($container:ident, $size:expr) => {{
+        if $container.len() != $size {
+            None
+        } else {
+            use std::mem;
+            let mut arr : [_; $size] = [0; $size];
+            for element in $container.into_iter().enumerate() {
+                let old_val = mem::replace(&mut arr[element.0], element.1);
+                mem::forget(old_val);
+            }
+            Some(arr)
         }
-    }
-
+    }};
 }

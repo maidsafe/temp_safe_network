@@ -39,10 +39,10 @@ etc
 
 ##TODO (rust_3 sprint)
 ### [0.1.2]
-- [ ] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
+- [X] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
 
 ### [0.1.3]
-- [ ] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
+- [X] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
 
 ### [0.1.4]
 - [ ] [MAID-1248](https://maidsafe.atlassian.net/browse/MAID-1248) Name the spawned rust threads
