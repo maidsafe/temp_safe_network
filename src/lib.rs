@@ -55,6 +55,8 @@ extern crate lru_time_cache;
 pub mod client;
 /// Parse incoming data
 pub mod data_parser;
+/// Logic for StructuredData
+pub mod structured_data_operations;
 
 /// Representation of input/output error
 pub type IoError = std::io::Error;
