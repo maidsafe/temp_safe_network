@@ -48,9 +48,10 @@ extern crate rand;
 extern crate crypto;
 extern crate routing;
 extern crate sodiumoxide;
-extern crate rustc_serialize;
 extern crate maidsafe_types;
 extern crate lru_time_cache;
+extern crate rustc_serialize;
+extern crate self_encryption;
 
 /// Maidsafe-Client Errors
 pub mod errors;
