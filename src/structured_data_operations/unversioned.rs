@@ -15,9 +15,12 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-const CONTAINS_DATA: u8          = 0;
-const CONTAINS_DATA_MAP: u8      = 1;
-const CONTAINS_DATA_MAP_NAME: u8 = 2;
+#[derive(Clone, RustcEncodable, RustcDecodable, PartialEq)]
+enum DataTypeEncoding {
+    ContainsData(Vec<u8>),
+    ContainsDataMap(::self_encryption::datamap::DataMap),
+    ContainsDataMapName(::routing::NameType),
+}
 
 /// Create StructuredData
 pub fn create<T>(storage: ::std::sync::Arc<T>,
@@ -32,7 +35,7 @@ pub fn create<T>(storage: ::std::sync::Arc<T>,
                                                &::sodiumoxide::crypto::box_::SecretKey,
                                                &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::client::StructuredData, ::errors::ClientError>
                                                                                          where T: ::self_encryption::Storage + Sync + Send + 'static {
-    let data_to_store = try!(get_data_to_store_in_structured_data(CONTAINS_DATA, &data, data_encryption_keys));
+    let data_to_store = try!(get_data_to_store_in_structured_data(DataTypeEncoding::ContainsData(data.clone()), data_encryption_keys));
 
     match ::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone()) {
         ::structured_data_operations::DataFitResult::DataFits => {
@@ -50,7 +53,7 @@ pub fn create<T>(storage: ::std::sync::Arc<T>,
             se.write(&data, 0);
             let data_map = se.close();
 
-            let data_to_store = try!(get_data_to_store_in_structured_data(CONTAINS_DATA_MAP, &data_map, data_encryption_keys));
+            let data_to_store = try!(get_data_to_store_in_structured_data(DataTypeEncoding::ContainsDataMap(data_map.clone()), data_encryption_keys));
             match ::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone()) {
                 ::structured_data_operations::DataFitResult::DataFits => {
                     Ok(::client::StructuredData::new(tag_type,
@@ -66,16 +69,10 @@ pub fn create<T>(storage: ::std::sync::Arc<T>,
                     // TODO Improve this - will require changes elsewhere - eg., implement storage
                     // trait in client itself
 
-                    let raw_data_map = if let Some(encrypted_vec) = try!(encrypt_data_if_needed(&data_map, data_encryption_keys)) {
-                        encrypted_vec
-                    } else {
-                        ::utility::serialise(data_map)
-                    };
+                    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data_to_store.clone());
+                    storage.put(Vec::new(), data_to_store); // TODO improve 1st parameter - use new function to take Data as parameter
 
-                    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, raw_data_map.clone());
-                    storage.put(Vec::new(), raw_data_map); // TODO improve 1st parameter - use new function to take Data as parameter
-
-                    let data_to_store = try!(get_data_to_store_in_structured_data(CONTAINS_DATA_MAP_NAME, &immutable_data.name(), None));
+                    let data_to_store = try!(get_data_to_store_in_structured_data(DataTypeEncoding::ContainsDataMapName(immutable_data.name()), None));
 
                     Ok(::client::StructuredData::new(tag_type,
                                                      id,
@@ -92,31 +89,25 @@ pub fn create<T>(storage: ::std::sync::Arc<T>,
     }
 }
 
-fn get_data_to_store_in_structured_data<T>(data_encoding: u8,
-                                           data: &T,
-                                           data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
-                                                                         &::sodiumoxide::crypto::box_::SecretKey,
-                                                                         &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError>
-                                                                                                                   where T: ::rustc_serialize::Encodable {
-    let mut encoder = ::cbor::Encoder::from_memory();
-    if let Some(encrypted_vec) = try!(encrypt_data_if_needed(data, data_encryption_keys)) {
-        try!(encoder.encode(&[(data_encoding, encrypted_vec)]));
-    } else {
-        try!(encoder.encode(&[(data_encoding, data)]));
-    }
-    Ok(encoder.into_bytes())
-}
+//pub fn get_data<T>(storage: ::std::sync::Arc<T>,
+//                   struct_data: &::client::StructuredData,
+//                   data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
+//                                                 &::sodiumoxide::crypto::box_::SecretKey,
+//                                                 &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError>
+//                                                                                           where T: ::self_encryption::Storage + Sync + Send + 'static {
+//    ;
+//}
 
-fn encrypt_data_if_needed<T>(data: &T,
-                             data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
-                                                           &::sodiumoxide::crypto::box_::SecretKey,
-                                                           &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Option<Vec<u8>>, ::errors::ClientError>
-                                                                                                     where T: ::rustc_serialize::Encodable {
+fn get_data_to_store_in_structured_data(data: DataTypeEncoding,
+                                        data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
+                                                                      &::sodiumoxide::crypto::box_::SecretKey,
+                                                                      &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
+    let mut encoder = ::cbor::Encoder::from_memory();
+    try!(encoder.encode(&[data])); // TODO utilise ::utility::serialise() once return type is corrected there
+
     if let Some((ref public_encryp_key, ref secret_encryp_key, ref nonce)) = data_encryption_keys {
-        let mut encoder = ::cbor::Encoder::from_memory();
-        try!(encoder.encode(&[data])); // TODO utilise ::utility::serialise() once return type is corrected there
-        Ok(Some(try!(::utility::hybrid_encrypt(&encoder.into_bytes()[..], nonce, public_encryp_key, secret_encryp_key))))
+        Ok(try!(::utility::hybrid_encrypt(&encoder.into_bytes()[..], nonce, public_encryp_key, secret_encryp_key)))
     } else {
-        Ok(None)
+        Ok(encoder.into_bytes())
     }
 }
