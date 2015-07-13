@@ -128,7 +128,7 @@ pub mod utility {
 
     #[allow(dead_code)]
     /// utility function to deserialise a Decodable type
-    pub fn deserialise<T>(data: Vec<u8>) -> T where T : ::rustc_serialize::Decodable {
+    pub fn deserialise<T>(data: Vec<u8>) -> T where T: ::rustc_serialize::Decodable {
         let mut d = ::cbor::Decoder::from_bytes(data);
         d.decode().next().unwrap().unwrap()
     }
