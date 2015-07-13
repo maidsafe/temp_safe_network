@@ -52,8 +52,6 @@ etc
 - [ ] [MAID-1249](https://maidsafe.atlassian.net/browse/MAID-1249) Implement Unified Structured Datatype
     - [ ] [MAID-1252](https://maidsafe.atlassian.net/browse/MAID-1252) Mock Unified StructuredData and ImmutableData
     - [ ] [MAID-1253](https://maidsafe.atlassian.net/browse/MAID-1253) Update Mock Routing to support Mock Unified SturcturedData and ImmutableData
-    - [ ] [MAID-1220](https://maidsafe.atlassian.net/browse/MAID-1220) Update the SessionPacket struct
-    - [ ] [MAID-1221](https://maidsafe.atlassian.net/browse/MAID-1221) Update client API to get and set configuration directory ids
     - [ ] [MAID-1222](https://maidsafe.atlassian.net/browse/MAID-1222) Compute size of Structured Data
     - [ ] [MAID-1223](https://maidsafe.atlassian.net/browse/MAID-1223) Implement a handler for Storing UnVersioned Structured Data
     - [ ] [MAID-1224](https://maidsafe.atlassian.net/browse/MAID-1224) Implement a handler for Retrieving Content of UnVersioned Structured Data
