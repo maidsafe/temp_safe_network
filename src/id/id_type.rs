@@ -114,6 +114,7 @@ impl ::rustc_serialize::Encodable for IdType {
 
 impl ::rustc_serialize::Decodable for IdType {
     fn decode<D: ::rustc_serialize::Decoder>(d: &mut D)-> Result<IdType, D::Error> {
+        let _ = try!(d.read_u64());
         let (tag_type_vec, pub_sign_vec, pub_asym_vec, sec_sign_vec, sec_asym_vec) :
             (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = try!(::rustc_serialize::Decodable::decode(d));
         let pub_sign_arr = convert_to_array!(pub_sign_vec, ::sodiumoxide::crypto::sign::PUBLICKEYBYTES);
@@ -164,20 +165,16 @@ mod test {
         e.encode(&[&obj_before]).unwrap();
 
         let mut d = ::cbor::Decoder::from_bytes(e.as_bytes());
-        match d.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::Maid(obj_after) => {
-                let &(::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr_before), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
-                let &(::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr_after), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr_after)) = obj_after.public_keys();
-                let &(::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr_before), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_arr_before)) = &obj_before.secret_keys;
-                let &(::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr_after), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_arr_after)) = &obj_after.secret_keys;
+        let obj_after: ::id::IdType = d.decode().next().unwrap().unwrap();
+        let &(::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr_before), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
+        let &(::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr_after), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr_after)) = obj_after.public_keys();
+        let &(::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr_before), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_arr_before)) = &obj_before.secret_keys;
+        let &(::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr_after), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_arr_after)) = &obj_after.secret_keys;
 
-                assert_eq!(pub_sign_arr_before, pub_sign_arr_after);
-                assert_eq!(pub_asym_arr_before, pub_asym_arr_after);
-                assert!(::utility::slice_equal(&sec_sign_arr_before, &sec_sign_arr_after));
-                assert_eq!(sec_asym_arr_before, sec_asym_arr_after);
-            },
-            _ => panic!("Unexpected!"),
-        }
+        assert_eq!(pub_sign_arr_before, pub_sign_arr_after);
+        assert_eq!(pub_asym_arr_before, pub_asym_arr_after);
+        assert!(::utility::slice_equal(&sec_sign_arr_before, &sec_sign_arr_after));
+        assert_eq!(sec_asym_arr_before, sec_asym_arr_after);
     }
 
 #[test]

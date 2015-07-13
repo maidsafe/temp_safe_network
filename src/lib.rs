@@ -29,7 +29,7 @@
 
 #![deny(deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
 overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
-raw_pointer_derive, stable_features, unconditional_recursion, unknown_lints,
+raw_pointer_derive, stable_features, unconditional_recursion, unknown_lints, unsafe_code,
 unsigned_negation, unused, unused_allocation, unused_attributes, unused_comparisons,
 unused_features, unused_parens, while_true)]
 

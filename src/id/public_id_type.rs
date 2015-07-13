@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use routing::sendable::Sendable;
-
 /// PublicIdType
 ///
 /// #Examples
@@ -35,39 +33,6 @@ pub struct PublicIdType {
     public_keys: (::sodiumoxide::crypto::sign::PublicKey, ::sodiumoxide::crypto::box_::PublicKey),
     revocation_public_key: ::sodiumoxide::crypto::sign::PublicKey,
     signature: ::sodiumoxide::crypto::sign::Signature,
-}
-
-impl Sendable for PublicIdType {
-    fn name(&self) -> ::routing::NameType {
-        let combined_iter = (self.public_keys.0).0.into_iter().chain((self.public_keys.1).0.into_iter());
-        let mut combined: Vec<u8> = Vec::new();
-        for iter in combined_iter {
-            combined.push(*iter);
-        }
-        for i in self.type_tag.to_string().into_bytes().into_iter() {
-            combined.push(i);
-        }
-        for i in 0..::sodiumoxide::crypto::sign::SIGNATUREBYTES {
-            combined.push(self.signature.0[i]);
-        }
-        ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&combined).0)
-    }
-
-    fn type_tag(&self) -> u64 {
-        self.type_tag.clone()
-    }
-
-    fn serialised_contents(&self) -> Vec<u8> {
-        let mut e = ::cbor::Encoder::from_memory();
-        e.encode(&[&self]).unwrap();
-        e.into_bytes()
-    }
-
-    fn refresh(&self) -> bool {
-        false
-    }
-
-    fn merge(&self, _: Vec<Box<Sendable>>) -> Option<Box<Sendable>> { None }
 }
 
 impl PartialEq for PublicIdType {
@@ -109,6 +74,23 @@ impl PublicIdType {
              revocation_public_key: revocation_id.public_key().clone(),
              signature: ::sodiumoxide::crypto::sign::Signature(signature_arr.unwrap()) }
     }
+
+    /// Returns the name
+    pub fn name(&self) -> ::routing::NameType {
+        let combined_iter = (self.public_keys.0).0.into_iter().chain((self.public_keys.1).0.into_iter());
+        let mut combined: Vec<u8> = Vec::new();
+        for iter in combined_iter {
+            combined.push(*iter);
+        }
+        for i in self.type_tag.to_string().into_bytes().into_iter() {
+            combined.push(i);
+        }
+        for i in 0..::sodiumoxide::crypto::sign::SIGNATUREBYTES {
+            combined.push(self.signature.0[i]);
+        }
+        ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&combined).0)
+    }
+
     /// Returns the PublicKeys
     pub fn public_keys(&self) -> &(::sodiumoxide::crypto::sign::PublicKey, ::sodiumoxide::crypto::box_::PublicKey) {
         &self.public_keys
@@ -139,34 +121,35 @@ impl ::rustc_serialize::Encodable for PublicIdType {
 
 impl ::rustc_serialize::Decodable for PublicIdType {
     fn decode<D: ::rustc_serialize::Decoder>(d: &mut D)-> Result<PublicIdType, D::Error> {
-    let (tag_type_vec, pub_sign_vec, pub_asym_vec, revocation_public_key_vec, signature_vec):
-        (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = try!(::rustc_serialize::Decodable::decode(d));
-    let pub_sign_arr = convert_to_array!(pub_sign_vec, ::sodiumoxide::crypto::sign::PUBLICKEYBYTES);
-    let pub_asym_arr = convert_to_array!(pub_asym_vec, ::sodiumoxide::crypto::box_::PUBLICKEYBYTES);
-    let revocation_public_key_arr = convert_to_array!(revocation_public_key_vec, ::sodiumoxide::crypto::box_::PUBLICKEYBYTES);
-    let signature_arr = convert_to_array!(signature_vec, ::sodiumoxide::crypto::sign::SIGNATUREBYTES);
+        let _ = try!(d.read_u64());
+        let (tag_type_vec, pub_sign_vec, pub_asym_vec, revocation_public_key_vec, signature_vec):
+            (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = try!(::rustc_serialize::Decodable::decode(d));
+        let pub_sign_arr = convert_to_array!(pub_sign_vec, ::sodiumoxide::crypto::sign::PUBLICKEYBYTES);
+        let pub_asym_arr = convert_to_array!(pub_asym_vec, ::sodiumoxide::crypto::box_::PUBLICKEYBYTES);
+        let revocation_public_key_arr = convert_to_array!(revocation_public_key_vec, ::sodiumoxide::crypto::box_::PUBLICKEYBYTES);
+        let signature_arr = convert_to_array!(signature_vec, ::sodiumoxide::crypto::sign::SIGNATUREBYTES);
 
-    if pub_sign_arr.is_none() || pub_asym_arr.is_none() || revocation_public_key_arr.is_none()
-        || signature_arr.is_none() {
-             return Err(d.error("Bad PublicIdType size"));
-    }
+        if pub_sign_arr.is_none() || pub_asym_arr.is_none() || revocation_public_key_arr.is_none()
+            || signature_arr.is_none() {
+                 return Err(d.error("Bad PublicIdType size"));
+        }
 
-    let type_tag: u64 = match String::from_utf8(tag_type_vec) {
-        Ok(string) =>  {
-            match string.parse::<u64>() {
-                Ok(type_tag) => type_tag,
-                Err(_) => return Err(d.error("Bad Tag Type")),
-            }
-        },
-        Err(_) => return Err(d.error("Bad Tag Type")),
-    };
+        let type_tag: u64 = match String::from_utf8(tag_type_vec) {
+            Ok(string) =>  {
+                match string.parse::<u64>() {
+                    Ok(type_tag) => type_tag,
+                    Err(_) => return Err(d.error("Bad Tag Type")),
+                }
+            },
+            Err(_) => return Err(d.error("Bad Tag Type")),
+        };
 
-    Ok(PublicIdType {
-            type_tag: type_tag,
-            public_keys: (::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr.unwrap()), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr.unwrap())),
-            revocation_public_key: ::sodiumoxide::crypto::sign::PublicKey(revocation_public_key_arr.unwrap()),
-            signature: ::sodiumoxide::crypto::sign::Signature(signature_arr.unwrap()),
-        })
+        Ok(PublicIdType {
+                type_tag: type_tag,
+                public_keys: (::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr.unwrap()), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr.unwrap())),
+                revocation_public_key: ::sodiumoxide::crypto::sign::PublicKey(revocation_public_key_arr.unwrap()),
+                signature: ::sodiumoxide::crypto::sign::Signature(signature_arr.unwrap()),
+            })
     }
 }
 
@@ -199,10 +182,10 @@ mod test {
         e.encode(&[&obj_before]).unwrap();
 
         let mut d = ::cbor::Decoder::from_bytes(e.as_bytes());
-        match d.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::PublicMaid(obj_after) => assert_eq!(obj_before, obj_after),
-            _ => panic!("Unexpected!"),
-        }
+
+        let obj_after: PublicIdType = d.decode().next().unwrap().unwrap();
+
+        assert_eq!(obj_before, obj_after);
     }
 
     #[test]

@@ -128,6 +128,7 @@ impl ::rustc_serialize::Encodable for RevocationIdType {
 
 impl ::rustc_serialize::Decodable for RevocationIdType {
     fn decode<D: ::rustc_serialize::Decoder>(d: &mut D)-> Result<RevocationIdType, D::Error> {
+        let _ = try!(d.read_u64());
         let (revocation_type_tag_vec, id_type_tag_vec, public_id_type_tag_vec , pub_sign_vec, sec_sign_vec):
             (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = try!(::rustc_serialize::Decodable::decode(d));
         let pub_sign_arr = convert_to_array!(pub_sign_vec, ::sodiumoxide::crypto::sign::PUBLICKEYBYTES);
@@ -175,10 +176,9 @@ mod test {
         e.encode(&[&obj_before]).unwrap();
 
         let mut d = ::cbor::Decoder::from_bytes(e.as_bytes());
-        match d.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::AnMaid(obj_after) => assert_eq!(obj_before, obj_after),
-            _ => panic!("Unexpected!"),
-        }
+
+        let obj_after = d.decode().next().unwrap().unwrap();
+        assert_eq!(obj_before, obj_after);
     }
 
 #[test]
