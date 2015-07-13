@@ -36,6 +36,7 @@ pub struct PublicIdType {
 }
 
 impl PartialEq for PublicIdType {
+
     fn eq(&self, other: &PublicIdType) -> bool {
         &self.type_tag == &other.type_tag &&
         ::utility::slice_equal(&self.public_keys.0 .0, &other.public_keys.0 .0) &&
@@ -43,17 +44,21 @@ impl PartialEq for PublicIdType {
         ::utility::slice_equal(&self.revocation_public_key.0, &other.revocation_public_key.0) &&
         ::utility::slice_equal(&self.signature.0, &other.signature.0)
     }
+
 }
 
 impl ::std::fmt::Debug for PublicIdType {
+
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "PublicIdType {{ type_tag:{}, public_keys:({:?}, {:?}), revocation_public_key:{:?}, signature:{:?}}}",
             self.type_tag, self.public_keys.0 .0.to_vec(), self.public_keys.1 .0.to_vec(), self.revocation_public_key.0.to_vec(),
             self.signature.0.to_vec())
     }
+
 }
 
 impl PublicIdType {
+
     /// An instanstance of the PublicIdType can be created using the new()
     pub fn new(id_type: &::id::IdType, revocation_id: &::id::RevocationIdType) -> PublicIdType {
         let type_tag = revocation_id.type_tags().2;
@@ -103,9 +108,11 @@ impl PublicIdType {
     pub fn signature(&self) -> &::sodiumoxide::crypto::sign::Signature {
         &self.signature
     }
+
 }
 
 impl ::rustc_serialize::Encodable for PublicIdType {
+
     fn encode<E: ::rustc_serialize::Encoder>(&self, e: &mut E)->Result<(), E::Error> {
         let (::sodiumoxide::crypto::sign::PublicKey(ref pub_sign_vec), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_vec)) = self.public_keys;
         let ::sodiumoxide::crypto::sign::PublicKey(ref revocation_public_key_vec) = self.revocation_public_key;
@@ -117,10 +124,12 @@ impl ::rustc_serialize::Encodable for PublicIdType {
                                                     revocation_public_key_vec.as_ref(),
                                                     signature.as_ref())).encode(e)
     }
+
 }
 
 impl ::rustc_serialize::Decodable for PublicIdType {
-    fn decode<D: ::rustc_serialize::Decoder>(d: &mut D)-> Result<PublicIdType, D::Error> {
+
+    fn decode<D: ::rustc_serialize::Decoder>(d: &mut D) -> Result<PublicIdType, D::Error> {
         let _ = try!(d.read_u64());
         let (tag_type_vec, pub_sign_vec, pub_asym_vec, revocation_public_key_vec, signature_vec):
             (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = try!(::rustc_serialize::Decodable::decode(d));
@@ -151,6 +160,7 @@ impl ::rustc_serialize::Decodable for PublicIdType {
                 signature: ::sodiumoxide::crypto::sign::Signature(signature_arr.unwrap()),
             })
     }
+
 }
 
 #[cfg(test)]

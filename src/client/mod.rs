@@ -108,7 +108,7 @@ impl Client {
                     cloned_routing_client.lock().unwrap().run();
                 }
             })),
-        };        
+        };
 
         let encrypted_account = maidsafe_types::ImmutableData::new(client.account.encrypt(password, pin).ok().unwrap());
         let put_res = client.routing.lock().unwrap().put(encrypted_account.clone());

@@ -27,6 +27,7 @@
 /// let an_maid = ::maidsafe_client::id::RevocationIdType::new::<::maidsafe_client::id::MaidTypeTags>();
 /// ```
 ///
+
 #[derive(Clone)]
 pub struct RevocationIdType {
     type_tags: (u64, u64, u64),  // type tags for revocation, id and public ids
@@ -35,19 +36,23 @@ pub struct RevocationIdType {
 }
 
 impl PartialEq for RevocationIdType {
+
     fn eq(&self, other: &RevocationIdType) -> bool {
         // Private key is mathematically linked, so just check public key
         &self.type_tags == &other.type_tags &&
         ::utility::slice_equal(&self.public_key.0, &other.public_key.0)
     }
+
 }
 
 
 impl ::std::fmt::Debug for RevocationIdType {
+
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         let ::sodiumoxide::crypto::sign::PublicKey(ref public_key) = self.public_key;
         write!(f, "RevocationIdType( type_tags:{:?}, public_key: {:?} )", self.type_tags, public_key)
     }
+
 }
 
 impl RevocationIdType {
@@ -98,6 +103,7 @@ impl RevocationIdType {
     pub fn sign(&self, data : &[u8]) -> Vec<u8> {
         return ::sodiumoxide::crypto::sign::sign(&data, &self.secret_key)
     }
+
 }
 
 fn convert_to_u64(num_vec: Vec<u8>) -> Option<u64> {
@@ -113,6 +119,7 @@ fn convert_to_u64(num_vec: Vec<u8>) -> Option<u64> {
 }
 
 impl ::rustc_serialize::Encodable for RevocationIdType {
+
     fn encode<E: ::rustc_serialize::Encoder>(&self, e: &mut E)->Result<(), E::Error> {
         let revocation_type_tag_vec = self.type_tags.0.to_string().into_bytes();
         let id_type_tag_vec = self.type_tags.1.to_string().into_bytes();
@@ -124,9 +131,11 @@ impl ::rustc_serialize::Encodable for RevocationIdType {
                 self.public_key.0.as_ref(), self.secret_key.0.as_ref())
             ).encode(e)
     }
+
 }
 
 impl ::rustc_serialize::Decodable for RevocationIdType {
+
     fn decode<D: ::rustc_serialize::Decoder>(d: &mut D)-> Result<RevocationIdType, D::Error> {
         let _ = try!(d.read_u64());
         let (revocation_type_tag_vec, id_type_tag_vec, public_id_type_tag_vec , pub_sign_vec, sec_sign_vec):
@@ -148,6 +157,7 @@ impl ::rustc_serialize::Decodable for RevocationIdType {
                 secret_key: ::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr.unwrap()),
             })
     }
+
 }
 
 #[cfg(test)]

@@ -24,6 +24,7 @@
 /// let maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>());
 ///
 /// ```
+
 #[derive(Clone)]
 pub struct IdType {
     type_tag: u64,
@@ -32,6 +33,7 @@ pub struct IdType {
 }
 
 impl IdType {
+
     /// Invoked to create an instance of IdType
     pub fn new(revocation_id: &::id::RevocationIdType) -> IdType {
         let asym_keys = ::sodiumoxide::crypto::box_::gen_keypair();
@@ -42,6 +44,7 @@ impl IdType {
             public_keys: (signing_keys.0, asym_keys.0),
             secret_keys: (signing_keys.1, asym_keys.1),
         }
+
     }
     /// Returns name
     pub fn name(&self) -> ::routing::NameType {
@@ -55,51 +58,61 @@ impl IdType {
         }
         ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&combined).0)
     }
+
     /// Returns the PublicKeys
-    pub fn public_keys(&self) -> &(::sodiumoxide::crypto::sign::PublicKey, ::sodiumoxide::crypto::box_::PublicKey){
+    pub fn public_keys(&self) -> &(::sodiumoxide::crypto::sign::PublicKey, ::sodiumoxide::crypto::box_::PublicKey) {
         &self.public_keys
     }
+
     /// Returns the PublicKeys
     pub fn secret_keys(&self) -> &(::sodiumoxide::crypto::sign::SecretKey, ::sodiumoxide::crypto::box_::SecretKey) {
         &self.secret_keys
     }
+
     /// Signs the data with the SecretKey and returns the Signed data
     pub fn sign(&self, data : &[u8]) -> Vec<u8> {
         return ::sodiumoxide::crypto::sign::sign(&data, &self.secret_keys.0)
     }
+
     /// Encrypts and authenticates data. It returns a ciphertext and the Nonce.
     pub fn seal(&self, data : &[u8], to : &::sodiumoxide::crypto::box_::PublicKey) -> (Vec<u8>, ::sodiumoxide::crypto::box_::Nonce) {
         let nonce = ::sodiumoxide::crypto::box_::gen_nonce();
         let sealed = ::sodiumoxide::crypto::box_::seal(data, &nonce, &to, &self.secret_keys.1);
         return (sealed, nonce);
     }
+
     /// Verifies and decrypts the data
-    pub fn open(
-        &self,
-        data : &[u8],
-        nonce : &::sodiumoxide::crypto::box_::Nonce,
-        from : &::sodiumoxide::crypto::box_::PublicKey) -> Result<Vec<u8>, ::CryptoError> {
+    pub fn open(&self,
+                data : &[u8],
+                nonce : &::sodiumoxide::crypto::box_::Nonce,
+                from : &::sodiumoxide::crypto::box_::PublicKey) -> Result<Vec<u8>, ::CryptoError> {
         return ::sodiumoxide::crypto::box_::open(&data, &nonce, &from, &self.secret_keys.1).ok_or(::CryptoError::Unknown);
     }
+
 }
 
 impl PartialEq for IdType {
+
     fn eq(&self, other: &IdType) -> bool {
         // Private keys are mathematically linked, so just check public keys
         &self.type_tag == &other.type_tag &&
         ::utility::slice_equal(&self.public_keys.0 .0, &other.public_keys.0 .0) &&
         ::utility::slice_equal(&self.public_keys.1 .0, &other.public_keys.1 .0)
     }
+
 }
 
 impl ::std::fmt::Debug for IdType {
+
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "IdType {{ type_tag:{}, public_keys: ({:?}, {:?}) }}", self.type_tag, self.public_keys.0 .0.to_vec(), self.public_keys.1 .0.to_vec())
     }
+
 }
 
 impl ::rustc_serialize::Encodable for IdType {
-    fn encode<E: ::rustc_serialize::Encoder>(&self, e: &mut E)->Result<(), E::Error> {
+
+    fn encode<E: ::rustc_serialize::Encoder>(&self, e: &mut E) -> Result<(), E::Error> {
         let (::sodiumoxide::crypto::sign::PublicKey(pub_sign_vec), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_vec)) = self.public_keys;
         let (::sodiumoxide::crypto::sign::SecretKey(sec_sign_vec), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_vec)) = self.secret_keys;
         let type_vec = self.type_tag.to_string().into_bytes();
@@ -110,10 +123,12 @@ impl ::rustc_serialize::Encodable for IdType {
                                                     sec_sign_vec.as_ref(),
                                                     sec_asym_vec.as_ref())).encode(e)
     }
+
 }
 
 impl ::rustc_serialize::Decodable for IdType {
-    fn decode<D: ::rustc_serialize::Decoder>(d: &mut D)-> Result<IdType, D::Error> {
+
+    fn decode<D: ::rustc_serialize::Decoder>(d: &mut D) -> Result<IdType, D::Error> {
         let _ = try!(d.read_u64());
         let (tag_type_vec, pub_sign_vec, pub_asym_vec, sec_sign_vec, sec_asym_vec) :
             (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = try!(::rustc_serialize::Decodable::decode(d));
@@ -142,6 +157,7 @@ impl ::rustc_serialize::Decodable for IdType {
                 secret_keys: (::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr.unwrap()), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_arr.unwrap()))
             })
     }
+
 }
 
 #[cfg(test)]
@@ -152,9 +168,11 @@ mod test {
     use ::id::Random;
 
     impl Random for ::id::IdType {
+
         fn generate_random() -> ::id::IdType {
             ::id::IdType::new(&::id::RevocationIdType::new::<::id::MaidTypeTags>())
         }
+
     }
 
 #[test]
@@ -213,4 +231,5 @@ mod test {
             assert!(maid3.open(&encrypt2.0, &encrypt2.1, &maid1.public_keys().1).is_err());
         }
     }
+
 }

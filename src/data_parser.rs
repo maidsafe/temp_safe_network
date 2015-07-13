@@ -26,6 +26,7 @@ pub enum Parser {
 }
 
 impl ::rustc_serialize::Decodable for Parser {
+
     fn decode<D: ::rustc_serialize::Decoder>(d: &mut D) -> Result<Parser, D::Error> {
         let tag = try!(d.read_u64());
 
@@ -35,4 +36,5 @@ impl ::rustc_serialize::Decodable for Parser {
             _ => Ok(Parser::Unknown(tag)),
         }
     }
+
 }

@@ -26,6 +26,7 @@
 /// assert!(convert_to_array(data, 2).is_some());
 /// assert!(convert_to_array(data, 3).is_none());
 /// ```
+
 macro_rules! convert_to_array {
     ($container:ident, $size:expr) => {{
         if $container.len() != $size {
