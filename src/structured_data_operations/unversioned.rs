@@ -23,7 +23,8 @@ enum DataTypeEncoding {
 }
 
 /// Create StructuredData
-pub fn create<T>(storage: ::std::sync::Arc<T>,
+pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from client
+                 client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                  tag_type: u64,
                  id: ::routing::NameType,
                  version: u64,
@@ -69,10 +70,12 @@ pub fn create<T>(storage: ::std::sync::Arc<T>,
                     // TODO Improve this - will require changes elsewhere - eg., implement storage
                     // trait in client itself
 
-                    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data_to_store.clone());
-                    storage.put(Vec::new(), data_to_store); // TODO improve 1st parameter - use new function to take Data as parameter
+                    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data_to_store);
+                    let name = immutable_data.name();
+                    let data = ::client::Data::ImmutableData(immutable_data);
+                    let _ = client.lock().unwrap().put_new(name.clone(), data);
 
-                    let data_to_store = try!(get_data_to_store_in_structured_data(DataTypeEncoding::ContainsDataMapName(immutable_data.name()), None));
+                    let data_to_store = try!(get_data_to_store_in_structured_data(DataTypeEncoding::ContainsDataMapName(name), data_encryption_keys));
 
                     Ok(::client::StructuredData::new(tag_type,
                                                      id,
@@ -89,14 +92,38 @@ pub fn create<T>(storage: ::std::sync::Arc<T>,
     }
 }
 
-//pub fn get_data<T>(storage: ::std::sync::Arc<T>,
-//                   struct_data: &::client::StructuredData,
-//                   data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
-//                                                 &::sodiumoxide::crypto::box_::SecretKey,
-//                                                 &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError>
-//                                                                                           where T: ::self_encryption::Storage + Sync + Send + 'static {
-//    ;
-//}
+/// Get Actual Data From StructuredData
+pub fn get_data<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from client
+                   client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+                   struct_data: &::client::StructuredData,
+                   data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
+                                                 &::sodiumoxide::crypto::box_::SecretKey,
+                                                 &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError>
+                                                                                           where T: ::self_encryption::Storage + Sync + Send + 'static {
+    match try!(get_data_from_structured_data(struct_data.get_data().clone(), data_decryption_keys)) {
+        DataTypeEncoding::ContainsData(data) => Ok(data),
+        DataTypeEncoding::ContainsDataMap(data_map) => {
+            let mut se = ::self_encryption::SelfEncryptor::new(storage, data_map);
+            let length = se.len();
+            Ok(se.read(0, length))
+        },
+        DataTypeEncoding::ContainsDataMapName(data_map_name) => {
+            match client.lock().unwrap().get_new(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).unwrap().get() {
+                Ok(raw_data_map) => {
+                    match try!(get_data_from_structured_data(raw_data_map, data_decryption_keys)) {
+                        DataTypeEncoding::ContainsDataMap(data_map) => {
+                            let mut se = ::self_encryption::SelfEncryptor::new(storage, data_map);
+                            let length = se.len();
+                            Ok(se.read(0, length))
+                        },
+                        _ => Err(::errors::ClientError::ReceivedUnexpectedData),
+                    }
+                },
+                Err(_) => Err(::errors::ClientError::GetFailure),
+            }
+        }
+    }
+}
 
 fn get_data_to_store_in_structured_data(data: DataTypeEncoding,
                                         data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
@@ -110,4 +137,18 @@ fn get_data_to_store_in_structured_data(data: DataTypeEncoding,
     } else {
         Ok(encoder.into_bytes())
     }
+}
+
+fn get_data_from_structured_data(raw_data: Vec<u8>,
+                                 data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
+                                                               &::sodiumoxide::crypto::box_::SecretKey,
+                                                               &::sodiumoxide::crypto::box_::Nonce)>) -> Result<DataTypeEncoding, ::errors::ClientError> {
+    let data = if let Some((ref public_encryp_key, ref secret_encryp_key, ref nonce)) = data_decryption_keys {
+        try!(::utility::hybrid_decrypt(&raw_data, nonce, public_encryp_key, secret_encryp_key))
+    } else {
+        raw_data
+    };
+
+    let mut decoder = ::cbor::Decoder::from_bytes(data);
+    Ok(try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
 }

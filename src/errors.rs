@@ -21,6 +21,14 @@ pub enum ClientError {
     StructuredDataHeaderSizeProhibitive,
     /// Could not Serialise or Deserialise
     UnsuccessfulEncodeDecode,
+    /// Asymmetric Key Decryption Failed
+    AsymmetricDecipherFailure,
+    /// Symmetric Key Decryption Failed
+    SymmetricDecipherFailure,
+    /// GetFailure
+    GetFailure,
+    /// ReceivedUnexpectedData
+    ReceivedUnexpectedData,
 }
 
 impl From<::cbor::CborError> for ClientError {
