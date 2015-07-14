@@ -25,8 +25,7 @@ enum DataTypeEncoding {
 /// Create StructuredData in accordance with data-encoding rules abstracted from user. For
 /// StructuredData created with create, data must be obtained using the complementary function
 /// defined in this module to get_data()
-pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from client
-                 client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+pub fn create<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                  tag_type: u64,
                  id: ::routing::NameType,
                  version: u64,
@@ -52,7 +51,7 @@ pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from clien
 
         },
         ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-            let mut se = ::self_encryption::SelfEncryptor::new(storage.clone(), ::self_encryption::datamap::DataMap::None);
+            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::NetworkStorage::new(client.clone()), ::self_encryption::datamap::DataMap::None);
             se.write(&data, 0);
             let data_map = se.close();
 
@@ -95,8 +94,7 @@ pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from clien
 }
 
 /// Get Actual Data From StructuredData created via create() function in this module.
-pub fn get_data<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from client
-                   client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+pub fn get_data<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                    struct_data: &::client::StructuredData,
                    data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                  &::sodiumoxide::crypto::box_::SecretKey,
@@ -105,7 +103,7 @@ pub fn get_data<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from cli
     match try!(get_decoded_stored_data(struct_data.get_data().clone(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
-            let mut se = ::self_encryption::SelfEncryptor::new(storage, data_map);
+            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::NetworkStorage::new(client), data_map);
             let length = se.len();
             Ok(se.read(0, length))
         },
@@ -114,7 +112,7 @@ pub fn get_data<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from cli
                 Ok(raw_data_map) => {
                     match try!(get_decoded_stored_data(raw_data_map, data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
-                            let mut se = ::self_encryption::SelfEncryptor::new(storage, data_map);
+                            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::NetworkStorage::new(client.clone()), data_map);
                             let length = se.len();
                             Ok(se.read(0, length))
                         },
@@ -153,4 +151,13 @@ fn get_decoded_stored_data(raw_data: Vec<u8>,
 
     let mut decoder = ::cbor::Decoder::from_bytes(data);
     Ok(try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
+}
+
+#[cfg(test)]
+mod test {
+
+        fn create() {
+
+        }
+
 }

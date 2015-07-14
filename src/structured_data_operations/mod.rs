@@ -15,15 +15,20 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+/// NetworkStorage implements the Storage trait from the Self_Encryption 
+pub mod network_storage;
 /// Unversioned-Structured Data
 pub mod unversioned;
 ///// Versioned-Structured Data
 //pub mod versioned;
 
+pub use self::network_storage::NetworkStorage;
+
 const PADDING_SIZE_IN_BYTES: usize = 1024;
 const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 100;
 
 /// Inform about data fitting or not into given StructuredData
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum DataFitResult {
     /// Invalid StrucuturedData.
     NoDataCanFit,
@@ -37,11 +42,12 @@ pub enum DataFitResult {
 /// all owners must sign this StructuredData.
 pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                                       prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> usize {
-    let max_signatures_possible = if prev_owner_keys.is_empty() {
-        owner_keys.len()
-    } else {
-        prev_owner_keys.len()
-    };
+    let max_signatures_possible = owner_keys.len() + prev_owner_keys.len();
+    // if prev_owner_keys.is_empty() {
+    //     owner_keys.len()
+    // } else {
+    //     prev_owner_keys.len()
+    // };
 
     let (_, fake_signer) = ::sodiumoxide::crypto::sign::gen_keypair();
     let mut structured_data = ::client::StructuredData::new(::std::u64::MAX,
@@ -70,13 +76,77 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sig
 pub fn check_if_data_can_fit_in_structured_data(data: Vec<u8>,
                                                 owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                                                 prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> DataFitResult {
-    let available_size = get_approximate_space_for_data(owner_keys, prev_owner_keys);
-
-    if available_size <= MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES {
-        DataFitResult::NoDataCanFit
-    } else if available_size < data.len() {
+    if data.len() >= ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES {
         DataFitResult::DataDoesNotFit
     } else {
-        DataFitResult::DataFits
+        let available_size = get_approximate_space_for_data(owner_keys, prev_owner_keys);
+        if available_size <= MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES {
+            DataFitResult::NoDataCanFit
+        } else if available_size < data.len() {
+            DataFitResult::DataDoesNotFit
+        } else {
+            DataFitResult::DataFits
+        }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn genearte_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+        let mut public_keys = Vec::with_capacity(size);
+        for _ in 0..size {
+            public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
+        }
+        public_keys
+    }
+
+    #[test]
+    fn test_get_approximate_space_for_data() {
+        let mut keys = genearte_public_keys(10);
+        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 5000);
+        assert!(get_approximate_space_for_data(Vec::new(), keys.clone()) > 5000);
+        keys.extend(genearte_public_keys(40)); // 50 keys
+        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 5000);
+        assert!(get_approximate_space_for_data(Vec::new(), keys.clone()) > 5000);
+        keys.extend(genearte_public_keys(480)); // 530 keys
+        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 100);
+        assert!(get_approximate_space_for_data(Vec::new(), keys.clone()) > 100);
+
+        assert!(get_approximate_space_for_data(genearte_public_keys(480), genearte_public_keys(100)) == 0);
+        assert!(get_approximate_space_for_data(genearte_public_keys(250), genearte_public_keys(250)) > 100);
+    }
+
+    #[test]
+    fn test_check_if_data_can_fit_in_structured_data() {
+        // Empty data
+        {
+            let mut keys = genearte_public_keys(250);
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(Vec::new(), keys.clone(), keys.clone()));
+            keys.extend(genearte_public_keys(350));
+            assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(Vec::new(), keys, Vec::new()));
+        }
+        // Data of size 80kb with one signamture
+        {
+            let data = vec![1u8; 1024 * 80];
+            let mut keys = genearte_public_keys(1);
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
+            keys.extend(genearte_public_keys(290));
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
+            keys.extend(genearte_public_keys(254));
+            assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(data.clone(), keys, Vec::new()));
+        }
+        // Data size of 100 kb
+        {
+            let data = vec![1u8; 102400];
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), genearte_public_keys(1), Vec::new()));
+        }
+        // Data size of 101 kb
+        {
+            let data = vec![1u8; 103424];
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), genearte_public_keys(1), Vec::new()));
+        }
+    }
+
 }
