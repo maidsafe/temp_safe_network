@@ -97,7 +97,7 @@ fn create_impl(client: &mut ::client::Client,
 }
 
 fn get_immutable_data(client: &mut ::client::Client,
-                          struct_data: &::client::StructuredData) -> Result<::client::ImmutableData, ::errors::ClientError> {
+                      struct_data: &::client::StructuredData) -> Result<::client::ImmutableData, ::errors::ClientError> {
     let mut decoder = ::cbor::Decoder::from_bytes(&struct_data.get_data()[..]);
     let location = try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode)));
 
