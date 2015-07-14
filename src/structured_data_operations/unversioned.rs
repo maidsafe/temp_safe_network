@@ -22,7 +22,9 @@ enum DataTypeEncoding {
     ContainsDataMapName(::routing::NameType),
 }
 
-/// Create StructuredData
+/// Create StructuredData in accordance with data-encoding rules abstracted from user. For
+/// StructuredData created with create, data must be obtained using the complementary function
+/// defined in this module to get_data()
 pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from client
                  client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                  tag_type: u64,
@@ -92,7 +94,7 @@ pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from clien
     }
 }
 
-/// Get Actual Data From StructuredData
+/// Get Actual Data From StructuredData created via create() function in this module.
 pub fn get_data<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from client
                    client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                    struct_data: &::client::StructuredData,
