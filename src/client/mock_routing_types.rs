@@ -17,6 +17,8 @@
 
 #![allow(unused, dead_code, missing_docs)]
 
+pub const MAX_STRUCTURED_DATA_SIZE_IN_BYTES: usize = 102400;
+
 #[derive(Clone, RustcEncodable, RustcDecodable, PartialEq, Debug)]
 pub enum ImmutableDataType {
     Normal,

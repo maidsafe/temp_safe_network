@@ -383,9 +383,9 @@ impl Client {
         }
 
         let asymm_encryption_result = ::sodiumoxide::crypto::box_::seal(&combined_key_iv,
-                                                                                 &nonce,
-                                                                                 &self.account.get_public_maid().public_keys().1,
-                                                                                 &self.account.get_maid().secret_keys().1);
+                                                                        &nonce,
+                                                                        &self.account.get_public_maid().public_keys().1,
+                                                                        &self.account.get_maid().secret_keys().1);
 
         let mut encoder = ::cbor::Encoder::from_memory();
         encoder.encode(&[(asymm_encryption_result, symm_encryption_result)]).unwrap();
@@ -414,9 +414,9 @@ impl Client {
         };
 
         match ::sodiumoxide::crypto::box_::open(&asymm_encryption_result[..],
-                                                         &nonce,
-                                                         &self.account.get_public_maid().public_keys().1,
-                                                         &self.account.get_maid().secret_keys().1) {
+                                                &nonce,
+                                                &self.account.get_public_maid().public_keys().1,
+                                                &self.account.get_maid().secret_keys().1) {
             Some(asymm_decryption_result) => {
                 if asymm_decryption_result.len() == 48 {
                     let mut key: [u8; 32] = unsafe { ::std::mem::uninitialized() };

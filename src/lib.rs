@@ -48,23 +48,32 @@ extern crate rand;
 extern crate crypto;
 extern crate routing;
 extern crate sodiumoxide;
-extern crate rustc_serialize;
 extern crate maidsafe_types;
 extern crate lru_time_cache;
+extern crate rustc_serialize;
+extern crate self_encryption;
 
 /// Macros defined for usage
 #[macro_use]
 mod macros;
+
+/// Maidsafe-Client Errors
+pub mod errors;
+
+/// Public and Private Id types
+pub mod id;
 /// Self-Auth and Gateway Module
 pub mod client;
 /// Parse incoming data
 pub mod data_parser;
-/// Public and Private Id types
-pub mod id;
-/// All Maidsafe tagging should offset from this
-pub const MAIDSAFE_TAG: u64 = 5483_000;
+/// Logic for StructuredData
+pub mod structured_data_operations;
+
 /// Representation of input/output error
 pub type IoError = std::io::Error;
+
+/// All Maidsafe tagging should offset from this
+pub const MAIDSAFE_TAG: u64 = 5483_000;
 
 /// CryptoError - To be removed
 pub enum CryptoError {
@@ -110,6 +119,63 @@ impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
 
 /// Common utility functions grouped together
 pub mod utility {
+    /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and
+    /// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text produces different
+    /// cipher-texts for each fresh symmetric encryption. The Key and IV are then asymmetrically
+    /// enrypted using Public-MAID and the whole thing is then serialised into a single Vec<u8>.
+    pub fn hybrid_encrypt(plain_text: &[u8],
+                          asym_nonce: &::sodiumoxide::crypto::box_::Nonce,
+                          asym_public_key: &::sodiumoxide::crypto::box_::PublicKey,
+                          asym_secret_key: &::sodiumoxide::crypto::box_::SecretKey) -> Result<Vec<u8>, ::errors::ClientError> {
+        let sym_key = ::sodiumoxide::crypto::secretbox::gen_key();
+        let sym_nonce = ::sodiumoxide::crypto::secretbox::gen_nonce();
+
+        let mut asym_plain_text = [0u8; ::sodiumoxide::crypto::secretbox::KEYBYTES + ::sodiumoxide::crypto::secretbox::NONCEBYTES];
+        for it in sym_key.0.iter().chain(sym_nonce.0.iter()).enumerate() {
+            asym_plain_text[it.0] = *it.1;
+        }
+
+        let sym_cipher_text = ::sodiumoxide::crypto::secretbox::seal(plain_text, &sym_nonce, &sym_key);
+        let asym_cipher_text = ::sodiumoxide::crypto::box_::seal(&asym_plain_text, asym_nonce, asym_public_key, asym_secret_key);
+
+        let mut encoder = ::cbor::Encoder::from_memory();
+        try!(encoder.encode(&[(asym_cipher_text, sym_cipher_text)]));
+
+        Ok(encoder.into_bytes())
+    }
+
+    /// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
+    pub fn hybrid_decrypt(cipher_text: &[u8],
+                          asym_nonce: &::sodiumoxide::crypto::box_::Nonce,
+                          asym_public_key: &::sodiumoxide::crypto::box_::PublicKey,
+                          asym_secret_key: &::sodiumoxide::crypto::box_::SecretKey) -> Result<Vec<u8>, ::errors::ClientError> {
+        let mut decoder = ::cbor::Decoder::from_bytes(cipher_text);
+        let (asym_cipher_text, sym_cipher_text): (Vec<u8>, Vec<u8>) = try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode)));
+
+        if let Some(asym_plain_text) = ::sodiumoxide::crypto::box_::open(&asym_cipher_text, asym_nonce, asym_public_key, asym_secret_key) {
+            if asym_plain_text.len() != ::sodiumoxide::crypto::secretbox::KEYBYTES + ::sodiumoxide::crypto::secretbox::NONCEBYTES {
+                Err(::errors::ClientError::AsymmetricDecipherFailure)
+            } else {
+                let mut sym_key = ::sodiumoxide::crypto::secretbox::Key([0u8; ::sodiumoxide::crypto::secretbox::KEYBYTES]);
+                let mut sym_nonce = ::sodiumoxide::crypto::secretbox::Nonce([0u8; ::sodiumoxide::crypto::secretbox::NONCEBYTES]);
+
+                for it in asym_plain_text.iter().take(::sodiumoxide::crypto::secretbox::KEYBYTES).enumerate() {
+                    sym_key.0[it.0] = *it.1;
+                }
+                for it in asym_plain_text.iter().skip(::sodiumoxide::crypto::secretbox::KEYBYTES).enumerate() {
+                    sym_nonce.0[it.0] = *it.1;
+                }
+
+                if let Some(sym_plain_text) = ::sodiumoxide::crypto::secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key) {
+                    Ok(sym_plain_text)
+                } else {
+                    Err(::errors::ClientError::SymmetricDecipherFailure)
+                }
+            }
+        } else {
+            Err(::errors::ClientError::AsymmetricDecipherFailure)
+        }
+    }
 
     #[allow(dead_code)]
     /// utility function to serialise an Encodable type
