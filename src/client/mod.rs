@@ -110,12 +110,6 @@ impl Client {
             })),
         };
 
-        {
-            let destination = client.account.get_public_maid().name();
-            let boxed_public_maid = Box::new(client.account.get_public_maid().clone());
-            let _ = client.routing.lock().unwrap().unauthorised_put(destination, boxed_public_maid);
-        }
-
         let encrypted_account = maidsafe_types::ImmutableData::new(client.account.encrypt(password, pin).ok().unwrap());
         let put_res = client.routing.lock().unwrap().put(encrypted_account.clone());
         match put_res {

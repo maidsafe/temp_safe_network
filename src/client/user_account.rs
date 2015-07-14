@@ -17,11 +17,9 @@
 
 #![allow(unsafe_code)]
 
-use cbor;
-use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
+use rustc_serialize::{Decoder, Encodable, Encoder};
 
 use routing;
-use maidsafe_types;
 
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
 
@@ -30,13 +28,13 @@ static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivatio
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also his Root
 /// Directory ID if he has put data onto the network.
 pub struct Account {
-    an_maid: maidsafe_types::RevocationIdType,
-    maid: maidsafe_types::IdType,
-    public_maid: maidsafe_types::PublicIdType,
+    an_maid: ::id::RevocationIdType,
+    maid: ::id::IdType,
+    public_maid: ::id::PublicIdType,
 
-    an_mpid: maidsafe_types::RevocationIdType,
-    mpid: maidsafe_types::IdType,
-    public_mpid: maidsafe_types::PublicIdType,
+    an_mpid: ::id::RevocationIdType,
+    mpid: ::id::IdType,
+    public_mpid: ::id::PublicIdType,
 
     root_dir_id: Option<routing::NameType>,
 }
@@ -45,13 +43,13 @@ pub struct Account {
 impl Account {
     /// Create a new Session Packet with Randomly generated Maid keys for the user
     pub fn new(root_dir_id: Option<routing::NameType>) -> Account {
-        let an_maid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MaidTypeTags>();
-        let maid = maidsafe_types::IdType::new(&an_maid);
-        let public_maid = maidsafe_types::PublicIdType::new(&maid, &an_maid);
+        let an_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();
+        let maid = ::id::IdType::new(&an_maid);
+        let public_maid = ::id::PublicIdType::new(&maid, &an_maid);
 
-        let an_mpid = maidsafe_types::RevocationIdType::new::<maidsafe_types::MpidTypeTags>();
-        let mpid = maidsafe_types::IdType::new(&an_mpid);
-        let public_mpid = maidsafe_types::PublicIdType::new(&mpid, &an_mpid);
+        let an_mpid = ::id::RevocationIdType::new::<::id::MpidTypeTags>();
+        let mpid = ::id::IdType::new(&an_mpid);
+        let public_mpid = ::id::PublicIdType::new(&mpid, &an_mpid);
 
         Account {
             an_maid: an_maid,
@@ -65,32 +63,32 @@ impl Account {
     }
 
     /// Get user's AnMAID
-    pub fn get_an_maid(&self) -> &maidsafe_types::RevocationIdType {
+    pub fn get_an_maid(&self) -> &::id::RevocationIdType {
         &self.an_maid
     }
 
     /// Get user's MAID
-    pub fn get_maid(&self) -> &maidsafe_types::IdType {
+    pub fn get_maid(&self) -> &::id::IdType {
         &self.maid
     }
 
     /// Get user's Public-MAID
-    pub fn get_public_maid(&self) -> &maidsafe_types::PublicIdType {
+    pub fn get_public_maid(&self) -> &::id::PublicIdType {
         &self.public_maid
     }
 
     /// Get user's AnMPID
-    pub fn get_an_mpid(&self) -> &maidsafe_types::RevocationIdType {
+    pub fn get_an_mpid(&self) -> &::id::RevocationIdType {
         &self.an_mpid
     }
 
     /// Get user's MPID
-    pub fn get_mpid(&self) -> &maidsafe_types::IdType {
+    pub fn get_mpid(&self) -> &::id::IdType {
         &self.mpid
     }
 
     /// Get user's Public-MPID
-    pub fn get_public_mpid(&self) -> &maidsafe_types::PublicIdType {
+    pub fn get_public_mpid(&self) -> &::id::PublicIdType {
         &self.public_mpid
     }
 
@@ -143,7 +141,7 @@ impl Account {
     /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
     /// through PBKDF2 first
     pub fn encrypt(&self, password: &[u8], pin: u32) -> Result<Vec<u8>, ::MaidsafeError> {
-        let serialised = try!(self.serialise());
+        let serialised = ::utility::serialise(self.clone());
 
         let mut encrypted : Vec<u8> = Vec::new();
         {
@@ -213,7 +211,7 @@ impl Account {
             }
         }
 
-        Ok(try!(Account::deserialise(&decrypted)))
+        Ok(::utility::deserialise(decrypted))
     }
 
     fn hash_pin(hasher : &mut ::crypto::sha2::Sha512, pin : u32) {
@@ -261,110 +259,6 @@ impl Account {
         return (key, iv);
     }
 
-    fn serialise(&self) -> cbor::CborResult<Vec<u8>> {
-        let mut encoder = cbor::Encoder::from_memory();
-        try!(encoder.encode(&[&self.an_maid]));
-        let encoded_an_maid = encoder.into_bytes();
-
-        encoder = cbor::Encoder::from_memory();
-        try!(encoder.encode(&[&self.maid]));
-        let encoded_maid = encoder.into_bytes();
-
-        encoder = cbor::Encoder::from_memory();
-        try!(encoder.encode(&[&self.public_maid]));
-        let encoded_public_maid = encoder.into_bytes();
-
-        encoder = cbor::Encoder::from_memory();
-        try!(encoder.encode(&[&self.an_mpid]));
-        let encoded_an_mpid = encoder.into_bytes();
-
-        encoder = cbor::Encoder::from_memory();
-        try!(encoder.encode(&[&self.mpid]));
-        let encoded_mpid = encoder.into_bytes();
-
-        encoder = cbor::Encoder::from_memory();
-        try!(encoder.encode(&[&self.public_mpid]));
-        let encoded_public_mpid = encoder.into_bytes();
-
-        encoder = cbor::Encoder::from_memory();
-        try!(encoder.encode(&[&self.root_dir_id]));
-        let encoded_root_dir_id = encoder.into_bytes();
-
-        encoder = cbor::Encoder::from_memory();
-        try!(encoder.encode(&[(encoded_an_maid,
-                               encoded_maid,
-                               encoded_public_maid,
-                               encoded_an_mpid,
-                               encoded_mpid,
-                               encoded_public_mpid,
-                               encoded_root_dir_id)]));
-
-        Ok(encoder.into_bytes())
-    }
-
-    fn deserialise(source : &[u8]) -> cbor::CborResult<Account> {
-        use ::std::io::Error;
-        use ::std::io::ErrorKind;
-
-        let mut decoder = cbor::Decoder::from_bytes(source);
-        let (encoded_an_maid, encoded_maid, encoded_public_maid, encoded_an_mpid, encoded_mpid, encoded_public_mpid, encoded_root_dir_id):
-            (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) = decoder.decode().next().unwrap().unwrap();
-
-        let an_maid: _;
-        decoder = cbor::Decoder::from_bytes(&encoded_an_maid[..]);
-        match decoder.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::AnMaid(obj) => an_maid = obj,
-            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
-        }
-
-        let maid: _;
-        decoder = cbor::Decoder::from_bytes(&encoded_maid[..]);
-        match decoder.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::Maid(obj) => maid = obj,
-            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
-        }
-
-        let public_maid: _;
-        decoder = cbor::Decoder::from_bytes(&encoded_public_maid[..]);
-        match decoder.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::PublicMaid(obj) => public_maid = obj,
-            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
-        }
-
-        let an_mpid: _;
-        decoder = cbor::Decoder::from_bytes(&encoded_an_mpid[..]);
-        match decoder.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::AnMpid(obj) => an_mpid = obj,
-            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
-        }
-
-        let mpid: _;
-        decoder = cbor::Decoder::from_bytes(&encoded_mpid[..]);
-        match decoder.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::Mpid(obj) => mpid = obj,
-            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
-        }
-
-        let public_mpid: _;
-        decoder = cbor::Decoder::from_bytes(&encoded_public_mpid[..]);
-        match decoder.decode().next().unwrap().unwrap() {
-            ::data_parser::Parser::PublicMpid(obj) => public_mpid = obj,
-            _ => return Err(cbor::CborError::Io(Error::new(ErrorKind::Other, "Unexpected"))),
-        }
-
-        decoder = cbor::Decoder::from_bytes(&encoded_root_dir_id[..]);
-        let root_dir_id: Option<routing::NameType> = decoder.decode().next().unwrap().unwrap();
-
-        Ok(Account {
-            an_maid: an_maid,
-            maid: maid,
-            public_maid: public_maid,
-            an_mpid: an_mpid,
-            mpid: mpid,
-            public_mpid: public_mpid,
-            root_dir_id: root_dir_id,
-        })
-    }
 }
 
 #[cfg(test)]
@@ -443,14 +337,9 @@ mod test {
     #[test]
     fn serialisation() {
         let account = Account::new(None);
-
-        match account.serialise() {
-            Ok(serialised) => match Account::deserialise(&serialised) {
-                Ok(account_again) => assert_eq!(account, account_again),
-                Err(_) => panic!("Should have been equal !!"),
-            },
-            Err(_) => panic!("Serialisation Failed !!"),
-        }
+        let serialised = ::utility::serialise(account.clone());
+        let deserialised: Account = ::utility::deserialise(serialised);
+        assert_eq!(account, deserialised);
     }
 
     #[test]
@@ -462,7 +351,7 @@ mod test {
         match account.encrypt(&password, pin) {
             Ok(encrypted) => {
                 assert!(encrypted.len() > 0);
-                assert!(account.serialise().map(|serialised| assert!(encrypted != serialised)).is_ok());
+                assert!(encrypted != ::utility::serialise(account.clone()));
                 match Account::decrypt(&encrypted, &password, pin) {
                     Ok(account_again) => assert_eq!(account, account_again),
                     Err(_) => panic!("Should have been equal !!"),

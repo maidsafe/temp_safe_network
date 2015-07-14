@@ -21,7 +21,7 @@ pub mod unversioned;
 //pub mod versioned;
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
-const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 64;
+const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 100;
 
 /// Inform about data fitting or not into given StructuredData
 pub enum DataFitResult {

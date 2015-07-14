@@ -53,8 +53,15 @@ extern crate lru_time_cache;
 extern crate rustc_serialize;
 extern crate self_encryption;
 
+/// Macros defined for usage
+#[macro_use]
+mod macros;
+
 /// Maidsafe-Client Errors
 pub mod errors;
+
+/// Public and Private Id types
+pub mod id;
 /// Self-Auth and Gateway Module
 pub mod client;
 /// Parse incoming data
@@ -65,12 +72,17 @@ pub mod structured_data_operations;
 /// Representation of input/output error
 pub type IoError = std::io::Error;
 
+/// All Maidsafe tagging should offset from this
+pub const MAIDSAFE_TAG: u64 = 5483_000;
+
 /// CryptoError - To be removed
 pub enum CryptoError {
     /// TODO
     SymmetricCryptoError(crypto::symmetriccipher::SymmetricCipherError),
     /// TODO
-    BadBuffer
+    BadBuffer,
+    /// TODO
+    Unknown,
 }
 
 impl From<crypto::symmetriccipher::SymmetricCipherError> for CryptoError {
@@ -197,5 +209,12 @@ pub mod utility {
     /// Generates a random PIN number
     pub fn generate_random_pin() -> u32 {
         ::rand::random::<u32>() % 10000
+    }
+
+    ///
+    /// Returns true if both slices are equal in length, and have equal contents
+    ///
+    pub fn slice_equal<T: PartialEq>(lhs: &[T], rhs: &[T]) -> bool {
+        lhs.len() == rhs.len() && lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b)
     }
 }
