@@ -15,17 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// NetworkStorage implements the Storage trait from the Self_Encryption 
+/// NetworkStorage implements the Storage trait from the Self_Encryption
 pub mod network_storage;
 /// Unversioned-Structured Data
 pub mod unversioned;
-///// Versioned-Structured Data
-//pub mod versioned;
+/// Versioned-Structured Data
+pub mod versioned;
 
 pub use self::network_storage::NetworkStorage;
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
-const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 100;
+const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 64;
 
 /// Inform about data fitting or not into given StructuredData
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -76,7 +76,7 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sig
 pub fn check_if_data_can_fit_in_structured_data(data: Vec<u8>,
                                                 owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                                                 prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> DataFitResult {
-    if data.len() >= ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES {
+    if data.len() > ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - PADDING_SIZE_IN_BYTES {
         DataFitResult::DataDoesNotFit
     } else {
         let available_size = get_approximate_space_for_data(owner_keys, prev_owner_keys);

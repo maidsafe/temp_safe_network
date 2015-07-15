@@ -109,6 +109,8 @@ pub fn get_data<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>
         },
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
             match client.lock().unwrap().get_new(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).unwrap().get() {
+                // TODO This is wrong as feedback is to be Data not raw data. Wait for routing to
+                // build and correct everywhere
                 Ok(raw_data_map) => {
                     match try!(get_decoded_stored_data(raw_data_map, data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
