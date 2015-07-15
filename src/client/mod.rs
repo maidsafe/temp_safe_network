@@ -55,7 +55,7 @@ fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<call
 }
 
 mod misc {
-    pub type ResponseNotifier = ::std::sync::Arc<(::std::sync::Mutex<::routing::types::MessageId>, ::std::sync::Condvar)>;
+    pub type ResponseNotifier = ::std::sync::Arc<(::std::sync::Mutex<Option<::routing::types::MessageId>>, ::std::sync::Condvar)>;
 }
 
 const POLL_DURATION_IN_MILLISEC: u32 = 1;
@@ -82,7 +82,7 @@ impl Client {
     pub fn create_account(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::IoError> {
         let password = password_str.as_bytes();
 
-        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
+        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let id_packet = routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
@@ -147,7 +147,7 @@ impl Client {
     pub fn log_in(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::IoError> {
         let password = password_str.as_bytes();
 
-        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
+        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let user_network_id = user_account::Account::generate_network_id(keyword, pin);
         let fake_account_packet = user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
@@ -463,47 +463,36 @@ impl Client {
         self.account.get_public_maid().name()
     }
 
-    /// Put data onto the network. This is non-blocking.
-    pub fn put_new(&mut self, location: ::routing::NameType, data: Data) -> Result<response_getter::ResponseGetter, ::IoError> {
-        match self.routing.lock().unwrap().put_new(location, data) {
-            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
-            Err(io_err) => Err(io_err),
-        }
-    }
-
     /// Get data onto the network. This is non-blocking.
-    pub fn get_new(&mut self, location: ::routing::NameType, request_for: DataRequest) -> Result<response_getter::ResponseGetter, ::IoError> {
+    pub fn get_new(&mut self, location: ::routing::NameType, request_for: DataRequest) -> Result<response_getter::ResponseGetter, ::errors::ClientError> {
         let mut data_name: Option<routing::NameType> = None;
 
-        if let DataRequest::ImmutableData(_) = request_for {
+        if let ::client::DataRequest::ImmutableData(_) = request_for {
             let mut cb_interface = self.callback_interface.lock().unwrap();
             if cb_interface.cache_check(&location) {
-                return Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), None, Some(location)))
+                return Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), None, Some(location)));
             }
 
             data_name = Some(location.clone());
         }
 
-        match self.routing.lock().unwrap().get_new(location, request_for) {
-            Ok(id) => Ok(response_getter::ResponseGetter::new( self.response_notifier.clone(), self.callback_interface.clone(), Some(id), data_name)),
-            Err(io_err) => Err(io_err),
-        }
+        let msg_id = try!(self.routing.lock().unwrap().get_new(location, request_for).map_err(|error| ::errors::ClientError::RoutingFailure(error)));
+        Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(msg_id), None))
+    }
+
+    /// Put data onto the network. This is non-blocking.
+    pub fn put_new(&mut self, location: ::routing::NameType, data: Data) -> Result<(), ::errors::ClientError> {
+        Ok(try!(self.routing.lock().unwrap().put_new(location, data).map_err(|error| ::errors::ClientError::RoutingFailure(error))))
     }
 
     /// Post data onto the network
-    pub fn post(&mut self, location: ::routing::NameType, data: Data) -> Result<response_getter::ResponseGetter, ::IoError> {
-        match self.routing.lock().unwrap().post(location, data) {
-            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
-            Err(io_err) => Err(io_err),
-        }
+    pub fn post(&mut self, location: ::routing::NameType, data: Data) -> Result<(), ::errors::ClientError> {
+        Ok(try!(self.routing.lock().unwrap().post(location, data).map_err(|error| ::errors::ClientError::RoutingFailure(error))))
     }
 
     /// Delete data from the network
-    pub fn delete(&mut self, location: ::routing::NameType, data: Data) -> Result<response_getter::ResponseGetter, ::IoError> {
-        match self.routing.lock().unwrap().delete(location, data) {
-            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
-            Err(io_err) => Err(io_err),
-        }
+    pub fn delete(&mut self, location: ::routing::NameType, data: Data) -> Result<(), ::errors::ClientError> {
+        Ok(try!(self.routing.lock().unwrap().delete(location, data).map_err(|error| ::errors::ClientError::RoutingFailure(error))))
     }
 
     /// Put data onto the network. This is non-blocking.

@@ -56,13 +56,13 @@ impl CallbackInterface {
     }
 
     /// Check if data is already in local cache
-    pub fn cache_local_check(&mut self, key: &::routing::NameType) -> bool {
+    pub fn local_cache_check(&mut self, key: &::routing::NameType) -> bool {
         self.local_cache.contains_key(key)
     }
 
     /// Get data if already in local cache.
-    pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Option<Result<Vec<u8>, ::routing::error::ResponseError>> {
-        Some(Ok(self.local_cache.get(key).unwrap().clone()))
+    pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Result<::client::Data, ::errors::ClientError> {
+        Ok(try!(self.local_cache.get(key).ok_or(::errors::ClientError::VersionCacheMiss)))
     }
 
     /// Put data into local cache
@@ -71,7 +71,17 @@ impl CallbackInterface {
     }
 
     /// Get data from cache filled by the response from routing
-    pub fn get_response(&mut self, message_id: ::routing::types::MessageId) -> Option<Result<Vec<u8>, ::routing::error::ResponseError>> {
-        self.message_queue.remove(&message_id)
+    pub fn get_response(&mut self, message_id: ::routing::types::MessageId) -> Result<::client::Data, ::errors::ClientError> {
+        Ok(try!(self.message_queue.remove(&message_id).ok_or(::errors::ClientError::RoutingMessageCacheMiss)))
+    }
+
+    fn handle_get_response(&mut self,
+                           message_id: ::routing::types::MessageId,
+                           response:   Result<::client::Data, ::routing::error::ResponseError>) {
+        self.message_queue.insert(message_id, response);
+        let &(ref lock, ref condition_var) = &*self.response_notifier;
+        let mut fetched_id = lock.lock().unwrap();
+        *fetched_id = Some(message_id);
+        condition_var.notify_all();
     }
 }
