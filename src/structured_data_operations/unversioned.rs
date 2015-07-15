@@ -25,18 +25,17 @@ enum DataTypeEncoding {
 /// Create StructuredData in accordance with data-encoding rules abstracted from user. For
 /// StructuredData created with create, data must be obtained using the complementary function
 /// defined in this module to get_data()
-pub fn create<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
-                 tag_type: u64,
-                 id: ::routing::NameType,
-                 version: u64,
-                 data: Vec<u8>,
-                 owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-                 prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-                 private_signing_key: &::sodiumoxide::crypto::sign::SecretKey,
-                 data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
-                                               &::sodiumoxide::crypto::box_::SecretKey,
-                                               &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::client::StructuredData, ::errors::ClientError>
-                                                                                         where T: ::self_encryption::Storage + Sync + Send + 'static {
+pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+              tag_type: u64,
+              id: ::routing::NameType,
+              version: u64,
+              data: Vec<u8>,
+              owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
+              prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
+              private_signing_key: &::sodiumoxide::crypto::sign::SecretKey,
+              data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
+                                            &::sodiumoxide::crypto::box_::SecretKey,
+                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::client::StructuredData, ::errors::ClientError> {
     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsData(data.clone()), data_encryption_keys));
 
     match ::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone()) {
@@ -94,12 +93,11 @@ pub fn create<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 }
 
 /// Get Actual Data From StructuredData created via create() function in this module.
-pub fn get_data<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                    struct_data: &::client::StructuredData,
                    data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                  &::sodiumoxide::crypto::box_::SecretKey,
-                                                 &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError>
-                                                                                           where T: ::self_encryption::Storage + Sync + Send + 'static {
+                                                 &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
     match try!(get_decoded_stored_data(struct_data.get_data().clone(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
@@ -157,9 +155,152 @@ fn get_decoded_stored_data(raw_data: Vec<u8>,
 
 #[cfg(test)]
 mod test {
+    // extern crate rand;
 
-        // fn create() {
-        //
-        // }
+    use super::*;
+    // use self::rand::Rng;
+
+    const TAG_ID : u64 = ::MAIDSAFE_TAG + 1000;
+
+    fn get_client() -> ::std::sync::Arc<::std::sync::Mutex<::client::Client>> {
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
+        ::std::sync::Arc::new(::std::sync::Mutex::new(::client::Client::create_account(&keyword, pin, &password).unwrap()))
+    }
+
+    fn genearte_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+        let mut public_keys = Vec::with_capacity(size);
+        for _ in 0..size {
+            public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
+        }
+        public_keys
+    }
+
+    fn genearte_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
+        let mut secret_keys = Vec::with_capacity(size);
+        for _ in 0..size {
+            secret_keys.push(::sodiumoxide::crypto::sign::gen_keypair().1);
+        }
+        secret_keys
+    }
+
+    // fn generate_nonce() -> [u8; 24] {
+    //     let v = rand::thread_rng().gen_iter::<u8>().take(24).collect::<Vec<u8>>();
+    //     convert_to_array!(v, 24).unwrap()
+    // }
+
+    #[test]
+    fn test_create() {
+        let client = get_client();
+        // Empty Data
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = Vec::new();
+            let owners = genearte_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = genearte_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+        }
+        // Data of size 80 KB
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 80];
+            let owners = genearte_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = genearte_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+        }
+        // Data of size 80 KB with 10 owners
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 80];
+            let owners = genearte_public_keys(10);
+            let prev_owners = Vec::new();
+            let ref secret_key = genearte_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+        }
+        // Data of size 80 KB with 100 owners
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 80];
+            let owners = genearte_public_keys(100);
+            let prev_owners = Vec::new();
+            let ref secret_key = genearte_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+        }
+        // Data of size 80 KB with MAX owners
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 80];
+            let owners = genearte_public_keys(543);
+            let prev_owners = Vec::new();
+            let ref secret_key = genearte_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+        }
+        // Data of size 80 KB with MAX + 5 owners
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 80];
+            let owners = genearte_public_keys(548);
+            let prev_owners = Vec::new();
+            let ref secret_key = genearte_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_err());
+        }
+    }
 
 }

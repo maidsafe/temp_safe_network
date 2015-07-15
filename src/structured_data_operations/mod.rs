@@ -126,12 +126,12 @@ mod test {
         }
         // Data of size 80kb
         {
-            let data = vec![1u8; 1024 * 80];
+            let data = vec![99u8; 1024 * 80];
             let mut keys = genearte_public_keys(1);
             assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
             keys.extend(genearte_public_keys(289));
             assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
-            keys.extend(genearte_public_keys(248));
+            keys.extend(genearte_public_keys(250));
             assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
             keys.extend(genearte_public_keys(10));
             assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(data.clone(), keys, Vec::new()));
