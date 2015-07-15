@@ -183,7 +183,7 @@ impl Client {
         };
 
         // TODO - Remove This thread::sleep Hack
-        ::std::thread::sleep_ms(10000);
+        ::std::thread::sleep_ms(3000);
 
         let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
         let get_result = fake_routing_client.lock().unwrap().get(structured_data_type_id.type_tag(), user_network_id);
