@@ -99,6 +99,10 @@ impl StructuredData {
         &self.data
     }
 
+    pub fn get_identifier(&self) -> &::routing::NameType {
+        &self.identifier
+    }
+
     pub fn get_version(&self) -> u64 {
         self.version
     }
@@ -109,6 +113,10 @@ impl StructuredData {
 
     pub fn get_owners(&self) -> &Vec<::sodiumoxide::crypto::sign::PublicKey> {
         &self.current_owner_keys
+    }
+
+    pub fn get_previous_owners(&self) -> &Vec<::sodiumoxide::crypto::sign::PublicKey> {
+        &self.previous_owner_keys
     }
 
     pub fn add_signature(&mut self, sign_key: &::sodiumoxide::crypto::sign::SecretKey) {
