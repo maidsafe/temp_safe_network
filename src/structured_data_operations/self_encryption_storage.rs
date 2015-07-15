@@ -17,20 +17,20 @@
 
 /// Network storage is the concrete type which self-encryption crate will use to put or get data
 /// from the network
-pub struct NetworkStorage {
+pub struct SelfEncryptionStorage {
     client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 }
 
-impl NetworkStorage {
-    /// Create a new NetworkStorage instance
-    pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>) -> ::std::sync::Arc<NetworkStorage> {
-        ::std::sync::Arc::new(NetworkStorage {
+impl SelfEncryptionStorage {
+    /// Create a new SelfEncryptionStorage instance
+    pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>) -> ::std::sync::Arc<SelfEncryptionStorage> {
+        ::std::sync::Arc::new(SelfEncryptionStorage {
             client: client,
         })
     }
 }
 
-impl ::self_encryption::Storage for NetworkStorage {
+impl ::self_encryption::Storage for SelfEncryptionStorage {
     fn get(&self, name: Vec<u8>) -> Vec<u8> {
         let mut name_id = [0u8;64];
         assert_eq!(name.len(), 64);

@@ -51,7 +51,7 @@ pub fn create<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 
         },
         ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::NetworkStorage::new(client.clone()), ::self_encryption::datamap::DataMap::None);
+            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::SelfEncryptionStorage::new(client.clone()), ::self_encryption::datamap::DataMap::None);
             se.write(&data, 0);
             let data_map = se.close();
 
@@ -103,7 +103,7 @@ pub fn get_data<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>
     match try!(get_decoded_stored_data(struct_data.get_data().clone(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
-            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::NetworkStorage::new(client), data_map);
+            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::SelfEncryptionStorage::new(client), data_map);
             let length = se.len();
             Ok(se.read(0, length))
         },
@@ -114,7 +114,7 @@ pub fn get_data<T>(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>
                 Ok(raw_data_map) => {
                     match try!(get_decoded_stored_data(raw_data_map, data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
-                            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::NetworkStorage::new(client.clone()), data_map);
+                            let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::SelfEncryptionStorage::new(client.clone()), data_map);
                             let length = se.len();
                             Ok(se.read(0, length))
                         },
@@ -158,8 +158,8 @@ fn get_decoded_stored_data(raw_data: Vec<u8>,
 #[cfg(test)]
 mod test {
 
-        fn create() {
-
-        }
+        // fn create() {
+        //
+        // }
 
 }
