@@ -19,7 +19,7 @@
 /// responses. It is nonblocking in nature.
 pub struct CallbackInterface {
     response_notifier: ::client::misc::ResponseNotifier,
-    message_queue:     ::lru_time_cache::LruCache<::routing::types::MessageId, Result<::client::Data, ::routing::error::ResponseError>>,
+    message_queue:     ::lru_time_cache::LruCache<::routing::NameType, ::client::Data>,
     local_cache:       ::lru_time_cache::LruCache<::routing::NameType, ::client::Data>,
 }
 
@@ -62,7 +62,7 @@ impl CallbackInterface {
 
     /// Get data if already in local cache.
     pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Result<::client::Data, ::errors::ClientError> {
-        Ok(try!(self.local_cache.get(key).ok_or(::errors::ClientError::VersionCacheMiss)))
+        Ok(try!(self.local_cache.get(key).ok_or(::errors::ClientError::VersionCacheMiss)).clone())
     }
 
     /// Put data into local cache
@@ -71,17 +71,15 @@ impl CallbackInterface {
     }
 
     /// Get data from cache filled by the response from routing
-    pub fn get_response(&mut self, message_id: ::routing::types::MessageId) -> Result<::client::Data, ::errors::ClientError> {
-        Ok(try!(self.message_queue.remove(&message_id).ok_or(::errors::ClientError::RoutingMessageCacheMiss)))
+    pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::client::Data, ::errors::ClientError> {
+        Ok(try!(self.message_queue.remove(&location).ok_or(::errors::ClientError::RoutingMessageCacheMiss)))
     }
 
-    fn handle_get_response(&mut self,
-                           message_id: ::routing::types::MessageId,
-                           response:   Result<::client::Data, ::routing::error::ResponseError>) {
-        self.message_queue.insert(message_id, response);
+    fn handle_get_response(&mut self, original_requested_location: ::routing::NameType, response: ::client::Data) {
+        self.message_queue.insert(original_requested_location.clone(), response);
         let &(ref lock, ref condition_var) = &*self.response_notifier;
-        let mut fetched_id = lock.lock().unwrap();
-        *fetched_id = Some(message_id);
+        let mut fetched_location = lock.lock().unwrap();
+        *fetched_location = Some(original_requested_location);
         condition_var.notify_all();
     }
 }

@@ -35,6 +35,8 @@ pub enum ClientError {
     RoutingMessageCacheMiss,
     /// Network operation failed
     NetworkOperationFailure(::routing::error::ResponseError),
+    /// Generic I/O Error
+    GenericIoError(::std::io::Error),
 }
 
 impl From<::cbor::CborError> for ClientError {
@@ -46,6 +48,12 @@ impl From<::cbor::CborError> for ClientError {
 impl From<::routing::error::ResponseError> for ClientError {
     fn from(error: ::routing::error::ResponseError) -> ClientError {
         ClientError::NetworkOperationFailure(error)
+    }
+}
+
+impl From<::std::io::Error> for ClientError {
+    fn from(error: ::std::io::Error) -> ClientError {
+        ClientError::GenericIoError(error)
     }
 }
 
@@ -61,6 +69,7 @@ impl ::std::fmt::Display for ClientError {
             ClientError::VersionCacheMiss                    => ::std::fmt::Display::fmt("ClientError::VersionCacheMiss", f),
             ClientError::RoutingMessageCacheMiss             => ::std::fmt::Display::fmt("ClientError::RoutingMessageCacheMiss", f),
             ClientError::NetworkOperationFailure(_)          => ::std::fmt::Display::fmt("ClientError::NetworkOperationFailure", f),
+            ClientError::GenericIoError(_)                   => ::std::fmt::Display::fmt("ClientError::GenericIoError", f),
         }
     }
 }

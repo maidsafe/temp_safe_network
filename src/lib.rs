@@ -41,7 +41,7 @@ unused_qualifications, variant_size_differences)]
 //! #Maidsafe-Client Library
 //! [Project github page](https://github.com/maidsafe/maidsafe_client)
 
-#![allow(variant_size_differences)]
+#![allow(variant_size_differences, unused_extern_crates)] // TODO
 
 extern crate cbor;
 extern crate rand;
@@ -57,63 +57,18 @@ extern crate self_encryption;
 #[macro_use]
 mod macros;
 
-/// Public and Private Id types
-pub mod id;
+///// Public and Private Id types
+//pub mod id;
 /// Maidsafe-Client Errors
 pub mod errors;
 /// Self-Auth and Gateway Module
 pub mod client;
 /// Utility functions
 pub mod utility;
-/// Parse incoming data
-pub mod data_parser;
-/// Logic for StructuredData
-pub mod structured_data_operations;
+///// Parse incoming data
+//pub mod data_parser;
+///// Logic for StructuredData
+//pub mod structured_data_operations;
 
-/// Representation of input/output error
-pub type IoError = std::io::Error;
-
-/// All Maidsafe tagging should offset from this
-pub const MAIDSAFE_TAG: u64 = 5483_000;
-
-/// CryptoError - To be removed
-pub enum CryptoError {
-    /// TODO
-    SymmetricCryptoError(crypto::symmetriccipher::SymmetricCipherError),
-    /// TODO
-    BadBuffer,
-    /// TODO
-    Unknown,
-}
-
-impl From<crypto::symmetriccipher::SymmetricCipherError> for CryptoError {
-    fn from(error : crypto::symmetriccipher::SymmetricCipherError) -> CryptoError {
-        return CryptoError::SymmetricCryptoError(error);
-    }
-}
-
-/// Under Construction - Will undergo lot of modification in upcoming sprint
-pub enum MaidsafeError {
-    /// Under Construction
-    CryptoError(CryptoError),
-    /// Under Construction
-    EncodingError(cbor::CborError),
-}
-
-impl From<CryptoError> for MaidsafeError {
-    fn from(error : CryptoError) -> MaidsafeError {
-        return MaidsafeError::CryptoError(error);
-    }
-}
-
-impl From<cbor::CborError> for MaidsafeError {
-    fn from(error : cbor::CborError) -> MaidsafeError {
-        return MaidsafeError::EncodingError(error);
-    }
-}
-
-impl From<crypto::symmetriccipher::SymmetricCipherError> for MaidsafeError {
-    fn from(error : crypto::symmetriccipher::SymmetricCipherError) -> MaidsafeError {
-        return MaidsafeError::CryptoError(CryptoError::SymmetricCryptoError(error));
-    }
-}
+///// All Maidsafe tagging should offset from this
+//pub const MAIDSAFE_TAG: u64 = 5483_000;
