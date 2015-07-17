@@ -123,15 +123,31 @@ pub mod test_utils {
         ::client::Client::create_account(&keyword, pin, &password).unwrap()
     }
     /// Gnerates Random public keys
-    pub fn genearte_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+    pub fn generate_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
         let mut public_keys = Vec::with_capacity(size);
         for _ in 0..size {
             public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
         }
         public_keys
     }
+    /// Gnerates Fixed Size public keys
+    pub fn generate_fixed_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+        let mut public_keys = Vec::with_capacity(size);
+        for _ in 0..size {
+            public_keys.push(::sodiumoxide::crypto::sign::PublicKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::PUBLICKEYBYTES]));
+        }
+        public_keys
+    }
+    /// Gnerates Fixed Size secret keys
+    pub fn generate_fixed_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
+        let mut secret_keys = Vec::with_capacity(size);
+        for _ in 0..size {
+            secret_keys.push(::sodiumoxide::crypto::sign::SecretKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::SECRETKEYBYTES]));
+        }
+        secret_keys
+    }
     /// Gnerates Random SecretKey
-    pub fn genearte_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
+    pub fn generate_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
         let mut secret_keys = Vec::with_capacity(size);
         for _ in 0..size {
             secret_keys.push(::sodiumoxide::crypto::sign::gen_keypair().1);

@@ -96,83 +96,82 @@ pub fn check_if_data_can_fit_in_structured_data(data: Vec<u8>,
 mod test {
     use super::*;
 
-    // Refers the fixed size of the test_get_approximate_space_for_data fn without and sugnatures
+    /// Refers the fixed size of the test_get_approximate_space_for_data fn without signatures
     const DEFAULT_FIXED_SIZE : usize = ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - 1187;
+    /// 196 is approximate size (close enough) of a Fixed Key after serialisation.
     const FIXED_SIZE_OF_KEY :  usize = 196;
 
-    fn genearte_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-        let mut public_keys = Vec::with_capacity(size);
-        for _ in 0..size {
-            public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
-        }
-        public_keys
-    }
-
-    fn genearte_fixed_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-        let mut public_keys = Vec::with_capacity(size);
-        for _ in 0..size {
-            public_keys.push(::sodiumoxide::crypto::sign::PublicKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::PUBLICKEYBYTES]));
-        }
-        public_keys
-    }
-
     #[test]
-    fn test_get_approximate_space_for_data() {
-        let mut keys = genearte_public_keys(10);
-        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 5000);
-        assert!(get_approximate_space_for_data(genearte_public_keys(1), keys.clone()) > 5000);
-        keys.extend(genearte_public_keys(40)); // 50 keys
-        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 5000);
-        assert!(get_approximate_space_for_data(genearte_public_keys(1), keys.clone()) > 5000);
-        keys.extend(genearte_public_keys(470)); // 520 keys
-        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 100);
-        assert!(get_approximate_space_for_data(genearte_public_keys(1), keys.clone()) > 100);
+    fn approximate_space_for_data() {
         // Assertion based on Fixed Key sizes
         {
-            let mut keys = genearte_fixed_public_keys(1);
+            let mut keys = ::utility::test_utils::generate_fixed_public_keys(1);
             assert_eq!(get_approximate_space_for_data(keys.clone(), Vec::new()), DEFAULT_FIXED_SIZE - FIXED_SIZE_OF_KEY);
-            keys.extend(genearte_fixed_public_keys(2));
+            keys.extend(::utility::test_utils::generate_fixed_public_keys(2));
             assert_eq!(get_approximate_space_for_data(keys.clone(), Vec::new()), DEFAULT_FIXED_SIZE - (FIXED_SIZE_OF_KEY * keys.len()));
-            keys.extend(genearte_fixed_public_keys(513));
+            keys.extend(::utility::test_utils::generate_fixed_public_keys(513));
             assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) < 100);
-            keys.extend(genearte_fixed_public_keys(1));
+            keys.extend(::utility::test_utils::generate_fixed_public_keys(1));
             assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) == 0);
         }
+        // Random key assertions
+        let mut keys = ::utility::test_utils::generate_public_keys(10);
+        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 5000);
+        assert!(get_approximate_space_for_data(::utility::test_utils::generate_public_keys(1), keys.clone()) > 5000);
+        keys.extend(::utility::test_utils::generate_public_keys(40)); // 50 keys
+        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 5000);
+        assert!(get_approximate_space_for_data(::utility::test_utils::generate_public_keys(1), keys.clone()) > 5000);
+        keys.extend(::utility::test_utils::generate_public_keys(470)); // 520 keys
+        assert!(get_approximate_space_for_data(keys.clone(), Vec::new()) > 100);
+        assert!(get_approximate_space_for_data(::utility::test_utils::generate_public_keys(1), keys.clone()) > 100);
     }
 
     #[test]
-    fn test_check_if_data_can_fit_in_structured_data() {
+    fn data_can_fit_in_structured_data() {
+        // Assertion based on Fixed Key sizes
+        // Maximum of 516 keys can be accomodated after serialisation. Thus the fixed key tests work on that calculation
+        {
+            let mut keys = ::utility::test_utils::generate_fixed_public_keys(1);
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(vec![1u8; 0], keys.clone(), Vec::new()));
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(vec![1u8; 102400], keys.clone(), Vec::new()));
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(vec![1u8; 103424], keys.clone(), Vec::new()));
+            keys.extend(::utility::test_utils::generate_fixed_public_keys(515));
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(vec![0u8; 0], keys.clone(), Vec::new()));
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(vec![0u8; 102400], keys.clone(), Vec::new()));
+            keys.extend(::utility::test_utils::generate_fixed_public_keys(1));
+            assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(vec![0u8; 0], keys.clone(), Vec::new()));
+        }
         // Empty data
         {
-            let mut keys = genearte_public_keys(250);
+            let mut keys = ::utility::test_utils::generate_public_keys(250);
             assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(Vec::new(), keys.clone(), Vec::new()));
-            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(Vec::new(), genearte_public_keys(1), keys.clone()));
-            keys.extend(genearte_public_keys(350));
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(Vec::new(), ::utility::test_utils::generate_public_keys(1), keys.clone()));
+            keys.extend(::utility::test_utils::generate_public_keys(350));
             assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(Vec::new(), keys, Vec::new()));
         }
         // Data of size 80kb
         {
             let data = vec![99u8; 1024 * 80];
-            let mut keys = genearte_public_keys(1);
+            let mut keys = ::utility::test_utils::generate_public_keys(1);
             assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
-            keys.extend(genearte_public_keys(99));
+            keys.extend(::utility::test_utils::generate_public_keys(98));
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
+            keys.extend(::utility::test_utils::generate_public_keys(190));
             assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
-            keys.extend(genearte_public_keys(190));
+            keys.extend(::utility::test_utils::generate_public_keys(225));
             assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
-            keys.extend(genearte_public_keys(225));
-            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()));
-            keys.extend(genearte_public_keys(10));
+            keys.extend(::utility::test_utils::generate_public_keys(15));
             assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(data.clone(), keys, Vec::new()));
         }
         // Data size of 100 kb
         {
             let data = vec![1u8; 102400];
-            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), genearte_public_keys(1), Vec::new()));
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), ::utility::test_utils::generate_public_keys(1), Vec::new()));
         }
         // Data size of 101 kb
         {
             let data = vec![1u8; 103424];
-            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), genearte_public_keys(1), Vec::new()));
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), ::utility::test_utils::generate_public_keys(1), Vec::new()));
         }
     }
 

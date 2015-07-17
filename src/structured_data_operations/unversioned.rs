@@ -100,7 +100,7 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
         DataTypeEncoding::ContainsDataMap(data_map) => {
             let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::SelfEncryptionStorage::new(client), data_map);
             let length = se.len();
-            Ok(se.read(0, length+1))
+            Ok(se.read(0, length))
         },
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
             match client.lock().unwrap().get_new(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).unwrap().get() {
@@ -161,15 +161,15 @@ mod test {
     const TAG_ID : u64 = ::MAIDSAFE_TAG + 1000;
 
     #[test]
-    fn create_and_get() {
+    fn create_and_get_unversionsed_structured_data() {
         let client = ::std::sync::Arc::new(::std::sync::Mutex::new(::utility::test_utils::get_client()));
-        // Empty Data
+        // Empty Data - Hsould directly fit in the StructuredData
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = Vec::new();
-            let owners = ::utility::test_utils::genearte_public_keys(1);
+            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -185,13 +185,13 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        // Data of size 80 KB
+        // Data of size 80 KB - Should directly fit in the structured data
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = ::utility::test_utils::genearte_public_keys(1);
+            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -207,13 +207,13 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        // Data of size 80 KB with 100 owners
+        // Data of size 80 KB with 200 owners - The data map of the data should fit in the StructuredData
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = ::utility::test_utils::genearte_public_keys(100);
+            let owners = ::utility::test_utils::generate_fixed_public_keys(200);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -233,9 +233,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = ::utility::test_utils::genearte_public_keys(520);
+            let owners = ::utility::test_utils::generate_fixed_public_keys(516);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -251,13 +251,13 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        // Data of size 80 KB with MAX + 5 owners
+        // Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = ::utility::test_utils::genearte_public_keys(525);
+            let owners = ::utility::test_utils::generate_fixed_public_keys(517);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -273,9 +273,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 102400];
-            let owners = ::utility::test_utils::genearte_public_keys(1);
+            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,

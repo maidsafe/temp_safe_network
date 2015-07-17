@@ -124,9 +124,9 @@ mod test {
         let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
         let first_data = vec![1u8; 10];
         let second_data = vec![2u8; 20];
-        let owners = ::utility::test_utils::genearte_public_keys(1);
+        let owners = ::utility::test_utils::generate_public_keys(1);
         let prev_owners = Vec::new();
-        let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+        let ref secret_key = ::utility::test_utils::generate_secret_keys(1)[0];
         let mut version = ::utility::test_utils::save_as_immutable_data(&mut client, first_data.clone());
 
         let structured_data_result = create(&mut client, version, TAG_ID, id, 0, owners, prev_owners, secret_key);
