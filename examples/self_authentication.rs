@@ -17,8 +17,6 @@
 
 extern crate maidsafe_client;
 
-use std::error::Error;
-
 #[allow(unused_must_use)]
 fn main() {
 /*    let mut keyword = String::new();
@@ -53,7 +51,7 @@ fn main() {
 
         match maidsafe_client::client::Client::create_account(&keyword, pin, &password) {
             Ok(_) => println!("Account Created Successfully !!"),
-            Err(io_error)  => println!("Account Creation Failed !! Reason: {:?}", io_error.description()),
+            Err(error)  => println!("Account Creation Failed !! Reason: {}", error),
         }
     }
 
@@ -65,7 +63,7 @@ fn main() {
         println!("\nTrying to log into the created account using supplied credentials ...");
         match maidsafe_client::client::Client::log_in(&keyword, pin, &password) {
             Ok(_) => println!("Account Login Successful !!"),
-            Err(io_error)  => println!("Account Login Failed !! Reason: {:?}", io_error.description()),
+            Err(error)  => println!("Account Login Failed !! Reason: {}", error),
         }
     }
 
@@ -102,7 +100,7 @@ fn main() {
                     println!("Account Login Successful !!");
                     break;
                 }
-                Err(io_error)  => println!("Account Login Failed !! Reason: {:?}\n\n", io_error.description()),
+                Err(error)  => println!("Account Login Failed !! Reason: {}\n\n", error),
             }
         }
     }*/

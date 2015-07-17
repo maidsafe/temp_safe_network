@@ -202,7 +202,7 @@ impl Account {
                 ::crypto::aes::KeySize::KeySize256, &keys.0, &keys.1, ::crypto::blockmodes::PkcsPadding);
 
             loop {
-                let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true).ok().unwrap(); // TODO Improve
+                let result = try!(decryptor.decrypt(&mut read_buffer, &mut write_buffer, true).map_err(|_| ::errors::ClientError::SymmetricDecipherFailure));
                 decrypted.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&a| a.clone()));
                 match result {
                     ::crypto::buffer::BufferResult::BufferUnderflow => break,
