@@ -85,8 +85,8 @@ impl IdType {
     pub fn open(&self,
                 data : &[u8],
                 nonce : &::sodiumoxide::crypto::box_::Nonce,
-                from : &::sodiumoxide::crypto::box_::PublicKey) -> Result<Vec<u8>, ::CryptoError> {
-        return ::sodiumoxide::crypto::box_::open(&data, &nonce, &from, &self.secret_keys.1).ok_or(::CryptoError::Unknown);
+                from : &::sodiumoxide::crypto::box_::PublicKey) -> Result<Vec<u8>, ::errors::ClientError> {
+        ::sodiumoxide::crypto::box_::open(&data, &nonce, &from, &self.secret_keys.1).ok_or(::errors::ClientError::AsymmetricDecipherFailure)
     }
 
 }

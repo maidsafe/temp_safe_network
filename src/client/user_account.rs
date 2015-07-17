@@ -140,8 +140,8 @@ impl Account {
 
     /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
     /// through PBKDF2 first
-    pub fn encrypt(&self, password: &[u8], pin: u32) -> Result<Vec<u8>, ::MaidsafeError> {
-        let serialised = ::utility::serialise(self.clone());
+    pub fn encrypt(&self, password: &[u8], pin: u32) -> Result<Vec<u8>, ::errors::ClientError> {
+        let serialised = try!(::utility::serialise(self));
 
         let mut encrypted : Vec<u8> = Vec::new();
         {
@@ -165,7 +165,7 @@ impl Account {
                 ::crypto::aes::KeySize::KeySize256, &keys.0, &keys.1, ::crypto::blockmodes::PkcsPadding);
 
             loop {
-                let result = try!(encryptor.encrypt(&mut read_buffer, &mut write_buffer, true));
+                let result = encryptor.encrypt(&mut read_buffer, &mut write_buffer, true).ok().unwrap(); // TODO Improve
                 encrypted.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&a| a.clone()));
                 match result {
                     ::crypto::buffer::BufferResult::BufferUnderflow => break,
@@ -179,7 +179,7 @@ impl Account {
 
     /// Symmetric decryption of Session Packet using User's credentials. Credentials are passed
     /// through PBKDF2 first
-    pub fn decrypt(encrypted: &[u8], password: &[u8], pin: u32) -> Result<Account, ::MaidsafeError> {
+    pub fn decrypt(encrypted: &[u8], password: &[u8], pin: u32) -> Result<Account, ::errors::ClientError> {
         let mut decrypted : Vec<u8> = Vec::new();
         {
             use crypto::symmetriccipher::Decryptor;
@@ -202,7 +202,7 @@ impl Account {
                 ::crypto::aes::KeySize::KeySize256, &keys.0, &keys.1, ::crypto::blockmodes::PkcsPadding);
 
             loop {
-                let result = try!(decryptor.decrypt(&mut read_buffer, &mut write_buffer, true));
+                let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true).ok().unwrap(); // TODO Improve
                 decrypted.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&a| a.clone()));
                 match result {
                     ::crypto::buffer::BufferResult::BufferUnderflow => break,
@@ -211,7 +211,7 @@ impl Account {
             }
         }
 
-        Ok(::utility::deserialise(decrypted))
+        Ok(try!(::utility::deserialise(&decrypted)))
     }
 
     fn hash_pin(hasher : &mut ::crypto::sha2::Sha512, pin : u32) {
@@ -337,9 +337,15 @@ mod test {
     #[test]
     fn serialisation() {
         let account = Account::new(None);
-        let serialised = ::utility::serialise(account.clone());
-        let deserialised: Account = ::utility::deserialise(serialised);
-        assert_eq!(account, deserialised);
+        if let Ok(serialised) = ::utility::serialise(&account) {
+            if let Ok(deserialised) = ::utility::deserialise::<Account>(&serialised) {
+                assert_eq!(account, deserialised);
+            } else {
+                panic!("Deserialisation Failed");
+            }
+        } else {
+            panic!("Serialisation Failed");
+        }
     }
 
     #[test]
@@ -351,7 +357,7 @@ mod test {
         match account.encrypt(&password, pin) {
             Ok(encrypted) => {
                 assert!(encrypted.len() > 0);
-                assert!(encrypted != ::utility::serialise(account.clone()));
+                assert!(encrypted != ::utility::serialise(&account).ok().unwrap());
                 match Account::decrypt(&encrypted, &password, pin) {
                     Ok(account_again) => assert_eq!(account, account_again),
                     Err(_) => panic!("Should have been equal !!"),

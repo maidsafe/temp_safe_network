@@ -18,8 +18,6 @@
 #![allow(unsafe_code, unused)] // TODO Remove the unused attribute later
 
 use routing;
-use maidsafe_types::TypeTag;
-use routing::sendable::Sendable;
 use routing::client_interface::Interface;
 
 use client::callback_interface;
@@ -49,7 +47,6 @@ fn get_storage() -> DataStore {
 
 pub struct RoutingClientMock {
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
-    msg_id: routing::types::MessageId,
     network_delay_ms: u32,
 }
 
@@ -58,7 +55,6 @@ impl RoutingClientMock {
                _: routing::types::Id) -> RoutingClientMock {
         RoutingClientMock {
             callback_interface: cb_interface,
-            msg_id: 1,
             network_delay_ms: 1000,
         }
     }
@@ -68,37 +64,33 @@ impl RoutingClientMock {
         self.network_delay_ms = delay_ms;
     }
 
-    pub fn get_new(&mut self, location: ::routing::NameType, request_for: ::client::DataRequest) -> Result<routing::types::MessageId, ::IoError> {
-        self.msg_id += 1;
-        let msg_id = self.msg_id;
+    pub fn get(&mut self, location: ::routing::NameType, request_for: ::client::DataRequest) -> Result<(), ::routing::error::ResponseError> {
         let delay_ms = self.network_delay_ms;
         let cb_interface = self.callback_interface.clone();
         let data_store = get_storage();
 
         ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(delay_ms);
-            match data_store.lock().unwrap().get(&location).clone() {
-                Some(data) => {
-                    if match (::utility::deserialise(data.clone()), request_for) {
-                        (::client::Data::ImmutableData(immut_data), ::client::DataRequest::ImmutableData(tag)) => *immut_data.get_tag_type() == tag,
-                        (::client::Data::StructuredData(struct_data), ::client::DataRequest::StructuredData(tag)) => struct_data.get_tag_type() == tag,
-                        _ => false,
-                    } {
-                        cb_interface.lock().unwrap().handle_get_response(msg_id, Ok(data.clone()));
-                    } else {
-                        cb_interface.lock().unwrap().handle_get_response(msg_id, Err(routing::error::ResponseError::NoData));
+            match data_store.lock().unwrap().get(&location) {
+                Some(raw_data) => {
+                    if let Ok(data) = ::utility::deserialise::<::client::Data>(raw_data) {
+                        if match (&data, request_for) {
+                            (&::client::Data::ImmutableData(ref immut_data), ::client::DataRequest::ImmutableData(ref tag)) => immut_data.get_tag_type() == tag,
+                            (&::client::Data::StructuredData(ref struct_data), ::client::DataRequest::StructuredData(ref tag)) => struct_data.get_tag_type() == *tag,
+                            _ => false,
+                        } {
+                            cb_interface.lock().unwrap().handle_get_response(location, data);
+                        }
                     }
                 },
-                None => cb_interface.lock().unwrap().handle_get_response(msg_id, Err(routing::error::ResponseError::NoData)),
+                None => (),
             };
         });
 
-        Ok(self.msg_id)
+        Ok(())
     }
 
-    pub fn put_new(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<routing::types::MessageId, ::IoError> {
-        self.msg_id += 1;
-        let msg_id = self.msg_id;
+    pub fn put(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<(), ::routing::error::ResponseError> {
         let delay_ms = self.network_delay_ms;
         let cb_interface = self.callback_interface.clone();
         let data_store = get_storage();
@@ -106,41 +98,39 @@ impl RoutingClientMock {
         let mut data_store_mutex_guard = data_store.lock().unwrap();
         let success = if data_store_mutex_guard.contains_key(&location) {
             if let ::client::Data::ImmutableData(immut_data) = data {
-                match ::utility::deserialise(data_store_mutex_guard.get(&location).unwrap().clone()) {
-                    ::client::Data::ImmutableData(immut_data_stored) => immut_data_stored.get_tag_type() == immut_data.get_tag_type(), // Immutable data is de-duplicated so always allowed
+                match ::utility::deserialise(data_store_mutex_guard.get(&location).unwrap()) {
+                    Ok(::client::Data::ImmutableData(immut_data_stored)) => immut_data_stored.get_tag_type() == immut_data.get_tag_type(), // Immutable data is de-duplicated so always allowed
                     _ => false
                 }
             } else {
                 false
             }
-        } else {
-            data_store_mutex_guard.insert(location, ::utility::serialise(data));
+        } else if let Ok(raw_data) = ::utility::serialise(&data) {
+            data_store_mutex_guard.insert(location, raw_data);
             true
+        } else {
+            false
         };
 
-        ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(delay_ms);
-            if success {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Ok(Vec::<u8>::new()));
-            } else {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Err(routing::error::ResponseError::InvalidRequest));
-            }
-        });
+        // ::std::thread::spawn(move || {
+        //     ::std::thread::sleep_ms(delay_ms);
+        //     if !success {
+        //         cb_interface.lock().unwrap().handle_put_post_delete_error(location, ::routing::error::ResponseError::CouldNotPutData(data)); // TODO
+        //     }
+        // });
 
-        Ok(self.msg_id)
+        Ok(())
     }
 
-    pub fn post(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<routing::types::MessageId, ::IoError> {
-        self.msg_id += 1;
-        let msg_id = self.msg_id;
+    pub fn post(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<(), ::routing::error::ResponseError> {
         let delay_ms = self.network_delay_ms;
         let cb_interface = self.callback_interface.clone();
         let data_store = get_storage();
 
         let mut data_store_mutex_guard = data_store.lock().unwrap();
         let success = if data_store_mutex_guard.contains_key(&location) {
-            match (data.clone(), ::utility::deserialise(data_store_mutex_guard.get(&location).unwrap().clone())) {
-                (::client::Data::StructuredData(struct_data_new), ::client::Data::StructuredData(struct_data_stored)) => {
+            match (&data, ::utility::deserialise(data_store_mutex_guard.get(&location).unwrap())) {
+                (&::client::Data::StructuredData(ref struct_data_new), Ok(::client::Data::StructuredData(ref struct_data_stored))) => {
                     if struct_data_new.get_version() != struct_data_stored.get_version() + 1 {
                         false
                     } else {
@@ -152,8 +142,12 @@ impl RoutingClientMock {
 
                             count >= struct_data_stored.get_owners().len() / 2 + struct_data_stored.get_owners().len() % 2
                         }) {
-                            data_store_mutex_guard.insert(location, ::utility::serialise(data));
-                            true
+                            if let Ok(raw_data) = ::utility::serialise(&data) {
+                                data_store_mutex_guard.insert(location, raw_data);
+                                true
+                            } else {
+                                false
+                            }
                         } else {
                             false
                         }
@@ -165,29 +159,25 @@ impl RoutingClientMock {
             false
         };
 
-        ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(delay_ms);
-            if success {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Ok(Vec::<u8>::new()));
-            } else {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Err(routing::error::ResponseError::InvalidRequest));
-            }
-        });
+        // ::std::thread::spawn(move || {
+        //     ::std::thread::sleep_ms(delay_ms);
+        //     if !success {
+        //         cb_interface.lock().unwrap().handle_put_response(location, ::routing::error::ResponseError::CouldNotPutData(data)); // TODO
+        //     }
+        // });
 
-        Ok(self.msg_id)
+        Ok(())
     }
 
-    pub fn delete(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<routing::types::MessageId, ::IoError> {
-        self.msg_id += 1;
-        let msg_id = self.msg_id;
+    pub fn delete(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<(), ::routing::error::ResponseError> {
         let delay_ms = self.network_delay_ms;
         let cb_interface = self.callback_interface.clone();
         let data_store = get_storage();
 
         let mut data_store_mutex_guard = data_store.lock().unwrap();
         let success = if data_store_mutex_guard.contains_key(&location) {
-            match (data, ::utility::deserialise(data_store_mutex_guard.get(&location).unwrap().clone())) {
-                (::client::Data::StructuredData(struct_data_new), ::client::Data::StructuredData(struct_data_stored)) => {
+            match (&data, ::utility::deserialise(data_store_mutex_guard.get(&location).unwrap())) {
+                (&::client::Data::StructuredData(ref struct_data_new), Ok(::client::Data::StructuredData(ref struct_data_stored))) => {
                     let mut count = 0usize;
                     if struct_data_stored.get_owners().iter().any(|key| { // This is more efficient than filter as it will stop whenever sign count reaches >= 50%
                         if struct_data_new.get_signatures().iter().any(|sig| ::sodiumoxide::crypto::sign::verify_detached(sig, &struct_data_new.data_to_sign(), key)) {
@@ -208,88 +198,14 @@ impl RoutingClientMock {
             false
         };
 
-        ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(delay_ms);
-            if success {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Ok(Vec::<u8>::new()));
-            } else {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Err(routing::error::ResponseError::InvalidRequest));
-            }
-        });
+        // ::std::thread::spawn(move || {
+        //     ::std::thread::sleep_ms(delay_ms);
+        //     if !success {
+        //         cb_interface.lock().unwrap().handle_put_response(location, ::routing::error::ResponseError::CouldNotPutData(data)); // TODO
+        //     }
+        // });
 
-        Ok(self.msg_id)
-    }
-
-    pub fn get(&mut self, _type_id: u64, name: routing::NameType) -> Result<routing::types::MessageId, ::IoError> {
-        self.msg_id += 1;
-        let msg_id = self.msg_id;
-        let delay_ms = self.network_delay_ms;
-        let cb_interface = self.callback_interface.clone();
-        let data_store = get_storage();
-
-        ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(delay_ms);
-            match data_store.lock().unwrap().get(&name).clone() {
-                Some(data) => cb_interface.lock().unwrap().handle_get_response(msg_id, Ok(data.clone())),
-                None => cb_interface.lock().unwrap().handle_get_response(msg_id, Err(routing::error::ResponseError::NoData)),
-            };
-        });
-
-        Ok(self.msg_id)
-    }
-
-    pub fn put<T>(&mut self, sendable: T) -> Result<routing::types::MessageId, ::IoError> where T: Sendable {
-        self.msg_id += 1;
-        let msg_id = self.msg_id;
-        let delay_ms = self.network_delay_ms;
-        let cb_interface = self.callback_interface.clone();
-        let data_store = get_storage();
-
-        let structured_data_type_id = ::maidsafe_types::data::StructuredDataTypeTag;
-        let success: bool = if sendable.type_tag() != structured_data_type_id.type_tag() && data_store.lock().unwrap().contains_key(&sendable.name()) {
-            false
-        } else {
-            data_store.lock().unwrap().insert(sendable.name(), sendable.serialised_contents());
-            true
-        };
-
-        ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(delay_ms);
-            if success {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Ok(Vec::<u8>::new()));
-            } else {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Err(routing::error::ResponseError::InvalidRequest));
-            }
-        });
-
-        Ok(self.msg_id)
-    }
-
-    pub fn unauthorised_put(&mut self, _: routing::NameType, sendable: Box<Sendable>) -> Result<routing::types::MessageId, ::IoError> {
-        self.msg_id += 1;
-        let msg_id = self.msg_id;
-        let delay_ms = self.network_delay_ms;
-        let cb_interface = self.callback_interface.clone();
-        let data_store = get_storage();
-
-        let structured_data_type_id = ::maidsafe_types::data::StructuredDataTypeTag;
-        let success: bool = if sendable.type_tag() != structured_data_type_id.type_tag() && data_store.lock().unwrap().contains_key(&sendable.name()) {
-            false
-        } else {
-            data_store.lock().unwrap().insert(sendable.name(), sendable.serialised_contents());
-            true
-        };
-
-        ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(delay_ms);
-            if success {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Ok(Vec::<u8>::new()));
-            } else {
-                cb_interface.lock().unwrap().handle_put_response(msg_id, Err(routing::error::ResponseError::InvalidRequest));
-            }
-        });
-
-        Ok(self.msg_id)
+        Ok(())
     }
 
     pub fn run(&mut self) {
@@ -318,7 +234,7 @@ mod test {
 
     #[test]
     fn check_put_post_get_delete_for_immutable_data() {
-        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
+        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
@@ -358,42 +274,25 @@ mod test {
         let orig_immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, orig_raw_data.clone());
         let orig_data = ::client::Data::ImmutableData(orig_immutable_data.clone());
 
-        // GET ImmutableData should fail
-        {
-            match mock_routing.lock().unwrap().get_new(orig_immutable_data.name(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => panic!("Should not have found data before a PUT"),
-                        Err(_) => (),
-                    }
-                },
-                Err(_) => panic!("Failure in GET !!"),
-            }
-        }
-
         // First PUT should succeed
         {
-            match mock_routing.lock().unwrap().put_new(orig_immutable_data.name(), orig_data.clone()) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => (),
-                        Err(error) => panic!("PUT Response Failure :: {:?}", error.description()),
-                    }
-                },
+            match mock_routing.lock().unwrap().put(orig_immutable_data.name(), orig_data.clone()) {
+                Ok(()) => (),
                 Err(_) => panic!("Failure in PUT !!"),
             }
         }
 
         // GET ImmutableData should pass
         {
-            match mock_routing.lock().unwrap().get_new(orig_immutable_data.name(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+            let mut mock_routing_guard = mock_routing.lock().unwrap();
+            match mock_routing_guard.get(orig_immutable_data.name(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
+                Ok(()) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+                                                                                             callback_interface.clone(),
+                                                                                             orig_immutable_data.name(),
+                                                                                             ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
-                        Ok(raw_data) => {
-                            let data = ::utility::deserialise::<::client::Data>(raw_data);
+                        Ok(data) => {
                             match data {
                                 ::client::Data::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data),
                                 _ => panic!("Unexpected!"),
@@ -408,15 +307,9 @@ mod test {
 
         // Subsequent PUTs for same ImmutableData should succeed - De-duplication
         {
-            let put_result = mock_routing.lock().unwrap().put_new(orig_immutable_data.name(), orig_data.clone());
+            let put_result = mock_routing.lock().unwrap().put(orig_immutable_data.name(), orig_data.clone());
             match put_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => (),
-                        Err(_) => panic!("Second PUT for same ImmutableData shouldn't fail - should have been De-duplicated !!"),
-                    }
-                },
+                Ok(()) => (),
                 Err(_) => panic!("Failure in PUT !!"),
             }
         }
@@ -427,15 +320,9 @@ mod test {
 
         // Subsequent PUTs for same ImmutableData of different type should fail
         {
-            let put_result = mock_routing.lock().unwrap().put_new(orig_immutable_data.name(), new_data);
+            let put_result = mock_routing.lock().unwrap().put(orig_immutable_data.name(), new_data);
             match put_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => panic!("PUT for same ImmutableData of different type should fail !!"),
-                        Err(_) => (),
-                    }
-                },
+                Ok(()) => (),
                 Err(_) => panic!("Failure in PUT !!"),
             }
         }
@@ -444,14 +331,8 @@ mod test {
         {
             let post_result = mock_routing.lock().unwrap().post(orig_immutable_data.name(), orig_data.clone());
             match post_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => panic!("POST for ImmutableData should fail !!"),
-                        Err(_) => (),
-                    }
-                },
-                Err(_) => panic!("Failure in PUT !!"),
+                Ok(()) => (),
+                Err(_) => panic!("Failure in POST !!"),
             }
         }
 
@@ -459,28 +340,24 @@ mod test {
         {
             let delete_result = mock_routing.lock().unwrap().delete(orig_immutable_data.name(), orig_data);
             match delete_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => panic!("DELETE for ImmutableData should fail !!"),
-                        Err(_) => (),
-                    }
-                },
-                Err(_) => panic!("Failure in PUT !!"),
+                Ok(()) => (),
+                Err(_) => panic!("Failure in DELETE !!"),
             }
         }
 
         // GET ImmutableData should pass
         {
             let mut mock_routing_mutex_guard = mock_routing.lock().unwrap();
-            match mock_routing_mutex_guard.get_new(orig_immutable_data.name(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+            match mock_routing_mutex_guard.get(orig_immutable_data.name(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
+                Ok(()) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+                                                                                             callback_interface.clone(),
+                                                                                             orig_immutable_data.name(),
+                                                                                             ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
-                        Ok(raw_data) => {
-                            let data = ::utility::deserialise::<::client::Data>(raw_data);
+                        Ok(data) => {
                             match data {
-                                ::client::Data::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data),
+                                ::client::Data::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data), // TODO Improve by directly assert_eq!(data)
                                 _ => panic!("Unexpected!"),
                             }
                         },
@@ -494,7 +371,7 @@ mod test {
 
     #[test]
     fn check_put_post_get_delete_for_structured_data() {
-        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(0), ::std::sync::Condvar::new()));
+        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
@@ -536,56 +413,30 @@ mod test {
 
         // Construct StructuredData, 1st version, for this ImmutableData
         const TYPE_TAG: u64 = 999;
-        let keyword = ::utility::generate_random_string(10);
+        let keyword = ::utility::generate_random_string(10).ok().unwrap();
         let pin = ::utility::generate_random_pin();
         let user_id = ::client::user_account::Account::generate_network_id(&keyword, pin);
         let mut account_version = ::client::StructuredData::new(TYPE_TAG,
                                                                 user_id.clone(),
                                                                 0,
-                                                                ::utility::serialise(vec![orig_immutable_data.name()]),
+                                                                ::utility::serialise(&vec![orig_immutable_data.name()]).ok().unwrap(),
                                                                 vec![account_packet.get_public_maid().public_keys().0.clone()],
                                                                 Vec::new(),
                                                                 &account_packet.get_maid().secret_keys().0);
         let mut data_account_version = ::client::Data::StructuredData(account_version.clone());
 
-        // GET StructuredData should fail
-        {
-            match mock_routing.lock().unwrap().get_new(user_id.clone(), ::client::DataRequest::StructuredData(TYPE_TAG)) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => panic!("Should not have found data before a PUT"),
-                        Err(_) => (),
-                    }
-                },
-                Err(_) => panic!("Failure in GET !!"),
-            }
-        }
-
         // First PUT of StructuredData should succeed
         {
-            match mock_routing.lock().unwrap().put_new(account_version.name(), data_account_version.clone()) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => (),
-                        Err(error) => panic!("PUT Response Failure :: {:?}", error.description()),
-                    }
-                },
+            match mock_routing.lock().unwrap().put(account_version.name(), data_account_version.clone()) {
+                Ok(()) => (),
                 Err(_) => panic!("Failure in PUT !!"),
             }
         }
 
         // PUT for ImmutableData should succeed
         {
-            match mock_routing.lock().unwrap().put_new(orig_immutable_data.name(), orig_data_immutable.clone()) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => (),
-                        Err(error) => panic!("PUT Response Failure :: {:?}", error.description()),
-                    }
-                },
+            match mock_routing.lock().unwrap().put(orig_immutable_data.name(), orig_data_immutable.clone()) {
+                Ok(()) => (),
                 Err(_) => panic!("Failure in PUT !!"),
             }
         }
@@ -594,12 +445,15 @@ mod test {
 
         // GET StructuredData should pass
         {
-            match mock_routing.lock().unwrap().get_new(account_version.name(), ::client::DataRequest::StructuredData(TYPE_TAG)) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+            match mock_routing.lock().unwrap().get(account_version.name(), ::client::DataRequest::StructuredData(TYPE_TAG)) {
+                Ok(()) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+                                                                                             callback_interface.clone(),
+                                                                                             account_version.name(),
+                                                                                             ::client::DataRequest::StructuredData(TYPE_TAG));
                     match response_getter.get() {
-                        Ok(raw_data) => {
-                            match ::utility::deserialise(raw_data) {
+                        Ok(data) => {
+                            match data {
                                 ::client::Data::StructuredData(struct_data) => {
                                     received_structured_data = struct_data;
                                     assert!(account_version == received_structured_data);
@@ -616,13 +470,16 @@ mod test {
 
         // GET ImmutableData from lastest version of StructuredData should pass
         {
-            let mut location_vec = ::utility::deserialise::<Vec<::routing::NameType>>(received_structured_data.get_data().clone());
-            match mock_routing.lock().unwrap().get_new(location_vec.pop().unwrap(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+            let mut location_vec = ::utility::deserialise::<Vec<::routing::NameType>>(received_structured_data.get_data()).ok().unwrap();
+            match mock_routing.lock().unwrap().get(location_vec.pop().unwrap(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
+                Ok(()) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+                                                                                             callback_interface.clone(),
+                                                                                             orig_immutable_data.name(),
+                                                                                             ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
-                        Ok(raw_data) => {
-                            match ::utility::deserialise(raw_data) {
+                        Ok(data) => {
+                            match data {
                                 ::client::Data::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data),
                                 _ => panic!("Unexpected!"),
                             }
@@ -641,14 +498,8 @@ mod test {
 
         // PUT for new ImmutableData should succeed
         {
-            match mock_routing.lock().unwrap().put_new(new_immutable_data.name(), new_data_immutable) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => (),
-                        Err(error) => panic!("PUT Response Failure :: {:?}", error.description()),
-                    }
-                },
+            match mock_routing.lock().unwrap().put(new_immutable_data.name(), new_data_immutable) {
+                Ok(()) => (),
                 Err(_) => panic!("Failure in PUT !!"),
             }
         }
@@ -657,7 +508,7 @@ mod test {
         let invalid_version_account_version = ::client::StructuredData::new(TYPE_TAG,
                                                                             user_id.clone(),
                                                                             0,
-                                                                            ::utility::serialise(vec![orig_immutable_data.name(), new_immutable_data.name()]),
+                                                                            ::utility::serialise(&vec![orig_immutable_data.name(), new_immutable_data.name()]).ok().unwrap(),
                                                                             vec![account_packet.get_public_maid().public_keys().0.clone()],
                                                                             Vec::new(),
                                                                             &account_packet.get_maid().secret_keys().0);
@@ -667,7 +518,7 @@ mod test {
         let invalid_signature_account_version = ::client::StructuredData::new(TYPE_TAG,
                                                                               user_id.clone(),
                                                                               1,
-                                                                              ::utility::serialise(vec![orig_immutable_data.name(), new_immutable_data.name()]),
+                                                                              ::utility::serialise(&vec![orig_immutable_data.name(), new_immutable_data.name()]).ok().unwrap(),
                                                                               vec![account_packet.get_public_maid().public_keys().0.clone()],
                                                                               Vec::new(),
                                                                               &account_packet.get_mpid().secret_keys().0);
@@ -677,7 +528,7 @@ mod test {
         account_version = ::client::StructuredData::new(TYPE_TAG,
                                                         user_id.clone(),
                                                         1,
-                                                        ::utility::serialise(vec![orig_immutable_data.name(), new_immutable_data.name()]),
+                                                        ::utility::serialise(&vec![orig_immutable_data.name(), new_immutable_data.name()]).ok().unwrap(),
                                                         vec![account_packet.get_public_maid().public_keys().0.clone()],
                                                         Vec::new(),
                                                         &account_packet.get_maid().secret_keys().0);
@@ -685,15 +536,9 @@ mod test {
 
         // Subsequent PUTs for same StructuredData should fail
         {
-            let put_result = mock_routing.lock().unwrap().put_new(account_version.name(), data_account_version.clone());
+            let put_result = mock_routing.lock().unwrap().put(account_version.name(), data_account_version.clone());
             match put_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => panic!("Subsequent PUTs for same StructuredData should fail !!"),
-                        Err(_) => (),
-                    }
-                },
+                Ok(()) => (),
                 Err(_) => panic!("Failure in PUT !!"),
             }
         }
@@ -702,13 +547,7 @@ mod test {
         {
             let post_result = mock_routing.lock().unwrap().post(invalid_version_account_version.name(), invalid_version_data_account_version.clone());
             match post_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => panic!("Subsequent POSTs for same StructuredData should fail if versioning is invalid !!"),
-                        Err(_) => (),
-                    }
-                },
+                Ok(()) => (),
                 Err(_) => panic!("Failure in POST !!"),
             }
         }
@@ -717,13 +556,7 @@ mod test {
         {
             let post_result = mock_routing.lock().unwrap().post(invalid_signature_account_version.name(), invalid_signature_data_account_version.clone());
             match post_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => panic!("Subsequent POSTs for same StructuredData should fail if signature is invalid !!"),
-                        Err(_) => (),
-                    }
-                },
+                Ok(()) => (),
                 Err(_) => panic!("Failure in POST !!"),
             }
         }
@@ -732,25 +565,22 @@ mod test {
         {
             let post_result = mock_routing.lock().unwrap().post(account_version.name(), data_account_version.clone());
             match post_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => (),
-                        Err(_) => panic!("StructuredData should be allowed to be overwritten !!"),
-                    }
-                },
-                Err(_) => panic!("Failure in PUT !!"),
+                Ok(()) => (),
+                Err(_) => panic!("Failure in POST !!"),
             }
         }
 
         // GET for new StructuredData version should pass
         {
-            match mock_routing.lock().unwrap().get_new(account_version.name(), ::client::DataRequest::StructuredData(TYPE_TAG)) {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+            match mock_routing.lock().unwrap().get(account_version.name(), ::client::DataRequest::StructuredData(TYPE_TAG)) {
+                Ok(()) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+                                                                                             callback_interface.clone(),
+                                                                                             account_version.name(),
+                                                                                             ::client::DataRequest::StructuredData(TYPE_TAG));
                     match response_getter.get() {
-                        Ok(raw_data) => {
-                            match ::utility::deserialise(raw_data) {
+                        Ok(data) => {
+                            match data {
                                 ::client::Data::StructuredData(structured_data) => {
                                     received_structured_data = structured_data;
                                     assert!(received_structured_data == account_version);
@@ -765,18 +595,21 @@ mod test {
             }
         }
 
-        let location_vec = ::utility::deserialise::<Vec<::routing::NameType>>(received_structured_data.get_data().clone());
+        let location_vec = ::utility::deserialise::<Vec<::routing::NameType>>(received_structured_data.get_data()).ok().unwrap();
         assert_eq!(location_vec.len(), 2);
 
         // GET new ImmutableData should pass
         {
-            let get_result = mock_routing.lock().unwrap().get_new(location_vec[1].clone(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
+            let get_result = mock_routing.lock().unwrap().get(location_vec[1].clone(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
             match get_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+                Ok(()) => {
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+                                                                                             callback_interface.clone(),
+                                                                                             location_vec[1].clone(),
+                                                                                             ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
-                        Ok(raw_data) => {
-                            match ::utility::deserialise(raw_data) {
+                        Ok(data) => {
+                            match data {
                                 ::client::Data::ImmutableData(received_immutable_data) => assert_eq!(new_immutable_data, received_immutable_data),
                                 _ => panic!("Unexpected!"),
                             }
@@ -790,13 +623,16 @@ mod test {
 
         // GET original ImmutableData should pass
         {
-            let get_result = mock_routing.lock().unwrap().get_new(location_vec[0].clone(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
+            let get_result = mock_routing.lock().unwrap().get(location_vec[0].clone(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
             match get_result {
                 Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
+                    let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+                                                                                             callback_interface.clone(),
+                                                                                             location_vec[0].clone(),
+                                                                                             ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
-                        Ok(raw_data) => {
-                            match ::utility::deserialise(raw_data) {
+                        Ok(data) => {
+                            match data {
                                 ::client::Data::ImmutableData(received_immutable_data) => assert_eq!(orig_immutable_data, received_immutable_data),
                                 _ => panic!("Unexpected!"),
                             }
@@ -812,29 +648,8 @@ mod test {
         {
             let delete_result = mock_routing.lock().unwrap().delete(account_version.name(), data_account_version.clone());
             match delete_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(_) => (),
-                        Err(_) => panic!("StructuredData should be allowed to be deleted !!"),
-                    }
-                },
+                Ok(()) => (),
                 Err(_) => panic!("Failure in DELETE !!"),
-            }
-        }
-
-        // GET for DELETEd StructuredData version should fail
-        {
-            let get_result = mock_routing.lock().unwrap().get_new(account_version.name(), ::client::DataRequest::StructuredData(TYPE_TAG));
-            match get_result {
-                Ok(id) => {
-                    let mut response_getter = ::client::response_getter::ResponseGetter::new(notifier.clone(), callback_interface.clone(), Some(id), None);
-                    match response_getter.get() {
-                        Ok(raw_data) => panic!("GET for DELETEd StructuredData version should fail !!"),
-                        Err(_) => (),
-                    }
-                },
-                Err(_) => panic!("Failure in GET !!"),
             }
         }
     }
