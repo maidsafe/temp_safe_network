@@ -57,8 +57,8 @@ extern crate self_encryption;
 #[macro_use]
 mod macros;
 
-///// Public and Private Id types
-//pub mod id;
+/// Public and Private Id types
+pub mod id;
 /// Maidsafe-Client Errors
 pub mod errors;
 /// Self-Auth and Gateway Module
@@ -70,5 +70,5 @@ pub mod utility;
 ///// Logic for StructuredData
 //pub mod structured_data_operations;
 
-///// All Maidsafe tagging should offset from this
-//pub const MAIDSAFE_TAG: u64 = 5483_000;
+/// All Maidsafe tagging should offset from this
+pub const MAIDSAFE_TAG: u64 = 5483_000;

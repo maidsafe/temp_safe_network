@@ -30,7 +30,7 @@ use routing::sendable::Sendable;
 /// ResponseGetter is a lazy evaluated response getter.
 pub mod response_getter;
 
-//mod user_account;
+mod user_account;
 mod callback_interface;
 
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
@@ -38,8 +38,8 @@ mod mock_routing_types;
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 pub use self::mock_routing_types::*;
 
-//#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
-//mod non_networking_test_framework;
+#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
+mod non_networking_test_framework;
 //#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 //type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<non_networking_test_framework::RoutingClientMock>>;
 //#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]

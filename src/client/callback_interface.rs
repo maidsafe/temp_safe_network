@@ -75,7 +75,7 @@ impl CallbackInterface {
         Ok(try!(self.message_queue.remove(&location).ok_or(::errors::ClientError::RoutingMessageCacheMiss)))
     }
 
-    fn handle_get_response(&mut self, original_requested_location: ::routing::NameType, response: ::client::Data) {
+    pub fn handle_get_response(&mut self, original_requested_location: ::routing::NameType, response: ::client::Data) {
         self.message_queue.insert(original_requested_location.clone(), response);
         let &(ref lock, ref condition_var) = &*self.response_notifier;
         let mut fetched_location = lock.lock().unwrap();

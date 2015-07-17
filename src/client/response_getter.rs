@@ -49,7 +49,12 @@ impl ResponseGetter {
                 let mut cb_interface = self.callback_interface.lock().unwrap();
                 match cb_interface.get_response(&self.requested_location) {
                     Ok(response) => return Ok(response),
-                    Err(_)       => mutex_guard = lock.lock().unwrap(),
+                    Err(_) => {
+                        mutex_guard = lock.lock().unwrap();
+                        if *mutex_guard == Some(self.requested_location.clone()) {
+                            *mutex_guard = None;
+                        }
+                    },
                 }
             }
 
