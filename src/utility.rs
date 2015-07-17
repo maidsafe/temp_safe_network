@@ -176,4 +176,16 @@ mod test {
         assert!(str0 != str2);
         assert!(str1 != str2);
     }
+
+    #[test]
+    fn random_vector() {
+        const SIZE: usize = 10;
+        let vec0 = generate_random_vector::<u8>(SIZE).ok().unwrap();
+        let vec1 = generate_random_vector::<u8>(SIZE).ok().unwrap();
+        let vec2 = generate_random_vector::<u8>(SIZE).ok().unwrap();
+
+        assert!(vec0 != vec1);
+        assert!(vec0 != vec2);
+        assert!(vec1 != vec2);
+    }
 }
