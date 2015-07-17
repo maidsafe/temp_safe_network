@@ -56,7 +56,7 @@ impl ImmutableData {
         let digest = ::sodiumoxide::crypto::hash::sha512::hash(&self.value);
         match self.type_tag {
             ImmutableDataType::Normal       => ::routing::NameType(digest.0),
-            ImmutableDataType::Backup       => ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&digest.0).0),        
+            ImmutableDataType::Backup       => ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&digest.0).0),
             ImmutableDataType::Sacrificaial => ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&::sodiumoxide::crypto::hash::sha512::hash(&digest.0).0).0)
         }
     }
@@ -134,6 +134,10 @@ impl StructuredData {
                             ).iter()))).map(|a| *a).collect::<Vec<u8>>()
     }
 
+    pub fn set_version(&mut self, version: u64) {
+        self.version = version;
+    }
+
     pub fn get_tag_type(&self) -> u64 {
         self.tag_type
     }
@@ -143,6 +147,11 @@ impl StructuredData {
         ::routing::NameType(
             hash(&hash(&self.identifier.0).0.iter().chain(self.tag_type.to_string().as_bytes().iter()).map(|a| *a).collect::<Vec<u8>>()[..]).0)
     }
+
+    pub fn replace_signatures(&mut self, new_signatures: Vec<::sodiumoxide::crypto::sign::Signature>) {
+        self.previous_owner_signatures = new_signatures;
+    }
+
 }
 
 impl ::rustc_serialize::Encodable for StructuredData {

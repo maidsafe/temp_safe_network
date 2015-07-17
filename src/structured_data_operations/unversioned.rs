@@ -67,9 +67,6 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 
                 },
                 ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-                    // TODO Improve this - will require changes elsewhere - eg., implement storage
-                    // trait in client itself
-
                     let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
                     let data = ::client::Data::ImmutableData(immutable_data);
@@ -103,7 +100,7 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
         DataTypeEncoding::ContainsDataMap(data_map) => {
             let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::SelfEncryptionStorage::new(client), data_map);
             let length = se.len();
-            Ok(se.read(0, length))
+            Ok(se.read(0, length+1))
         },
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
             match client.lock().unwrap().get_new(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).unwrap().get() {
@@ -153,6 +150,7 @@ fn get_decoded_stored_data(raw_data: Vec<u8>,
     Ok(try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
 }
 
+
 #[cfg(test)]
 mod test {
     // extern crate rand;
@@ -162,44 +160,16 @@ mod test {
 
     const TAG_ID : u64 = ::MAIDSAFE_TAG + 1000;
 
-    fn get_client() -> ::std::sync::Arc<::std::sync::Mutex<::client::Client>> {
-        let keyword = ::utility::generate_random_string(10);
-        let password = ::utility::generate_random_string(10);
-        let pin = ::utility::generate_random_pin();
-        ::std::sync::Arc::new(::std::sync::Mutex::new(::client::Client::create_account(&keyword, pin, &password).unwrap()))
-    }
-
-    fn genearte_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-        let mut public_keys = Vec::with_capacity(size);
-        for _ in 0..size {
-            public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
-        }
-        public_keys
-    }
-
-    fn genearte_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
-        let mut secret_keys = Vec::with_capacity(size);
-        for _ in 0..size {
-            secret_keys.push(::sodiumoxide::crypto::sign::gen_keypair().1);
-        }
-        secret_keys
-    }
-
-    // fn generate_nonce() -> [u8; 24] {
-    //     let v = rand::thread_rng().gen_iter::<u8>().take(24).collect::<Vec<u8>>();
-    //     convert_to_array!(v, 24).unwrap()
-    // }
-
     #[test]
-    fn test_create() {
-        let client = get_client();
+    fn create_and_get() {
+        let client = ::std::sync::Arc::new(::std::sync::Mutex::new(::utility::test_utils::get_client()));
         // Empty Data
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = Vec::new();
-            let owners = genearte_public_keys(1);
+            let owners = ::utility::test_utils::genearte_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -210,14 +180,18 @@ mod test {
                                 secret_key,
                                 None);
             assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
         }
         // Data of size 80 KB
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = genearte_public_keys(1);
+            let owners = ::utility::test_utils::genearte_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -228,32 +202,18 @@ mod test {
                                 secret_key,
                                 None);
             assert!(result.is_ok());
-        }
-        // Data of size 80 KB with 10 owners
-        {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-            let data = vec![99u8; 1024 * 80];
-            let owners = genearte_public_keys(10);
-            let prev_owners = Vec::new();
-            let ref secret_key = genearte_secret_keys(1)[0];
-            let result = create(client.clone(),
-                                TAG_ID,
-                                id,
-                                0,
-                                data.clone(),
-                                owners.clone(),
-                                prev_owners.clone(),
-                                secret_key,
-                                None);
-            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(data[0], fetched_data[0]),
+                Err(_) => panic!("Failed to fetch"),
+            }
         }
         // Data of size 80 KB with 100 owners
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = genearte_public_keys(100);
+            let owners = ::utility::test_utils::genearte_public_keys(100);
             let prev_owners = Vec::new();
-            let ref secret_key = genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -264,14 +224,18 @@ mod test {
                                 secret_key,
                                 None);
             assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
         }
         // Data of size 80 KB with MAX owners
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = genearte_public_keys(543);
+            let owners = ::utility::test_utils::genearte_public_keys(520);
             let prev_owners = Vec::new();
-            let ref secret_key = genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -282,14 +246,18 @@ mod test {
                                 secret_key,
                                 None);
             assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
         }
         // Data of size 80 KB with MAX + 5 owners
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = genearte_public_keys(548);
+            let owners = ::utility::test_utils::genearte_public_keys(525);
             let prev_owners = Vec::new();
-            let ref secret_key = genearte_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -300,6 +268,28 @@ mod test {
                                 secret_key,
                                 None);
             assert!(result.is_err());
+        }
+        // Data of size 100 KB
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 102400];
+            let owners = ::utility::test_utils::genearte_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
         }
     }
 

@@ -111,3 +111,38 @@ pub fn generate_random_pin() -> u32 {
 pub fn slice_equal<T: PartialEq>(lhs: &[T], rhs: &[T]) -> bool {
     lhs.len() == rhs.len() && lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b)
 }
+
+/// Common utility functions for writting test cases
+pub mod test_utils {
+
+    /// Gnerates a mock client
+    pub fn get_client() -> ::client::Client {
+        let keyword = ::utility::generate_random_string(10);
+        let password = ::utility::generate_random_string(10);
+        let pin = ::utility::generate_random_pin();
+        ::client::Client::create_account(&keyword, pin, &password).unwrap()
+    }
+    /// Gnerates Random public keys
+    pub fn genearte_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+        let mut public_keys = Vec::with_capacity(size);
+        for _ in 0..size {
+            public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
+        }
+        public_keys
+    }
+    /// Gnerates Random SecretKey
+    pub fn genearte_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
+        let mut secret_keys = Vec::with_capacity(size);
+        for _ in 0..size {
+            secret_keys.push(::sodiumoxide::crypto::sign::gen_keypair().1);
+        }
+        secret_keys
+    }
+    /// Saves data as immutable data and returns the name of the immutable data
+    pub fn save_as_immutable_data(client: &mut ::client::Client, data: Vec<u8>) -> ::routing::NameType {
+        let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);
+        let name_of_immutable_data = immutable_data.name();
+        let _ = client.put_new(name_of_immutable_data.clone(), ::client::Data::ImmutableData(immutable_data));
+        name_of_immutable_data
+    }
+}

@@ -48,7 +48,6 @@ pub fn append_version(client: &mut ::client::Client,
                       private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::client::StructuredData, ::errors::ClientError> {
     // let immut_data = try!(get_immutable_data(mut client, struct_data));
     // client.delete(immut_data);
-
     let mut versions = try!(get_all_versions(client, &struct_data));
     versions.push(version_to_append);
     create_impl(client,
@@ -110,5 +109,36 @@ fn get_immutable_data(client: &mut ::client::Client,
             }
         },
         Err(_) => Err(::errors::ClientError::GetFailure),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const TAG_ID : u64 = ::MAIDSAFE_TAG + 1001;
+
+    #[test]
+    fn save_and_retrieve_immtable_data() {
+        let mut client = ::utility::test_utils::get_client();
+        let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+        let first_data = vec![1u8; 10];
+        let second_data = vec![2u8; 20];
+        let owners = ::utility::test_utils::genearte_public_keys(1);
+        let prev_owners = Vec::new();
+        let ref secret_key = ::utility::test_utils::genearte_secret_keys(1)[0];
+        let mut version = ::utility::test_utils::save_as_immutable_data(&mut client, first_data.clone());
+
+        let structured_data_result = create(&mut client, version, TAG_ID, id, 0, owners, prev_owners, secret_key);
+        assert!(structured_data_result.is_ok());
+        let mut structured_data = structured_data_result.ok().unwrap();
+        let mut versions = get_all_versions(&mut client, &structured_data).ok().unwrap();
+        assert_eq!(versions.len(), 1);
+        version = ::utility::test_utils::save_as_immutable_data(&mut client, second_data.clone());
+        assert!(append_version(&mut client, structured_data.clone(), version.clone(), secret_key).is_err());
+        structured_data.set_version(1u64);
+        assert!(append_version(&mut client, structured_data.clone(), version, secret_key).is_ok());
+        versions = get_all_versions(&mut client, &structured_data).ok().unwrap();
+        assert_eq!(versions.len(), 2);
     }
 }
