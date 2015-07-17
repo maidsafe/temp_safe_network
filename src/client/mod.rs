@@ -279,17 +279,17 @@ impl Client {
     /// enrypted using Public-MAID and the whole thing is then serialised into a single Vec<u8>.
     pub fn hybrid_encrypt(&self,
                           data_to_encrypt: &[u8],
-                          nonce_opt: Option<::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::errors::ClientError> {
+                          nonce_opt: Option<&::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::errors::ClientError> {
+        let mut nonce_default = ::sodiumoxide::crypto::box_::Nonce([0u8; ::sodiumoxide::crypto::box_::NONCEBYTES]);
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
             None => {
                 let digest = ::sodiumoxide::crypto::hash::sha256::hash(&self.account.get_public_maid().name().0);
-                let mut nonce = ::sodiumoxide::crypto::box_::Nonce([0u8; ::sodiumoxide::crypto::box_::NONCEBYTES]);
                 let min_length = ::std::cmp::min(::sodiumoxide::crypto::box_::NONCEBYTES, digest.0.len());
                 for it in digest.0.iter().take(min_length).enumerate() {
-                    nonce.0[it.0] = *it.1;
+                    nonce_default.0[it.0] = *it.1;
                 }
-                nonce
+                &nonce_default
             },
         };
 
@@ -302,17 +302,17 @@ impl Client {
     /// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
     pub fn hybrid_decrypt(&self,
                           data_to_decrypt: &[u8],
-                          nonce_opt: Option<::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::errors::ClientError> {
+                          nonce_opt: Option<&::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::errors::ClientError> {
+        let mut nonce_default = ::sodiumoxide::crypto::box_::Nonce([0u8; ::sodiumoxide::crypto::box_::NONCEBYTES]);
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
             None => {
                 let digest = ::sodiumoxide::crypto::hash::sha256::hash(&self.account.get_public_maid().name().0);
-                let mut nonce = ::sodiumoxide::crypto::box_::Nonce([0u8; ::sodiumoxide::crypto::box_::NONCEBYTES]);
                 let min_length = ::std::cmp::min(::sodiumoxide::crypto::box_::NONCEBYTES, digest.0.len());
                 for it in digest.0.iter().take(min_length).enumerate() {
-                    nonce.0[it.0] = *it.1;
+                    nonce_default.0[it.0] = *it.1;
                 }
-                nonce
+                &nonce_default
             },
         };
 
@@ -498,8 +498,8 @@ mod test {
 
         // Encrypt passing Nonce
         let nonce = ::sodiumoxide::crypto::box_::gen_nonce();
-        let hybrid_encrypt_0 = client.hybrid_encrypt(&plain_text_0[..], Some(nonce));
-        let hybrid_encrypt_1 = client.hybrid_encrypt(&plain_text_1[..], Some(nonce));
+        let hybrid_encrypt_0 = client.hybrid_encrypt(&plain_text_0[..], Some(&nonce));
+        let hybrid_encrypt_1 = client.hybrid_encrypt(&plain_text_1[..], Some(&nonce));
 
         // Encrypt without passing Nonce
         let hybrid_encrypt_2 = client.hybrid_encrypt(&plain_text_0[..], None);
@@ -513,39 +513,44 @@ mod test {
         // Same Plain Texts
         assert_eq!(plain_text_0, plain_text_1);
 
+        let cipher_text_0 = hybrid_encrypt_0.ok().unwrap();
+        let cipher_text_1 = hybrid_encrypt_1.ok().unwrap();
+        let cipher_text_2 = hybrid_encrypt_2.ok().unwrap();
+        let cipher_text_3 = hybrid_encrypt_3.ok().unwrap();
+
         // Different Results because of random "iv"
-        assert!(hybrid_encrypt_0.clone().ok().unwrap() != hybrid_encrypt_1.clone().ok().unwrap());
-        assert!(hybrid_encrypt_0.clone().ok().unwrap() != hybrid_encrypt_2.clone().ok().unwrap());
-        assert!(hybrid_encrypt_0.clone().ok().unwrap() != hybrid_encrypt_3.clone().ok().unwrap());
-        assert!(hybrid_encrypt_2.clone().ok().unwrap() != hybrid_encrypt_1.clone().ok().unwrap());
-        assert!(hybrid_encrypt_2.clone().ok().unwrap() != hybrid_encrypt_3.clone().ok().unwrap());
+        assert!(cipher_text_0 != cipher_text_1);
+        assert!(cipher_text_0 != cipher_text_2);
+        assert!(cipher_text_0 != cipher_text_3);
+        assert!(cipher_text_2 != cipher_text_1);
+        assert!(cipher_text_2 != cipher_text_3);
 
         // Decrypt with Nonce
-        let hybrid_decrypt_0 = client.hybrid_decrypt(&hybrid_encrypt_0.clone().ok().unwrap()[..], Some(nonce));
-        let hybrid_decrypt_1 = client.hybrid_decrypt(&hybrid_encrypt_1.ok().unwrap()[..], Some(nonce));
+        let hybrid_decrypt_0 = client.hybrid_decrypt(&cipher_text_0, Some(&nonce));
+        let hybrid_decrypt_1 = client.hybrid_decrypt(&cipher_text_1, Some(&nonce));
 
         // Decrypt without Nonce
-        let hybrid_decrypt_2 = client.hybrid_decrypt(&hybrid_encrypt_2.ok().unwrap()[..], None);
-        let hybrid_decrypt_3 = client.hybrid_decrypt(&hybrid_encrypt_3.clone().ok().unwrap()[..], None);
+        let hybrid_decrypt_2 = client.hybrid_decrypt(&cipher_text_2, None);
+        let hybrid_decrypt_3 = client.hybrid_decrypt(&cipher_text_3, None);
 
         // Decryption without passing Nonce for something encrypted with passing Nonce - Should Fail
-        let hybrid_decrypt_4 = client.hybrid_decrypt(&hybrid_encrypt_0.ok().unwrap()[..], None);
+        let hybrid_decrypt_4 = client.hybrid_decrypt(&cipher_text_0, None);
         // Decryption passing Nonce for something encrypted without passing Nonce - Should Fail
-        let hybrid_decrypt_5 = client.hybrid_decrypt(&hybrid_encrypt_3.ok().unwrap()[..], Some(nonce));
+        let hybrid_decrypt_5 = client.hybrid_decrypt(&cipher_text_3, Some(&nonce));
 
-        assert!(hybrid_decrypt_0.is_some());
-        assert!(hybrid_decrypt_1.is_some());
-        assert!(hybrid_decrypt_2.is_some());
-        assert!(hybrid_decrypt_3.is_some());
+        assert!(hybrid_decrypt_0.is_ok());
+        assert!(hybrid_decrypt_1.is_ok());
+        assert!(hybrid_decrypt_2.is_ok());
+        assert!(hybrid_decrypt_3.is_ok());
 
         // Should fail
-        assert!(hybrid_decrypt_4.is_none());
-        assert!(hybrid_decrypt_5.is_none());
+        assert!(hybrid_decrypt_4.is_err());
+        assert!(hybrid_decrypt_5.is_err());
 
         // Should have decrypted to the same Plain Texts
-        assert_eq!(plain_text_0, hybrid_decrypt_0.unwrap());
-        assert_eq!(plain_text_1, hybrid_decrypt_1.unwrap());
-        assert_eq!(plain_text_0, hybrid_decrypt_2.unwrap());
-        assert_eq!(plain_text_1, hybrid_decrypt_3.unwrap());
+        assert_eq!(plain_text_0, hybrid_decrypt_0.ok().unwrap());
+        assert_eq!(plain_text_1, hybrid_decrypt_1.ok().unwrap());
+        assert_eq!(plain_text_0, hybrid_decrypt_2.ok().unwrap());
+        assert_eq!(plain_text_1, hybrid_decrypt_3.ok().unwrap());
     }
 }
