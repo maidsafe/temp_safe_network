@@ -103,10 +103,9 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
             Ok(se.read(0, length))
         },
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
-            match client.lock().unwrap().get(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).ok().unwrap().get() {
-                // TODO This is wrong as feedback is to be Data not raw data. Wait for routing to
-                // build and correct everywhere
-                Ok(::client::Data::ImmutableData(immutable_data)) => {
+            let mut response_getter = try!(client.lock().unwrap().get(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)));
+            match try!(response_getter.get()) {
+                ::client::Data::ImmutableData(immutable_data) => {
                     match try!(get_decoded_stored_data(immutable_data.value().clone(), data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
                             let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::SelfEncryptionStorage::new(client.clone()), data_map);
@@ -116,8 +115,7 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                         _ => Err(::errors::ClientError::ReceivedUnexpectedData),
                     }
                 },
-                // TODO Krishna change the error type
-                Err(_) => Err(::errors::ClientError::ReceivedUnexpectedData),
+                _ => Err(::errors::ClientError::ReceivedUnexpectedData),
             }
         }
     }

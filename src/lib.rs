@@ -65,7 +65,7 @@ pub mod errors;
 pub mod client;
 /// Utility functions
 pub mod utility;
-///// Logic for StructuredData
+/// Helper functions to handle StructuredData related operations 
 pub mod structured_data_operations;
 
 /// All Maidsafe tagging should positive-offset from this

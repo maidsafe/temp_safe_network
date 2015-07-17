@@ -42,7 +42,12 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
         match client.get(::routing::NameType(name_id), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
             Ok(mut response_getter) => {
                 match response_getter.get() {
-                    Ok(::client::Data::ImmutableData(data)) => data.value().clone(),
+                    Ok(data) => {
+                        match data {
+                            ::client::Data::ImmutableData(data) => data.value().clone(),
+                            _ => Vec::new(),
+                        }
+                    },
                     Err(_) => Vec::new(),
                 }
             },
@@ -54,6 +59,6 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
         let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);
         let client_mutex = self.client.clone();
         let mut client = client_mutex.lock().unwrap();
-        client.put(immutable_data.name(), ::client::Data::ImmutableData(immutable_data));        
+        let _ = client.put(immutable_data.name(), ::client::Data::ImmutableData(immutable_data));
     }
 }

@@ -100,15 +100,17 @@ fn get_immutable_data(client: &mut ::client::Client,
     let mut decoder = ::cbor::Decoder::from_bytes(&struct_data.get_data()[..]);
     let location = try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode)));
 
-    match client.get(location, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).ok().unwrap().get() {
-        Ok(::client::Data::ImmutableData(immutable_data)) => {
+    let mut response_getter = try!(client.get(location, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)));
+    let data = try!(response_getter.get());
+    match data {
+        ::client::Data::ImmutableData(immutable_data) => {
             let mut decoder = ::cbor::Decoder::from_bytes(immutable_data.value().clone());
             match try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))) {
                 ::client::Data::ImmutableData(immut_data) => Ok(immut_data),
                 _ => Err(::errors::ClientError::ReceivedUnexpectedData),
             }
         },
-        Err(_) => Err(::errors::ClientError::ReceivedUnexpectedData),
+        _ => Err(::errors::ClientError::ReceivedUnexpectedData),
     }
 }
 
