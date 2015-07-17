@@ -70,7 +70,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                     let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
                     let data = ::client::Data::ImmutableData(immutable_data);
-                    let _ = client.lock().unwrap().put_new(name.clone(), data);
+                    let _ = client.lock().unwrap().put(name.clone(), data);
 
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name), data_encryption_keys));
 
@@ -103,11 +103,11 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
             Ok(se.read(0, length))
         },
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
-            match client.lock().unwrap().get_new(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).unwrap().get() {
+            match client.lock().unwrap().get(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).ok().unwrap().get() {
                 // TODO This is wrong as feedback is to be Data not raw data. Wait for routing to
                 // build and correct everywhere
-                Ok(raw_data_map) => {
-                    match try!(get_decoded_stored_data(raw_data_map, data_decryption_keys)) {
+                Ok(::client::Data::ImmutableData(immutable_data)) => {
+                    match try!(get_decoded_stored_data(immutable_data.value().clone(), data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
                             let mut se = ::self_encryption::SelfEncryptor::new(::structured_data_operations::SelfEncryptionStorage::new(client.clone()), data_map);
                             let length = se.len();
@@ -116,7 +116,8 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                         _ => Err(::errors::ClientError::ReceivedUnexpectedData),
                     }
                 },
-                Err(_) => Err(::errors::ClientError::GetFailure),
+                // TODO Krishna change the error type
+                Err(_) => Err(::errors::ClientError::ReceivedUnexpectedData),
             }
         }
     }

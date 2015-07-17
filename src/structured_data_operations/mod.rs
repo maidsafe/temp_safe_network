@@ -65,7 +65,7 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sig
     }
     structured_data.replace_signatures(fake_signatures);
 
-    let serialised_structured_data_len = ::utility::serialise(structured_data).len() + PADDING_SIZE_IN_BYTES;
+    let serialised_structured_data_len = ::utility::serialise(&structured_data).unwrap_or(vec![1u8; ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES]).len() + PADDING_SIZE_IN_BYTES;
 
     if ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES <= serialised_structured_data_len {
         0

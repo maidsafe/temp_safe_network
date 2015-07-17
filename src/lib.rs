@@ -66,7 +66,7 @@ pub mod client;
 /// Utility functions
 pub mod utility;
 ///// Logic for StructuredData
-//pub mod structured_data_operations;
+pub mod structured_data_operations;
 
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;

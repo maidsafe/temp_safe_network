@@ -39,15 +39,10 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
         }
         let client_mutex = self.client.clone();
         let mut client = client_mutex.lock().unwrap();
-        match client.get_new(::routing::NameType(name_id), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
+        match client.get(::routing::NameType(name_id), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
             Ok(mut response_getter) => {
                 match response_getter.get() {
-                    Ok(serialised_data) => {
-                        match ::utility::deserialise(serialised_data) {
-                            ::client::Data::ImmutableData(obj) => obj.value().clone(),
-                            _ => Vec::new()
-                        }
-                    },
+                    Ok(::client::Data::ImmutableData(data)) => data.value().clone(),
                     Err(_) => Vec::new(),
                 }
             },
@@ -59,9 +54,6 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
         let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);
         let client_mutex = self.client.clone();
         let mut client = client_mutex.lock().unwrap();
-        let put_result = client.put_new(immutable_data.name(), ::client::Data::ImmutableData(immutable_data));
-        if put_result.is_ok() {
-            let _ = put_result.ok().unwrap().get();
-        }
+        client.put(immutable_data.name(), ::client::Data::ImmutableData(immutable_data));        
     }
 }

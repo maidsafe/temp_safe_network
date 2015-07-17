@@ -14,7 +14,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+/// Common utility functions for writting test cases
 pub mod test_utils;
+
 use ::rand::Rng;
 
 /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and

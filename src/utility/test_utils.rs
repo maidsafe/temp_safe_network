@@ -14,54 +14,49 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// Common utility functions for writting test cases
-pub mod test_utils {
-
-    /// Gnerates a mock client
-    pub fn get_client() -> ::client::Client {
-        let keyword = ::utility::generate_random_string(10);
-        let password = ::utility::generate_random_string(10);
-        let pin = ::utility::generate_random_pin();
-        ::client::Client::create_account(&keyword, pin, &password).unwrap()
+/// Gnerates a mock client
+pub fn get_client() -> ::client::Client {
+    let keyword = ::utility::generate_random_string(10).ok().unwrap();
+    let password = ::utility::generate_random_string(10).ok().unwrap();
+    let pin = ::utility::generate_random_pin();
+    ::client::Client::create_account(&keyword, pin, &password).ok().unwrap()
+}
+/// Gnerates Random public keys
+pub fn generate_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+    let mut public_keys = Vec::with_capacity(size);
+    for _ in 0..size {
+        public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
     }
-    /// Gnerates Random public keys
-    pub fn generate_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-        let mut public_keys = Vec::with_capacity(size);
-        for _ in 0..size {
-            public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
-        }
-        public_keys
+    public_keys
+}
+/// Gnerates Fixed Size public keys
+pub fn generate_fixed_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+    let mut public_keys = Vec::with_capacity(size);
+    for _ in 0..size {
+        public_keys.push(::sodiumoxide::crypto::sign::PublicKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::PUBLICKEYBYTES]));
     }
-    /// Gnerates Fixed Size public keys
-    pub fn generate_fixed_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-        let mut public_keys = Vec::with_capacity(size);
-        for _ in 0..size {
-            public_keys.push(::sodiumoxide::crypto::sign::PublicKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::PUBLICKEYBYTES]));
-        }
-        public_keys
+    public_keys
+}
+/// Gnerates Fixed Size secret keys
+pub fn generate_fixed_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
+    let mut secret_keys = Vec::with_capacity(size);
+    for _ in 0..size {
+        secret_keys.push(::sodiumoxide::crypto::sign::SecretKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::SECRETKEYBYTES]));
     }
-    /// Gnerates Fixed Size secret keys
-    pub fn generate_fixed_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
-        let mut secret_keys = Vec::with_capacity(size);
-        for _ in 0..size {
-            secret_keys.push(::sodiumoxide::crypto::sign::SecretKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::SECRETKEYBYTES]));
-        }
-        secret_keys
+    secret_keys
+}
+/// Gnerates Random SecretKey
+pub fn generate_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
+    let mut secret_keys = Vec::with_capacity(size);
+    for _ in 0..size {
+        secret_keys.push(::sodiumoxide::crypto::sign::gen_keypair().1);
     }
-    /// Gnerates Random SecretKey
-    pub fn generate_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
-        let mut secret_keys = Vec::with_capacity(size);
-        for _ in 0..size {
-            secret_keys.push(::sodiumoxide::crypto::sign::gen_keypair().1);
-        }
-        secret_keys
-    }
-    /// Saves data as immutable data and returns the name of the immutable data
-    pub fn save_as_immutable_data(client: &mut ::client::Client, data: Vec<u8>) -> ::routing::NameType {
-        let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);
-        let name_of_immutable_data = immutable_data.name();
-        let _ = client.put_new(name_of_immutable_data.clone(), ::client::Data::ImmutableData(immutable_data));
-        name_of_immutable_data
-    }
-
+    secret_keys
+}
+/// Saves data as immutable data and returns the name of the immutable data
+pub fn save_as_immutable_data(client: &mut ::client::Client, data: Vec<u8>) -> ::routing::NameType {
+    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);
+    let name_of_immutable_data = immutable_data.name();
+    let _ = client.put(name_of_immutable_data.clone(), ::client::Data::ImmutableData(immutable_data));
+    name_of_immutable_data
 }
