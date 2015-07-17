@@ -206,72 +206,36 @@ impl Client {
         }
     }
 
-//    /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
-//    /// store it. It will be retireved when the user logs into his account. Root directory ID is
-//    /// necessary to fetch all of user's data as all further data is encoded as meta-information
-//    /// into the Root Directory or one of its subdirectories.
-//    pub fn set_root_directory_id(&mut self, root_dir_id: routing::NameType) -> Result<(), ::IoError> {
-//        if self.account.set_root_dir_id(root_dir_id.clone()) {
-//            let encrypted_account = maidsafe_types::ImmutableData::new(self.account.encrypt(self.session_packet_keys.get_password(), self.session_packet_keys.get_pin()).ok().unwrap());
-//            let put_res = self.routing.lock().unwrap().put(encrypted_account.clone());
-//            match put_res {
-//                Ok(id) => {
-//                    let mut response_getter = response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None);
-//                    match response_getter.get() {
-//                        Ok(_) => {},
-//                        Err(_) => return Err(::IoError::new(::std::io::ErrorKind::Other, "Session-Packet PUT-Response Failure !!")),
-//                    }
-//
-//                    let structured_data_type_id = maidsafe_types::data::StructuredDataTypeTag;
-//                    let get_result = self.routing.lock().unwrap().get(structured_data_type_id.type_tag(), self.session_packet_id.clone());
-//
-//                    match get_result {
-//                        Ok(id) => {
-//                            let mut response_getter = response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None);
-//                            match response_getter.get() {
-//                                Ok(raw_data) => {
-//                                    let mut decoder = cbor::Decoder::from_bytes(raw_data);
-//                                    if let ::data_parser::Parser::StructuredData(account_versions) = decoder.decode().next().unwrap().unwrap() {
-//                                        let mut vec_accounts = account_versions.value();
-//                                        vec_accounts.push(encrypted_account.name());
-//
-//                                        let new_account_versions = maidsafe_types::StructuredData::new(self.session_packet_id.clone(),
-//                                                                                                       self.account.get_public_maid().name(),
-//                                                                                                       vec_accounts);
-//
-//                                        let put_res = self.routing.lock().unwrap().put(new_account_versions);
-//
-//                                        match put_res {
-//                                            Ok(id) => {
-//                                                let mut response_getter = response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None);
-//                                                match response_getter.get() {
-//                                                    Ok(_) => Ok(()),
-//                                                    Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "Version-Packet PUT-Response Failure !!")),
-//                                                }
-//                                            },
-//                                            Err(io_error) => Err(io_error),
-//                                        }
-//                                    } else {
-//                                        Err(::IoError::new(::std::io::ErrorKind::Other, "SD-GET-Resp Failure - Did not get SD !!"))
-//                                    }
-//                                },
-//                                Err(_) => Err(::IoError::new(::std::io::ErrorKind::Other, "SD-GET-Resp Failure - Could Not Retrieve Existing Account Versions !!")),
-//                            }
-//                        },
-//                        Err(io_error) => Err(io_error),
-//                    }
-//                },
-//                Err(io_error) => Err(io_error),
-//            }
-//        } else {
-//            Err(::IoError::new(::std::io::ErrorKind::Other, "Root Directory Id Set-Failure (Possibly already Exists - Do a get) !!"))
-//        }
-//    }
-//
-//    /// Get Root Directory ID if available in session packet used for current login
-//    pub fn get_root_directory_id(&self) -> Option<&routing::NameType> {
-//        self.account.get_root_dir_id()
-//    }
+    /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
+    /// store it. It will be retireved when the user logs into his account. Root directory ID is
+    /// necessary to fetch all of user's data as all further data is encoded as meta-information
+    /// into the Root Directory or one of its subdirectories.
+    pub fn set_root_directory_id(&mut self, root_dir_id: routing::NameType) -> Result<(), ::errors::ClientError> {
+        if self.account.set_root_dir_id(root_dir_id.clone()) {
+            let encrypted_account = try!(self.account.encrypt(self.session_packet_keys.get_password(), self.session_packet_keys.get_pin()));
+            let location = ::client::StructuredData::compute_name(LOGIN_PACKET_TYPE_TAG, &self.session_packet_id);
+            if let ::client::Data::StructuredData(retrieved_session_packet) = try!(try!(self.get(location.clone(),
+                                                                                                 ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG))).get()) {
+                let new_account_version = ::client::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
+                                                                        self.session_packet_id.clone(),
+                                                                        retrieved_session_packet.get_version() + 1,
+                                                                        encrypted_account,
+                                                                        vec![self.account.get_public_maid().public_keys().0.clone()],
+                                                                        Vec::new(),
+                                                                        &self.account.get_maid().secret_keys().0);
+                Ok(try!(self.post(location, ::client::Data::StructuredData(new_account_version))))
+            } else {
+                Err(::errors::ClientError::ReceivedUnexpectedData)
+            }
+        } else {
+            Err(::errors::ClientError::RootDirectoryAlreadyExists)
+        }
+    }
+
+    /// Get Root Directory ID if available in session packet used for current login
+    pub fn get_root_directory_id(&self) -> Option<&routing::NameType> {
+        self.account.get_root_dir_id()
+    }
 
     /// Combined Asymmectric and Symmetric encryption. The data is encrypted using random Key and
     /// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text produces different
@@ -349,39 +313,6 @@ impl Client {
     pub fn delete(&mut self, location: ::routing::NameType, data: Data) -> Result<(), ::errors::ClientError> {
         Ok(try!(self.routing.lock().unwrap().delete(location, data)))
     }
-
-//    /// Put data onto the network. This is non-blocking.
-//    pub fn put<T>(&mut self, sendable: T) -> Result<response_getter::ResponseGetter, ::IoError> where T: Sendable {
-//        match self.routing.lock().unwrap().put(sendable) {
-//            Ok(id)      => Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), Some(id), None)),
-//            Err(io_err) => Err(io_err),
-//        }
-//    }
-//
-//    /// Get data from the network. This is non-blocking. Additionally this incorporates a mechanism
-//    /// of local caching. So if data already exists in the local cache, it is immediately returned
-//    /// via ResponseGetter and no networking penatly is payed. The functionality is abstracted to
-//    /// the user and is baked entirely into ResponseGetter.
-//    pub fn get(&mut self, tag_id: u64, name: routing::NameType) -> Result<response_getter::ResponseGetter, ::IoError> {
-//        let immutable_data_tag = maidsafe_types::data::ImmutableDataTypeTag;
-//        if tag_id == immutable_data_tag.type_tag() {
-//            let mut cb_interface = self.callback_interface.lock().unwrap();
-//            if cb_interface.cache_check(&name) {
-//                return Ok(response_getter::ResponseGetter::new(self.response_notifier.clone(), self.callback_interface.clone(), None, Some(name)))
-//            }
-//        }
-//
-//        let mut data_name: Option<routing::NameType> = None;
-//        if tag_id == immutable_data_tag.type_tag() {
-//            data_name = Some(name.clone());
-//        }
-//
-//        match self.routing.lock().unwrap().get(tag_id, name) {
-//            Ok(id) => Ok(response_getter::ResponseGetter::new(
-//                    self.response_notifier.clone(), self.callback_interface.clone(), Some(id), data_name)),
-//            Err(io_err) => Err(io_err),
-//        }
-//    }
 }
 
 impl Drop for Client {
@@ -451,35 +382,35 @@ mod test {
         assert!(result.is_ok());
     }
 
-//    #[test]
-//    fn root_dir_id_creation() {
-//        // Construct Client
-//        let keyword = ::utility::generate_random_string(10);
-//        let password = ::utility::generate_random_string(10);
-//        let pin = ::utility::generate_random_pin();
-//
-//        let result = Client::create_account(&keyword, pin, &password);
-//        assert!(result.is_ok());
-//        let mut client = result.ok().unwrap();
-//
-//        assert!(client.get_root_directory_id().is_none());
-//
-//        let root_dir_id = ::routing::NameType::new([99u8; 64]);
-//        match client.set_root_directory_id(root_dir_id.clone()) {
-//            Ok(_) => {
-//                // Correct Credentials - Login Should Pass
-//                let result = Client::log_in(&keyword, pin, &password);
-//                assert!(result.is_ok());
-//
-//                let client = result.ok().unwrap();
-//
-//                assert!(client.get_root_directory_id().is_some());
-//
-//                assert_eq!(*client.get_root_directory_id().unwrap(), root_dir_id);
-//            },
-//            Err(io_err) => panic!("{:?}", io_err.description()),
-//        }
-//    }
+    #[test]
+    fn root_dir_id_creation() {
+        // Construct Client
+        let keyword = ::utility::generate_random_string(10).ok().unwrap();
+        let password = ::utility::generate_random_string(10).ok().unwrap();
+        let pin = ::utility::generate_random_pin();
+
+        let result = Client::create_account(&keyword, pin, &password);
+        assert!(result.is_ok());
+        let mut client = result.ok().unwrap();
+
+        assert!(client.get_root_directory_id().is_none());
+
+        let root_dir_id = ::routing::NameType::new([99u8; 64]);
+        match client.set_root_directory_id(root_dir_id.clone()) {
+            Ok(()) => {
+                // Correct Credentials - Login Should Pass
+                let result = Client::log_in(&keyword, pin, &password);
+                assert!(result.is_ok());
+
+                let client = result.ok().unwrap();
+
+                assert!(client.get_root_directory_id().is_some());
+
+                assert_eq!(client.get_root_directory_id(), Some(&root_dir_id));
+            },
+            Err(err) => panic!("{}", err),
+        }
+    }
 
     #[test]
     fn hybrid_encryption_decryption() {
