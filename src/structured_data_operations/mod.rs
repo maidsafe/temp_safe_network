@@ -26,7 +26,7 @@ pub use self::self_encryption_storage::SelfEncryptionStorage;
 
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
-const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 64;
+const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 70;
 
 /// Inform about data fitting or not into given StructuredData
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]

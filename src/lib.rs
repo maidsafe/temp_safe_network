@@ -65,10 +65,11 @@ pub mod errors;
 pub mod client;
 /// Utility functions
 pub mod utility;
-///// Parse incoming data
-//pub mod data_parser;
 ///// Logic for StructuredData
 //pub mod structured_data_operations;
 
-/// All Maidsafe tagging should offset from this
+/// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;
+/// All StructuredData tagging should positive-offset from this if the operation needs to go
+/// through this maidsafe_client crate
+pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000; // TODO offset this itself from routing
