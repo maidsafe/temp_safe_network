@@ -18,61 +18,62 @@
 /// ResponseGetter is a lazy evaluated response getter. It will fetch either from local cache or
 /// wait for the CallbackInterface to notify it of the incoming response from the network.
 pub struct ResponseGetter {
-    response_notifier:  ::client::misc::ResponseNotifier,
+    response_notifier:  Option<::client::misc::ResponseNotifier>,
     callback_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
-    message_id:         Option<::routing::types::MessageId>,
-    name:               Option<::routing::NameType>,
+    requested_location: ::routing::NameType,
+    requested_type:     ::client::DataRequest,
 }
 
 impl ResponseGetter {
     /// Create a new instance of ResponseGetter
-    pub fn new(notifier: ::client::misc::ResponseNotifier,
-               cb_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
-               msg_id: Option<::routing::types::MessageId>,
-               name: Option<::routing::NameType>) -> ResponseGetter {
+    pub fn new(notifier          : Option<::client::misc::ResponseNotifier>,
+               callback_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
+               requested_location: ::routing::NameType,
+               requested_type    : ::client::DataRequest) -> ResponseGetter {
         ResponseGetter {
-            response_notifier: notifier,
-            callback_interface: cb_interface,
-            message_id: msg_id,
-            name: name
+            response_notifier : notifier,
+            callback_interface: callback_interface,
+            requested_location: requested_location,
+            requested_type    : requested_type,
         }
     }
 
     /// Get either from local cache or (if not available there) get it when it comes from the
     /// network as informed by CallbackInterface. This is blocking.
-    pub fn get(&mut self) -> Result<Vec<u8>, ::routing::error::ResponseError> {
-        let &(ref lock, ref condition_var) = &*self.response_notifier;
-        let mut mutex_guard: _;
+    pub fn get(&mut self) -> Result<::client::Data, ::errors::ClientError> {
+        if let Some(ref notifier) = self.response_notifier {
+            let (ref lock, ref condition_var) = **notifier;
+            let mut mutex_guard: _;
 
-        if self.name.is_some() {
-            let mut cb_interface = self.callback_interface.lock().unwrap();
-            if cb_interface.cache_check(&self.name.clone().unwrap()) {
-                match cb_interface.cache_get(&self.name.clone().unwrap()) {
-                    Some(data) => return data,
-                    None => (),
+            {
+                let mut cb_interface = self.callback_interface.lock().unwrap();
+                match cb_interface.get_response(&self.requested_location) {
+                    Ok(response) => return Ok(response),
+                    Err(_) => {
+                        mutex_guard = lock.lock().unwrap();
+                        if *mutex_guard == Some(self.requested_location.clone()) {
+                            *mutex_guard = None;
+                        }
+                    },
                 }
             }
-        }
 
-        {
-            let mut cb_interface = self.callback_interface.lock().unwrap();
-            match cb_interface.get_response(self.message_id.unwrap()) {
-                Some(response_result) => return response_result,
-                None                  => mutex_guard = lock.lock().unwrap(),
+            let valid_condition = Some(self.requested_location.clone());
+            while *mutex_guard != valid_condition {
+                mutex_guard = condition_var.wait(mutex_guard).unwrap();
             }
+
+            let mut cb_interface = self.callback_interface.lock().unwrap();
+            let response = try!(cb_interface.get_response(&self.requested_location));
+
+            if let ::client::DataRequest::ImmutableData(_) = self.requested_type {
+                cb_interface.local_cache_insert(self.requested_location.clone(), response.clone());
+            }
+
+            Ok(response)
+        } else {
+            let mut cb_interface = self.callback_interface.lock().unwrap();
+            Ok(try!(cb_interface.local_cache_get(&self.requested_location)))
         }
-
-        while *mutex_guard != self.message_id.unwrap() {
-            mutex_guard = condition_var.wait(mutex_guard).unwrap();
-        }
-
-        let mut cb_interface = self.callback_interface.lock().unwrap();
-        let response = cb_interface.get_response(self.message_id.unwrap()).unwrap();
-
-        if self.name.is_some() && response.is_ok() {
-            cb_interface.cache_insert(self.name.clone().unwrap(), response.clone().unwrap().clone());
-        }
-
-        response
     }
 }

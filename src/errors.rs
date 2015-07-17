@@ -25,14 +25,51 @@ pub enum ClientError {
     AsymmetricDecipherFailure,
     /// Symmetric Key Decryption Failed
     SymmetricDecipherFailure,
-    /// GetFailure
-    GetFailure,
+    /// Routing GET, PUT, POST, DELETE Immediate Failure
+    RoutingFailure(::std::io::Error),
     /// ReceivedUnexpectedData
     ReceivedUnexpectedData,
+    /// No such data found in local version cache
+    VersionCacheMiss,
+    /// No such data found in routing-filled cache
+    RoutingMessageCacheMiss,
+    /// Network operation failed
+    NetworkOperationFailure(::routing::error::ResponseError),
+    /// Generic I/O Error
+    GenericIoError(::std::io::Error),
 }
 
 impl From<::cbor::CborError> for ClientError {
     fn from(_: ::cbor::CborError) -> ClientError {
         ClientError::UnsuccessfulEncodeDecode
+    }
+}
+
+impl From<::routing::error::ResponseError> for ClientError {
+    fn from(error: ::routing::error::ResponseError) -> ClientError {
+        ClientError::NetworkOperationFailure(error)
+    }
+}
+
+impl From<::std::io::Error> for ClientError {
+    fn from(error: ::std::io::Error) -> ClientError {
+        ClientError::GenericIoError(error)
+    }
+}
+
+impl ::std::fmt::Display for ClientError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+            ClientError::StructuredDataHeaderSizeProhibitive => ::std::fmt::Display::fmt("ClientError::StructuredDataHeaderSizeProhibitive", f),
+            ClientError::UnsuccessfulEncodeDecode            => ::std::fmt::Display::fmt("ClientError::UnsuccessfulEncodeDecode", f),
+            ClientError::AsymmetricDecipherFailure           => ::std::fmt::Display::fmt("ClientError::AsymmetricDecipherFailure", f),
+            ClientError::SymmetricDecipherFailure            => ::std::fmt::Display::fmt("ClientError::SymmetricDecipherFailure", f),
+            ClientError::RoutingFailure(_)                   => ::std::fmt::Display::fmt("ClientError::RoutingFailure", f), // TODO Improve these containing nested stuff to print as well
+            ClientError::ReceivedUnexpectedData              => ::std::fmt::Display::fmt("ClientError::ReceivedUnexpectedData", f),
+            ClientError::VersionCacheMiss                    => ::std::fmt::Display::fmt("ClientError::VersionCacheMiss", f),
+            ClientError::RoutingMessageCacheMiss             => ::std::fmt::Display::fmt("ClientError::RoutingMessageCacheMiss", f),
+            ClientError::NetworkOperationFailure(_)          => ::std::fmt::Display::fmt("ClientError::NetworkOperationFailure", f),
+            ClientError::GenericIoError(_)                   => ::std::fmt::Display::fmt("ClientError::GenericIoError", f),
+        }
     }
 }
