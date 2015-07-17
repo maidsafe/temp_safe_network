@@ -35,6 +35,8 @@ pub enum ClientError {
     RoutingMessageCacheMiss,
     /// Network operation failed
     NetworkOperationFailure(::routing::error::ResponseError),
+    /// Cannot overwrite a root directory if it already exists
+    RootDirectoryAlreadyExists,
     /// Generic I/O Error
     GenericIoError(::std::io::Error),
 }
@@ -69,6 +71,7 @@ impl ::std::fmt::Display for ClientError {
             ClientError::VersionCacheMiss                    => ::std::fmt::Display::fmt("ClientError::VersionCacheMiss", f),
             ClientError::RoutingMessageCacheMiss             => ::std::fmt::Display::fmt("ClientError::RoutingMessageCacheMiss", f),
             ClientError::NetworkOperationFailure(_)          => ::std::fmt::Display::fmt("ClientError::NetworkOperationFailure", f),
+            ClientError::RootDirectoryAlreadyExists          => ::std::fmt::Display::fmt("ClientError::RootDirectoryAlreadyExists", f),
             ClientError::GenericIoError(_)                   => ::std::fmt::Display::fmt("ClientError::GenericIoError", f),
         }
     }
