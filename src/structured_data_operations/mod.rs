@@ -15,15 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// NetworkStorage implements the Storage trait from the Self_Encryption
-pub mod self_encryption_storage;
 /// Unversioned-Structured Data
 pub mod unversioned;
 /// Versioned-Structured Data
 pub mod versioned;
-
-pub use self::self_encryption_storage::SelfEncryptionStorage;
-
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
 const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 70;
