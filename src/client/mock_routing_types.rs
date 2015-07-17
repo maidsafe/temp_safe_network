@@ -139,9 +139,13 @@ impl StructuredData {
     }
 
     pub fn name(&self) -> ::routing::NameType {
+        StructuredData::compute_name(self.tag_type, &self.identifier)
+    }
+    
+    pub fn compute_name(tag_type: u64, identifier: &::routing::NameType) -> ::routing::NameType {
         use ::sodiumoxide::crypto::hash::sha512::hash;
         ::routing::NameType(
-            hash(&hash(&self.identifier.0).0.iter().chain(self.tag_type.to_string().as_bytes().iter()).map(|a| *a).collect::<Vec<u8>>()[..]).0)
+            hash(&hash(&identifier.0).0.iter().chain(tag_type.to_string().as_bytes().iter()).map(|a| *a).collect::<Vec<u8>>()[..]).0)
     }
 }
 

@@ -21,7 +21,7 @@ pub mod unversioned;
 pub mod versioned;
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
-const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 64;
+const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 70;
 
 /// Inform about data fitting or not into given StructuredData
 pub enum DataFitResult {
@@ -45,7 +45,7 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sig
 
     let (_, fake_signer) = ::sodiumoxide::crypto::sign::gen_keypair();
     let mut structured_data = ::client::StructuredData::new(::std::u64::MAX,
-                                                            ::routing::NameType::new([0; 64]),
+                                                            ::routing::NameType::new([::std::u8::MAX; 64]),
                                                             ::std::u64::MAX,
                                                             Vec::new(),
                                                             owner_keys,
