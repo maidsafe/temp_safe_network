@@ -159,7 +159,7 @@ mod test {
     #[test]
     fn create_and_get_unversionsed_structured_data() {
         let keys = ::sodiumoxide::crypto::box_::gen_keypair();
-        let _data_decryption_keys = (&keys.0,
+        let data_decryption_keys = (&keys.0,
                                     &keys.1,
                                     &::sodiumoxide::crypto::box_::gen_nonce());
         let client = ::std::sync::Arc::new(::std::sync::Mutex::new(::utility::test_utils::get_client()));
@@ -185,7 +185,7 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        /// Empty Data- with decryption_keys
+        // Empty Data- with decryption_keys
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = Vec::new();
@@ -207,7 +207,7 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        /// Data of size 75 KB
+        // Data of size 75 KB
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 75];
@@ -229,7 +229,7 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        /// Data of size 75 KB with 200 owners
+        // Data of size 75 KB with 200 owners
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 75];
@@ -251,7 +251,7 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        /// Data of size 75 KB with MAX owners
+        // Data of size 75 KB with MAX owners
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 75];
@@ -273,7 +273,7 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        /// Data of size 75 KB with MAX owners - with decryption_keys
+        // Data of size 75 KB with MAX owners - with decryption_keys
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 75];
@@ -295,7 +295,7 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        /// Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
+        // Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
@@ -313,7 +313,7 @@ mod test {
                                 None);
             assert!(result.is_err());
         }
-        /// Data of size 100 KB
+        // Data of size 100 KB
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 102400];
@@ -335,7 +335,7 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        /// Data of size 200 KB
+        // Data of size 200 KB
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 204801];
