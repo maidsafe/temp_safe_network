@@ -151,10 +151,8 @@ fn get_decoded_stored_data(raw_data: Vec<u8>,
 
 #[cfg(test)]
 mod test {
-    // extern crate rand;
 
     use super::*;
-    // use self::rand::Rng;
 
     const TAG_ID : u64 = ::MAIDSAFE_TAG + 1000;
 
@@ -165,54 +163,54 @@ mod test {
                                     &keys.1,
                                     &::sodiumoxide::crypto::box_::gen_nonce());
         let client = ::std::sync::Arc::new(::std::sync::Mutex::new(::utility::test_utils::get_client()));
-        // Empty Data - Should directly fit in the StructuredData
-        // {
-        //     let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        //     let data = Vec::new();
-        //     let owners = ::utility::test_utils::generate_fixed_public_keys(1);
-        //     let prev_owners = Vec::new();
-        //     let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
-        //     let result = create(client.clone(),
-        //                         TAG_ID,
-        //                         id,
-        //                         0,
-        //                         data.clone(),
-        //                         owners.clone(),
-        //                         prev_owners.clone(),
-        //                         secret_key,
-        //                         None);
-        //     assert!(result.is_ok());
-        //     match get_data(client.clone(), &result.ok().unwrap(), None) {
-        //         Ok(fetched_data) => assert_eq!(fetched_data, data),
-        //         Err(_) => panic!("Failed to fetch"),
-        //     }
-        // }
-        // // Empty Data - Should directly fit in the StructuredData - with decryption_keys
-        // {
-        //     let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        //     let data = Vec::new();
-        //     let owners = ::utility::test_utils::generate_fixed_public_keys(1);
-        //     let prev_owners = Vec::new();
-        //     let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
-        //     let result = create(client.clone(),
-        //                         TAG_ID,
-        //                         id,
-        //                         0,
-        //                         data.clone(),
-        //                         owners.clone(),
-        //                         prev_owners.clone(),
-        //                         secret_key,
-        //                         Some(data_decryption_keys));
-        //     assert!(result.is_ok());
-        //     match get_data(client.clone(), &result.ok().unwrap(), Some(data_decryption_keys)) {
-        //         Ok(fetched_data) => assert_eq!(fetched_data, data),
-        //         Err(_) => panic!("Failed to fetch"),
-        //     }
-        // }
-        // Data of size 75 KB - Should directly fit in the structured data
+        // Empty Data
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-            let data = vec![99u8; 1024 * 112];
+            let data = Vec::new();
+            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        /// Empty Data- with decryption_keys
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = Vec::new();
+            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                Some(data_decryption_keys));
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), Some(data_decryption_keys)) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        /// Data of size 75 KB
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::generate_fixed_public_keys(1);
             let prev_owners = Vec::new();
             let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
@@ -231,134 +229,134 @@ mod test {
                 Err(_) => panic!("Failed to fetch"),
             }
         }
-        // Data of size 75 KB with 200 owners - The data map of the data should fit in the StructuredData
-        // {
-        //     let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        //     let data = vec![99u8; 1024 * 75];
-        //     let owners = ::utility::test_utils::generate_fixed_public_keys(200);
-        //     let prev_owners = Vec::new();
-        //     let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
-        //     let result = create(client.clone(),
-        //                         TAG_ID,
-        //                         id,
-        //                         0,
-        //                         data.clone(),
-        //                         owners.clone(),
-        //                         prev_owners.clone(),
-        //                         secret_key,
-        //                         None);
-        //     assert!(result.is_ok());
-        //     match get_data(client.clone(), &result.ok().unwrap(), None) {
-        //         Ok(fetched_data) => assert_eq!(fetched_data, data),
-        //         Err(_) => panic!("Failed to fetch"),
-        //     }
-        // }
-        // // Data of size 75 KB with MAX owners
-        // {
-        //     let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        //     let data = vec![99u8; 1024 * 75];
-        //     let owners = ::utility::test_utils::generate_fixed_public_keys(516);
-        //     let prev_owners = Vec::new();
-        //     let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
-        //     let result = create(client.clone(),
-        //                         TAG_ID,
-        //                         id,
-        //                         0,
-        //                         data.clone(),
-        //                         owners.clone(),
-        //                         prev_owners.clone(),
-        //                         secret_key,
-        //                         None);
-        //     assert!(result.is_ok());
-        //     match get_data(client.clone(), &result.ok().unwrap(), None) {
-        //         Ok(fetched_data) => assert_eq!(fetched_data, data),
-        //         Err(_) => panic!("Failed to fetch"),
-        //     }
-        // }
-        // // Data of size 75 KB with MAX owners - with decryption_keys
-        // {
-        //     let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        //     let data = vec![99u8; 1024 * 75];
-        //     let owners = ::utility::test_utils::generate_fixed_public_keys(516);
-        //     let prev_owners = Vec::new();
-        //     let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
-        //     let result = create(client.clone(),
-        //                         TAG_ID,
-        //                         id,
-        //                         0,
-        //                         data.clone(),
-        //                         owners.clone(),
-        //                         prev_owners.clone(),
-        //                         secret_key,
-        //                         Some(data_decryption_keys));
-        //     assert!(result.is_ok());
-        //     match get_data(client.clone(), &result.ok().unwrap(), Some(data_decryption_keys)) {
-        //         Ok(fetched_data) => assert_eq!(fetched_data, data),
-        //         Err(_) => panic!("Failed to fetch"),
-        //     }
-        // }
-        // // Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
-        // {
-        //     let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        //     let data = vec![99u8; 1024 * 80];
-        //     let owners = ::utility::test_utils::generate_fixed_public_keys(517);
-        //     let prev_owners = Vec::new();
-        //     let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
-        //     let result = create(client.clone(),
-        //                         TAG_ID,
-        //                         id,
-        //                         0,
-        //                         data.clone(),
-        //                         owners.clone(),
-        //                         prev_owners.clone(),
-        //                         secret_key,
-        //                         None);
-        //     assert!(result.is_err());
-        // }
-        // // Data of size 100 KB
-        // {
-        //     let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        //     let data = vec![99u8; 102400];
-        //     let owners = ::utility::test_utils::generate_fixed_public_keys(1);
-        //     let prev_owners = Vec::new();
-        //     let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
-        //     let result = create(client.clone(),
-        //                         TAG_ID,
-        //                         id,
-        //                         0,
-        //                         data.clone(),
-        //                         owners.clone(),
-        //                         prev_owners.clone(),
-        //                         secret_key,
-        //                         None);
-        //     assert!(result.is_ok());
-        //     match get_data(client.clone(), &result.ok().unwrap(), None) {
-        //         Ok(fetched_data) => assert_eq!(fetched_data, data),
-        //         Err(_) => panic!("Failed to fetch"),
-        //     }
-        // }
-        // // Data of size 200 KB
-        // {
-        //     let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        //     let data = vec![99u8; 204801];
-        //     let owners = ::utility::test_utils::generate_fixed_public_keys(1);
-        //     let prev_owners = Vec::new();
-        //     let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
-        //     let result = create(client.clone(),
-        //                         TAG_ID,
-        //                         id,
-        //                         0,
-        //                         data.clone(),
-        //                         owners.clone(),
-        //                         prev_owners.clone(),
-        //                         secret_key,
-        //                         None);
-        //     assert!(result.is_ok());
-        //     match get_data(client.clone(), &result.ok().unwrap(), None) {
-        //         Ok(fetched_data) => assert_eq!(fetched_data, data),
-        //         Err(_) => panic!("Failed to fetch"),
-        //     }
-        // }
+        /// Data of size 75 KB with 200 owners
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 75];
+            let owners = ::utility::test_utils::generate_fixed_public_keys(200);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        /// Data of size 75 KB with MAX owners
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 75];
+            let owners = ::utility::test_utils::generate_fixed_public_keys(516);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        /// Data of size 75 KB with MAX owners - with decryption_keys
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 75];
+            let owners = ::utility::test_utils::generate_fixed_public_keys(516);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                Some(data_decryption_keys));
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), Some(data_decryption_keys)) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        /// Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 80];
+            let owners = ::utility::test_utils::generate_fixed_public_keys(517);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_err());
+        }
+        /// Data of size 100 KB
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 102400];
+            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        /// Data of size 200 KB
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 204801];
+            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
     }
 
 }
