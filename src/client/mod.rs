@@ -15,18 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(unsafe_code, unused)] // TODO
-
-use cbor;
-use rand::Rng;
-use crypto::buffer::ReadBuffer;
-use crypto::buffer::WriteBuffer;
-
-use routing;
-use maidsafe_types;
-use maidsafe_types::TypeTag;
-use routing::sendable::Sendable;
-
 /// ResponseGetter is a lazy evaluated response getter.
 pub mod response_getter;
 
@@ -43,15 +31,15 @@ mod non_networking_test_framework;
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<non_networking_test_framework::RoutingClientMock>>;
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
-fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>, id_packet: routing::types::Id) -> RoutingClient {
+fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>, id_packet: ::routing::types::Id) -> RoutingClient {
     ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(cb_interface, id_packet)))
 }
 
 #[cfg(feature = "USE_ACTUAL_ROUTING")]
-type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>>;
+type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<::routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>>;
 #[cfg(feature = "USE_ACTUAL_ROUTING")]
-fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>, id_packet: routing::types::Id) -> RoutingClient {
-    ::std::sync::Arc::new(::std::sync::Mutex::new(routing::routing_client::RoutingClient::new(cb_interface, id_packet)))
+fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>, id_packet: ::routing::types::Id) -> RoutingClient {
+    ::std::sync::Arc::new(::std::sync::Mutex::new(::routing::routing_client::RoutingClient::new(cb_interface, id_packet)))
 }
 
 mod misc {
@@ -84,9 +72,9 @@ impl Client {
         let password = password_str.as_bytes();
 
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-        let account_packet = user_account::Account::new(None);
+        let account_packet = user_account::Account::new(None, None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
-        let id_packet = routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
+        let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
                                                       account_packet.get_maid().secret_keys().clone());
 
         let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
@@ -130,9 +118,9 @@ impl Client {
 
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let user_network_id = user_account::Account::generate_network_id(keyword, pin);
-        let fake_account_packet = user_account::Account::new(None);
+        let fake_account_packet = user_account::Account::new(None, None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
-        let fake_id_packet = routing::types::Id::with_keys(fake_account_packet.get_maid().public_keys().clone(),
+        let fake_id_packet = ::routing::types::Id::with_keys(fake_account_packet.get_maid().public_keys().clone(),
                                                            fake_account_packet.get_maid().secret_keys().clone());
 
         let fake_routing_client = get_new_routing_client(callback_interface.clone(), fake_id_packet);
@@ -167,7 +155,7 @@ impl Client {
         ::std::thread::sleep_ms(3000);
 
         let location_session_packet = ::client::StructuredData::compute_name(LOGIN_PACKET_TYPE_TAG, &user_network_id);
-        let get_result = try!(fake_routing_client.lock().unwrap().get(location_session_packet.clone(), ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG)));
+        try!(fake_routing_client.lock().unwrap().get(location_session_packet.clone(), ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG)));
 
         let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
                                                                                  callback_interface.clone(),
@@ -175,7 +163,7 @@ impl Client {
                                                                                  ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG));
         if let ::client::Data::StructuredData(session_packet) = try!(response_getter.get()) {
             let decrypted_session_packet = try!(user_account::Account::decrypt(session_packet.get_data(), password, pin));
-            let id_packet = routing::types::Id::with_keys(decrypted_session_packet.get_maid().public_keys().clone(),
+            let id_packet = ::routing::types::Id::with_keys(decrypted_session_packet.get_maid().public_keys().clone(),
                                                           decrypted_session_packet.get_maid().secret_keys().clone());
 
             let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
@@ -210,31 +198,35 @@ impl Client {
     /// store it. It will be retireved when the user logs into his account. Root directory ID is
     /// necessary to fetch all of user's data as all further data is encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
-    pub fn set_root_directory_id(&mut self, root_dir_id: routing::NameType) -> Result<(), ::errors::ClientError> {
-        if self.account.set_root_dir_id(root_dir_id.clone()) {
-            let encrypted_account = try!(self.account.encrypt(self.session_packet_keys.get_password(), self.session_packet_keys.get_pin()));
-            let location = ::client::StructuredData::compute_name(LOGIN_PACKET_TYPE_TAG, &self.session_packet_id);
-            if let ::client::Data::StructuredData(retrieved_session_packet) = try!(try!(self.get(location.clone(),
-                                                                                                 ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG))).get()) {
-                let new_account_version = ::client::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
-                                                                        self.session_packet_id.clone(),
-                                                                        retrieved_session_packet.get_version() + 1,
-                                                                        encrypted_account,
-                                                                        vec![self.account.get_public_maid().public_keys().0.clone()],
-                                                                        Vec::new(),
-                                                                        &self.account.get_maid().secret_keys().0);
-                Ok(try!(self.post(location, ::client::Data::StructuredData(new_account_version))))
-            } else {
-                Err(::errors::ClientError::ReceivedUnexpectedData)
-            }
+    pub fn set_user_root_directory_id(&mut self, root_dir_id: ::routing::NameType) -> Result<(), ::errors::ClientError> {
+        if self.account.set_user_root_dir_id(root_dir_id) {
+            self.update_session_packet()
         } else {
             Err(::errors::ClientError::RootDirectoryAlreadyExists)
         }
     }
 
-    /// Get Root Directory ID if available in session packet used for current login
-    pub fn get_root_directory_id(&self) -> Option<&routing::NameType> {
-        self.account.get_root_dir_id()
+    /// Get User's Root Directory ID if available in session packet used for current login
+    pub fn get_user_root_directory_id(&self) -> Option<&::routing::NameType> {
+        self.account.get_user_root_dir_id()
+    }
+
+    /// Create an entry for the Maidsafe configuration specific Root Directory ID into the
+    /// session packet, encrypt and store it. It will be retireved when the user logs into
+    /// his account. Root directory ID is necessary to fetch all of configuration data as all further
+    /// data is encoded as meta-information into the config Root Directory or one of its subdirectories.
+    pub fn set_configuration_root_directory_id(&mut self, root_dir_id: ::routing::NameType) -> Result<(), ::errors::ClientError> {
+        if self.account.set_maidsafe_config_root_dir_id(root_dir_id) {
+            self.update_session_packet()
+        } else {
+            Err(::errors::ClientError::RootDirectoryAlreadyExists)
+        }
+    }
+
+    /// Get Maidsafe specific configuration's Root Directory ID if available in session packet used
+    /// for current login
+    pub fn get_configuration_root_directory_id(&self) -> Option<&::routing::NameType> {
+        self.account.get_maidsafe_config_root_dir_id()
     }
 
     /// Combined Asymmectric and Symmetric encryption. The data is encrypted using random Key and
@@ -313,6 +305,24 @@ impl Client {
     pub fn delete(&mut self, location: ::routing::NameType, data: Data) -> Result<(), ::errors::ClientError> {
         Ok(try!(self.routing.lock().unwrap().delete(location, data)))
     }
+
+    fn update_session_packet(&mut self) -> Result<(), ::errors::ClientError> {
+        let encrypted_account = try!(self.account.encrypt(self.session_packet_keys.get_password(), self.session_packet_keys.get_pin()));
+        let location = ::client::StructuredData::compute_name(LOGIN_PACKET_TYPE_TAG, &self.session_packet_id);
+        if let ::client::Data::StructuredData(retrieved_session_packet) = try!(try!(self.get(location.clone(),
+                                                                                             ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG))).get()) {
+            let new_account_version = ::client::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
+                                                                    self.session_packet_id.clone(),
+                                                                    retrieved_session_packet.get_version() + 1,
+                                                                    encrypted_account,
+                                                                    vec![self.account.get_public_maid().public_keys().0.clone()],
+                                                                    Vec::new(),
+                                                                    &self.account.get_maid().secret_keys().0);
+            Ok(try!(self.post(location, ::client::Data::StructuredData(new_account_version))))
+        } else {
+            Err(::errors::ClientError::ReceivedUnexpectedData)
+        }
+    }
 }
 
 impl Drop for Client {
@@ -354,7 +364,6 @@ impl SessionPacketEncryptionKeys {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::error::Error;
 
     #[test]
     fn account_creation() {
@@ -393,10 +402,10 @@ mod test {
         assert!(result.is_ok());
         let mut client = result.ok().unwrap();
 
-        assert!(client.get_root_directory_id().is_none());
+        assert!(client.get_user_root_directory_id().is_none());
 
         let root_dir_id = ::routing::NameType::new([99u8; 64]);
-        match client.set_root_directory_id(root_dir_id.clone()) {
+        match client.set_user_root_directory_id(root_dir_id.clone()) {
             Ok(()) => {
                 // Correct Credentials - Login Should Pass
                 let result = Client::log_in(&keyword, pin, &password);
@@ -404,9 +413,9 @@ mod test {
 
                 let client = result.ok().unwrap();
 
-                assert!(client.get_root_directory_id().is_some());
+                assert!(client.get_user_root_directory_id().is_some());
 
-                assert_eq!(client.get_root_directory_id(), Some(&root_dir_id));
+                assert_eq!(client.get_user_root_directory_id(), Some(&root_dir_id));
             },
             Err(err) => panic!("{}", err),
         }

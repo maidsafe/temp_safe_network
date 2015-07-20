@@ -23,10 +23,10 @@ use routing;
 
 static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
 
-#[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also his Root
 /// Directory ID if he has put data onto the network.
+#[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
 pub struct Account {
     an_maid: ::id::RevocationIdType,
     maid: ::id::IdType,
@@ -36,13 +36,15 @@ pub struct Account {
     mpid: ::id::IdType,
     public_mpid: ::id::PublicIdType,
 
-    root_dir_id: Option<routing::NameType>,
+    user_root_dir_id: Option<routing::NameType>,
+    maidsafe_config_root_dir_id: Option<routing::NameType>,
 }
 
 #[allow(dead_code)]
 impl Account {
     /// Create a new Session Packet with Randomly generated Maid keys for the user
-    pub fn new(root_dir_id: Option<routing::NameType>) -> Account {
+    pub fn new(user_root_dir_id: Option<routing::NameType>,
+               maidsafe_config_root_dir_id: Option<routing::NameType>) -> Account {
         let an_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();
         let maid = ::id::IdType::new(&an_maid);
         let public_maid = ::id::PublicIdType::new(&maid, &an_maid);
@@ -58,7 +60,8 @@ impl Account {
             an_mpid: an_mpid,
             mpid: mpid,
             public_mpid: public_mpid,
-            root_dir_id: root_dir_id,
+            user_root_dir_id: user_root_dir_id,
+            maidsafe_config_root_dir_id: maidsafe_config_root_dir_id,
         }
     }
 
@@ -93,19 +96,38 @@ impl Account {
     }
 
     /// Get user's root directory ID
-    pub fn get_root_dir_id(&self) -> Option<&routing::NameType> {
-        match self.root_dir_id {
+    pub fn get_user_root_dir_id(&self) -> Option<&routing::NameType> {
+        match self.user_root_dir_id {
             Some(ref dir_id) => Some(dir_id),
             None => None,
         }
     }
 
     /// Set user's root directory ID
-    pub fn set_root_dir_id(&mut self, root_dir_id: routing::NameType) -> bool {
-        match self.root_dir_id {
+    pub fn set_user_root_dir_id(&mut self, user_root_dir_id: routing::NameType) -> bool {
+        match self.user_root_dir_id {
             Some(_) => false,
             None => {
-                self.root_dir_id = Some(root_dir_id);
+                self.user_root_dir_id = Some(user_root_dir_id);
+                true
+            },
+        }
+    }
+
+    /// Get maidsafe configuration specific root directory ID
+    pub fn get_maidsafe_config_root_dir_id(&self) -> Option<&routing::NameType> {
+        match self.maidsafe_config_root_dir_id {
+            Some(ref dir_id) => Some(dir_id),
+            None => None,
+        }
+    }
+
+    /// Set maidsafe configuration specific root directory ID
+    pub fn set_maidsafe_config_root_dir_id(&mut self, maidsafe_config_root_dir_id: routing::NameType) -> bool {
+        match self.maidsafe_config_root_dir_id {
+            Some(_) => false,
+            None => {
+                self.maidsafe_config_root_dir_id = Some(maidsafe_config_root_dir_id);
                 true
             },
         }
@@ -273,8 +295,8 @@ mod test {
 
     #[test]
     fn generating_new_account() {
-        let account1 = Account::new(None);
-        let account2 = Account::new(None);
+        let account1 = Account::new(None, None);
+        let account2 = Account::new(None, None);
         assert!(account1 != account2);
     }
 
@@ -336,7 +358,7 @@ mod test {
 
     #[test]
     fn serialisation() {
-        let account = Account::new(None);
+        let account = Account::new(None, None);
         if let Ok(serialised) = ::utility::serialise(&account) {
             if let Ok(deserialised) = ::utility::deserialise::<Account>(&serialised) {
                 assert_eq!(account, deserialised);
@@ -350,7 +372,7 @@ mod test {
 
     #[test]
     fn encryption() {
-        let account = Account::new(None);
+        let account = Account::new(None, None);
 
         let password = "impossible to guess".to_string().into_bytes();
         let pin = 10000u32;
