@@ -106,7 +106,7 @@ mod test {
     const TAG_ID : u64 = ::MAIDSAFE_TAG + 1001;
 
     #[test]
-    fn save_and_retrieve_immtable_data() {
+    fn save_and_retrieve_immutable_data() {
         let mut client = ::utility::test_utils::get_client();
 
         let id: ::routing::NameType = ::routing::test_utils::Random::generate_random();

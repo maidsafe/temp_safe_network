@@ -125,13 +125,11 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
                              data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                            &::sodiumoxide::crypto::box_::SecretKey,
                                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
-    let mut encoder = ::cbor::Encoder::from_memory();
-    try!(encoder.encode(&[data])); // TODO utilise ::utility::serialise() once return type is corrected there
-
+    let serialised_data = try!(::utility::serialise(&data));
     if let Some((ref public_encryp_key, ref secret_encryp_key, ref nonce)) = data_encryption_keys {
-        Ok(try!(::utility::hybrid_encrypt(&encoder.into_bytes()[..], nonce, public_encryp_key, secret_encryp_key)))
+        Ok(try!(::utility::hybrid_encrypt(&serialised_data[..], nonce, public_encryp_key, secret_encryp_key)))
     } else {
-        Ok(encoder.into_bytes())
+        Ok(serialised_data)
     }
 }
 
@@ -145,8 +143,7 @@ fn get_decoded_stored_data(raw_data: Vec<u8>,
         raw_data
     };
 
-    let mut decoder = ::cbor::Decoder::from_bytes(data);
-    Ok(try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
+    Ok(try!(::utility::deserialise(&data)))
 }
 
 
@@ -202,7 +199,7 @@ mod test {
                                 None);
             assert!(result.is_ok());
             match get_data(client.clone(), &result.ok().unwrap(), None) {
-                Ok(fetched_data) => assert_eq!(data, fetched_data),
+                Ok(fetched_data) => assert_eq!(data.len(), fetched_data.len()),
                 Err(_) => panic!("Failed to fetch"),
             }
         }
