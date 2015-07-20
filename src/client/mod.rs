@@ -392,7 +392,7 @@ mod test {
     }
 
     #[test]
-    fn root_dir_id_creation() {
+    fn user_root_dir_id_creation() {
         // Construct Client
         let keyword = ::utility::generate_random_string(10).ok().unwrap();
         let password = ::utility::generate_random_string(10).ok().unwrap();
@@ -403,6 +403,7 @@ mod test {
         let mut client = result.ok().unwrap();
 
         assert!(client.get_user_root_directory_id().is_none());
+        assert!(client.get_configuration_root_directory_id().is_none());
 
         let root_dir_id = ::routing::NameType::new([99u8; 64]);
         match client.set_user_root_directory_id(root_dir_id.clone()) {
@@ -414,8 +415,41 @@ mod test {
                 let client = result.ok().unwrap();
 
                 assert!(client.get_user_root_directory_id().is_some());
+                assert!(client.get_configuration_root_directory_id().is_none());
 
                 assert_eq!(client.get_user_root_directory_id(), Some(&root_dir_id));
+            },
+            Err(err) => panic!("{}", err),
+        }
+    }
+
+    #[test]
+    fn maidsafe_config_root_dir_id_creation() {
+        // Construct Client
+        let keyword = ::utility::generate_random_string(10).ok().unwrap();
+        let password = ::utility::generate_random_string(10).ok().unwrap();
+        let pin = ::utility::generate_random_pin();
+
+        let result = Client::create_account(&keyword, pin, &password);
+        assert!(result.is_ok());
+        let mut client = result.ok().unwrap();
+
+        assert!(client.get_user_root_directory_id().is_none());
+        assert!(client.get_configuration_root_directory_id().is_none());
+
+        let root_dir_id = ::routing::NameType::new([99u8; 64]);
+        match client.set_configuration_root_directory_id(root_dir_id.clone()) {
+            Ok(()) => {
+                // Correct Credentials - Login Should Pass
+                let result = Client::log_in(&keyword, pin, &password);
+                assert!(result.is_ok());
+
+                let client = result.ok().unwrap();
+
+                assert!(client.get_user_root_directory_id().is_none());
+                assert!(client.get_configuration_root_directory_id().is_some());
+
+                assert_eq!(client.get_configuration_root_directory_id(), Some(&root_dir_id));
             },
             Err(err) => panic!("{}", err),
         }
