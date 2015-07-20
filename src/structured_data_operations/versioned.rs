@@ -25,7 +25,7 @@ pub fn create(client: &mut ::client::Client,
               prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
               private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::client::StructuredData, ::errors::ClientError> {
     create_impl(client,
-                vec![version_name_to_store],
+                &vec![version_name_to_store],
                 tag_type,
                 identifier,
                 version,
@@ -37,8 +37,7 @@ pub fn create(client: &mut ::client::Client,
 /// Get the complete version list
 pub fn get_all_versions(client: &mut ::client::Client, struct_data: &::client::StructuredData) -> Result<Vec<::routing::NameType>, ::errors::ClientError> {
     let immut_data = try!(get_immutable_data(client, struct_data));
-    let mut decoder = ::cbor::Decoder::from_bytes(&immut_data.value()[..]);
-    Ok(try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
+    Ok(try!(::utility::deserialise(&immut_data.value())))
 }
 
 /// Append a new version
@@ -51,7 +50,7 @@ pub fn append_version(client: &mut ::client::Client,
     let mut versions = try!(get_all_versions(client, &struct_data));
     versions.push(version_to_append);
     create_impl(client,
-                versions,
+                &versions,
                 struct_data.get_tag_type(),
                 struct_data.get_identifier().clone(),
                 struct_data.get_version(),
@@ -61,27 +60,22 @@ pub fn append_version(client: &mut ::client::Client,
 }
 
 fn create_impl(client: &mut ::client::Client,
-               version_names_to_store: Vec<::routing::NameType>,
+               version_names_to_store: &Vec<::routing::NameType>,
                tag_type: u64,
                identifier: ::routing::NameType,
                version: u64,
                owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::client::StructuredData, ::errors::ClientError> {
-    let mut version_encoder = ::cbor::Encoder::from_memory();
-    try!(version_encoder.encode(version_names_to_store));
-
-    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, version_encoder.into_bytes());
+    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, try!(::utility::serialise(version_names_to_store)));
     let name_of_immutable_data = immutable_data.name();
 
-    let mut name_encoder = ::cbor::Encoder::from_memory();
-    try!(name_encoder.encode(&[name_of_immutable_data.clone()]));
-    let encoded_name = name_encoder.into_bytes();
+    let encoded_name = try!(::utility::serialise(&name_of_immutable_data));
     let data = ::client::Data::ImmutableData(immutable_data);
 
     match ::structured_data_operations::check_if_data_can_fit_in_structured_data(encoded_name.clone(), owner_keys.clone(), prev_owner_keys.clone()) {
         ::structured_data_operations::DataFitResult::DataFits => {
-            let _ = client.put(name_of_immutable_data, data);
+            try!(client.put(name_of_immutable_data, data));
             Ok(::client::StructuredData::new(tag_type,
                                              identifier,
                                              version,
@@ -96,8 +90,7 @@ fn create_impl(client: &mut ::client::Client,
 
 fn get_immutable_data(client: &mut ::client::Client,
                       struct_data: &::client::StructuredData) -> Result<::client::ImmutableData, ::errors::ClientError> {
-    let mut decoder = ::cbor::Decoder::from_bytes(&struct_data.get_data()[..]);
-    let location: ::routing::NameType = try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode)));
+    let location: ::routing::NameType = try!(::utility::deserialise(&struct_data.get_data()));
     let mut response_getter = try!(client.get(location, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)));
     let data = try!(response_getter.get());
     match data {
@@ -115,24 +108,36 @@ mod test {
     #[test]
     fn save_and_retrieve_immtable_data() {
         let mut client = ::utility::test_utils::get_client();
-        let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
-        let first_data = vec![1u8; 10];
-        let second_data = vec![2u8; 20];
+
+        let id: ::routing::NameType = ::routing::test_utils::Random::generate_random();
         let owners = ::utility::test_utils::generate_public_keys(1);
         let prev_owners = Vec::new();
         let ref secret_key = ::utility::test_utils::generate_secret_keys(1)[0];
-        let mut version = ::utility::test_utils::save_as_immutable_data(&mut client, first_data.clone());
 
-        let structured_data_result = create(&mut client, version, TAG_ID, id, 0, owners, prev_owners, secret_key);
+        let version_0: ::routing::NameType = ::routing::test_utils::Random::generate_random();
+
+        let mut structured_data_result = create(&mut client, version_0.clone(), TAG_ID, id, 0, owners, prev_owners, secret_key);
         assert!(structured_data_result.is_ok());
+
         let mut structured_data = structured_data_result.ok().unwrap();
-        let mut versions = get_all_versions(&mut client, &structured_data).ok().unwrap();
+        let mut versions_res = get_all_versions(&mut client, &structured_data);
+        assert!(versions_res.is_ok());
+        let mut versions = versions_res.ok().unwrap();
         assert_eq!(versions.len(), 1);
-        version = ::utility::test_utils::save_as_immutable_data(&mut client, second_data.clone());
-        assert!(append_version(&mut client, structured_data.clone(), version.clone(), secret_key).is_err());
-        structured_data.set_version(1u64);
-        assert!(append_version(&mut client, structured_data.clone(), version, secret_key).is_ok());
-        versions = get_all_versions(&mut client, &structured_data).ok().unwrap();
+
+        let version_1: ::routing::NameType = ::routing::test_utils::Random::generate_random();
+
+        structured_data.set_version(1);
+        structured_data_result = append_version(&mut client, structured_data.clone(), version_1.clone(), secret_key);
+        assert!(structured_data_result.is_ok());
+        structured_data = structured_data_result.ok().unwrap();
+
+        versions_res = get_all_versions(&mut client, &structured_data);
+        assert!(versions_res.is_ok());
+        versions = versions_res.ok().unwrap();
         assert_eq!(versions.len(), 2);
+
+        assert_eq!(versions[0], version_0);
+        assert_eq!(versions[1], version_1);
     }
 }
