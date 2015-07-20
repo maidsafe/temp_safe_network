@@ -202,7 +202,7 @@ mod test {
                                 None);
             assert!(result.is_ok());
             match get_data(client.clone(), &result.ok().unwrap(), None) {
-                Ok(fetched_data) => assert_eq!(data[0], fetched_data[0]),
+                Ok(fetched_data) => assert_eq!(data, fetched_data),
                 Err(_) => panic!("Failed to fetch"),
             }
         }

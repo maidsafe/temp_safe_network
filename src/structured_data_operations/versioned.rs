@@ -77,7 +77,6 @@ fn create_impl(client: &mut ::client::Client,
     let mut name_encoder = ::cbor::Encoder::from_memory();
     try!(name_encoder.encode(&[name_of_immutable_data.clone()]));
     let encoded_name = name_encoder.into_bytes();
-
     let data = ::client::Data::ImmutableData(immutable_data);
 
     match ::structured_data_operations::check_if_data_can_fit_in_structured_data(encoded_name.clone(), owner_keys.clone(), prev_owner_keys.clone()) {
@@ -98,18 +97,11 @@ fn create_impl(client: &mut ::client::Client,
 fn get_immutable_data(client: &mut ::client::Client,
                       struct_data: &::client::StructuredData) -> Result<::client::ImmutableData, ::errors::ClientError> {
     let mut decoder = ::cbor::Decoder::from_bytes(&struct_data.get_data()[..]);
-    let location = try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode)));
-
+    let location: ::routing::NameType = try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode)));
     let mut response_getter = try!(client.get(location, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)));
     let data = try!(response_getter.get());
     match data {
-        ::client::Data::ImmutableData(immutable_data) => {
-            let mut decoder = ::cbor::Decoder::from_bytes(immutable_data.value().clone());
-            match try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))) {
-                ::client::Data::ImmutableData(immut_data) => Ok(immut_data),
-                _ => Err(::errors::ClientError::ReceivedUnexpectedData),
-            }
-        },
+        ::client::Data::ImmutableData(immutable_data) => Ok(immutable_data),
         _ => Err(::errors::ClientError::ReceivedUnexpectedData),
     }
 }
