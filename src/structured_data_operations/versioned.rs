@@ -53,7 +53,7 @@ pub fn append_version(client: &mut ::client::Client,
                 &versions,
                 struct_data.get_tag_type(),
                 struct_data.get_identifier().clone(),
-                struct_data.get_version(),
+                struct_data.get_version() + 1,
                 struct_data.get_owners().clone(),
                 struct_data.get_previous_owners().clone(),
                 private_signing_key)
@@ -129,7 +129,7 @@ mod test {
 
         structured_data_result = append_version(&mut client, structured_data, version_1.clone(), secret_key);
         assert!(structured_data_result.is_ok());
-        structured_data = structured_data_result.ok().unwrap();        
+        structured_data = structured_data_result.ok().unwrap();
         versions_res = get_all_versions(&mut client, &structured_data);
         assert!(versions_res.is_ok());
         versions = versions_res.ok().unwrap();

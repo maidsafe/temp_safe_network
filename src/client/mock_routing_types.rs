@@ -65,7 +65,7 @@ impl ImmutableData {
 #[derive(Clone)]
 pub struct StructuredData {
     tag_type: u64,
-    identifier: ::routing::NameType,//::sodiumoxide::crypto::hash::sha512::Digest,
+    identifier: ::routing::NameType,
     version: u64,
     data: Vec<u8>,
     current_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
@@ -75,7 +75,7 @@ pub struct StructuredData {
 
 impl StructuredData {
     pub fn new(tag_type: u64,
-               identifier: ::routing::NameType,//::sodiumoxide::crypto::hash::sha512::Digest,
+               identifier: ::routing::NameType,
                version: u64,
                data: Vec<u8>,
                current_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
@@ -145,7 +145,7 @@ impl StructuredData {
     pub fn name(&self) -> ::routing::NameType {
         StructuredData::compute_name(self.tag_type, &self.identifier)
     }
-    
+
     pub fn compute_name(tag_type: u64, identifier: &::routing::NameType) -> ::routing::NameType {
         use ::sodiumoxide::crypto::hash::sha512::hash;
         ::routing::NameType(
