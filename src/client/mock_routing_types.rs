@@ -134,10 +134,6 @@ impl StructuredData {
                             ).iter()))).map(|a| *a).collect::<Vec<u8>>()
     }
 
-    pub fn set_version(&mut self, version: u64) {
-        self.version = version;
-    }
-
     pub fn get_tag_type(&self) -> u64 {
         self.tag_type
     }

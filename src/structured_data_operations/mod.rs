@@ -38,7 +38,7 @@ pub enum DataFitResult {
 /// all owners must sign this StructuredData.
 pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                                       prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> usize {
-    let max_signatures_possible =  if prev_owner_keys.is_empty() {
+    let max_signatures_possible = if prev_owner_keys.is_empty() {
         owner_keys.len()
     } else {
         prev_owner_keys.len()
