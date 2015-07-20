@@ -75,7 +75,7 @@ impl Client {
         let account_packet = user_account::Account::new(None, None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
-                                                      account_packet.get_maid().secret_keys().clone());
+                                                        account_packet.get_maid().secret_keys().clone());
 
         let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
         let cloned_routing_client = routing_client.clone();
@@ -121,7 +121,7 @@ impl Client {
         let fake_account_packet = user_account::Account::new(None, None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let fake_id_packet = ::routing::types::Id::with_keys(fake_account_packet.get_maid().public_keys().clone(),
-                                                           fake_account_packet.get_maid().secret_keys().clone());
+                                                             fake_account_packet.get_maid().secret_keys().clone());
 
         let fake_routing_client = get_new_routing_client(callback_interface.clone(), fake_id_packet);
         let cloned_fake_routing_client = fake_routing_client.clone();
@@ -164,7 +164,7 @@ impl Client {
         if let ::client::Data::StructuredData(session_packet) = try!(response_getter.get()) {
             let decrypted_session_packet = try!(user_account::Account::decrypt(session_packet.get_data(), password, pin));
             let id_packet = ::routing::types::Id::with_keys(decrypted_session_packet.get_maid().public_keys().clone(),
-                                                          decrypted_session_packet.get_maid().secret_keys().clone());
+                                                            decrypted_session_packet.get_maid().secret_keys().clone());
 
             let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
             let cloned_routing_client = routing_client.clone();
