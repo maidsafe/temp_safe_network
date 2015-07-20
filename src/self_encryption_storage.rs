@@ -32,13 +32,13 @@ impl SelfEncryptionStorage {
 
 impl ::self_encryption::Storage for SelfEncryptionStorage {
     fn get(&self, name: Vec<u8>) -> Vec<u8> {
-        let mut name_id = [0u8;64];
+        let mut name_id = [0u8; 64];
         assert_eq!(name.len(), 64);
         for i in 0..64 {
-            name_id[i] = *name.get(i).unwrap();
+            name_id[i] = name[i];
         }
-        let client_mutex = self.client.clone();
-        let mut client = client_mutex.lock().unwrap();
+
+        let mut client = self.client.lock().unwrap();
         match client.get(::routing::NameType(name_id), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
             Ok(mut response_getter) => {
                 match response_getter.get() {
@@ -56,9 +56,8 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
     }
 
     fn put(&self, _: Vec<u8>, data: Vec<u8>) {
-        let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);
-        let client_mutex = self.client.clone();
-        let mut client = client_mutex.lock().unwrap();
+        let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);        
+        let mut client = self.client.lock().unwrap();
         let _ = client.put(immutable_data.name(), ::client::Data::ImmutableData(immutable_data));
     }
 }

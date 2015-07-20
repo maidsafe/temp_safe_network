@@ -57,7 +57,6 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
             let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMap(data_map.clone()), data_encryption_keys));
             match ::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone()) {
                 ::structured_data_operations::DataFitResult::DataFits => {
-                    println!("saving as datamap");
                     Ok(::client::StructuredData::new(tag_type,
                                                      id,
                                                      version,
@@ -68,7 +67,6 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 
                 },
                 ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-                    println!("saving as datamap name");
                     let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
                     let data = ::client::Data::ImmutableData(immutable_data);
@@ -97,7 +95,7 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                    data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                  &::sodiumoxide::crypto::box_::SecretKey,
                                                  &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
-    match try!(get_decoded_stored_data(struct_data.get_data().clone(), data_decryption_keys)) {
+    match try!(get_decoded_stored_data(&struct_data.get_data(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
             let mut se = ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client), data_map);
@@ -108,7 +106,7 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
             let mut response_getter = try!(client.lock().unwrap().get(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)));
             match try!(response_getter.get()) {
                 ::client::Data::ImmutableData(immutable_data) => {
-                    match try!(get_decoded_stored_data(immutable_data.value().clone(), data_decryption_keys)) {
+                    match try!(get_decoded_stored_data(&immutable_data.value(), data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
                             let mut se = ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), data_map);
                             let length = se.len();
@@ -128,24 +126,26 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
                                                            &::sodiumoxide::crypto::box_::SecretKey,
                                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
     let serialised_data = try!(::utility::serialise(&data));
-    if let Some((ref public_encryp_key, ref secret_encryp_key, ref nonce)) = data_encryption_keys {
+    if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_encryption_keys {
         Ok(try!(::utility::hybrid_encrypt(&serialised_data[..], nonce, public_encryp_key, secret_encryp_key)))
     } else {
         Ok(serialised_data)
     }
 }
 
-fn get_decoded_stored_data(raw_data: Vec<u8>,
+fn get_decoded_stored_data(raw_data: &Vec<u8>,
                            data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                          &::sodiumoxide::crypto::box_::SecretKey,
                                                          &::sodiumoxide::crypto::box_::Nonce)>) -> Result<DataTypeEncoding, ::errors::ClientError> {
-    let data = if let Some((ref public_encryp_key, ref secret_encryp_key, ref nonce)) = data_decryption_keys {
-        try!(::utility::hybrid_decrypt(&raw_data, nonce, public_encryp_key, secret_encryp_key))
+    let data: _;
+    let data_to_serialise = if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_decryption_keys {
+        data = try!(::utility::hybrid_decrypt(&raw_data, nonce, public_encryp_key, secret_encryp_key));
+        &data
     } else {
         raw_data
     };
 
-    Ok(try!(::utility::deserialise(&data)))
+    Ok(try!(::utility::deserialise(data_to_serialise)))
 }
 
 
@@ -154,7 +154,7 @@ mod test {
 
     use super::*;
 
-    const TAG_ID : u64 = ::MAIDSAFE_TAG + 1000;
+    const TAG_ID: u64 = ::MAIDSAFE_TAG + 1000;
 
     #[test]
     fn create_and_get_unversionsed_structured_data() {
@@ -167,9 +167,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = Vec::new();
-            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -189,9 +189,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = Vec::new();
-            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -211,9 +211,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 75];
-            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -233,9 +233,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 75];
-            let owners = ::utility::test_utils::generate_fixed_public_keys(200);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(200);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -255,9 +255,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 75];
-            let owners = ::utility::test_utils::generate_fixed_public_keys(516);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(516);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -277,9 +277,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 75];
-            let owners = ::utility::test_utils::generate_fixed_public_keys(516);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(516);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -299,9 +299,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 1024 * 80];
-            let owners = ::utility::test_utils::generate_fixed_public_keys(517);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(517);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -317,9 +317,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 102400];
-            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -339,9 +339,9 @@ mod test {
         {
             let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
             let data = vec![99u8; 204801];
-            let owners = ::utility::test_utils::generate_fixed_public_keys(1);
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::generate_fixed_secret_keys(1)[0];
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,

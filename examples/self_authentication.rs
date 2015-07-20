@@ -19,7 +19,7 @@ extern crate maidsafe_client;
 
 #[allow(unused_must_use)]
 fn main() {
-/*    let mut keyword = String::new();
+    let mut keyword = String::new();
     let mut password = String::new();
     let mut pin_str = String::new();
     let mut pin: u32;
@@ -103,5 +103,5 @@ fn main() {
                 Err(error)  => println!("Account Login Failed !! Reason: {}\n\n", error),
             }
         }
-    }*/
+    }
 }
