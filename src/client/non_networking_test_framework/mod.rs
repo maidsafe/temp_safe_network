@@ -235,7 +235,7 @@ mod test {
     #[test]
     fn check_put_post_get_delete_for_immutable_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-        let account_packet = ::client::user_account::Account::new(None);
+        let account_packet = ::client::user_account::Account::new(None, None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
         let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
@@ -372,7 +372,7 @@ mod test {
     #[test]
     fn check_put_post_get_delete_for_structured_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-        let account_packet = ::client::user_account::Account::new(None);
+        let account_packet = ::client::user_account::Account::new(None, None);
         let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
         let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),

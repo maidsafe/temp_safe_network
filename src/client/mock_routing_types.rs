@@ -65,7 +65,7 @@ impl ImmutableData {
 #[derive(Clone)]
 pub struct StructuredData {
     tag_type: u64,
-    identifier: ::routing::NameType,//::sodiumoxide::crypto::hash::sha512::Digest,
+    identifier: ::routing::NameType,
     version: u64,
     data: Vec<u8>,
     current_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
@@ -75,7 +75,7 @@ pub struct StructuredData {
 
 impl StructuredData {
     pub fn new(tag_type: u64,
-               identifier: ::routing::NameType,//::sodiumoxide::crypto::hash::sha512::Digest,
+               identifier: ::routing::NameType,
                version: u64,
                data: Vec<u8>,
                current_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
@@ -146,6 +146,10 @@ impl StructuredData {
         use ::sodiumoxide::crypto::hash::sha512::hash;
         ::routing::NameType(
             hash(&hash(&identifier.0).0.iter().chain(tag_type.to_string().as_bytes().iter()).map(|a| *a).collect::<Vec<u8>>()[..]).0)
+    }
+
+    pub fn replace_signatures(&mut self, new_signatures: Vec<::sodiumoxide::crypto::sign::Signature>) {
+        self.previous_owner_signatures = new_signatures;
     }
 }
 
