@@ -38,7 +38,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                                             &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::client::StructuredData, ::errors::ClientError> {
     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsData(data.clone()), data_encryption_keys));
 
-    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone())) {
+    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store, owner_keys.clone(), prev_owner_keys.clone())) {
         ::structured_data_operations::DataFitResult::DataFits => {
             Ok(::client::StructuredData::new(tag_type,
                                              id,
@@ -55,7 +55,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
             let data_map = se.close();
 
             let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMap(data_map.clone()), data_encryption_keys));
-            match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone())) {
+            match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store, owner_keys.clone(), prev_owner_keys.clone())) {
                 ::structured_data_operations::DataFitResult::DataFits => {
                     Ok(::client::StructuredData::new(tag_type,
                                                      id,
@@ -74,7 +74,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name), data_encryption_keys));
 
-                    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone())) {
+                    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store, owner_keys.clone(), prev_owner_keys.clone())) {
                         ::structured_data_operations::DataFitResult::DataFits => {
                             Ok(::client::StructuredData::new(tag_type,
                                                              id,
