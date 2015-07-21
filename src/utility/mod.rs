@@ -73,7 +73,6 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
     }
 }
 
-#[allow(dead_code)]
 /// utility function to serialise an Encodable type
 pub fn serialise<T>(data: &T) -> Result<Vec<u8>, ::errors::ClientError>
                                  where T: ::rustc_serialize::Encodable {
@@ -82,7 +81,6 @@ pub fn serialise<T>(data: &T) -> Result<Vec<u8>, ::errors::ClientError>
     Ok(encoder.into_bytes())
 }
 
-#[allow(dead_code)]
 /// utility function to deserialise a Decodable type
 pub fn deserialise<T>(data: &[u8]) -> Result<T, ::errors::ClientError>
                                       where T: ::rustc_serialize::Decodable {
@@ -90,14 +88,12 @@ pub fn deserialise<T>(data: &[u8]) -> Result<T, ::errors::ClientError>
     Ok(try!(try!(d.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
 }
 
-#[allow(dead_code)]
 /// Generates a random string for specified size
 pub fn generate_random_string(length: usize) -> Result<String, ::errors::ClientError> {
     let mut os_rng = try!(::rand::OsRng::new());
     Ok((0..length).map(|_| os_rng.gen::<char>()).collect())
 }
 
-#[allow(dead_code)]
 /// Generates a random PIN number
 pub fn generate_random_pin() -> u32 {
     ::rand::random::<u32>() % 10000

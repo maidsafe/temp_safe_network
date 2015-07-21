@@ -10,15 +10,21 @@ license = "GPL-3.0"
 homepage = "http://maidsafe.net"
 
 [dependencies]
-cbor = "*"
-rustc-serialize = "*"
-rust-crypto = "*"
-lru_time_cache = "0.2.*"
-maidsafe_types = "0.2.*"
-self_encryption = "*"
+#---------------------
+###### MaidSafe ######
+#---------------------
 routing = "0.2.*"
-sodiumoxide = "*"
+self_encryption = "*"
+lru_time_cache = "0.2.*"
+#---------------------
+###### Others ######
+#---------------------
+cbor = "*"
 rand = "*"
+sodiumoxide = "*"
+rust-crypto = "*"
+rustc-serialize = "*"
+#---------------------
 
 [features]
 USE_ACTUAL_ROUTING = []

@@ -41,14 +41,13 @@ unused_qualifications, variant_size_differences)]
 //! #Maidsafe-Client Library
 //! [Project github page](https://github.com/maidsafe/maidsafe_client)
 
-#![allow(variant_size_differences, unused_extern_crates)] // TODO
+#![allow(variant_size_differences)] // TODO
 
 extern crate cbor;
 extern crate rand;
 extern crate crypto;
 extern crate routing;
 extern crate sodiumoxide;
-extern crate maidsafe_types;
 extern crate lru_time_cache;
 extern crate rustc_serialize;
 extern crate self_encryption;
