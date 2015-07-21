@@ -25,22 +25,20 @@ enum DataTypeEncoding {
 /// Create StructuredData in accordance with data-encoding rules abstracted from user. For
 /// StructuredData created with create, data must be obtained using the complementary function
 /// defined in this module to get_data()
-pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from client
-                 client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
-                 tag_type: u64,
-                 id: ::routing::NameType,
-                 version: u64,
-                 data: Vec<u8>,
-                 owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-                 prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-                 private_signing_key: &::sodiumoxide::crypto::sign::SecretKey,
-                 data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
-                                               &::sodiumoxide::crypto::box_::SecretKey,
-                                               &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::client::StructuredData, ::errors::ClientError>
-                                                                                         where T: ::self_encryption::Storage + Sync + Send + 'static {
+pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+              tag_type: u64,
+              id: ::routing::NameType,
+              version: u64,
+              data: Vec<u8>,
+              owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
+              prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
+              private_signing_key: &::sodiumoxide::crypto::sign::SecretKey,
+              data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
+                                            &::sodiumoxide::crypto::box_::SecretKey,
+                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::client::StructuredData, ::errors::ClientError> {
     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsData(data.clone()), data_encryption_keys));
 
-    match ::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone()) {
+    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone())) {
         ::structured_data_operations::DataFitResult::DataFits => {
             Ok(::client::StructuredData::new(tag_type,
                                              id,
@@ -52,12 +50,12 @@ pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from clien
 
         },
         ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-            let mut se = ::self_encryption::SelfEncryptor::new(storage.clone(), ::self_encryption::datamap::DataMap::None);
+            let mut se = ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), ::self_encryption::datamap::DataMap::None);
             se.write(&data, 0);
             let data_map = se.close();
 
             let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMap(data_map.clone()), data_encryption_keys));
-            match ::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone()) {
+            match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone())) {
                 ::structured_data_operations::DataFitResult::DataFits => {
                     Ok(::client::StructuredData::new(tag_type,
                                                      id,
@@ -69,23 +67,25 @@ pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from clien
 
                 },
                 ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-                    // TODO Improve this - will require changes elsewhere - eg., implement storage
-                    // trait in client itself
-
                     let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
                     let data = ::client::Data::ImmutableData(immutable_data);
-                    let _ = client.lock().unwrap().put_new(name.clone(), data);
+                    let _ = client.lock().unwrap().put(name.clone(), data);
 
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name), data_encryption_keys));
 
-                    Ok(::client::StructuredData::new(tag_type,
-                                                     id,
-                                                     version,
-                                                     data_to_store,
-                                                     owner_keys,
-                                                     prev_owner_keys,
-                                                     private_signing_key))
+                    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(data_to_store.clone(), owner_keys.clone(), prev_owner_keys.clone())) {
+                        ::structured_data_operations::DataFitResult::DataFits => {
+                            Ok(::client::StructuredData::new(tag_type,
+                                                             id,
+                                                             version,
+                                                             data_to_store,
+                                                             owner_keys,
+                                                             prev_owner_keys,
+                                                             private_signing_key))
+                        },
+                        _ => Err(::errors::ClientError::StructuredDataHeaderSizeProhibitive),
+                    }
                 },
                 ::structured_data_operations::DataFitResult::NoDataCanFit => Err(::errors::ClientError::StructuredDataHeaderSizeProhibitive),
             }
@@ -95,35 +95,32 @@ pub fn create<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from clien
 }
 
 /// Get Actual Data From StructuredData created via create() function in this module.
-pub fn get_data<T>(storage: ::std::sync::Arc<T>, // TODO Construct this from client
-                   client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                    struct_data: &::client::StructuredData,
                    data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                  &::sodiumoxide::crypto::box_::SecretKey,
-                                                 &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError>
-                                                                                           where T: ::self_encryption::Storage + Sync + Send + 'static {
-    match try!(get_decoded_stored_data(struct_data.get_data().clone(), data_decryption_keys)) {
+                                                 &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
+    match try!(get_decoded_stored_data(&struct_data.get_data(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
-            let mut se = ::self_encryption::SelfEncryptor::new(storage, data_map);
+            let mut se = ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client), data_map);
             let length = se.len();
             Ok(se.read(0, length))
         },
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
-            match client.lock().unwrap().get_new(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)).unwrap().get() {
-                // TODO This is wrong as feedback is to be Data not raw data. Wait for routing to
-                // build and correct everywhere
-                Ok(raw_data_map) => {
-                    match try!(get_decoded_stored_data(raw_data_map, data_decryption_keys)) {
+            let mut response_getter = try!(client.lock().unwrap().get(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)));
+            match try!(response_getter.get()) {
+                ::client::Data::ImmutableData(immutable_data) => {
+                    match try!(get_decoded_stored_data(&immutable_data.value(), data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
-                            let mut se = ::self_encryption::SelfEncryptor::new(storage, data_map);
+                            let mut se = ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), data_map);
                             let length = se.len();
                             Ok(se.read(0, length))
                         },
                         _ => Err(::errors::ClientError::ReceivedUnexpectedData),
                     }
                 },
-                Err(_) => Err(::errors::ClientError::GetFailure),
+                _ => Err(::errors::ClientError::ReceivedUnexpectedData),
             }
         }
     }
@@ -133,26 +130,238 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
                              data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                            &::sodiumoxide::crypto::box_::SecretKey,
                                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
-    let mut encoder = ::cbor::Encoder::from_memory();
-    try!(encoder.encode(&[data])); // TODO utilise ::utility::serialise() once return type is corrected there
-
-    if let Some((ref public_encryp_key, ref secret_encryp_key, ref nonce)) = data_encryption_keys {
-        Ok(try!(::utility::hybrid_encrypt(&encoder.into_bytes()[..], nonce, public_encryp_key, secret_encryp_key)))
+    let serialised_data = try!(::utility::serialise(&data));
+    if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_encryption_keys {
+        Ok(try!(::utility::hybrid_encrypt(&serialised_data, nonce, public_encryp_key, secret_encryp_key)))
     } else {
-        Ok(encoder.into_bytes())
+        Ok(serialised_data)
     }
 }
 
-fn get_decoded_stored_data(raw_data: Vec<u8>,
+fn get_decoded_stored_data(raw_data: &Vec<u8>,
                            data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                          &::sodiumoxide::crypto::box_::SecretKey,
                                                          &::sodiumoxide::crypto::box_::Nonce)>) -> Result<DataTypeEncoding, ::errors::ClientError> {
-    let data = if let Some((ref public_encryp_key, ref secret_encryp_key, ref nonce)) = data_decryption_keys {
-        try!(::utility::hybrid_decrypt(&raw_data, nonce, public_encryp_key, secret_encryp_key))
+    let data: _;
+    let data_to_deserialise = if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_decryption_keys {
+        data = try!(::utility::hybrid_decrypt(&raw_data, nonce, public_encryp_key, secret_encryp_key));
+        &data
     } else {
         raw_data
     };
 
-    let mut decoder = ::cbor::Decoder::from_bytes(data);
-    Ok(try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
+    Ok(try!(::utility::deserialise(data_to_deserialise)))
+}
+
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    const TAG_ID: u64 = ::MAIDSAFE_TAG + 1000;
+
+    #[test]
+    fn create_and_get_unversionsed_structured_data() {
+        let keys = ::sodiumoxide::crypto::box_::gen_keypair();
+        let data_decryption_keys = (&keys.0,
+                                    &keys.1,
+                                    &::sodiumoxide::crypto::box_::gen_nonce());
+        let client = ::std::sync::Arc::new(::std::sync::Mutex::new(::utility::test_utils::get_client().ok().unwrap()));
+        // Empty Data
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = Vec::new();
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        // Empty Data- with decryption_keys
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = Vec::new();
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                Some(data_decryption_keys));
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), Some(data_decryption_keys)) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        // Data of size 75 KB
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 75];
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(data.len(), fetched_data.len()),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        // Data of size 75 KB with 200 owners
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 75];
+            let owners = ::utility::test_utils::get_max_sized_public_keys(200);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        // Data of size 75 KB with MAX owners
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 75];
+            let owners = ::utility::test_utils::get_max_sized_public_keys(515);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        // Data of size 75 KB with MAX owners - with decryption_keys
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 75];
+            let owners = ::utility::test_utils::get_max_sized_public_keys(510);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                Some(data_decryption_keys));
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), Some(data_decryption_keys)) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        // Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 1024 * 80];
+            let owners = ::utility::test_utils::get_max_sized_public_keys(517);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_err());
+        }
+        // Data of size 100 KB
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 102400];
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+        // Data of size 200 KB
+        {
+            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let data = vec![99u8; 204801];
+            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let prev_owners = Vec::new();
+            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let result = create(client.clone(),
+                                TAG_ID,
+                                id,
+                                0,
+                                data.clone(),
+                                owners.clone(),
+                                prev_owners.clone(),
+                                secret_key,
+                                None);
+            assert!(result.is_ok());
+            match get_data(client.clone(), &result.ok().unwrap(), None) {
+                Ok(fetched_data) => assert_eq!(fetched_data, data),
+                Err(_) => panic!("Failed to fetch"),
+            }
+        }
+    }
+
 }

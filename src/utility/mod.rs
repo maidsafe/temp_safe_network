@@ -1,4 +1,4 @@
-// Copyright 2015 MaidSafe.net limited.  
+// Copyright 2015 MaidSafe.net limited.
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
 // licence you accepted on initial access to the Software (the "Licences").
@@ -13,6 +13,9 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
+/// Common utility functions for writting test cases
+pub mod test_utils;
 
 use ::rand::Rng;
 
@@ -111,7 +114,6 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, ::errors::Clie
 pub fn slice_equal<T: PartialEq>(lhs: &[T], rhs: &[T]) -> bool {
     lhs.len() == rhs.len() && lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b)
 }
-
 
 #[cfg(test)]
 mod test {

@@ -24,6 +24,7 @@ const PADDING_SIZE_IN_BYTES: usize = 1024;
 const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 70;
 
 /// Inform about data fitting or not into given StructuredData
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum DataFitResult {
     /// Invalid StrucuturedData.
     NoDataCanFit,
@@ -36,7 +37,7 @@ pub enum DataFitResult {
 /// Calculates approximate space available for data. Calculates the worst case scenario in which
 /// all owners must sign this StructuredData.
 pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-                                      prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> usize {
+                                      prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> Result<usize, ::errors::ClientError> {
     let max_signatures_possible = if prev_owner_keys.is_empty() {
         owner_keys.len()
     } else {
@@ -53,34 +54,119 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sig
                                                             &fake_signer);
 
     // Fill it with rest of signatures
-    for _ in 1..max_signatures_possible {
-        structured_data.add_signature(&fake_signer);
-    }
+    structured_data.replace_signatures(vec![::sodiumoxide::crypto::sign::Signature([::std::u8::MAX; ::sodiumoxide::crypto::sign::SIGNATUREBYTES]); max_signatures_possible]);
 
-    let serialised_structured_data_len = ::utility::serialise(structured_data).len() + PADDING_SIZE_IN_BYTES;
-
+    let serialised_structured_data_len = try!(::utility::serialise(&structured_data)).len() + PADDING_SIZE_IN_BYTES;
     if ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES <= serialised_structured_data_len {
-        0
+        Ok(0)
     } else {
-        ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - serialised_structured_data_len
+        Ok(::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - serialised_structured_data_len)
     }
 }
 
 /// Check if it is possible to fit the given data into the given StructuredData
 pub fn check_if_data_can_fit_in_structured_data(data: Vec<u8>,
                                                 owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-                                                prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> DataFitResult {
+                                                prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> Result<DataFitResult, ::errors::ClientError> {
     if data.len() > ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - PADDING_SIZE_IN_BYTES {
-        DataFitResult::DataDoesNotFit
+        Ok(DataFitResult::DataDoesNotFit)
     } else {
-        let available_size = get_approximate_space_for_data(owner_keys, prev_owner_keys);
-
+        let available_size = try!(get_approximate_space_for_data(owner_keys, prev_owner_keys));
         if available_size <= MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES {
-            DataFitResult::NoDataCanFit
+            Ok(DataFitResult::NoDataCanFit)
         } else if available_size < data.len() {
-            DataFitResult::DataDoesNotFit
+            Ok(DataFitResult::DataDoesNotFit)
         } else {
-            DataFitResult::DataFits
+            Ok(DataFitResult::DataFits)
         }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    // Refers the fixed size of the test_get_approximate_space_for_data fn without signatures
+    const DEFAULT_FIXED_SIZE: usize = ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - 1187;
+    // 196 is approximate size (close enough) of a Fixed Key after serialisation.
+    const FIXED_SIZE_OF_KEY:  usize = 196;
+
+    #[test]
+    fn approximate_space_for_data() {
+        // Assertion based on Fixed Key sizes
+        {
+            let mut keys = ::utility::test_utils::get_max_sized_public_keys(1);
+            assert_eq!(get_approximate_space_for_data(keys.clone(), Vec::new()).ok().unwrap(), DEFAULT_FIXED_SIZE - FIXED_SIZE_OF_KEY);
+            keys.extend(::utility::test_utils::get_max_sized_public_keys(2));
+            assert_eq!(get_approximate_space_for_data(keys.clone(), Vec::new()).ok().unwrap(), DEFAULT_FIXED_SIZE - (FIXED_SIZE_OF_KEY * keys.len()));
+            keys.extend(::utility::test_utils::get_max_sized_public_keys(513));
+            assert!(get_approximate_space_for_data(keys.clone(), Vec::new()).ok().unwrap() < 100);
+            keys.extend(::utility::test_utils::get_max_sized_public_keys(1));
+            assert!(get_approximate_space_for_data(keys.clone(), Vec::new()).ok().unwrap() == 0);
+        }
+        // Random key assertions
+        {
+            let mut keys = ::utility::test_utils::generate_public_keys(10);
+            assert!(get_approximate_space_for_data(keys.clone(), Vec::new()).ok().unwrap() > 5000);
+            assert!(get_approximate_space_for_data(::utility::test_utils::generate_public_keys(1), keys.clone()).ok().unwrap() > 5000);
+            keys.extend(::utility::test_utils::generate_public_keys(40)); // 50 keys
+            assert!(get_approximate_space_for_data(keys.clone(), Vec::new()).ok().unwrap() > 5000);
+            assert!(get_approximate_space_for_data(::utility::test_utils::generate_public_keys(1), keys.clone()).ok().unwrap() > 5000);
+            keys.extend(::utility::test_utils::generate_public_keys(470)); // 520 keys
+            assert!(get_approximate_space_for_data(keys.clone(), Vec::new()).ok().unwrap() > 100);
+            assert!(get_approximate_space_for_data(::utility::test_utils::generate_public_keys(1), keys.clone()).ok().unwrap() > 100);
+        }
+    }
+
+    #[test]
+    fn data_can_fit_in_structured_data() {
+        // Assertion based on Fixed Key sizes
+        // Maximum of 516 keys can be accomodated after serialisation. Thus the fixed key tests work on that calculation
+        {
+            let mut keys = ::utility::test_utils::get_max_sized_public_keys(1);
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(Vec::with_capacity(0), keys.clone(), Vec::new()).ok().unwrap());
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(vec![1u8; 102400], keys.clone(), Vec::new()).ok().unwrap());
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(vec![1u8; 103424], keys.clone(), Vec::new()).ok().unwrap());
+            keys.extend(::utility::test_utils::get_max_sized_public_keys(515));
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(Vec::with_capacity(0), keys.clone(), Vec::new()).ok().unwrap());
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(vec![0u8; 102400], keys.clone(), Vec::new()).ok().unwrap());
+            keys.extend(::utility::test_utils::get_max_sized_public_keys(1));
+            assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(Vec::with_capacity(0), keys.clone(), Vec::new()).ok().unwrap());
+        }
+        // Empty data
+        {
+            let mut keys = ::utility::test_utils::generate_public_keys(250);
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(Vec::new(), keys.clone(), Vec::new()).ok().unwrap());
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(Vec::new(), ::utility::test_utils::generate_public_keys(1), keys.clone()).ok().unwrap());
+            keys.extend(::utility::test_utils::generate_public_keys(350));
+            assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(Vec::new(), keys, Vec::new()).ok().unwrap());
+        }
+        // Data of size 80kb
+        {
+            let data = vec![99u8; 1024 * 80];
+            let mut keys = ::utility::test_utils::generate_public_keys(1);
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()).ok().unwrap());
+            keys.extend(::utility::test_utils::generate_public_keys(98));
+            assert_eq!(DataFitResult::DataFits, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()).ok().unwrap());
+            keys.extend(::utility::test_utils::generate_public_keys(190));
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()).ok().unwrap());
+            keys.extend(::utility::test_utils::generate_public_keys(225));
+            assert_eq!(DataFitResult::DataDoesNotFit, check_if_data_can_fit_in_structured_data(data.clone(), keys.clone(), Vec::new()).ok().unwrap());
+            keys.extend(::utility::test_utils::generate_public_keys(15));
+            assert_eq!(DataFitResult::NoDataCanFit, check_if_data_can_fit_in_structured_data(data.clone(), keys, Vec::new()).ok().unwrap());
+        }
+        // Data size of 100 kb
+        {
+            let data = vec![1u8; 102400];
+            assert_eq!(DataFitResult::DataDoesNotFit,
+                       check_if_data_can_fit_in_structured_data(data.clone(), ::utility::test_utils::generate_public_keys(1), Vec::new()).ok().unwrap());
+        }
+        // Data size of 101 kb
+        {
+            let data = vec![1u8; 103424];
+            assert_eq!(DataFitResult::DataDoesNotFit,
+                       check_if_data_can_fit_in_structured_data(data.clone(), ::utility::test_utils::generate_public_keys(1), Vec::new()).ok().unwrap());
+        }
+    }
+
 }
