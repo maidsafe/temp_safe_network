@@ -73,7 +73,7 @@ fn create_impl(client: &mut ::client::Client,
     let encoded_name = try!(::utility::serialise(&name_of_immutable_data));
     let data = ::client::Data::ImmutableData(immutable_data);
 
-    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(encoded_name.clone(), owner_keys.clone(), prev_owner_keys.clone())) {
+    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&encoded_name, owner_keys.clone(), prev_owner_keys.clone())) {
         ::structured_data_operations::DataFitResult::DataFits => {
             try!(client.put(name_of_immutable_data, data));
             Ok(::client::StructuredData::new(tag_type,
