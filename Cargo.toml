@@ -1,24 +1,26 @@
 [package]
-name = "maidsafe_client"
-version = "0.1.2"
-authors = ["MaidSafe Developers <dev@maidsafe.net>"]
-description = "Maidsafe Client API library"
+name          = "maidsafe_client"
+version       = "0.1.2"
+authors       = ["MaidSafe Developers <dev@maidsafe.net>"]
+description   = "Maidsafe Client API library"
 documentation = "http://maidsafe.github.io/maidsafe_client/latest/"
-repository = "https://github.com/maidsafe/maidsafe_client"
-readme = "README.md"
-license = "GPL-3.0"
-homepage = "http://maidsafe.net"
+repository    = "https://github.com/maidsafe/maidsafe_client"
+readme        = "README.md"
+license       = "GPL-3.0"
+homepage      = "http://maidsafe.net"
 
 [dependencies]
-cbor = "*"
-rustc-serialize = "*"
-rust-crypto = "*"
-lru_time_cache = "0.2.*"
-maidsafe_types = "0.2.*"
+# ---- MaidSafe -----
+routing         = "0.2.*"
+lru_time_cache  = "0.2.*"
 self_encryption = "*"
-routing = "0.2.*"
-sodiumoxide = "*"
-rand = "*"
+
+# ---- Others ----
+cbor            = "*"
+rand            = "*"
+sodiumoxide     = "*"
+rust-crypto     = "*"
+rustc-serialize = "*"
 
 [features]
 USE_ACTUAL_ROUTING = []
