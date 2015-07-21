@@ -15,14 +15,11 @@
 // relating to use of the SAFE Network Software.
 
 /// Gnerates a mock client
-pub fn get_client() -> ::client::Client {
+pub fn get_client() -> Result<::client::Client, ::errors::ClientError> {
     let keyword = ::utility::generate_random_string(10).ok().unwrap();
     let password = ::utility::generate_random_string(10).ok().unwrap();
     let pin = ::utility::generate_random_pin();
-    match ::client::Client::create_account(&keyword, pin, &password) {
-        Ok(client) => client,
-        Err(_) => panic!("Client could not be initialised"),
-    }
+    ::client::Client::create_account(&keyword, pin, &password)
 }
 
 /// Gnerates Random public keys
