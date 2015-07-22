@@ -306,6 +306,26 @@ impl Client {
         Ok(try!(self.routing.lock().unwrap().delete(location, data)))
     }
 
+    /// Returns the public encryption key
+    pub fn get_public_encryption_key(&self) -> &::sodiumoxide::crypto::box_::PublicKey {
+        &self.account.get_maid().public_keys().1
+    }
+
+    /// Returns the Secret encryption key
+    pub fn get_secret_encryption_key(&self) -> &::sodiumoxide::crypto::box_::SecretKey {
+        &self.account.get_maid().secret_keys().1
+    }
+
+    /// Returns the Public Signing key
+    pub fn get_public_signing_key(&self) -> &::sodiumoxide::crypto::sign::PublicKey {
+        &self.account.get_maid().public_keys().0
+    }
+
+    /// Returns the Secret Signing key
+    pub fn get_secret_signing_key(&self) -> &::sodiumoxide::crypto::sign::SecretKey {
+        &self.account.get_maid().secret_keys().0
+    }
+
     fn update_session_packet(&mut self) -> Result<(), ::errors::ClientError> {
         let encrypted_account = try!(self.account.encrypt(self.session_packet_keys.get_password(), self.session_packet_keys.get_pin()));
         let location = ::client::StructuredData::compute_name(LOGIN_PACKET_TYPE_TAG, &self.session_packet_id);
