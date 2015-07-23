@@ -96,10 +96,10 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 
 /// Get Actual Data From StructuredData created via create() function in this module.
 pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
-                   struct_data: &::client::StructuredData,
-                   data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
-                                                 &::sodiumoxide::crypto::box_::SecretKey,
-                                                 &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
+                struct_data: &::client::StructuredData,
+                data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
+                                              &::sodiumoxide::crypto::box_::SecretKey,
+                                              &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
     match try!(get_decoded_stored_data(&struct_data.get_data(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
