@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use std::error::Error;
+
 /// Client Errors
 pub enum ClientError {
     /// StructuredData has no space available to fit in any user data inside it.
@@ -59,6 +61,7 @@ impl From<::std::io::Error> for ClientError {
     }
 }
 
+// TODO Remove this - is of no use if Debug trait exists.
 impl ::std::fmt::Display for ClientError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
@@ -73,6 +76,24 @@ impl ::std::fmt::Display for ClientError {
             ClientError::NetworkOperationFailure(_)          => ::std::fmt::Display::fmt("ClientError::NetworkOperationFailure", f),
             ClientError::RootDirectoryAlreadyExists          => ::std::fmt::Display::fmt("ClientError::RootDirectoryAlreadyExists", f),
             ClientError::GenericIoError(_)                   => ::std::fmt::Display::fmt("ClientError::GenericIoError", f),
+        }
+    }
+}
+
+impl ::std::fmt::Debug for ClientError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+            ClientError::StructuredDataHeaderSizeProhibitive => write!(f, "ClientError::StructuredDataHeaderSizeProhibitive"),
+            ClientError::UnsuccessfulEncodeDecode            => write!(f, "ClientError::UnsuccessfulEncodeDecode"),
+            ClientError::AsymmetricDecipherFailure           => write!(f, "ClientError::AsymmetricDecipherFailure"),
+            ClientError::SymmetricDecipherFailure            => write!(f, "ClientError::SymmetricDecipherFailure"),
+            ClientError::RoutingFailure(ref error)           => write!(f, "ClientError::RoutingFailure -> {:?}", error.description()),
+            ClientError::ReceivedUnexpectedData              => write!(f, "ClientError::ReceivedUnexpectedData"),
+            ClientError::VersionCacheMiss                    => write!(f, "ClientError::VersionCacheMiss"),
+            ClientError::RoutingMessageCacheMiss             => write!(f, "ClientError::RoutingMessageCacheMiss"),
+            ClientError::NetworkOperationFailure(ref error)  => write!(f, "ClientError::NetworkOperationFailure -> {:?}", error.description()),
+            ClientError::RootDirectoryAlreadyExists          => write!(f, "ClientError::RootDirectoryAlreadyExists"),
+            ClientError::GenericIoError(ref error)           => write!(f, "ClientError::GenericIoError -> {:?}", error.description()),
         }
     }
 }
