@@ -61,6 +61,7 @@ impl From<::std::io::Error> for ClientError {
     }
 }
 
+// TODO Remove this - is of no use if Debug trait exists.
 impl ::std::fmt::Display for ClientError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
