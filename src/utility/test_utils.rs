@@ -65,3 +65,24 @@ pub fn save_as_immutable_data(client: &mut ::client::Client, data: Vec<u8>) -> :
     let _ = client.put(name_of_immutable_data.clone(), ::client::Data::ImmutableData(immutable_data));
     name_of_immutable_data
 }
+
+#[macro_export]
+macro_rules! eval_result {
+    ($result:expr) => {
+        $result.unwrap_or_else(|error| {
+            let decorator = (0..50).map(|_| "-").collect::<String>();
+            panic!("\n\n {}\n| {:?}\n {}\n\n", decorator, error, decorator)
+        })
+    }
+}
+
+#[macro_export]
+macro_rules! eval_option {
+    ($option:expr, $user_string:expr) => {
+        $option.unwrap_or_else(|| {
+            let error = "Option Evaluated to None ! ".to_string() + $user_string;
+            let decorator = (0..50).map(|_| "-").collect::<String>();
+            panic!("\n\n {}\n| {:?}\n {}\n\n", decorator, error, decorator)
+        })
+    }
+}
