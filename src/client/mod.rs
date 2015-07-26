@@ -387,130 +387,97 @@ mod test {
 
     #[test]
     fn account_creation() {
-        let keyword = ::utility::generate_random_string(10).ok().unwrap();
-        let password = ::utility::generate_random_string(10).ok().unwrap();
+        let keyword = eval_result!(::utility::generate_random_string(10));
+        let password = eval_result!(::utility::generate_random_string(10));
         let pin = ::utility::generate_random_pin();
-        let result = Client::create_account(&keyword, pin, &password);
-        assert!(result.is_ok());
+        let _ = eval_result!(Client::create_account(&keyword, pin, &password));
     }
 
     #[test]
     fn account_login() {
-        let keyword = ::utility::generate_random_string(10).ok().unwrap();
-        let password = ::utility::generate_random_string(10).ok().unwrap();
+        let keyword = eval_result!(::utility::generate_random_string(10));
+        let password = eval_result!(::utility::generate_random_string(10));
         let pin = ::utility::generate_random_pin();
 
-        let mut result: _;
-
         // Creation should pass
-        result = Client::create_account(&keyword, pin, &password);
-        assert!(result.is_ok());
+        let _ = eval_result!(Client::create_account(&keyword, pin, &password));
 
         // Correct Credentials - Login Should Pass
-        result = Client::log_in(&keyword, pin, &password);
-        assert!(result.is_ok());
+        let _ = eval_result!(Client::log_in(&keyword, pin, &password));
     }
 
     #[test]
     fn user_root_dir_id_creation() {
         // Construct Client
-        let keyword = ::utility::generate_random_string(10).ok().unwrap();
-        let password = ::utility::generate_random_string(10).ok().unwrap();
+        let keyword = eval_result!(::utility::generate_random_string(10));
+        let password = eval_result!(::utility::generate_random_string(10));
         let pin = ::utility::generate_random_pin();
 
-        let result = Client::create_account(&keyword, pin, &password);
-        assert!(result.is_ok());
-        let mut client = result.ok().unwrap();
+        let mut client = eval_result!(Client::create_account(&keyword, pin, &password));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
 
         let root_dir_id = ::routing::NameType::new([99u8; 64]);
-        match client.set_user_root_directory_id(root_dir_id.clone()) {
-            Ok(()) => {
-                // Correct Credentials - Login Should Pass
-                let result = Client::log_in(&keyword, pin, &password);
-                assert!(result.is_ok());
+        eval_result!(client.set_user_root_directory_id(root_dir_id.clone()));
 
-                let client = result.ok().unwrap();
+        // Correct Credentials - Login Should Pass
+        let client = eval_result!(Client::log_in(&keyword, pin, &password));
 
-                assert!(client.get_user_root_directory_id().is_some());
-                assert!(client.get_configuration_root_directory_id().is_none());
+        assert!(client.get_user_root_directory_id().is_some());
+        assert!(client.get_configuration_root_directory_id().is_none());
 
-                assert_eq!(client.get_user_root_directory_id(), Some(&root_dir_id));
-            },
-            Err(err) => panic!("{}", err),
-        }
+        assert_eq!(client.get_user_root_directory_id(), Some(&root_dir_id));
     }
 
     #[test]
     fn maidsafe_config_root_dir_id_creation() {
         // Construct Client
-        let keyword = ::utility::generate_random_string(10).ok().unwrap();
-        let password = ::utility::generate_random_string(10).ok().unwrap();
+        let keyword = eval_result!(::utility::generate_random_string(10));
+        let password = eval_result!(::utility::generate_random_string(10));
         let pin = ::utility::generate_random_pin();
 
-        let result = Client::create_account(&keyword, pin, &password);
-        assert!(result.is_ok());
-        let mut client = result.ok().unwrap();
+        let mut client = eval_result!(Client::create_account(&keyword, pin, &password));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
 
         let root_dir_id = ::routing::NameType::new([99u8; 64]);
-        match client.set_configuration_root_directory_id(root_dir_id.clone()) {
-            Ok(()) => {
-                // Correct Credentials - Login Should Pass
-                let result = Client::log_in(&keyword, pin, &password);
-                assert!(result.is_ok());
+        eval_result!(client.set_configuration_root_directory_id(root_dir_id.clone()));
 
-                let client = result.ok().unwrap();
+        // Correct Credentials - Login Should Pass
+        let client = eval_result!(Client::log_in(&keyword, pin, &password));
 
-                assert!(client.get_user_root_directory_id().is_none());
-                assert!(client.get_configuration_root_directory_id().is_some());
+        assert!(client.get_user_root_directory_id().is_none());
+        assert!(client.get_configuration_root_directory_id().is_some());
 
-                assert_eq!(client.get_configuration_root_directory_id(), Some(&root_dir_id));
-            },
-            Err(err) => panic!("{}", err),
-        }
+        assert_eq!(client.get_configuration_root_directory_id(), Some(&root_dir_id));
     }
 
     #[test]
     fn hybrid_encryption_decryption() {
         // Construct Client
-        let keyword = ::utility::generate_random_string(10).ok().unwrap();
-        let password = ::utility::generate_random_string(10).ok().unwrap();
+        let keyword = eval_result!(::utility::generate_random_string(10));
+        let password = eval_result!(::utility::generate_random_string(10));
         let pin = ::utility::generate_random_pin();
 
-        let result = Client::create_account(&keyword, pin, &password);
-        assert!(result.is_ok());
-        let client = result.ok().unwrap();
+        let client = eval_result!(Client::create_account(&keyword, pin, &password));
 
         // Identical Plain Texts
-        let plain_text_0 = vec![123u8; 1000];
-        let plain_text_1 = plain_text_0.clone();
+        let plain_text_original_0 = vec![123u8; 1000];
+        let plain_text_original_1 = plain_text_original_0.clone();
 
         // Encrypt passing Nonce
         let nonce = ::sodiumoxide::crypto::box_::gen_nonce();
-        let hybrid_encrypt_0 = client.hybrid_encrypt(&plain_text_0[..], Some(&nonce));
-        let hybrid_encrypt_1 = client.hybrid_encrypt(&plain_text_1[..], Some(&nonce));
+        let cipher_text_0 = eval_result!(client.hybrid_encrypt(&plain_text_original_0[..], Some(&nonce)));
+        let cipher_text_1 = eval_result!(client.hybrid_encrypt(&plain_text_original_1[..], Some(&nonce)));
 
         // Encrypt without passing Nonce
-        let hybrid_encrypt_2 = client.hybrid_encrypt(&plain_text_0[..], None);
-        let hybrid_encrypt_3 = client.hybrid_encrypt(&plain_text_1[..], None);
-
-        assert!(hybrid_encrypt_0.is_ok());
-        assert!(hybrid_encrypt_1.is_ok());
-        assert!(hybrid_encrypt_2.is_ok());
-        assert!(hybrid_encrypt_3.is_ok());
+        let cipher_text_2 = eval_result!(client.hybrid_encrypt(&plain_text_original_0[..], None));
+        let cipher_text_3 = eval_result!(client.hybrid_encrypt(&plain_text_original_1[..], None));
 
         // Same Plain Texts
-        assert_eq!(plain_text_0, plain_text_1);
-
-        let cipher_text_0 = hybrid_encrypt_0.ok().unwrap();
-        let cipher_text_1 = hybrid_encrypt_1.ok().unwrap();
-        let cipher_text_2 = hybrid_encrypt_2.ok().unwrap();
-        let cipher_text_3 = hybrid_encrypt_3.ok().unwrap();
+        assert_eq!(plain_text_original_0, plain_text_original_1);
 
         // Different Results because of random "iv"
         assert!(cipher_text_0 != cipher_text_1);
@@ -520,31 +487,30 @@ mod test {
         assert!(cipher_text_2 != cipher_text_3);
 
         // Decrypt with Nonce
-        let hybrid_decrypt_0 = client.hybrid_decrypt(&cipher_text_0, Some(&nonce));
-        let hybrid_decrypt_1 = client.hybrid_decrypt(&cipher_text_1, Some(&nonce));
+        let plain_text_0 = eval_result!(client.hybrid_decrypt(&cipher_text_0, Some(&nonce)));
+        let plain_text_1 = eval_result!(client.hybrid_decrypt(&cipher_text_1, Some(&nonce)));
 
         // Decrypt without Nonce
-        let hybrid_decrypt_2 = client.hybrid_decrypt(&cipher_text_2, None);
-        let hybrid_decrypt_3 = client.hybrid_decrypt(&cipher_text_3, None);
+        let plain_text_2 = eval_result!(client.hybrid_decrypt(&cipher_text_2, None));
+        let plain_text_3 = eval_result!(client.hybrid_decrypt(&cipher_text_3, None));
 
         // Decryption without passing Nonce for something encrypted with passing Nonce - Should Fail
-        let hybrid_decrypt_4 = client.hybrid_decrypt(&cipher_text_0, None);
+        match client.hybrid_decrypt(&cipher_text_0, None) {
+            Ok(_) => panic!("Should have failed !"),
+            Err(::errors::ClientError::AsymmetricDecipherFailure) => (),
+            Err(error) => panic!("{:?}", error),
+        }
         // Decryption passing Nonce for something encrypted without passing Nonce - Should Fail
-        let hybrid_decrypt_5 = client.hybrid_decrypt(&cipher_text_3, Some(&nonce));
-
-        assert!(hybrid_decrypt_0.is_ok());
-        assert!(hybrid_decrypt_1.is_ok());
-        assert!(hybrid_decrypt_2.is_ok());
-        assert!(hybrid_decrypt_3.is_ok());
-
-        // Should fail
-        assert!(hybrid_decrypt_4.is_err());
-        assert!(hybrid_decrypt_5.is_err());
+        match client.hybrid_decrypt(&cipher_text_3, Some(&nonce)) {
+            Ok(_) => panic!("Should have failed !"),
+            Err(::errors::ClientError::AsymmetricDecipherFailure) => (),
+            Err(error) => panic!("{:?}", error),
+        }
 
         // Should have decrypted to the same Plain Texts
-        assert_eq!(plain_text_0, hybrid_decrypt_0.ok().unwrap());
-        assert_eq!(plain_text_1, hybrid_decrypt_1.ok().unwrap());
-        assert_eq!(plain_text_0, hybrid_decrypt_2.ok().unwrap());
-        assert_eq!(plain_text_1, hybrid_decrypt_3.ok().unwrap());
+        assert_eq!(plain_text_original_0, plain_text_0);
+        assert_eq!(plain_text_original_1, plain_text_1);
+        assert_eq!(plain_text_original_0, plain_text_2);
+        assert_eq!(plain_text_original_1, plain_text_3);
     }
 }

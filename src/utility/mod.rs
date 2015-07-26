@@ -125,31 +125,22 @@ mod test {
         let (public_key, secret_key) = ::sodiumoxide::crypto::box_::gen_keypair();
 
         // Encrypt
-        let hybrid_encrypt_0 = hybrid_encrypt(&plain_text_0[..], &nonce, &public_key, &secret_key);
-        let hybrid_encrypt_1 = hybrid_encrypt(&plain_text_1[..], &nonce, &public_key, &secret_key);
-
-        assert!(hybrid_encrypt_0.is_ok());
-        assert!(hybrid_encrypt_1.is_ok());
+        let cipher_text_0 = eval_result!(hybrid_encrypt(&plain_text_0[..], &nonce, &public_key, &secret_key));
+        let cipher_text_1 = eval_result!(hybrid_encrypt(&plain_text_1[..], &nonce, &public_key, &secret_key));
 
         // Same Plain Texts
         assert_eq!(plain_text_0, plain_text_1);
 
-        let result0 = hybrid_encrypt_0.ok().unwrap();
-        let result1 = hybrid_encrypt_1.ok().unwrap();
-
         // Different Results because of random "iv"
-        assert!(result0 != result1);
+        assert!(cipher_text_0 != cipher_text_1);
 
         // Decrypt
-        let hybrid_decrypt_0 = hybrid_decrypt(&result0, &nonce, &public_key, &secret_key);
-        let hybrid_decrypt_1 = hybrid_decrypt(&result1, &nonce, &public_key, &secret_key);
-
-        assert!(hybrid_decrypt_0.is_ok());
-        assert!(hybrid_decrypt_1.is_ok());
+        let deciphered_plain_text_0 = eval_result!(hybrid_decrypt(&cipher_text_0, &nonce, &public_key, &secret_key));
+        let deciphered_plain_text_1 = eval_result!(hybrid_decrypt(&cipher_text_1, &nonce, &public_key, &secret_key));
 
         // Should have decrypted to the same Plain Texts
-        assert_eq!(plain_text_0, hybrid_decrypt_0.ok().unwrap());
-        assert_eq!(plain_text_1, hybrid_decrypt_1.ok().unwrap());
+        assert_eq!(plain_text_0, deciphered_plain_text_0);
+        assert_eq!(plain_text_1, deciphered_plain_text_1);
     }
 
     #[test]
@@ -158,17 +149,17 @@ mod test {
                              generate_random_vector::<i64>(19).ok().unwrap(),
                              generate_random_string(10).ok().unwrap());
 
-        let serialised_data = serialise(&original_data).ok().unwrap();
-        let deserialised_data: (Vec<u8>, Vec<i64>, String) = deserialise(&serialised_data).ok().unwrap();
+        let serialised_data = eval_result!(serialise(&original_data));
+        let deserialised_data: (Vec<u8>, Vec<i64>, String) = eval_result!(deserialise(&serialised_data));
         assert_eq!(original_data, deserialised_data);
     }
 
     #[test]
     fn random_string() {
         const SIZE: usize = 10;
-        let str0 = generate_random_string(SIZE).ok().unwrap();
-        let str1 = generate_random_string(SIZE).ok().unwrap();
-        let str2 = generate_random_string(SIZE).ok().unwrap();
+        let str0 = eval_result!(generate_random_string(SIZE));
+        let str1 = eval_result!(generate_random_string(SIZE));
+        let str2 = eval_result!(generate_random_string(SIZE));
 
         assert!(str0 != str1);
         assert!(str0 != str2);
@@ -178,9 +169,9 @@ mod test {
     #[test]
     fn random_vector() {
         const SIZE: usize = 10;
-        let vec0 = generate_random_vector::<u8>(SIZE).ok().unwrap();
-        let vec1 = generate_random_vector::<u8>(SIZE).ok().unwrap();
-        let vec2 = generate_random_vector::<u8>(SIZE).ok().unwrap();
+        let vec0 = eval_result!(generate_random_vector::<u8>(SIZE));
+        let vec1 = eval_result!(generate_random_vector::<u8>(SIZE));
+        let vec2 = eval_result!(generate_random_vector::<u8>(SIZE));
 
         assert!(vec0 != vec1);
         assert!(vec0 != vec2);
