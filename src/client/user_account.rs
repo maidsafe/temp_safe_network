@@ -15,13 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                */
 
-#![allow(unsafe_code)]
-
-use rustc_serialize::{Decoder, Encodable, Encoder};
-
-use routing;
-
-static MAIDSAFE_VERSION_LABEL : &'static str = "MaidSafe Version 1 Key Derivation";
+static MAIDSAFE_VERSION_LABEL: &'static str = "MaidSafe Version 1 Key Derivation";
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also his Root
@@ -36,15 +30,15 @@ pub struct Account {
     mpid: ::id::IdType,
     public_mpid: ::id::PublicIdType,
 
-    user_root_dir_id: Option<routing::NameType>,
-    maidsafe_config_root_dir_id: Option<routing::NameType>,
+    user_root_dir_id: Option<::routing::NameType>,
+    maidsafe_config_root_dir_id: Option<::routing::NameType>,
 }
 
 #[allow(dead_code)]
 impl Account {
     /// Create a new Session Packet with Randomly generated Maid keys for the user
-    pub fn new(user_root_dir_id: Option<routing::NameType>,
-               maidsafe_config_root_dir_id: Option<routing::NameType>) -> Account {
+    pub fn new(user_root_dir_id: Option<::routing::NameType>,
+               maidsafe_config_root_dir_id: Option<::routing::NameType>) -> Account {
         let an_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();
         let maid = ::id::IdType::new(&an_maid);
         let public_maid = ::id::PublicIdType::new(&maid, &an_maid);
@@ -96,7 +90,7 @@ impl Account {
     }
 
     /// Get user's root directory ID
-    pub fn get_user_root_dir_id(&self) -> Option<&routing::NameType> {
+    pub fn get_user_root_dir_id(&self) -> Option<&::routing::NameType> {
         match self.user_root_dir_id {
             Some(ref dir_id) => Some(dir_id),
             None => None,
@@ -104,7 +98,7 @@ impl Account {
     }
 
     /// Set user's root directory ID
-    pub fn set_user_root_dir_id(&mut self, user_root_dir_id: routing::NameType) -> bool {
+    pub fn set_user_root_dir_id(&mut self, user_root_dir_id: ::routing::NameType) -> bool {
         match self.user_root_dir_id {
             Some(_) => false,
             None => {
@@ -115,7 +109,7 @@ impl Account {
     }
 
     /// Get maidsafe configuration specific root directory ID
-    pub fn get_maidsafe_config_root_dir_id(&self) -> Option<&routing::NameType> {
+    pub fn get_maidsafe_config_root_dir_id(&self) -> Option<&::routing::NameType> {
         match self.maidsafe_config_root_dir_id {
             Some(ref dir_id) => Some(dir_id),
             None => None,
@@ -123,7 +117,7 @@ impl Account {
     }
 
     /// Set maidsafe configuration specific root directory ID
-    pub fn set_maidsafe_config_root_dir_id(&mut self, maidsafe_config_root_dir_id: routing::NameType) -> bool {
+    pub fn set_maidsafe_config_root_dir_id(&mut self, maidsafe_config_root_dir_id: ::routing::NameType) -> bool {
         match self.maidsafe_config_root_dir_id {
             Some(_) => false,
             None => {
@@ -135,7 +129,7 @@ impl Account {
 
     /// Generate User's Identity for the network using supplied credentials in a deterministic way.
     /// This is similary to the username in various places.
-    pub fn generate_network_id(keyword: &String, pin: u32) -> routing::NameType {
+    pub fn generate_network_id(keyword: &String, pin: u32) -> ::routing::NameType {
         use crypto::digest::Digest;
 
         let mut hasher = ::crypto::sha2::Sha512::new();
@@ -148,7 +142,7 @@ impl Account {
         hasher.result(&mut output1);
 
         hasher.reset();
-        Account::hash_pin(&mut hasher, pin);
+        hasher.input(&pin.to_string().as_bytes());
         hasher.result(&mut output2);
 
         let mut name = [0u8; 64];
@@ -157,7 +151,7 @@ impl Account {
         hasher.input(&output2);
         hasher.result(&mut name);
 
-        routing::NameType::new(name)
+        ::routing::NameType::new(name)
     }
 
     /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
@@ -196,7 +190,7 @@ impl Account {
             }
         }
 
-        return Ok(encrypted);
+        Ok(encrypted)
     }
 
     /// Symmetric decryption of Session Packet using User's credentials. Credentials are passed
@@ -236,15 +230,6 @@ impl Account {
         Ok(try!(::utility::deserialise(&decrypted)))
     }
 
-    fn hash_pin(hasher : &mut ::crypto::sha2::Sha512, pin : u32) {
-        use crypto::digest::Digest;
-        use std::slice;
-        unsafe {
-            let address : *const u8 = ::std::mem::transmute(&pin);
-            hasher.input(&slice::from_raw_parts(address, ::std::mem::size_of_val(&pin)));
-        }
-    }
-
     fn generate_crypto_keys(password: &[u8], pin: u32) -> (Vec<u8>, Vec<u8>) {
         use crypto::digest::Digest;
 
@@ -253,12 +238,12 @@ impl Account {
         let key_size = digest_size / 2;
         let iv_size = key_size / 2;
 
-        let iterations : u16 = ((pin % 10000) + 10000) as u16;
+        let iterations = (pin % 10000) + 10000;
         let salt : Vec<u8>;
         {
             let mut salt_partial = vec![0u8; digest_size];
 
-            Account::hash_pin(&mut hasher, pin);
+            hasher.input(&pin.to_string().as_bytes());
             hasher.result(&mut salt_partial);
 
             // Original version uses a Secure Byte Block,
@@ -273,24 +258,21 @@ impl Account {
         let mut mac = ::crypto::hmac::Hmac::new(hasher, &password);
 
         let mut output = vec![0u8 ; digest_size];
-        ::crypto::pbkdf2::pbkdf2(&mut mac, &salt, iterations as u32, &mut output);
+        ::crypto::pbkdf2::pbkdf2(&mut mac, &salt, iterations, &mut output);
 
         let key = output.iter().take(key_size).map(|&a| a.clone()).collect();
         let iv = output.into_iter().skip(key_size).take(iv_size).collect();
 
-        return (key, iv);
+        (key, iv)
     }
-
 }
 
 #[cfg(test)]
 mod test {
-    use std;
-
-    use super::Account;
+    use super::*;
 
     fn slice_eq(left : &[u8], right : &[u8]) -> bool {
-        return left.iter().zip(right.iter()).all(|(a, b)| a == b);
+        left.iter().zip(right.iter()).all(|(a, b)| a == b)
     }
 
     #[test]
@@ -306,14 +288,14 @@ mod test {
         {
             let user1_id1 = Account::generate_network_id(&keyword1, 0);
             let user1_id2 = Account::generate_network_id(&keyword1, 1234);
-            let user1_id3 = Account::generate_network_id(&keyword1, std::u32::MAX);
+            let user1_id3 = Account::generate_network_id(&keyword1, ::std::u32::MAX);
 
             assert!(!slice_eq(&user1_id1.get_id(), &user1_id2.get_id()));
             assert!(!slice_eq(&user1_id1.get_id(), &user1_id3.get_id()));
             assert!(!slice_eq(&user1_id2.get_id(), &user1_id3.get_id()));
             assert!(slice_eq(&user1_id1.get_id(), &Account::generate_network_id(&keyword1, 0).get_id()));
             assert!(slice_eq(&user1_id2.get_id(), &Account::generate_network_id(&keyword1, 1234).get_id()));
-            assert!(slice_eq(&user1_id3.get_id(), &Account::generate_network_id(&keyword1, std::u32::MAX).get_id()));
+            assert!(slice_eq(&user1_id3.get_id(), &Account::generate_network_id(&keyword1, ::std::u32::MAX).get_id()));
         }
         {
             let keyword2 = "user2".to_string();
@@ -331,7 +313,7 @@ mod test {
         {
             let keys1 = Account::generate_crypto_keys(&password1, 0);
             let keys2 = Account::generate_crypto_keys(&password1, 1234);
-            let keys3 = Account::generate_crypto_keys(&password1, std::u32::MAX);
+            let keys3 = Account::generate_crypto_keys(&password1, ::std::u32::MAX);
 
             assert!(!slice_eq(&keys1.0, &keys2.0));
             assert!(!slice_eq(&keys1.0, &keys3.0));
@@ -359,15 +341,8 @@ mod test {
     #[test]
     fn serialisation() {
         let account = Account::new(None, None);
-        if let Ok(serialised) = ::utility::serialise(&account) {
-            if let Ok(deserialised) = ::utility::deserialise::<Account>(&serialised) {
-                assert_eq!(account, deserialised);
-            } else {
-                panic!("Deserialisation Failed");
-            }
-        } else {
-            panic!("Serialisation Failed");
-        }
+        let deserialised_account = eval_result!(::utility::deserialise::<Account>(&eval_result!(::utility::serialise(&account))));
+        assert_eq!(account, deserialised_account);
     }
 
     #[test]
@@ -375,17 +350,13 @@ mod test {
         let account = Account::new(None, None);
 
         let password = "impossible to guess".to_string().into_bytes();
-        let pin = 10000u32;
-        match account.encrypt(&password, pin) {
-            Ok(encrypted) => {
-                assert!(encrypted.len() > 0);
-                assert!(encrypted != ::utility::serialise(&account).ok().unwrap());
-                match Account::decrypt(&encrypted, &password, pin) {
-                    Ok(account_again) => assert_eq!(account, account_again),
-                    Err(_) => panic!("Should have been equal !!"),
-                }
-            }
-            Err(_) => panic!("Account Encryption Failed !!"),
-        }
+        let pin = 1000u32;
+
+        let encrypted_account = eval_result!(account.encrypt(&password, pin));
+        assert!(encrypted_account.len() > 0);
+        assert!(encrypted_account != eval_result!(::utility::serialise(&account)));
+
+        let decrypted_account = eval_result!(Account::decrypt(&encrypted_account, &password, pin));
+        assert_eq!(account, decrypted_account);
     }
 }

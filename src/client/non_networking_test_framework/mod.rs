@@ -413,13 +413,13 @@ mod test {
 
         // Construct StructuredData, 1st version, for this ImmutableData
         const TYPE_TAG: u64 = 999;
-        let keyword = ::utility::generate_random_string(10).ok().unwrap();
+        let keyword = eval_result!(::utility::generate_random_string(10));
         let pin = ::utility::generate_random_pin();
         let user_id = ::client::user_account::Account::generate_network_id(&keyword, pin);
         let mut account_version = ::client::StructuredData::new(TYPE_TAG,
                                                                 user_id.clone(),
                                                                 0,
-                                                                ::utility::serialise(&vec![orig_immutable_data.name()]).ok().unwrap(),
+                                                                eval_result!(::utility::serialise(&vec![orig_immutable_data.name()])),
                                                                 vec![account_packet.get_public_maid().public_keys().0.clone()],
                                                                 Vec::new(),
                                                                 &account_packet.get_maid().secret_keys().0);
@@ -470,8 +470,8 @@ mod test {
 
         // GET ImmutableData from lastest version of StructuredData should pass
         {
-            let mut location_vec = ::utility::deserialise::<Vec<::routing::NameType>>(received_structured_data.get_data()).ok().unwrap();
-            match mock_routing.lock().unwrap().get(location_vec.pop().unwrap(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
+            let mut location_vec = eval_result!(::utility::deserialise::<Vec<::routing::NameType>>(received_structured_data.get_data()));
+            match mock_routing.lock().unwrap().get(eval_option!(location_vec.pop(), "Value must exist !"), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
                 Ok(()) => {
                     let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
                                                                                              callback_interface.clone(),
@@ -595,7 +595,7 @@ mod test {
             }
         }
 
-        let location_vec = ::utility::deserialise::<Vec<::routing::NameType>>(received_structured_data.get_data()).ok().unwrap();
+        let location_vec = eval_result!(::utility::deserialise::<Vec<::routing::NameType>>(received_structured_data.get_data()));
         assert_eq!(location_vec.len(), 2);
 
         // GET new ImmutableData should pass
