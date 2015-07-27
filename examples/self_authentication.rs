@@ -17,7 +17,6 @@
 
 extern crate maidsafe_client;
 
-#[allow(unused_must_use)]
 fn main() {
     let mut keyword = String::new();
     let mut password = String::new();
@@ -28,14 +27,14 @@ fn main() {
     println!("\t================");
 
     println!("\n------------ Enter Keyword ---------------");
-    std::io::stdin().read_line(&mut keyword);
+    let _ = std::io::stdin().read_line(&mut keyword);
 
     println!("\n\n------------ Enter Password --------------");
-    std::io::stdin().read_line(&mut password);
+    let _ = std::io::stdin().read_line(&mut password);
 
     loop {
         println!("\n\n--------- Enter PIN (4 Digits) -----------");
-        std::io::stdin().read_line(&mut pin_str);
+        let _ = std::io::stdin().read_line(&mut pin_str);
         let result = pin_str.trim().parse::<u32>();
         if result.is_ok() && pin_str.trim().len() == 4 {
             pin = result.ok().unwrap();
@@ -75,15 +74,15 @@ fn main() {
         keyword.clear();
 
         println!("\n------------ Enter Keyword ---------------");
-        std::io::stdin().read_line(&mut keyword);
+        let _ = std::io::stdin().read_line(&mut keyword);
 
         println!("\n\n------------ Enter Password --------------");
-        std::io::stdin().read_line(&mut password);
+        let _ = std::io::stdin().read_line(&mut password);
 
         loop {
             pin_str.clear();
             println!("\n\n--------- Enter PIN (4 Digits) -----------");
-            std::io::stdin().read_line(&mut pin_str);
+            let _ = std::io::stdin().read_line(&mut pin_str);
             let result = pin_str.trim().parse::<u32>();
             if result.is_ok() && pin_str.trim().len() == 4 {
                 pin = result.ok().unwrap();
