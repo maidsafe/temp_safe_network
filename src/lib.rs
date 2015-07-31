@@ -38,7 +38,7 @@ unused_qualifications, variant_size_differences)]
 
 ///////////////////////////////////////////////////
 
-//! #Maidsafe-Client Library
+//! #Safe-Client Library
 //! [Project github page](https://github.com/maidsafe/safe_client)
 
 #![allow(variant_size_differences)] // TODO
@@ -58,7 +58,7 @@ mod macros;
 
 /// Public and Private Id types
 pub mod id;
-/// Maidsafe-Client Errors
+/// Safe-Client Errors
 pub mod errors;
 /// Self-Auth and Gateway Module
 pub mod client;
