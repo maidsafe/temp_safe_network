@@ -19,7 +19,7 @@
 pub mod response_getter;
 
 mod user_account;
-mod callback_interface;
+mod message_queue;
 
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 mod mock_routing_types;
@@ -31,14 +31,15 @@ mod non_networking_test_framework;
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<non_networking_test_framework::RoutingClientMock>>;
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
-fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>, id_packet: ::routing::types::Id) -> RoutingClient {
-    ::std::sync::Arc::new(::std::sync::Mutex::new(non_networking_test_framework::RoutingClientMock::new(cb_interface, id_packet)))
+fn get_new_routing_client(id_packet: ::routing::types::Id) -> (RoutingClient, ::std::sync::mpsc::Receiver<(::routing::NameType, Data)>) {
+    let (routing_client_mock, receiver) = non_networking_test_framework::RoutingClientMock::new(id_packet);
+    (::std::sync::Arc::new(::std::sync::Mutex::new(routing_client_mock)), receiver)
 }
 
 #[cfg(feature = "USE_ACTUAL_ROUTING")]
-type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<::routing::routing_client::RoutingClient<callback_interface::CallbackInterface>>>;
+type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<::routing::routing_client::RoutingClient<message_queue::MessageQueue>>>;
 #[cfg(feature = "USE_ACTUAL_ROUTING")]
-fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>, id_packet: ::routing::types::Id) -> RoutingClient {
+fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>, id_packet: ::routing::types::Id) -> RoutingClient {
     ::std::sync::Arc::new(::std::sync::Mutex::new(::routing::routing_client::RoutingClient::new(cb_interface, id_packet)))
 }
 
@@ -60,7 +61,7 @@ pub struct Client {
     session_packet_keys: SessionPacketEncryptionKeys,
     routing:             RoutingClient,
     response_notifier:   misc::ResponseNotifier,
-    callback_interface:  ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
+    message_queue:  ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>,
     routing_stop_flag:   ::std::sync::Arc<::std::sync::Mutex<bool>>,
     routing_join_handle: Option<::std::thread::JoinHandle<()>>,
 }
@@ -73,30 +74,30 @@ impl Client {
 
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(None, None);
-        let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
                                                         account_packet.get_maid().secret_keys().clone());
 
-        let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
+        let (routing_client, receiver) = get_new_routing_client(id_packet);
+        let message_queue = message_queue::MessageQueue::new(notifier.clone(), receiver);
         let cloned_routing_client = routing_client.clone();
         let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
         let routing_stop_flag_clone = routing_stop_flag.clone();
 
         let mut client = Client {
-            account: account_packet,
-            session_packet_id: user_account::Account::generate_network_id(keyword, pin),
+            account            : account_packet,
+            session_packet_id  : user_account::Account::generate_network_id(keyword, pin),
             session_packet_keys: SessionPacketEncryptionKeys::new(password, pin),
-            routing: routing_client,
-            callback_interface: callback_interface,
-            response_notifier: notifier,
-            routing_stop_flag: routing_stop_flag,
+            routing            : routing_client,
+            message_queue      : message_queue,
+            response_notifier  : notifier,
+            routing_stop_flag  : routing_stop_flag,
             routing_join_handle: Some(::std::thread::spawn(move || {
-                let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
-                while !*routing_stop_flag_clone.lock().unwrap() {
-                    ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
-                    cloned_routing_client.lock().unwrap().run();
-                }
-            })),
+                                     let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
+                                     while !*routing_stop_flag_clone.lock().unwrap() {
+                                         ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
+                                         cloned_routing_client.lock().unwrap().run();
+                                     }
+                                 })),
         };
 
         let account_version = ::client::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
@@ -119,11 +120,12 @@ impl Client {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let user_network_id = user_account::Account::generate_network_id(keyword, pin);
         let fake_account_packet = user_account::Account::new(None, None);
-        let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(callback_interface::CallbackInterface::new(notifier.clone())));
         let fake_id_packet = ::routing::types::Id::with_keys(fake_account_packet.get_maid().public_keys().clone(),
                                                              fake_account_packet.get_maid().secret_keys().clone());
 
-        let fake_routing_client = get_new_routing_client(callback_interface.clone(), fake_id_packet);
+        let (fake_routing_client, receiver) = get_new_routing_client(fake_id_packet);
+        let message_queue = message_queue::MessageQueue::new(notifier.clone(), receiver);
+
         let cloned_fake_routing_client = fake_routing_client.clone();
         let fake_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
         let fake_routing_stop_flag_clone = fake_routing_stop_flag.clone();
@@ -158,7 +160,7 @@ impl Client {
         try!(fake_routing_client.lock().unwrap().get(location_session_packet.clone(), ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG)));
 
         let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
-                                                                                 callback_interface.clone(),
+                                                                                 message_queue.clone(),
                                                                                  location_session_packet,
                                                                                  ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG));
         if let ::client::Data::StructuredData(session_packet) = try!(response_getter.get()) {
@@ -166,7 +168,8 @@ impl Client {
             let id_packet = ::routing::types::Id::with_keys(decrypted_session_packet.get_maid().public_keys().clone(),
                                                             decrypted_session_packet.get_maid().secret_keys().clone());
 
-            let routing_client = get_new_routing_client(callback_interface.clone(), id_packet);
+            let (routing_client, receiver) = get_new_routing_client(id_packet);
+            let message_queue = message_queue::MessageQueue::new(notifier.clone(), receiver);
             let cloned_routing_client = routing_client.clone();
             let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
             let routing_stop_flag_clone = routing_stop_flag.clone();
@@ -176,7 +179,7 @@ impl Client {
                 session_packet_id: user_account::Account::generate_network_id(keyword, pin),
                 session_packet_keys: SessionPacketEncryptionKeys::new(password, pin),
                 routing: routing_client,
-                callback_interface: callback_interface,
+                message_queue: message_queue,
                 response_notifier: notifier,
                 routing_stop_flag: routing_stop_flag,
                 routing_join_handle: Some(::std::thread::spawn(move || {
@@ -281,14 +284,14 @@ impl Client {
     /// Get data onto the network. This is non-blocking.
     pub fn get(&mut self, location: ::routing::NameType, request_for: DataRequest) -> Result<response_getter::ResponseGetter, ::errors::ClientError> {
         if let ::client::DataRequest::ImmutableData(_) = request_for {
-            let mut cb_interface = self.callback_interface.lock().unwrap();
+            let mut cb_interface = self.message_queue.lock().unwrap();
             if cb_interface.local_cache_check(&location) {
-                return Ok(response_getter::ResponseGetter::new(None, self.callback_interface.clone(), location, request_for));
+                return Ok(response_getter::ResponseGetter::new(None, self.message_queue.clone(), location, request_for));
             }
         }
 
         try!(self.routing.lock().unwrap().get(location.clone(), request_for.clone()));
-        Ok(response_getter::ResponseGetter::new(Some(self.response_notifier.clone()), self.callback_interface.clone(), location, request_for))
+        Ok(response_getter::ResponseGetter::new(Some(self.response_notifier.clone()), self.message_queue.clone(), location, request_for))
     }
 
     /// Put data onto the network. This is non-blocking.

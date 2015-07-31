@@ -17,12 +17,7 @@
 
 #![allow(unsafe_code, unused)] // TODO Remove the unused attribute later
 
-use routing;
-use routing::client_interface::Interface;
-
-use client::callback_interface;
-
-type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::BTreeMap<routing::NameType, Vec<u8>>>>;
+type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::BTreeMap<::routing::NameType, Vec<u8>>>>;
 
 struct PersistentStorageSimulation {
     data_store: DataStore,
@@ -46,17 +41,20 @@ fn get_storage() -> DataStore {
 }
 
 pub struct RoutingClientMock {
-    callback_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
+    sender          : ::std::sync::mpsc::Sender<(::routing::NameType, ::client::Data)>,
     network_delay_ms: u32,
 }
 
 impl RoutingClientMock {
-    pub fn new(cb_interface: ::std::sync::Arc<::std::sync::Mutex<callback_interface::CallbackInterface>>,
-               _: routing::types::Id) -> RoutingClientMock {
-        RoutingClientMock {
-            callback_interface: cb_interface,
-            network_delay_ms: 1000,
-        }
+    pub fn new(_: ::routing::types::Id) -> (RoutingClientMock, ::std::sync::mpsc::Receiver<(::routing::NameType, ::client::Data)>) {
+        let (sender, receiver) = ::std::sync::mpsc::channel();
+
+        let mock_routing = RoutingClientMock {
+            sender            : sender,
+            network_delay_ms  : 1000,
+        };
+
+        (mock_routing, receiver)
     }
 
     #[allow(dead_code)]
@@ -66,8 +64,8 @@ impl RoutingClientMock {
 
     pub fn get(&mut self, location: ::routing::NameType, request_for: ::client::DataRequest) -> Result<(), ::routing::error::ResponseError> {
         let delay_ms = self.network_delay_ms;
-        let cb_interface = self.callback_interface.clone();
         let data_store = get_storage();
+        let cloned_sender = self.sender.clone();
 
         ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(delay_ms);
@@ -79,7 +77,7 @@ impl RoutingClientMock {
                             (&::client::Data::StructuredData(ref struct_data), ::client::DataRequest::StructuredData(ref tag)) => struct_data.get_tag_type() == *tag,
                             _ => false,
                         } {
-                            cb_interface.lock().unwrap().handle_get_response(location, data);
+                            let _ = cloned_sender.send((location, data)); // TODO Handle the error case by printing it maybe
                         }
                     }
                 },
@@ -92,7 +90,6 @@ impl RoutingClientMock {
 
     pub fn put(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<(), ::routing::error::ResponseError> {
         let delay_ms = self.network_delay_ms;
-        let cb_interface = self.callback_interface.clone();
         let data_store = get_storage();
 
         let mut data_store_mutex_guard = data_store.lock().unwrap();
@@ -114,8 +111,7 @@ impl RoutingClientMock {
 
         // ::std::thread::spawn(move || {
         //     ::std::thread::sleep_ms(delay_ms);
-        //     if !success {
-        //         cb_interface.lock().unwrap().handle_put_post_delete_error(location, ::routing::error::ResponseError::CouldNotPutData(data)); // TODO
+        //     if !success { // TODO Check how routing is going to handle PUT errors
         //     }
         // });
 
@@ -124,7 +120,6 @@ impl RoutingClientMock {
 
     pub fn post(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<(), ::routing::error::ResponseError> {
         let delay_ms = self.network_delay_ms;
-        let cb_interface = self.callback_interface.clone();
         let data_store = get_storage();
 
         let mut data_store_mutex_guard = data_store.lock().unwrap();
@@ -161,8 +156,7 @@ impl RoutingClientMock {
 
         // ::std::thread::spawn(move || {
         //     ::std::thread::sleep_ms(delay_ms);
-        //     if !success {
-        //         cb_interface.lock().unwrap().handle_put_response(location, ::routing::error::ResponseError::CouldNotPutData(data)); // TODO
+        //     if !success { // TODO Check how routing is going to handle POST errors
         //     }
         // });
 
@@ -171,25 +165,28 @@ impl RoutingClientMock {
 
     pub fn delete(&mut self, location: ::routing::NameType, data: ::client::Data) -> Result<(), ::routing::error::ResponseError> {
         let delay_ms = self.network_delay_ms;
-        let cb_interface = self.callback_interface.clone();
         let data_store = get_storage();
 
         let mut data_store_mutex_guard = data_store.lock().unwrap();
         let success = if data_store_mutex_guard.contains_key(&location) {
             match (&data, ::utility::deserialise(data_store_mutex_guard.get(&location).unwrap())) {
                 (&::client::Data::StructuredData(ref struct_data_new), Ok(::client::Data::StructuredData(ref struct_data_stored))) => {
-                    let mut count = 0usize;
-                    if struct_data_stored.get_owners().iter().any(|key| { // This is more efficient than filter as it will stop whenever sign count reaches >= 50%
-                        if struct_data_new.get_signatures().iter().any(|sig| ::sodiumoxide::crypto::sign::verify_detached(sig, &struct_data_new.data_to_sign(), key)) {
-                            count += 1;
-                        }
-
-                        count >= struct_data_stored.get_owners().len() / 2 + struct_data_stored.get_owners().len() % 2
-                    }) {
-                        let _ = data_store_mutex_guard.remove(&location);
-                        true
-                    } else {
+                    if struct_data_new.get_version() != struct_data_stored.get_version() + 1 {
                         false
+                    } else {
+                        let mut count = 0usize;
+                        if struct_data_stored.get_owners().iter().any(|key| { // This is more efficient than filter as it will stop whenever sign count reaches >= 50%
+                            if struct_data_new.get_signatures().iter().any(|sig| ::sodiumoxide::crypto::sign::verify_detached(sig, &struct_data_new.data_to_sign(), key)) {
+                                count += 1;
+                            }
+
+                            count >= struct_data_stored.get_owners().len() / 2 + struct_data_stored.get_owners().len() % 2
+                        }) {
+                            let _ = data_store_mutex_guard.remove(&location);
+                            true
+                        } else {
+                            false
+                        }
                     }
                 },
                 _ => false,
@@ -200,8 +197,7 @@ impl RoutingClientMock {
 
         // ::std::thread::spawn(move || {
         //     ::std::thread::sleep_ms(delay_ms);
-        //     if !success {
-        //         cb_interface.lock().unwrap().handle_put_response(location, ::routing::error::ResponseError::CouldNotPutData(data)); // TODO
+        //     if !success { // TODO Check how routing is going to handle DELETE errors
         //     }
         // });
 
@@ -215,7 +211,7 @@ impl RoutingClientMock {
 
     pub fn bootstrap(&mut self,
                      endpoints: Option<Vec<::routing::routing_client::Endpoint>>,
-                     _: Option<u16>) -> Result<(), routing::error::RoutingError> {
+                     _: Option<u16>) -> Result<(), ::routing::error::RoutingError> {
         if let Some(vec_endpoints) = endpoints {
             for endpoint in vec_endpoints {
                 println!("Endpoint: {:?}", endpoint);
@@ -236,12 +232,14 @@ mod test {
     fn check_put_post_get_delete_for_immutable_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
-        let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
         let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
                                                         account_packet.get_maid().secret_keys().clone());
 
-        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone(), id_packet)));
+        let (routing, receiver) = RoutingClientMock::new(id_packet);
+        let message_queue = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
+
+        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(routing));
         let mock_routing_clone = mock_routing.clone();
 
         let mock_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
@@ -288,7 +286,7 @@ mod test {
             match mock_routing_guard.get(orig_immutable_data.name(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
                 Ok(()) => {
                     let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
-                                                                                             callback_interface.clone(),
+                                                                                             message_queue.clone(),
                                                                                              orig_immutable_data.name(),
                                                                                              ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
@@ -351,7 +349,7 @@ mod test {
             match mock_routing_mutex_guard.get(orig_immutable_data.name(), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
                 Ok(()) => {
                     let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
-                                                                                             callback_interface.clone(),
+                                                                                             message_queue.clone(),
                                                                                              orig_immutable_data.name(),
                                                                                              ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
@@ -373,12 +371,13 @@ mod test {
     fn check_put_post_get_delete_for_structured_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
-        let callback_interface = ::std::sync::Arc::new(::std::sync::Mutex::new(::client::callback_interface::CallbackInterface::new(notifier.clone())));
 
         let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
                                                       account_packet.get_maid().secret_keys().clone());
 
-        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(RoutingClientMock::new(callback_interface.clone(), id_packet)));
+        let (routing, receiver) = RoutingClientMock::new(id_packet);
+        let message_queue = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(routing));
         let mock_routing_clone = mock_routing.clone();
 
         let mock_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
@@ -448,7 +447,7 @@ mod test {
             match mock_routing.lock().unwrap().get(account_version.name(), ::client::DataRequest::StructuredData(TYPE_TAG)) {
                 Ok(()) => {
                     let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
-                                                                                             callback_interface.clone(),
+                                                                                             message_queue.clone(),
                                                                                              account_version.name(),
                                                                                              ::client::DataRequest::StructuredData(TYPE_TAG));
                     match response_getter.get() {
@@ -474,7 +473,7 @@ mod test {
             match mock_routing.lock().unwrap().get(eval_option!(location_vec.pop(), "Value must exist !"), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
                 Ok(()) => {
                     let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
-                                                                                             callback_interface.clone(),
+                                                                                             message_queue.clone(),
                                                                                              orig_immutable_data.name(),
                                                                                              ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
@@ -575,7 +574,7 @@ mod test {
             match mock_routing.lock().unwrap().get(account_version.name(), ::client::DataRequest::StructuredData(TYPE_TAG)) {
                 Ok(()) => {
                     let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
-                                                                                             callback_interface.clone(),
+                                                                                             message_queue.clone(),
                                                                                              account_version.name(),
                                                                                              ::client::DataRequest::StructuredData(TYPE_TAG));
                     match response_getter.get() {
@@ -604,7 +603,7 @@ mod test {
             match get_result {
                 Ok(()) => {
                     let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
-                                                                                             callback_interface.clone(),
+                                                                                             message_queue.clone(),
                                                                                              location_vec[1].clone(),
                                                                                              ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
@@ -627,7 +626,7 @@ mod test {
             match get_result {
                 Ok(id) => {
                     let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
-                                                                                             callback_interface.clone(),
+                                                                                             message_queue.clone(),
                                                                                              location_vec[0].clone(),
                                                                                              ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal));
                     match response_getter.get() {
@@ -644,6 +643,7 @@ mod test {
             }
         }
 
+        // TODO this will not function properly presently .. DELETE needs a version Bump too
         // DELETE of Structured Data should succeed
         {
             let delete_result = mock_routing.lock().unwrap().delete(account_version.name(), data_account_version.clone());
