@@ -15,11 +15,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![crate_name = "maidsafe_client"]
+#![crate_name = "safe_client"]
 #![crate_type = "lib"]
 #![doc(html_logo_url = "http://maidsafe.net/img/Resources/branding/maidsafe_logo.fab2.png",
        html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-              html_root_url = "http://dirvine.github.io/dirvine/maidsafe_client/")]
+              html_root_url = "http://dirvine.github.io/dirvine/safe_client/")]
 
 ///////////////////////////////////////////////////
 //               LINT
@@ -38,8 +38,8 @@ unused_qualifications, variant_size_differences)]
 
 ///////////////////////////////////////////////////
 
-//! #Maidsafe-Client Library
-//! [Project github page](https://github.com/maidsafe/maidsafe_client)
+//! #Safe-Client Library
+//! [Project github page](https://github.com/maidsafe/safe_client)
 
 #![allow(variant_size_differences)] // TODO
 
@@ -58,7 +58,7 @@ mod macros;
 
 /// Public and Private Id types
 pub mod id;
-/// Maidsafe-Client Errors
+/// Safe-Client Errors
 pub mod errors;
 /// Self-Auth and Gateway Module
 pub mod client;
@@ -74,5 +74,5 @@ pub use self_encryption_storage::SelfEncryptionStorage;
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;
 /// All StructuredData tagging should positive-offset from this if the operation needs to go
-/// through this maidsafe_client crate
+/// through this safe_client crate
 pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000; // TODO offset this itself from routing

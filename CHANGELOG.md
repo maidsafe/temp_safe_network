@@ -1,4 +1,4 @@
-# MaidSafe Client - Change Log
+# Safe Client - Change Log
 
 ## [0.1.1]
 - Updated dependencies' versions
