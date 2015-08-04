@@ -56,14 +56,14 @@ const LOGIN_PACKET_TYPE_TAG: u64 = ::CLIENT_STRUCTURED_DATA_TAG - 1;
 /// on the returned ResponseGetter for receiving network response or spawn a new thread. The Client
 /// itself is however well equipped for parallel and non-blocking PUTs and GETS.
 pub struct Client {
-    account:             user_account::Account,
-    session_packet_id:   ::routing::NameType,
+    account            : user_account::Account,
+    routing            : RoutingClient,
+    join_handles       : Vec<::std::thread::JoinHandle<()>>,
+    message_queue      : ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>,
+    response_notifier  : misc::ResponseNotifier,
+    routing_stop_flag  : ::std::sync::Arc<::std::sync::Mutex<bool>>,
+    session_packet_id  : ::routing::NameType,
     session_packet_keys: SessionPacketEncryptionKeys,
-    routing:             RoutingClient,
-    response_notifier:   misc::ResponseNotifier,
-    message_queue:  ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>,
-    routing_stop_flag:   ::std::sync::Arc<::std::sync::Mutex<bool>>,
-    routing_join_handle: Option<::std::thread::JoinHandle<()>>,
 }
 
 impl Client {
@@ -78,26 +78,29 @@ impl Client {
                                                         account_packet.get_maid().secret_keys().clone());
 
         let (routing_client, receiver) = get_new_routing_client(id_packet);
-        let message_queue = message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, receiver_joiner) = message_queue::MessageQueue::new(notifier.clone(), receiver);
         let cloned_routing_client = routing_client.clone();
         let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
         let routing_stop_flag_clone = routing_stop_flag.clone();
 
+        let routing_joiner = ::std::thread::spawn(move || {
+            let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
+            while !*routing_stop_flag_clone.lock().unwrap() {
+                ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
+                cloned_routing_client.lock().unwrap().run();
+            }
+            cloned_routing_client.lock().unwrap().close();
+        });
+
         let mut client = Client {
             account            : account_packet,
-            session_packet_id  : user_account::Account::generate_network_id(keyword, pin),
-            session_packet_keys: SessionPacketEncryptionKeys::new(password, pin),
             routing            : routing_client,
+            join_handles       : vec![routing_joiner, receiver_joiner],
             message_queue      : message_queue,
             response_notifier  : notifier,
             routing_stop_flag  : routing_stop_flag,
-            routing_join_handle: Some(::std::thread::spawn(move || {
-                                     let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
-                                     while !*routing_stop_flag_clone.lock().unwrap() {
-                                         ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
-                                         cloned_routing_client.lock().unwrap().run();
-                                     }
-                                 })),
+            session_packet_id  : user_account::Account::generate_network_id(keyword, pin),
+            session_packet_keys: SessionPacketEncryptionKeys::new(password, pin),
         };
 
         let account_version = ::client::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
@@ -124,7 +127,7 @@ impl Client {
                                                              fake_account_packet.get_maid().secret_keys().clone());
 
         let (fake_routing_client, receiver) = get_new_routing_client(fake_id_packet);
-        let message_queue = message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, receiver_joiner) = message_queue::MessageQueue::new(notifier.clone(), receiver);
 
         let cloned_fake_routing_client = fake_routing_client.clone();
         let fake_routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
@@ -150,11 +153,13 @@ impl Client {
                     ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
                     cloned_fake_routing_client.lock().unwrap().run();
                 }
+                cloned_fake_routing_client.lock().unwrap().close();
+                receiver_joiner.join().unwrap();
             })),
         };
 
         // TODO - Remove This thread::sleep Hack
-        ::std::thread::sleep_ms(3000);
+        // ::std::thread::sleep_ms(1000);
 
         let location_session_packet = ::client::StructuredData::compute_name(LOGIN_PACKET_TYPE_TAG, &user_network_id);
         try!(fake_routing_client.lock().unwrap().get(location_session_packet.clone(), ::client::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG)));
@@ -169,26 +174,29 @@ impl Client {
                                                             decrypted_session_packet.get_maid().secret_keys().clone());
 
             let (routing_client, receiver) = get_new_routing_client(id_packet);
-            let message_queue = message_queue::MessageQueue::new(notifier.clone(), receiver);
+            let (message_queue, receiver_joiner) = message_queue::MessageQueue::new(notifier.clone(), receiver);
             let cloned_routing_client = routing_client.clone();
             let routing_stop_flag = ::std::sync::Arc::new(::std::sync::Mutex::new(false));
             let routing_stop_flag_clone = routing_stop_flag.clone();
 
+            let routing_joiner = ::std::thread::spawn(move || {
+                let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
+                while !*routing_stop_flag_clone.lock().unwrap() {
+                    ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
+                    cloned_routing_client.lock().unwrap().run();
+                }
+                cloned_routing_client.lock().unwrap().close();
+            });
+
             let client = Client {
-                account: decrypted_session_packet,
-                session_packet_id: user_account::Account::generate_network_id(keyword, pin),
+                account            : decrypted_session_packet,
+                routing            : routing_client,
+                join_handles       : vec![routing_joiner, receiver_joiner],
+                message_queue      : message_queue,
+                response_notifier  : notifier,
+                routing_stop_flag  : routing_stop_flag,
+                session_packet_id  : user_account::Account::generate_network_id(keyword, pin),
                 session_packet_keys: SessionPacketEncryptionKeys::new(password, pin),
-                routing: routing_client,
-                message_queue: message_queue,
-                response_notifier: notifier,
-                routing_stop_flag: routing_stop_flag,
-                routing_join_handle: Some(::std::thread::spawn(move || {
-                    let _ = cloned_routing_client.lock().unwrap().bootstrap(None, None);
-                    while !*routing_stop_flag_clone.lock().unwrap() {
-                        ::std::thread::sleep_ms(POLL_DURATION_IN_MILLISEC);
-                        cloned_routing_client.lock().unwrap().run();
-                    }
-                })),
             };
 
             Ok(client)
@@ -351,7 +359,10 @@ impl Client {
 impl Drop for Client {
     fn drop(&mut self) {
         *self.routing_stop_flag.lock().unwrap() = true;
-        self.routing_join_handle.take().unwrap().join().unwrap();
+        let join_handles = ::std::mem::replace(&mut self.join_handles, vec![]);
+        for joiner in join_handles {
+            eval_result!(joiner.join());
+        }
     }
 }
 

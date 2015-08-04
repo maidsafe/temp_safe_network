@@ -15,43 +15,41 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                 */
 
-// TODO update doc
-/// MessageQueue is the concrete type that the routing layer will use to notify of network
-/// responses. It is nonblocking in nature.
+/// MessageQueue gets and collects messages/responses from routing. It also maintains local caching
+/// of previously fetched ImmutableData (because the very nature of such data implies Immutability)
+/// enabling fast re-retrieval and avoiding networking.
 pub struct MessageQueue {
-    message_queue    : ::lru_time_cache::LruCache<::routing::NameType, ::client::Data>,
-    local_cache      : ::lru_time_cache::LruCache<::routing::NameType, ::client::Data>,
-    join_handle      : Option<::std::thread::JoinHandle<()>>,
+    local_cache  : ::lru_time_cache::LruCache<::routing::NameType, ::client::Data>,
+    message_queue: ::lru_time_cache::LruCache<::routing::NameType, ::client::Data>,
 }
 
 impl MessageQueue {
     /// Create a new instance of MessageQueue
     pub fn new(notifier: ::client::misc::ResponseNotifier,
-               receiver: ::std::sync::mpsc::Receiver<(::routing::NameType, ::client::Data)>) -> ::std::sync::Arc<::std::sync::Mutex<MessageQueue>> {
+               receiver: ::std::sync::mpsc::Receiver<(::routing::NameType, ::client::Data)>) -> (::std::sync::Arc<::std::sync::Mutex<MessageQueue>>, ::std::thread::JoinHandle<()>) {
         let message_queue = ::std::sync::Arc::new(::std::sync::Mutex::new(MessageQueue {
-            message_queue: ::lru_time_cache::LruCache::with_capacity(1000),
             local_cache  : ::lru_time_cache::LruCache::with_capacity(1000),
-            join_handle  : None,
+            message_queue: ::lru_time_cache::LruCache::with_capacity(1000),
         }));
 
-        let cloned_message_queue = message_queue.clone();
-        message_queue.lock().unwrap().join_handle = Some(::std::thread::Builder::new().name("ReceiverThread".to_string()).spawn(move || {
+        let message_queue_cloned = message_queue.clone();
+        let receiver_joiner = ::std::thread::Builder::new().name("ReceiverThread".to_string()).spawn(move || {
             for it in receiver.iter() {
-                println!("====================> 0");
-                cloned_message_queue.lock().unwrap().message_queue.insert(it.0.clone(), it.1);
-                println!("====================> 1");
+                match it.1 {
+                    ::client::Data::ShutDown => break,
+                    _ => {
+                        message_queue_cloned.lock().unwrap().message_queue.insert(it.0.clone(), it.1);
 
-                let &(ref lock, ref condition_var) = &*notifier;
-                println!("====================> 2");
-                let mut fetched_location = eval_result!(lock.lock());
-                println!("====================> 3");
-                *fetched_location = Some(it.0);
-                condition_var.notify_all();
+                        let &(ref lock, ref condition_var) = &*notifier;
+                        let mut fetched_location = eval_result!(lock.lock());
+                        *fetched_location = Some(it.0);
+                        condition_var.notify_all();
+                    }
+                }
             }
-            println!("====================> 4");
-        }).unwrap());
+        }).unwrap();
 
-        message_queue
+        (message_queue, receiver_joiner)
     }
 
     /// Check if data is already in local cache
@@ -72,11 +70,5 @@ impl MessageQueue {
     /// Get data from cache filled by the response from routing
     pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::client::Data, ::errors::ClientError> {
         Ok(try!(self.message_queue.remove(&location).ok_or(::errors::ClientError::RoutingMessageCacheMiss)))
-    }
-}
-
-impl Drop for MessageQueue {
-    fn drop(&mut self) {
-        eval_result!(self.join_handle.take().unwrap().join());
     }
 }

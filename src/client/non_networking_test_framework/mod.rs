@@ -50,8 +50,8 @@ impl RoutingClientMock {
         let (sender, receiver) = ::std::sync::mpsc::channel();
 
         let mock_routing = RoutingClientMock {
-            sender            : sender,
-            network_delay_ms  : 1000,
+            sender          : sender,
+            network_delay_ms: 1000,
         };
 
         (mock_routing, receiver)
@@ -220,6 +220,10 @@ impl RoutingClientMock {
 
         Ok(())
     }
+
+    pub fn close(&self) {
+        let _ = self.sender.send((::routing::NameType::new([0; 64]), ::client::Data::ShutDown));
+    }
 }
 
 #[cfg(test)]
@@ -237,7 +241,7 @@ mod test {
                                                         account_packet.get_maid().secret_keys().clone());
 
         let (routing, receiver) = RoutingClientMock::new(id_packet);
-        let message_queue = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, reciever_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
 
         let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(routing));
         let mock_routing_clone = mock_routing.clone();
@@ -264,6 +268,8 @@ mod test {
                     ::std::thread::sleep_ms(10);
                     mock_routing_clone.lock().unwrap().run();
                 }
+                mock_routing_clone.lock().unwrap().close();
+                reciever_joiner.join().unwrap();
             })),
         };
 
@@ -376,7 +382,7 @@ mod test {
                                                       account_packet.get_maid().secret_keys().clone());
 
         let (routing, receiver) = RoutingClientMock::new(id_packet);
-        let message_queue = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, receiver_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
         let mock_routing = ::std::sync::Arc::new(::std::sync::Mutex::new(routing));
         let mock_routing_clone = mock_routing.clone();
 
@@ -402,6 +408,8 @@ mod test {
                     ::std::thread::sleep_ms(10);
                     mock_routing_clone.lock().unwrap().run();
                 }
+                mock_routing_clone.lock().unwrap().close();
+                receiver_joiner.join().unwrap();
             })),
         };
 

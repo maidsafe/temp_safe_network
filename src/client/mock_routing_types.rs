@@ -263,6 +263,7 @@ pub enum DataRequest {
 pub enum Data {
     StructuredData(StructuredData),
     ImmutableData(ImmutableData),
+    ShutDown,
 }
 
 #[cfg(test)]
