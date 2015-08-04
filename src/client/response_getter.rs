@@ -16,38 +16,38 @@
 // relating to use of the SAFE Network Software.
 
 /// ResponseGetter is a lazy evaluated response getter. It will fetch either from local cache or
-/// wait for the CallbackInterface to notify it of the incoming response from the network.
+/// wait for the MessageQueue to notify it of the incoming response from the network.
 pub struct ResponseGetter {
-    response_notifier:  Option<::client::misc::ResponseNotifier>,
-    callback_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
+    response_notifier :  Option<::client::misc::ResponseNotifier>,
+    message_queue     : ::std::sync::Arc<::std::sync::Mutex<::client::message_queue::MessageQueue>>,
     requested_location: ::routing::NameType,
-    requested_type:     ::client::DataRequest,
+    requested_type    :     ::client::DataRequest,
 }
 
 impl ResponseGetter {
     /// Create a new instance of ResponseGetter
     pub fn new(notifier          : Option<::client::misc::ResponseNotifier>,
-               callback_interface: ::std::sync::Arc<::std::sync::Mutex<::client::callback_interface::CallbackInterface>>,
+               message_queue     : ::std::sync::Arc<::std::sync::Mutex<::client::message_queue::MessageQueue>>,
                requested_location: ::routing::NameType,
                requested_type    : ::client::DataRequest) -> ResponseGetter {
         ResponseGetter {
             response_notifier : notifier,
-            callback_interface: callback_interface,
+            message_queue     : message_queue,
             requested_location: requested_location,
             requested_type    : requested_type,
         }
     }
 
     /// Get either from local cache or (if not available there) get it when it comes from the
-    /// network as informed by CallbackInterface. This is blocking.
+    /// network as informed by MessageQueue. This is blocking.
     pub fn get(&mut self) -> Result<::client::Data, ::errors::ClientError> {
         if let Some(ref notifier) = self.response_notifier {
             let (ref lock, ref condition_var) = **notifier;
             let mut mutex_guard: _;
 
             {
-                let mut cb_interface = self.callback_interface.lock().unwrap();
-                match cb_interface.get_response(&self.requested_location) {
+                let mut msg_queue = self.message_queue.lock().unwrap();
+                match msg_queue.get_response(&self.requested_location) {
                     Ok(response) => return Ok(response),
                     Err(_) => {
                         mutex_guard = lock.lock().unwrap();
@@ -63,17 +63,17 @@ impl ResponseGetter {
                 mutex_guard = condition_var.wait(mutex_guard).unwrap();
             }
 
-            let mut cb_interface = self.callback_interface.lock().unwrap();
-            let response = try!(cb_interface.get_response(&self.requested_location));
+            let mut msg_queue = self.message_queue.lock().unwrap();
+            let response = try!(msg_queue.get_response(&self.requested_location));
 
             if let ::client::DataRequest::ImmutableData(_) = self.requested_type {
-                cb_interface.local_cache_insert(self.requested_location.clone(), response.clone());
+                msg_queue.local_cache_insert(self.requested_location.clone(), response.clone());
             }
 
             Ok(response)
         } else {
-            let mut cb_interface = self.callback_interface.lock().unwrap();
-            Ok(try!(cb_interface.local_cache_get(&self.requested_location)))
+            let mut msg_queue = self.message_queue.lock().unwrap();
+            Ok(try!(msg_queue.local_cache_get(&self.requested_location)))
         }
     }
 }
