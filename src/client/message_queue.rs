@@ -35,16 +35,21 @@ impl MessageQueue {
         }));
 
         let cloned_message_queue = message_queue.clone();
-        message_queue.lock().unwrap().join_handle = Some(::std::thread::spawn(move || {
+        message_queue.lock().unwrap().join_handle = Some(::std::thread::Builder::new().name("ReceiverThread".to_string()).spawn(move || {
             for it in receiver.iter() {
+                println!("====================> 0");
                 cloned_message_queue.lock().unwrap().message_queue.insert(it.0.clone(), it.1);
+                println!("====================> 1");
 
                 let &(ref lock, ref condition_var) = &*notifier;
-                let mut fetched_location = lock.lock().unwrap();
+                println!("====================> 2");
+                let mut fetched_location = eval_result!(lock.lock());
+                println!("====================> 3");
                 *fetched_location = Some(it.0);
                 condition_var.notify_all();
             }
-        }));
+            println!("====================> 4");
+        }).unwrap());
 
         message_queue
     }
@@ -67,5 +72,11 @@ impl MessageQueue {
     /// Get data from cache filled by the response from routing
     pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::client::Data, ::errors::ClientError> {
         Ok(try!(self.message_queue.remove(&location).ok_or(::errors::ClientError::RoutingMessageCacheMiss)))
+    }
+}
+
+impl Drop for MessageQueue {
+    fn drop(&mut self) {
+        eval_result!(self.join_handle.take().unwrap().join());
     }
 }
