@@ -17,10 +17,24 @@
 
 #![allow(unsafe_code, unused)] // TODO Remove the unused attribute later
 
-type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::BTreeMap<::routing::NameType, Vec<u8>>>>;
+use std::io::{Read, Write};
+
+type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::HashMap<::routing::NameType, Vec<u8>>>>;
+
+const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
 
 struct PersistentStorageSimulation {
     data_store: DataStore,
+}
+
+// This is a hack because presently cbor isn't able to encode HashMap<NameType, Vec<u8>>
+pub fn convert_hashmap_to_vec(hashmap: &::std::collections::HashMap<::routing::NameType, Vec<u8>>) -> Vec<(::routing::NameType, Vec<u8>)> {
+    hashmap.iter().map(|a| (a.0.clone(), a.1.clone())).collect()
+}
+
+// This is a hack because presently cbor isn't able to encode HashMap<NameType, Vec<u8>>
+pub fn convert_vec_to_hashmap(vec: Vec<(::routing::NameType, Vec<u8>)>) -> ::std::collections::HashMap<::routing::NameType, Vec<u8>> {
+    vec.into_iter().collect()
 }
 
 fn get_storage() -> DataStore {
@@ -29,15 +43,40 @@ fn get_storage() -> DataStore {
 
     unsafe {
         ONCE.call_once(|| {
+            let mut memory_storage = ::std::collections::HashMap::new();
+
+            let mut temp_dir_pathbuf = ::std::env::temp_dir();
+            temp_dir_pathbuf.push(STORAGE_FILE_NAME);
+
+            if let Ok(mut file) = ::std::fs::File::open(temp_dir_pathbuf) {
+                let mut raw_disk_data = Vec::with_capacity(eval_result!(file.metadata()).len() as usize);
+                if let Ok(_) = file.read_to_end(&mut raw_disk_data) {
+                    if raw_disk_data.len() != 0 {
+                        let vec: Vec<(::routing::NameType, Vec<u8>)>;
+                        vec = eval_result!(::utility::deserialise(&raw_disk_data));
+                        memory_storage = convert_vec_to_hashmap(vec);
+                    }
+                }
+            }
+
             STORAGE = ::std::mem::transmute(Box::new(
                     PersistentStorageSimulation {
-                        data_store: ::std::sync::Arc::new(::std::sync::Mutex::new(::std::collections::BTreeMap::new())),
+                        data_store: ::std::sync::Arc::new(::std::sync::Mutex::new(memory_storage)),
                     }
                     ));
         });
 
         (*STORAGE).data_store.clone()
     }
+}
+
+fn sync_disk_storage(memory_storage: &::std::collections::HashMap<::routing::NameType, Vec<u8>>) {
+    let mut temp_dir_pathbuf = ::std::env::temp_dir();
+    temp_dir_pathbuf.push(STORAGE_FILE_NAME);
+
+    let mut file = eval_result!(::std::fs::File::create(temp_dir_pathbuf));
+    file.write_all(&eval_result!(::utility::serialise(&convert_hashmap_to_vec(memory_storage))));
+    eval_result!(file.sync_all());
 }
 
 pub struct RoutingClientMock {
@@ -104,6 +143,7 @@ impl RoutingClientMock {
             }
         } else if let Ok(raw_data) = ::utility::serialise(&data) {
             data_store_mutex_guard.insert(location, raw_data);
+            sync_disk_storage(&*data_store_mutex_guard);
             true
         } else {
             false
@@ -139,6 +179,7 @@ impl RoutingClientMock {
                         }) {
                             if let Ok(raw_data) = ::utility::serialise(&data) {
                                 data_store_mutex_guard.insert(location, raw_data);
+                                sync_disk_storage(&*data_store_mutex_guard);
                                 true
                             } else {
                                 false
@@ -183,6 +224,7 @@ impl RoutingClientMock {
                             count >= struct_data_stored.get_owners().len() / 2 + struct_data_stored.get_owners().len() % 2
                         }) {
                             let _ = data_store_mutex_guard.remove(&location);
+                            sync_disk_storage(&*data_store_mutex_guard);
                             true
                         } else {
                             false
@@ -233,6 +275,19 @@ mod test {
     use super::*;
 
     #[test]
+    fn map_serialisation() {
+        let mut map_before = ::std::collections::HashMap::<::routing::NameType, Vec<u8>>::new();
+        map_before.insert(::routing::NameType::new([1; 64]), vec![1; 10]);
+
+        let vec_before = convert_hashmap_to_vec(&map_before);
+        let serialised_data = eval_result!(::utility::serialise(&vec_before));
+
+        let vec_after: Vec<(::routing::NameType, Vec<u8>)> = eval_result!(::utility::deserialise(&serialised_data));
+        let map_after = convert_vec_to_hashmap(vec_after);
+        assert_eq!(map_before, map_after);
+    }
+
+    #[test]
     fn check_put_post_get_delete_for_immutable_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
@@ -274,7 +329,7 @@ mod test {
         };
 
         // Construct ImmutableData
-        let orig_raw_data: Vec<u8> = (0u8..100u8).map(|_| ::rand::random::<u8>()).collect();
+        let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));
         let orig_immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, orig_raw_data.clone());
         let orig_data = ::client::Data::ImmutableData(orig_immutable_data.clone());
 
@@ -414,7 +469,7 @@ mod test {
         };
 
         // Construct ImmutableData
-        let orig_data: Vec<u8> = (0u8..100u8).map(|_| ::rand::random::<u8>()).collect();
+        let orig_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));
         let orig_immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, orig_data);
         let orig_data_immutable = ::client::Data::ImmutableData(orig_immutable_data.clone());
 
@@ -499,7 +554,7 @@ mod test {
         }
 
         // Construct ImmutableData
-        let new_data: Vec<u8> = (0u8..100u8).map(|_| ::rand::random::<u8>()).collect();
+        let new_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));
         let new_immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, new_data);
         let new_data_immutable = ::client::Data::ImmutableData(new_immutable_data.clone());
 

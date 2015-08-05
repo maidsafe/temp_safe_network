@@ -289,7 +289,7 @@ impl Client {
                                           &self.account.get_maid().secret_keys().1)))
     }
 
-    /// Get data onto the network. This is non-blocking.
+    /// Get data from the network. This is non-blocking.
     pub fn get(&mut self, location: ::routing::NameType, request_for: DataRequest) -> Result<response_getter::ResponseGetter, ::errors::ClientError> {
         if let ::client::DataRequest::ImmutableData(_) = request_for {
             let mut cb_interface = self.message_queue.lock().unwrap();

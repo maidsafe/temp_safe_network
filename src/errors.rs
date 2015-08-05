@@ -61,25 +61,6 @@ impl From<::std::io::Error> for ClientError {
     }
 }
 
-// TODO Remove this - is of no use if Debug trait exists.
-impl ::std::fmt::Display for ClientError {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match *self {
-            ClientError::StructuredDataHeaderSizeProhibitive => ::std::fmt::Display::fmt("ClientError::StructuredDataHeaderSizeProhibitive", f),
-            ClientError::UnsuccessfulEncodeDecode            => ::std::fmt::Display::fmt("ClientError::UnsuccessfulEncodeDecode", f),
-            ClientError::AsymmetricDecipherFailure           => ::std::fmt::Display::fmt("ClientError::AsymmetricDecipherFailure", f),
-            ClientError::SymmetricDecipherFailure            => ::std::fmt::Display::fmt("ClientError::SymmetricDecipherFailure", f),
-            ClientError::RoutingFailure(_)                   => ::std::fmt::Display::fmt("ClientError::RoutingFailure", f), // TODO Improve these containing nested stuff to print as well
-            ClientError::ReceivedUnexpectedData              => ::std::fmt::Display::fmt("ClientError::ReceivedUnexpectedData", f),
-            ClientError::VersionCacheMiss                    => ::std::fmt::Display::fmt("ClientError::VersionCacheMiss", f),
-            ClientError::RoutingMessageCacheMiss             => ::std::fmt::Display::fmt("ClientError::RoutingMessageCacheMiss", f),
-            ClientError::NetworkOperationFailure(_)          => ::std::fmt::Display::fmt("ClientError::NetworkOperationFailure", f),
-            ClientError::RootDirectoryAlreadyExists          => ::std::fmt::Display::fmt("ClientError::RootDirectoryAlreadyExists", f),
-            ClientError::GenericIoError(_)                   => ::std::fmt::Display::fmt("ClientError::GenericIoError", f),
-        }
-    }
-}
-
 impl ::std::fmt::Debug for ClientError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
