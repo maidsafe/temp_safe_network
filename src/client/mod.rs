@@ -39,8 +39,8 @@ fn get_new_routing_client(id_packet: ::routing::types::Id) -> (RoutingClient, ::
 #[cfg(feature = "USE_ACTUAL_ROUTING")]
 type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<::routing::routing_client::RoutingClient<message_queue::MessageQueue>>>;
 #[cfg(feature = "USE_ACTUAL_ROUTING")]
-fn get_new_routing_client(cb_interface: ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>, id_packet: ::routing::types::Id) -> RoutingClient {
-    ::std::sync::Arc::new(::std::sync::Mutex::new(::routing::routing_client::RoutingClient::new(cb_interface, id_packet)))
+fn get_new_routing_client(msg_queue: ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>, id_packet: ::routing::types::Id) -> RoutingClient {
+    ::std::sync::Arc::new(::std::sync::Mutex::new(::routing::routing_client::RoutingClient::new(msg_queue, id_packet)))
 }
 
 mod misc {
@@ -292,8 +292,8 @@ impl Client {
     /// Get data from the network. This is non-blocking.
     pub fn get(&mut self, location: ::routing::NameType, request_for: DataRequest) -> Result<response_getter::ResponseGetter, ::errors::ClientError> {
         if let ::client::DataRequest::ImmutableData(_) = request_for {
-            let mut cb_interface = self.message_queue.lock().unwrap();
-            if cb_interface.local_cache_check(&location) {
+            let mut msg_queue = self.message_queue.lock().unwrap();
+            if msg_queue.local_cache_check(&location) {
                 return Ok(response_getter::ResponseGetter::new(None, self.message_queue.clone(), location, request_for));
             }
         }
