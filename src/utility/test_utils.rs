@@ -16,8 +16,8 @@
 
 /// Gnerates a mock client
 pub fn get_client() -> Result<::client::Client, ::errors::ClientError> {
-    let keyword = ::utility::generate_random_string(10).ok().unwrap();
-    let password = ::utility::generate_random_string(10).ok().unwrap();
+    let keyword = try!(::utility::generate_random_string(10));
+    let password = try!(::utility::generate_random_string(10));
     let pin = ::utility::generate_random_pin();
     ::client::Client::create_account(&keyword, pin, &password)
 }

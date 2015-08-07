@@ -15,6 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+/// Intended for converting Client Errors into numeric codes for propagating some error information
+/// across FFI boundaries and specially to C.
+pub const CLIENT_ERROR_START_RANGE: i32 = -1;
+
 use std::error::Error;
 
 /// Client Errors
@@ -58,6 +62,24 @@ impl From<::routing::error::ResponseError> for ClientError {
 impl From<::std::io::Error> for ClientError {
     fn from(error: ::std::io::Error) -> ClientError {
         ClientError::GenericIoError(error)
+    }
+}
+
+impl Into<i32> for ClientError {
+    fn into(self) -> i32 {
+        match self {
+            ClientError::StructuredDataHeaderSizeProhibitive => CLIENT_ERROR_START_RANGE,
+            ClientError::UnsuccessfulEncodeDecode            => CLIENT_ERROR_START_RANGE - 1,
+            ClientError::AsymmetricDecipherFailure           => CLIENT_ERROR_START_RANGE - 2,
+            ClientError::SymmetricDecipherFailure            => CLIENT_ERROR_START_RANGE - 3,
+            ClientError::RoutingFailure(_)                   => CLIENT_ERROR_START_RANGE - 4,
+            ClientError::ReceivedUnexpectedData              => CLIENT_ERROR_START_RANGE - 5,
+            ClientError::VersionCacheMiss                    => CLIENT_ERROR_START_RANGE - 6,
+            ClientError::RoutingMessageCacheMiss             => CLIENT_ERROR_START_RANGE - 7,
+            ClientError::NetworkOperationFailure(_)          => CLIENT_ERROR_START_RANGE - 8,
+            ClientError::RootDirectoryAlreadyExists          => CLIENT_ERROR_START_RANGE - 9,
+            ClientError::GenericIoError(_)                   => CLIENT_ERROR_START_RANGE - 10,
+        }
     }
 }
 
