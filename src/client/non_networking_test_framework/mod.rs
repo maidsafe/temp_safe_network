@@ -90,7 +90,7 @@ impl RoutingClientMock {
 
         let mock_routing = RoutingClientMock {
             sender          : sender,
-            network_delay_ms: 1000,
+            network_delay_ms: 30,
         };
 
         (mock_routing, receiver)
