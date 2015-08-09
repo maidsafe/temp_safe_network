@@ -22,6 +22,7 @@ use std::io::{Read, Write};
 type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::HashMap<::routing::NameType, Vec<u8>>>>;
 
 const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
+const SIMULATED_NETWORK_DELAY_MS: u32 = 30;
 
 struct PersistentStorageSimulation {
     data_store: DataStore,
@@ -90,15 +91,10 @@ impl RoutingClientMock {
 
         let mock_routing = RoutingClientMock {
             sender          : sender,
-            network_delay_ms: 1000,
+            network_delay_ms: SIMULATED_NETWORK_DELAY_MS,
         };
 
         (mock_routing, receiver)
-    }
-
-    #[allow(dead_code)]
-    pub fn set_network_delay_for_delay_simulation(&mut self, delay_ms: u32) {
-        self.network_delay_ms = delay_ms;
     }
 
     pub fn get(&mut self, location: ::routing::NameType, request_for: ::client::DataRequest) -> Result<(), ::routing::error::ResponseError> {
