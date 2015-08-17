@@ -11,7 +11,7 @@ homepage      = "http://maidsafe.net"
 
 [dependencies]
 # ---- MaidSafe -----
-routing         = "0.2.*"
+#routing         = "0.2.*"
 lru_time_cache  = "0.2.*"
 self_encryption = "*"
 
@@ -21,6 +21,9 @@ rand            = "*"
 sodiumoxide     = "*"
 rust-crypto     = "*"
 rustc-serialize = "*"
+
+[dependencies.routing]
+git = "https://github.com/maidsafe/routing"
 
 [features]
 USE_ACTUAL_ROUTING = []

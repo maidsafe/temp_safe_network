@@ -86,7 +86,7 @@ pub struct RoutingClientMock {
 }
 
 impl RoutingClientMock {
-    pub fn new(_: ::routing::types::Id) -> (RoutingClientMock, ::std::sync::mpsc::Receiver<(::routing::NameType, ::client::Data)>) {
+    pub fn new(_: ::routing::id::Id) -> (RoutingClientMock, ::std::sync::mpsc::Receiver<(::routing::NameType, ::client::Data)>) {
         let (sender, receiver) = ::std::sync::mpsc::channel();
 
         let mock_routing = RoutingClientMock {
@@ -248,7 +248,7 @@ impl RoutingClientMock {
     }
 
     pub fn bootstrap(&mut self,
-                     endpoints: Option<Vec<::routing::routing_client::Endpoint>>,
+                     endpoints: Option<Vec<String>>, // TODO Actually it's: Option<Vec<::routing::routing_client::Endpoint>>,
                      _: Option<u16>) -> Result<(), ::routing::error::RoutingError> {
         if let Some(vec_endpoints) = endpoints {
             for endpoint in vec_endpoints {
@@ -288,8 +288,10 @@ mod test {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
 
-        let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
-                                                        account_packet.get_maid().secret_keys().clone());
+        let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
+                                                      account_packet.get_maid().secret_keys().0.clone()),
+                                                     (account_packet.get_maid().public_keys().1.clone(),
+                                                      account_packet.get_maid().secret_keys().1.clone()));
 
         let (routing, receiver) = RoutingClientMock::new(id_packet);
         let (message_queue, reciever_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
@@ -429,8 +431,10 @@ mod test {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
 
-        let id_packet = ::routing::types::Id::with_keys(account_packet.get_maid().public_keys().clone(),
-                                                      account_packet.get_maid().secret_keys().clone());
+        let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
+                                                      account_packet.get_maid().secret_keys().0.clone()),
+                                                     (account_packet.get_maid().public_keys().1.clone(),
+                                                      account_packet.get_maid().secret_keys().1.clone()));
 
         let (routing, receiver) = RoutingClientMock::new(id_packet);
         let (message_queue, receiver_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);

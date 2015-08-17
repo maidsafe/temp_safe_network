@@ -109,12 +109,12 @@ mod test {
     fn save_and_retrieve_immutable_data() {
         let mut client = ::utility::test_utils::get_client().ok().unwrap();
 
-        let id: ::routing::NameType = ::routing::test_utils::Random::generate_random();
+        let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
         let owners = ::utility::test_utils::generate_public_keys(1);
         let prev_owners = Vec::new();
         let ref secret_key = ::utility::test_utils::generate_secret_keys(1)[0];
 
-        let version_0: ::routing::NameType = ::routing::test_utils::Random::generate_random();
+        let version_0 = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
 
         let mut structured_data_result = create(&mut client, version_0.clone(), TAG_ID, id, 0, owners, prev_owners, secret_key);
         assert!(structured_data_result.is_ok());
@@ -125,7 +125,7 @@ mod test {
         let mut versions = versions_res.ok().unwrap();
         assert_eq!(versions.len(), 1);
 
-        let version_1: ::routing::NameType = ::routing::test_utils::Random::generate_random();
+        let version_1 = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
 
         structured_data_result = append_version(&mut client, structured_data, version_1.clone(), secret_key);
         assert!(structured_data_result.is_ok());

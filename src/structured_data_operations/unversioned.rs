@@ -153,10 +153,8 @@ fn get_decoded_stored_data(raw_data: &Vec<u8>,
     Ok(try!(::utility::deserialise(data_to_deserialise)))
 }
 
-
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     const TAG_ID: u64 = ::MAIDSAFE_TAG + 1000;
@@ -170,7 +168,7 @@ mod test {
         let client = ::std::sync::Arc::new(::std::sync::Mutex::new(::utility::test_utils::get_client().ok().unwrap()));
         // Empty Data
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = Vec::new();
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -192,7 +190,7 @@ mod test {
         }
         // Empty Data- with decryption_keys
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = Vec::new();
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -214,7 +212,7 @@ mod test {
         }
         // Data of size 75 KB
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -236,7 +234,7 @@ mod test {
         }
         // Data of size 75 KB with 200 owners
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::get_max_sized_public_keys(200);
             let prev_owners = Vec::new();
@@ -258,7 +256,7 @@ mod test {
         }
         // Data of size 75 KB with MAX owners
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::get_max_sized_public_keys(515);
             let prev_owners = Vec::new();
@@ -280,7 +278,7 @@ mod test {
         }
         // Data of size 75 KB with MAX owners - with decryption_keys
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::get_max_sized_public_keys(510);
             let prev_owners = Vec::new();
@@ -302,7 +300,7 @@ mod test {
         }
         // Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 80];
             let owners = ::utility::test_utils::get_max_sized_public_keys(517);
             let prev_owners = Vec::new();
@@ -320,7 +318,7 @@ mod test {
         }
         // Data of size 100 KB
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 102400];
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -342,7 +340,7 @@ mod test {
         }
         // Data of size 200 KB
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 204801];
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();

@@ -217,11 +217,11 @@ mod test {
             let sign2 = maid2.sign(&random_bytes);
             assert!(sign1 != sign2);
 
-            assert!(::sodiumoxide::crypto::sign::verify(&sign1, &maid1.public_key()).is_some());
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_key()).is_none());
+            assert!(::sodiumoxide::crypto::sign::verify(&sign1, &maid1.public_key()).is_ok());
+            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_key()).is_err());
 
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid2.public_key()).is_some());
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_key()).is_none());
+            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid2.public_key()).is_ok());
+            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_key()).is_err());
         }
     }
 }
