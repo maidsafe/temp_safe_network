@@ -15,9 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#[macro_use] extern crate safe_client;
+// #[macro_use] extern crate safe_client;
 
 fn main() {
+    /*
     let mut keyword = String::new();
     let mut password = String::new();
     let mut pin_str = String::new();
@@ -108,4 +109,5 @@ fn main() {
             }
         }
     }
+*/
 }

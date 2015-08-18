@@ -18,62 +18,62 @@
 /// ResponseGetter is a lazy evaluated response getter. It will fetch either from local cache or
 /// wait for the MessageQueue to notify it of the incoming response from the network.
 pub struct ResponseGetter {
-    response_notifier :  Option<::client::misc::ResponseNotifier>,
-    message_queue     : ::std::sync::Arc<::std::sync::Mutex<::client::message_queue::MessageQueue>>,
-    requested_location: ::routing::NameType,
-    requested_type    :     ::client::DataRequest,
+    response_notifier: Option<::client::misc::ResponseNotifier>,
+    message_queue    : ::std::sync::Arc<::std::sync::Mutex<::client::message_queue::MessageQueue>>,
+    requested_name   : ::routing::NameType,
+    requested_type   : ::routing::data::DataRequest,
 }
 
 impl ResponseGetter {
     /// Create a new instance of ResponseGetter
-    pub fn new(notifier          : Option<::client::misc::ResponseNotifier>,
-               message_queue     : ::std::sync::Arc<::std::sync::Mutex<::client::message_queue::MessageQueue>>,
-               requested_location: ::routing::NameType,
-               requested_type    : ::client::DataRequest) -> ResponseGetter {
+    pub fn new(notifier      : Option<::client::misc::ResponseNotifier>,
+               message_queue : ::std::sync::Arc<::std::sync::Mutex<::client::message_queue::MessageQueue>>,
+               requested_name: ::routing::NameType,
+               requested_type: ::routing::data::DataRequest) -> ResponseGetter {
         ResponseGetter {
-            response_notifier : notifier,
-            message_queue     : message_queue,
-            requested_location: requested_location,
-            requested_type    : requested_type,
+            response_notifier: notifier,
+            message_queue    : message_queue,
+            requested_name   : requested_name,
+            requested_type   : requested_type,
         }
     }
 
     /// Get either from local cache or (if not available there) get it when it comes from the
     /// network as informed by MessageQueue. This is blocking.
-    pub fn get(&mut self) -> Result<::client::Data, ::errors::ClientError> {
+    pub fn get(&mut self) -> Result<::routing::data::Data, ::errors::ClientError> {
         if let Some(ref notifier) = self.response_notifier {
             let (ref lock, ref condition_var) = **notifier;
             let mut mutex_guard: _;
 
             {
                 let mut msg_queue = self.message_queue.lock().unwrap();
-                match msg_queue.get_response(&self.requested_location) {
+                match msg_queue.get_response(&self.requested_name) {
                     Ok(response) => return Ok(response),
                     Err(_) => {
                         mutex_guard = lock.lock().unwrap();
-                        if *mutex_guard == Some(self.requested_location.clone()) {
+                        if *mutex_guard == Some(self.requested_name.clone()) {
                             *mutex_guard = None;
                         }
                     },
                 }
             }
 
-            let valid_condition = Some(self.requested_location.clone());
+            let valid_condition = Some(self.requested_name.clone());
             while *mutex_guard != valid_condition {
                 mutex_guard = condition_var.wait(mutex_guard).unwrap();
             }
 
             let mut msg_queue = self.message_queue.lock().unwrap();
-            let response = try!(msg_queue.get_response(&self.requested_location));
+            let response = try!(msg_queue.get_response(&self.requested_name));
 
-            if let ::client::DataRequest::ImmutableData(_) = self.requested_type {
-                msg_queue.local_cache_insert(self.requested_location.clone(), response.clone());
+            if let ::routing::data::DataRequest::ImmutableData(..) = self.requested_type {
+                msg_queue.local_cache_insert(self.requested_name.clone(), response.clone());
             }
 
             Ok(response)
         } else {
             let mut msg_queue = self.message_queue.lock().unwrap();
-            Ok(try!(msg_queue.local_cache_get(&self.requested_location)))
+            Ok(try!(msg_queue.local_cache_get(&self.requested_name)))
         }
     }
 }

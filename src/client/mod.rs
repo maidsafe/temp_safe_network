@@ -18,16 +18,13 @@
 /// ResponseGetter is a lazy evaluated response getter.
 pub mod response_getter;
 
+mod misc;
 mod user_account;
 mod message_queue;
 
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
-mod mock_routing_types;
-#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
-pub use self::mock_routing_types::*;
-
-#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 mod non_networking_test_framework;
+/*
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<non_networking_test_framework::RoutingClientMock>>;
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
@@ -41,10 +38,6 @@ type RoutingClient = ::std::sync::Arc<::std::sync::Mutex<::routing::routing_clie
 #[cfg(feature = "USE_ACTUAL_ROUTING")]
 fn get_new_routing_client(msg_queue: ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>, id_packet: ::routing::id::Id) -> RoutingClient {
     ::std::sync::Arc::new(::std::sync::Mutex::new(::routing::routing_client::RoutingClient::new(msg_queue, id_packet)))
-}
-
-mod misc {
-    pub type ResponseNotifier = ::std::sync::Arc<(::std::sync::Mutex<Option<::routing::NameType>>, ::std::sync::Condvar)>;
 }
 
 const POLL_DURATION_IN_MILLISEC: u32 = 1;
@@ -105,13 +98,13 @@ impl Client {
             session_packet_keys: SessionPacketEncryptionKeys::new(password, pin),
         };
 
-        let account_version = ::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
-                                                                              client.session_packet_id.clone(),
-                                                                              0,
-                                                                              try!(client.account.encrypt(password, pin)),
-                                                                              vec![client.account.get_public_maid().public_keys().0.clone()],
-                                                                              Vec::new(),
-                                                                              &client.account.get_maid().secret_keys().0);
+        let account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
+                                                                                   client.session_packet_id.clone(),
+                                                                                   0,
+                                                                                   try!(client.account.encrypt(password, pin)),
+                                                                                   vec![client.account.get_public_maid().public_keys().0.clone()],
+                                                                                   Vec::new(),
+                                                                                   &client.account.get_maid().secret_keys().0));
         try!(client.put(account_version.name(), ::routing::data::Data::StructuredData(account_version)));
         Ok(client)
     }
@@ -296,16 +289,16 @@ impl Client {
     }
 
     /// Get data from the network. This is non-blocking.
-    pub fn get(&mut self, location: ::routing::NameType, request_for: DataRequest) -> Result<response_getter::ResponseGetter, ::errors::ClientError> {
-        if let ::routing::data::DataRequest::ImmutableData(_) = request_for {
+    pub fn get(&mut self, request_for: ::routing::data::DataRequest) -> Result<response_getter::ResponseGetter, ::errors::ClientError> {
+        if let ::routing::data::DataRequest::ImmutableData(ref name, _) = request_for {
             let mut msg_queue = self.message_queue.lock().unwrap();
-            if msg_queue.local_cache_check(&location) {
-                return Ok(response_getter::ResponseGetter::new(None, self.message_queue.clone(), location, request_for));
+            if msg_queue.local_cache_check(name) {
+                return Ok(response_getter::ResponseGetter::new(None, self.message_queue.clone(), name.clone(), request_for));
             }
         }
 
-        try!(self.routing.lock().unwrap().get(location.clone(), request_for.clone()));
-        Ok(response_getter::ResponseGetter::new(Some(self.response_notifier.clone()), self.message_queue.clone(), location, request_for))
+        try!(self.routing.lock().unwrap().get_request(::routing::authority::Authority::NaeManager(request_for.name()), request_for.clone()));
+        Ok(response_getter::ResponseGetter::new(Some(self.response_notifier.clone()), self.message_queue.clone(), request_for.name(), request_for))
     }
 
     /// Put data onto the network. This is non-blocking.
@@ -348,13 +341,13 @@ impl Client {
         let location = ::routing::structured_data::StructuredData::compute_name(LOGIN_PACKET_TYPE_TAG, &self.session_packet_id);
         if let ::routing::data::Data::StructuredData(retrieved_session_packet) = try!(try!(self.get(location.clone(),
                                                                                                     ::routing::data::DataRequest::StructuredData(LOGIN_PACKET_TYPE_TAG))).get()) {
-            let new_account_version = ::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
-                                                                                      self.session_packet_id.clone(),
-                                                                                      retrieved_session_packet.get_version() + 1,
-                                                                                      encrypted_account,
-                                                                                      vec![self.account.get_public_maid().public_keys().0.clone()],
-                                                                                      Vec::new(),
-                                                                                      &self.account.get_maid().secret_keys().0);
+            let new_account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
+                                                                                           self.session_packet_id.clone(),
+                                                                                           retrieved_session_packet.get_version() + 1,
+                                                                                           encrypted_account,
+                                                                                           vec![self.account.get_public_maid().public_keys().0.clone()],
+                                                                                           Vec::new(),
+                                                                                           &self.account.get_maid().secret_keys().0));
             Ok(try!(self.post(location, ::routing::data::Data::StructuredData(new_account_version))))
         } else {
             Err(::errors::ClientError::ReceivedUnexpectedData)
@@ -534,3 +527,4 @@ mod test {
         assert_eq!(plain_text_original_1, plain_text_3);
     }
 }
+*/
