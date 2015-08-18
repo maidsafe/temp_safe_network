@@ -7,9 +7,9 @@
 
 **Secondary Maintainer:**   Krishna Kumar (krishna.kumar@maidsafe.net)
 
-|Crate|Linux|Windows|OSX|Coverage|
-|:------:|:-------:|:-------:|:-------:|:-------:|
-|[![](http://meritbadge.herokuapp.com/safe_client)](https://crates.io/crates/safe_client)|[![Build Status](https://travis-ci.org/maidsafe/safe_client.svg?branch=master)](https://travis-ci.org/maidsafe/safe_client)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=safe_client_win64_status_badge)](http://ci.maidsafe.net:8080/job/safe_client_win64_status_badge/)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=safe_client_osx_status_badge)](http://ci.maidsafe.net:8080/job/safe_client_osx_status_badge/)|[![Coverage Status](https://coveralls.io/repos/maidsafe/safe_client/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/safe_client?branch=master)|
+|Crate|Linux|Windows|OSX|Appveyor|Coverage|
+|:---:|:---:|:-----:|:-:|:------:|:------:|
+|[![](http://meritbadge.herokuapp.com/safe_client)](https://crates.io/crates/safe_client)|[![Build Status](https://travis-ci.org/maidsafe/safe_client.svg?branch=master)](https://travis-ci.org/maidsafe/safe_client)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=safe_client_win64_status_badge)](http://ci.maidsafe.net:8080/job/safe_client_win64_status_badge/)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=safe_client_osx_status_badge)](http://ci.maidsafe.net:8080/job/safe_client_osx_status_badge/)|[![Build status](https://ci.appveyor.com/api/projects/status/pqjc5v2ww7k0qx88/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-client/branch/master)|[![Coverage Status](https://coveralls.io/repos/maidsafe/safe_client/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/safe_client?branch=master)|
 
 | [API Documentation - master branch](http://maidsafe.net/safe_client/master) | [SAFE Network System Documentation](http://systemdocs.maidsafe.net) | [MaidSafe website](http://maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 |:------:|:-------:|:-------:|:-------:|
