@@ -86,7 +86,7 @@ impl IdType {
                 data : &[u8],
                 nonce : &::sodiumoxide::crypto::box_::Nonce,
                 from : &::sodiumoxide::crypto::box_::PublicKey) -> Result<Vec<u8>, ::errors::ClientError> {
-        ::sodiumoxide::crypto::box_::open(&data, &nonce, &from, &self.secret_keys.1).ok_or(::errors::ClientError::AsymmetricDecipherFailure)
+        ::sodiumoxide::crypto::box_::open(&data, &nonce, &from, &self.secret_keys.1).map_err(|_| ::errors::ClientError::AsymmetricDecipherFailure)
     }
 
 }
@@ -211,11 +211,11 @@ mod test {
             let sign2 = maid2.sign(&random_bytes);
             assert!(sign1 != sign2);
 
-            assert!(::sodiumoxide::crypto::sign::verify(&sign1, &maid1.public_keys().0).is_some());
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_keys().0).is_none());
+            assert!(::sodiumoxide::crypto::sign::verify(&sign1, &maid1.public_keys().0).is_ok());
+            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_keys().0).is_err());
 
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid2.public_keys().0).is_some());
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_keys().0).is_none());
+            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid2.public_keys().0).is_ok());
+            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_keys().0).is_err());
         }
         {
             let maid3 = ::id::IdType::generate_random();

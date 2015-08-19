@@ -19,37 +19,45 @@
 /// of previously fetched ImmutableData (because the very nature of such data implies Immutability)
 /// enabling fast re-retrieval and avoiding networking.
 pub struct MessageQueue {
-    local_cache  : ::lru_time_cache::LruCache<::routing::NameType, ::client::Data>,
-    message_queue: ::lru_time_cache::LruCache<::routing::NameType, ::client::Data>,
+    local_cache  : ::lru_time_cache::LruCache<::routing::NameType, ::routing::data::Data>,
+    message_queue: ::lru_time_cache::LruCache<::routing::NameType, ::routing::data::Data>,
 }
 
 impl MessageQueue {
     /// Create a new instance of MessageQueue
     pub fn new(notifier: ::client::misc::ResponseNotifier,
-               receiver: ::std::sync::mpsc::Receiver<(::routing::NameType, ::client::Data)>) -> (::std::sync::Arc<::std::sync::Mutex<MessageQueue>>, ::std::thread::JoinHandle<()>) {
+               receiver: ::std::sync::mpsc::Receiver<::routing::event::Event>) -> (::std::sync::Arc<::std::sync::Mutex<MessageQueue>>,
+                                                                                   ::client::misc::RAIIThreadJoiner) {
         let message_queue = ::std::sync::Arc::new(::std::sync::Mutex::new(MessageQueue {
             local_cache  : ::lru_time_cache::LruCache::with_capacity(1000),
             message_queue: ::lru_time_cache::LruCache::with_capacity(1000),
         }));
 
         let message_queue_cloned = message_queue.clone();
-        let receiver_joiner = ::std::thread::Builder::new().name("ReceiverThread".to_string()).spawn(move || {
+        let receiver_joiner = ::std::thread::Builder::new().name("MessageReceiverThread".to_string()).spawn(move || {
             for it in receiver.iter() {
-                match it.1 {
-                    ::client::Data::ShutDown => break,
-                    _ => {
-                        message_queue_cloned.lock().unwrap().message_queue.insert(it.0.clone(), it.1);
+                match it {
+                    ::routing::event::Event::Response { response, .. } => {
+                        match response {
+                            ::routing::ExternalResponse::Get(data, _, _) => {
+                                let data_name = data.name();
+                                message_queue_cloned.lock().unwrap().message_queue.insert(data_name.clone(), data);
 
-                        let &(ref lock, ref condition_var) = &*notifier;
-                        let mut fetched_location = eval_result!(lock.lock());
-                        *fetched_location = Some(it.0);
-                        condition_var.notify_all();
+                                let &(ref lock, ref condition_var) = &*notifier;
+                                let mut fetched_location = eval_result!(lock.lock());
+                                *fetched_location = Some(data_name);
+                                condition_var.notify_all();
+                            }
+                            _ => unimplemented!(),
+                        }
                     }
+                    ::routing::event::Event::Terminated => break,
+                    _ => (),
                 }
             }
         }).unwrap();
 
-        (message_queue, receiver_joiner)
+        (message_queue, ::client::misc::RAIIThreadJoiner::new(receiver_joiner))
     }
 
     /// Check if data is already in local cache
@@ -58,17 +66,17 @@ impl MessageQueue {
     }
 
     /// Get data if already in local cache.
-    pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Result<::client::Data, ::errors::ClientError> {
+    pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Result<::routing::data::Data, ::errors::ClientError> {
         Ok(try!(self.local_cache.get(key).ok_or(::errors::ClientError::VersionCacheMiss)).clone())
     }
 
     /// Put data into local cache
-    pub fn local_cache_insert(&mut self, key: ::routing::NameType, value: ::client::Data) {
+    pub fn local_cache_insert(&mut self, key: ::routing::NameType, value: ::routing::data::Data) {
         self.local_cache.insert(key, value);
     }
 
     /// Get data from cache filled by the response from routing
-    pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::client::Data, ::errors::ClientError> {
+    pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::routing::data::Data, ::errors::ClientError> {
         Ok(try!(self.message_queue.remove(&location).ok_or(::errors::ClientError::RoutingMessageCacheMiss)))
     }
 }
