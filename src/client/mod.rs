@@ -409,6 +409,45 @@ mod test {
     }
 
     #[test]
+    fn unregistered_client() {
+        let immut_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal,
+                                                                       eval_result!(::utility::generate_random_vector(30)));
+        let orig_data = ::routing::data::Data::ImmutableData(immut_data);
+
+        // Registered Client PUTs something onto the network
+        {
+            let keyword = eval_result!(::utility::generate_random_string(10));
+            let password = eval_result!(::utility::generate_random_string(10));
+            let pin = ::utility::generate_random_pin();
+
+            // Creation should pass
+            let client = eval_result!(Client::create_account(&keyword, pin, &password));
+            client.put(orig_data.clone(), None);
+        }
+
+        // Unregistered Client should be able to retrieve the data
+        let mut unregistered_client = Client::create_unregistered_client();
+        let request = ::routing::data::DataRequest::ImmutableData(orig_data.name(),
+                                                                  ::routing::immutable_data::ImmutableDataType::Normal);
+        let rxd_data = eval_result!(unregistered_client.get(request, None).get());
+
+        assert_eq!(rxd_data, orig_data);
+
+        // Operations Not Allowed for Unregistered Client
+        let rand_name = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
+
+        match (unregistered_client.set_user_root_directory_id(rand_name.clone()),
+               unregistered_client.set_configuration_root_directory_id(rand_name)) {
+            (Err(error0), Err(error1)) => match (error0, error1) {
+                (::errors::ClientError::OperationForbiddenForClient,
+                 ::errors::ClientError::OperationForbiddenForClient) => (),
+                _ => panic!("Expected a different Error !!"),
+            },
+            _ => panic!("Should have been all Errors !!"),
+        };
+    }
+
+    #[test]
     fn user_root_dir_id_creation() {
         // Construct Client
         let keyword = eval_result!(::utility::generate_random_string(10));
