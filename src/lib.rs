@@ -50,7 +50,7 @@ extern crate routing;
 extern crate sodiumoxide;
 extern crate lru_time_cache;
 extern crate rustc_serialize;
-//extern crate self_encryption;
+extern crate self_encryption;
 
 /// Macros defined for usage
 #[macro_use]
@@ -65,11 +65,11 @@ pub mod client;
 /// Utility functions
 pub mod utility;
 /// Implements the Self Encryption storage trait
-//pub mod self_encryption_storage;
+pub mod self_encryption_storage;
 /// Helper functions to handle StructuredData related operations
-//pub mod structured_data_operations;
+pub mod structured_data_operations;
 
-//pub use self_encryption_storage::SelfEncryptionStorage;
+pub use self_encryption_storage::SelfEncryptionStorage;
 
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;

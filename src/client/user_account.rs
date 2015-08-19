@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                */
 
-#![allow(unused)] // TODO
 static MAIDSAFE_VERSION_LABEL: &'static str = "MaidSafe Version 1 Key Derivation";
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user

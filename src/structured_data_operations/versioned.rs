@@ -23,7 +23,7 @@ pub fn create(client: &mut ::client::Client,
               version: u64,
               owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
               prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-              private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::client::StructuredData, ::errors::ClientError> {
+              private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::ClientError> {
     create_impl(client,
                 &vec![version_name_to_store],
                 tag_type,
@@ -35,66 +35,68 @@ pub fn create(client: &mut ::client::Client,
 }
 
 /// Get the complete version list
-pub fn get_all_versions(client: &mut ::client::Client, struct_data: &::client::StructuredData) -> Result<Vec<::routing::NameType>, ::errors::ClientError> {
+pub fn get_all_versions(client: &mut ::client::Client, struct_data: &::routing::structured_data::StructuredData) -> Result<Vec<::routing::NameType>, ::errors::ClientError> {
     let immut_data = try!(get_immutable_data(client, struct_data));
     Ok(try!(::utility::deserialise(&immut_data.value())))
 }
 
 /// Append a new version
 pub fn append_version(client: &mut ::client::Client,
-                      struct_data: ::client::StructuredData,
+                      struct_data: ::routing::structured_data::StructuredData,
                       version_to_append: ::routing::NameType,
-                      private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::client::StructuredData, ::errors::ClientError> {
+                      private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::ClientError> {
     // let immut_data = try!(get_immutable_data(mut client, struct_data));
     // client.delete(immut_data);
     let mut versions = try!(get_all_versions(client, &struct_data));
     versions.push(version_to_append);
     create_impl(client,
                 &versions,
-                struct_data.get_tag_type(),
+                struct_data.get_type_tag(),
                 struct_data.get_identifier().clone(),
                 struct_data.get_version() + 1,
-                struct_data.get_owners().clone(),
-                struct_data.get_previous_owners().clone(),
+                struct_data.get_owner_keys().clone(),
+                struct_data.get_previous_owner_keys().clone(),
                 private_signing_key)
 }
 
-fn create_impl(client: &mut ::client::Client,
+fn create_impl(client: &::client::Client,
                version_names_to_store: &Vec<::routing::NameType>,
                tag_type: u64,
                identifier: ::routing::NameType,
                version: u64,
                owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-               private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::client::StructuredData, ::errors::ClientError> {
-    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, try!(::utility::serialise(version_names_to_store)));
+               private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::ClientError> {
+    let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal,
+                                                                       try!(::utility::serialise(version_names_to_store)));
     let name_of_immutable_data = immutable_data.name();
 
     let encoded_name = try!(::utility::serialise(&name_of_immutable_data));
-    let data = ::client::Data::ImmutableData(immutable_data);
 
     match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&encoded_name, owner_keys.clone(), prev_owner_keys.clone())) {
         ::structured_data_operations::DataFitResult::DataFits => {
-            try!(client.put(name_of_immutable_data, data));
-            Ok(::client::StructuredData::new(tag_type,
-                                             identifier,
-                                             version,
-                                             encoded_name,
-                                             owner_keys,
-                                             prev_owner_keys,
-                                             private_signing_key))
+            let data = ::routing::data::Data::ImmutableData(immutable_data);
+            client.put(data, None);
+
+            Ok(try!(::routing::structured_data::StructuredData::new(tag_type,
+                                                                    identifier,
+                                                                    version,
+                                                                    encoded_name,
+                                                                    owner_keys,
+                                                                    prev_owner_keys,
+                                                                    Some(private_signing_key))))
         },
         _ => Err(::errors::ClientError::StructuredDataHeaderSizeProhibitive),
     }
 }
 
 fn get_immutable_data(client: &mut ::client::Client,
-                      struct_data: &::client::StructuredData) -> Result<::client::ImmutableData, ::errors::ClientError> {
-    let location: ::routing::NameType = try!(::utility::deserialise(&struct_data.get_data()));
-    let mut response_getter = try!(client.get(location, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)));
+                      struct_data: &::routing::structured_data::StructuredData) -> Result<::routing::immutable_data::ImmutableData, ::errors::ClientError> {
+    let name = try!(::utility::deserialise(&struct_data.get_data()));
+    let response_getter = client.get(::routing::data::DataRequest::ImmutableData(name, ::routing::immutable_data::ImmutableDataType::Normal), None);
     let data = try!(response_getter.get());
     match data {
-        ::client::Data::ImmutableData(immutable_data) => Ok(immutable_data),
+        ::routing::data::Data::ImmutableData(immutable_data) => Ok(immutable_data),
         _ => Err(::errors::ClientError::ReceivedUnexpectedData),
     }
 }

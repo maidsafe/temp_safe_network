@@ -15,7 +15,7 @@
 // relating to use of the SAFE Network Software.
 
 /// Common utility functions for writting test cases
-//pub mod test_utils;
+pub mod test_utils;
 
 use ::rand::Rng;
 

@@ -80,17 +80,17 @@ fn sync_disk_storage(memory_storage: &::std::collections::HashMap<::routing::Nam
     eval_result!(file.sync_all());
 }
 
-pub struct RoutingClientMock {
+pub struct RoutingMock {
     sender          : ::std::sync::mpsc::Sender<::routing::event::Event>,
     network_delay_ms: u32,
 }
 
-impl RoutingClientMock {
+impl RoutingMock {
     pub fn new_client(sender: ::std::sync::mpsc::Sender<::routing::event::Event>,
-                      _id: Option<::routing::id::Id>) -> RoutingClientMock {
+                      _id: Option<::routing::id::Id>) -> RoutingMock {
         ::sodiumoxide::init();
 
-        RoutingClientMock {
+        RoutingMock {
             sender          : sender,
             network_delay_ms: SIMULATED_NETWORK_DELAY_MS,
         }
@@ -280,9 +280,9 @@ mod test {
                                                       account_packet.get_maid().secret_keys().1.clone()));
 
         let (sender, receiver) = ::std::sync::mpsc::channel();
-        let (message_queue, managed_reciever_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
 
-        let mock_routing = RoutingClientMock::new_client(sender, Some(id_packet));
+        let mock_routing = RoutingMock::new_client(sender, Some(id_packet));
 
         // Construct ImmutableData
         let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));
@@ -356,9 +356,9 @@ mod test {
                                                       account_packet.get_maid().secret_keys().1.clone()));
 
         let (sender, receiver) = ::std::sync::mpsc::channel();
-        let (message_queue, managed_reciever_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
 
-        let mock_routing = RoutingClientMock::new_client(sender, Some(id_packet));
+        let mock_routing = RoutingMock::new_client(sender, Some(id_packet));
 
         // Construct ImmutableData
         let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));

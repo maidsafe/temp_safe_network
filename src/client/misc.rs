@@ -15,22 +15,21 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(unused)] // TODO
 pub type ResponseNotifier = ::std::sync::Arc<(::std::sync::Mutex<Option<::routing::NameType>>, ::std::sync::Condvar)>;
 
-pub struct ManagedThreadJoiner {
+pub struct RAIIThreadJoiner {
     joiner: Option<::std::thread::JoinHandle<()>>,
 }
 
-impl ManagedThreadJoiner {
-    pub fn new(joiner: ::std::thread::JoinHandle<()>) -> ManagedThreadJoiner {
-        ManagedThreadJoiner {
+impl RAIIThreadJoiner {
+    pub fn new(joiner: ::std::thread::JoinHandle<()>) -> RAIIThreadJoiner {
+        RAIIThreadJoiner {
             joiner: Some(joiner),
         }
     }
 }
 
-impl Drop for ManagedThreadJoiner {
+impl Drop for RAIIThreadJoiner {
     fn drop(&mut self) {
         self.joiner.take().unwrap().join().unwrap();
     }

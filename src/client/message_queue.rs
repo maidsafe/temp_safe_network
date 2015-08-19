@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                 */
 
-#![allow(unused)] // TODO
 /// MessageQueue gets and collects messages/responses from routing. It also maintains local caching
 /// of previously fetched ImmutableData (because the very nature of such data implies Immutability)
 /// enabling fast re-retrieval and avoiding networking.
@@ -28,7 +27,7 @@ impl MessageQueue {
     /// Create a new instance of MessageQueue
     pub fn new(notifier: ::client::misc::ResponseNotifier,
                receiver: ::std::sync::mpsc::Receiver<::routing::event::Event>) -> (::std::sync::Arc<::std::sync::Mutex<MessageQueue>>,
-                                                                                   ::client::misc::ManagedThreadJoiner) {
+                                                                                   ::client::misc::RAIIThreadJoiner) {
         let message_queue = ::std::sync::Arc::new(::std::sync::Mutex::new(MessageQueue {
             local_cache  : ::lru_time_cache::LruCache::with_capacity(1000),
             message_queue: ::lru_time_cache::LruCache::with_capacity(1000),
@@ -58,7 +57,7 @@ impl MessageQueue {
             }
         }).unwrap();
 
-        (message_queue, ::client::misc::ManagedThreadJoiner::new(receiver_joiner))
+        (message_queue, ::client::misc::RAIIThreadJoiner::new(receiver_joiner))
     }
 
     /// Check if data is already in local cache

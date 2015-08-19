@@ -44,23 +44,22 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sig
         prev_owner_keys.len()
     };
 
-    let (_, fake_signer) = ::sodiumoxide::crypto::sign::gen_keypair();
-    let mut structured_data = ::client::StructuredData::new(::std::u64::MAX,
-                                                            ::routing::NameType::new([::std::u8::MAX; 64]),
-                                                            ::std::u64::MAX,
-                                                            Vec::new(),
-                                                            owner_keys,
-                                                            prev_owner_keys,
-                                                            &fake_signer);
+    let mut structured_data = try!(::routing::structured_data::StructuredData::new(::std::u64::MAX,
+                                                                                   ::routing::NameType::new([::std::u8::MAX; 64]),
+                                                                                   ::std::u64::MAX,
+                                                                                   Vec::new(),
+                                                                                   owner_keys,
+                                                                                   prev_owner_keys,
+                                                                                   None));
 
     // Fill it with rest of signatures
     structured_data.replace_signatures(vec![::sodiumoxide::crypto::sign::Signature([::std::u8::MAX; ::sodiumoxide::crypto::sign::SIGNATUREBYTES]); max_signatures_possible]);
 
     let serialised_structured_data_len = try!(::utility::serialise(&structured_data)).len() + PADDING_SIZE_IN_BYTES;
-    if ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES <= serialised_structured_data_len {
+    if ::routing::structured_data::MAX_STRUCTURED_DATA_SIZE_IN_BYTES <= serialised_structured_data_len {
         Ok(0)
     } else {
-        Ok(::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - serialised_structured_data_len)
+        Ok(::routing::structured_data::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - serialised_structured_data_len)
     }
 }
 
@@ -68,7 +67,7 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sig
 pub fn check_if_data_can_fit_in_structured_data(data: &Vec<u8>,
                                                 owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                                                 prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> Result<DataFitResult, ::errors::ClientError> {
-    if data.len() > ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - PADDING_SIZE_IN_BYTES {
+    if data.len() > ::routing::structured_data::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - PADDING_SIZE_IN_BYTES {
         Ok(DataFitResult::DataDoesNotFit)
     } else {
         let available_size = try!(get_approximate_space_for_data(owner_keys, prev_owner_keys));
@@ -87,7 +86,7 @@ mod test {
     use super::*;
 
     // Refers the fixed size of the test_get_approximate_space_for_data fn without signatures
-    const DEFAULT_FIXED_SIZE: usize = ::client::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - 1187;
+    const DEFAULT_FIXED_SIZE: usize = ::routing::structured_data::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - 1187;
     // 196 is approximate size (close enough) of a Fixed Key after serialisation.
     const FIXED_SIZE_OF_KEY:  usize = 196;
 

@@ -40,7 +40,7 @@ impl ResponseGetter {
 
     /// Get either from local cache or (if not available there) get it when it comes from the
     /// network as informed by MessageQueue. This is blocking.
-    pub fn get(&mut self) -> Result<::routing::data::Data, ::errors::ClientError> {
+    pub fn get(&self) -> Result<::routing::data::Data, ::errors::ClientError> {
         if let Some(ref notifier) = self.response_notifier {
             let (ref lock, ref condition_var) = **notifier;
             let mut mutex_guard: _;

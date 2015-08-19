@@ -60,8 +60,8 @@ pub fn generate_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::Sec
 
 /// Saves data as immutable data and returns the name of the immutable data
 pub fn save_as_immutable_data(client: &mut ::client::Client, data: Vec<u8>) -> ::routing::NameType {
-    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);
+    let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal, data);
     let name_of_immutable_data = immutable_data.name();
-    let _ = client.put(name_of_immutable_data.clone(), ::client::Data::ImmutableData(immutable_data));
+    client.put(::routing::data::Data::ImmutableData(immutable_data), None);
     name_of_immutable_data
 }
