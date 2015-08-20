@@ -42,6 +42,9 @@ etc
 - [X] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
 
 ### [0.1.3]
+- [X] [MAID-1283](https://maidsafe.atlassian.net/browse/MAID-1283) Rename repositories from "maidsafe_" to "safe_"
+
+### [0.1.4]
 - [X] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
 - [ ] [MAID-1248](https://maidsafe.atlassian.net/browse/MAID-1248) Name the spawned rust threads
 - [ ] [MAID-1218](https://maidsafe.atlassian.net/browse/MAID-1218) No restarting of routing-client
