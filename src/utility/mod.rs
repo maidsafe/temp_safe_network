@@ -38,7 +38,7 @@ pub fn hybrid_encrypt(plain_text: &[u8],
     let sym_cipher_text = ::sodiumoxide::crypto::secretbox::seal(plain_text, &sym_nonce, &sym_key);
     let asym_cipher_text = ::sodiumoxide::crypto::box_::seal(&asym_plain_text, asym_nonce, asym_public_key, asym_secret_key);
 
-    Ok(try!(serialise(&(asym_cipher_text, sym_cipher_text))))
+    serialise(&(asym_cipher_text, sym_cipher_text))
 }
 
 /// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
@@ -48,28 +48,21 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
                       asym_secret_key: &::sodiumoxide::crypto::box_::SecretKey) -> Result<Vec<u8>, ::errors::ClientError> {
     let (asym_cipher_text, sym_cipher_text): (Vec<u8>, Vec<u8>) = try!(deserialise(cipher_text));
 
-    if let Some(asym_plain_text) = ::sodiumoxide::crypto::box_::open(&asym_cipher_text, asym_nonce, asym_public_key, asym_secret_key) {
-        if asym_plain_text.len() != ::sodiumoxide::crypto::secretbox::KEYBYTES + ::sodiumoxide::crypto::secretbox::NONCEBYTES {
-            Err(::errors::ClientError::AsymmetricDecipherFailure)
-        } else {
-            let mut sym_key = ::sodiumoxide::crypto::secretbox::Key([0u8; ::sodiumoxide::crypto::secretbox::KEYBYTES]);
-            let mut sym_nonce = ::sodiumoxide::crypto::secretbox::Nonce([0u8; ::sodiumoxide::crypto::secretbox::NONCEBYTES]);
-
-            for it in asym_plain_text.iter().take(::sodiumoxide::crypto::secretbox::KEYBYTES).enumerate() {
-                sym_key.0[it.0] = *it.1;
-            }
-            for it in asym_plain_text.iter().skip(::sodiumoxide::crypto::secretbox::KEYBYTES).enumerate() {
-                sym_nonce.0[it.0] = *it.1;
-            }
-
-            if let Some(sym_plain_text) = ::sodiumoxide::crypto::secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key) {
-                Ok(sym_plain_text)
-            } else {
-                Err(::errors::ClientError::SymmetricDecipherFailure)
-            }
-        }
-    } else {
+    let asym_plain_text = try!(::sodiumoxide::crypto::box_::open(&asym_cipher_text, asym_nonce, asym_public_key, asym_secret_key).map_err(|_| ::errors::ClientError::AsymmetricDecipherFailure));
+    if asym_plain_text.len() != ::sodiumoxide::crypto::secretbox::KEYBYTES + ::sodiumoxide::crypto::secretbox::NONCEBYTES {
         Err(::errors::ClientError::AsymmetricDecipherFailure)
+    } else {
+        let mut sym_key = ::sodiumoxide::crypto::secretbox::Key([0u8; ::sodiumoxide::crypto::secretbox::KEYBYTES]);
+        let mut sym_nonce = ::sodiumoxide::crypto::secretbox::Nonce([0u8; ::sodiumoxide::crypto::secretbox::NONCEBYTES]);
+
+        for it in asym_plain_text.iter().take(::sodiumoxide::crypto::secretbox::KEYBYTES).enumerate() {
+            sym_key.0[it.0] = *it.1;
+        }
+        for it in asym_plain_text.iter().skip(::sodiumoxide::crypto::secretbox::KEYBYTES).enumerate() {
+            sym_nonce.0[it.0] = *it.1;
+        }
+
+        ::sodiumoxide::crypto::secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key).map_err(|_| ::errors::ClientError::SymmetricDecipherFailure)
     }
 }
 
@@ -104,6 +97,16 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, ::errors::Clie
                                                    where T: ::rand::Rand {
     let mut os_rng = try!(::rand::OsRng::new());
     Ok((0..length).map(|_| os_rng.gen()).collect())
+}
+
+/// Generate a random array of 64 u8's
+pub fn generate_random_array_u8_64() -> Result<[u8; 64], ::errors::ClientError> {
+    let mut arr = [0; 64];
+    let mut os_rng = try!(::rand::OsRng::new());
+    for it in arr.iter_mut() {
+        *it = os_rng.gen();
+    }
+    Ok(arr)
 }
 
 /// Returns true if both slices are equal in length, and have equal contents
@@ -176,5 +179,25 @@ mod test {
         assert!(vec0 != vec1);
         assert!(vec0 != vec2);
         assert!(vec1 != vec2);
+    }
+
+    #[test]
+    fn random_array() {
+        let arr0 = eval_result!(generate_random_array_u8_64());
+        let arr1 = eval_result!(generate_random_array_u8_64());
+        let arr2 = eval_result!(generate_random_array_u8_64());
+
+        assert!(!slice_equal(&arr0, &arr1));
+        assert!(!slice_equal(&arr0, &arr2));
+        assert!(!slice_equal(&arr1, &arr2));
+    }
+
+    #[test]
+    fn slice_eqality() {
+        let arr0 = eval_result!(generate_random_array_u8_64());
+        let arr1 = eval_result!(generate_random_array_u8_64());
+
+        assert!(slice_equal(&arr0, &arr0));
+        assert!(!slice_equal(&arr0, &arr1));
     }
 }

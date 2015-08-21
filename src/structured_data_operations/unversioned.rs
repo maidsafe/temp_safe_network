@@ -35,18 +35,18 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
               private_signing_key: &::sodiumoxide::crypto::sign::SecretKey,
               data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                             &::sodiumoxide::crypto::box_::SecretKey,
-                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::client::StructuredData, ::errors::ClientError> {
+                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::routing::structured_data::StructuredData, ::errors::ClientError> {
     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsData(data.clone()), data_encryption_keys));
 
     match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store, owner_keys.clone(), prev_owner_keys.clone())) {
         ::structured_data_operations::DataFitResult::DataFits => {
-            Ok(::client::StructuredData::new(tag_type,
-                                             id,
-                                             version,
-                                             data_to_store,
-                                             owner_keys,
-                                             prev_owner_keys,
-                                             private_signing_key))
+            Ok(try!(::routing::structured_data::StructuredData::new(tag_type,
+                                                                    id,
+                                                                    version,
+                                                                    data_to_store,
+                                                                    owner_keys,
+                                                                    prev_owner_keys,
+                                                                    Some(private_signing_key))))
 
         },
         ::structured_data_operations::DataFitResult::DataDoesNotFit => {
@@ -57,32 +57,32 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
             let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMap(data_map.clone()), data_encryption_keys));
             match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store, owner_keys.clone(), prev_owner_keys.clone())) {
                 ::structured_data_operations::DataFitResult::DataFits => {
-                    Ok(::client::StructuredData::new(tag_type,
-                                                     id,
-                                                     version,
-                                                     data_to_store,
-                                                     owner_keys,
-                                                     prev_owner_keys,
-                                                     private_signing_key))
+                    Ok(try!(::routing::structured_data::StructuredData::new(tag_type,
+                                                                            id,
+                                                                            version,
+                                                                            data_to_store,
+                                                                            owner_keys,
+                                                                            prev_owner_keys,
+                                                                            Some(private_signing_key))))
 
                 },
                 ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-                    let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data_to_store);
+                    let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
-                    let data = ::client::Data::ImmutableData(immutable_data);
-                    let _ = client.lock().unwrap().put(name.clone(), data);
+                    let data = ::routing::data::Data::ImmutableData(immutable_data);
+                    client.lock().unwrap().put(data, None);
 
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name), data_encryption_keys));
 
                     match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store, owner_keys.clone(), prev_owner_keys.clone())) {
                         ::structured_data_operations::DataFitResult::DataFits => {
-                            Ok(::client::StructuredData::new(tag_type,
-                                                             id,
-                                                             version,
-                                                             data_to_store,
-                                                             owner_keys,
-                                                             prev_owner_keys,
-                                                             private_signing_key))
+                            Ok(try!(::routing::structured_data::StructuredData::new(tag_type,
+                                                                                    id,
+                                                                                    version,
+                                                                                    data_to_store,
+                                                                                    owner_keys,
+                                                                                    prev_owner_keys,
+                                                                                    Some(private_signing_key))))
                         },
                         _ => Err(::errors::ClientError::StructuredDataHeaderSizeProhibitive),
                     }
@@ -96,7 +96,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 
 /// Get Actual Data From StructuredData created via create() function in this module.
 pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
-                struct_data: &::client::StructuredData,
+                struct_data: &::routing::structured_data::StructuredData,
                 data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                               &::sodiumoxide::crypto::box_::SecretKey,
                                               &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
@@ -108,9 +108,10 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
             Ok(se.read(0, length))
         },
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
-            let mut response_getter = try!(client.lock().unwrap().get(data_map_name, ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)));
+            let request = ::routing::data::DataRequest::ImmutableData(data_map_name, ::routing::immutable_data::ImmutableDataType::Normal);
+            let response_getter = client.lock().unwrap().get(request, None);
             match try!(response_getter.get()) {
-                ::client::Data::ImmutableData(immutable_data) => {
+                ::routing::data::Data::ImmutableData(immutable_data) => {
                     match try!(get_decoded_stored_data(&immutable_data.value(), data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
                             let mut se = ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), data_map);
@@ -153,10 +154,8 @@ fn get_decoded_stored_data(raw_data: &Vec<u8>,
     Ok(try!(::utility::deserialise(data_to_deserialise)))
 }
 
-
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     const TAG_ID: u64 = ::MAIDSAFE_TAG + 1000;
@@ -170,7 +169,7 @@ mod test {
         let client = ::std::sync::Arc::new(::std::sync::Mutex::new(::utility::test_utils::get_client().ok().unwrap()));
         // Empty Data
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = Vec::new();
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -192,7 +191,7 @@ mod test {
         }
         // Empty Data- with decryption_keys
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = Vec::new();
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -214,7 +213,7 @@ mod test {
         }
         // Data of size 75 KB
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -236,7 +235,7 @@ mod test {
         }
         // Data of size 75 KB with 200 owners
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::get_max_sized_public_keys(200);
             let prev_owners = Vec::new();
@@ -258,7 +257,7 @@ mod test {
         }
         // Data of size 75 KB with MAX owners
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::get_max_sized_public_keys(515);
             let prev_owners = Vec::new();
@@ -280,7 +279,7 @@ mod test {
         }
         // Data of size 75 KB with MAX owners - with decryption_keys
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
             let owners = ::utility::test_utils::get_max_sized_public_keys(510);
             let prev_owners = Vec::new();
@@ -302,7 +301,7 @@ mod test {
         }
         // Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 80];
             let owners = ::utility::test_utils::get_max_sized_public_keys(517);
             let prev_owners = Vec::new();
@@ -320,7 +319,7 @@ mod test {
         }
         // Data of size 100 KB
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 102400];
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -342,7 +341,7 @@ mod test {
         }
         // Data of size 200 KB
         {
-            let id : ::routing::NameType = ::routing::test_utils::Random::generate_random();
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
             let data = vec![99u8; 204801];
             let owners = ::utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
@@ -363,5 +362,4 @@ mod test {
             }
         }
     }
-
 }

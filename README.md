@@ -7,8 +7,8 @@
 
 **Secondary Maintainer:**   Krishna Kumar (krishna.kumar@maidsafe.net)
 
-|Crate|Linux/OS X|Appveyor|Coverage|Issues|
-|:---:|:--------:|:------:|:------:|:----:|
+|Crate|Linux/OS X|Windows|Coverage|Issues|
+|:---:|:--------:|:-----:|:------:|:----:|
 |[![](http://meritbadge.herokuapp.com/safe_client)](https://crates.io/crates/safe_client)|[![Build Status](https://travis-ci.org/maidsafe/safe_client.svg?branch=master)](https://travis-ci.org/maidsafe/safe_client)|[![Build status](https://ci.appveyor.com/api/projects/status/pqjc5v2ww7k0qx88/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-client/branch/master)|[![Coverage Status](https://coveralls.io/repos/maidsafe/safe_client/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/safe_client?branch=master)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_client.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_client)|
 
 | [API Documentation - master branch](http://maidsafe.net/safe_client/master) | [SAFE Network System Documentation](http://systemdocs.maidsafe.net) | [MaidSafe website](http://maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
@@ -42,6 +42,9 @@ etc
 - [X] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
 
 ### [0.1.3]
+- [X] [MAID-1283](https://maidsafe.atlassian.net/browse/MAID-1283) Rename repositories from "maidsafe_" to "safe_"
+
+### [0.1.4]
 - [X] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
 - [ ] [MAID-1248](https://maidsafe.atlassian.net/browse/MAID-1248) Name the spawned rust threads
 - [ ] [MAID-1218](https://maidsafe.atlassian.net/browse/MAID-1218) No restarting of routing-client

@@ -45,6 +45,18 @@ pub enum ClientError {
     RootDirectoryAlreadyExists,
     /// Generic I/O Error
     GenericIoError(::std::io::Error),
+    /// Forbidden operation requested for this Client
+    OperationForbiddenForClient,
+    /// Unexpected - Probably a Logic error
+    Unexpected(String),
+    /// Routing Error
+    RoutingError(::routing::error::RoutingError),
+}
+
+impl<'a> From<&'a str> for ClientError {
+    fn from(error: &'a str) -> ClientError {
+        ClientError::Unexpected(error.to_string())
+    }
 }
 
 impl From<::cbor::CborError> for ClientError {
@@ -65,6 +77,12 @@ impl From<::std::io::Error> for ClientError {
     }
 }
 
+impl From<::routing::error::RoutingError> for ClientError {
+    fn from(error: ::routing::error::RoutingError) -> ClientError {
+        ClientError::RoutingError(error)
+    }
+}
+
 impl Into<i32> for ClientError {
     fn into(self) -> i32 {
         match self {
@@ -79,6 +97,9 @@ impl Into<i32> for ClientError {
             ClientError::NetworkOperationFailure(_)          => CLIENT_ERROR_START_RANGE - 8,
             ClientError::RootDirectoryAlreadyExists          => CLIENT_ERROR_START_RANGE - 9,
             ClientError::GenericIoError(_)                   => CLIENT_ERROR_START_RANGE - 10,
+            ClientError::OperationForbiddenForClient         => CLIENT_ERROR_START_RANGE - 11,
+            ClientError::Unexpected(_)                       => CLIENT_ERROR_START_RANGE - 12,
+            ClientError::RoutingError(_)                     => CLIENT_ERROR_START_RANGE - 13,
         }
     }
 }
@@ -97,6 +118,9 @@ impl ::std::fmt::Debug for ClientError {
             ClientError::NetworkOperationFailure(ref error)  => write!(f, "ClientError::NetworkOperationFailure -> {:?}", error.description()),
             ClientError::RootDirectoryAlreadyExists          => write!(f, "ClientError::RootDirectoryAlreadyExists"),
             ClientError::GenericIoError(ref error)           => write!(f, "ClientError::GenericIoError -> {:?}", error.description()),
+            ClientError::OperationForbiddenForClient         => write!(f, "ClientError::OperationForbiddenForClient"),
+            ClientError::Unexpected(ref error)               => write!(f, "ClientError::Unexpected::{{{:?}}}", error),
+            ClientError::RoutingError(ref error)             => write!(f, "ClientError::RoutingError -> {:?}", error),
         }
     }
 }

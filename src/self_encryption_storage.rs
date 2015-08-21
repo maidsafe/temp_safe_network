@@ -38,26 +38,22 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
             name_id[i] = name[i];
         }
 
-        let mut client = self.client.lock().unwrap();
-        match client.get(::routing::NameType(name_id), ::client::DataRequest::ImmutableData(::client::ImmutableDataType::Normal)) {
-            Ok(mut response_getter) => {
-                match response_getter.get() {
-                    Ok(data) => {
-                        match data {
-                            ::client::Data::ImmutableData(data) => data.value().clone(),
-                            _ => Vec::new(),
-                        }
-                    },
-                    Err(_) => Vec::new(),
+        let client = self.client.lock().unwrap();
+        let immutable_data_request = ::routing::data::DataRequest::ImmutableData(::routing::NameType::new(name_id),
+                                                                                 ::routing::immutable_data::ImmutableDataType::Normal);
+        match client.get(immutable_data_request, None).get() {
+            Ok(ref data) => {
+                match data {
+                    &::routing::data::Data::ImmutableData(ref rxd_data) => rxd_data.value().clone(),
+                    _ => Vec::new(),
                 }
             },
-            Err(_) => Vec::new()
+            Err(_) => Vec::new(),
         }
     }
 
     fn put(&self, _: Vec<u8>, data: Vec<u8>) {
-        let immutable_data = ::client::ImmutableData::new(::client::ImmutableDataType::Normal, data);        
-        let mut client = self.client.lock().unwrap();
-        let _ = client.put(immutable_data.name(), ::client::Data::ImmutableData(immutable_data));
+        let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal, data);
+        self.client.lock().unwrap().put(::routing::data::Data::ImmutableData(immutable_data), None);
     }
 }
