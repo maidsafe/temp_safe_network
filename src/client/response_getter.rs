@@ -48,7 +48,12 @@ impl ResponseGetter {
                 let mut msg_queue = self.message_queue.lock().unwrap();
                 match msg_queue.get_response(&self.requested_name) {
                     Ok(response) => return Ok(response),
-                    Err(_)       => mutex_guard = lock.lock().unwrap(),
+                    Err(_) => {
+                        mutex_guard = lock.lock().unwrap();
+                        if *mutex_guard == Some(self.requested_name.clone()) {
+                            *mutex_guard = None;
+                        }
+                    },
                 }
             }
 
@@ -56,8 +61,6 @@ impl ResponseGetter {
             while *mutex_guard != valid_condition {
                 mutex_guard = condition_var.wait(mutex_guard).unwrap();
             }
-
-            *mutex_guard = None;
 
             let mut msg_queue = self.message_queue.lock().unwrap();
             let response = try!(msg_queue.get_response(&self.requested_name));
