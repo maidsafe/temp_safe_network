@@ -86,7 +86,7 @@ pub struct RoutingMock {
 }
 
 impl RoutingMock {
-    pub fn new_client(sender: ::std::sync::mpsc::Sender<::routing::event::Event>,
+    pub fn new(sender: ::std::sync::mpsc::Sender<::routing::event::Event>,
                       _id: Option<::routing::id::Id>) -> RoutingMock {
         ::sodiumoxide::init();
 
@@ -282,7 +282,7 @@ mod test {
         let (sender, receiver) = ::std::sync::mpsc::channel();
         let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
 
-        let mock_routing = RoutingMock::new_client(sender, Some(id_packet));
+        let mock_routing = RoutingMock::new(sender, Some(id_packet));
 
         // Construct ImmutableData
         let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));
@@ -356,7 +356,7 @@ mod test {
         let (sender, receiver) = ::std::sync::mpsc::channel();
         let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
 
-        let mock_routing = RoutingMock::new_client(sender, Some(id_packet));
+        let mock_routing = RoutingMock::new(sender, Some(id_packet));
 
         // Construct ImmutableData
         let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));

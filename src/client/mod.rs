@@ -28,7 +28,7 @@ mod non_networking_test_framework;
 #[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
 type Routing = non_networking_test_framework::RoutingMock;
 #[cfg(feature = "USE_ACTUAL_ROUTING")]
-type Routing = ::routing::routing::Routing;
+type Routing = ::routing::routing_client::RoutingClient;
 
 const LOGIN_PACKET_TYPE_TAG: u64 = ::CLIENT_STRUCTURED_DATA_TAG - 1;
 
@@ -319,7 +319,7 @@ impl Client {
 
     fn get_new_routing(sender   : ::std::sync::mpsc::Sender<::routing::event::Event>,
                        id_packet: Option<::routing::id::Id>) -> Routing {
-        Routing::new_client(sender, id_packet)
+        Routing::new(sender, id_packet)
     }
 
     fn update_session_packet(&self) -> Result<(), ::errors::ClientError> {
