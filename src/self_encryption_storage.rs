@@ -38,7 +38,7 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
             name_id[i] = name[i];
         }
 
-        let client = self.client.lock().unwrap();
+        let mut client = self.client.lock().unwrap();
         let immutable_data_request = ::routing::data::DataRequest::ImmutableData(::routing::NameType::new(name_id),
                                                                                  ::routing::immutable_data::ImmutableDataType::Normal);
         match client.get(immutable_data_request, None).get() {
