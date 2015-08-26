@@ -12,8 +12,8 @@ install:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/install_libsodium.sh | bash
   - export PKG_CONFIG_PATH=$HOME/libsodium-1.0.3/lib/pkgconfig:$PKG_CONFIG_PATH
 script:
-  - cargo build --verbose
-  - cargo test --verbose
+  - cargo build --verbose --features "use-mock-routing"
+  - cargo test --verbose --features "use-mock-routing"
 after_success:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/deploy_gh-pages.sh | bash
 env:

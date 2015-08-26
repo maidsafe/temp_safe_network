@@ -25,15 +25,15 @@ Maidsafe-Client interfaces conditionally with either the actual routing crate or
 
 To use it with the Mock (default) do:
 ```
-cargo build
-cargo test
+cargo build --features "use-mock-routing"
+cargo test --features "use-mock-routing"
 etc
 ```
 
 To interface it with actual routing, do:
 ```
-cargo build --features "USE_ACTUAL_ROUTING"
-cargo test --features "USE_ACTUAL_ROUTING"
+cargo build
+cargo test
 etc
 ```
 

@@ -23,4 +23,4 @@ rust-crypto     = "*"
 rustc-serialize = "*"
 
 [features]
-USE_ACTUAL_ROUTING = []
+use-mock-routing = []

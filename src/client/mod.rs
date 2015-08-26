@@ -22,12 +22,12 @@ mod misc;
 mod user_account;
 mod message_queue;
 
-#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
+#[cfg(feature = "use-mock-routing")]
 mod non_networking_test_framework;
 
-#[cfg(not(feature = "USE_ACTUAL_ROUTING"))]
+#[cfg(feature = "use-mock-routing")]
 type Routing = non_networking_test_framework::RoutingMock;
-#[cfg(feature = "USE_ACTUAL_ROUTING")]
+#[cfg(not(feature = "use-mock-routing"))]
 type Routing = ::routing::routing_client::RoutingClient;
 
 const LOGIN_PACKET_TYPE_TAG: u64 = ::CLIENT_STRUCTURED_DATA_TAG - 1;
