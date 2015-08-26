@@ -28,7 +28,7 @@ environment:
     - RUST_VERSION: nightly
 
 matrix:
-    allow failures:
+    allow_failures:
         - platform: x86
 
 build: false
