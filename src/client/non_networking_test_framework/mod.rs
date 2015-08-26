@@ -96,7 +96,7 @@ impl RoutingMock {
         }
     }
 
-    pub fn get_request(&self,
+    pub fn get_request(&mut self,
                        _location  : ::routing::authority::Authority,
                        request_for: ::routing::data::DataRequest) {
         let delay_ms = self.network_delay_ms;
@@ -282,7 +282,7 @@ mod test {
         let (sender, receiver) = ::std::sync::mpsc::channel();
         let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
 
-        let mock_routing = RoutingMock::new(sender, Some(id_packet));
+        let mut mock_routing = RoutingMock::new(sender, Some(id_packet));
 
         // Construct ImmutableData
         let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));
@@ -356,7 +356,7 @@ mod test {
         let (sender, receiver) = ::std::sync::mpsc::channel();
         let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
 
-        let mock_routing = RoutingMock::new(sender, Some(id_packet));
+        let mut mock_routing = RoutingMock::new(sender, Some(id_packet));
 
         // Construct ImmutableData
         let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));

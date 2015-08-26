@@ -114,7 +114,7 @@ impl Client {
     /// create_account. This will help log into an already created account for the user in the
     /// SAFE-network.
     pub fn log_in(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::errors::ClientError> {
-        let unregistered_client = Client::create_unregistered_client();
+        let mut unregistered_client = Client::create_unregistered_client();
         let user_id = user_account::Account::generate_network_id(keyword, pin);
 
         let session_packet_request = ::routing::data::DataRequest::StructuredData(user_id.clone(), LOGIN_PACKET_TYPE_TAG);
@@ -238,7 +238,7 @@ impl Client {
     }
 
     /// Get data from the network. This is non-blocking.
-    pub fn get(&self,
+    pub fn get(&mut self,
                request_for : ::routing::data::DataRequest,
                opt_location: Option<::routing::authority::Authority>) -> response_getter::ResponseGetter {
         if let ::routing::data::DataRequest::ImmutableData(..) = request_for {
@@ -322,17 +322,20 @@ impl Client {
         Routing::new(sender, id_packet)
     }
 
-    fn update_session_packet(&self) -> Result<(), ::errors::ClientError> {
+    fn update_session_packet(&mut self) -> Result<(), ::errors::ClientError> {
+        let session_packet_id = try!(self.session_packet_id.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient)).clone();
+        let session_packet_request = ::routing::data::DataRequest::StructuredData(session_packet_id.clone(), LOGIN_PACKET_TYPE_TAG);
+
+        let response_getter = self.get(session_packet_request, None);
+
         let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
-        let session_packet_id = try!(self.session_packet_id.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
         let session_packet_keys = try!(self.session_packet_keys.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
 
-        let session_packet_request = ::routing::data::DataRequest::StructuredData(session_packet_id.clone(), LOGIN_PACKET_TYPE_TAG);
-        if let ::routing::data::Data::StructuredData(retrieved_session_packet) = try!(self.get(session_packet_request, None).get()) {
+        if let ::routing::data::Data::StructuredData(retrieved_session_packet) = try!(response_getter.get()) {
             let encrypted_account = try!(account.encrypt(session_packet_keys.get_password(), session_packet_keys.get_pin()));
 
             let new_account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
-                                                                                           session_packet_id.clone(),
+                                                                                           session_packet_id,
                                                                                            retrieved_session_packet.get_version() + 1,
                                                                                            encrypted_account,
                                                                                            vec![account.get_public_maid().public_keys().0.clone()],
