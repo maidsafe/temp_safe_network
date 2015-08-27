@@ -45,7 +45,6 @@ unused_qualifications, variant_size_differences)]
 
 extern crate cbor;
 extern crate rand;
-extern crate crypto;
 extern crate routing;
 extern crate sodiumoxide;
 extern crate lru_time_cache;

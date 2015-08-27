@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                */
 
-static MAIDSAFE_VERSION_LABEL: &'static str = "MaidSafe Version 1 Key Derivation";
-
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also his Root
 /// Directory ID if he has put data onto the network.
@@ -128,142 +126,78 @@ impl Account {
     }
 
     /// Generate User's Identity for the network using supplied credentials in a deterministic way.
-    /// This is similary to the username in various places.
-    pub fn generate_network_id(keyword: &String, pin: u32) -> ::routing::NameType {
-        use crypto::digest::Digest;
+    /// This is similar to the username in various places.
+    pub fn generate_network_id(keyword: &[u8], pin: &[u8]) -> Result<::routing::NameType, ::errors::ClientError> {
+        let mut id = ::routing::NameType::new([0; 64]);
+        try!(Account::derive_key(&mut id.0[..], keyword, pin));
 
-        let mut hasher = ::crypto::sha2::Sha512::new();
-        let digest_size = hasher.output_bytes();
-
-        let mut output1 = vec![0u8; digest_size];
-        let mut output2 = vec![0u8; digest_size];
-
-        hasher.input_str(&keyword);
-        hasher.result(&mut output1);
-
-        hasher.reset();
-        hasher.input(&pin.to_string().as_bytes());
-        hasher.result(&mut output2);
-
-        let mut name = [0u8; 64];
-        hasher.reset();
-        hasher.input(&output1);
-        hasher.input(&output2);
-        hasher.result(&mut name);
-
-        ::routing::NameType::new(name)
+        Ok(id)
     }
 
     /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
     /// through PBKDF2 first
-    pub fn encrypt(&self, password: &[u8], pin: u32) -> Result<Vec<u8>, ::errors::ClientError> {
+    pub fn encrypt(&self, password: &[u8], pin: &[u8]) -> Result<Vec<u8>, ::errors::ClientError> {
         let serialised = try!(::utility::serialise(self));
+        let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
 
-        let mut encrypted : Vec<u8> = Vec::new();
-        {
-            use crypto::symmetriccipher::Encryptor;
-            use crypto::buffer::WriteBuffer;
-            use crypto::buffer::ReadBuffer;
-
-            // when/if multiple versions are supported, the key/iv should be
-            // unpredictable. Consider the new key gen algorithm for EncryptDataMap.
-            let keys = Account::generate_crypto_keys(password, pin);
-
-            // there SHOULD be an HMAC here. But crypto-experts recommend a second
-            // key for this, and there isn't much to go on. Maybe the pin shouldn't
-            // be used in the password? it'd be a weak hmac though, kinda screwed
-            // really, authenticated encryption is necessary here probably.
-
-            let mut buffer = [0u8; 4096];
-            let mut read_buffer = ::crypto::buffer::RefReadBuffer::new(&serialised);
-            let mut write_buffer = ::crypto::buffer::RefWriteBuffer::new(&mut buffer);
-            let mut encryptor = ::crypto::aes::cbc_encryptor(
-                ::crypto::aes::KeySize::KeySize256, &keys.0, &keys.1, ::crypto::blockmodes::PkcsPadding);
-
-            loop {
-                let result = encryptor.encrypt(&mut read_buffer, &mut write_buffer, true).ok().unwrap(); // TODO Improve
-                encrypted.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&a| a.clone()));
-                match result {
-                    ::crypto::buffer::BufferResult::BufferUnderflow => break,
-                    ::crypto::buffer::BufferResult::BufferOverflow => {}
-                }
-            }
-        }
-
-        Ok(encrypted)
+        Ok(::sodiumoxide::crypto::secretbox::seal(&serialised, &nonce, &key))
     }
 
     /// Symmetric decryption of Session Packet using User's credentials. Credentials are passed
     /// through PBKDF2 first
-    pub fn decrypt(encrypted: &[u8], password: &[u8], pin: u32) -> Result<Account, ::errors::ClientError> {
-        let mut decrypted : Vec<u8> = Vec::new();
+    pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Account, ::errors::ClientError> {
+        let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
+        let decrypted_self = try!(::sodiumoxide::crypto::secretbox::open(encrypted_self, &nonce, &key)
+                                  .map_err(|_| ::errors::ClientError::SymmetricDecipherFailure));
+
+        ::utility::deserialise(&decrypted_self)
+    }
+
+    fn generate_crypto_keys(password: &[u8], pin: &[u8]) -> Result<(::sodiumoxide::crypto::secretbox::Key,
+                                                                    ::sodiumoxide::crypto::secretbox::Nonce),
+                                                                   ::errors::ClientError> {
+        let mut output = [0; ::sodiumoxide::crypto::secretbox::KEYBYTES + ::sodiumoxide::crypto::secretbox::NONCEBYTES];
+        try!(Account::derive_key(&mut output[..], password, pin));
+
+        let mut key = ::sodiumoxide::crypto::secretbox::Key([0; ::sodiumoxide::crypto::secretbox::KEYBYTES]);
+        let mut nonce = ::sodiumoxide::crypto::secretbox::Nonce([0; ::sodiumoxide::crypto::secretbox::NONCEBYTES]);
+
+        for it in output.iter().take(::sodiumoxide::crypto::secretbox::KEYBYTES).enumerate() {
+            key.0[it.0] = *it.1;
+        }
+        for it in output.iter().skip(::sodiumoxide::crypto::secretbox::KEYBYTES).enumerate() {
+            nonce.0[it.0] = *it.1;
+        }
+
+        Ok((key, nonce))
+    }
+
+    fn derive_key(output: &mut [u8], input: &[u8], pin: &[u8]) -> Result<(), ::errors::ClientError> {
+        let mut salt = ::sodiumoxide::crypto::pwhash::Salt([0; ::sodiumoxide::crypto::pwhash::SALTBYTES]);
         {
-            use crypto::symmetriccipher::Decryptor;
-            use crypto::buffer::WriteBuffer;
-            use crypto::buffer::ReadBuffer;
-
-            // when/if multiple versions are supported, the key/iv should be
-            // unpredictable. Consider the new key gen algorithm for EncryptDataMap.
-            let keys = Account::generate_crypto_keys(password, pin);
-
-            // there SHOULD be an HMAC here. But crypto-experts recommend a second
-            // key for this, and there isn't much to go on. Maybe the pin shouldn't
-            // be used in the password? it'd be a weak hmac though, kinda screwed
-            // really, authenticated encryption is necessary here probably.
-
-            let mut buffer = [0u8; 4096];
-            let mut read_buffer = ::crypto::buffer::RefReadBuffer::new(&encrypted);
-            let mut write_buffer = ::crypto::buffer::RefWriteBuffer::new(&mut buffer);
-            let mut decryptor = ::crypto::aes::cbc_decryptor(
-                ::crypto::aes::KeySize::KeySize256, &keys.0, &keys.1, ::crypto::blockmodes::PkcsPadding);
-
-            loop {
-                let result = try!(decryptor.decrypt(&mut read_buffer, &mut write_buffer, true).map_err(|_| ::errors::ClientError::SymmetricDecipherFailure));
-                decrypted.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&a| a.clone()));
-                match result {
-                    ::crypto::buffer::BufferResult::BufferUnderflow => break,
-                    ::crypto::buffer::BufferResult::BufferOverflow => {}
+            let ::sodiumoxide::crypto::pwhash::Salt(ref mut salt_bytes) = salt;
+            if salt_bytes.len() == ::sodiumoxide::crypto::hash::sha256::HASHBYTES {
+                let hashed_pin = ::sodiumoxide::crypto::hash::sha256::hash(pin);
+                for it in salt_bytes.iter_mut().enumerate() {
+                    *it.1 = hashed_pin.0[it.0];
                 }
+            } else if salt_bytes.len() == ::sodiumoxide::crypto::hash::sha512::HASHBYTES {
+                let hashed_pin = ::sodiumoxide::crypto::hash::sha512::hash(pin);
+                for it in salt_bytes.iter_mut().enumerate() {
+                    *it.1 = hashed_pin.0[it.0];
+                }
+            } else {
+                return Err(::errors::ClientError::UnsupportedSaltSizeForPwHash)
             }
         }
 
-        Ok(try!(::utility::deserialise(&decrypted)))
-    }
-
-    fn generate_crypto_keys(password: &[u8], pin: u32) -> (Vec<u8>, Vec<u8>) {
-        use crypto::digest::Digest;
-
-        let mut hasher = ::crypto::sha2::Sha512::new();
-        let digest_size = hasher.output_bytes();
-        let key_size = digest_size / 2;
-        let iv_size = key_size / 2;
-
-        let iterations = (pin % 10000) + 10000;
-        let salt : Vec<u8>;
-        {
-            let mut salt_partial = vec![0u8; digest_size];
-
-            hasher.input(&pin.to_string().as_bytes());
-            hasher.result(&mut salt_partial);
-
-            // Original version uses a Secure Byte Block,
-            // which we have no available resource for
-            salt = salt_partial.iter().chain(password.iter())
-                                      .chain(MAIDSAFE_VERSION_LABEL.as_bytes().iter())
-                                      .map(|&a| a.clone())
-                                      .collect();
-        }
-
-        hasher.reset();
-        let mut mac = ::crypto::hmac::Hmac::new(hasher, &password);
-
-        let mut output = vec![0u8 ; digest_size];
-        ::crypto::pbkdf2::pbkdf2(&mut mac, &salt, iterations, &mut output);
-
-        let key = output.iter().take(key_size).map(|&a| a.clone()).collect();
-        let iv = output.into_iter().skip(key_size).take(iv_size).collect();
-
-        (key, iv)
+        try!(::sodiumoxide::crypto::pwhash::derive_key(output,
+                                                       input,
+                                                       &salt,
+                                                       ::sodiumoxide::crypto::pwhash::OPSLIMIT_INTERACTIVE,
+                                                       ::sodiumoxide::crypto::pwhash::MEMLIMIT_INTERACTIVE)
+                                            .map_err(|_| ::errors::ClientError::UnsuccessfulPwHash)
+                                            .map(|_| Ok(())))
     }
 }
 
@@ -286,55 +220,51 @@ mod test {
     fn generating_network_id() {
         let keyword1 = "user1".to_string();
         {
-            let user1_id1 = Account::generate_network_id(&keyword1, 0);
-            let user1_id2 = Account::generate_network_id(&keyword1, 1234);
-            let user1_id3 = Account::generate_network_id(&keyword1, ::std::u32::MAX);
+            let user1_id1 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), 0.to_string().as_bytes()));
+            let user1_id2 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), 1234.to_string().as_bytes()));
+            let user1_id3 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), ::std::u32::MAX.to_string().as_bytes()));
 
             assert!(!slice_eq(&user1_id1.get_id(), &user1_id2.get_id()));
             assert!(!slice_eq(&user1_id1.get_id(), &user1_id3.get_id()));
             assert!(!slice_eq(&user1_id2.get_id(), &user1_id3.get_id()));
-            assert!(slice_eq(&user1_id1.get_id(), &Account::generate_network_id(&keyword1, 0).get_id()));
-            assert!(slice_eq(&user1_id2.get_id(), &Account::generate_network_id(&keyword1, 1234).get_id()));
-            assert!(slice_eq(&user1_id3.get_id(), &Account::generate_network_id(&keyword1, ::std::u32::MAX).get_id()));
+            assert!(slice_eq(&user1_id1.get_id(), &eval_result!(Account::generate_network_id(keyword1.as_bytes(), 0.to_string().as_bytes())).get_id()));
+            assert!(slice_eq(&user1_id2.get_id(), &eval_result!(Account::generate_network_id(keyword1.as_bytes(), 1234.to_string().as_bytes())).get_id()));
+            assert!(slice_eq(&user1_id3.get_id(), &eval_result!(Account::generate_network_id(keyword1.as_bytes(), ::std::u32::MAX.to_string().as_bytes())).get_id()));
         }
         {
             let keyword2 = "user2".to_string();
             assert!(
                 !slice_eq(
-                    &Account::generate_network_id(&keyword1, 248).get_id(),
-                    &Account::generate_network_id(&keyword2, 248).get_id()));
+                    &eval_result!(Account::generate_network_id(keyword1.as_bytes(), 248.to_string().as_bytes())).get_id(),
+                    &eval_result!(Account::generate_network_id(keyword2.as_bytes(), 248.to_string().as_bytes())).get_id()));
         }
     }
 
     #[test]
     fn generating_crypto_keys() {
-        let password1 = "super great password".as_bytes();
-        let password2 = "even better password".as_bytes();
+        let password1 = "super great password".to_string();
+        let password2 = "even better password".to_string();
         {
-            let keys1 = Account::generate_crypto_keys(&password1, 0);
-            let keys2 = Account::generate_crypto_keys(&password1, 1234);
-            let keys3 = Account::generate_crypto_keys(&password1, ::std::u32::MAX);
+            let keys1 = eval_result!(Account::generate_crypto_keys(password1.as_bytes(), 0.to_string().as_bytes()));
+            let keys2 = eval_result!(Account::generate_crypto_keys(password1.as_bytes(), 1234.to_string().as_bytes()));
+            let keys3 = eval_result!(Account::generate_crypto_keys(password1.as_bytes(), ::std::u32::MAX.to_string().as_bytes()));
 
-            assert!(!slice_eq(&keys1.0, &keys2.0));
-            assert!(!slice_eq(&keys1.0, &keys3.0));
-            assert!(!slice_eq(&keys2.0, &keys3.0));
-
-            assert!(!slice_eq(&keys1.1, &keys2.1));
-            assert!(!slice_eq(&keys1.1, &keys3.1));
-            assert!(!slice_eq(&keys2.1, &keys3.1));
+            assert!(keys1 != keys2);
+            assert!(keys1 != keys3);
+            assert!(keys2 != keys3);
         }
         {
-            let keys1 = Account::generate_crypto_keys(&password1, 0);
-            let keys2 = Account::generate_crypto_keys(&password2, 0);
+            let keys1 = eval_result!(Account::generate_crypto_keys(password1.as_bytes(), 0.to_string().as_bytes()));
+            let keys2 = eval_result!(Account::generate_crypto_keys(password2.as_bytes(), 0.to_string().as_bytes()));
 
-            assert!(!slice_eq(&keys1.0, &keys2.0));
-            assert!(!slice_eq(&keys1.1, &keys2.1));
+            assert!(keys1 != keys2);
+            assert!(keys1 != keys2);
         }
         {
-            let keys = Account::generate_crypto_keys(&password1, 0);
-            let again = Account::generate_crypto_keys(&password1, 0);
-            assert!(slice_eq(&keys.0, &again.0));
-            assert!(slice_eq(&keys.1, &again.1));
+            let keys  = eval_result!(Account::generate_crypto_keys(password1.as_bytes(), 0.to_string().as_bytes()));
+            let again = eval_result!(Account::generate_crypto_keys(password1.as_bytes(), 0.to_string().as_bytes()));
+            assert_eq!(keys, again);
+            assert_eq!(keys, again);
         }
     }
 
@@ -349,14 +279,14 @@ mod test {
     fn encryption() {
         let account = Account::new(None, None);
 
-        let password = "impossible to guess".to_string().into_bytes();
+        let password = "impossible to guess".to_string();
         let pin = 1000u32;
 
-        let encrypted_account = eval_result!(account.encrypt(&password, pin));
+        let encrypted_account = eval_result!(account.encrypt(password.as_bytes(), pin.to_string().as_bytes()));
         assert!(encrypted_account.len() > 0);
         assert!(encrypted_account != eval_result!(::utility::serialise(&account)));
 
-        let decrypted_account = eval_result!(Account::decrypt(&encrypted_account, &password, pin));
+        let decrypted_account = eval_result!(Account::decrypt(&encrypted_account, password.as_bytes(), pin.to_string().as_bytes()));
         assert_eq!(account, decrypted_account);
     }
 }

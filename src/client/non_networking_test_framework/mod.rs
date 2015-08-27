@@ -368,7 +368,7 @@ mod test {
         // Construct StructuredData, 1st version, for this ImmutableData
         let keyword = eval_result!(::utility::generate_random_string(10));
         let pin = ::utility::generate_random_pin();
-        let user_id = ::client::user_account::Account::generate_network_id(&keyword, pin);
+        let user_id = eval_result!(::client::user_account::Account::generate_network_id(keyword.as_bytes(), pin.to_string().as_bytes()));
         let mut account_version = eval_result!(::routing::structured_data::StructuredData::new(TYPE_TAG,
                                                                                                user_id.clone(),
                                                                                                0,

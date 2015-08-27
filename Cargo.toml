@@ -19,7 +19,6 @@ self_encryption = "*"
 cbor            = "*"
 rand            = "*"
 sodiumoxide     = "*"
-rust-crypto     = "*"
 rustc-serialize = "*"
 
 [features]
