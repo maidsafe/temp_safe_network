@@ -1,5 +1,11 @@
 # Safe Client - Change Log
 
+## [0.1.3]
+- [MAID-1283](https://maidsafe.atlassian.net/browse/MAID-1283) Rename repositories from "maidsafe_" to "safe_"
+
+## [0.1.2]
+- [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
+
 ## [0.1.1]
 - Updated dependencies' versions
 - Fixed lint warnings caused by latest Rust nightly
