@@ -87,11 +87,6 @@ pub fn generate_random_string(length: usize) -> Result<String, ::errors::ClientE
     Ok((0..length).map(|_| os_rng.gen::<char>()).collect())
 }
 
-/// Generates a random PIN number
-pub fn generate_random_pin() -> u32 {
-    ::rand::random::<u32>() % 10000
-}
-
 /// Generate a random vector of given length
 pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, ::errors::ClientError>
                                                    where T: ::rand::Rand {

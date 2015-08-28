@@ -27,6 +27,11 @@ environment:
 #    - RUST_VERSION: beta
     - RUST_VERSION: nightly
 
+# Allowing failures for x86 to accomodate for current libsodium test failure in x86
+matrix:
+    allow_failures:
+        - platform: x86
+
 build: false
 
 test_script:
