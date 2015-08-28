@@ -17,37 +17,31 @@
 ###Pre-requisite:
 libsodium is a native dependency for [sodiumxoide](https://github.com/dnaq/sodiumoxide). Thus, install sodium by following the instructions [here](http://doc.libsodium.org/installation/index.html).
 
-For windows, download and use the [prebuilt mingw library](https://download.libsodium.org/libsodium/releases/libsodium-1.0.2-mingw.tar.gz).
-Extract and place the libsodium.a file in "bin\x86_64-pc-windows-gnu" for 64bit System, or "bin\i686-pc-windows-gnu" for a 32bit system.
+For windows:
+
+- Download [prebuilt libsodium library](https://download.libsodium.org/libsodium/releases/libsodium-1.0.2-mingw.tar.gz)
+- Extract `libsodium.a` for x86/x64 from the corresponding folder in the archive to your local filesystem
+- Add this local path to `%PATH%`. (`PATH=%PATH%;<path to extracted libsodium.a dir>`)
 
 ###Build Instructions:
-Maidsafe-Client interfaces conditionally with either the actual routing crate or the Mock used for efficient local testing.
+`safe_client` can interface conditionally against either the routing crate or a mock used for local testing.
 
-To use it with the Mock do:
+To use it with the Mock:
 ```
 cargo build --features "use-mock-routing"
 cargo test --features "use-mock-routing"
-etc
 ```
 
-To interface it with actual routing (default), do:
+To interface it with actual routing (default):
 ```
 cargo build
 cargo test
-etc
 ```
 
-##TODO (rust_3 sprint)
-### [0.1.2]
-- [X] [MAID-1209](https://maidsafe.atlassian.net/browse/MAID-1209) Remove NFS API
-
-### [0.1.3]
-- [X] [MAID-1283](https://maidsafe.atlassian.net/browse/MAID-1283) Rename repositories from "maidsafe_" to "safe_"
+## TODO
 
 ### [0.1.4]
 - [X] [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
-- [ ] [MAID-1248](https://maidsafe.atlassian.net/browse/MAID-1248) Name the spawned rust threads
-- [ ] [MAID-1218](https://maidsafe.atlassian.net/browse/MAID-1218) No restarting of routing-client
 - [X] [MAID-1249](https://maidsafe.atlassian.net/browse/MAID-1249) Implement Unified Structured Datatype
     - [X] [MAID-1252](https://maidsafe.atlassian.net/browse/MAID-1252) Mock Unified StructuredData and ImmutableData
     - [X] [MAID-1253](https://maidsafe.atlassian.net/browse/MAID-1253) Update Mock Routing to support Mock Unified SturcturedData and ImmutableData
