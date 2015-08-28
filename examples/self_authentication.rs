@@ -20,8 +20,7 @@
 fn main() {
     let mut keyword = String::new();
     let mut password = String::new();
-    let mut pin_str = String::new();
-    let mut pin: u32;
+    let mut pin = String::new();
 
     println!("\nDo you already have an account created (enter Y for yes) ?");
 
@@ -41,21 +40,20 @@ fn main() {
 
         loop {
             println!("\n\n--------- Enter PIN (4 Digits) -----------");
-            let _ = std::io::stdin().read_line(&mut pin_str);
-            let result = pin_str.trim().parse::<u32>();
-            if result.is_ok() && pin_str.trim().len() == 4 {
-                pin = result.ok().unwrap();
+            let _ = std::io::stdin().read_line(&mut pin);
+            pin = pin.trim().to_string();
+            if pin.parse::<u16>().is_ok() && pin.len() == 4 {
                 break;
             }
             println!("ERROR: PIN is not 4 Digits !!");
-            pin_str.clear();
+            pin.clear();
         }
 
         // Account Creation
         {
             println!("\nTrying to create an account ...");
 
-            let _ = eval_result!(safe_client::client::Client::create_account(&keyword, pin, &password));
+            let _ = eval_result!(safe_client::client::Client::create_account(keyword.clone(), pin.clone(), password.clone()));
             println!("Account Created Successfully !!");
         }
 
@@ -66,7 +64,7 @@ fn main() {
         {
             println!("\nTrying to log into the created account using supplied credentials ...");
 
-            let _ = eval_result!(safe_client::client::Client::log_in(&keyword, pin, &password));
+            let _ = eval_result!(safe_client::client::Client::log_in(keyword, pin, password));
             println!("Account Login Successful !!");
         }
     }
@@ -75,8 +73,8 @@ fn main() {
     println!("\t====================");
 
     loop {
-        password.clear();
-        keyword.clear();
+        keyword = String::new();
+        password = String::new();
 
         println!("\n------------ Enter Keyword ---------------");
         let _ = std::io::stdin().read_line(&mut keyword);
@@ -85,12 +83,11 @@ fn main() {
         let _ = std::io::stdin().read_line(&mut password);
 
         loop {
-            pin_str.clear();
+            pin = String::new();
             println!("\n\n--------- Enter PIN (4 Digits) -----------");
-            let _ = std::io::stdin().read_line(&mut pin_str);
-            let result = pin_str.trim().parse::<u32>();
-            if result.is_ok() && pin_str.trim().len() == 4 {
-                pin = result.ok().unwrap();
+            let _ = std::io::stdin().read_line(&mut pin);
+            pin = pin.trim().to_string();
+            if pin.parse::<u16>().is_ok() && pin.len() == 4 {
                 break;
             }
             println!("ERROR: PIN is not 4 Digits !!");
@@ -99,7 +96,7 @@ fn main() {
         // Log into the created account
         {
             println!("\nTrying to log in ...");
-            match safe_client::client::Client::log_in(&keyword, pin, &password) {
+            match safe_client::client::Client::log_in(keyword, pin, password) {
                 Ok(_) => {
                     println!("Account Login Successful !!");
                     break;

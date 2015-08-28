@@ -57,6 +57,15 @@ impl Account {
         }
     }
 
+    /// Generate User's Identity for the network using supplied credentials in a deterministic way.
+    /// This is similar to the username in various places.
+    pub fn generate_network_id(keyword: &[u8], pin: &[u8]) -> Result<::routing::NameType, ::errors::ClientError> {
+        let mut id = ::routing::NameType::new([0; 64]);
+        try!(Account::derive_key(&mut id.0[..], keyword, pin));
+
+        Ok(id)
+    }
+
     /// Get user's AnMAID
     pub fn get_an_maid(&self) -> &::id::RevocationIdType {
         &self.an_maid
@@ -125,30 +134,21 @@ impl Account {
         }
     }
 
-    /// Generate User's Identity for the network using supplied credentials in a deterministic way.
-    /// This is similar to the username in various places.
-    pub fn generate_network_id(keyword: &[u8], pin: &[u8]) -> Result<::routing::NameType, ::errors::ClientError> {
-        let mut id = ::routing::NameType::new([0; 64]);
-        try!(Account::derive_key(&mut id.0[..], keyword, pin));
-
-        Ok(id)
-    }
-
     /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
-    /// through PBKDF2 first
+    /// through key-derivation-function first
     pub fn encrypt(&self, password: &[u8], pin: &[u8]) -> Result<Vec<u8>, ::errors::ClientError> {
-        let serialised = try!(::utility::serialise(self));
+        let serialised_self = try!(::utility::serialise(self));
         let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
 
-        Ok(::sodiumoxide::crypto::secretbox::seal(&serialised, &nonce, &key))
+        Ok(::sodiumoxide::crypto::secretbox::seal(&serialised_self, &nonce, &key))
     }
 
     /// Symmetric decryption of Session Packet using User's credentials. Credentials are passed
-    /// through PBKDF2 first
+    /// through key-derivation-function first
     pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Account, ::errors::ClientError> {
         let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
         let decrypted_self = try!(::sodiumoxide::crypto::secretbox::open(encrypted_self, &nonce, &key)
-                                  .map_err(|_| ::errors::ClientError::SymmetricDecipherFailure));
+                                                                    .map_err(|_| ::errors::ClientError::SymmetricDecipherFailure));
 
         ::utility::deserialise(&decrypted_self)
     }
@@ -172,17 +172,17 @@ impl Account {
         Ok((key, nonce))
     }
 
-    fn derive_key(output: &mut [u8], input: &[u8], pin: &[u8]) -> Result<(), ::errors::ClientError> {
+    fn derive_key(output: &mut [u8], input: &[u8], user_salt: &[u8]) -> Result<(), ::errors::ClientError> {
         let mut salt = ::sodiumoxide::crypto::pwhash::Salt([0; ::sodiumoxide::crypto::pwhash::SALTBYTES]);
         {
             let ::sodiumoxide::crypto::pwhash::Salt(ref mut salt_bytes) = salt;
             if salt_bytes.len() == ::sodiumoxide::crypto::hash::sha256::HASHBYTES {
-                let hashed_pin = ::sodiumoxide::crypto::hash::sha256::hash(pin);
+                let hashed_pin = ::sodiumoxide::crypto::hash::sha256::hash(user_salt);
                 for it in salt_bytes.iter_mut().enumerate() {
                     *it.1 = hashed_pin.0[it.0];
                 }
             } else if salt_bytes.len() == ::sodiumoxide::crypto::hash::sha512::HASHBYTES {
-                let hashed_pin = ::sodiumoxide::crypto::hash::sha512::hash(pin);
+                let hashed_pin = ::sodiumoxide::crypto::hash::sha512::hash(user_salt);
                 for it in salt_bytes.iter_mut().enumerate() {
                     *it.1 = hashed_pin.0[it.0];
                 }
@@ -205,10 +205,6 @@ impl Account {
 mod test {
     use super::*;
 
-    fn slice_eq(left : &[u8], right : &[u8]) -> bool {
-        left.iter().zip(right.iter()).all(|(a, b)| a == b)
-    }
-
     #[test]
     fn generating_new_account() {
         let account1 = Account::new(None, None);
@@ -219,25 +215,22 @@ mod test {
     #[test]
     fn generating_network_id() {
         let keyword1 = "user1".to_string();
-        {
-            let user1_id1 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), 0.to_string().as_bytes()));
-            let user1_id2 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), 1234.to_string().as_bytes()));
-            let user1_id3 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), ::std::u32::MAX.to_string().as_bytes()));
 
-            assert!(!slice_eq(&user1_id1.get_id(), &user1_id2.get_id()));
-            assert!(!slice_eq(&user1_id1.get_id(), &user1_id3.get_id()));
-            assert!(!slice_eq(&user1_id2.get_id(), &user1_id3.get_id()));
-            assert!(slice_eq(&user1_id1.get_id(), &eval_result!(Account::generate_network_id(keyword1.as_bytes(), 0.to_string().as_bytes())).get_id()));
-            assert!(slice_eq(&user1_id2.get_id(), &eval_result!(Account::generate_network_id(keyword1.as_bytes(), 1234.to_string().as_bytes())).get_id()));
-            assert!(slice_eq(&user1_id3.get_id(), &eval_result!(Account::generate_network_id(keyword1.as_bytes(), ::std::u32::MAX.to_string().as_bytes())).get_id()));
-        }
-        {
-            let keyword2 = "user2".to_string();
-            assert!(
-                !slice_eq(
-                    &eval_result!(Account::generate_network_id(keyword1.as_bytes(), 248.to_string().as_bytes())).get_id(),
-                    &eval_result!(Account::generate_network_id(keyword2.as_bytes(), 248.to_string().as_bytes())).get_id()));
-        }
+        let user1_id1 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), 0.to_string().as_bytes()));
+        let user1_id2 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), 1234.to_string().as_bytes()));
+        let user1_id3 = eval_result!(Account::generate_network_id(keyword1.as_bytes(), ::std::u32::MAX.to_string().as_bytes()));
+
+        assert!(user1_id1 != user1_id2);
+        assert!(user1_id1 != user1_id3);
+        assert!(user1_id2 != user1_id3);
+        assert_eq!(user1_id1, eval_result!(Account::generate_network_id(keyword1.as_bytes(), 0.to_string().as_bytes())));
+        assert_eq!(user1_id2, eval_result!(Account::generate_network_id(keyword1.as_bytes(), 1234.to_string().as_bytes())));
+        assert_eq!(user1_id3, eval_result!(Account::generate_network_id(keyword1.as_bytes(), ::std::u32::MAX.to_string().as_bytes())));
+
+        let keyword2 = "user2".to_string();
+        assert!(eval_result!(Account::generate_network_id(keyword1.as_bytes(), 248.to_string().as_bytes()))
+                !=
+                eval_result!(Account::generate_network_id(keyword2.as_bytes(), 248.to_string().as_bytes())));
     }
 
     #[test]
@@ -271,7 +264,7 @@ mod test {
     #[test]
     fn serialisation() {
         let account = Account::new(None, None);
-        let deserialised_account = eval_result!(::utility::deserialise::<Account>(&eval_result!(::utility::serialise(&account))));
+        let deserialised_account = eval_result!(::utility::deserialise(&eval_result!(::utility::serialise(&account))));
         assert_eq!(account, deserialised_account);
     }
 
@@ -280,7 +273,7 @@ mod test {
         let account = Account::new(None, None);
 
         let password = "impossible to guess".to_string();
-        let pin = 1000u32;
+        let pin = 1000u16;
 
         let encrypted_account = eval_result!(account.encrypt(password.as_bytes(), pin.to_string().as_bytes()));
         assert!(encrypted_account.len() > 0);

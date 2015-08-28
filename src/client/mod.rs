@@ -71,9 +71,7 @@ impl Client {
 
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
-    pub fn create_account(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::errors::ClientError> {
-        let password = password_str.as_bytes();
-
+    pub fn create_account(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(None, None);
         let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
@@ -91,16 +89,19 @@ impl Client {
             _raii_joiner       : raii_joiner,
             message_queue      : message_queue,
             response_notifier  : notifier,
-            session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.to_string().as_bytes()))),
+            session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()))),
             session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
         };
 
         {
             let account = try!(client.account.iter().next().ok_or(::errors::ClientError::from("Logic Error !!")));
+            let session_packet_keys = try!(client.session_packet_keys.iter().next().ok_or(::errors::ClientError::from("Logic Error !!")));
+
             let account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
                                                                                        try!(client.session_packet_id.ok_or(::errors::ClientError::from("Logic Error !!"))).clone(),
                                                                                        0,
-                                                                                       try!(account.encrypt(password, pin.to_string().as_bytes())),
+                                                                                       try!(account.encrypt(session_packet_keys.get_password(),
+                                                                                                            session_packet_keys.get_pin())),
                                                                                        vec![account.get_public_maid().public_keys().0.clone()],
                                                                                        Vec::new(),
                                                                                        Some(&account.get_maid().secret_keys().0)));
@@ -113,16 +114,15 @@ impl Client {
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// create_account. This will help log into an already created account for the user in the
     /// SAFE-network.
-    pub fn log_in(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::errors::ClientError> {
+    pub fn log_in(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
         let mut unregistered_client = Client::create_unregistered_client();
-        let user_id = try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.to_string().as_bytes()));
+        let user_id = try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
 
         let session_packet_request = ::routing::data::DataRequest::StructuredData(user_id.clone(), LOGIN_PACKET_TYPE_TAG);
         let response_getter = unregistered_client.get(session_packet_request, None);
 
         if let ::routing::data::Data::StructuredData(session_packet) = try!(response_getter.get()) {
-            let password = password_str.as_bytes();
-            let decrypted_session_packet = try!(user_account::Account::decrypt(session_packet.get_data(), password, pin.to_string().as_bytes()));
+            let decrypted_session_packet = try!(user_account::Account::decrypt(session_packet.get_data(), password.as_bytes(), pin.as_bytes()));
             let id_packet = ::routing::id::Id::with_keys((decrypted_session_packet.get_maid().public_keys().0.clone(),
                                                           decrypted_session_packet.get_maid().secret_keys().0.clone()),
                                                          (decrypted_session_packet.get_maid().public_keys().1.clone(),
@@ -139,7 +139,7 @@ impl Client {
                 _raii_joiner       : raii_joiner,
                 message_queue      : message_queue,
                 response_notifier  : notifier,
-                session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.to_string().as_bytes()))),
+                session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()))),
                 session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
             };
 
@@ -333,7 +333,7 @@ impl Client {
 
         if let ::routing::data::Data::StructuredData(retrieved_session_packet) = try!(response_getter.get()) {
             let encrypted_account = try!(account.encrypt(session_packet_keys.get_password(),
-                                                         session_packet_keys.get_pin().to_string().as_bytes()));
+                                                         session_packet_keys.get_pin()));
 
             let new_account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
                                                                                            session_packet_id,
@@ -362,16 +362,15 @@ impl Drop for Client {
 /////////////////////////////////////////////////////////////////
 
 struct SessionPacketEncryptionKeys {
+    pin     : Vec<u8>,
     password: Vec<u8>,
-    pin: u32,
 }
 
 impl SessionPacketEncryptionKeys {
-    fn new(password: &[u8], pin: u32) -> SessionPacketEncryptionKeys {
-        let vec: Vec<u8> = password.iter().map(|a| *a).collect();
+    fn new(password: String, pin: String) -> SessionPacketEncryptionKeys {
         SessionPacketEncryptionKeys {
-            password: vec,
-            pin: pin,
+            pin     : pin.into_bytes(),
+            password: password.into_bytes(),
         }
     }
 
@@ -379,8 +378,8 @@ impl SessionPacketEncryptionKeys {
         &self.password[..]
     }
 
-    fn get_pin(&self) -> u32 {
-        self.pin
+    fn get_pin(&self) -> &[u8] {
+        &self.pin[..]
     }
 }
 
@@ -394,21 +393,21 @@ mod test {
     fn account_creation() {
         let keyword = eval_result!(::utility::generate_random_string(10));
         let password = eval_result!(::utility::generate_random_string(10));
-        let pin = ::utility::generate_random_pin();
-        let _ = eval_result!(Client::create_account(&keyword, pin, &password));
+        let pin = eval_result!(::utility::generate_random_string(10));
+        let _ = eval_result!(Client::create_account(keyword, pin, password));
     }
 
     #[test]
     fn account_login() {
         let keyword = eval_result!(::utility::generate_random_string(10));
         let password = eval_result!(::utility::generate_random_string(10));
-        let pin = ::utility::generate_random_pin();
+        let pin = eval_result!(::utility::generate_random_string(10));
 
         // Creation should pass
-        let _ = eval_result!(Client::create_account(&keyword, pin, &password));
+        let _ = eval_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         // Correct Credentials - Login Should Pass
-        let _ = eval_result!(Client::log_in(&keyword, pin, &password));
+        let _ = eval_result!(Client::log_in(keyword, pin, password));
     }
 
     #[test]
@@ -421,10 +420,10 @@ mod test {
         {
             let keyword = eval_result!(::utility::generate_random_string(10));
             let password = eval_result!(::utility::generate_random_string(10));
-            let pin = ::utility::generate_random_pin();
+            let pin = eval_result!(::utility::generate_random_string(10));
 
             // Creation should pass
-            let client = eval_result!(Client::create_account(&keyword, pin, &password));
+            let client = eval_result!(Client::create_account(keyword, pin, password));
             client.put(orig_data.clone(), None);
         }
 
@@ -441,12 +440,9 @@ mod test {
 
         match (unregistered_client.set_user_root_directory_id(rand_name.clone()),
                unregistered_client.set_configuration_root_directory_id(rand_name)) {
-            (Err(error0), Err(error1)) => match (error0, error1) {
-                (::errors::ClientError::OperationForbiddenForClient,
-                 ::errors::ClientError::OperationForbiddenForClient) => (),
-                _ => panic!("Expected a different Error !!"),
-            },
-            _ => panic!("Should have been all Errors !!"),
+            (Err(::errors::ClientError::OperationForbiddenForClient),
+             Err(::errors::ClientError::OperationForbiddenForClient)) => (),
+            _ => panic!("Unexpected !!"),
         };
     }
 
@@ -455,9 +451,9 @@ mod test {
         // Construct Client
         let keyword = eval_result!(::utility::generate_random_string(10));
         let password = eval_result!(::utility::generate_random_string(10));
-        let pin = ::utility::generate_random_pin();
+        let pin = eval_result!(::utility::generate_random_string(10));
 
-        let mut client = eval_result!(Client::create_account(&keyword, pin, &password));
+        let mut client = eval_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -466,7 +462,7 @@ mod test {
         eval_result!(client.set_user_root_directory_id(root_dir_id.clone()));
 
         // Correct Credentials - Login Should Pass
-        let client = eval_result!(Client::log_in(&keyword, pin, &password));
+        let client = eval_result!(Client::log_in(keyword, pin, password));
 
         assert!(client.get_user_root_directory_id().is_some());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -479,9 +475,9 @@ mod test {
         // Construct Client
         let keyword = eval_result!(::utility::generate_random_string(10));
         let password = eval_result!(::utility::generate_random_string(10));
-        let pin = ::utility::generate_random_pin();
+        let pin = eval_result!(::utility::generate_random_string(10));
 
-        let mut client = eval_result!(Client::create_account(&keyword, pin, &password));
+        let mut client = eval_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -490,7 +486,7 @@ mod test {
         eval_result!(client.set_configuration_root_directory_id(root_dir_id.clone()));
 
         // Correct Credentials - Login Should Pass
-        let client = eval_result!(Client::log_in(&keyword, pin, &password));
+        let client = eval_result!(Client::log_in(keyword, pin, password));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_some());
@@ -503,9 +499,9 @@ mod test {
         // Construct Client
         let keyword = eval_result!(::utility::generate_random_string(10));
         let password = eval_result!(::utility::generate_random_string(10));
-        let pin = ::utility::generate_random_pin();
+        let pin = eval_result!(::utility::generate_random_string(10));
 
-        let client = eval_result!(Client::create_account(&keyword, pin, &password));
+        let client = eval_result!(Client::create_account(keyword, pin, password));
 
         // Identical Plain Texts
         let plain_text_original_0 = vec![123u8; 1000];

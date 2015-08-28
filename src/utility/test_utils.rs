@@ -14,12 +14,14 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+// TODO move to utility - this mod should be private
 /// Gnerates a mock client
 pub fn get_client() -> Result<::client::Client, ::errors::ClientError> {
+    let pin = try!(::utility::generate_random_string(10));
     let keyword = try!(::utility::generate_random_string(10));
     let password = try!(::utility::generate_random_string(10));
-    let pin = ::utility::generate_random_pin();
-    ::client::Client::create_account(&keyword, pin, &password)
+
+    ::client::Client::create_account(keyword, pin, password)
 }
 
 /// Gnerates Random public keys
