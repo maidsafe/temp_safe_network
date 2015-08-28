@@ -91,7 +91,7 @@ impl Client {
             _raii_joiner       : raii_joiner,
             message_queue      : message_queue,
             response_notifier  : notifier,
-            session_packet_id  : Some(user_account::Account::generate_network_id(keyword, pin)),
+            session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.to_string().as_bytes()))),
             session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
         };
 
@@ -100,7 +100,7 @@ impl Client {
             let account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
                                                                                        try!(client.session_packet_id.ok_or(::errors::ClientError::from("Logic Error !!"))).clone(),
                                                                                        0,
-                                                                                       try!(account.encrypt(password, pin)),
+                                                                                       try!(account.encrypt(password, pin.to_string().as_bytes())),
                                                                                        vec![account.get_public_maid().public_keys().0.clone()],
                                                                                        Vec::new(),
                                                                                        Some(&account.get_maid().secret_keys().0)));
@@ -115,14 +115,14 @@ impl Client {
     /// SAFE-network.
     pub fn log_in(keyword: &String, pin: u32, password_str: &String) -> Result<Client, ::errors::ClientError> {
         let mut unregistered_client = Client::create_unregistered_client();
-        let user_id = user_account::Account::generate_network_id(keyword, pin);
+        let user_id = try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.to_string().as_bytes()));
 
         let session_packet_request = ::routing::data::DataRequest::StructuredData(user_id.clone(), LOGIN_PACKET_TYPE_TAG);
         let response_getter = unregistered_client.get(session_packet_request, None);
 
         if let ::routing::data::Data::StructuredData(session_packet) = try!(response_getter.get()) {
             let password = password_str.as_bytes();
-            let decrypted_session_packet = try!(user_account::Account::decrypt(session_packet.get_data(), password, pin));
+            let decrypted_session_packet = try!(user_account::Account::decrypt(session_packet.get_data(), password, pin.to_string().as_bytes()));
             let id_packet = ::routing::id::Id::with_keys((decrypted_session_packet.get_maid().public_keys().0.clone(),
                                                           decrypted_session_packet.get_maid().secret_keys().0.clone()),
                                                          (decrypted_session_packet.get_maid().public_keys().1.clone(),
@@ -139,7 +139,7 @@ impl Client {
                 _raii_joiner       : raii_joiner,
                 message_queue      : message_queue,
                 response_notifier  : notifier,
-                session_packet_id  : Some(user_account::Account::generate_network_id(keyword, pin)),
+                session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.to_string().as_bytes()))),
                 session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
             };
 
@@ -332,7 +332,8 @@ impl Client {
         let session_packet_keys = try!(self.session_packet_keys.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
 
         if let ::routing::data::Data::StructuredData(retrieved_session_packet) = try!(response_getter.get()) {
-            let encrypted_account = try!(account.encrypt(session_packet_keys.get_password(), session_packet_keys.get_pin()));
+            let encrypted_account = try!(account.encrypt(session_packet_keys.get_password(),
+                                                         session_packet_keys.get_pin().to_string().as_bytes()));
 
             let new_account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
                                                                                            session_packet_id,

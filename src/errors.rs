@@ -51,6 +51,11 @@ pub enum ClientError {
     Unexpected(String),
     /// Routing Error
     RoutingError(::routing::error::RoutingError),
+    /// Unable to pack into or operate with size of Salt
+    UnsupportedSaltSizeForPwHash,
+    /// Unable to complete computation for password hashing - usually because OS refused to
+    /// allocate amount of requested memory
+    UnsuccessfulPwHash,
 }
 
 impl<'a> From<&'a str> for ClientError {
@@ -100,6 +105,8 @@ impl Into<i32> for ClientError {
             ClientError::OperationForbiddenForClient         => CLIENT_ERROR_START_RANGE - 11,
             ClientError::Unexpected(_)                       => CLIENT_ERROR_START_RANGE - 12,
             ClientError::RoutingError(_)                     => CLIENT_ERROR_START_RANGE - 13,
+            ClientError::UnsupportedSaltSizeForPwHash        => CLIENT_ERROR_START_RANGE - 14,
+            ClientError::UnsuccessfulPwHash                  => CLIENT_ERROR_START_RANGE - 15,
         }
     }
 }
@@ -121,6 +128,8 @@ impl ::std::fmt::Debug for ClientError {
             ClientError::OperationForbiddenForClient         => write!(f, "ClientError::OperationForbiddenForClient"),
             ClientError::Unexpected(ref error)               => write!(f, "ClientError::Unexpected::{{{:?}}}", error),
             ClientError::RoutingError(ref error)             => write!(f, "ClientError::RoutingError -> {:?}", error),
+            ClientError::UnsupportedSaltSizeForPwHash        => write!(f, "ClientError::UnsupportedSaltSizeForPwHash"),
+            ClientError::UnsuccessfulPwHash                  => write!(f, "ClientError::UnsuccessfulPwHash"),
         }
     }
 }

@@ -23,14 +23,14 @@ Extract and place the libsodium.a file in "bin\x86_64-pc-windows-gnu" for 64bit 
 ###Build Instructions:
 Maidsafe-Client interfaces conditionally with either the actual routing crate or the Mock used for efficient local testing.
 
-To use it with the Mock (default) do:
+To use it with the Mock do:
 ```
 cargo build --features "use-mock-routing"
 cargo test --features "use-mock-routing"
 etc
 ```
 
-To interface it with actual routing, do:
+To interface it with actual routing (default), do:
 ```
 cargo build
 cargo test
