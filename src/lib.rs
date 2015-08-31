@@ -50,6 +50,7 @@ extern crate sodiumoxide;
 extern crate lru_time_cache;
 extern crate rustc_serialize;
 extern crate self_encryption;
+#[macro_use] extern crate log;
 
 /// Macros defined for usage
 #[macro_use]

@@ -53,10 +53,23 @@ impl Client {
     /// Network-Get
     pub fn create_unregistered_client() -> Client {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
+        // TODO stabilise this design
+        let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
         let (sender, receiver) = ::std::sync::mpsc::channel();
 
         let routing = Client::get_new_routing(sender, None);
-        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
+
+        // TODO stabilise this design
+        {
+            debug!("Bootstrapping ...");
+            let (ref lock, ref condition_var) = *bootstrap_notifier;
+            let mut mutex_guard = lock.lock().unwrap();
+            while !*mutex_guard {
+                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+            }
+            debug!("Bootstrapped");
+        }
 
         Client {
             account            : None,
@@ -73,6 +86,8 @@ impl Client {
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
     pub fn create_account(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
+        // TODO stabilise this design
+        let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(None, None);
         let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
                                                       account_packet.get_maid().secret_keys().0.clone()),
@@ -81,7 +96,18 @@ impl Client {
         let (sender, receiver) = ::std::sync::mpsc::channel();
 
         let routing = Client::get_new_routing(sender, Some(id_packet));
-        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
+
+        // TODO stabilise this design
+        {
+            debug!("Bootstrapping ...");
+            let (ref lock, ref condition_var) = *bootstrap_notifier;
+            let mut mutex_guard = lock.lock().unwrap();
+            while !*mutex_guard {
+                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+            }
+            debug!("Bootstrapped");
+        }
 
         let client = Client {
             account            : Some(account_packet),
@@ -131,7 +157,20 @@ impl Client {
 
             let routing = Client::get_new_routing(sender, Some(id_packet));
             let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-            let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), receiver);
+            // TODO stabilise this design
+            let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
+            let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
+
+            // TODO stabilise this design
+            {
+                debug!("Bootstrapping ...");
+                let (ref lock, ref condition_var) = *bootstrap_notifier;
+                let mut mutex_guard = lock.lock().unwrap();
+                while !*mutex_guard {
+                    mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                }
+                debug!("Bootstrapped");
+            }
 
             let client = Client {
                 account            : Some(decrypted_session_packet),

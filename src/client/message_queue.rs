@@ -25,9 +25,10 @@ pub struct MessageQueue {
 
 impl MessageQueue {
     /// Create a new instance of MessageQueue
-    pub fn new(notifier: ::client::misc::ResponseNotifier,
-               receiver: ::std::sync::mpsc::Receiver<::routing::event::Event>) -> (::std::sync::Arc<::std::sync::Mutex<MessageQueue>>,
-                                                                                   ::client::misc::RAIIThreadJoiner) {
+    pub fn new(notifier          : ::client::misc::ResponseNotifier,
+               bootstrap_notifier: ::client::misc::BootstrapNotifier, // TODO Improve this design
+               receiver          : ::std::sync::mpsc::Receiver<::routing::event::Event>) -> (::std::sync::Arc<::std::sync::Mutex<MessageQueue>>,
+                                                                                             ::client::misc::RAIIThreadJoiner) {
         let message_queue = ::std::sync::Arc::new(::std::sync::Mutex::new(MessageQueue {
             local_cache  : ::lru_time_cache::LruCache::with_capacity(1000),
             message_queue: ::lru_time_cache::LruCache::with_capacity(1000),
@@ -47,12 +48,20 @@ impl MessageQueue {
                                 let mut fetched_location = eval_result!(lock.lock());
                                 *fetched_location = Some(data_name);
                                 condition_var.notify_all();
-                            }
-                            _ => unimplemented!(),
+                            },
+                            _ => debug!("Received External Response: {:?} ;; This is currently not supported.", response),
                         }
-                    }
+                    },
+                    // TODO Improve this design
+                    ::routing::event::Event::Bootstrapped => {
+                        debug!("Bootstrapped");
+                        let (ref lock, ref condition_var) = *bootstrap_notifier;
+                        let mut mutex_guard = eval_result!(lock.lock());
+                        *mutex_guard = true;
+                        condition_var.notify_all();
+                    },
                     ::routing::event::Event::Terminated => break,
-                    _ => (),
+                    _ => debug!("Received Event: {:?} ;; This is currently not supported.", it),
                 }
             }
         }).unwrap();
