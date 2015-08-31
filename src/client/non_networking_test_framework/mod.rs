@@ -229,23 +229,6 @@ impl RoutingMock {
         // });
     }
 
-    pub fn run(&mut self) {
-        // let data_store = get_storage();
-        // println!("Amount Of Chunks Stored: {:?}", data_store.lock().unwrap().len());
-    }
-
-    pub fn bootstrap(&mut self,
-                     endpoints: Option<Vec<String>>, // TODO Actually it's: Option<Vec<::routing::routing_client::Endpoint>>,
-                     _: Option<u16>) -> Result<(), ::routing::error::RoutingError> {
-        if let Some(vec_endpoints) = endpoints {
-            for endpoint in vec_endpoints {
-                println!("Endpoint: {:?}", endpoint);
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn stop(&self) {
         let _ = self.sender.send(::routing::event::Event::Terminated);
     }

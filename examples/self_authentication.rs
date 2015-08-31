@@ -15,9 +15,14 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+extern crate env_logger;
 #[macro_use] extern crate safe_client;
 
 fn main() {
+    if let Err(error) = env_logger::init() {
+        println!("ERROR: Could not initialise logger !! (Continuing without it): {:?}", error);
+    }
+
     let mut keyword = String::new();
     let mut password = String::new();
     let mut pin = String::new();
