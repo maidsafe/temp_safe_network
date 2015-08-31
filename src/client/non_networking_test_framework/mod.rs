@@ -82,6 +82,7 @@ fn sync_disk_storage(memory_storage: &::std::collections::HashMap<::routing::Nam
 
 pub struct RoutingMock {
     sender          : ::std::sync::mpsc::Sender<::routing::event::Event>,
+    // TODO remove this and use the global const
     network_delay_ms: u32,
 }
 
@@ -89,6 +90,12 @@ impl RoutingMock {
     pub fn new(sender: ::std::sync::mpsc::Sender<::routing::event::Event>,
                       _id: Option<::routing::id::Id>) -> RoutingMock {
         ::sodiumoxide::init();
+
+        let cloned_sender = sender.clone();
+        ::std::thread::spawn(move || {
+            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
+            let _ = cloned_sender.send(::routing::event::Event::Bootstrapped);
+        });
 
         RoutingMock {
             sender          : sender,
@@ -255,6 +262,8 @@ mod test {
     #[test]
     fn check_put_post_get_delete_for_immutable_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
+        // TODO stabilise this design
+        let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
 
         let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
@@ -263,9 +272,20 @@ mod test {
                                                       account_packet.get_maid().secret_keys().1.clone()));
 
         let (sender, receiver) = ::std::sync::mpsc::channel();
-        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
 
         let mut mock_routing = RoutingMock::new(sender, Some(id_packet));
+
+        // TODO stabilise this design
+        {
+            debug!("Bootstrapping ...");
+            let (ref lock, ref condition_var) = *bootstrap_notifier;
+            let mut mutex_guard = lock.lock().unwrap();
+            while !*mutex_guard {
+                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+            }
+            debug!("Bootstrapped");
+        }
 
         // Construct ImmutableData
         let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));
@@ -329,6 +349,8 @@ mod test {
     #[test]
     fn check_put_post_get_delete_for_structured_data() {
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
+        // TODO stabilise this design
+        let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
 
         let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
@@ -337,9 +359,20 @@ mod test {
                                                       account_packet.get_maid().secret_keys().1.clone()));
 
         let (sender, receiver) = ::std::sync::mpsc::channel();
-        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), receiver);
+        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
 
         let mut mock_routing = RoutingMock::new(sender, Some(id_packet));
+
+        // TODO stabilise this design
+        {
+            debug!("Bootstrapping ...");
+            let (ref lock, ref condition_var) = *bootstrap_notifier;
+            let mut mutex_guard = lock.lock().unwrap();
+            while !*mutex_guard {
+                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+            }
+            debug!("Bootstrapped");
+        }
 
         // Construct ImmutableData
         let orig_raw_data: Vec<u8> = eval_result!(::utility::generate_random_vector(100));
