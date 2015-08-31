@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 pub type ResponseNotifier = ::std::sync::Arc<(::std::sync::Mutex<Option<::routing::NameType>>, ::std::sync::Condvar)>;
+pub type BootstrapNotifier = ::std::sync::Arc<(::std::sync::Mutex<bool>, ::std::sync::Condvar)>;
 
 pub struct RAIIThreadJoiner {
     joiner: Option<::std::thread::JoinHandle<()>>,
