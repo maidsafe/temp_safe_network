@@ -1,5 +1,9 @@
 # Safe Client - Change Log
 
+## [0.1.5]
+- Wait for routing to fire a bootstrap completion event
+- Added support for environment logger
+
 ## [0.1.4]
 - [MAID-1219](https://maidsafe.atlassian.net/browse/MAID-1219) Implement Private and Public types
 - [MAID-1249](https://maidsafe.atlassian.net/browse/MAID-1249) Implement Unified Structured Datatype
