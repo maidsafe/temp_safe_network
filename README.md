@@ -39,7 +39,14 @@ cargo test
 ```
 
 ## TODO
-
-### 0.1.5
-- Wait for routing to fire a bootstrap completion event
-- Added support for environment logger
+### [0.1.6]
+- [ ] [MAID-1295](https://maidsafe.atlassian.net/browse/MAID-1295) Remove all unwraps() AND Check for Ok(try!( and see if really required (ie., for error conversion etc)
+- [ ] [MAID-1296](https://maidsafe.atlassian.net/browse/MAID-1296) Remove unwanted errors and Unexpected should take an &str instead of String
+- [ ] [MAID-1297](https://maidsafe.atlassian.net/browse/MAID-1297) Evaluate test_utils in client
+- [ ] [MAID-1298](https://maidsafe.atlassian.net/browse/MAID-1298) Put debug statements
+- [ ] [MAID-1299](https://maidsafe.atlassian.net/browse/MAID-1299) check for all muts (eg., response_getter etc) and validate if really required
+- [ ] [MAID-1300](https://maidsafe.atlassian.net/browse/MAID-1300) Error conditions in Mock Routing
+- [ ] [MAID-1301](https://maidsafe.atlassian.net/browse/MAID-1301) Test cases for Error conditions in Mock
+- [ ] [MAID-1302](https://maidsafe.atlassian.net/browse/MAID-1302) Ask routing for every event it is going to pass to client and handle each of them
+- [ ] [MAID-1303](https://maidsafe.atlassian.net/browse/MAID-1303) Address the TODO’s and make temporary fixes as permanent (eg., listening to bootstrapped signal)
+- [ ] [MAID-1304](https://maidsafe.atlassian.net/browse/MAID-1304) Test cases for TODO's and temp fixes as permanent
