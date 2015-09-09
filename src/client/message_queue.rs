@@ -64,6 +64,8 @@ impl MessageQueue {
                     _ => debug!("Received Event: {:?} ;; This is currently not supported.", it),
                 }
             }
+
+            debug!("Thread \"MessageReceiverThread\" terminated.");
         }));
 
         (message_queue, ::client::misc::RAIIThreadJoiner::new(receiver_joiner))

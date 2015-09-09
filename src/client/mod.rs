@@ -52,6 +52,8 @@ impl Client {
     /// unregistered random clinet, which can do very limited set of operations - eg., a
     /// Network-Get
     pub fn create_unregistered_client() -> Client {
+        debug!("Creating unregistered client ...");
+
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         // TODO stabilise this design
         let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
@@ -85,6 +87,8 @@ impl Client {
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
     pub fn create_account(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
+        debug!("Creating account for supplied credentials ...");
+
         let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
         // TODO stabilise this design
         let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
@@ -141,13 +145,19 @@ impl Client {
     /// create_account. This will help log into an already created account for the user in the
     /// SAFE-network.
     pub fn log_in(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
+        debug!("Loging into account with supplied credentials ...");
+
         let mut unregistered_client = Client::create_unregistered_client();
         let user_id = try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
 
         let session_packet_request = ::routing::data::DataRequest::StructuredData(user_id.clone(), LOGIN_PACKET_TYPE_TAG);
+
+        debug!("Fetch Session Packet using unregistered client ...");
         let response_getter = unregistered_client.get(session_packet_request, None);
 
         if let ::routing::data::Data::StructuredData(session_packet) = try!(response_getter.get()) {
+            debug!("Session Packet fetched. Using Id's from fetched packet to construct a registered client ...");
+
             let decrypted_session_packet = try!(user_account::Account::decrypt(session_packet.get_data(), password.as_bytes(), pin.as_bytes()));
             let id_packet = ::routing::id::Id::with_keys((decrypted_session_packet.get_maid().public_keys().0.clone(),
                                                           decrypted_session_packet.get_maid().secret_keys().0.clone()),
@@ -293,6 +303,8 @@ impl Client {
         };
 
         self.routing.get_request(location, request_for.clone());
+        debug!("GET request posted to the network.");
+
         response_getter::ResponseGetter::new(Some(self.response_notifier.clone()), self.message_queue.clone(), request_for)
     }
 
@@ -305,6 +317,7 @@ impl Client {
             None       => ::routing::authority::Authority::ClientManager(data.name()),
         };
 
+        debug!("Posting PUT request to the network ...");
         self.routing.put_request(location, data)
     }
 
@@ -317,6 +330,7 @@ impl Client {
             None       => ::routing::authority::Authority::NaeManager(data.name()),
         };
 
+        debug!("Posting POST request to the network ...");
         self.routing.post_request(location, data)
     }
 
@@ -329,6 +343,7 @@ impl Client {
             None       => ::routing::authority::Authority::ClientManager(data.name()),
         };
 
+        debug!("Posting DELETE request to the network ...");
         self.routing.delete_request(location, data)
     }
 
@@ -390,6 +405,7 @@ impl Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
+        debug!("Client Destructor entered.");
         // Important, otherwise will be at the mercy of order of construction, ie., routing being
         // before _raii_joiner etc.
         self.routing.stop();
