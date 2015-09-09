@@ -18,10 +18,11 @@
 /// IdType
 ///
 /// #Examples
+///
 /// ```
 /// use ::safe_client::id::{IdType, RevocationIdType, MaidTypeTags};
 /// // Creating new IdType
-/// let maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>());
+/// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>());
 ///
 /// ```
 
@@ -107,11 +108,10 @@ mod test {
     fn serialisation_maid() {
         let obj_before = ::id::IdType::generate_random();
 
-        let mut e = ::cbor::Encoder::from_memory();
-        e.encode(&[&obj_before]).unwrap();
+        let serialised_obj = eval_result!(::utility::serialise(&obj_before));
 
-        let mut d = ::cbor::Decoder::from_bytes(e.as_bytes());
-        let obj_after: ::id::IdType = d.decode().next().unwrap().unwrap();
+        let obj_after: ::id::IdType = eval_result!(::utility::deserialise(&serialised_obj));
+
         let &(::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr_before), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
         let &(::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr_after), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr_after)) = obj_after.public_keys();
         let &(::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr_before), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_arr_before)) = &obj_before.secret_keys;

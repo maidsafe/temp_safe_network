@@ -70,7 +70,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                     let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
                     let data = ::routing::data::Data::ImmutableData(immutable_data);
-                    client.lock().unwrap().put(data, None);
+                    eval_result!(client.lock()).put(data, None);
 
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name), data_encryption_keys));
 
@@ -109,7 +109,7 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
         },
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
             let request = ::routing::data::DataRequest::ImmutableData(data_map_name, ::routing::immutable_data::ImmutableDataType::Normal);
-            let response_getter = client.lock().unwrap().get(request, None);
+            let response_getter = eval_result!(client.lock()).get(request, None);
             match try!(response_getter.get()) {
                 ::routing::data::Data::ImmutableData(immutable_data) => {
                     match try!(get_decoded_stored_data(&immutable_data.value(), data_decryption_keys)) {
@@ -133,7 +133,7 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
                                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
     let serialised_data = try!(::utility::serialise(&data));
     if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_encryption_keys {
-        Ok(try!(::utility::hybrid_encrypt(&serialised_data, nonce, public_encryp_key, secret_encryp_key)))
+        ::utility::hybrid_encrypt(&serialised_data, nonce, public_encryp_key, secret_encryp_key)
     } else {
         Ok(serialised_data)
     }
@@ -151,7 +151,7 @@ fn get_decoded_stored_data(raw_data: &Vec<u8>,
         raw_data
     };
 
-    Ok(try!(::utility::deserialise(data_to_deserialise)))
+    ::utility::deserialise(data_to_deserialise)
 }
 
 #[cfg(test)]
@@ -166,7 +166,7 @@ mod test {
         let data_decryption_keys = (&keys.0,
                                     &keys.1,
                                     &::sodiumoxide::crypto::box_::gen_nonce());
-        let client = ::std::sync::Arc::new(::std::sync::Mutex::new(::utility::test_utils::get_client().ok().unwrap()));
+        let client = ::std::sync::Arc::new(::std::sync::Mutex::new(eval_result!(::utility::test_utils::get_client())));
         // Empty Data
         {
             let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
@@ -183,8 +183,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 None);
-            assert!(result.is_ok());
-            match get_data(client.clone(), &result.ok().unwrap(), None) {
+            match get_data(client.clone(), &eval_result!(result), None) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }
@@ -205,8 +204,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 Some(data_decryption_keys));
-            assert!(result.is_ok());
-            match get_data(client.clone(), &result.ok().unwrap(), Some(data_decryption_keys)) {
+            match get_data(client.clone(), &eval_result!(result), Some(data_decryption_keys)) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }
@@ -227,8 +225,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 None);
-            assert!(result.is_ok());
-            match get_data(client.clone(), &result.ok().unwrap(), None) {
+            match get_data(client.clone(), &eval_result!(result), None) {
                 Ok(fetched_data) => assert_eq!(data.len(), fetched_data.len()),
                 Err(_) => panic!("Failed to fetch"),
             }
@@ -249,8 +246,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 None);
-            assert!(result.is_ok());
-            match get_data(client.clone(), &result.ok().unwrap(), None) {
+            match get_data(client.clone(), &eval_result!(result), None) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }
@@ -271,8 +267,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 None);
-            assert!(result.is_ok());
-            match get_data(client.clone(), &result.ok().unwrap(), None) {
+            match get_data(client.clone(), &eval_result!(result), None) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }
@@ -293,8 +288,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 Some(data_decryption_keys));
-            assert!(result.is_ok());
-            match get_data(client.clone(), &result.ok().unwrap(), Some(data_decryption_keys)) {
+            match get_data(client.clone(), &eval_result!(result), Some(data_decryption_keys)) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }
@@ -333,8 +327,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 None);
-            assert!(result.is_ok());
-            match get_data(client.clone(), &result.ok().unwrap(), None) {
+            match get_data(client.clone(), &eval_result!(result), None) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }
@@ -355,8 +348,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 None);
-            assert!(result.is_ok());
-            match get_data(client.clone(), &result.ok().unwrap(), None) {
+            match get_data(client.clone(), &eval_result!(result), None) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }

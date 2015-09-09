@@ -113,7 +113,7 @@ impl RoutingMock {
         ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(delay_ms);
             let data_name = request_for.name();
-            match data_store.lock().unwrap().get(&data_name) {
+            match eval_result!(data_store.lock()).get(&data_name) {
                 Some(raw_data) => {
                     if let Ok(data) = ::utility::deserialise::<::routing::data::Data>(raw_data) {
                         if match (&data, &request_for) {
@@ -143,10 +143,10 @@ impl RoutingMock {
 
         let data_name = data.name();
 
-        let mut data_store_mutex_guard = data_store.lock().unwrap();
+        let mut data_store_mutex_guard = eval_result!(data_store.lock());
         let success = if data_store_mutex_guard.contains_key(&data_name) {
             if let ::routing::data::Data::ImmutableData(immut_data) = data {
-                match ::utility::deserialise(data_store_mutex_guard.get(&data_name).unwrap()) {
+                match ::utility::deserialise(eval_option!(data_store_mutex_guard.get(&data_name), "Programming Error - Report this as a Bug.")) {
                     Ok(::routing::data::Data::ImmutableData(immut_data_stored)) => immut_data_stored.get_type_tag() == immut_data.get_type_tag(), // Immutable data is de-duplicated so always allowed
                     _ => false
                 }
@@ -176,10 +176,10 @@ impl RoutingMock {
 
         let data_name = data.name();
 
-        let mut data_store_mutex_guard = data_store.lock().unwrap();
+        let mut data_store_mutex_guard = eval_result!(data_store.lock());
         let success = if data_store_mutex_guard.contains_key(&data_name) {
             let raw_data_result = ::utility::serialise(&data);
-            match (raw_data_result, data, ::utility::deserialise(data_store_mutex_guard.get(&data_name).unwrap())) {
+            match (raw_data_result, data, ::utility::deserialise(eval_option!(data_store_mutex_guard.get(&data_name), "Programming Error - Report this as a Bug."))) {
                 (Ok(raw_data), ::routing::data::Data::StructuredData(struct_data_new), Ok(::routing::data::Data::StructuredData(struct_data_stored))) => {
                     if let Ok(_) = struct_data_stored.validate_self_against_successor(&struct_data_new) {
                         let _ = data_store_mutex_guard.insert(data_name, raw_data);
@@ -210,10 +210,10 @@ impl RoutingMock {
 
         let data_name = data.name();
 
-        let mut data_store_mutex_guard = data_store.lock().unwrap();
+        let mut data_store_mutex_guard = eval_result!(data_store.lock());
         let success = if data_store_mutex_guard.contains_key(&data_name) {
             let raw_data_result = ::utility::serialise(&data);
-            match (raw_data_result, data, ::utility::deserialise(data_store_mutex_guard.get(&data_name).unwrap())) {
+            match (raw_data_result, data, ::utility::deserialise(eval_option!(data_store_mutex_guard.get(&data_name), "Programming Error - Report this as a Bug."))) {
                 (Ok(raw_data), ::routing::data::Data::StructuredData(struct_data_new), Ok(::routing::data::Data::StructuredData(struct_data_stored))) => {
                     if let Ok(_) = struct_data_stored.validate_self_against_successor(&struct_data_new) {
                         let _ = data_store_mutex_guard.remove(&data_name);
@@ -280,9 +280,9 @@ mod test {
         {
             debug!("Bootstrapping ...");
             let (ref lock, ref condition_var) = *bootstrap_notifier;
-            let mut mutex_guard = lock.lock().unwrap();
+            let mut mutex_guard = eval_result!(lock.lock());
             while !*mutex_guard {
-                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
             }
             debug!("Bootstrapped");
         }
@@ -367,9 +367,9 @@ mod test {
         {
             debug!("Bootstrapping ...");
             let (ref lock, ref condition_var) = *bootstrap_notifier;
-            let mut mutex_guard = lock.lock().unwrap();
+            let mut mutex_guard = eval_result!(lock.lock());
             while !*mutex_guard {
-                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
             }
             debug!("Bootstrapped");
         }
@@ -477,7 +477,7 @@ mod test {
         account_version = eval_result!(::routing::structured_data::StructuredData::new(TYPE_TAG,
                                                                                        user_id.clone(),
                                                                                        1,
-                                                                                       ::utility::serialise(&vec![orig_data_immutable.name(), new_data_immutable.name()]).ok().unwrap(),
+                                                                                       eval_result!(::utility::serialise(&vec![orig_data_immutable.name(), new_data_immutable.name()])),
                                                                                        vec![account_packet.get_public_maid().public_keys().0.clone()],
                                                                                        Vec::new(),
                                                                                        Some(&account_packet.get_maid().secret_keys().0)));

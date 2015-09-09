@@ -15,34 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-///
-/// Convert a container to an array. If the container is not the exact size specified, None is
-/// returned. Otherwise, all of the elements are moved into the array.
-///
-/// ```
-/// let mut data = Vec::<usize>::new();
-/// data.push(1);
-/// data.push(2);
-/// assert!(convert_to_array(data, 2).is_some());
-/// assert!(convert_to_array(data, 3).is_none());
-/// ```
-
-macro_rules! convert_to_array {
-    ($container:ident, $size:expr) => {{
-        if $container.len() != $size {
-            None
-        } else {
-            use std::mem;
-            let mut arr : [_; $size] = [0; $size];
-            for element in $container.into_iter().enumerate() {
-                let old_val = mem::replace(&mut arr[element.0], element.1);
-                mem::forget(old_val);
-            }
-            Some(arr)
-        }
-    }};
-}
-
 /// This macro is intended to be used in all cases where we unwrap() a result to delebrately panic
 /// in case of error - eg., in test-cases. Such unwraps don't give a precise point of failure in
 /// our code and instead indicate some line number in core library. This macro will provide a
