@@ -35,12 +35,11 @@ function prepare_for_tar {
   cd "$RootDir/packages/$Platform"
   Bits=$(getconf LONG_BIT)
   PackageName="$ClientName"_"$Version"_"$Bits"-bit
-  AfterInstallCommand=
-  BeforeRemoveCommand=
-  ExtraFilesCommand=
+
 }
 
 function create_package {
+  PackageName=$ClientName
   fpm \
     -t $1 \
     -s dir \
@@ -53,22 +52,21 @@ function create_package {
     --maintainer "MaidSafeQA <qa@maidsafe.net>" \
     --description "$Description" \
     --url "http://maidsafe.net" \
-    $AfterInstallCommand \
-    $BeforeRemoveCommand \
     "$RootDir/target/release/examples/$ClientName"=$ClientPath \
-    "$RootDir/installer/common/$ClientName.crust.config"=$ConfigFilePath \
-    $ExtraFilesCommand
+    "$RootDir/installer/common/$ClientName.crust.config"=$ConfigFilePath
 }
 
 cd "$RootDir"
 cargo update
-cargo build --release
+cargo build --release --example safe_client
 # strip "$RootDir/target/release/$ClientName"
 rm -rf "$RootDir/packages/$Platform" || true
 if [[ "$1" == "linux" ]]
 then
   prepare_for_tar
   create_package tar
+  PackageName="$ClientName"_"$Version"_"$Bits"-bit
+  mv safe*.tar $PackageName.tar
   gzip $PackageName.tar
 
   # prepare_systemd_scripts
