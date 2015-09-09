@@ -15,16 +15,14 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// The following key types use the internal cbor tag to identify them and this
-/// should be carried through to any json representation if stored on disk
-///
 /// RevocationIdType
 ///
 /// #Examples
+///
 /// ```
 /// // Generating public and secret keys using sodiumoxide
 /// // Create RevocationIdType
-/// let an_maid = ::safe_client::id::RevocationIdType::new::<::safe_client::id::MaidTypeTags>();
+/// let _an_maid = ::safe_client::id::RevocationIdType::new::<::safe_client::id::MaidTypeTags>();
 /// ```
 ///
 
@@ -111,12 +109,9 @@ mod test {
     #[test]
     fn serialisation_an_maid() {
         let obj_before = RevocationIdType::generate_random();
-        let mut e = ::cbor::Encoder::from_memory();
-        e.encode(&[&obj_before]).unwrap();
 
-        let mut d = ::cbor::Decoder::from_bytes(e.as_bytes());
-
-        let obj_after = d.decode().next().unwrap().unwrap();
+        let serialised_obj = eval_result!(::utility::serialise(&obj_before));
+        let obj_after = eval_result!(::utility::deserialise(&serialised_obj));
         assert_eq!(obj_before, obj_after);
     }
 

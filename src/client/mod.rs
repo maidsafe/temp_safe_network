@@ -64,9 +64,9 @@ impl Client {
         {
             debug!("Bootstrapping ...");
             let (ref lock, ref condition_var) = *bootstrap_notifier;
-            let mut mutex_guard = lock.lock().unwrap();
+            let mut mutex_guard = eval_result!(lock.lock());
             while !*mutex_guard {
-                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
             }
             debug!("Bootstrapped");
         }
@@ -102,9 +102,9 @@ impl Client {
         {
             debug!("Bootstrapping ...");
             let (ref lock, ref condition_var) = *bootstrap_notifier;
-            let mut mutex_guard = lock.lock().unwrap();
+            let mut mutex_guard = eval_result!(lock.lock());
             while !*mutex_guard {
-                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
             }
             debug!("Bootstrapped");
         }
@@ -165,9 +165,9 @@ impl Client {
             {
                 debug!("Bootstrapping ...");
                 let (ref lock, ref condition_var) = *bootstrap_notifier;
-                let mut mutex_guard = lock.lock().unwrap();
+                let mut mutex_guard = eval_result!(lock.lock());
                 while !*mutex_guard {
-                    mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                    mutex_guard = eval_result!(condition_var.wait(mutex_guard));
                 }
                 debug!("Bootstrapped");
             }
@@ -245,10 +245,10 @@ impl Client {
             },
         };
 
-        Ok(try!(::utility::hybrid_encrypt(data_to_encrypt,
-                                          &nonce,
-                                          &account.get_public_maid().public_keys().1,
-                                          &account.get_maid().secret_keys().1)))
+        ::utility::hybrid_encrypt(data_to_encrypt,
+                                  &nonce,
+                                  &account.get_public_maid().public_keys().1,
+                                  &account.get_maid().secret_keys().1)
     }
 
     /// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
@@ -270,10 +270,10 @@ impl Client {
             },
         };
 
-        Ok(try!(::utility::hybrid_decrypt(data_to_decrypt,
-                                          &nonce,
-                                          &account.get_public_maid().public_keys().1,
-                                          &account.get_maid().secret_keys().1)))
+        ::utility::hybrid_decrypt(data_to_decrypt,
+                                  &nonce,
+                                  &account.get_public_maid().public_keys().1,
+                                  &account.get_maid().secret_keys().1)
     }
 
     /// Get data from the network. This is non-blocking.
@@ -281,7 +281,7 @@ impl Client {
                request_for : ::routing::data::DataRequest,
                opt_location: Option<::routing::authority::Authority>) -> response_getter::ResponseGetter {
         if let ::routing::data::DataRequest::ImmutableData(..) = request_for {
-            let mut msg_queue = self.message_queue.lock().unwrap();
+            let mut msg_queue = eval_result!(self.message_queue.lock());
             if msg_queue.local_cache_check(&request_for.name()) {
                 return response_getter::ResponseGetter::new(None, self.message_queue.clone(), request_for)
             }

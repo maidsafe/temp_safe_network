@@ -143,9 +143,9 @@ mod test {
 
     #[test]
     fn serialise_deserialise() {
-        let original_data = (generate_random_vector::<u8>(13).ok().unwrap(),
-                             generate_random_vector::<i64>(19).ok().unwrap(),
-                             generate_random_string(10).ok().unwrap());
+        let original_data = (eval_result!(generate_random_vector::<u8>(13)),
+                             eval_result!(generate_random_vector::<i64>(19)),
+                             eval_result!(generate_random_string(10)));
 
         let serialised_data = eval_result!(serialise(&original_data));
         let deserialised_data: (Vec<u8>, Vec<i64>, String) = eval_result!(deserialise(&serialised_data));

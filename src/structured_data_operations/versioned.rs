@@ -37,7 +37,7 @@ pub fn create(client: &mut ::client::Client,
 /// Get the complete version list
 pub fn get_all_versions(client: &mut ::client::Client, struct_data: &::routing::structured_data::StructuredData) -> Result<Vec<::routing::NameType>, ::errors::ClientError> {
     let immut_data = try!(get_immutable_data(client, struct_data));
-    Ok(try!(::utility::deserialise(&immut_data.value())))
+    ::utility::deserialise(&immut_data.value())
 }
 
 /// Append a new version
@@ -109,7 +109,7 @@ mod test {
 
     #[test]
     fn save_and_retrieve_immutable_data() {
-        let mut client = ::utility::test_utils::get_client().ok().unwrap();
+        let mut client = eval_result!(::utility::test_utils::get_client());
 
         let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
         let owners = ::utility::test_utils::generate_public_keys(1);
@@ -119,22 +119,18 @@ mod test {
         let version_0 = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
 
         let mut structured_data_result = create(&mut client, version_0.clone(), TAG_ID, id, 0, owners, prev_owners, secret_key);
-        assert!(structured_data_result.is_ok());
 
-        let mut structured_data = structured_data_result.ok().unwrap();
+        let mut structured_data = eval_result!(structured_data_result);
         let mut versions_res = get_all_versions(&mut client, &structured_data);
-        assert!(versions_res.is_ok());
-        let mut versions = versions_res.ok().unwrap();
+        let mut versions = eval_result!(versions_res);
         assert_eq!(versions.len(), 1);
 
         let version_1 = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
 
         structured_data_result = append_version(&mut client, structured_data, version_1.clone(), secret_key);
-        assert!(structured_data_result.is_ok());
-        structured_data = structured_data_result.ok().unwrap();
+        structured_data = eval_result!(structured_data_result);
         versions_res = get_all_versions(&mut client, &structured_data);
-        assert!(versions_res.is_ok());
-        versions = versions_res.ok().unwrap();
+        versions = eval_result!(versions_res);
         assert_eq!(versions.len(), 2);
 
         assert_eq!(versions[0], version_0);
