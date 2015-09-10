@@ -1,11 +1,15 @@
 *.exe
 *.lock
 *.swp
-*.bootstrap.cache
+*.rsproj
 tags*
 build/
 build-tests/
 target/
 /.idea
+/.project
+*.sublime-*
+*.bootstrap.cache
 /bin
-.cargo/*
+packages/
+.DS_Store

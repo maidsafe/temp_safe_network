@@ -22,11 +22,10 @@
 /// ```
 /// use ::safe_client::id::{IdType, RevocationIdType, MaidTypeTags, PublicIdType};
 ///
-///  let revocation_maid = RevocationIdType::new::<::safe_client::id::MaidTypeTags>();
-///  let maid = IdType::new(&revocation_maid);
-///  let public_maid  = PublicIdType::new(&maid, &revocation_maid);
+/// let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
+/// let maid = IdType::new(&revocation_maid);
+/// let _public_maid  = PublicIdType::new(&maid, &revocation_maid);
 /// ```
-
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct PublicIdType {
     type_tag: u64,
@@ -50,11 +49,17 @@ impl PublicIdType {
             combined.push(i);
         }
         let message_length = combined.len();
+
         let signature = revocation_id.sign(&combined).into_iter().skip(message_length).collect::<Vec<_>>();
-        let signature_arr = convert_to_array!(signature, ::sodiumoxide::crypto::sign::SIGNATUREBYTES);
+        let mut signature_arr = [0; ::sodiumoxide::crypto::sign::SIGNATUREBYTES];
+
+        for it in signature.into_iter().take(::sodiumoxide::crypto::sign::SIGNATUREBYTES).enumerate() {
+            signature_arr[it.0] = it.1;
+        }
+
         PublicIdType { type_tag: type_tag, public_keys: public_keys,
              revocation_public_key: revocation_id.public_key().clone(),
-             signature: ::sodiumoxide::crypto::sign::Signature(signature_arr.unwrap()) }
+             signature: ::sodiumoxide::crypto::sign::Signature(signature_arr) }
     }
 
     /// Returns the name
@@ -114,12 +119,8 @@ mod test {
     fn serialisation_public_maid() {
         let obj_before: PublicIdType = ::id::Random::generate_random();
 
-        let mut e = ::cbor::Encoder::from_memory();
-        e.encode(&[&obj_before]).unwrap();
-
-        let mut d = ::cbor::Decoder::from_bytes(e.as_bytes());
-
-        let obj_after: PublicIdType = d.decode().next().unwrap().unwrap();
+        let serialised_obj = eval_result!(::utility::serialise(&obj_before));
+        let obj_after: PublicIdType = eval_result!(::utility::deserialise(&serialised_obj));
 
         assert_eq!(obj_before, obj_after);
     }
@@ -154,9 +155,17 @@ mod test {
         }
 
         let message_length = combined.len();
-        let signature = revocation_maid.sign(&combined).into_iter().skip(message_length).collect::<Vec<_>>();
-        let signature_array = convert_to_array!(signature, ::sodiumoxide::crypto::sign::SIGNATUREBYTES);
-        let signature = ::sodiumoxide::crypto::sign::Signature(signature_array.unwrap());
+        let signature_vec = revocation_maid.sign(&combined).into_iter().skip(message_length).collect::<Vec<_>>();
+
+        assert_eq!(signature_vec.len(), ::sodiumoxide::crypto::sign::SIGNATUREBYTES);
+
+        let mut signature_arr = [0; ::sodiumoxide::crypto::sign::SIGNATUREBYTES];
+
+        for it in signature_vec.into_iter().take(::sodiumoxide::crypto::sign::SIGNATUREBYTES).enumerate() {
+            signature_arr[it.0] = it.1;
+        }
+
+        let signature = ::sodiumoxide::crypto::sign::Signature(signature_arr);
 
         assert_eq!(array_as_vector(&signature.0), array_as_vector(&public_maid.signature().0));
     }

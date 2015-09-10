@@ -35,14 +35,14 @@ impl MessageQueue {
         }));
 
         let message_queue_cloned = message_queue.clone();
-        let receiver_joiner = ::std::thread::Builder::new().name("MessageReceiverThread".to_string()).spawn(move || {
+        let receiver_joiner = eval_result!(::std::thread::Builder::new().name("MessageReceiverThread".to_string()).spawn(move || {
             for it in receiver.iter() {
                 match it {
                     ::routing::event::Event::Response { response, .. } => {
                         match response {
                             ::routing::ExternalResponse::Get(data, _, _) => {
                                 let data_name = data.name();
-                                message_queue_cloned.lock().unwrap().message_queue.insert(data_name.clone(), data);
+                                eval_result!(message_queue_cloned.lock()).message_queue.insert(data_name.clone(), data);
 
                                 let &(ref lock, ref condition_var) = &*notifier;
                                 let mut fetched_location = eval_result!(lock.lock());
@@ -64,7 +64,9 @@ impl MessageQueue {
                     _ => debug!("Received Event: {:?} ;; This is currently not supported.", it),
                 }
             }
-        }).unwrap();
+
+            debug!("Thread \"MessageReceiverThread\" terminated.");
+        }));
 
         (message_queue, ::client::misc::RAIIThreadJoiner::new(receiver_joiner))
     }
@@ -86,6 +88,6 @@ impl MessageQueue {
 
     /// Get data from cache filled by the response from routing
     pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::routing::data::Data, ::errors::ClientError> {
-        Ok(try!(self.message_queue.remove(&location).ok_or(::errors::ClientError::RoutingMessageCacheMiss)))
+        self.message_queue.remove(&location).ok_or(::errors::ClientError::RoutingMessageCacheMiss)
     }
 }

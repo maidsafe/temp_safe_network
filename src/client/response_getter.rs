@@ -45,11 +45,11 @@ impl ResponseGetter {
             let mut mutex_guard: _;
 
             {
-                let mut msg_queue = self.message_queue.lock().unwrap();
+                let mut msg_queue = eval_result!(self.message_queue.lock());
                 match msg_queue.get_response(&self.requested_name) {
                     Ok(response) => return Ok(response),
                     Err(_) => {
-                        mutex_guard = lock.lock().unwrap();
+                        mutex_guard = eval_result!(lock.lock());
                         if *mutex_guard == Some(self.requested_name.clone()) {
                             *mutex_guard = None;
                         }
@@ -59,10 +59,11 @@ impl ResponseGetter {
 
             let valid_condition = Some(self.requested_name.clone());
             while *mutex_guard != valid_condition {
-                mutex_guard = condition_var.wait(mutex_guard).unwrap();
+                debug!("Blocking wait for response from the network ...");
+                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
             }
 
-            let mut msg_queue = self.message_queue.lock().unwrap();
+            let mut msg_queue = eval_result!(self.message_queue.lock());
             let response = try!(msg_queue.get_response(&self.requested_name));
 
             if let ::routing::data::DataRequest::ImmutableData(..) = self.requested_type {
@@ -71,8 +72,8 @@ impl ResponseGetter {
 
             Ok(response)
         } else {
-            let mut msg_queue = self.message_queue.lock().unwrap();
-            Ok(try!(msg_queue.local_cache_get(&self.requested_name)))
+            let mut msg_queue = eval_result!(self.message_queue.lock());
+            msg_queue.local_cache_get(&self.requested_name)
         }
     }
 }
