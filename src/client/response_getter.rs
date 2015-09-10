@@ -59,6 +59,7 @@ impl ResponseGetter {
 
             let valid_condition = Some(self.requested_name.clone());
             while *mutex_guard != valid_condition {
+                debug!("Blocking wait for response from the network ...");
                 mutex_guard = eval_result!(condition_var.wait(mutex_guard));
             }
 
