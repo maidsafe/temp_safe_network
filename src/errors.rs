@@ -61,7 +61,8 @@ impl<'a> From<&'a str> for ClientError {
 }
 
 impl From<::cbor::CborError> for ClientError {
-    fn from(_: ::cbor::CborError) -> ClientError {
+    fn from(error: ::cbor::CborError) -> ClientError {
+        debug!("Error: {:?}", error);
         ClientError::UnsuccessfulEncodeDecode
     }
 }
