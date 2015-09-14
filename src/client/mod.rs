@@ -124,11 +124,11 @@ impl Client {
         };
 
         {
-            let account = try!(client.account.iter().next().ok_or(::errors::ClientError::from("Logic Error !!")));
-            let session_packet_keys = try!(client.session_packet_keys.iter().next().ok_or(::errors::ClientError::from("Logic Error !!")));
+            let account = try!(client.account.iter().next().ok_or(::errors::ClientError::from("Logic Error !! Report as bug.")));
+            let session_packet_keys = try!(client.session_packet_keys.iter().next().ok_or(::errors::ClientError::from("Logic Error !! Report as bug.")));
 
             let account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
-                                                                                       try!(client.session_packet_id.ok_or(::errors::ClientError::from("Logic Error !!"))).clone(),
+                                                                                       try!(client.session_packet_id.ok_or(::errors::ClientError::from("Logic Error !! Report as bug."))).clone(),
                                                                                        0,
                                                                                        try!(account.encrypt(session_packet_keys.get_password(),
                                                                                                             session_packet_keys.get_pin())),

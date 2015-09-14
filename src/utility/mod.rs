@@ -83,21 +83,30 @@ pub fn deserialise<T>(data: &[u8]) -> Result<T, ::errors::ClientError>
 
 /// Generates a random string for specified size
 pub fn generate_random_string(length: usize) -> Result<String, ::errors::ClientError> {
-    let mut os_rng = try!(::rand::OsRng::new());
+    let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
+        debug!("Error {:?}", error);
+        ::errors::ClientError::RandomDataGenerationFailure
+    }));
     Ok((0..length).map(|_| os_rng.gen::<char>()).collect())
 }
 
 /// Generate a random vector of given length
 pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, ::errors::ClientError>
                                                    where T: ::rand::Rand {
-    let mut os_rng = try!(::rand::OsRng::new());
+    let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
+        debug!("Error {:?}", error);
+        ::errors::ClientError::RandomDataGenerationFailure
+    }));
     Ok((0..length).map(|_| os_rng.gen()).collect())
 }
 
 /// Generate a random array of 64 u8's
 pub fn generate_random_array_u8_64() -> Result<[u8; 64], ::errors::ClientError> {
     let mut arr = [0; 64];
-    let mut os_rng = try!(::rand::OsRng::new());
+    let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
+        debug!("Error {:?}", error);
+        ::errors::ClientError::RandomDataGenerationFailure
+    }));
     for it in arr.iter_mut() {
         *it = os_rng.gen();
     }

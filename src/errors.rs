@@ -19,8 +19,6 @@
 /// across FFI boundaries and specially to C.
 pub const CLIENT_ERROR_START_RANGE: i32 = -1;
 
-use std::error::Error;
-
 /// Client Errors
 pub enum ClientError {
     /// StructuredData has no space available to fit in any user data inside it.
@@ -31,8 +29,6 @@ pub enum ClientError {
     AsymmetricDecipherFailure,
     /// Symmetric Key Decryption Failed
     SymmetricDecipherFailure,
-    /// Routing GET, PUT, POST, DELETE Immediate Failure
-    RoutingFailure(::std::io::Error),
     /// ReceivedUnexpectedData
     ReceivedUnexpectedData,
     /// No such data found in local version cache
@@ -40,11 +36,11 @@ pub enum ClientError {
     /// No such data found in routing-filled cache
     RoutingMessageCacheMiss,
     /// Network operation failed
-    NetworkOperationFailure(::routing::error::ResponseError),
+    ResponseError(::routing::error::ResponseError),
     /// Cannot overwrite a root directory if it already exists
     RootDirectoryAlreadyExists,
-    /// Generic I/O Error
-    GenericIoError(::std::io::Error),
+    /// Unable to obtain generator for random data
+    RandomDataGenerationFailure,
     /// Forbidden operation requested for this Client
     OperationForbiddenForClient,
     /// Unexpected - Probably a Logic error
@@ -65,20 +61,15 @@ impl<'a> From<&'a str> for ClientError {
 }
 
 impl From<::cbor::CborError> for ClientError {
-    fn from(_: ::cbor::CborError) -> ClientError {
+    fn from(error: ::cbor::CborError) -> ClientError {
+        debug!("Error: {:?}", error);
         ClientError::UnsuccessfulEncodeDecode
     }
 }
 
 impl From<::routing::error::ResponseError> for ClientError {
     fn from(error: ::routing::error::ResponseError) -> ClientError {
-        ClientError::NetworkOperationFailure(error)
-    }
-}
-
-impl From<::std::io::Error> for ClientError {
-    fn from(error: ::std::io::Error) -> ClientError {
-        ClientError::GenericIoError(error)
+        ClientError::ResponseError(error)
     }
 }
 
@@ -95,18 +86,17 @@ impl Into<i32> for ClientError {
             ClientError::UnsuccessfulEncodeDecode            => CLIENT_ERROR_START_RANGE - 1,
             ClientError::AsymmetricDecipherFailure           => CLIENT_ERROR_START_RANGE - 2,
             ClientError::SymmetricDecipherFailure            => CLIENT_ERROR_START_RANGE - 3,
-            ClientError::RoutingFailure(_)                   => CLIENT_ERROR_START_RANGE - 4,
-            ClientError::ReceivedUnexpectedData              => CLIENT_ERROR_START_RANGE - 5,
-            ClientError::VersionCacheMiss                    => CLIENT_ERROR_START_RANGE - 6,
-            ClientError::RoutingMessageCacheMiss             => CLIENT_ERROR_START_RANGE - 7,
-            ClientError::NetworkOperationFailure(_)          => CLIENT_ERROR_START_RANGE - 8,
-            ClientError::RootDirectoryAlreadyExists          => CLIENT_ERROR_START_RANGE - 9,
-            ClientError::GenericIoError(_)                   => CLIENT_ERROR_START_RANGE - 10,
-            ClientError::OperationForbiddenForClient         => CLIENT_ERROR_START_RANGE - 11,
-            ClientError::Unexpected(_)                       => CLIENT_ERROR_START_RANGE - 12,
-            ClientError::RoutingError(_)                     => CLIENT_ERROR_START_RANGE - 13,
-            ClientError::UnsupportedSaltSizeForPwHash        => CLIENT_ERROR_START_RANGE - 14,
-            ClientError::UnsuccessfulPwHash                  => CLIENT_ERROR_START_RANGE - 15,
+            ClientError::ReceivedUnexpectedData              => CLIENT_ERROR_START_RANGE - 4,
+            ClientError::VersionCacheMiss                    => CLIENT_ERROR_START_RANGE - 5,
+            ClientError::RoutingMessageCacheMiss             => CLIENT_ERROR_START_RANGE - 6,
+            ClientError::ResponseError(_)                    => CLIENT_ERROR_START_RANGE - 7,
+            ClientError::RootDirectoryAlreadyExists          => CLIENT_ERROR_START_RANGE - 8,
+            ClientError::RandomDataGenerationFailure         => CLIENT_ERROR_START_RANGE - 9,
+            ClientError::OperationForbiddenForClient         => CLIENT_ERROR_START_RANGE - 10,
+            ClientError::Unexpected(_)                       => CLIENT_ERROR_START_RANGE - 11,
+            ClientError::RoutingError(_)                     => CLIENT_ERROR_START_RANGE - 12,
+            ClientError::UnsupportedSaltSizeForPwHash        => CLIENT_ERROR_START_RANGE - 13,
+            ClientError::UnsuccessfulPwHash                  => CLIENT_ERROR_START_RANGE - 14,
         }
     }
 }
@@ -118,13 +108,12 @@ impl ::std::fmt::Debug for ClientError {
             ClientError::UnsuccessfulEncodeDecode            => write!(f, "ClientError::UnsuccessfulEncodeDecode"),
             ClientError::AsymmetricDecipherFailure           => write!(f, "ClientError::AsymmetricDecipherFailure"),
             ClientError::SymmetricDecipherFailure            => write!(f, "ClientError::SymmetricDecipherFailure"),
-            ClientError::RoutingFailure(ref error)           => write!(f, "ClientError::RoutingFailure -> {:?}", error.description()),
             ClientError::ReceivedUnexpectedData              => write!(f, "ClientError::ReceivedUnexpectedData"),
             ClientError::VersionCacheMiss                    => write!(f, "ClientError::VersionCacheMiss"),
             ClientError::RoutingMessageCacheMiss             => write!(f, "ClientError::RoutingMessageCacheMiss"),
-            ClientError::NetworkOperationFailure(ref error)  => write!(f, "ClientError::NetworkOperationFailure -> {:?}", error.description()),
+            ClientError::ResponseError(ref error)            => write!(f, "ClientError::ResponseError -> {:?}", error),
             ClientError::RootDirectoryAlreadyExists          => write!(f, "ClientError::RootDirectoryAlreadyExists"),
-            ClientError::GenericIoError(ref error)           => write!(f, "ClientError::GenericIoError -> {:?}", error.description()),
+            ClientError::RandomDataGenerationFailure         => write!(f, "ClientError::RandomDataGenerationFailure"),
             ClientError::OperationForbiddenForClient         => write!(f, "ClientError::OperationForbiddenForClient"),
             ClientError::Unexpected(ref error)               => write!(f, "ClientError::Unexpected::{{{:?}}}", error),
             ClientError::RoutingError(ref error)             => write!(f, "ClientError::RoutingError -> {:?}", error),
