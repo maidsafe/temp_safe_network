@@ -14,8 +14,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// TODO move to utility - this mod should be private
-/// Gnerates a mock client
+/// Gnerates a random mock client for testing
 pub fn get_client() -> Result<::client::Client, ::errors::ClientError> {
     let pin = try!(::utility::generate_random_string(10));
     let keyword = try!(::utility::generate_random_string(10));
@@ -24,46 +23,36 @@ pub fn get_client() -> Result<::client::Client, ::errors::ClientError> {
     ::client::Client::create_account(keyword, pin, password)
 }
 
-/// Gnerates Random public keys
-pub fn generate_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-    let mut public_keys = Vec::with_capacity(size);
-    for _ in 0..size {
-        public_keys.push(::sodiumoxide::crypto::sign::gen_keypair().0);
-    }
-    public_keys
+/// Gnerates Random Public Keys
+pub fn generate_public_keys(len: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+    (0..len).map(|_| ::sodiumoxide::crypto::sign::gen_keypair().0).collect()
+}
+
+/// Gnerates Random Secret Keys
+pub fn generate_secret_keys(len: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
+    (0..len).map(|_| ::sodiumoxide::crypto::sign::gen_keypair().1).collect()
 }
 
 /// Gnerates public keys of maximun size
-pub fn get_max_sized_public_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-    let mut public_keys = Vec::with_capacity(size);
-    for _ in 0..size {
-        public_keys.push(::sodiumoxide::crypto::sign::PublicKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::PUBLICKEYBYTES]));
-    }
-    public_keys
+pub fn get_max_sized_public_keys(len: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
+    ::std::iter::repeat(::sodiumoxide::crypto::sign::PublicKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::PUBLICKEYBYTES])).take(len).collect()
 }
 
 /// Gnerates secret keys of maximun size
-pub fn get_max_sized_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
-    let mut secret_keys = Vec::with_capacity(size);
-    for _ in 0..size {
-        secret_keys.push(::sodiumoxide::crypto::sign::SecretKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::SECRETKEYBYTES]));
-    }
-    secret_keys
+pub fn get_max_sized_secret_keys(len: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
+    ::std::iter::repeat(::sodiumoxide::crypto::sign::SecretKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::SECRETKEYBYTES])).take(len).collect()
 }
 
-/// Gnerates Random SecretKey
-pub fn generate_secret_keys(size: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
-    let mut secret_keys = Vec::with_capacity(size);
-    for _ in 0..size {
-        secret_keys.push(::sodiumoxide::crypto::sign::gen_keypair().1);
-    }
-    secret_keys
-}
+#[cfg(test)]
+mod test {
+    use super::*;
 
-/// Saves data as immutable data and returns the name of the immutable data
-pub fn save_as_immutable_data(client: &mut ::client::Client, data: Vec<u8>) -> ::routing::NameType {
-    let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal, data);
-    let name_of_immutable_data = immutable_data.name();
-    client.put(::routing::data::Data::ImmutableData(immutable_data), None);
-    name_of_immutable_data
+    #[test]
+    fn random_client() {
+        let client0 = eval_result!(get_client());
+        let client1 = eval_result!(get_client());
+
+        assert!(eval_result!(client0.get_public_signing_key()) != eval_result!(client1.get_public_signing_key()));
+        assert!(eval_result!(client0.get_public_encryption_key()) != eval_result!(client1.get_public_encryption_key()));
+    }
 }
