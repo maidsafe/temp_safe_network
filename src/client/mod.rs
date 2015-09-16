@@ -42,7 +42,6 @@ pub struct Client {
     routing            : Routing,
     _raii_joiner       : misc::RAIIThreadJoiner,
     message_queue      : ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>,
-    response_notifier  : misc::ResponseNotifier,
     session_packet_id  : Option<::routing::NameType>,
     session_packet_keys: Option<SessionPacketEncryptionKeys>,
 }
@@ -51,37 +50,30 @@ impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will create an
     /// unregistered random clinet, which can do very limited set of operations - eg., a
     /// Network-Get
-    pub fn create_unregistered_client() -> Client {
+    pub fn create_unregistered_client() -> Result<Client, ::errors::ClientError> {
         debug!("Creating unregistered client ...");
 
-        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-        // TODO stabilise this design
-        let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
-        let (sender, receiver) = ::std::sync::mpsc::channel();
+        let (routing_sender, routing_receiver) = ::std::sync::mpsc::channel();
+        let (network_event_sender, network_event_receiver) = ::std::sync::mpsc::channel();
 
-        let routing = Client::get_new_routing(sender, None);
-        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
+        let routing = Client::get_new_routing(routing_sender, None);
+        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
 
-        // TODO stabilise this design
-        {
-            debug!("Bootstrapping ...");
-            let (ref lock, ref condition_var) = *bootstrap_notifier;
-            let mut mutex_guard = eval_result!(lock.lock());
-            while !*mutex_guard {
-                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
-            }
-            debug!("Bootstrapped");
+        debug!("Bootstrapping ...");
+        match try!(network_event_receiver.recv()) {
+            ::translated_events::NetworkEvent::Bootstrapped => (),
+            _ => return Err(::errors::ClientError::OperationAborted),
         }
+        debug!("Bootstrapped");
 
-        Client {
+        Ok(Client {
             account            : None,
             routing            : routing,
             _raii_joiner       : raii_joiner,
             message_queue      : message_queue,
-            response_notifier  : notifier,
             session_packet_id  : None,
             session_packet_keys: None,
-        }
+        })
     }
 
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
@@ -89,36 +81,30 @@ impl Client {
     pub fn create_account(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
         debug!("Creating account for supplied credentials ...");
 
-        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-        // TODO stabilise this design
-        let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
         let account_packet = user_account::Account::new(None, None);
         let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
                                                       account_packet.get_maid().secret_keys().0.clone()),
                                                      (account_packet.get_maid().public_keys().1.clone(),
                                                       account_packet.get_maid().secret_keys().1.clone()));
-        let (sender, receiver) = ::std::sync::mpsc::channel();
 
-        let routing = Client::get_new_routing(sender, Some(id_packet));
-        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
+        let (routing_sender, routing_receiver) = ::std::sync::mpsc::channel();
+        let (network_event_sender, network_event_receiver) = ::std::sync::mpsc::channel();
 
-        // TODO stabilise this design
-        {
-            debug!("Bootstrapping ...");
-            let (ref lock, ref condition_var) = *bootstrap_notifier;
-            let mut mutex_guard = eval_result!(lock.lock());
-            while !*mutex_guard {
-                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
-            }
-            debug!("Bootstrapped");
+        let routing = Client::get_new_routing(routing_sender, Some(id_packet));
+        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
+
+        debug!("Bootstrapping ...");
+        match try!(network_event_receiver.recv()) {
+            ::translated_events::NetworkEvent::Bootstrapped => (),
+            _ => return Err(::errors::ClientError::OperationAborted),
         }
+        debug!("Bootstrapped");
 
         let client = Client {
             account            : Some(account_packet),
             routing            : routing,
             _raii_joiner       : raii_joiner,
             message_queue      : message_queue,
-            response_notifier  : notifier,
             session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()))),
             session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
         };
@@ -147,7 +133,7 @@ impl Client {
     pub fn log_in(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
         debug!("Loging into account with supplied credentials ...");
 
-        let mut unregistered_client = Client::create_unregistered_client();
+        let mut unregistered_client = try!(Client::create_unregistered_client());
         let user_id = try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
 
         let session_packet_request = ::routing::data::DataRequest::StructuredData(user_id.clone(), LOGIN_PACKET_TYPE_TAG);
@@ -163,31 +149,25 @@ impl Client {
                                                           decrypted_session_packet.get_maid().secret_keys().0.clone()),
                                                          (decrypted_session_packet.get_maid().public_keys().1.clone(),
                                                           decrypted_session_packet.get_maid().secret_keys().1.clone()));
-            let (sender, receiver) = ::std::sync::mpsc::channel();
 
-            let routing = Client::get_new_routing(sender, Some(id_packet));
-            let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-            // TODO stabilise this design
-            let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
-            let (message_queue, raii_joiner) = message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
+            let (routing_sender, routing_receiver) = ::std::sync::mpsc::channel();
+            let (network_event_sender, network_event_receiver) = ::std::sync::mpsc::channel();
 
-            // TODO stabilise this design
-            {
-                debug!("Bootstrapping ...");
-                let (ref lock, ref condition_var) = *bootstrap_notifier;
-                let mut mutex_guard = eval_result!(lock.lock());
-                while !*mutex_guard {
-                    mutex_guard = eval_result!(condition_var.wait(mutex_guard));
-                }
-                debug!("Bootstrapped");
+            let routing = Client::get_new_routing(routing_sender, Some(id_packet));
+            let (message_queue, raii_joiner) = message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
+
+            debug!("Bootstrapping ...");
+            match try!(network_event_receiver.recv()) {
+                ::translated_events::NetworkEvent::Bootstrapped => (),
+                _ => return Err(::errors::ClientError::OperationAborted),
             }
+            debug!("Bootstrapped");
 
             let client = Client {
                 account            : Some(decrypted_session_packet),
                 routing            : routing,
                 _raii_joiner       : raii_joiner,
                 message_queue      : message_queue,
-                response_notifier  : notifier,
                 session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()))),
                 session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
             };
@@ -302,10 +282,16 @@ impl Client {
             None       => ::routing::authority::Authority::NaeManager(request_for.name()),
         };
 
+        let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+        eval_result!(self.message_queue.lock()).add_data_receive_event_observer(request_for.name(),
+                                                                                data_event_sender.clone());
+
         self.routing.get_request(location, request_for.clone());
         debug!("GET request posted to the network.");
 
-        response_getter::ResponseGetter::new(Some(self.response_notifier.clone()), self.message_queue.clone(), request_for)
+        response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                             self.message_queue.clone(),
+                                             request_for)
     }
 
     /// Put data onto the network. This is non-blocking.
@@ -483,7 +469,7 @@ mod test {
         }
 
         // Unregistered Client should be able to retrieve the data
-        let mut unregistered_client = Client::create_unregistered_client();
+        let mut unregistered_client = eval_result!(Client::create_unregistered_client());
         let request = ::routing::data::DataRequest::ImmutableData(orig_data.name(),
                                                                   ::routing::immutable_data::ImmutableDataType::Normal);
         let rxd_data = eval_result!(unregistered_client.get(request, None).get());
