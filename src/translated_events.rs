@@ -13,22 +13,34 @@
 // KIND, either express or implied.
 //
 // Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.
+// relating to use of the SAFE Network Software.                                                                 */
 
-pub struct RAIIThreadJoiner {
-    joiner: Option<::std::thread::JoinHandle<()>>,
+/// Reception of reqested Data
+pub enum DataReceivedEvent {
+    /// Received Data
+    DataReceived,
+    /// Graceful Exit Condition
+    Terminated,
 }
 
-impl RAIIThreadJoiner {
-    pub fn new(joiner: ::std::thread::JoinHandle<()>) -> RAIIThreadJoiner {
-        RAIIThreadJoiner {
-            joiner: Some(joiner),
-        }
-    }
+/// Netowork Events that Client Modules need to deal with
+pub enum NetworkEvent {
+    /// The client engine is connected to atleast one peer
+    Bootstrapped,
+    /// The client has lost connection to all peers
+    Disconnected,
+    /// Graceful Exit Condition
+    Terminated,
 }
 
-impl Drop for RAIIThreadJoiner {
-    fn drop(&mut self) {
-        eval_result!(eval_option!(self.joiner.take(), "Programming Error - Please report this as a Bug.").join());
-    }
+/// Failures in operations that Client Modules need to deal with
+pub enum OperationFailureEvent {
+    /// PUT request failed
+    PutFailure(::routing::error::ResponseError),
+    /// POST request failed
+    PostFailure(::routing::error::ResponseError),
+    /// DELETE request failed
+    DeleteFailure(::routing::error::ResponseError),
+    /// Graceful Exit Condition
+    Terminated,
 }

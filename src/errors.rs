@@ -20,6 +20,7 @@
 pub const CLIENT_ERROR_START_RANGE: i32 = -1;
 
 /// Client Errors
+#[allow(variant_size_differences)] // TODO
 pub enum ClientError {
     /// StructuredData has no space available to fit in any user data inside it.
     StructuredDataHeaderSizeProhibitive,
@@ -52,6 +53,8 @@ pub enum ClientError {
     /// Unable to complete computation for password hashing - usually because OS refused to
     /// allocate amount of requested memory
     UnsuccessfulPwHash,
+    /// Blocking operation was cancelled
+    OperationAborted,
 }
 
 impl<'a> From<&'a str> for ClientError {
@@ -79,6 +82,12 @@ impl From<::routing::error::RoutingError> for ClientError {
     }
 }
 
+impl From<::std::sync::mpsc::RecvError> for ClientError {
+    fn from(_: ::std::sync::mpsc::RecvError) -> ClientError {
+        ClientError::OperationAborted
+    }
+}
+
 impl Into<i32> for ClientError {
     fn into(self) -> i32 {
         match self {
@@ -97,6 +106,7 @@ impl Into<i32> for ClientError {
             ClientError::RoutingError(_)                     => CLIENT_ERROR_START_RANGE - 12,
             ClientError::UnsupportedSaltSizeForPwHash        => CLIENT_ERROR_START_RANGE - 13,
             ClientError::UnsuccessfulPwHash                  => CLIENT_ERROR_START_RANGE - 14,
+            ClientError::OperationAborted                    => CLIENT_ERROR_START_RANGE - 15,
         }
     }
 }
@@ -119,6 +129,7 @@ impl ::std::fmt::Debug for ClientError {
             ClientError::RoutingError(ref error)             => write!(f, "ClientError::RoutingError -> {:?}", error),
             ClientError::UnsupportedSaltSizeForPwHash        => write!(f, "ClientError::UnsupportedSaltSizeForPwHash"),
             ClientError::UnsuccessfulPwHash                  => write!(f, "ClientError::UnsuccessfulPwHash"),
+            ClientError::OperationAborted                    => write!(f, "ClientError::OperationAborted"),
         }
     }
 }

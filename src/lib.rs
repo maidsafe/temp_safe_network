@@ -41,8 +41,6 @@ unused_qualifications, variant_size_differences)]
 //! #Safe-Client Library
 //! [Project github page](https://github.com/maidsafe/safe_client)
 
-#![allow(variant_size_differences)] // TODO
-
 extern crate cbor;
 extern crate rand;
 extern crate routing;
@@ -64,6 +62,9 @@ pub mod errors;
 pub mod client;
 /// Utility functions
 pub mod utility;
+/// Events filtered from set of Routing provided events, on which the Client Modules must
+/// specifically act
+pub mod translated_events;
 /// Implements the Self Encryption storage trait
 pub mod self_encryption_storage;
 /// Helper functions to handle StructuredData related operations

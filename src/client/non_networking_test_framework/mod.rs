@@ -261,9 +261,6 @@ mod test {
 
     #[test]
     fn check_put_post_get_delete_for_immutable_data() {
-        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-        // TODO stabilise this design
-        let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
 
         let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
@@ -271,20 +268,15 @@ mod test {
                                                      (account_packet.get_maid().public_keys().1.clone(),
                                                       account_packet.get_maid().secret_keys().1.clone()));
 
-        let (sender, receiver) = ::std::sync::mpsc::channel();
-        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
+        let (routing_sender, routing_receiver) = ::std::sync::mpsc::channel();
+        let (network_event_sender, network_event_receiver) = ::std::sync::mpsc::channel();
 
-        let mut mock_routing = RoutingMock::new(sender, Some(id_packet));
+        let mut mock_routing = RoutingMock::new(routing_sender, Some(id_packet));
+        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
 
-        // TODO stabilise this design
-        {
-            debug!("Bootstrapping ...");
-            let (ref lock, ref condition_var) = *bootstrap_notifier;
-            let mut mutex_guard = eval_result!(lock.lock());
-            while !*mutex_guard {
-                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
-            }
-            debug!("Bootstrapped");
+        match eval_result!(network_event_receiver.recv()) {
+            ::translated_events::NetworkEvent::Bootstrapped => (),
+            _ => panic!("Could not Bootstrap !!"),
         }
 
         // Construct ImmutableData
@@ -303,9 +295,14 @@ mod test {
         {
             let data_request = ::routing::data::DataRequest::ImmutableData(orig_data.name(),
                                                                            ::routing::immutable_data::ImmutableDataType::Normal);
+
+            let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+            eval_result!(message_queue.lock()).add_data_receive_event_observer(data_request.name(),
+                                                                               data_event_sender.clone());
+
             mock_routing.get_request(location_nae_mgr.clone(), data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                                                                      message_queue.clone(),
                                                                                      data_request);
             match response_getter.get() {
@@ -334,23 +331,28 @@ mod test {
         {
             let data_request = ::routing::data::DataRequest::ImmutableData(orig_data.name(),
                                                                            ::routing::immutable_data::ImmutableDataType::Normal);
+
+            let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+            eval_result!(message_queue.lock()).add_data_receive_event_observer(data_request.name(),
+                                                                               data_event_sender.clone());
+
             mock_routing.get_request(location_nae_mgr, data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                                                                      message_queue.clone(),
                                                                                      data_request);
+
             match response_getter.get() {
                 Ok(data) => assert_eq!(data, orig_data),
                 Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
             }
         }
+
+        mock_routing.stop();
     }
 
     #[test]
     fn check_put_post_get_delete_for_structured_data() {
-        let notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(None), ::std::sync::Condvar::new()));
-        // TODO stabilise this design
-        let bootstrap_notifier = ::std::sync::Arc::new((::std::sync::Mutex::new(false), ::std::sync::Condvar::new()));
         let account_packet = ::client::user_account::Account::new(None, None);
 
         let id_packet = ::routing::id::Id::with_keys((account_packet.get_maid().public_keys().0.clone(),
@@ -358,20 +360,15 @@ mod test {
                                                      (account_packet.get_maid().public_keys().1.clone(),
                                                       account_packet.get_maid().secret_keys().1.clone()));
 
-        let (sender, receiver) = ::std::sync::mpsc::channel();
-        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(notifier.clone(), bootstrap_notifier.clone(), receiver);
+        let (routing_sender, routing_receiver) = ::std::sync::mpsc::channel();
+        let (network_event_sender, network_event_receiver) = ::std::sync::mpsc::channel();
 
-        let mut mock_routing = RoutingMock::new(sender, Some(id_packet));
+        let mut mock_routing = RoutingMock::new(routing_sender, Some(id_packet));
+        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
 
-        // TODO stabilise this design
-        {
-            debug!("Bootstrapping ...");
-            let (ref lock, ref condition_var) = *bootstrap_notifier;
-            let mut mutex_guard = eval_result!(lock.lock());
-            while !*mutex_guard {
-                mutex_guard = eval_result!(condition_var.wait(mutex_guard));
-            }
-            debug!("Bootstrapped");
+        match eval_result!(network_event_receiver.recv()) {
+            ::translated_events::NetworkEvent::Bootstrapped => (),
+            _ => panic!("Could not Bootstrap !!"),
         }
 
         // Construct ImmutableData
@@ -413,8 +410,13 @@ mod test {
         {
             let struct_data_request = ::routing::data::DataRequest::StructuredData(user_id.clone(), TYPE_TAG);
 
+            let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+            eval_result!(message_queue.lock()).add_data_receive_event_observer(struct_data_request.name(),
+                                                                               data_event_sender.clone());
+
             mock_routing.get_request(location_nae_mgr_struct.clone(), struct_data_request.clone());
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+
+            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                                                                      message_queue.clone(),
                                                                                      struct_data_request);
             match response_getter.get() {
@@ -435,8 +437,13 @@ mod test {
             let immut_data_request = ::routing::data::DataRequest::ImmutableData(eval_option!(location_vec.pop(), "Value must exist !"),
                                                                                  ::routing::immutable_data::ImmutableDataType::Normal);
 
+            let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+            eval_result!(message_queue.lock()).add_data_receive_event_observer(immut_data_request.name(),
+                                                                               data_event_sender.clone());
+
             mock_routing.get_request(location_nae_mgr_immut.clone(), immut_data_request.clone());
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+
+            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                                                                      message_queue.clone(),
                                                                                      immut_data_request);
             match response_getter.get() {
@@ -499,8 +506,13 @@ mod test {
         {
             let struct_data_request = ::routing::data::DataRequest::StructuredData(user_id, TYPE_TAG);
 
+            let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+            eval_result!(message_queue.lock()).add_data_receive_event_observer(struct_data_request.name(),
+                                                                               data_event_sender.clone());
+
             mock_routing.get_request(location_nae_mgr_struct, struct_data_request.clone());
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+
+            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                                                                      message_queue.clone(),
                                                                                      struct_data_request);
             match response_getter.get() {
@@ -523,8 +535,13 @@ mod test {
             let immut_data_request = ::routing::data::DataRequest::ImmutableData(location_vec[1].clone(),
                                                                                  ::routing::immutable_data::ImmutableDataType::Normal);
 
+            let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+            eval_result!(message_queue.lock()).add_data_receive_event_observer(immut_data_request.name(),
+                                                                               data_event_sender.clone());
+
             mock_routing.get_request(location_nae_mgr_immut.clone(), immut_data_request.clone());
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+
+            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                                                                      message_queue.clone(),
                                                                                      immut_data_request);
             match response_getter.get() {
@@ -538,8 +555,13 @@ mod test {
             let immut_data_request = ::routing::data::DataRequest::ImmutableData(location_vec[0].clone(),
                                                                                  ::routing::immutable_data::ImmutableDataType::Normal);
 
+            let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+            eval_result!(message_queue.lock()).add_data_receive_event_observer(immut_data_request.name(),
+                                                                               data_event_sender.clone());
+
             mock_routing.get_request(location_nae_mgr_immut, immut_data_request.clone());
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some(notifier.clone()),
+
+            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                                                                      message_queue.clone(),
                                                                                      immut_data_request);
             match response_getter.get() {
@@ -551,5 +573,7 @@ mod test {
         // TODO this will not function properly presently .. DELETE needs a version Bump too
         // DELETE of Structured Data should succeed
         mock_routing.delete_request(location_client_mgr_struct, data_account_version);
+
+        mock_routing.stop();
     }
 }
