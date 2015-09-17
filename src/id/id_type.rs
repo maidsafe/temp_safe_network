@@ -25,7 +25,6 @@
 /// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>());
 ///
 /// ```
-
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct IdType {
     type_tag   : u64,

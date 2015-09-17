@@ -20,7 +20,6 @@
 pub const CLIENT_ERROR_START_RANGE: i32 = -1;
 
 /// Client Errors
-#[allow(variant_size_differences)] // TODO
 pub enum ClientError {
     /// StructuredData has no space available to fit in any user data inside it.
     StructuredDataHeaderSizeProhibitive,

@@ -139,42 +139,32 @@ impl MessageQueue {
         (message_queue, ::client::misc::RAIIThreadJoiner::new(receiver_joiner))
     }
 
-    /// Add observers for Data Recieve Events
     pub fn add_data_receive_event_observer(&mut self,
                                            data_name: ::routing::NameType,
                                            sender   : ::std::sync::mpsc::Sender<::translated_events::DataReceivedEvent>) {
         self.data_senders.entry(data_name).or_insert(Vec::new()).push(sender);
     }
 
-    /// Add observers for Operation Failure Events like `PutFailure`, `PostFailure`, `DeleteFailure`,
-    /// `Terminated`
-    #[allow(dead_code)]
     pub fn add_operation_failure_event_observer(&mut self, sender: ::std::sync::mpsc::Sender<::translated_events::OperationFailureEvent>) {
         self.error_senders.push(sender);
     }
 
-    /// Add observers for Network Events like `Bootstrapped`, `Disconnected`, `Terminated`
-    #[allow(dead_code)]
     pub fn add_network_event_observer(&mut self, sender: ::std::sync::mpsc::Sender<::translated_events::NetworkEvent>) {
         self.network_event_senders.push(sender);
     }
 
-    /// Check if data is already in local cache
     pub fn local_cache_check(&mut self, key: &::routing::NameType) -> bool {
         self.local_cache.contains_key(key)
     }
 
-    /// Get data if already in local cache.
     pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Result<::routing::data::Data, ::errors::ClientError> {
         self.local_cache.get(key).ok_or(::errors::ClientError::VersionCacheMiss).map(|val| val.clone())
     }
 
-    /// Put data into local cache
     pub fn local_cache_insert(&mut self, key: ::routing::NameType, value: ::routing::data::Data) {
         self.local_cache.insert(key, value);
     }
 
-    /// Get data from cache filled by the response from routing
     pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::routing::data::Data, ::errors::ClientError> {
         self.routing_message_cache.get(location).ok_or(::errors::ClientError::RoutingMessageCacheMiss).map(|val| val.clone())
     }
