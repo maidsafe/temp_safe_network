@@ -51,8 +51,6 @@ impl MessageQueue {
                     ::routing::event::Event::Response { response, .. } => {
                         match response {
                             ::routing::ExternalResponse::Get(data, _, _) => {
-                                // TODO optimise by fine-graining mutexes
-
                                 let data_name = data.name();
                                 let mut dead_sender_positions = Vec::<usize>::new();
                                 let mut queue_guard = eval_result!(message_queue_cloned.lock());

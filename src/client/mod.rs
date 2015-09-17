@@ -594,4 +594,90 @@ mod test {
         assert_eq!(plain_text_original_0, plain_text_2);
         assert_eq!(plain_text_original_1, plain_text_3);
     }
+
+    #[test]
+    fn version_caching() {
+        let mut client = eval_result!(::utility::test_utils::get_client());
+
+        // Version Caching should work for ImmutableData
+        {
+            let immut_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal,
+                                                                           eval_result!(::utility::generate_random_vector(10)));
+            let data = ::routing::data::Data::ImmutableData(immut_data);
+
+            client.put(data.clone(), None);
+
+            let data_request = ::routing::data::DataRequest::ImmutableData(data.name(),
+                                                                           ::routing::immutable_data::ImmutableDataType::Normal);
+
+            // Should not initially be in version cache
+            {
+                let response_getter = ::client::response_getter::ResponseGetter::new(None,
+                                                                                     client.message_queue.clone(),
+                                                                                     data_request.clone());
+
+                match response_getter.get() {
+                    Ok(_) => panic!("Should not have found data in version cache !!"),
+                    Err(::errors::ClientError::VersionCacheMiss) => (),
+                    Err(error) => panic!("{:?}", error),
+                }
+            }
+
+            let response_getter = client.get(data_request.clone(), None);
+            assert_eq!(eval_result!(response_getter.get()), data);
+
+            let response_getter = ::client::response_getter::ResponseGetter::new(None,
+                                                                                 client.message_queue.clone(),
+                                                                                 data_request);
+            assert_eq!(eval_result!(response_getter.get()), data);
+        }
+
+        // Version Caching should NOT work for StructuredData
+        {
+            const TYPE_TAG: u64 = 15000;
+            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
+
+            let struct_data = eval_result!(::routing::structured_data::StructuredData::new(TYPE_TAG,
+                                                                                           id.clone(),
+                                                                                           0,
+                                                                                           Vec::new(),
+                                                                                           Vec::new(),
+                                                                                           Vec::new(),
+                                                                                           None));
+            let data = ::routing::data::Data::StructuredData(struct_data);
+
+            client.put(data.clone(), None);
+
+            let data_request = ::routing::data::DataRequest::StructuredData(id, TYPE_TAG);
+
+            // Should not initially be in version cache
+            {
+                let response_getter = ::client::response_getter::ResponseGetter::new(None,
+                                                                                     client.message_queue.clone(),
+                                                                                     data_request.clone());
+
+                match response_getter.get() {
+                    Ok(_) => panic!("Should not have found data in version cache !!"),
+                    Err(::errors::ClientError::VersionCacheMiss) => (),
+                    Err(error) => panic!("{:?}", error),
+                }
+            }
+
+            let response_getter = client.get(data_request.clone(), None);
+            assert_eq!(eval_result!(response_getter.get()), data);
+
+            // Should not be in version cache even after fetch
+            {
+                let response_getter = ::client::response_getter::ResponseGetter::new(None,
+                                                                                     client.message_queue.clone(),
+                                                                                     data_request);
+
+                match response_getter.get() {
+                    Ok(_) => panic!("Should not have found data in version cache !!"),
+                    Err(::errors::ClientError::VersionCacheMiss) => (),
+                    Err(error) => panic!("{:?}", error),
+                }
+            }
+        }
+    }
 }

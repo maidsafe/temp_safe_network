@@ -167,5 +167,4 @@ mod test {
                        eval_result!(check_if_data_can_fit_in_structured_data(&data, ::utility::test_utils::generate_public_keys(1), Vec::new())));
         }
     }
-
 }
