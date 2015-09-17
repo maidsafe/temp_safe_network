@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 /// Create the StructuredData to manage versioned data.
-pub fn create(client: &mut ::client::Client,
+pub fn create(client: &::client::Client,
               version_name_to_store: ::routing::NameType,
               tag_type: u64,
               identifier: ::routing::NameType,
@@ -118,7 +118,7 @@ mod test {
 
         let version_0 = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
 
-        let mut structured_data_result = create(&mut client, version_0.clone(), TAG_ID, id, 0, owners, prev_owners, secret_key);
+        let mut structured_data_result = create(&client, version_0.clone(), TAG_ID, id, 0, owners, prev_owners, secret_key);
 
         let mut structured_data = eval_result!(structured_data_result);
         let mut versions_res = get_all_versions(&mut client, &structured_data);

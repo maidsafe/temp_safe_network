@@ -77,8 +77,8 @@ pub fn serialise<T>(data: &T) -> Result<Vec<u8>, ::errors::ClientError>
 /// utility function to deserialise a Decodable type
 pub fn deserialise<T>(data: &[u8]) -> Result<T, ::errors::ClientError>
                                       where T: ::rustc_serialize::Decodable {
-    let mut d = ::cbor::Decoder::from_bytes(data);
-    Ok(try!(try!(d.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
+    let mut decoder = ::cbor::Decoder::from_bytes(data);
+    Ok(try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
 }
 
 /// Generates a random string for specified size

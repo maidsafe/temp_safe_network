@@ -22,7 +22,7 @@ use std::io::{Read, Write};
 type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::HashMap<::routing::NameType, Vec<u8>>>>;
 
 const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
-const SIMULATED_NETWORK_DELAY_MS: u32 = 30;
+const SIMULATED_NETWORK_DELAY_MS: u32 = 0;
 
 struct PersistentStorageSimulation {
     data_store: DataStore,
@@ -82,8 +82,6 @@ fn sync_disk_storage(memory_storage: &::std::collections::HashMap<::routing::Nam
 
 pub struct RoutingMock {
     sender          : ::std::sync::mpsc::Sender<::routing::event::Event>,
-    // TODO remove this and use the global const
-    network_delay_ms: u32,
 }
 
 impl RoutingMock {
@@ -98,20 +96,18 @@ impl RoutingMock {
         });
 
         RoutingMock {
-            sender          : sender,
-            network_delay_ms: SIMULATED_NETWORK_DELAY_MS,
+            sender: sender,
         }
     }
 
     pub fn get_request(&mut self,
                        _location  : ::routing::authority::Authority,
                        request_for: ::routing::data::DataRequest) {
-        let delay_ms = self.network_delay_ms;
         let data_store = get_storage();
         let cloned_sender = self.sender.clone();
 
         ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(delay_ms);
+            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
             let data_name = request_for.name();
             match eval_result!(data_store.lock()).get(&data_name) {
                 Some(raw_data) => {
@@ -138,7 +134,6 @@ impl RoutingMock {
     pub fn put_request(&self,
                        _location: ::routing::authority::Authority,
                        data     : ::routing::data::Data) {
-        let delay_ms = self.network_delay_ms;
         let data_store = get_storage();
 
         let data_name = data.name();
@@ -162,7 +157,7 @@ impl RoutingMock {
         };
 
         // ::std::thread::spawn(move || {
-        //     ::std::thread::sleep_ms(delay_ms);
+        //     ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
         //     if !success { // TODO Check how routing is going to handle PUT errors
         //     }
         // });
@@ -171,7 +166,6 @@ impl RoutingMock {
     pub fn post_request(&self,
                         _location: ::routing::authority::Authority,
                         data     : ::routing::data::Data) {
-        let delay_ms = self.network_delay_ms;
         let data_store = get_storage();
 
         let data_name = data.name();
@@ -196,7 +190,7 @@ impl RoutingMock {
         };
 
         // ::std::thread::spawn(move || {
-        //     ::std::thread::sleep_ms(delay_ms);
+        //     ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
         //     if !success { // TODO Check how routing is going to handle POST errors
         //     }
         // });
@@ -205,7 +199,6 @@ impl RoutingMock {
     pub fn delete_request(&self,
                            _location: ::routing::authority::Authority,
                            data     : ::routing::data::Data) {
-        let delay_ms = self.network_delay_ms;
         let data_store = get_storage();
 
         let data_name = data.name();
@@ -230,7 +223,7 @@ impl RoutingMock {
         };
 
         // ::std::thread::spawn(move || {
-        //     ::std::thread::sleep_ms(delay_ms);
+        //     ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
         //     if !success { // TODO Check how routing is going to handle DELETE errors
         //     }
         // });
@@ -302,9 +295,9 @@ mod test {
 
             mock_routing.get_request(location_nae_mgr.clone(), data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
-                                                                                     message_queue.clone(),
-                                                                                     data_request);
+            let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                                                                 message_queue.clone(),
+                                                                                 data_request);
             match response_getter.get() {
                 Ok(data) => assert_eq!(data, orig_data),
                 Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
@@ -338,9 +331,9 @@ mod test {
 
             mock_routing.get_request(location_nae_mgr, data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
-                                                                                     message_queue.clone(),
-                                                                                     data_request);
+            let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                                                                 message_queue.clone(),
+                                                                                 data_request);
 
             match response_getter.get() {
                 Ok(data) => assert_eq!(data, orig_data),
@@ -416,9 +409,9 @@ mod test {
 
             mock_routing.get_request(location_nae_mgr_struct.clone(), struct_data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
-                                                                                     message_queue.clone(),
-                                                                                     struct_data_request);
+            let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                                                                 message_queue.clone(),
+                                                                                 struct_data_request);
             match response_getter.get() {
                 Ok(data) => {
                     assert_eq!(data, data_account_version);
@@ -443,9 +436,9 @@ mod test {
 
             mock_routing.get_request(location_nae_mgr_immut.clone(), immut_data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
-                                                                                     message_queue.clone(),
-                                                                                     immut_data_request);
+            let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                                                                 message_queue.clone(),
+                                                                                 immut_data_request);
             match response_getter.get() {
                 Ok(data) => assert_eq!(data, orig_data_immutable),
                 Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
@@ -512,9 +505,9 @@ mod test {
 
             mock_routing.get_request(location_nae_mgr_struct, struct_data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
-                                                                                     message_queue.clone(),
-                                                                                     struct_data_request);
+            let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                                                                 message_queue.clone(),
+                                                                                 struct_data_request);
             match response_getter.get() {
                 Ok(data) => {
                     assert_eq!(data, data_account_version);
@@ -541,9 +534,9 @@ mod test {
 
             mock_routing.get_request(location_nae_mgr_immut.clone(), immut_data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
-                                                                                     message_queue.clone(),
-                                                                                     immut_data_request);
+            let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                                                                 message_queue.clone(),
+                                                                                 immut_data_request);
             match response_getter.get() {
                 Ok(data) => assert_eq!(data, new_data_immutable),
                 Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
@@ -561,9 +554,9 @@ mod test {
 
             mock_routing.get_request(location_nae_mgr_immut, immut_data_request.clone());
 
-            let mut response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
-                                                                                     message_queue.clone(),
-                                                                                     immut_data_request);
+            let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                                                                 message_queue.clone(),
+                                                                                 immut_data_request);
             match response_getter.get() {
                 Ok(data) => assert_eq!(data, orig_data_immutable),
                 Err(error) => panic!("Should have found data put before by a PUT {:?}", error),

@@ -51,8 +51,6 @@ impl MessageQueue {
                     ::routing::event::Event::Response { response, .. } => {
                         match response {
                             ::routing::ExternalResponse::Get(data, _, _) => {
-                                // TODO optimise by fine-graining mutexes
-
                                 let data_name = data.name();
                                 let mut dead_sender_positions = Vec::<usize>::new();
                                 let mut queue_guard = eval_result!(message_queue_cloned.lock());
@@ -162,7 +160,7 @@ impl MessageQueue {
     }
 
     /// Check if data is already in local cache
-    pub fn local_cache_check(&mut self, key: &::routing::NameType) -> bool {
+    pub fn local_cache_check(&self, key: &::routing::NameType) -> bool {
         self.local_cache.contains_key(key)
     }
 
