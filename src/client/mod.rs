@@ -271,7 +271,7 @@ impl Client {
                request_for : ::routing::data::DataRequest,
                opt_location: Option<::routing::authority::Authority>) -> response_getter::ResponseGetter {
         if let ::routing::data::DataRequest::ImmutableData(..) = request_for {
-            let msg_queue = eval_result!(self.message_queue.lock());
+            let mut msg_queue = eval_result!(self.message_queue.lock());
             if msg_queue.local_cache_check(&request_for.name()) {
                 return response_getter::ResponseGetter::new(None, self.message_queue.clone(), request_for)
             }

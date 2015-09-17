@@ -160,7 +160,7 @@ impl MessageQueue {
     }
 
     /// Check if data is already in local cache
-    pub fn local_cache_check(&self, key: &::routing::NameType) -> bool {
+    pub fn local_cache_check(&mut self, key: &::routing::NameType) -> bool {
         self.local_cache.contains_key(key)
     }
 
