@@ -15,14 +15,21 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(unsafe_code, unused)] // TODO Remove the unused attribute later
-
 use std::io::{Read, Write};
 
 type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::HashMap<::routing::NameType, Vec<u8>>>>;
 
 const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
-const SIMULATED_NETWORK_DELAY_MS: u32 = 0;
+
+// TODO Activating these (ie., non-zero values) will require an update to all test cases. See how
+// it is intended to be handled.
+//
+// These will allow to code properly for behavioral anomalies like GETs reaching the address faster
+// than PUTs. So a proper delay will help code better logic against scenarios where it is required
+// to do a GET after a PUT/DELETE to confirm that action. So for example if a GET done immediately
+// after a PUT failed, it could mean that the PUT either failed or hasn't reached the address yet.
+const SIMULATED_NETWORK_DELAY_GETS_POSTS_MS: u32 = 0;
+const SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS: u32 = 2 * SIMULATED_NETWORK_DELAY_GETS_POSTS_MS;
 
 struct PersistentStorageSimulation {
     data_store: DataStore,
@@ -38,6 +45,7 @@ pub fn convert_vec_to_hashmap(vec: Vec<(::routing::NameType, Vec<u8>)>) -> ::std
     vec.into_iter().collect()
 }
 
+#[allow(unsafe_code)]
 fn get_storage() -> DataStore {
     static mut STORAGE: *const PersistentStorageSimulation = 0 as *const PersistentStorageSimulation;
     static mut ONCE: ::std::sync::Once = ::std::sync::ONCE_INIT;
@@ -76,22 +84,22 @@ fn sync_disk_storage(memory_storage: &::std::collections::HashMap<::routing::Nam
     temp_dir_pathbuf.push(STORAGE_FILE_NAME);
 
     let mut file = eval_result!(::std::fs::File::create(temp_dir_pathbuf));
-    file.write_all(&eval_result!(::utility::serialise(&convert_hashmap_to_vec(memory_storage))));
+    let _ = file.write_all(&eval_result!(::utility::serialise(&convert_hashmap_to_vec(memory_storage))));
     eval_result!(file.sync_all());
 }
 
 pub struct RoutingMock {
-    sender          : ::std::sync::mpsc::Sender<::routing::event::Event>,
+    sender: ::std::sync::mpsc::Sender<::routing::event::Event>,
 }
 
 impl RoutingMock {
     pub fn new(sender: ::std::sync::mpsc::Sender<::routing::event::Event>,
-                      _id: Option<::routing::id::Id>) -> RoutingMock {
+               _id   : Option<::routing::id::Id>) -> RoutingMock {
         ::sodiumoxide::init();
 
         let cloned_sender = sender.clone();
         ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
+            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
             let _ = cloned_sender.send(::routing::event::Event::Bootstrapped);
         });
 
@@ -107,7 +115,7 @@ impl RoutingMock {
         let cloned_sender = self.sender.clone();
 
         ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
+            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS);
             let data_name = request_for.name();
             match eval_result!(data_store.lock()).get(&data_name) {
                 Some(raw_data) => {
@@ -118,15 +126,17 @@ impl RoutingMock {
                                _ => false,
                            } {
                             let external_response = ::routing::ExternalResponse::Get(data, request_for, None);
-                            let _ = cloned_sender.send(::routing::event::Event::Response {
+                            if let Err(error) = cloned_sender.send(::routing::event::Event::Response {
                                 response      : external_response,
                                 our_authority : ::routing::authority::Authority::NaeManager(data_name.clone()),
                                 from_authority: ::routing::authority::Authority::NaeManager(data_name),
-                            }); // TODO Handle the error case by printing it maybe (ie., if sender fails)
-                        } // TODO Handle the error case by printing it maybe
-                    } // TODO Handle the error case by printing it maybe
+                            }) {
+                                debug!("Get-Request Send Failure: {:?}", error);
+                            }
+                        }
+                    }
                 },
-                None => (), // TODO Handle the error case by printing it maybe
+                None => (),
             };
         });
     }
@@ -156,11 +166,11 @@ impl RoutingMock {
             false
         };
 
-        // ::std::thread::spawn(move || {
-        //     ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
-        //     if !success { // TODO Check how routing is going to handle PUT errors
-        //     }
-        // });
+        ::std::thread::spawn(move || {
+            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
+            if !success { // TODO Check how routing is going to handle PUT errors
+            }
+        });
     }
 
     pub fn post_request(&self,
@@ -189,11 +199,11 @@ impl RoutingMock {
             false
         };
 
-        // ::std::thread::spawn(move || {
-        //     ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
-        //     if !success { // TODO Check how routing is going to handle POST errors
-        //     }
-        // });
+        ::std::thread::spawn(move || {
+            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS);
+            if !success { // TODO Check how routing is going to handle POST errors
+            }
+        });
     }
 
     pub fn delete_request(&self,
@@ -207,7 +217,7 @@ impl RoutingMock {
         let success = if data_store_mutex_guard.contains_key(&data_name) {
             let raw_data_result = ::utility::serialise(&data);
             match (raw_data_result, data, ::utility::deserialise(eval_option!(data_store_mutex_guard.get(&data_name), "Programming Error - Report this as a Bug."))) {
-                (Ok(raw_data), ::routing::data::Data::StructuredData(struct_data_new), Ok(::routing::data::Data::StructuredData(struct_data_stored))) => {
+                (Ok(_), ::routing::data::Data::StructuredData(struct_data_new), Ok(::routing::data::Data::StructuredData(struct_data_stored))) => {
                     if let Ok(_) = struct_data_stored.validate_self_against_successor(&struct_data_new) {
                         let _ = data_store_mutex_guard.remove(&data_name);
                         sync_disk_storage(&*data_store_mutex_guard);
@@ -222,11 +232,11 @@ impl RoutingMock {
             false
         };
 
-        // ::std::thread::spawn(move || {
-        //     ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_MS);
-        //     if !success { // TODO Check how routing is going to handle DELETE errors
-        //     }
-        // });
+        ::std::thread::spawn(move || {
+            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
+            if !success { // TODO Check how routing is going to handle DELETE errors
+            }
+        });
     }
 
     pub fn stop(&self) {
@@ -237,7 +247,6 @@ impl RoutingMock {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ::std::error::Error;
 
     #[test]
     fn map_serialisation() {
@@ -265,7 +274,7 @@ mod test {
         let (network_event_sender, network_event_receiver) = ::std::sync::mpsc::channel();
 
         let mut mock_routing = RoutingMock::new(routing_sender, Some(id_packet));
-        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
+        let (message_queue, _raii_joiner) = ::client::message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
 
         match eval_result!(network_event_receiver.recv()) {
             ::translated_events::NetworkEvent::Bootstrapped => (),
@@ -357,7 +366,7 @@ mod test {
         let (network_event_sender, network_event_receiver) = ::std::sync::mpsc::channel();
 
         let mut mock_routing = RoutingMock::new(routing_sender, Some(id_packet));
-        let (message_queue, raii_joiner) = ::client::message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
+        let (message_queue, _raii_joiner) = ::client::message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
 
         match eval_result!(network_event_receiver.recv()) {
             ::translated_events::NetworkEvent::Bootstrapped => (),
@@ -497,13 +506,13 @@ mod test {
 
         // GET for new StructuredData version should pass
         {
-            let struct_data_request = ::routing::data::DataRequest::StructuredData(user_id, TYPE_TAG);
+            let struct_data_request = ::routing::data::DataRequest::StructuredData(user_id.clone(), TYPE_TAG);
 
             let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
             eval_result!(message_queue.lock()).add_data_receive_event_observer(struct_data_request.name(),
                                                                                data_event_sender.clone());
 
-            mock_routing.get_request(location_nae_mgr_struct, struct_data_request.clone());
+            mock_routing.get_request(location_nae_mgr_struct.clone(), struct_data_request.clone());
 
             let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                                                                  message_queue.clone(),
@@ -563,8 +572,39 @@ mod test {
             }
         }
 
-        // TODO this will not function properly presently .. DELETE needs a version Bump too
-        // DELETE of Structured Data should succeed
+        // DELETE of Structured Data without version bump should fail
+        mock_routing.delete_request(location_client_mgr_struct.clone(), data_account_version.clone());
+
+        // GET for StructuredData version should still pass
+        {
+            let struct_data_request = ::routing::data::DataRequest::StructuredData(user_id.clone(), TYPE_TAG);
+
+            let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
+            eval_result!(message_queue.lock()).add_data_receive_event_observer(struct_data_request.name(),
+                                                                               data_event_sender.clone());
+
+            mock_routing.get_request(location_nae_mgr_struct, struct_data_request.clone());
+
+            let response_getter = ::client::response_getter::ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
+                                                                                 message_queue.clone(),
+                                                                                 struct_data_request);
+            match response_getter.get() {
+                Ok(data) => assert_eq!(data, data_account_version),
+                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
+            }
+        }
+
+        // Construct StructuredData, 3rd version, for DELETE - Valid
+        account_version = eval_result!(::routing::structured_data::StructuredData::new(TYPE_TAG,
+                                                                                       user_id,
+                                                                                       2,
+                                                                                       Vec::new(),
+                                                                                       vec![account_packet.get_public_maid().public_keys().0.clone()],
+                                                                                       Vec::new(),
+                                                                                       Some(&account_packet.get_maid().secret_keys().0)));
+        data_account_version = ::routing::data::Data::StructuredData(account_version);
+
+        // DELETE of Structured Data with version bump should pass
         mock_routing.delete_request(location_client_mgr_struct, data_account_version);
 
         mock_routing.stop();

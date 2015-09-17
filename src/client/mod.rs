@@ -283,8 +283,7 @@ impl Client {
         };
 
         let (data_event_sender, data_event_receiver) = ::std::sync::mpsc::channel();
-        eval_result!(self.message_queue.lock()).add_data_receive_event_observer(request_for.name(),
-                                                                                data_event_sender.clone());
+        self.add_data_receive_event_observer(request_for.name(), data_event_sender.clone());
 
         self.routing.get_request(location, request_for.clone());
         debug!("GET request posted to the network.");
@@ -355,6 +354,24 @@ impl Client {
     pub fn get_secret_signing_key(&self) -> Result<&::sodiumoxide::crypto::sign::SecretKey, ::errors::ClientError> {
         let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
         Ok(&account.get_maid().secret_keys().0)
+    }
+
+    /// Add observers for Data Recieve Events
+    pub fn add_data_receive_event_observer(&self,
+                                           data_name: ::routing::NameType,
+                                           sender   : ::std::sync::mpsc::Sender<::translated_events::DataReceivedEvent>) {
+        eval_result!(self.message_queue.lock()).add_data_receive_event_observer(data_name, sender);
+    }
+
+    /// Add observers for Operation Failure Events like `PutFailure`, `PostFailure`, `DeleteFailure`,
+    /// `Terminated`
+    pub fn add_operation_failure_event_observer(&self, sender: ::std::sync::mpsc::Sender<::translated_events::OperationFailureEvent>) {
+        eval_result!(self.message_queue.lock()).add_operation_failure_event_observer(sender);
+    }
+
+    /// Add observers for Network Events like `Bootstrapped`, `Disconnected`, `Terminated`
+    pub fn add_network_event_observer(&self, sender: ::std::sync::mpsc::Sender<::translated_events::NetworkEvent>) {
+        eval_result!(self.message_queue.lock()).add_network_event_observer(sender);
     }
 
     fn get_new_routing(sender   : ::std::sync::mpsc::Sender<::routing::event::Event>,

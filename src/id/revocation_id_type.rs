@@ -24,8 +24,6 @@
 /// // Create RevocationIdType
 /// let _an_maid = ::safe_client::id::RevocationIdType::new::<::safe_client::id::MaidTypeTags>();
 /// ```
-///
-
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct RevocationIdType {
     type_tags: (u64, u64, u64),  // type tags for revocation, id and public ids
@@ -66,9 +64,8 @@ impl RevocationIdType {
     }
 
     /// Returns type tag
-    /// TODO needless reference for built in POD
-    pub fn type_tag(&self) -> &u64 {
-        &self.type_tags.0
+    pub fn type_tag(&self) -> u64 {
+        self.type_tags.0
     }
 
     /// Returns the SecretKey of the RevocationIdType
