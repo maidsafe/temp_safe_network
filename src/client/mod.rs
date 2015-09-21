@@ -44,6 +44,7 @@ pub struct Client {
     message_queue      : ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>,
     session_packet_id  : Option<::routing::NameType>,
     session_packet_keys: Option<SessionPacketEncryptionKeys>,
+    client_manager_addr: Option<::routing::NameType>,
 }
 
 impl Client {
@@ -73,6 +74,7 @@ impl Client {
             message_queue      : message_queue,
             session_packet_id  : None,
             session_packet_keys: None,
+            client_manager_addr: None,
         })
     }
 
@@ -100,6 +102,9 @@ impl Client {
         }
         debug!("Bootstrapped");
 
+        let hash_sign_key = ::sodiumoxide::crypto::hash::sha512::hash(&(account_packet.get_maid().public_keys().0).0);
+        let client_manager_addr = ::routing::NameType::new(hash_sign_key.0);
+
         let client = Client {
             account            : Some(account_packet),
             routing            : routing,
@@ -107,6 +112,7 @@ impl Client {
             message_queue      : message_queue,
             session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()))),
             session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
+            client_manager_addr: Some(client_manager_addr),
         };
 
         {
@@ -121,7 +127,7 @@ impl Client {
                                                                                        vec![account.get_public_maid().public_keys().0.clone()],
                                                                                        Vec::new(),
                                                                                        Some(&account.get_maid().secret_keys().0)));
-            client.put(::routing::data::Data::StructuredData(account_version), None);
+            try!(client.put(::routing::data::Data::StructuredData(account_version), None));
         }
 
         Ok(client)
@@ -163,6 +169,9 @@ impl Client {
             }
             debug!("Bootstrapped");
 
+            let hash_sign_key = ::sodiumoxide::crypto::hash::sha512::hash(&(decrypted_session_packet.get_maid().public_keys().0).0);
+            let client_manager_addr = ::routing::NameType::new(hash_sign_key.0);
+
             let client = Client {
                 account            : Some(decrypted_session_packet),
                 routing            : routing,
@@ -170,6 +179,7 @@ impl Client {
                 message_queue      : message_queue,
                 session_packet_id  : Some(try!(user_account::Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()))),
                 session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
+                client_manager_addr: Some(client_manager_addr),
             };
 
             Ok(client)
@@ -296,14 +306,14 @@ impl Client {
     /// Put data onto the network. This is non-blocking.
     pub fn put(&self,
                data        : ::routing::data::Data,
-               opt_location: Option<::routing::authority::Authority>) {
+               opt_location: Option<::routing::authority::Authority>) -> Result<(), ::errors::ClientError> {
         let location = match opt_location {
             Some(auth) => auth,
-            None       => ::routing::authority::Authority::ClientManager(data.name()),
+            None => ::routing::authority::Authority::ClientManager(try!(self.get_default_client_manager_address()).clone()),
         };
 
         debug!("Posting PUT request to the network ...");
-        self.routing.put_request(location, data)
+        Ok(self.routing.put_request(location, data))
     }
 
     /// Post data onto the network
@@ -322,14 +332,14 @@ impl Client {
     /// Delete data from the network
     pub fn delete(&self,
                   data        : ::routing::data::Data,
-                  opt_location: Option<::routing::authority::Authority>) {
+                  opt_location: Option<::routing::authority::Authority>) -> Result<(), ::errors::ClientError> {
         let location = match opt_location {
             Some(auth) => auth,
-            None       => ::routing::authority::Authority::ClientManager(data.name()),
+            None => ::routing::authority::Authority::ClientManager(try!(self.get_default_client_manager_address()).clone()),
         };
 
         debug!("Posting DELETE request to the network ...");
-        self.routing.delete_request(location, data)
+        Ok(self.routing.delete_request(location, data))
     }
 
     /// Returns the public encryption key
@@ -372,6 +382,21 @@ impl Client {
     /// Add observers for Network Events like `Bootstrapped`, `Disconnected`, `Terminated`
     pub fn add_network_event_observer(&self, sender: ::std::sync::mpsc::Sender<::translated_events::NetworkEvent>) {
         eval_result!(self.message_queue.lock()).add_network_event_observer(sender);
+    }
+
+    /// Get the default address where the PUTs and DELETEs will go to for this client
+    pub fn get_default_client_manager_address(&self) -> Result<&::routing::NameType, ::errors::ClientError> {
+        self.client_manager_addr.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient)
+    }
+
+    /// Set the default address where the PUTs and DELETEs will go to for this client
+    pub fn set_default_client_manager_address(&mut self, address: ::routing::NameType) -> Result<(), ::errors::ClientError> {
+        match self.client_manager_addr.as_mut() {
+            Some(contained_address) => *contained_address = address,
+            None => return Err(::errors::ClientError::OperationForbiddenForClient),
+        }
+
+        Ok(())
     }
 
     fn get_new_routing(sender   : ::std::sync::mpsc::Sender<::routing::event::Event>,
@@ -482,7 +507,7 @@ mod test {
 
             // Creation should pass
             let client = eval_result!(Client::create_account(keyword, pin, password));
-            client.put(orig_data.clone(), None);
+            eval_result!(client.put(orig_data.clone(), None));
         }
 
         // Unregistered Client should be able to retrieve the data
@@ -622,7 +647,7 @@ mod test {
                                                                            eval_result!(::utility::generate_random_vector(10)));
             let data = ::routing::data::Data::ImmutableData(immut_data);
 
-            client.put(data.clone(), None);
+            eval_result!(client.put(data.clone(), None));
 
             let data_request = ::routing::data::DataRequest::ImmutableData(data.name(),
                                                                            ::routing::immutable_data::ImmutableDataType::Normal);
@@ -663,7 +688,7 @@ mod test {
                                                                                            None));
             let data = ::routing::data::Data::StructuredData(struct_data);
 
-            client.put(data.clone(), None);
+            eval_result!(client.put(data.clone(), None));
 
             let data_request = ::routing::data::DataRequest::StructuredData(id, TYPE_TAG);
 
