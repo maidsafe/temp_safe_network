@@ -76,7 +76,7 @@ fn create_impl(client: &::client::Client,
     match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&encoded_name, owner_keys.clone(), prev_owner_keys.clone())) {
         ::structured_data_operations::DataFitResult::DataFits => {
             let data = ::routing::data::Data::ImmutableData(immutable_data);
-            client.put(data, None);
+            try!(client.put(data, None));
 
             Ok(try!(::routing::structured_data::StructuredData::new(tag_type,
                                                                     identifier,

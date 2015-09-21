@@ -70,7 +70,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                     let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
                     let data = ::routing::data::Data::ImmutableData(immutable_data);
-                    eval_result!(client.lock()).put(data, None);
+                    try!(eval_result!(client.lock()).put(data, None));
 
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name), data_encryption_keys));
 

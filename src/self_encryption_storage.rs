@@ -54,6 +54,6 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
 
     fn put(&self, _: Vec<u8>, data: Vec<u8>) {
         let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal, data);
-        eval_result!(self.client.lock()).put(::routing::data::Data::ImmutableData(immutable_data), None);
+        eval_result!(eval_result!(self.client.lock()).put(::routing::data::Data::ImmutableData(immutable_data), None));
     }
 }
