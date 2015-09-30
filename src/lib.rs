@@ -76,4 +76,4 @@ pub use self_encryption_storage::SelfEncryptionStorage;
 pub const MAIDSAFE_TAG: u64 = 5483_000;
 /// All StructuredData tagging should positive-offset from this if the operation needs to go
 /// through this safe_client crate
-pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000; // TODO offset this itself from routing
+pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;

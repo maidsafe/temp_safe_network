@@ -21,8 +21,8 @@ type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::HashMap
 
 const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
 
-// TODO Activating these (ie., non-zero values) will require an update to all test cases. See how
-// it is intended to be handled.
+// TODO(Spandan) Activating these (ie., non-zero values) will require an update to all test cases.
+// See how it is intended to be handled.
 //
 // These will allow to code properly for behavioral anomalies like GETs reaching the address faster
 // than PUTs. So a proper delay will help code better logic against scenarios where it is required
@@ -168,7 +168,7 @@ impl RoutingMock {
 
         ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
-            if !success { // TODO Check how routing is going to handle PUT errors
+            if !success { // TODO(Spandan) Check how routing is going to handle PUT errors
             }
         });
     }
@@ -201,7 +201,7 @@ impl RoutingMock {
 
         ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS);
-            if !success { // TODO Check how routing is going to handle POST errors
+            if !success { // TODO(Spandan) Check how routing is going to handle POST errors
             }
         });
     }
@@ -234,7 +234,7 @@ impl RoutingMock {
 
         ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
-            if !success { // TODO Check how routing is going to handle DELETE errors
+            if !success { // TODO(Spandan) Check how routing is going to handle DELETE errors
             }
         });
     }
