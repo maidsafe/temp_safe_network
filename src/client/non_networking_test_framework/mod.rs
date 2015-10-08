@@ -98,7 +98,7 @@ impl RoutingMock {
         ::sodiumoxide::init();
 
         let cloned_sender = sender.clone();
-        ::std::thread::spawn(move || {
+        let _ = ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
             let _ = cloned_sender.send(::routing::event::Event::Bootstrapped);
         });
@@ -114,7 +114,7 @@ impl RoutingMock {
         let data_store = get_storage();
         let cloned_sender = self.sender.clone();
 
-        ::std::thread::spawn(move || {
+        let _ = ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS);
             let data_name = request_for.name();
             match eval_result!(data_store.lock()).get(&data_name) {
@@ -166,7 +166,7 @@ impl RoutingMock {
             false
         };
 
-        ::std::thread::spawn(move || {
+        let _ = ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
             if !success { // TODO(Spandan) Check how routing is going to handle PUT errors
             }
@@ -199,7 +199,7 @@ impl RoutingMock {
             false
         };
 
-        ::std::thread::spawn(move || {
+        let _ = ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS);
             if !success { // TODO(Spandan) Check how routing is going to handle POST errors
             }
@@ -232,7 +232,7 @@ impl RoutingMock {
             false
         };
 
-        ::std::thread::spawn(move || {
+        let _ = ::std::thread::spawn(move || {
             ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
             if !success { // TODO(Spandan) Check how routing is going to handle DELETE errors
             }
@@ -251,7 +251,7 @@ mod test {
     #[test]
     fn map_serialisation() {
         let mut map_before = ::std::collections::HashMap::<::routing::NameType, Vec<u8>>::new();
-        map_before.insert(::routing::NameType::new([1; 64]), vec![1; 10]);
+        let _ = map_before.insert(::routing::NameType::new([1; 64]), vec![1; 10]);
 
         let vec_before = convert_hashmap_to_vec(&map_before);
         let serialised_data = eval_result!(::utility::serialise(&vec_before));
