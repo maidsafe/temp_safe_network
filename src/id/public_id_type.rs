@@ -112,7 +112,7 @@ mod test {
     fn create_public_mpid() {
         let revocation_mpid = ::id::RevocationIdType::new::<::id::MpidTypeTags>();
         let mpid = ::id::IdType::new(&revocation_mpid);
-        PublicIdType::new(&mpid, &revocation_mpid);
+        let _ = PublicIdType::new(&mpid, &revocation_mpid);
     }
 
     #[test]
