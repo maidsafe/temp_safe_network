@@ -54,7 +54,7 @@ impl MessageQueue {
                                 let data_name = data.name();
                                 let mut dead_sender_positions = Vec::<usize>::new();
                                 let mut queue_guard = eval_result!(message_queue_cloned.lock());
-                                queue_guard.routing_message_cache.insert(data_name.clone(), data);
+                                let _ = queue_guard.routing_message_cache.insert(data_name.clone(), data);
                                 if let Some(mut specific_data_senders) = queue_guard.data_senders.get_mut(&data_name) {
                                     for it in specific_data_senders.iter().enumerate() {
                                         if it.1.send(::translated_events::DataReceivedEvent::DataReceived).is_err() {
@@ -162,7 +162,7 @@ impl MessageQueue {
     }
 
     pub fn local_cache_insert(&mut self, key: ::routing::NameType, value: ::routing::data::Data) {
-        self.local_cache.insert(key, value);
+        let _ = self.local_cache.insert(key, value);
     }
 
     pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::routing::data::Data, ::errors::ClientError> {
