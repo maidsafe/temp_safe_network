@@ -1,6 +1,6 @@
 [package]
 name          = "safe_core"
-version       = "0.2.1"
+version       = "0.3.0"
 authors       = ["MaidSafe Developers <dev@maidsafe.net>"]
 description   = "SAFE Core API library"
 documentation = "http://maidsafe.github.io/safe_core/latest/"

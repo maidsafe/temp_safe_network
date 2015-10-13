@@ -1,4 +1,7 @@
 # Safe Core - Change Log
+## [0.3.0]
+- [MAID-1423](https://maidsafe.atlassian.net/browse/MAID-1423) Rename safe_client to safe_core
+
 ## [0.2.1]
 - Routing crate updated to version 0.4.*
 
