@@ -33,7 +33,3 @@ To interface it with actual routing (default):
 cargo build
 cargo test
 ```
-## TODO
-
-### [0.3.0]
-- [X] [MAID-1423](https://maidsafe.atlassian.net/browse/MAID-1423)
