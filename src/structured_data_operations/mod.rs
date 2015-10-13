@@ -37,7 +37,7 @@ pub enum DataFitResult {
 /// Calculates approximate space available for data. Calculates the worst case scenario in which
 /// all owners must sign this StructuredData.
 pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-                                      prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> Result<usize, ::errors::ClientError> {
+                                      prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> Result<usize, ::errors::CoreError> {
     let max_signatures_possible = if prev_owner_keys.is_empty() {
         owner_keys.len()
     } else {
@@ -66,7 +66,7 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<::sodiumoxide::crypto::sig
 /// Check if it is possible to fit the given data into the given StructuredData
 pub fn check_if_data_can_fit_in_structured_data(data: &Vec<u8>,
                                                 owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-                                                prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> Result<DataFitResult, ::errors::ClientError> {
+                                                prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>) -> Result<DataFitResult, ::errors::CoreError> {
     if data.len() > ::routing::structured_data::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - PADDING_SIZE_IN_BYTES {
         Ok(DataFitResult::DataDoesNotFit)
     } else {

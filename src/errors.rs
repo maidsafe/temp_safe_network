@@ -20,7 +20,7 @@
 pub const CLIENT_ERROR_START_RANGE: i32 = -1;
 
 /// Client Errors
-pub enum ClientError {
+pub enum CoreError {
     /// StructuredData has no space available to fit in any user data inside it.
     StructuredDataHeaderSizeProhibitive,
     /// Could not Serialise or Deserialise
@@ -56,79 +56,79 @@ pub enum ClientError {
     OperationAborted,
 }
 
-impl<'a> From<&'a str> for ClientError {
-    fn from(error: &'a str) -> ClientError {
-        ClientError::Unexpected(error.to_string())
+impl<'a> From<&'a str> for CoreError {
+    fn from(error: &'a str) -> CoreError {
+        CoreError::Unexpected(error.to_string())
     }
 }
 
-impl From<::cbor::CborError> for ClientError {
-    fn from(error: ::cbor::CborError) -> ClientError {
+impl From<::cbor::CborError> for CoreError {
+    fn from(error: ::cbor::CborError) -> CoreError {
         debug!("Error: {:?}", error);
-        ClientError::UnsuccessfulEncodeDecode
+        CoreError::UnsuccessfulEncodeDecode
     }
 }
 
-impl From<::routing::error::ResponseError> for ClientError {
-    fn from(error: ::routing::error::ResponseError) -> ClientError {
-        ClientError::ResponseError(error)
+impl From<::routing::error::ResponseError> for CoreError {
+    fn from(error: ::routing::error::ResponseError) -> CoreError {
+        CoreError::ResponseError(error)
     }
 }
 
-impl From<::routing::error::RoutingError> for ClientError {
-    fn from(error: ::routing::error::RoutingError) -> ClientError {
-        ClientError::RoutingError(error)
+impl From<::routing::error::RoutingError> for CoreError {
+    fn from(error: ::routing::error::RoutingError) -> CoreError {
+        CoreError::RoutingError(error)
     }
 }
 
-impl From<::std::sync::mpsc::RecvError> for ClientError {
-    fn from(_: ::std::sync::mpsc::RecvError) -> ClientError {
-        ClientError::OperationAborted
+impl From<::std::sync::mpsc::RecvError> for CoreError {
+    fn from(_: ::std::sync::mpsc::RecvError) -> CoreError {
+        CoreError::OperationAborted
     }
 }
 
-impl Into<i32> for ClientError {
+impl Into<i32> for CoreError {
     fn into(self) -> i32 {
         match self {
-            ClientError::StructuredDataHeaderSizeProhibitive => CLIENT_ERROR_START_RANGE,
-            ClientError::UnsuccessfulEncodeDecode            => CLIENT_ERROR_START_RANGE - 1,
-            ClientError::AsymmetricDecipherFailure           => CLIENT_ERROR_START_RANGE - 2,
-            ClientError::SymmetricDecipherFailure            => CLIENT_ERROR_START_RANGE - 3,
-            ClientError::ReceivedUnexpectedData              => CLIENT_ERROR_START_RANGE - 4,
-            ClientError::VersionCacheMiss                    => CLIENT_ERROR_START_RANGE - 5,
-            ClientError::RoutingMessageCacheMiss             => CLIENT_ERROR_START_RANGE - 6,
-            ClientError::ResponseError(_)                    => CLIENT_ERROR_START_RANGE - 7,
-            ClientError::RootDirectoryAlreadyExists          => CLIENT_ERROR_START_RANGE - 8,
-            ClientError::RandomDataGenerationFailure         => CLIENT_ERROR_START_RANGE - 9,
-            ClientError::OperationForbiddenForClient         => CLIENT_ERROR_START_RANGE - 10,
-            ClientError::Unexpected(_)                       => CLIENT_ERROR_START_RANGE - 11,
-            ClientError::RoutingError(_)                     => CLIENT_ERROR_START_RANGE - 12,
-            ClientError::UnsupportedSaltSizeForPwHash        => CLIENT_ERROR_START_RANGE - 13,
-            ClientError::UnsuccessfulPwHash                  => CLIENT_ERROR_START_RANGE - 14,
-            ClientError::OperationAborted                    => CLIENT_ERROR_START_RANGE - 15,
+            CoreError::StructuredDataHeaderSizeProhibitive => CLIENT_ERROR_START_RANGE,
+            CoreError::UnsuccessfulEncodeDecode            => CLIENT_ERROR_START_RANGE - 1,
+            CoreError::AsymmetricDecipherFailure           => CLIENT_ERROR_START_RANGE - 2,
+            CoreError::SymmetricDecipherFailure            => CLIENT_ERROR_START_RANGE - 3,
+            CoreError::ReceivedUnexpectedData              => CLIENT_ERROR_START_RANGE - 4,
+            CoreError::VersionCacheMiss                    => CLIENT_ERROR_START_RANGE - 5,
+            CoreError::RoutingMessageCacheMiss             => CLIENT_ERROR_START_RANGE - 6,
+            CoreError::ResponseError(_)                    => CLIENT_ERROR_START_RANGE - 7,
+            CoreError::RootDirectoryAlreadyExists          => CLIENT_ERROR_START_RANGE - 8,
+            CoreError::RandomDataGenerationFailure         => CLIENT_ERROR_START_RANGE - 9,
+            CoreError::OperationForbiddenForClient         => CLIENT_ERROR_START_RANGE - 10,
+            CoreError::Unexpected(_)                       => CLIENT_ERROR_START_RANGE - 11,
+            CoreError::RoutingError(_)                     => CLIENT_ERROR_START_RANGE - 12,
+            CoreError::UnsupportedSaltSizeForPwHash        => CLIENT_ERROR_START_RANGE - 13,
+            CoreError::UnsuccessfulPwHash                  => CLIENT_ERROR_START_RANGE - 14,
+            CoreError::OperationAborted                    => CLIENT_ERROR_START_RANGE - 15,
         }
     }
 }
 
-impl ::std::fmt::Debug for ClientError {
+impl ::std::fmt::Debug for CoreError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
-            ClientError::StructuredDataHeaderSizeProhibitive => write!(f, "ClientError::StructuredDataHeaderSizeProhibitive"),
-            ClientError::UnsuccessfulEncodeDecode            => write!(f, "ClientError::UnsuccessfulEncodeDecode"),
-            ClientError::AsymmetricDecipherFailure           => write!(f, "ClientError::AsymmetricDecipherFailure"),
-            ClientError::SymmetricDecipherFailure            => write!(f, "ClientError::SymmetricDecipherFailure"),
-            ClientError::ReceivedUnexpectedData              => write!(f, "ClientError::ReceivedUnexpectedData"),
-            ClientError::VersionCacheMiss                    => write!(f, "ClientError::VersionCacheMiss"),
-            ClientError::RoutingMessageCacheMiss             => write!(f, "ClientError::RoutingMessageCacheMiss"),
-            ClientError::ResponseError(ref error)            => write!(f, "ClientError::ResponseError -> {:?}", error),
-            ClientError::RootDirectoryAlreadyExists          => write!(f, "ClientError::RootDirectoryAlreadyExists"),
-            ClientError::RandomDataGenerationFailure         => write!(f, "ClientError::RandomDataGenerationFailure"),
-            ClientError::OperationForbiddenForClient         => write!(f, "ClientError::OperationForbiddenForClient"),
-            ClientError::Unexpected(ref error)               => write!(f, "ClientError::Unexpected::{{{:?}}}", error),
-            ClientError::RoutingError(ref error)             => write!(f, "ClientError::RoutingError -> {:?}", error),
-            ClientError::UnsupportedSaltSizeForPwHash        => write!(f, "ClientError::UnsupportedSaltSizeForPwHash"),
-            ClientError::UnsuccessfulPwHash                  => write!(f, "ClientError::UnsuccessfulPwHash"),
-            ClientError::OperationAborted                    => write!(f, "ClientError::OperationAborted"),
+            CoreError::StructuredDataHeaderSizeProhibitive => write!(f, "CoreError::StructuredDataHeaderSizeProhibitive"),
+            CoreError::UnsuccessfulEncodeDecode            => write!(f, "CoreError::UnsuccessfulEncodeDecode"),
+            CoreError::AsymmetricDecipherFailure           => write!(f, "CoreError::AsymmetricDecipherFailure"),
+            CoreError::SymmetricDecipherFailure            => write!(f, "CoreError::SymmetricDecipherFailure"),
+            CoreError::ReceivedUnexpectedData              => write!(f, "CoreError::ReceivedUnexpectedData"),
+            CoreError::VersionCacheMiss                    => write!(f, "CoreError::VersionCacheMiss"),
+            CoreError::RoutingMessageCacheMiss             => write!(f, "CoreError::RoutingMessageCacheMiss"),
+            CoreError::ResponseError(ref error)            => write!(f, "CoreError::ResponseError -> {:?}", error),
+            CoreError::RootDirectoryAlreadyExists          => write!(f, "CoreError::RootDirectoryAlreadyExists"),
+            CoreError::RandomDataGenerationFailure         => write!(f, "CoreError::RandomDataGenerationFailure"),
+            CoreError::OperationForbiddenForClient         => write!(f, "CoreError::OperationForbiddenForClient"),
+            CoreError::Unexpected(ref error)               => write!(f, "CoreError::Unexpected::{{{:?}}}", error),
+            CoreError::RoutingError(ref error)             => write!(f, "CoreError::RoutingError -> {:?}", error),
+            CoreError::UnsupportedSaltSizeForPwHash        => write!(f, "CoreError::UnsupportedSaltSizeForPwHash"),
+            CoreError::UnsuccessfulPwHash                  => write!(f, "CoreError::UnsuccessfulPwHash"),
+            CoreError::OperationAborted                    => write!(f, "CoreError::OperationAborted"),
         }
     }
 }

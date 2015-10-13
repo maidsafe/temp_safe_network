@@ -19,6 +19,27 @@ pub mod test_utils;
 
 use ::rand::Rng;
 
+/// A RAII style thread joiner. The destruction of an instance of this type will block until
+/// the thread it is managing has joined.
+pub struct RAIIThreadJoiner {
+    joiner: Option<::std::thread::JoinHandle<()>>,
+}
+
+impl RAIIThreadJoiner {
+    /// Create a new instance of self-managing thread joiner
+    pub fn new(joiner: ::std::thread::JoinHandle<()>) -> RAIIThreadJoiner {
+        RAIIThreadJoiner {
+            joiner: Some(joiner),
+        }
+    }
+}
+
+impl Drop for RAIIThreadJoiner {
+    fn drop(&mut self) {
+        eval_result!(eval_option!(self.joiner.take(), "Programming Error - Please report this as a Bug.").join());
+    }
+}
+
 /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and
 /// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text produces different
 /// cipher-texts for each fresh symmetric encryption. The Key and IV are then asymmetrically
@@ -26,7 +47,7 @@ use ::rand::Rng;
 pub fn hybrid_encrypt(plain_text: &[u8],
                       asym_nonce: &::sodiumoxide::crypto::box_::Nonce,
                       asym_public_key: &::sodiumoxide::crypto::box_::PublicKey,
-                      asym_secret_key: &::sodiumoxide::crypto::box_::SecretKey) -> Result<Vec<u8>, ::errors::ClientError> {
+                      asym_secret_key: &::sodiumoxide::crypto::box_::SecretKey) -> Result<Vec<u8>, ::errors::CoreError> {
     let sym_key = ::sodiumoxide::crypto::secretbox::gen_key();
     let sym_nonce = ::sodiumoxide::crypto::secretbox::gen_nonce();
 
@@ -45,12 +66,12 @@ pub fn hybrid_encrypt(plain_text: &[u8],
 pub fn hybrid_decrypt(cipher_text: &[u8],
                       asym_nonce: &::sodiumoxide::crypto::box_::Nonce,
                       asym_public_key: &::sodiumoxide::crypto::box_::PublicKey,
-                      asym_secret_key: &::sodiumoxide::crypto::box_::SecretKey) -> Result<Vec<u8>, ::errors::ClientError> {
+                      asym_secret_key: &::sodiumoxide::crypto::box_::SecretKey) -> Result<Vec<u8>, ::errors::CoreError> {
     let (asym_cipher_text, sym_cipher_text): (Vec<u8>, Vec<u8>) = try!(deserialise(cipher_text));
 
-    let asym_plain_text = try!(::sodiumoxide::crypto::box_::open(&asym_cipher_text, asym_nonce, asym_public_key, asym_secret_key).map_err(|_| ::errors::ClientError::AsymmetricDecipherFailure));
+    let asym_plain_text = try!(::sodiumoxide::crypto::box_::open(&asym_cipher_text, asym_nonce, asym_public_key, asym_secret_key).map_err(|_| ::errors::CoreError::AsymmetricDecipherFailure));
     if asym_plain_text.len() != ::sodiumoxide::crypto::secretbox::KEYBYTES + ::sodiumoxide::crypto::secretbox::NONCEBYTES {
-        Err(::errors::ClientError::AsymmetricDecipherFailure)
+        Err(::errors::CoreError::AsymmetricDecipherFailure)
     } else {
         let mut sym_key = ::sodiumoxide::crypto::secretbox::Key([0u8; ::sodiumoxide::crypto::secretbox::KEYBYTES]);
         let mut sym_nonce = ::sodiumoxide::crypto::secretbox::Nonce([0u8; ::sodiumoxide::crypto::secretbox::NONCEBYTES]);
@@ -62,12 +83,12 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
             sym_nonce.0[it.0] = *it.1;
         }
 
-        ::sodiumoxide::crypto::secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key).map_err(|_| ::errors::ClientError::SymmetricDecipherFailure)
+        ::sodiumoxide::crypto::secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key).map_err(|_| ::errors::CoreError::SymmetricDecipherFailure)
     }
 }
 
 /// utility function to serialise an Encodable type
-pub fn serialise<T>(data: &T) -> Result<Vec<u8>, ::errors::ClientError>
+pub fn serialise<T>(data: &T) -> Result<Vec<u8>, ::errors::CoreError>
                                  where T: ::rustc_serialize::Encodable {
     let mut encoder = ::cbor::Encoder::from_memory();
     try!(encoder.encode(&[data]));
@@ -75,37 +96,37 @@ pub fn serialise<T>(data: &T) -> Result<Vec<u8>, ::errors::ClientError>
 }
 
 /// utility function to deserialise a Decodable type
-pub fn deserialise<T>(data: &[u8]) -> Result<T, ::errors::ClientError>
+pub fn deserialise<T>(data: &[u8]) -> Result<T, ::errors::CoreError>
                                       where T: ::rustc_serialize::Decodable {
     let mut decoder = ::cbor::Decoder::from_bytes(data);
-    Ok(try!(try!(decoder.decode().next().ok_or(::errors::ClientError::UnsuccessfulEncodeDecode))))
+    Ok(try!(try!(decoder.decode().next().ok_or(::errors::CoreError::UnsuccessfulEncodeDecode))))
 }
 
 /// Generates a random string for specified size
-pub fn generate_random_string(length: usize) -> Result<String, ::errors::ClientError> {
+pub fn generate_random_string(length: usize) -> Result<String, ::errors::CoreError> {
     let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
         debug!("Error {:?}", error);
-        ::errors::ClientError::RandomDataGenerationFailure
+        ::errors::CoreError::RandomDataGenerationFailure
     }));
     Ok((0..length).map(|_| os_rng.gen::<char>()).collect())
 }
 
 /// Generate a random vector of given length
-pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, ::errors::ClientError>
+pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, ::errors::CoreError>
                                                    where T: ::rand::Rand {
     let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
         debug!("Error {:?}", error);
-        ::errors::ClientError::RandomDataGenerationFailure
+        ::errors::CoreError::RandomDataGenerationFailure
     }));
     Ok((0..length).map(|_| os_rng.gen()).collect())
 }
 
 /// Generate a random array of 64 u8's
-pub fn generate_random_array_u8_64() -> Result<[u8; 64], ::errors::ClientError> {
+pub fn generate_random_array_u8_64() -> Result<[u8; 64], ::errors::CoreError> {
     let mut arr = [0; 64];
     let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
         debug!("Error {:?}", error);
-        ::errors::ClientError::RandomDataGenerationFailure
+        ::errors::CoreError::RandomDataGenerationFailure
     }));
     for it in arr.iter_mut() {
         *it = os_rng.gen();

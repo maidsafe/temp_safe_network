@@ -23,7 +23,7 @@ pub fn create(client: &::client::Client,
               version: u64,
               owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
               prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-              private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::ClientError> {
+              private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::CoreError> {
     create_impl(client,
                 &vec![version_name_to_store],
                 tag_type,
@@ -35,7 +35,7 @@ pub fn create(client: &::client::Client,
 }
 
 /// Get the complete version list
-pub fn get_all_versions(client: &mut ::client::Client, struct_data: &::routing::structured_data::StructuredData) -> Result<Vec<::routing::NameType>, ::errors::ClientError> {
+pub fn get_all_versions(client: &mut ::client::Client, struct_data: &::routing::structured_data::StructuredData) -> Result<Vec<::routing::NameType>, ::errors::CoreError> {
     let immut_data = try!(get_immutable_data(client, struct_data));
     ::utility::deserialise(&immut_data.value())
 }
@@ -44,7 +44,7 @@ pub fn get_all_versions(client: &mut ::client::Client, struct_data: &::routing::
 pub fn append_version(client: &mut ::client::Client,
                       struct_data: ::routing::structured_data::StructuredData,
                       version_to_append: ::routing::NameType,
-                      private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::ClientError> {
+                      private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::CoreError> {
     // let immut_data = try!(get_immutable_data(mut client, struct_data));
     // client.delete(immut_data);
     let mut versions = try!(get_all_versions(client, &struct_data));
@@ -66,7 +66,7 @@ fn create_impl(client: &::client::Client,
                version: u64,
                owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
                prev_owner_keys: Vec<::sodiumoxide::crypto::sign::PublicKey>,
-               private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::ClientError> {
+               private_signing_key: &::sodiumoxide::crypto::sign::SecretKey) -> Result<::routing::structured_data::StructuredData, ::errors::CoreError> {
     let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal,
                                                                        try!(::utility::serialise(version_names_to_store)));
     let name_of_immutable_data = immutable_data.name();
@@ -86,18 +86,18 @@ fn create_impl(client: &::client::Client,
                                                                     prev_owner_keys,
                                                                     Some(private_signing_key))))
         },
-        _ => Err(::errors::ClientError::StructuredDataHeaderSizeProhibitive),
+        _ => Err(::errors::CoreError::StructuredDataHeaderSizeProhibitive),
     }
 }
 
 fn get_immutable_data(client: &mut ::client::Client,
-                      struct_data: &::routing::structured_data::StructuredData) -> Result<::routing::immutable_data::ImmutableData, ::errors::ClientError> {
+                      struct_data: &::routing::structured_data::StructuredData) -> Result<::routing::immutable_data::ImmutableData, ::errors::CoreError> {
     let name = try!(::utility::deserialise(&struct_data.get_data()));
     let response_getter = client.get(::routing::data::DataRequest::ImmutableData(name, ::routing::immutable_data::ImmutableDataType::Normal), None);
     let data = try!(response_getter.get());
     match data {
         ::routing::data::Data::ImmutableData(immutable_data) => Ok(immutable_data),
-        _ => Err(::errors::ClientError::ReceivedUnexpectedData),
+        _ => Err(::errors::CoreError::ReceivedUnexpectedData),
     }
 }
 

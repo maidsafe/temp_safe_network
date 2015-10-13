@@ -23,9 +23,9 @@
 /// #Examples
 ///
 /// ```
-/// # #[macro_use] extern crate safe_client;
+/// # #[macro_use] extern crate safe_core;
 /// # fn main() {
-/// let some_result: Result<String, safe_client::errors::ClientError> = Ok("Hello".to_string());
+/// let some_result: Result<String, safe_core::errors::CoreError> = Ok("Hello".to_string());
 /// let string_length = eval_result!(some_result).len();
 /// assert_eq!(string_length, 5);
 /// # }
@@ -48,7 +48,7 @@ macro_rules! eval_result {
 /// #Examples
 ///
 /// ```
-/// # #[macro_use] extern crate safe_client;
+/// # #[macro_use] extern crate safe_core;
 /// # fn main() {
 /// let some_result = Some("Hello".to_string());
 /// let string_length = eval_option!(some_result, "This is a user-supplied text.").len();

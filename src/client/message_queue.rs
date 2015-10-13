@@ -35,7 +35,7 @@ impl MessageQueue {
     pub fn new(routing_event_receiver: ::std::sync::mpsc::Receiver<::routing::event::Event>,
                network_event_senders : Vec<::std::sync::mpsc::Sender<::translated_events::NetworkEvent>>,
                error_senders         : Vec<::std::sync::mpsc::Sender<::translated_events::OperationFailureEvent>>) -> (::std::sync::Arc<::std::sync::Mutex<MessageQueue>>,
-                                                                                                                       ::client::misc::RAIIThreadJoiner) {
+                                                                                                                       ::utility::RAIIThreadJoiner) {
         let message_queue = ::std::sync::Arc::new(::std::sync::Mutex::new(MessageQueue {
             local_cache          : ::lru_time_cache::LruCache::with_capacity(1000),
             data_senders         : ::std::collections::HashMap::new(),
@@ -136,7 +136,7 @@ impl MessageQueue {
             debug!("Thread \"{}\" terminated.", EVENT_RECEIVER_THREAD_NAME);
         }));
 
-        (message_queue, ::client::misc::RAIIThreadJoiner::new(receiver_joiner))
+        (message_queue, ::utility::RAIIThreadJoiner::new(receiver_joiner))
     }
 
     pub fn add_data_receive_event_observer(&mut self,
@@ -157,16 +157,16 @@ impl MessageQueue {
         self.local_cache.contains_key(key)
     }
 
-    pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Result<::routing::data::Data, ::errors::ClientError> {
-        self.local_cache.get(key).ok_or(::errors::ClientError::VersionCacheMiss).map(|val| val.clone())
+    pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Result<::routing::data::Data, ::errors::CoreError> {
+        self.local_cache.get(key).ok_or(::errors::CoreError::VersionCacheMiss).map(|val| val.clone())
     }
 
     pub fn local_cache_insert(&mut self, key: ::routing::NameType, value: ::routing::data::Data) {
         let _ = self.local_cache.insert(key, value);
     }
 
-    pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::routing::data::Data, ::errors::ClientError> {
-        self.routing_message_cache.get(location).ok_or(::errors::ClientError::RoutingMessageCacheMiss).map(|val| val.clone())
+    pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::routing::data::Data, ::errors::CoreError> {
+        self.routing_message_cache.get(location).ok_or(::errors::CoreError::RoutingMessageCacheMiss).map(|val| val.clone())
     }
 
     fn purge_dead_senders<T>(senders  : &mut Vec<::std::sync::mpsc::Sender<T>>,

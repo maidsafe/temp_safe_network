@@ -59,7 +59,7 @@ impl Account {
 
     /// Generate User's Identity for the network using supplied credentials in a deterministic way.
     /// This is similar to the username in various places.
-    pub fn generate_network_id(keyword: &[u8], pin: &[u8]) -> Result<::routing::NameType, ::errors::ClientError> {
+    pub fn generate_network_id(keyword: &[u8], pin: &[u8]) -> Result<::routing::NameType, ::errors::CoreError> {
         let mut id = ::routing::NameType::new([0; 64]);
         try!(Account::derive_key(&mut id.0[..], keyword, pin));
 
@@ -136,7 +136,7 @@ impl Account {
 
     /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
     /// through key-derivation-function first
-    pub fn encrypt(&self, password: &[u8], pin: &[u8]) -> Result<Vec<u8>, ::errors::ClientError> {
+    pub fn encrypt(&self, password: &[u8], pin: &[u8]) -> Result<Vec<u8>, ::errors::CoreError> {
         let serialised_self = try!(::utility::serialise(self));
         let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
 
@@ -145,17 +145,17 @@ impl Account {
 
     /// Symmetric decryption of Session Packet using User's credentials. Credentials are passed
     /// through key-derivation-function first
-    pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Account, ::errors::ClientError> {
+    pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Account, ::errors::CoreError> {
         let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
         let decrypted_self = try!(::sodiumoxide::crypto::secretbox::open(encrypted_self, &nonce, &key)
-                                                                    .map_err(|_| ::errors::ClientError::SymmetricDecipherFailure));
+                                                                    .map_err(|_| ::errors::CoreError::SymmetricDecipherFailure));
 
         ::utility::deserialise(&decrypted_self)
     }
 
     fn generate_crypto_keys(password: &[u8], pin: &[u8]) -> Result<(::sodiumoxide::crypto::secretbox::Key,
                                                                     ::sodiumoxide::crypto::secretbox::Nonce),
-                                                                   ::errors::ClientError> {
+                                                                   ::errors::CoreError> {
         let mut output = [0; ::sodiumoxide::crypto::secretbox::KEYBYTES + ::sodiumoxide::crypto::secretbox::NONCEBYTES];
         try!(Account::derive_key(&mut output[..], password, pin));
 
@@ -172,7 +172,7 @@ impl Account {
         Ok((key, nonce))
     }
 
-    fn derive_key(output: &mut [u8], input: &[u8], user_salt: &[u8]) -> Result<(), ::errors::ClientError> {
+    fn derive_key(output: &mut [u8], input: &[u8], user_salt: &[u8]) -> Result<(), ::errors::CoreError> {
         let mut salt = ::sodiumoxide::crypto::pwhash::Salt([0; ::sodiumoxide::crypto::pwhash::SALTBYTES]);
         {
             let ::sodiumoxide::crypto::pwhash::Salt(ref mut salt_bytes) = salt;
@@ -187,7 +187,7 @@ impl Account {
                     *it.1 = hashed_pin.0[it.0];
                 }
             } else {
-                return Err(::errors::ClientError::UnsupportedSaltSizeForPwHash)
+                return Err(::errors::CoreError::UnsupportedSaltSizeForPwHash)
             }
         }
 
@@ -196,7 +196,7 @@ impl Account {
                                                        &salt,
                                                        ::sodiumoxide::crypto::pwhash::OPSLIMIT_INTERACTIVE,
                                                        ::sodiumoxide::crypto::pwhash::MEMLIMIT_INTERACTIVE)
-                                            .map_err(|_| ::errors::ClientError::UnsuccessfulPwHash)
+                                            .map_err(|_| ::errors::CoreError::UnsuccessfulPwHash)
                                             .map(|_| Ok(())))
     }
 }

@@ -15,7 +15,7 @@
 // relating to use of the SAFE Network Software.
 
 /// Gnerates a random mock client for testing
-pub fn get_client() -> Result<::client::Client, ::errors::ClientError> {
+pub fn get_client() -> Result<::client::Client, ::errors::CoreError> {
     let pin = try!(::utility::generate_random_string(10));
     let keyword = try!(::utility::generate_random_string(10));
     let password = try!(::utility::generate_random_string(10));

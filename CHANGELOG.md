@@ -1,4 +1,4 @@
-# Safe Client - Change Log
+# Safe Core - Change Log
 ## [0.2.1]
 - Routing crate updated to version 0.4.*
 
@@ -30,7 +30,7 @@
     - [MAID-1231](https://maidsafe.atlassian.net/browse/MAID-1231) Create MaidSafe Specific configuration directory
     - [MAID-1232](https://maidsafe.atlassian.net/browse/MAID-1232) Write Test Cases for Versioned Structured Data handler
     - [MAID-1226](https://maidsafe.atlassian.net/browse/MAID-1226) Implement Session Packet as UnVersioned Structure DataType
-    - [MAID-1227](https://maidsafe.atlassian.net/browse/MAID-1227) Update the test cases in Client API
+    - [MAID-1227](https://maidsafe.atlassian.net/browse/MAID-1227) Update the test cases in Core API
     - [MAID-1228](https://maidsafe.atlassian.net/browse/MAID-1228) Update the test cases in mock routing framework
     - [MAID-1234](https://maidsafe.atlassian.net/browse/MAID-1234) Update Hybrid Encrypt and Decrypt
 

@@ -22,7 +22,7 @@
 /// ```
 /// // Generating public and secret keys using sodiumoxide
 /// // Create RevocationIdType
-/// let _an_maid = ::safe_client::id::RevocationIdType::new::<::safe_client::id::MaidTypeTags>();
+/// let _an_maid = ::safe_core::id::RevocationIdType::new::<::safe_core::id::MaidTypeTags>();
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct RevocationIdType {
