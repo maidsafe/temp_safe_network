@@ -1,4 +1,4 @@
-# safe_client
+# safe_core
 
 [![](https://img.shields.io/badge/Project%20SAFE-Approved-green.svg)](http://maidsafe.net/applications) [![](https://img.shields.io/badge/License-GPL3-green.svg)](https://github.com/maidsafe/crust/blob/master/COPYING)
 
@@ -9,9 +9,9 @@
 
 |Crate|Linux/OS X|Windows|Coverage|Issues|
 |:---:|:--------:|:-----:|:------:|:----:|
-|[![](http://meritbadge.herokuapp.com/safe_client)](https://crates.io/crates/safe_client)|[![Build Status](https://travis-ci.org/maidsafe/safe_client.svg?branch=master)](https://travis-ci.org/maidsafe/safe_client)|[![Build status](https://ci.appveyor.com/api/projects/status/pqjc5v2ww7k0qx88/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-client/branch/master)|[![Coverage Status](https://coveralls.io/repos/maidsafe/safe_client/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/safe_client?branch=master)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_client.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_client)|
+|[![](http://meritbadge.herokuapp.com/safe_core)](https://crates.io/crates/safe_core)|[![Build Status](https://travis-ci.org/maidsafe/safe_core.svg?branch=master)](https://travis-ci.org/maidsafe/safe_core)|[![Build status](https://ci.appveyor.com/api/projects/status/pqjc5v2ww7k0qx88/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-core/branch/master)|[![Coverage Status](https://coveralls.io/repos/maidsafe/safe_core/badge.svg?branch=master)](https://coveralls.io/r/maidsafe/safe_core?branch=master)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_core.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_core)|
 
-| [API Documentation - master branch](http://maidsafe.net/safe_client/master) | [SAFE Network System Documentation](http://systemdocs.maidsafe.net) | [MaidSafe website](http://maidsafe.net) | [SAFE Network Forum](https://forum.safenetwork.io) |
+| [API Documentation - master branch](http://maidsafe.net/safe_core/master) | [SAFE Network System Documentation](http://systemdocs.maidsafe.net) | [MaidSafe website](http://maidsafe.net) | [SAFE Network Forum](https://forum.safenetwork.io) |
 |:------:|:-------:|:-------:|:-------:|
 
 ## Prerequisite
@@ -20,7 +20,7 @@
 
 ## Build Instructions
 
-`safe_client` can interface conditionally against either the routing crate or a mock used for local testing.
+`safe_core` can interface conditionally against either the routing crate or a mock used for local testing.
 
 To use it with the Mock:
 ```
@@ -33,3 +33,7 @@ To interface it with actual routing (default):
 cargo build
 cargo test
 ```
+## TODO
+
+### [0.3.0]
+- [X] [MAID-1423](https://maidsafe.atlassian.net/browse/MAID-1423)
