@@ -41,7 +41,7 @@ impl ResponseGetter {
 
     /// Get either from local cache or (if not available there) get it when it comes from the
     /// network as informed by MessageQueue. This is blocking.
-    pub fn get(&self) -> Result<::routing::data::Data, ::errors::ClientError> {
+    pub fn get(&self) -> Result<::routing::data::Data, ::errors::CoreError> {
         if let Some((_, ref data_receiver)) = self.data_channel {
             debug!("Blocking wait for response from the network ...");
 
@@ -56,7 +56,7 @@ impl ResponseGetter {
 
                     Ok(response)
                 },
-                ::translated_events::DataReceivedEvent::Terminated => return Err(::errors::ClientError::OperationAborted),
+                ::translated_events::DataReceivedEvent::Terminated => return Err(::errors::CoreError::OperationAborted),
             }
         } else {
             let mut msg_queue = eval_result!(self.message_queue.lock());

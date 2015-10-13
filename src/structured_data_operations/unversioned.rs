@@ -35,7 +35,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
               private_signing_key: &::sodiumoxide::crypto::sign::SecretKey,
               data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                             &::sodiumoxide::crypto::box_::SecretKey,
-                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::routing::structured_data::StructuredData, ::errors::ClientError> {
+                                            &::sodiumoxide::crypto::box_::Nonce)>) -> Result<::routing::structured_data::StructuredData, ::errors::CoreError> {
     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsData(data.clone()), data_encryption_keys));
 
     match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store, owner_keys.clone(), prev_owner_keys.clone())) {
@@ -84,13 +84,13 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                                                                                     prev_owner_keys,
                                                                                     Some(private_signing_key))))
                         },
-                        _ => Err(::errors::ClientError::StructuredDataHeaderSizeProhibitive),
+                        _ => Err(::errors::CoreError::StructuredDataHeaderSizeProhibitive),
                     }
                 },
-                ::structured_data_operations::DataFitResult::NoDataCanFit => Err(::errors::ClientError::StructuredDataHeaderSizeProhibitive),
+                ::structured_data_operations::DataFitResult::NoDataCanFit => Err(::errors::CoreError::StructuredDataHeaderSizeProhibitive),
             }
         },
-        ::structured_data_operations::DataFitResult::NoDataCanFit => Err(::errors::ClientError::StructuredDataHeaderSizeProhibitive),
+        ::structured_data_operations::DataFitResult::NoDataCanFit => Err(::errors::CoreError::StructuredDataHeaderSizeProhibitive),
     }
 }
 
@@ -99,7 +99,7 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                 struct_data: &::routing::structured_data::StructuredData,
                 data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                               &::sodiumoxide::crypto::box_::SecretKey,
-                                              &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
+                                              &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::CoreError> {
     match try!(get_decoded_stored_data(&struct_data.get_data(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
@@ -118,10 +118,10 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                             let length = se.len();
                             Ok(se.read(0, length))
                         },
-                        _ => Err(::errors::ClientError::ReceivedUnexpectedData),
+                        _ => Err(::errors::CoreError::ReceivedUnexpectedData),
                     }
                 },
-                _ => Err(::errors::ClientError::ReceivedUnexpectedData),
+                _ => Err(::errors::CoreError::ReceivedUnexpectedData),
             }
         }
     }
@@ -130,7 +130,7 @@ pub fn get_data(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 fn get_encoded_data_to_store(data: DataTypeEncoding,
                              data_encryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                            &::sodiumoxide::crypto::box_::SecretKey,
-                                                           &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::ClientError> {
+                                                           &::sodiumoxide::crypto::box_::Nonce)>) -> Result<Vec<u8>, ::errors::CoreError> {
     let serialised_data = try!(::utility::serialise(&data));
     if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_encryption_keys {
         ::utility::hybrid_encrypt(&serialised_data, nonce, public_encryp_key, secret_encryp_key)
@@ -142,7 +142,7 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
 fn get_decoded_stored_data(raw_data: &Vec<u8>,
                            data_decryption_keys: Option<(&::sodiumoxide::crypto::box_::PublicKey,
                                                          &::sodiumoxide::crypto::box_::SecretKey,
-                                                         &::sodiumoxide::crypto::box_::Nonce)>) -> Result<DataTypeEncoding, ::errors::ClientError> {
+                                                         &::sodiumoxide::crypto::box_::Nonce)>) -> Result<DataTypeEncoding, ::errors::CoreError> {
     let data: _;
     let data_to_deserialise = if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_decryption_keys {
         data = try!(::utility::hybrid_decrypt(&raw_data, nonce, public_encryp_key, secret_encryp_key));

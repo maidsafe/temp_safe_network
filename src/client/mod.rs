@@ -18,7 +18,6 @@
 /// ResponseGetter is a lazy evaluated response getter.
 pub mod response_getter;
 
-mod misc;
 mod user_account;
 mod message_queue;
 
@@ -40,7 +39,7 @@ const LOGIN_PACKET_TYPE_TAG: u64 = ::CLIENT_STRUCTURED_DATA_TAG - 1;
 pub struct Client {
     account            : Option<user_account::Account>,
     routing            : Routing,
-    _raii_joiner       : misc::RAIIThreadJoiner,
+    _raii_joiner       : ::utility::RAIIThreadJoiner,
     message_queue      : ::std::sync::Arc<::std::sync::Mutex<message_queue::MessageQueue>>,
     session_packet_id  : Option<::routing::NameType>,
     session_packet_keys: Option<SessionPacketEncryptionKeys>,
@@ -51,7 +50,7 @@ impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will create an
     /// unregistered random clinet, which can do very limited set of operations - eg., a
     /// Network-Get
-    pub fn create_unregistered_client() -> Result<Client, ::errors::ClientError> {
+    pub fn create_unregistered_client() -> Result<Client, ::errors::CoreError> {
         debug!("Creating unregistered client ...");
 
         let (routing_sender, routing_receiver) = ::std::sync::mpsc::channel();
@@ -63,7 +62,7 @@ impl Client {
         debug!("Bootstrapping ...");
         match try!(network_event_receiver.recv()) {
             ::translated_events::NetworkEvent::Bootstrapped => (),
-            _ => return Err(::errors::ClientError::OperationAborted),
+            _ => return Err(::errors::CoreError::OperationAborted),
         }
         debug!("Bootstrapped");
 
@@ -80,7 +79,7 @@ impl Client {
 
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
-    pub fn create_account(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
+    pub fn create_account(keyword: String, pin: String, password: String) -> Result<Client, ::errors::CoreError> {
         debug!("Creating account for supplied credentials ...");
 
         let account_packet = user_account::Account::new(None, None);
@@ -98,7 +97,7 @@ impl Client {
         debug!("Bootstrapping ...");
         match try!(network_event_receiver.recv()) {
             ::translated_events::NetworkEvent::Bootstrapped => (),
-            _ => return Err(::errors::ClientError::OperationAborted),
+            _ => return Err(::errors::CoreError::OperationAborted),
         }
         debug!("Bootstrapped");
 
@@ -116,11 +115,11 @@ impl Client {
         };
 
         {
-            let account = try!(client.account.iter().next().ok_or(::errors::ClientError::from("Logic Error !! Report as bug.")));
-            let session_packet_keys = try!(client.session_packet_keys.iter().next().ok_or(::errors::ClientError::from("Logic Error !! Report as bug.")));
+            let account = try!(client.account.iter().next().ok_or(::errors::CoreError::from("Logic Error !! Report as bug.")));
+            let session_packet_keys = try!(client.session_packet_keys.iter().next().ok_or(::errors::CoreError::from("Logic Error !! Report as bug.")));
 
             let account_version = try!(::routing::structured_data::StructuredData::new(LOGIN_PACKET_TYPE_TAG,
-                                                                                       try!(client.session_packet_id.ok_or(::errors::ClientError::from("Logic Error !! Report as bug."))).clone(),
+                                                                                       try!(client.session_packet_id.ok_or(::errors::CoreError::from("Logic Error !! Report as bug."))).clone(),
                                                                                        0,
                                                                                        try!(account.encrypt(session_packet_keys.get_password(),
                                                                                                             session_packet_keys.get_pin())),
@@ -136,7 +135,7 @@ impl Client {
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// create_account. This will help log into an already created account for the user in the
     /// SAFE-network.
-    pub fn log_in(keyword: String, pin: String, password: String) -> Result<Client, ::errors::ClientError> {
+    pub fn log_in(keyword: String, pin: String, password: String) -> Result<Client, ::errors::CoreError> {
         debug!("Loging into account with supplied credentials ...");
 
         let mut unregistered_client = try!(Client::create_unregistered_client());
@@ -165,7 +164,7 @@ impl Client {
             debug!("Bootstrapping ...");
             match try!(network_event_receiver.recv()) {
                 ::translated_events::NetworkEvent::Bootstrapped => (),
-                _ => return Err(::errors::ClientError::OperationAborted),
+                _ => return Err(::errors::CoreError::OperationAborted),
             }
             debug!("Bootstrapped");
 
@@ -184,7 +183,7 @@ impl Client {
 
             Ok(client)
         } else {
-            Err(::errors::ClientError::ReceivedUnexpectedData)
+            Err(::errors::CoreError::ReceivedUnexpectedData)
         }
     }
 
@@ -192,11 +191,11 @@ impl Client {
     /// store it. It will be retireved when the user logs into his account. Root directory ID is
     /// necessary to fetch all of user's data as all further data is encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
-    pub fn set_user_root_directory_id(&mut self, root_dir_id: ::routing::NameType) -> Result<(), ::errors::ClientError> {
-        if try!(self.account.iter_mut().next().ok_or(::errors::ClientError::OperationForbiddenForClient)).set_user_root_dir_id(root_dir_id) {
+    pub fn set_user_root_directory_id(&mut self, root_dir_id: ::routing::NameType) -> Result<(), ::errors::CoreError> {
+        if try!(self.account.iter_mut().next().ok_or(::errors::CoreError::OperationForbiddenForClient)).set_user_root_dir_id(root_dir_id) {
             self.update_session_packet()
         } else {
-            Err(::errors::ClientError::RootDirectoryAlreadyExists)
+            Err(::errors::CoreError::RootDirectoryAlreadyExists)
         }
     }
 
@@ -209,11 +208,11 @@ impl Client {
     /// session packet, encrypt and store it. It will be retireved when the user logs into
     /// his account. Root directory ID is necessary to fetch all of configuration data as all further
     /// data is encoded as meta-information into the config Root Directory or one of its subdirectories.
-    pub fn set_configuration_root_directory_id(&mut self, root_dir_id: ::routing::NameType) -> Result<(), ::errors::ClientError> {
-        if try!(self.account.iter_mut().next().ok_or(::errors::ClientError::OperationForbiddenForClient)).set_maidsafe_config_root_dir_id(root_dir_id) {
+    pub fn set_configuration_root_directory_id(&mut self, root_dir_id: ::routing::NameType) -> Result<(), ::errors::CoreError> {
+        if try!(self.account.iter_mut().next().ok_or(::errors::CoreError::OperationForbiddenForClient)).set_maidsafe_config_root_dir_id(root_dir_id) {
             self.update_session_packet()
         } else {
-            Err(::errors::ClientError::RootDirectoryAlreadyExists)
+            Err(::errors::CoreError::RootDirectoryAlreadyExists)
         }
     }
 
@@ -229,8 +228,8 @@ impl Client {
     /// enrypted using Public-MAID and the whole thing is then serialised into a single Vec<u8>.
     pub fn hybrid_encrypt(&self,
                           data_to_encrypt: &[u8],
-                          nonce_opt: Option<&::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::errors::ClientError> {
-        let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
+                          nonce_opt: Option<&::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::errors::CoreError> {
+        let account = try!(self.account.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient));
 
         let mut nonce_default = ::sodiumoxide::crypto::box_::Nonce([0u8; ::sodiumoxide::crypto::box_::NONCEBYTES]);
         let nonce = match nonce_opt {
@@ -254,8 +253,8 @@ impl Client {
     /// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
     pub fn hybrid_decrypt(&self,
                           data_to_decrypt: &[u8],
-                          nonce_opt: Option<&::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::errors::ClientError> {
-        let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
+                          nonce_opt: Option<&::sodiumoxide::crypto::box_::Nonce>) -> Result<Vec<u8>, ::errors::CoreError> {
+        let account = try!(self.account.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient));
 
         let mut nonce_default = ::sodiumoxide::crypto::box_::Nonce([0u8; ::sodiumoxide::crypto::box_::NONCEBYTES]);
         let nonce = match nonce_opt {
@@ -306,7 +305,7 @@ impl Client {
     /// Put data onto the network. This is non-blocking.
     pub fn put(&self,
                data        : ::routing::data::Data,
-               opt_location: Option<::routing::authority::Authority>) -> Result<(), ::errors::ClientError> {
+               opt_location: Option<::routing::authority::Authority>) -> Result<(), ::errors::CoreError> {
         let location = match opt_location {
             Some(auth) => auth,
             None => ::routing::authority::Authority::ClientManager(try!(self.get_default_client_manager_address()).clone()),
@@ -332,7 +331,7 @@ impl Client {
     /// Delete data from the network
     pub fn delete(&self,
                   data        : ::routing::data::Data,
-                  opt_location: Option<::routing::authority::Authority>) -> Result<(), ::errors::ClientError> {
+                  opt_location: Option<::routing::authority::Authority>) -> Result<(), ::errors::CoreError> {
         let location = match opt_location {
             Some(auth) => auth,
             None => ::routing::authority::Authority::ClientManager(try!(self.get_default_client_manager_address()).clone()),
@@ -343,26 +342,26 @@ impl Client {
     }
 
     /// Returns the public encryption key
-    pub fn get_public_encryption_key(&self) -> Result<&::sodiumoxide::crypto::box_::PublicKey, ::errors::ClientError> {
-        let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
+    pub fn get_public_encryption_key(&self) -> Result<&::sodiumoxide::crypto::box_::PublicKey, ::errors::CoreError> {
+        let account = try!(self.account.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient));
         Ok(&account.get_maid().public_keys().1)
     }
 
     /// Returns the Secret encryption key
-    pub fn get_secret_encryption_key(&self) -> Result<&::sodiumoxide::crypto::box_::SecretKey, ::errors::ClientError> {
-        let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
+    pub fn get_secret_encryption_key(&self) -> Result<&::sodiumoxide::crypto::box_::SecretKey, ::errors::CoreError> {
+        let account = try!(self.account.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient));
         Ok(&account.get_maid().secret_keys().1)
     }
 
     /// Returns the Public Signing key
-    pub fn get_public_signing_key(&self) -> Result<&::sodiumoxide::crypto::sign::PublicKey, ::errors::ClientError> {
-        let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
+    pub fn get_public_signing_key(&self) -> Result<&::sodiumoxide::crypto::sign::PublicKey, ::errors::CoreError> {
+        let account = try!(self.account.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient));
         Ok(&account.get_maid().public_keys().0)
     }
 
     /// Returns the Secret Signing key
-    pub fn get_secret_signing_key(&self) -> Result<&::sodiumoxide::crypto::sign::SecretKey, ::errors::ClientError> {
-        let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
+    pub fn get_secret_signing_key(&self) -> Result<&::sodiumoxide::crypto::sign::SecretKey, ::errors::CoreError> {
+        let account = try!(self.account.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient));
         Ok(&account.get_maid().secret_keys().0)
     }
 
@@ -385,15 +384,15 @@ impl Client {
     }
 
     /// Get the default address where the PUTs and DELETEs will go to for this client
-    pub fn get_default_client_manager_address(&self) -> Result<&::routing::NameType, ::errors::ClientError> {
-        self.client_manager_addr.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient)
+    pub fn get_default_client_manager_address(&self) -> Result<&::routing::NameType, ::errors::CoreError> {
+        self.client_manager_addr.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient)
     }
 
     /// Set the default address where the PUTs and DELETEs will go to for this client
-    pub fn set_default_client_manager_address(&mut self, address: ::routing::NameType) -> Result<(), ::errors::ClientError> {
+    pub fn set_default_client_manager_address(&mut self, address: ::routing::NameType) -> Result<(), ::errors::CoreError> {
         match self.client_manager_addr.as_mut() {
             Some(contained_address) => *contained_address = address,
-            None => return Err(::errors::ClientError::OperationForbiddenForClient),
+            None => return Err(::errors::CoreError::OperationForbiddenForClient),
         }
 
         Ok(())
@@ -404,14 +403,14 @@ impl Client {
         Routing::new(sender, id_packet)
     }
 
-    fn update_session_packet(&mut self) -> Result<(), ::errors::ClientError> {
-        let session_packet_id = try!(self.session_packet_id.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient)).clone();
+    fn update_session_packet(&mut self) -> Result<(), ::errors::CoreError> {
+        let session_packet_id = try!(self.session_packet_id.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient)).clone();
         let session_packet_request = ::routing::data::DataRequest::StructuredData(session_packet_id.clone(), LOGIN_PACKET_TYPE_TAG);
 
         let response_getter = self.get(session_packet_request, None);
 
-        let account = try!(self.account.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
-        let session_packet_keys = try!(self.session_packet_keys.iter().next().ok_or(::errors::ClientError::OperationForbiddenForClient));
+        let account = try!(self.account.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient));
+        let session_packet_keys = try!(self.session_packet_keys.iter().next().ok_or(::errors::CoreError::OperationForbiddenForClient));
 
         if let ::routing::data::Data::StructuredData(retrieved_session_packet) = try!(response_getter.get()) {
             let encrypted_account = try!(account.encrypt(session_packet_keys.get_password(),
@@ -426,7 +425,7 @@ impl Client {
                                                                                            Some(&account.get_maid().secret_keys().0)));
             Ok(self.post(::routing::data::Data::StructuredData(new_account_version), None))
         } else {
-            Err(::errors::ClientError::ReceivedUnexpectedData)
+            Err(::errors::CoreError::ReceivedUnexpectedData)
         }
     }
 }
@@ -523,8 +522,8 @@ mod test {
 
         match (unregistered_client.set_user_root_directory_id(rand_name.clone()),
                unregistered_client.set_configuration_root_directory_id(rand_name)) {
-            (Err(::errors::ClientError::OperationForbiddenForClient),
-             Err(::errors::ClientError::OperationForbiddenForClient)) => (),
+            (Err(::errors::CoreError::OperationForbiddenForClient),
+             Err(::errors::CoreError::OperationForbiddenForClient)) => (),
             _ => panic!("Unexpected !!"),
         };
     }
@@ -620,13 +619,13 @@ mod test {
         // Decryption without passing Nonce for something encrypted with passing Nonce - Should Fail
         match client.hybrid_decrypt(&cipher_text_0, None) {
             Ok(_) => panic!("Should have failed !"),
-            Err(::errors::ClientError::AsymmetricDecipherFailure) => (),
+            Err(::errors::CoreError::AsymmetricDecipherFailure) => (),
             Err(error) => panic!("{:?}", error),
         }
         // Decryption passing Nonce for something encrypted without passing Nonce - Should Fail
         match client.hybrid_decrypt(&cipher_text_3, Some(&nonce)) {
             Ok(_) => panic!("Should have failed !"),
-            Err(::errors::ClientError::AsymmetricDecipherFailure) => (),
+            Err(::errors::CoreError::AsymmetricDecipherFailure) => (),
             Err(error) => panic!("{:?}", error),
         }
 
@@ -660,7 +659,7 @@ mod test {
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
-                    Err(::errors::ClientError::VersionCacheMiss) => (),
+                    Err(::errors::CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),
                 }
             }
@@ -700,7 +699,7 @@ mod test {
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
-                    Err(::errors::ClientError::VersionCacheMiss) => (),
+                    Err(::errors::CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),
                 }
             }
@@ -716,7 +715,7 @@ mod test {
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
-                    Err(::errors::ClientError::VersionCacheMiss) => (),
+                    Err(::errors::CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),
                 }
             }

@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-//! #Safe-Client Library
-//! [Project github page](https://github.com/maidsafe/safe_client)
+//! #Safe-Core Library
+//! [Project github page](https://github.com/maidsafe/safe_core)
 
 #![doc(html_logo_url =
            "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
        html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-       html_root_url = "http://maidsafe.github.io/safe_client")]
+       html_root_url = "http://maidsafe.github.io/safe_core")]
 
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
@@ -52,9 +52,9 @@ mod macros;
 
 /// Public and Private Id types
 pub mod id;
-/// Safe-Client Errors
+/// Safe-Core Errors
 pub mod errors;
-/// Self-Auth and Gateway Module
+/// Self-Authentication and Gateway Module
 pub mod client;
 /// Utility functions
 pub mod utility;
@@ -71,5 +71,5 @@ pub use self_encryption_storage::SelfEncryptionStorage;
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;
 /// All StructuredData tagging should positive-offset from this if the operation needs to go
-/// through this safe_client crate
+/// through this safe_core crate
 pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;

@@ -20,7 +20,7 @@
 /// #Examples
 ///
 /// ```
-/// use ::safe_client::id::{IdType, RevocationIdType, MaidTypeTags};
+/// use ::safe_core::id::{IdType, RevocationIdType, MaidTypeTags};
 /// // Creating new IdType
 /// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>());
 ///
@@ -84,8 +84,8 @@ impl IdType {
     pub fn open(&self,
                 data : &[u8],
                 nonce : &::sodiumoxide::crypto::box_::Nonce,
-                from : &::sodiumoxide::crypto::box_::PublicKey) -> Result<Vec<u8>, ::errors::ClientError> {
-        ::sodiumoxide::crypto::box_::open(&data, &nonce, &from, &self.secret_keys.1).map_err(|_| ::errors::ClientError::AsymmetricDecipherFailure)
+                from : &::sodiumoxide::crypto::box_::PublicKey) -> Result<Vec<u8>, ::errors::CoreError> {
+        ::sodiumoxide::crypto::box_::open(&data, &nonce, &from, &self.secret_keys.1).map_err(|_| ::errors::CoreError::AsymmetricDecipherFailure)
     }
 }
 
