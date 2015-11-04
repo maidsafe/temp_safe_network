@@ -165,7 +165,6 @@ mod test {
         }
 
         let signature = ::sodiumoxide::crypto::sign::Signature(signature_arr);
-
-        assert_eq!(&signature.0, &public_maid.signature().0);
+        assert!(::utility::slice_equal(&signature.0, &public_maid.signature().0));
     }
 }
