@@ -1,6 +1,6 @@
 env:
   global:
-    - secure: HIc2yaZs1UIYmbr6JiSNnFxRlmHXSXfkL4ZV0vaI9QXxTPWC/7EKBm+A6oMjGJa7tGohXJjF+MhO6YVsWLe0F0PR+RFbCoSrmwtmxyhIF21JisEGcBhvmWqzemK3VYcx3sHJNHq0cMdGQEpcpm4QEuNJGzBYXsKb8bUR2vd0DdI=
+    - secure: kERfGEJxywTI3AvAsOCcjQBuxrAiJ7aOWooLmtxy8QWzNkVUlhY2A5xGWCqyKunMmjj9+cJ2FtrejYDo9FcXtmL2MlU0M6YZ1vLCeYTMsxMurZNXH0o64X0pFRsYAxR/uYgiZKujXBTcXiRlKkBd2G+aVetKPUl3rTi3nrejlto=
     - Features=use-mock-routing
 os:
   - linux
