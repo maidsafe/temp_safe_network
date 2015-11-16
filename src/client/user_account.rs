@@ -176,12 +176,12 @@ impl Account {
         let mut salt = ::sodiumoxide::crypto::pwhash::Salt([0; ::sodiumoxide::crypto::pwhash::SALTBYTES]);
         {
             let ::sodiumoxide::crypto::pwhash::Salt(ref mut salt_bytes) = salt;
-            if salt_bytes.len() == ::sodiumoxide::crypto::hash::sha256::HASHBYTES {
+            if salt_bytes.len() == ::sodiumoxide::crypto::hash::sha256::DIGESTBYTES {
                 let hashed_pin = ::sodiumoxide::crypto::hash::sha256::hash(user_salt);
                 for it in salt_bytes.iter_mut().enumerate() {
                     *it.1 = hashed_pin.0[it.0];
                 }
-            } else if salt_bytes.len() == ::sodiumoxide::crypto::hash::sha512::HASHBYTES {
+            } else if salt_bytes.len() == ::sodiumoxide::crypto::hash::sha512::DIGESTBYTES {
                 let hashed_pin = ::sodiumoxide::crypto::hash::sha512::hash(user_salt);
                 for it in salt_bytes.iter_mut().enumerate() {
                     *it.1 = hashed_pin.0[it.0];
