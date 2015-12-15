@@ -97,7 +97,6 @@ impl PublicIdType {
 #[cfg(test)]
 mod test {
     use super::PublicIdType;
-    use routing::types::array_as_vector;
     use ::id::Random;
 
     impl Random for PublicIdType {
@@ -166,7 +165,6 @@ mod test {
         }
 
         let signature = ::sodiumoxide::crypto::sign::Signature(signature_arr);
-
-        assert_eq!(array_as_vector(&signature.0), array_as_vector(&public_maid.signature().0));
+        assert!(::utility::slice_equal(&signature.0, &public_maid.signature().0));
     }
 }

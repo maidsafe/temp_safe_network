@@ -99,7 +99,8 @@ impl RoutingMock {
 
         let cloned_sender = sender.clone();
         let _ = ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
+            let sleep_duration = ::std::time::Duration::from_millis (SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS as u64);
+            ::std::thread::sleep(sleep_duration);
             let _ = cloned_sender.send(::routing::event::Event::Bootstrapped);
         });
 
@@ -115,7 +116,8 @@ impl RoutingMock {
         let cloned_sender = self.sender.clone();
 
         let _ = ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS);
+            let sleep_duration = ::std::time::Duration::from_millis (SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS as u64);
+            ::std::thread::sleep(sleep_duration);
             let data_name = request_for.name();
             match eval_result!(data_store.lock()).get(&data_name) {
                 Some(raw_data) => {
@@ -167,7 +169,8 @@ impl RoutingMock {
         };
 
         let _ = ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
+            let sleep_duration = ::std::time::Duration::from_millis (SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS as u64);
+            ::std::thread::sleep(sleep_duration);
             if !success { // TODO(Spandan) Check how routing is going to handle PUT errors
             }
         });
@@ -200,7 +203,8 @@ impl RoutingMock {
         };
 
         let _ = ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS);
+            let sleep_duration = ::std::time::Duration::from_millis (SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS as u64);
+            ::std::thread::sleep(sleep_duration);
             if !success { // TODO(Spandan) Check how routing is going to handle POST errors
             }
         });
@@ -233,7 +237,8 @@ impl RoutingMock {
         };
 
         let _ = ::std::thread::spawn(move || {
-            ::std::thread::sleep_ms(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS);
+            let sleep_duration = ::std::time::Duration::from_millis (SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS as u64);
+            ::std::thread::sleep(sleep_duration);
             if !success { // TODO(Spandan) Check how routing is going to handle DELETE errors
             }
         });

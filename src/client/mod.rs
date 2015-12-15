@@ -57,7 +57,9 @@ impl Client {
         let (network_event_sender, network_event_receiver) = ::std::sync::mpsc::channel();
 
         let routing = Client::get_new_routing(routing_sender, None);
-        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
+        let (message_queue, raii_joiner) = message_queue::MessageQueue::new(routing_receiver,
+                                                                            vec![network_event_sender],
+                                                                            Vec::new());
 
         debug!("Bootstrapping ...");
         match try!(network_event_receiver.recv()) {

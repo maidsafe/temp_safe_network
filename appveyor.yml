@@ -1,17 +1,28 @@
+environment:
+  global:
+    RUST_BACKTRACE: 1
+    Features: "use-mock-routing"
+  matrix:
+#    - RUST_VERSION: stable
+#    - RUST_VERSION: beta
+    - RUST_VERSION: nightly
+branches:
+  only:
+    - master
+
+clone_depth: 50
+
 install:
   - ps: |
-        Start-FileDownload "https://raw.githubusercontent.com/carllerche/travis-rust-matrix/master/install.ps1"; . .\install.ps1
-        if($env:platform -eq 'x86') {
-          $arch_expanded = "i686-pc-windows-gnu";
-          $env:Path = $env:Path + ";C:\MinGW\bin";
-        } else {
-          $arch_expanded = "x86_64-pc-windows-gnu";
-          Start-FileDownload "http://libgd.blob.core.windows.net/mingw/mingw-w64-dgn-x86_64-20141001.7z";
-          7z x -oC:\ mingw-w64-dgn-x86_64-20141001.7z | findstr /b /c:"Everything is Ok" /c:"Scanning" /c:"Creating archive";
-          $env:Path = $env:Path + ";C:\MinGW64\bin";
-        }
-        Start-FileDownload "https://gitlab.com/Fraser999/Dependencies/raw/master/bin/$arch_expanded/libsodium.a";
-        $env:SODIUM_LIB_DIR = Resolve-Path .
+        $url = "https://github.com/maidsafe/QA/raw/master/Powershell%20Scripts/AppVeyor"
+        Start-FileDownload "$url/Install%20Rust.ps1" -FileName "Install Rust.ps1"
+        Start-FileDownload "$url/Install%20MinGW.ps1" -FileName "Install MinGW.ps1"
+        Start-FileDownload "$url/Install%20libsodium.ps1" -FileName "Install libsodium.ps1"
+        Start-FileDownload "$url/Build.ps1" -FileName "Build.ps1"
+        Start-FileDownload "$url/Run%20Tests.ps1" -FileName "Run Tests.ps1"
+        . ".\Install Rust.ps1"
+        . ".\Install MinGW.ps1"
+        . ".\Install libsodium.ps1"
 
 platform:
   - x86
@@ -21,22 +32,13 @@ configuration:
 #  - Debug
   - Release
 
-environment:
-  matrix:
-#    - RUST_VERSION: 1.1.0
-#    - RUST_VERSION: beta
-    - RUST_VERSION: nightly
-
-# Allowing failures for x86 to accomodate for current libsodium test failure in x86
+# Allowing failures for x86 to accommodate for current libsodium test failure in x86
 matrix:
-    allow_failures:
-        - platform: x86
+  allow_failures:
+    - platform: x86
 
-build: false
+build_script:
+  - ps: . ".\Build.ps1"
 
 test_script:
-  - ps: if ($env:CONFIGURATION -eq "Release") {
-          $env:config_flags = "--release"
-        }
-  - cargo build --verbose --features "use-mock-routing" %config_flags%
-  - cargo test --verbose --features "use-mock-routing"
+  - ps: . ".\Run Tests.ps1"

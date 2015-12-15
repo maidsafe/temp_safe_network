@@ -35,8 +35,6 @@ pub enum CoreError {
     VersionCacheMiss,
     /// No such data found in routing-filled cache
     RoutingMessageCacheMiss,
-    /// Network operation failed
-    ResponseError(::routing::error::ResponseError),
     /// Cannot overwrite a root directory if it already exists
     RootDirectoryAlreadyExists,
     /// Unable to obtain generator for random data
@@ -47,6 +45,8 @@ pub enum CoreError {
     Unexpected(String),
     /// Routing Error
     RoutingError(::routing::error::RoutingError),
+    /// Interface Error
+    RoutingInterfaceError(::routing::InterfaceError),
     /// Unable to pack into or operate with size of Salt
     UnsupportedSaltSizeForPwHash,
     /// Unable to complete computation for password hashing - usually because OS refused to
@@ -66,12 +66,6 @@ impl From<::cbor::CborError> for CoreError {
     fn from(error: ::cbor::CborError) -> CoreError {
         debug!("Error: {:?}", error);
         CoreError::UnsuccessfulEncodeDecode
-    }
-}
-
-impl From<::routing::error::ResponseError> for CoreError {
-    fn from(error: ::routing::error::ResponseError) -> CoreError {
-        CoreError::ResponseError(error)
     }
 }
 
@@ -97,15 +91,15 @@ impl Into<i32> for CoreError {
             CoreError::ReceivedUnexpectedData              => CLIENT_ERROR_START_RANGE - 4,
             CoreError::VersionCacheMiss                    => CLIENT_ERROR_START_RANGE - 5,
             CoreError::RoutingMessageCacheMiss             => CLIENT_ERROR_START_RANGE - 6,
-            CoreError::ResponseError(_)                    => CLIENT_ERROR_START_RANGE - 7,
             CoreError::RootDirectoryAlreadyExists          => CLIENT_ERROR_START_RANGE - 8,
             CoreError::RandomDataGenerationFailure         => CLIENT_ERROR_START_RANGE - 9,
             CoreError::OperationForbiddenForClient         => CLIENT_ERROR_START_RANGE - 10,
             CoreError::Unexpected(_)                       => CLIENT_ERROR_START_RANGE - 11,
             CoreError::RoutingError(_)                     => CLIENT_ERROR_START_RANGE - 12,
-            CoreError::UnsupportedSaltSizeForPwHash        => CLIENT_ERROR_START_RANGE - 13,
-            CoreError::UnsuccessfulPwHash                  => CLIENT_ERROR_START_RANGE - 14,
-            CoreError::OperationAborted                    => CLIENT_ERROR_START_RANGE - 15,
+            CoreError::RoutingInterfaceError(_)            => CLIENT_ERROR_START_RANGE - 13,
+            CoreError::UnsupportedSaltSizeForPwHash        => CLIENT_ERROR_START_RANGE - 14,
+            CoreError::UnsuccessfulPwHash                  => CLIENT_ERROR_START_RANGE - 15,
+            CoreError::OperationAborted                    => CLIENT_ERROR_START_RANGE - 16,
         }
     }
 }
@@ -120,12 +114,12 @@ impl ::std::fmt::Debug for CoreError {
             CoreError::ReceivedUnexpectedData              => write!(f, "CoreError::ReceivedUnexpectedData"),
             CoreError::VersionCacheMiss                    => write!(f, "CoreError::VersionCacheMiss"),
             CoreError::RoutingMessageCacheMiss             => write!(f, "CoreError::RoutingMessageCacheMiss"),
-            CoreError::ResponseError(ref error)            => write!(f, "CoreError::ResponseError -> {:?}", error),
             CoreError::RootDirectoryAlreadyExists          => write!(f, "CoreError::RootDirectoryAlreadyExists"),
             CoreError::RandomDataGenerationFailure         => write!(f, "CoreError::RandomDataGenerationFailure"),
             CoreError::OperationForbiddenForClient         => write!(f, "CoreError::OperationForbiddenForClient"),
-            CoreError::Unexpected(ref error)               => write!(f, "CoreError::Unexpected::{{{:?}}}", error),
-            CoreError::RoutingError(ref error)             => write!(f, "CoreError::RoutingError -> {:?}", error),
+            CoreError::Unexpected(ref err)                 => write!(f, "CoreError::Unexpected::{{{:?}}}", err),
+            CoreError::RoutingError(ref err)               => write!(f, "CoreError::RoutingError -> {:?}", err),
+            CoreError::RoutingInterfaceError(ref err)      => write!(f, "CoreError::RoutingInterfaceError -> {:?}", err),
             CoreError::UnsupportedSaltSizeForPwHash        => write!(f, "CoreError::UnsupportedSaltSizeForPwHash"),
             CoreError::UnsuccessfulPwHash                  => write!(f, "CoreError::UnsuccessfulPwHash"),
             CoreError::OperationAborted                    => write!(f, "CoreError::OperationAborted"),

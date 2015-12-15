@@ -1,6 +1,6 @@
 [package]
 name          = "safe_core"
-version       = "0.3.0"
+version       = "0.3.1"
 authors       = ["MaidSafe Developers <dev@maidsafe.net>"]
 description   = "SAFE Core API library"
 documentation = "http://maidsafe.github.io/safe_core/latest/"
@@ -11,9 +11,10 @@ homepage      = "http://maidsafe.net"
 
 [dependencies]
 # ---- MaidSafe -----
-routing         = "~0.4.2"
-lru_time_cache  = "~0.2.5"
-self_encryption = "~0.2.5"
+routing            = "~0.4.2"
+lru_time_cache     = "~0.2.5"
+self_encryption    = "~0.2.5"
+maidsafe_utilities = "~0.1.5"
 
 # ---- Others ----
 log             = "~0.3.4"
