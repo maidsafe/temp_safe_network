@@ -15,16 +15,21 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use client::Client;
+use xor_name::XorName;
+use std::sync::{Arc, Mutex};
+use routing::{ImmutableData, ImmutableDataType, Data, DataRequest};
+
 /// Network storage is the concrete type which self-encryption crate will use to put or get data
 /// from the network
 pub struct SelfEncryptionStorage {
-    client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+    client: Arc<Mutex<Client>>,
 }
 
 impl SelfEncryptionStorage {
     /// Create a new SelfEncryptionStorage instance
-    pub fn new(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>) -> ::std::sync::Arc<SelfEncryptionStorage> {
-        ::std::sync::Arc::new(SelfEncryptionStorage {
+    pub fn new(client: Arc<Mutex<Client>>) -> Arc<SelfEncryptionStorage> {
+        Arc::new(SelfEncryptionStorage {
             client: client,
         })
     }
@@ -38,13 +43,12 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
             name_id[i] = name[i];
         }
 
-        let mut client = eval_result!(self.client.lock());
-        let immutable_data_request = ::routing::data::DataRequest::ImmutableData(::routing::NameType::new(name_id),
-                                                                                 ::routing::immutable_data::ImmutableDataType::Normal);
-        match client.get(immutable_data_request, None).get() {
+        let mut client = unwrap_result!(self.client.lock());
+        let immutable_data_request = DataRequest::ImmutableData(XorName::new(name_id), ImmutableDataType::Normal);
+        match unwrap_result!(client.get(immutable_data_request, None)).get() {
             Ok(ref data) => {
                 match data {
-                    &::routing::data::Data::ImmutableData(ref rxd_data) => rxd_data.value().clone(),
+                    &Data::ImmutableData(ref rxd_data) => rxd_data.value().clone(),
                     _ => Vec::new(),
                 }
             },
@@ -53,7 +57,7 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
     }
 
     fn put(&self, _: Vec<u8>, data: Vec<u8>) {
-        let immutable_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal, data);
-        eval_result!(eval_result!(self.client.lock()).put(::routing::data::Data::ImmutableData(immutable_data), None));
+        let immutable_data = ImmutableData::new(ImmutableDataType::Normal, data);
+        unwrap_result!(unwrap_result!(self.client.lock()).put(Data::ImmutableData(immutable_data), None));
     }
 }

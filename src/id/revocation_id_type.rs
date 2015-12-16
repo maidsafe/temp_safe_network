@@ -15,6 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use xor_name::XorName;
+use sodiumoxide::crypto::sign;
+use sodiumoxide::crypto::hash::sha512;
+
 /// RevocationIdType
 ///
 /// #Examples
@@ -27,8 +31,8 @@
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct RevocationIdType {
     type_tags: (u64, u64, u64),  // type tags for revocation, id and public ids
-    public_key: ::sodiumoxide::crypto::sign::PublicKey,
-    secret_key: ::sodiumoxide::crypto::sign::SecretKey,
+    public_key: sign::PublicKey,
+    secret_key: sign::SecretKey,
 }
 
 impl RevocationIdType {
@@ -36,7 +40,7 @@ impl RevocationIdType {
     /// Default contructed RevocationIdType instance is returned
     #[allow(unsafe_code)]
     pub fn new<TypeTags>() -> RevocationIdType where TypeTags: ::id::IdTypeTags {
-        let (pub_sign_key, sec_sign_key) = ::sodiumoxide::crypto::sign::gen_keypair();
+        let (pub_sign_key, sec_sign_key) = sign::gen_keypair();
         let type_tags: TypeTags = unsafe { ::std::mem::uninitialized() };
         RevocationIdType {
             type_tags: (type_tags.revocation_id_type_tag(), type_tags.id_type_tag(), type_tags.public_id_type_tag()),
@@ -46,7 +50,7 @@ impl RevocationIdType {
     }
 
     /// Returns name
-    pub fn name(&self) -> ::routing::NameType {
+    pub fn name(&self) -> XorName {
         let combined_iter = self.public_key.0.into_iter();
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
@@ -55,7 +59,7 @@ impl RevocationIdType {
         for i in self.type_tags.0.to_string().into_bytes().into_iter() {
             combined.push(i);
         }
-        ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&combined).0)
+        XorName(sha512::hash(&combined).0)
     }
 
     /// Returns type tags
@@ -69,28 +73,30 @@ impl RevocationIdType {
     }
 
     /// Returns the SecretKey of the RevocationIdType
-    pub fn secret_key(&self) -> &::sodiumoxide::crypto::sign::SecretKey {
+    pub fn secret_key(&self) -> &sign::SecretKey {
         &self.secret_key
     }
 
     /// Returns the PublicKey of the AnMaid
-    pub fn public_key(&self) -> &::sodiumoxide::crypto::sign::PublicKey {
+    pub fn public_key(&self) -> &sign::PublicKey {
         &self.public_key
     }
 
     /// Signs the data with the SecretKey of the AnMaid and recturns the Signed Data
     pub fn sign(&self, data : &[u8]) -> Vec<u8> {
-        return ::sodiumoxide::crypto::sign::sign(&data, &self.secret_key)
+        return sign::sign(&data, &self.secret_key)
     }
 }
 
 #[cfg(test)]
 mod test {
-    extern crate rand;
-
-    use super::RevocationIdType;
-    use self::rand::Rng;
+    use rand;
+    use super::*;
+    use rand::Rng;
     use ::id::Random;
+    use sodiumoxide::crypto::sign;
+    use maidsafe_utilities::serialisation::{serialise, deserialise};
+
 
     impl Random for RevocationIdType {
         fn generate_random() -> RevocationIdType {
@@ -107,8 +113,8 @@ mod test {
     fn serialisation_an_maid() {
         let obj_before = RevocationIdType::generate_random();
 
-        let serialised_obj = eval_result!(::utility::serialise(&obj_before));
-        let obj_after = eval_result!(::utility::deserialise(&serialised_obj));
+        let serialised_obj = unwrap_result!(serialise(&obj_before));
+        let obj_after = unwrap_result!(deserialise(&serialised_obj));
         assert_eq!(obj_before, obj_after);
     }
 
@@ -138,11 +144,11 @@ mod test {
             let sign2 = maid2.sign(&random_bytes);
             assert!(sign1 != sign2);
 
-            assert!(::sodiumoxide::crypto::sign::verify(&sign1, &maid1.public_key()).is_ok());
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_key()).is_err());
+            assert!(sign::verify(&sign1, &maid1.public_key()).is_ok());
+            assert!(sign::verify(&sign2, &maid1.public_key()).is_err());
 
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid2.public_key()).is_ok());
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_key()).is_err());
+            assert!(sign::verify(&sign2, &maid2.public_key()).is_ok());
+            assert!(sign::verify(&sign2, &maid1.public_key()).is_err());
         }
     }
 }

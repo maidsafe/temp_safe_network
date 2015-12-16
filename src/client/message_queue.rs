@@ -15,45 +15,53 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                 */
 
+use errors::CoreError;
+use xor_name::XorName;
+use lru_time_cache::LruCache;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, mpsc};
+use routing::{Data, Event, ResponseContent};
+use maidsafe_utilities::thread::RaiiThreadJoiner;
+
 const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 
 /// MessageQueue gets and collects messages/responses from routing. It also maintains local caching
 /// of previously fetched ImmutableData (because the very nature of such data implies Immutability)
 /// enabling fast re-retrieval and avoiding networking.
 pub struct MessageQueue {
-    local_cache          : ::lru_time_cache::LruCache<::routing::NameType, ::routing::data::Data>,
-    data_senders         : ::std::collections::HashMap<::routing::NameType, Vec<::std::sync::mpsc::Sender<::translated_events::DataReceivedEvent>>>,
-    error_senders        : Vec<::std::sync::mpsc::Sender<::translated_events::OperationFailureEvent>>,
-    network_event_senders: Vec<::std::sync::mpsc::Sender<::translated_events::NetworkEvent>>,
-    routing_message_cache: ::lru_time_cache::LruCache<::routing::NameType, ::routing::data::Data>,
+    local_cache          : LruCache<XorName, Data>,
+    data_senders         : HashMap<XorName, Vec<mpsc::Sender<::translated_events::DataReceivedEvent>>>,
+    error_senders        : Vec<mpsc::Sender<::translated_events::OperationFailureEvent>>,
+    network_event_senders: Vec<mpsc::Sender<::translated_events::NetworkEvent>>,
+    routing_message_cache: LruCache<XorName, Data>,
 }
 
 impl MessageQueue {
     /// Create a new instance of MessageQueue. `data_senders` can be added later via function to
     /// add observer since one will not receive data until one asks for it. Thus there is enough
     /// chance to add an observer before requesting data.
-    pub fn new(routing_event_receiver: ::std::sync::mpsc::Receiver<::routing::event::Event>,
-               network_event_senders : Vec<::std::sync::mpsc::Sender<::translated_events::NetworkEvent>>,
-               error_senders         : Vec<::std::sync::mpsc::Sender<::translated_events::OperationFailureEvent>>) -> (::std::sync::Arc<::std::sync::Mutex<MessageQueue>>,
-                                                                                                                       ::utility::RAIIThreadJoiner) {
-        let message_queue = ::std::sync::Arc::new(::std::sync::Mutex::new(MessageQueue {
-            local_cache          : ::lru_time_cache::LruCache::with_capacity(1000),
-            data_senders         : ::std::collections::HashMap::new(),
+    pub fn new(routing_event_receiver: mpsc::Receiver<Event>,
+               network_event_senders : Vec<mpsc::Sender<::translated_events::NetworkEvent>>,
+               error_senders         : Vec<mpsc::Sender<::translated_events::OperationFailureEvent>>) -> (Arc<Mutex<MessageQueue>>,
+                                                                                                          RaiiThreadJoiner) {
+        let message_queue = Arc::new(Mutex::new(MessageQueue {
+            local_cache          : LruCache::with_capacity(1000),
+            data_senders         : HashMap::new(),
             error_senders        : error_senders,
             network_event_senders: network_event_senders,
-            routing_message_cache: ::lru_time_cache::LruCache::with_capacity(1000),
+            routing_message_cache: LruCache::with_capacity(1000),
         }));
 
         let message_queue_cloned = message_queue.clone();
-        let receiver_joiner = eval_result!(::std::thread::Builder::new().name(EVENT_RECEIVER_THREAD_NAME.to_string()).spawn(move || {
+        let receiver_joiner = thread!(EVENT_RECEIVER_THREAD_NAME, move || {
             for it in routing_event_receiver.iter() {
                 match it {
-                    ::routing::event::Event::Response { response, .. } => {
-                        match response {
-                            ::routing::ExternalResponse::Get(data, _, _) => {
+                    Event::Response(msg) => {
+                        match msg.content {
+                            ResponseContent::GetSuccess(data) => {
                                 let data_name = data.name();
                                 let mut dead_sender_positions = Vec::<usize>::new();
-                                let mut queue_guard = eval_result!(message_queue_cloned.lock());
+                                let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 let _ = queue_guard.routing_message_cache.insert(data_name.clone(), data);
                                 if let Some(mut specific_data_senders) = queue_guard.data_senders.get_mut(&data_name) {
                                     for it in specific_data_senders.iter().enumerate() {
@@ -65,27 +73,23 @@ impl MessageQueue {
                                     MessageQueue::purge_dead_senders(&mut specific_data_senders, dead_sender_positions);
                                 }
                             },
-                            _ => debug!("Received External Response: {:?} ;; This is currently not supported.", response),
+                            _ => warn!("Received Response Message: {:?} ;; This is currently not supported.", msg),
                         }
                     },
-                    ::routing::event::Event::Bootstrapped => {
-                        debug!("Routing Event Received: Bootstrapped");
-
+                    Event::Connected => {
                         let mut dead_sender_positions = Vec::<usize>::new();
-                        let mut queue_guard = eval_result!(message_queue_cloned.lock());
+                        let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                         for it in queue_guard.network_event_senders.iter().enumerate() {
-                            if it.1.send(::translated_events::NetworkEvent::Bootstrapped).is_err() {
+                            if it.1.send(::translated_events::NetworkEvent::Connected).is_err() {
                                 dead_sender_positions.push(it.0);
                             }
                         }
 
                         MessageQueue::purge_dead_senders(&mut queue_guard.network_event_senders, dead_sender_positions);
                     },
-                    ::routing::event::Event::Disconnected => {
-                        debug!("Routing Event Received: Disconnected");
-
+                    Event::Disconnected => {
                         let mut dead_sender_positions = Vec::<usize>::new();
-                        let mut queue_guard = eval_result!(message_queue_cloned.lock());
+                        let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                         for it in queue_guard.network_event_senders.iter().enumerate() {
                             if it.1.send(::translated_events::NetworkEvent::Disconnected).is_err() {
                                 dead_sender_positions.push(it.0);
@@ -94,11 +98,9 @@ impl MessageQueue {
 
                         MessageQueue::purge_dead_senders(&mut queue_guard.network_event_senders, dead_sender_positions);
                     },
-                    ::routing::event::Event::Terminated => {
-                        debug!("Routing Event Received: Terminated");
-
+                    Event::Terminated => {
                         let mut dead_sender_positions = Vec::<usize>::new();
-                        let mut queue_guard = eval_result!(message_queue_cloned.lock());
+                        let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                         for it in queue_guard.error_senders.iter().enumerate() {
                             if it.1.send(::translated_events::OperationFailureEvent::Terminated).is_err() {
                                 dead_sender_positions.push(it.0);
@@ -132,45 +134,42 @@ impl MessageQueue {
                     _ => debug!("Received Routing Event: {:?} ;; This is currently not supported.", it),
                 }
             }
+        });
 
-            debug!("Thread \"{}\" terminated.", EVENT_RECEIVER_THREAD_NAME);
-        }));
-
-        (message_queue, ::utility::RAIIThreadJoiner::new(receiver_joiner))
+        (message_queue, RaiiThreadJoiner::new(receiver_joiner))
     }
 
     pub fn add_data_receive_event_observer(&mut self,
-                                           data_name: ::routing::NameType,
-                                           sender   : ::std::sync::mpsc::Sender<::translated_events::DataReceivedEvent>) {
+                                           data_name: XorName,
+                                           sender   : mpsc::Sender<::translated_events::DataReceivedEvent>) {
         self.data_senders.entry(data_name).or_insert(Vec::new()).push(sender);
     }
 
-    pub fn add_operation_failure_event_observer(&mut self, sender: ::std::sync::mpsc::Sender<::translated_events::OperationFailureEvent>) {
+    pub fn add_operation_failure_event_observer(&mut self, sender: mpsc::Sender<::translated_events::OperationFailureEvent>) {
         self.error_senders.push(sender);
     }
 
-    pub fn add_network_event_observer(&mut self, sender: ::std::sync::mpsc::Sender<::translated_events::NetworkEvent>) {
+    pub fn add_network_event_observer(&mut self, sender: mpsc::Sender<::translated_events::NetworkEvent>) {
         self.network_event_senders.push(sender);
     }
 
-    pub fn local_cache_check(&mut self, key: &::routing::NameType) -> bool {
+    pub fn local_cache_check(&mut self, key: &XorName) -> bool {
         self.local_cache.contains_key(key)
     }
 
-    pub fn local_cache_get(&mut self, key: &::routing::NameType) -> Result<::routing::data::Data, ::errors::CoreError> {
-        self.local_cache.get(key).ok_or(::errors::CoreError::VersionCacheMiss).map(|val| val.clone())
+    pub fn local_cache_get(&mut self, key: &XorName) -> Result<Data, CoreError> {
+        self.local_cache.get(key).ok_or(CoreError::VersionCacheMiss).map(|elt| elt.clone())
     }
 
-    pub fn local_cache_insert(&mut self, key: ::routing::NameType, value: ::routing::data::Data) {
+    pub fn local_cache_insert(&mut self, key: XorName, value: Data) {
         let _ = self.local_cache.insert(key, value);
     }
 
-    pub fn get_response(&mut self, location: &::routing::NameType) -> Result<::routing::data::Data, ::errors::CoreError> {
-        self.routing_message_cache.get(location).ok_or(::errors::CoreError::RoutingMessageCacheMiss).map(|val| val.clone())
+    pub fn get_response(&mut self, location: &XorName) -> Result<Data, CoreError> {
+        self.routing_message_cache.get(location).ok_or(CoreError::RoutingMessageCacheMiss).map(|elt| elt.clone())
     }
 
-    fn purge_dead_senders<T>(senders  : &mut Vec<::std::sync::mpsc::Sender<T>>,
-                             positions: Vec<usize>) {
+    fn purge_dead_senders<T>(senders: &mut Vec<mpsc::Sender<T>>, positions: Vec<usize>) {
         let mut delta = 0;
         for val in positions {
             let _ = senders.remove(val - delta);

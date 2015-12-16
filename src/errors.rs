@@ -15,6 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use std::sync::mpsc;
+use maidsafe_utilities::serialisation::SerialisationError;
+
 /// Intended for converting Client Errors into numeric codes for propagating some error information
 /// across FFI boundaries and specially to C.
 pub const CLIENT_ERROR_START_RANGE: i32 = -1;
@@ -24,7 +27,7 @@ pub enum CoreError {
     /// StructuredData has no space available to fit in any user data inside it.
     StructuredDataHeaderSizeProhibitive,
     /// Could not Serialise or Deserialise
-    UnsuccessfulEncodeDecode,
+    UnsuccessfulEncodeDecode(SerialisationError),
     /// Asymmetric Key Decryption Failed
     AsymmetricDecipherFailure,
     /// Symmetric Key Decryption Failed
@@ -44,7 +47,7 @@ pub enum CoreError {
     /// Unexpected - Probably a Logic error
     Unexpected(String),
     /// Routing Error
-    RoutingError(::routing::error::RoutingError),
+    RoutingError(::routing::RoutingError),
     /// Interface Error
     RoutingInterfaceError(::routing::InterfaceError),
     /// Unable to pack into or operate with size of Salt
@@ -62,21 +65,26 @@ impl<'a> From<&'a str> for CoreError {
     }
 }
 
-impl From<::cbor::CborError> for CoreError {
-    fn from(error: ::cbor::CborError) -> CoreError {
-        debug!("Error: {:?}", error);
-        CoreError::UnsuccessfulEncodeDecode
+impl From<SerialisationError> for CoreError {
+    fn from(error: SerialisationError) -> CoreError {
+        CoreError::UnsuccessfulEncodeDecode(error)
     }
 }
 
-impl From<::routing::error::RoutingError> for CoreError {
-    fn from(error: ::routing::error::RoutingError) -> CoreError {
+impl From<::routing::RoutingError> for CoreError {
+    fn from(error: ::routing::RoutingError) -> CoreError {
         CoreError::RoutingError(error)
     }
 }
 
-impl From<::std::sync::mpsc::RecvError> for CoreError {
-    fn from(_: ::std::sync::mpsc::RecvError) -> CoreError {
+impl From<::routing::InterfaceError> for CoreError {
+    fn from(error: ::routing::InterfaceError) -> CoreError {
+        CoreError::RoutingInterfaceError(error)
+    }
+}
+
+impl From<mpsc::RecvError> for CoreError {
+    fn from(_: mpsc::RecvError) -> CoreError {
         CoreError::OperationAborted
     }
 }
@@ -85,7 +93,7 @@ impl Into<i32> for CoreError {
     fn into(self) -> i32 {
         match self {
             CoreError::StructuredDataHeaderSizeProhibitive => CLIENT_ERROR_START_RANGE,
-            CoreError::UnsuccessfulEncodeDecode            => CLIENT_ERROR_START_RANGE - 1,
+            CoreError::UnsuccessfulEncodeDecode(_)         => CLIENT_ERROR_START_RANGE - 1,
             CoreError::AsymmetricDecipherFailure           => CLIENT_ERROR_START_RANGE - 2,
             CoreError::SymmetricDecipherFailure            => CLIENT_ERROR_START_RANGE - 3,
             CoreError::ReceivedUnexpectedData              => CLIENT_ERROR_START_RANGE - 4,
@@ -108,7 +116,7 @@ impl ::std::fmt::Debug for CoreError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
             CoreError::StructuredDataHeaderSizeProhibitive => write!(f, "CoreError::StructuredDataHeaderSizeProhibitive"),
-            CoreError::UnsuccessfulEncodeDecode            => write!(f, "CoreError::UnsuccessfulEncodeDecode"),
+            CoreError::UnsuccessfulEncodeDecode(ref err)   => write!(f, "CoreError::UnsuccessfulEncodeDecode -> {:?}", err),
             CoreError::AsymmetricDecipherFailure           => write!(f, "CoreError::AsymmetricDecipherFailure"),
             CoreError::SymmetricDecipherFailure            => write!(f, "CoreError::SymmetricDecipherFailure"),
             CoreError::ReceivedUnexpectedData              => write!(f, "CoreError::ReceivedUnexpectedData"),

@@ -24,19 +24,21 @@ mod message_queue;
 #[cfg(feature = "use-mock-routing")]
 mod non_networking_test_framework;
 
+use xor_name::XorName;
 use errors::CoreError;
-use user_account::Account;
-use message_queue::MessageQueue;
+use self::user_account::Account;
 use std::sync::{Arc, Mutex, mpsc};
+use self::message_queue::MessageQueue;
 use sodiumoxide::crypto::{box_, sign};
+use self::response_getter::ResponseGetter;
 use sodiumoxide::crypto::hash::{sha256, sha512};
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use routing::{FullId, XorName, StructuredData, ImmutableData, Data, DataRequest, Authority};
+use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event};
 
 #[cfg(feature = "use-mock-routing")]
-type Routing = non_networking_test_framework::RoutingMock;
+use self::non_networking_test_framework::RoutingMock as Routing;
 #[cfg(not(feature = "use-mock-routing"))]
-type Routing = ::routing::routing_client::RoutingClient;
+use routing::RoutingClient as Routing;
 
 const LOGIC_ERROR: &'static str = "Logic Error !! Report as bug.";
 const LOGIN_PACKET_TYPE_TAG: u64 = ::CLIENT_STRUCTURED_DATA_TAG - 1;
@@ -68,7 +70,7 @@ impl Client {
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
 
         match try!(network_event_receiver.recv()) {
-            ::translated_events::NetworkEvent::Bootstrapped => (),
+            ::translated_events::NetworkEvent::Connected => (),
             _ => return Err(CoreError::OperationAborted),
         }
 
@@ -95,11 +97,11 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = Client::get_new_routing(routing_sender, Some(id_packet));
+        let routing = try!(Client::get_new_routing(routing_sender, Some(id_packet)));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender], Vec::new());
 
         match try!(network_event_receiver.recv()) {
-            ::translated_events::NetworkEvent::Bootstrapped => (),
+            ::translated_events::NetworkEvent::Connected => (),
             _ => return Err(CoreError::OperationAborted),
         }
 
@@ -144,7 +146,7 @@ impl Client {
 
         let session_packet_request = DataRequest::StructuredData(user_id.clone(), LOGIN_PACKET_TYPE_TAG);
 
-        let response_getter = unregistered_client.get(session_packet_request, None);
+        let response_getter = try!(unregistered_client.get(session_packet_request, None));
 
         if let Data::StructuredData(session_packet) = try!(response_getter.get()) {
             let decrypted_session_packet = try!(Account::decrypt(session_packet.get_data(),
@@ -158,13 +160,13 @@ impl Client {
             let (routing_sender, routing_receiver) = mpsc::channel();
             let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-            let routing = Client::get_new_routing(routing_sender, Some(id_packet));
+            let routing = try!(Client::get_new_routing(routing_sender, Some(id_packet)));
             let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                                  vec![network_event_sender],
                                                                  Vec::new());
 
             match try!(network_event_receiver.recv()) {
-                ::translated_events::NetworkEvent::Bootstrapped => (),
+                ::translated_events::NetworkEvent::Connected => (),
                 _ => return Err(CoreError::OperationAborted),
             }
 
@@ -208,7 +210,7 @@ impl Client {
     /// session packet, encrypt and store it. It will be retireved when the user logs into
     /// his account. Root directory ID is necessary to fetch all of configuration data as all further
     /// data is encoded as meta-information into the config Root Directory or one of its subdirectories.
-    pub fn set_configuration_root_directory_id(&mut self, root_dir_id: XorName) -> Result<(), ::errors::CoreError> {
+    pub fn set_configuration_root_directory_id(&mut self, root_dir_id: XorName) -> Result<(), CoreError> {
         if try!(self.account.as_mut().ok_or(CoreError::OperationForbiddenForClient))
                     .set_maidsafe_config_root_dir_id(root_dir_id) {
             self.update_session_packet()
@@ -277,9 +279,7 @@ impl Client {
     }
 
     /// Get data from the network. This is non-blocking.
-    pub fn get(&mut self,
-               request_for: DataRequest,
-               opt_location: Option<Authority>) -> Result<ResponseGetter, CoreError> {
+    pub fn get(&mut self, request_for: DataRequest, opt_dst: Option<Authority>) -> Result<ResponseGetter, CoreError> {
         if let DataRequest::ImmutableData(..) = request_for {
             let mut msg_queue = unwrap_result!(self.message_queue.lock());
             if msg_queue.local_cache_check(&request_for.name()) {
@@ -287,7 +287,7 @@ impl Client {
             }
         }
 
-        let location = match opt_location {
+        let dst = match opt_dst {
             Some(auth) => auth,
             None       => Authority::NaeManager(request_for.name()),
         };
@@ -295,7 +295,7 @@ impl Client {
         let (data_event_sender, data_event_receiver) = mpsc::channel();
         self.add_data_receive_event_observer(request_for.name(), data_event_sender.clone());
 
-        try!(self.routing.send_get_request(location, request_for.clone()))
+        try!(self.routing.send_get_request(dst, request_for.clone()));
 
         Ok(ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                self.message_queue.clone(),
@@ -303,33 +303,33 @@ impl Client {
     }
 
     /// Put data onto the network. This is non-blocking.
-    pub fn put(&self, data: Data, opt_location: Option<Authority>) -> Result<(), CoreError> {
-        let location = match opt_location {
+    pub fn put(&self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+        let dst = match opt_dst {
             Some(auth) => auth,
             None => Authority::ClientManager(try!(self.get_default_client_manager_address()).clone()),
         };
 
-        Ok(self.routing.send_put_request(location, data))
+        Ok(try!(self.routing.send_put_request(dst, data)))
     }
 
     /// Post data onto the network
-    pub fn post(&self, data: Data, opt_location: Option<Authority>) -> Result<(), ::errors::CoreError> {
-        let location = match opt_location {
+    pub fn post(&self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+        let dst = match opt_dst {
             Some(auth) => auth,
             None       => Authority::NaeManager(data.name()),
         };
 
-        self.routing.send_post_request(location, data)
+        Ok(try!(self.routing.send_post_request(dst, data)))
     }
 
     /// Delete data from the network
-    pub fn delete(&self, data: Data, opt_location: Option<Authority>) -> Result<(), ::errors::CoreError> {
-        let location = match opt_location {
+    pub fn delete(&self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+        let dst = match opt_dst {
             Some(auth) => auth,
-            None => Authority::NaeManager(try!(data.name())).clone()),
+            None => Authority::NaeManager(data.name()),
         };
 
-        try!(self.routing.send_delete_request(location, data))
+        Ok(try!(self.routing.send_delete_request(dst, data)))
     }
 
     /// Returns the public encryption key
@@ -369,7 +369,7 @@ impl Client {
         unwrap_result!(self.message_queue.lock()).add_operation_failure_event_observer(sender);
     }
 
-    /// Add observers for Network Events like `Bootstrapped`, `Disconnected`, `Terminated`
+    /// Add observers for Network Events like `Connected`, `Disconnected`, `Terminated`
     pub fn add_network_event_observer(&self, sender: mpsc::Sender<::translated_events::NetworkEvent>) {
         unwrap_result!(self.message_queue.lock()).add_network_event_observer(sender);
     }
@@ -397,7 +397,7 @@ impl Client {
         let session_packet_id = try!(self.session_packet_id.as_ref().ok_or(CoreError::OperationForbiddenForClient)).clone();
         let session_packet_request = DataRequest::StructuredData(session_packet_id.clone(), LOGIN_PACKET_TYPE_TAG);
 
-        let response_getter = self.get(session_packet_request, None);
+        let response_getter = try!(self.get(session_packet_request, None));
 
         let account = try!(self.account.as_ref().ok_or(CoreError::OperationForbiddenForClient));
         let session_packet_keys = try!(self.session_packet_keys.as_ref().ok_or(CoreError::OperationForbiddenForClient));
@@ -451,55 +451,57 @@ impl SessionPacketEncryptionKeys {
 #[cfg(test)]
 mod test {
     use super::*;
+    use xor_name::XorName;
+    use client::response_getter::ResponseGetter;
+    use routing::{ImmutableDataType, ImmutableData, DataRequest, Data, StructuredData};
 
     #[test]
     fn account_creation() {
-        let keyword = eval_result!(::utility::generate_random_string(10));
-        let password = eval_result!(::utility::generate_random_string(10));
-        let pin = eval_result!(::utility::generate_random_string(10));
-        let _ = eval_result!(Client::create_account(keyword, pin, password));
+        let keyword = unwrap_result!(::utility::generate_random_string(10));
+        let password = unwrap_result!(::utility::generate_random_string(10));
+        let pin = unwrap_result!(::utility::generate_random_string(10));
+        let _ = unwrap_result!(Client::create_account(keyword, pin, password));
     }
 
     #[test]
     fn account_login() {
-        let keyword = eval_result!(::utility::generate_random_string(10));
-        let password = eval_result!(::utility::generate_random_string(10));
-        let pin = eval_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(::utility::generate_random_string(10));
+        let password = unwrap_result!(::utility::generate_random_string(10));
+        let pin = unwrap_result!(::utility::generate_random_string(10));
 
         // Creation should pass
-        let _ = eval_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let _ = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         // Correct Credentials - Login Should Pass
-        let _ = eval_result!(Client::log_in(keyword, pin, password));
+        let _ = unwrap_result!(Client::log_in(keyword, pin, password));
     }
 
     #[test]
     fn unregistered_client() {
-        let immut_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal,
-                                                                       eval_result!(::utility::generate_random_vector(30)));
-        let orig_data = ::routing::data::Data::ImmutableData(immut_data);
+        let immut_data = ImmutableData::new(ImmutableDataType::Normal,
+                                            unwrap_result!(::utility::generate_random_vector(30)));
+        let orig_data = Data::ImmutableData(immut_data);
 
         // Registered Client PUTs something onto the network
         {
-            let keyword = eval_result!(::utility::generate_random_string(10));
-            let password = eval_result!(::utility::generate_random_string(10));
-            let pin = eval_result!(::utility::generate_random_string(10));
+            let keyword = unwrap_result!(::utility::generate_random_string(10));
+            let password = unwrap_result!(::utility::generate_random_string(10));
+            let pin = unwrap_result!(::utility::generate_random_string(10));
 
             // Creation should pass
-            let client = eval_result!(Client::create_account(keyword, pin, password));
-            eval_result!(client.put(orig_data.clone(), None));
+            let client = unwrap_result!(Client::create_account(keyword, pin, password));
+            unwrap_result!(client.put(orig_data.clone(), None));
         }
 
         // Unregistered Client should be able to retrieve the data
-        let mut unregistered_client = eval_result!(Client::create_unregistered_client());
-        let request = ::routing::data::DataRequest::ImmutableData(orig_data.name(),
-                                                                  ::routing::immutable_data::ImmutableDataType::Normal);
-        let rxd_data = eval_result!(unregistered_client.get(request, None).get());
+        let mut unregistered_client = unwrap_result!(Client::create_unregistered_client());
+        let request = DataRequest::ImmutableData(orig_data.name(), ImmutableDataType::Normal);
+        let rxd_data = unwrap_result!(unwrap_result!(unregistered_client.get(request, None)).get());
 
         assert_eq!(rxd_data, orig_data);
 
         // Operations Not Allowed for Unregistered Client
-        let rand_name = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
+        let rand_name = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
 
         match (unregistered_client.set_user_root_directory_id(rand_name.clone()),
                unregistered_client.set_configuration_root_directory_id(rand_name)) {
@@ -512,20 +514,20 @@ mod test {
     #[test]
     fn user_root_dir_id_creation() {
         // Construct Client
-        let keyword = eval_result!(::utility::generate_random_string(10));
-        let password = eval_result!(::utility::generate_random_string(10));
-        let pin = eval_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(::utility::generate_random_string(10));
+        let password = unwrap_result!(::utility::generate_random_string(10));
+        let pin = unwrap_result!(::utility::generate_random_string(10));
 
-        let mut client = eval_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let mut client = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
 
-        let root_dir_id = ::routing::NameType::new([99u8; 64]);
-        eval_result!(client.set_user_root_directory_id(root_dir_id.clone()));
+        let root_dir_id = XorName::new([99u8; 64]);
+        unwrap_result!(client.set_user_root_directory_id(root_dir_id.clone()));
 
         // Correct Credentials - Login Should Pass
-        let client = eval_result!(Client::log_in(keyword, pin, password));
+        let client = unwrap_result!(Client::log_in(keyword, pin, password));
 
         assert!(client.get_user_root_directory_id().is_some());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -536,20 +538,20 @@ mod test {
     #[test]
     fn maidsafe_config_root_dir_id_creation() {
         // Construct Client
-        let keyword = eval_result!(::utility::generate_random_string(10));
-        let password = eval_result!(::utility::generate_random_string(10));
-        let pin = eval_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(::utility::generate_random_string(10));
+        let password = unwrap_result!(::utility::generate_random_string(10));
+        let pin = unwrap_result!(::utility::generate_random_string(10));
 
-        let mut client = eval_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let mut client = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
 
-        let root_dir_id = ::routing::NameType::new([99u8; 64]);
-        eval_result!(client.set_configuration_root_directory_id(root_dir_id.clone()));
+        let root_dir_id = XorName::new([99u8; 64]);
+        unwrap_result!(client.set_configuration_root_directory_id(root_dir_id.clone()));
 
         // Correct Credentials - Login Should Pass
-        let client = eval_result!(Client::log_in(keyword, pin, password));
+        let client = unwrap_result!(Client::log_in(keyword, pin, password));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_some());
@@ -560,11 +562,11 @@ mod test {
     #[test]
     fn hybrid_encryption_decryption() {
         // Construct Client
-        let keyword = eval_result!(::utility::generate_random_string(10));
-        let password = eval_result!(::utility::generate_random_string(10));
-        let pin = eval_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(::utility::generate_random_string(10));
+        let password = unwrap_result!(::utility::generate_random_string(10));
+        let pin = unwrap_result!(::utility::generate_random_string(10));
 
-        let client = eval_result!(Client::create_account(keyword, pin, password));
+        let client = unwrap_result!(Client::create_account(keyword, pin, password));
 
         // Identical Plain Texts
         let plain_text_original_0 = vec![123u8; 1000];
@@ -572,12 +574,12 @@ mod test {
 
         // Encrypt passing Nonce
         let nonce = ::sodiumoxide::crypto::box_::gen_nonce();
-        let cipher_text_0 = eval_result!(client.hybrid_encrypt(&plain_text_original_0[..], Some(&nonce)));
-        let cipher_text_1 = eval_result!(client.hybrid_encrypt(&plain_text_original_1[..], Some(&nonce)));
+        let cipher_text_0 = unwrap_result!(client.hybrid_encrypt(&plain_text_original_0[..], Some(&nonce)));
+        let cipher_text_1 = unwrap_result!(client.hybrid_encrypt(&plain_text_original_1[..], Some(&nonce)));
 
         // Encrypt without passing Nonce
-        let cipher_text_2 = eval_result!(client.hybrid_encrypt(&plain_text_original_0[..], None));
-        let cipher_text_3 = eval_result!(client.hybrid_encrypt(&plain_text_original_1[..], None));
+        let cipher_text_2 = unwrap_result!(client.hybrid_encrypt(&plain_text_original_0[..], None));
+        let cipher_text_3 = unwrap_result!(client.hybrid_encrypt(&plain_text_original_1[..], None));
 
         // Same Plain Texts
         assert_eq!(plain_text_original_0, plain_text_original_1);
@@ -590,12 +592,12 @@ mod test {
         assert!(cipher_text_2 != cipher_text_3);
 
         // Decrypt with Nonce
-        let plain_text_0 = eval_result!(client.hybrid_decrypt(&cipher_text_0, Some(&nonce)));
-        let plain_text_1 = eval_result!(client.hybrid_decrypt(&cipher_text_1, Some(&nonce)));
+        let plain_text_0 = unwrap_result!(client.hybrid_decrypt(&cipher_text_0, Some(&nonce)));
+        let plain_text_1 = unwrap_result!(client.hybrid_decrypt(&cipher_text_1, Some(&nonce)));
 
         // Decrypt without Nonce
-        let plain_text_2 = eval_result!(client.hybrid_decrypt(&cipher_text_2, None));
-        let plain_text_3 = eval_result!(client.hybrid_decrypt(&cipher_text_3, None));
+        let plain_text_2 = unwrap_result!(client.hybrid_decrypt(&cipher_text_2, None));
+        let plain_text_3 = unwrap_result!(client.hybrid_decrypt(&cipher_text_3, None));
 
         // Decryption without passing Nonce for something encrypted with passing Nonce - Should Fail
         match client.hybrid_decrypt(&cipher_text_0, None) {
@@ -619,24 +621,21 @@ mod test {
 
     #[test]
     fn version_caching() {
-        let mut client = eval_result!(::utility::test_utils::get_client());
+        let mut client = unwrap_result!(::utility::test_utils::get_client());
 
         // Version Caching should work for ImmutableData
         {
-            let immut_data = ::routing::immutable_data::ImmutableData::new(::routing::immutable_data::ImmutableDataType::Normal,
-                                                                           eval_result!(::utility::generate_random_vector(10)));
-            let data = ::routing::data::Data::ImmutableData(immut_data);
+            let immut_data = ImmutableData::new(ImmutableDataType::Normal,
+                                                unwrap_result!(::utility::generate_random_vector(10)));
+            let data = Data::ImmutableData(immut_data);
 
-            eval_result!(client.put(data.clone(), None));
+            unwrap_result!(client.put(data.clone(), None));
 
-            let data_request = ::routing::data::DataRequest::ImmutableData(data.name(),
-                                                                           ::routing::immutable_data::ImmutableDataType::Normal);
+            let data_request = DataRequest::ImmutableData(data.name(), ImmutableDataType::Normal);
 
             // Should not initially be in version cache
             {
-                let response_getter = ::client::response_getter::ResponseGetter::new(None,
-                                                                                     client.message_queue.clone(),
-                                                                                     data_request.clone());
+                let response_getter = ResponseGetter::new(None, client.message_queue.clone(), data_request.clone());
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
@@ -645,38 +644,34 @@ mod test {
                 }
             }
 
-            let response_getter = client.get(data_request.clone(), None);
-            assert_eq!(eval_result!(response_getter.get()), data);
+            let response_getter = unwrap_result!(client.get(data_request.clone(), None));
+            assert_eq!(unwrap_result!(response_getter.get()), data);
 
-            let response_getter = ::client::response_getter::ResponseGetter::new(None,
-                                                                                 client.message_queue.clone(),
-                                                                                 data_request);
-            assert_eq!(eval_result!(response_getter.get()), data);
+            let response_getter = ResponseGetter::new(None, client.message_queue.clone(), data_request);
+            assert_eq!(unwrap_result!(response_getter.get()), data);
         }
 
         // Version Caching should NOT work for StructuredData
         {
             const TYPE_TAG: u64 = 15000;
-            let id = ::routing::NameType::new(eval_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
 
-            let struct_data = eval_result!(::routing::structured_data::StructuredData::new(TYPE_TAG,
-                                                                                           id.clone(),
-                                                                                           0,
-                                                                                           Vec::new(),
-                                                                                           Vec::new(),
-                                                                                           Vec::new(),
-                                                                                           None));
-            let data = ::routing::data::Data::StructuredData(struct_data);
+            let struct_data = unwrap_result!(StructuredData::new(TYPE_TAG,
+                                                                 id.clone(),
+                                                                 0,
+                                                                 Vec::new(),
+                                                                 Vec::new(),
+                                                                 Vec::new(),
+                                                                 None));
+            let data = Data::StructuredData(struct_data);
 
-            eval_result!(client.put(data.clone(), None));
+            unwrap_result!(client.put(data.clone(), None));
 
-            let data_request = ::routing::data::DataRequest::StructuredData(id, TYPE_TAG);
+            let data_request = DataRequest::StructuredData(id, TYPE_TAG);
 
             // Should not initially be in version cache
             {
-                let response_getter = ::client::response_getter::ResponseGetter::new(None,
-                                                                                     client.message_queue.clone(),
-                                                                                     data_request.clone());
+                let response_getter = ResponseGetter::new(None, client.message_queue.clone(), data_request.clone());
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
@@ -685,14 +680,12 @@ mod test {
                 }
             }
 
-            let response_getter = client.get(data_request.clone(), None);
-            assert_eq!(eval_result!(response_getter.get()), data);
+            let response_getter = unwrap_result!(client.get(data_request.clone(), None));
+            assert_eq!(unwrap_result!(response_getter.get()), data);
 
             // Should not be in version cache even after fetch
             {
-                let response_getter = ::client::response_getter::ResponseGetter::new(None,
-                                                                                     client.message_queue.clone(),
-                                                                                     data_request);
+                let response_getter = ResponseGetter::new(None, client.message_queue.clone(), data_request);
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),

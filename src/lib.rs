@@ -37,13 +37,13 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations)]
 
-extern crate cbor;
 extern crate rand;
 extern crate routing;
+extern crate xor_name;
 extern crate sodiumoxide;
 extern crate lru_time_cache;
-extern crate rustc_serialize;
 extern crate self_encryption;
+extern crate rustc_serialize;
 #[macro_use] extern crate log;
 #[macro_use] extern crate maidsafe_utilities;
 

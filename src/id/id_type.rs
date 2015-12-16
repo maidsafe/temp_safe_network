@@ -15,6 +15,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use xor_name::XorName;
+use errors::CoreError;
+use sodiumoxide::crypto::{box_, sign};
+use sodiumoxide::crypto::hash::sha512;
+
 /// IdType
 ///
 /// #Examples
@@ -28,15 +33,15 @@
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct IdType {
     type_tag   : u64,
-    public_keys: (::sodiumoxide::crypto::sign::PublicKey, ::sodiumoxide::crypto::box_::PublicKey),
-    secret_keys: (::sodiumoxide::crypto::sign::SecretKey, ::sodiumoxide::crypto::box_::SecretKey),
+    public_keys: (sign::PublicKey, box_::PublicKey),
+    secret_keys: (sign::SecretKey, box_::SecretKey),
 }
 
 impl IdType {
     /// Invoked to create an instance of IdType
     pub fn new(revocation_id: &::id::RevocationIdType) -> IdType {
-        let asym_keys = ::sodiumoxide::crypto::box_::gen_keypair();
-        let signing_keys = ::sodiumoxide::crypto::sign::gen_keypair();
+        let asym_keys = box_::gen_keypair();
+        let signing_keys = sign::gen_keypair();
 
         IdType {
             type_tag   : revocation_id.type_tags().1,
@@ -46,7 +51,7 @@ impl IdType {
     }
 
     /// Returns name
-    pub fn name(&self) -> ::routing::NameType {
+    pub fn name(&self) -> XorName {
         let combined_iter = (&self.public_keys.0).0.into_iter().chain((&self.public_keys.1).0.into_iter());
         let mut combined = Vec::new();
         for iter in combined_iter {
@@ -55,37 +60,37 @@ impl IdType {
         for i in self.type_tag.to_string().into_bytes().into_iter() {
             combined.push(i);
         }
-        ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&combined).0)
+        XorName(sha512::hash(&combined).0)
     }
 
     /// Returns the PublicKeys
-    pub fn public_keys(&self) -> &(::sodiumoxide::crypto::sign::PublicKey, ::sodiumoxide::crypto::box_::PublicKey) {
+    pub fn public_keys(&self) -> &(sign::PublicKey, box_::PublicKey) {
         &self.public_keys
     }
 
     /// Returns the PublicKeys
-    pub fn secret_keys(&self) -> &(::sodiumoxide::crypto::sign::SecretKey, ::sodiumoxide::crypto::box_::SecretKey) {
+    pub fn secret_keys(&self) -> &(sign::SecretKey, box_::SecretKey) {
         &self.secret_keys
     }
 
     /// Signs the data with the SecretKey and returns the Signed data
     pub fn sign(&self, data : &[u8]) -> Vec<u8> {
-        return ::sodiumoxide::crypto::sign::sign(&data, &self.secret_keys.0)
+        return sign::sign(&data, &self.secret_keys.0)
     }
 
     /// Encrypts and authenticates data. It returns a ciphertext and the Nonce.
-    pub fn seal(&self, data : &[u8], to : &::sodiumoxide::crypto::box_::PublicKey) -> (Vec<u8>, ::sodiumoxide::crypto::box_::Nonce) {
-        let nonce = ::sodiumoxide::crypto::box_::gen_nonce();
-        let sealed = ::sodiumoxide::crypto::box_::seal(data, &nonce, &to, &self.secret_keys.1);
+    pub fn seal(&self, data : &[u8], to : &box_::PublicKey) -> (Vec<u8>, box_::Nonce) {
+        let nonce = box_::gen_nonce();
+        let sealed = box_::seal(data, &nonce, &to, &self.secret_keys.1);
         return (sealed, nonce);
     }
 
     /// Verifies and decrypts the data
     pub fn open(&self,
-                data : &[u8],
-                nonce : &::sodiumoxide::crypto::box_::Nonce,
-                from : &::sodiumoxide::crypto::box_::PublicKey) -> Result<Vec<u8>, ::errors::CoreError> {
-        ::sodiumoxide::crypto::box_::open(&data, &nonce, &from, &self.secret_keys.1).map_err(|_| ::errors::CoreError::AsymmetricDecipherFailure)
+                data: &[u8],
+                nonce: &box_::Nonce,
+                from: &box_::PublicKey) -> Result<Vec<u8>, CoreError> {
+        box_::open(&data, &nonce, &from, &self.secret_keys.1).map_err(|_| CoreError::AsymmetricDecipherFailure)
     }
 }
 
@@ -93,8 +98,10 @@ impl IdType {
 mod test {
     extern crate rand;
 
-    use self::rand::Rng;
     use ::id::Random;
+    use self::rand::Rng;
+    use sodiumoxide::crypto::{box_, sign};
+    use maidsafe_utilities::serialisation::{serialise, deserialise};
 
     impl Random for ::id::IdType {
 
@@ -107,14 +114,14 @@ mod test {
     fn serialisation_maid() {
         let obj_before = ::id::IdType::generate_random();
 
-        let serialised_obj = eval_result!(::utility::serialise(&obj_before));
+        let serialised_obj = unwrap_result!(serialise(&obj_before));
 
-        let obj_after: ::id::IdType = eval_result!(::utility::deserialise(&serialised_obj));
+        let obj_after: ::id::IdType = unwrap_result!(deserialise(&serialised_obj));
 
-        let &(::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr_before), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
-        let &(::sodiumoxide::crypto::sign::PublicKey(pub_sign_arr_after), ::sodiumoxide::crypto::box_::PublicKey(pub_asym_arr_after)) = obj_after.public_keys();
-        let &(::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr_before), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_arr_before)) = &obj_before.secret_keys;
-        let &(::sodiumoxide::crypto::sign::SecretKey(sec_sign_arr_after), ::sodiumoxide::crypto::box_::SecretKey(sec_asym_arr_after)) = &obj_after.secret_keys;
+        let &(sign::PublicKey(pub_sign_arr_before), box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
+        let &(sign::PublicKey(pub_sign_arr_after), box_::PublicKey(pub_asym_arr_after)) = obj_after.public_keys();
+        let &(sign::SecretKey(sec_sign_arr_before), box_::SecretKey(sec_asym_arr_before)) = &obj_before.secret_keys;
+        let &(sign::SecretKey(sec_sign_arr_after), box_::SecretKey(sec_asym_arr_after)) = &obj_after.secret_keys;
 
         assert_eq!(pub_sign_arr_before, pub_sign_arr_after);
         assert_eq!(pub_asym_arr_before, pub_asym_arr_after);
@@ -138,11 +145,11 @@ mod test {
             let sign2 = maid2.sign(&random_bytes);
             assert!(sign1 != sign2);
 
-            assert!(::sodiumoxide::crypto::sign::verify(&sign1, &maid1.public_keys().0).is_ok());
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_keys().0).is_err());
+            assert!(sign::verify(&sign1, &maid1.public_keys().0).is_ok());
+            assert!(sign::verify(&sign2, &maid1.public_keys().0).is_err());
 
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid2.public_keys().0).is_ok());
-            assert!(::sodiumoxide::crypto::sign::verify(&sign2, &maid1.public_keys().0).is_err());
+            assert!(sign::verify(&sign2, &maid2.public_keys().0).is_ok());
+            assert!(sign::verify(&sign2, &maid1.public_keys().0).is_err());
         }
         {
             let maid3 = ::id::IdType::generate_random();

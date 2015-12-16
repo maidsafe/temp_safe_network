@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-extern crate env_logger;
-#[macro_use] extern crate safe_core;
+extern crate safe_core;
+#[macro_use] extern crate maidsafe_utilities;
+
+use safe_core::client::Client;
 
 fn main() {
-    if let Err(error) = env_logger::init() {
-        println!("ERROR: Could not initialise logger !! (Continuing without it): {:?}", error);
-    }
+    maidsafe_utilities::log::init(true);
 
     let mut keyword = String::new();
     let mut password = String::new();
@@ -58,7 +58,7 @@ fn main() {
         {
             println!("\nTrying to create an account ...");
 
-            let _ = eval_result!(safe_core::client::Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+            let _ = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
             println!("Account Created Successfully !!");
         }
 
@@ -69,7 +69,7 @@ fn main() {
         {
             println!("\nTrying to log into the created account using supplied credentials ...");
 
-            let _ = eval_result!(safe_core::client::Client::log_in(keyword, pin, password));
+            let _ = unwrap_result!(Client::log_in(keyword, pin, password));
             println!("Account Login Successful !!");
         }
     }
@@ -101,7 +101,7 @@ fn main() {
         // Log into the created account
         {
             println!("\nTrying to log in ...");
-            match safe_core::client::Client::log_in(keyword, pin, password) {
+            match Client::log_in(keyword, pin, password) {
                 Ok(_) => {
                     println!("Account Login Successful !!");
                     break;
