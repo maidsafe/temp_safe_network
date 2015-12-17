@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.                                                                 */
 
+use routing::InterfaceError;
+
 /// Reception of reqested Data
 pub enum DataReceivedEvent {
     /// Received Data
@@ -26,7 +28,7 @@ pub enum DataReceivedEvent {
 /// Netowork Events that Client Modules need to deal with
 pub enum NetworkEvent {
     /// The client engine is connected to atleast one peer
-    Bootstrapped,
+    Connected,
     /// The client has lost connection to all peers
     Disconnected,
     /// Graceful Exit Condition
@@ -36,11 +38,11 @@ pub enum NetworkEvent {
 /// Failures in operations that Client Modules need to deal with
 pub enum OperationFailureEvent {
     /// PUT request failed
-    PutFailure(::routing::error::ResponseError),
+    PutFailure(InterfaceError),
     /// POST request failed
-    PostFailure(::routing::error::ResponseError),
+    PostFailure(InterfaceError),
     /// DELETE request failed
-    DeleteFailure(::routing::error::ResponseError),
+    DeleteFailure(InterfaceError),
     /// Graceful Exit Condition
     Terminated,
 }

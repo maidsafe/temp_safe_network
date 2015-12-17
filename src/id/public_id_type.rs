@@ -15,6 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use xor_name::XorName;
+use sodiumoxide::crypto::{box_, sign};
+use sodiumoxide::crypto::hash::sha512;
+
 /// PublicIdType
 ///
 /// #Examples
@@ -29,9 +33,9 @@
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct PublicIdType {
     type_tag: u64,
-    public_keys: (::sodiumoxide::crypto::sign::PublicKey, ::sodiumoxide::crypto::box_::PublicKey),
-    revocation_public_key: ::sodiumoxide::crypto::sign::PublicKey,
-    signature: ::sodiumoxide::crypto::sign::Signature,
+    public_keys: (sign::PublicKey, box_::PublicKey),
+    revocation_public_key: sign::PublicKey,
+    signature: sign::Signature,
 }
 
 impl PublicIdType {
@@ -51,19 +55,19 @@ impl PublicIdType {
         let message_length = combined.len();
 
         let signature = revocation_id.sign(&combined).into_iter().skip(message_length).collect::<Vec<_>>();
-        let mut signature_arr = [0; ::sodiumoxide::crypto::sign::SIGNATUREBYTES];
+        let mut signature_arr = [0; sign::SIGNATUREBYTES];
 
-        for it in signature.into_iter().take(::sodiumoxide::crypto::sign::SIGNATUREBYTES).enumerate() {
+        for it in signature.into_iter().take(sign::SIGNATUREBYTES).enumerate() {
             signature_arr[it.0] = it.1;
         }
 
         PublicIdType { type_tag: type_tag, public_keys: public_keys,
              revocation_public_key: revocation_id.public_key().clone(),
-             signature: ::sodiumoxide::crypto::sign::Signature(signature_arr) }
+             signature: sign::Signature(signature_arr) }
     }
 
     /// Returns the name
-    pub fn name(&self) -> ::routing::NameType {
+    pub fn name(&self) -> XorName {
         let combined_iter = (self.public_keys.0).0.into_iter().chain((self.public_keys.1).0.into_iter());
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
@@ -72,32 +76,34 @@ impl PublicIdType {
         for i in self.type_tag.to_string().into_bytes().into_iter() {
             combined.push(i);
         }
-        for i in 0..::sodiumoxide::crypto::sign::SIGNATUREBYTES {
+        for i in 0..sign::SIGNATUREBYTES {
             combined.push(self.signature.0[i]);
         }
-        ::routing::NameType(::sodiumoxide::crypto::hash::sha512::hash(&combined).0)
+        XorName(sha512::hash(&combined).0)
     }
 
     /// Returns the PublicKeys
-    pub fn public_keys(&self) -> &(::sodiumoxide::crypto::sign::PublicKey, ::sodiumoxide::crypto::box_::PublicKey) {
+    pub fn public_keys(&self) -> &(sign::PublicKey, box_::PublicKey) {
         &self.public_keys
     }
 
     /// Returns revocation public key
-    pub fn revocation_public_key(&self) -> &::sodiumoxide::crypto::sign::PublicKey {
+    pub fn revocation_public_key(&self) -> &sign::PublicKey {
         &self.revocation_public_key
     }
 
     /// Returns the Signature of PublicIdType
-    pub fn signature(&self) -> &::sodiumoxide::crypto::sign::Signature {
+    pub fn signature(&self) -> &sign::Signature {
         &self.signature
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::PublicIdType;
+    use super::*;
     use ::id::Random;
+    use sodiumoxide::crypto::sign;
+    use maidsafe_utilities::serialisation::{serialise, deserialise};
 
     impl Random for PublicIdType {
         fn generate_random() -> PublicIdType {
@@ -118,8 +124,8 @@ mod test {
     fn serialisation_public_maid() {
         let obj_before: PublicIdType = ::id::Random::generate_random();
 
-        let serialised_obj = eval_result!(::utility::serialise(&obj_before));
-        let obj_after: PublicIdType = eval_result!(::utility::deserialise(&serialised_obj));
+        let serialised_obj = unwrap_result!(serialise(&obj_before));
+        let obj_after: PublicIdType = unwrap_result!(deserialise(&serialised_obj));
 
         assert_eq!(obj_before, obj_after);
     }
@@ -156,15 +162,15 @@ mod test {
         let message_length = combined.len();
         let signature_vec = revocation_maid.sign(&combined).into_iter().skip(message_length).collect::<Vec<_>>();
 
-        assert_eq!(signature_vec.len(), ::sodiumoxide::crypto::sign::SIGNATUREBYTES);
+        assert_eq!(signature_vec.len(), sign::SIGNATUREBYTES);
 
-        let mut signature_arr = [0; ::sodiumoxide::crypto::sign::SIGNATUREBYTES];
+        let mut signature_arr = [0; sign::SIGNATUREBYTES];
 
-        for it in signature_vec.into_iter().take(::sodiumoxide::crypto::sign::SIGNATUREBYTES).enumerate() {
+        for it in signature_vec.into_iter().take(sign::SIGNATUREBYTES).enumerate() {
             signature_arr[it.0] = it.1;
         }
 
-        let signature = ::sodiumoxide::crypto::sign::Signature(signature_arr);
+        let signature = sign::Signature(signature_arr);
         assert!(::utility::slice_equal(&signature.0, &public_maid.signature().0));
     }
 }

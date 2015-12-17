@@ -14,33 +14,37 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use client::Client;
+use errors::CoreError;
+use sodiumoxide::crypto::sign;
+
 /// Gnerates a random mock client for testing
-pub fn get_client() -> Result<::client::Client, ::errors::CoreError> {
+pub fn get_client() -> Result<Client, CoreError> {
     let pin = try!(::utility::generate_random_string(10));
     let keyword = try!(::utility::generate_random_string(10));
     let password = try!(::utility::generate_random_string(10));
 
-    ::client::Client::create_account(keyword, pin, password)
+    Client::create_account(keyword, pin, password)
 }
 
 /// Gnerates Random Public Keys
-pub fn generate_public_keys(len: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-    (0..len).map(|_| ::sodiumoxide::crypto::sign::gen_keypair().0).collect()
+pub fn generate_public_keys(len: usize) -> Vec<sign::PublicKey> {
+    (0..len).map(|_| sign::gen_keypair().0).collect()
 }
 
 /// Gnerates Random Secret Keys
-pub fn generate_secret_keys(len: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
-    (0..len).map(|_| ::sodiumoxide::crypto::sign::gen_keypair().1).collect()
+pub fn generate_secret_keys(len: usize) -> Vec<sign::SecretKey> {
+    (0..len).map(|_| sign::gen_keypair().1).collect()
 }
 
 /// Gnerates public keys of maximun size
-pub fn get_max_sized_public_keys(len: usize) -> Vec<::sodiumoxide::crypto::sign::PublicKey> {
-    ::std::iter::repeat(::sodiumoxide::crypto::sign::PublicKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::PUBLICKEYBYTES])).take(len).collect()
+pub fn get_max_sized_public_keys(len: usize) -> Vec<sign::PublicKey> {
+    ::std::iter::repeat(sign::PublicKey([::std::u8::MAX; sign::PUBLICKEYBYTES])).take(len).collect()
 }
 
 /// Gnerates secret keys of maximun size
-pub fn get_max_sized_secret_keys(len: usize) -> Vec<::sodiumoxide::crypto::sign::SecretKey> {
-    ::std::iter::repeat(::sodiumoxide::crypto::sign::SecretKey([::std::u8::MAX; ::sodiumoxide::crypto::sign::SECRETKEYBYTES])).take(len).collect()
+pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
+    ::std::iter::repeat(sign::SecretKey([::std::u8::MAX; sign::SECRETKEYBYTES])).take(len).collect()
 }
 
 #[cfg(test)]
@@ -49,10 +53,10 @@ mod test {
 
     #[test]
     fn random_client() {
-        let client0 = eval_result!(get_client());
-        let client1 = eval_result!(get_client());
+        let client0 = unwrap_result!(get_client());
+        let client1 = unwrap_result!(get_client());
 
-        assert!(eval_result!(client0.get_public_signing_key()) != eval_result!(client1.get_public_signing_key()));
-        assert!(eval_result!(client0.get_public_encryption_key()) != eval_result!(client1.get_public_encryption_key()));
+        assert!(unwrap_result!(client0.get_public_signing_key()) != unwrap_result!(client1.get_public_signing_key()));
+        assert!(unwrap_result!(client0.get_public_encryption_key()) != unwrap_result!(client1.get_public_encryption_key()));
     }
 }
