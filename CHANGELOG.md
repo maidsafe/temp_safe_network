@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.4.0]
+- Refactored to comply with new routing API
+
 ## [0.3.1]
 - Remove wildcard dependencies
 
