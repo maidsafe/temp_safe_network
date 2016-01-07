@@ -43,7 +43,8 @@ pub enum DataFitResult {
 /// Calculates approximate space available for data. Calculates the worst case scenario in which
 /// all owners must sign this StructuredData.
 pub fn get_approximate_space_for_data(owner_keys: Vec<sign::PublicKey>,
-                                      prev_owner_keys: Vec<sign::PublicKey>) -> Result<usize, CoreError> {
+                                      prev_owner_keys: Vec<sign::PublicKey>)
+                                      -> Result<usize, CoreError> {
     let max_signatures_possible = if prev_owner_keys.is_empty() {
         owner_keys.len()
     } else {
@@ -59,9 +60,11 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<sign::PublicKey>,
                                                        None));
 
     // Fill it with rest of signatures
-    structured_data.replace_signatures(vec![sign::Signature([::std::u8::MAX; sign::SIGNATUREBYTES]); max_signatures_possible]);
+    structured_data.replace_signatures(vec![sign::Signature([::std::u8::MAX; sign::SIGNATUREBYTES]);
+                                            max_signatures_possible]);
 
-    let serialised_structured_data_len = try!(serialise(&structured_data)).len() + PADDING_SIZE_IN_BYTES;
+    let serialised_structured_data_len = try!(serialise(&structured_data)).len() +
+                                         PADDING_SIZE_IN_BYTES;
     if ::routing::MAX_STRUCTURED_DATA_SIZE_IN_BYTES <= serialised_structured_data_len {
         Ok(0)
     } else {
@@ -72,7 +75,8 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<sign::PublicKey>,
 /// Check if it is possible to fit the given data into the given StructuredData
 pub fn check_if_data_can_fit_in_structured_data(data: &Vec<u8>,
                                                 owner_keys: Vec<sign::PublicKey>,
-                                                prev_owner_keys: Vec<sign::PublicKey>) -> Result<DataFitResult, CoreError> {
+                                                prev_owner_keys: Vec<sign::PublicKey>)
+                                                -> Result<DataFitResult, CoreError> {
     if data.len() > ::routing::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - PADDING_SIZE_IN_BYTES {
         Ok(DataFitResult::DataDoesNotFit)
     } else {
@@ -95,7 +99,7 @@ mod test {
     // Refers the fixed size of the test_get_approximate_space_for_data fn without signatures
     const DEFAULT_FIXED_SIZE: usize = ::routing::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - 1276;
     // 196 is approximate size (close enough) of a Fixed Key after serialisation.
-    const FIXED_SIZE_OF_KEY:  usize = 196;
+    const FIXED_SIZE_OF_KEY: usize = 196;
 
     #[test]
     fn approximate_space_for_data() {
@@ -108,17 +112,20 @@ mod test {
             assert_eq!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())),
                        DEFAULT_FIXED_SIZE - (FIXED_SIZE_OF_KEY * keys.len()));
             keys.extend(::utility::test_utils::get_max_sized_public_keys(513)); // 515 keys Max
-            assert!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())) < FIXED_SIZE_OF_KEY);
+            assert!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())) <
+                    FIXED_SIZE_OF_KEY);
             keys.extend(::utility::test_utils::get_max_sized_public_keys(1));
             assert!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())) == 0);
         }
         // Random key assertions
         {
             let mut keys = ::utility::test_utils::generate_public_keys(10);
-            assert!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())) > 5000);
+            assert!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())) >
+                    5000);
             assert!(unwrap_result!(get_approximate_space_for_data(test_utils::generate_public_keys(1), keys.clone())) > 5000);
             keys.extend(::utility::test_utils::generate_public_keys(40)); // 50 keys
-            assert!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())) > 5000);
+            assert!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())) >
+                    5000);
             assert!(unwrap_result!(get_approximate_space_for_data(test_utils::generate_public_keys(1), keys.clone())) > 5000);
             keys.extend(::utility::test_utils::generate_public_keys(470)); // 520 keys
             assert!(unwrap_result!(get_approximate_space_for_data(keys.clone(), Vec::new())) > 100);

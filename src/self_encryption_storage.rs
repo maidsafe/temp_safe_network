@@ -29,9 +29,7 @@ pub struct SelfEncryptionStorage {
 impl SelfEncryptionStorage {
     /// Create a new SelfEncryptionStorage instance
     pub fn new(client: Arc<Mutex<Client>>) -> Arc<SelfEncryptionStorage> {
-        Arc::new(SelfEncryptionStorage {
-            client: client,
-        })
+        Arc::new(SelfEncryptionStorage { client: client })
     }
 }
 
@@ -44,20 +42,22 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
         }
 
         let mut client = unwrap_result!(self.client.lock());
-        let immutable_data_request = DataRequest::ImmutableData(XorName::new(name_id), ImmutableDataType::Normal);
+        let immutable_data_request = DataRequest::ImmutableData(XorName::new(name_id),
+                                                                ImmutableDataType::Normal);
         match unwrap_result!(client.get(immutable_data_request, None)).get() {
             Ok(ref data) => {
                 match data {
                     &Data::ImmutableData(ref rxd_data) => rxd_data.value().clone(),
                     _ => Vec::new(),
                 }
-            },
+            }
             Err(_) => Vec::new(),
         }
     }
 
     fn put(&self, _: Vec<u8>, data: Vec<u8>) {
         let immutable_data = ImmutableData::new(ImmutableDataType::Normal, data);
-        unwrap_result!(unwrap_result!(self.client.lock()).put(Data::ImmutableData(immutable_data), None));
+        unwrap_result!(unwrap_result!(self.client.lock())
+                           .put(Data::ImmutableData(immutable_data), None));
     }
 }

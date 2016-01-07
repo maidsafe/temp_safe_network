@@ -32,7 +32,7 @@ use sodiumoxide::crypto::hash::sha512;
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct IdType {
-    type_tag   : u64,
+    type_tag: u64,
     public_keys: (sign::PublicKey, box_::PublicKey),
     secret_keys: (sign::SecretKey, box_::SecretKey),
 }
@@ -44,7 +44,7 @@ impl IdType {
         let signing_keys = sign::gen_keypair();
 
         IdType {
-            type_tag   : revocation_id.type_tags().1,
+            type_tag: revocation_id.type_tags().1,
             public_keys: (signing_keys.0, asym_keys.0),
             secret_keys: (signing_keys.1, asym_keys.1),
         }
@@ -52,7 +52,10 @@ impl IdType {
 
     /// Returns name
     pub fn name(&self) -> XorName {
-        let combined_iter = (&self.public_keys.0).0.into_iter().chain((&self.public_keys.1).0.into_iter());
+        let combined_iter = (&self.public_keys.0)
+                                .0
+                                .into_iter()
+                                .chain((&self.public_keys.1).0.into_iter());
         let mut combined = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -74,12 +77,12 @@ impl IdType {
     }
 
     /// Signs the data with the SecretKey and returns the Signed data
-    pub fn sign(&self, data : &[u8]) -> Vec<u8> {
-        return sign::sign(&data, &self.secret_keys.0)
+    pub fn sign(&self, data: &[u8]) -> Vec<u8> {
+        return sign::sign(&data, &self.secret_keys.0);
     }
 
     /// Encrypts and authenticates data. It returns a ciphertext and the Nonce.
-    pub fn seal(&self, data : &[u8], to : &box_::PublicKey) -> (Vec<u8>, box_::Nonce) {
+    pub fn seal(&self, data: &[u8], to: &box_::PublicKey) -> (Vec<u8>, box_::Nonce) {
         let nonce = box_::gen_nonce();
         let sealed = box_::seal(data, &nonce, &to, &self.secret_keys.1);
         return (sealed, nonce);
@@ -89,8 +92,10 @@ impl IdType {
     pub fn open(&self,
                 data: &[u8],
                 nonce: &box_::Nonce,
-                from: &box_::PublicKey) -> Result<Vec<u8>, CoreError> {
-        box_::open(&data, &nonce, &from, &self.secret_keys.1).map_err(|_| CoreError::AsymmetricDecipherFailure)
+                from: &box_::PublicKey)
+                -> Result<Vec<u8>, CoreError> {
+        box_::open(&data, &nonce, &from, &self.secret_keys.1)
+            .map_err(|_| CoreError::AsymmetricDecipherFailure)
     }
 }
 
@@ -98,13 +103,12 @@ impl IdType {
 mod test {
     extern crate rand;
 
-    use ::id::Random;
+    use id::Random;
     use self::rand::Rng;
     use sodiumoxide::crypto::{box_, sign};
     use maidsafe_utilities::serialisation::{serialise, deserialise};
 
     impl Random for ::id::IdType {
-
         fn generate_random() -> ::id::IdType {
             ::id::IdType::new(&::id::RevocationIdType::new::<::id::MaidTypeTags>())
         }
@@ -118,10 +122,14 @@ mod test {
 
         let obj_after: ::id::IdType = unwrap_result!(deserialise(&serialised_obj));
 
-        let &(sign::PublicKey(pub_sign_arr_before), box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
-        let &(sign::PublicKey(pub_sign_arr_after), box_::PublicKey(pub_asym_arr_after)) = obj_after.public_keys();
-        let &(sign::SecretKey(sec_sign_arr_before), box_::SecretKey(sec_asym_arr_before)) = &obj_before.secret_keys;
-        let &(sign::SecretKey(sec_sign_arr_after), box_::SecretKey(sec_asym_arr_after)) = &obj_after.secret_keys;
+        let &(sign::PublicKey(pub_sign_arr_before),
+              box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
+        let &(sign::PublicKey(pub_sign_arr_after),
+              box_::PublicKey(pub_asym_arr_after)) = obj_after.public_keys();
+        let &(sign::SecretKey(sec_sign_arr_before),
+              box_::SecretKey(sec_asym_arr_before)) = &obj_before.secret_keys;
+        let &(sign::SecretKey(sec_sign_arr_after),
+              box_::SecretKey(sec_asym_arr_after)) = &obj_after.secret_keys;
 
         assert_eq!(pub_sign_arr_before, pub_sign_arr_after);
         assert_eq!(pub_asym_arr_before, pub_asym_arr_after);

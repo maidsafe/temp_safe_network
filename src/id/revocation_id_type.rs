@@ -30,7 +30,7 @@ use sodiumoxide::crypto::hash::sha512;
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct RevocationIdType {
-    type_tags: (u64, u64, u64),  // type tags for revocation, id and public ids
+    type_tags: (u64, u64, u64), // type tags for revocation, id and public ids
     public_key: sign::PublicKey,
     secret_key: sign::SecretKey,
 }
@@ -39,11 +39,15 @@ impl RevocationIdType {
     /// An instance of RevocationIdType can be created by invoking the new()
     /// Default contructed RevocationIdType instance is returned
     #[allow(unsafe_code)]
-    pub fn new<TypeTags>() -> RevocationIdType where TypeTags: ::id::IdTypeTags {
+    pub fn new<TypeTags>() -> RevocationIdType
+        where TypeTags: ::id::IdTypeTags
+    {
         let (pub_sign_key, sec_sign_key) = sign::gen_keypair();
         let type_tags: TypeTags = unsafe { ::std::mem::uninitialized() };
         RevocationIdType {
-            type_tags: (type_tags.revocation_id_type_tag(), type_tags.id_type_tag(), type_tags.public_id_type_tag()),
+            type_tags: (type_tags.revocation_id_type_tag(),
+                        type_tags.id_type_tag(),
+                        type_tags.public_id_type_tag()),
             public_key: pub_sign_key,
             secret_key: sec_sign_key,
         }
@@ -83,8 +87,8 @@ impl RevocationIdType {
     }
 
     /// Signs the data with the SecretKey of the AnMaid and recturns the Signed Data
-    pub fn sign(&self, data : &[u8]) -> Vec<u8> {
-        return sign::sign(&data, &self.secret_key)
+    pub fn sign(&self, data: &[u8]) -> Vec<u8> {
+        return sign::sign(&data, &self.secret_key);
     }
 }
 
@@ -93,7 +97,7 @@ mod test {
     use rand;
     use super::*;
     use rand::Rng;
-    use ::id::Random;
+    use id::Random;
     use sodiumoxide::crypto::sign;
     use maidsafe_utilities::serialisation::{serialise, deserialise};
 

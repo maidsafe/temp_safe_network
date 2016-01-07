@@ -44,20 +44,32 @@ pub struct MpidTypeTags;
 
 impl IdTypeTags for MaidTypeTags {
     /// returns tag type for AnMaid type
-    fn revocation_id_type_tag(&self) -> u64 { data_tags::AN_MAID_TAG }
+    fn revocation_id_type_tag(&self) -> u64 {
+        data_tags::AN_MAID_TAG
+    }
     /// returns tag type for Maid type
-    fn id_type_tag(&self) -> u64 { data_tags::MAID_TAG }
+    fn id_type_tag(&self) -> u64 {
+        data_tags::MAID_TAG
+    }
     /// returns tag type for PublicMaid type
-    fn public_id_type_tag(&self) -> u64 { data_tags::PUBLIC_MAID_TAG }
+    fn public_id_type_tag(&self) -> u64 {
+        data_tags::PUBLIC_MAID_TAG
+    }
 }
 
 impl IdTypeTags for MpidTypeTags {
     /// returns tag type for AnMpid type
-    fn revocation_id_type_tag(&self) -> u64 { data_tags::AN_MPID_TAG }
+    fn revocation_id_type_tag(&self) -> u64 {
+        data_tags::AN_MPID_TAG
+    }
     /// returns tag type for Mpid type
-    fn id_type_tag(&self) -> u64 { data_tags::MPID_TAG }
+    fn id_type_tag(&self) -> u64 {
+        data_tags::MPID_TAG
+    }
     /// returns tag type for PublicMpid type
-    fn public_id_type_tag(&self) -> u64 { data_tags::PUBLIC_MPID_TAG }
+    fn public_id_type_tag(&self) -> u64 {
+        data_tags::PUBLIC_MPID_TAG
+    }
 }
 
 /// Random trait is used to generate random instances.
@@ -71,10 +83,10 @@ pub trait Random {
 #[allow(missing_docs)]
 pub mod data_tags {
     pub const MAIDSAFE_DATA_TAG: u64 = ::MAIDSAFE_TAG + 100;
-    pub const AN_MPID_TAG: u64                    = MAIDSAFE_DATA_TAG + 5;
-    pub const AN_MAID_TAG: u64                    = MAIDSAFE_DATA_TAG + 6;
-    pub const MAID_TAG: u64                       = MAIDSAFE_DATA_TAG + 7;
-    pub const MPID_TAG: u64                       = MAIDSAFE_DATA_TAG + 8;
-    pub const PUBLIC_MAID_TAG: u64                = MAIDSAFE_DATA_TAG + 9;
-    pub const PUBLIC_MPID_TAG: u64                = MAIDSAFE_DATA_TAG + 10;
+    pub const AN_MPID_TAG: u64 = MAIDSAFE_DATA_TAG + 5;
+    pub const AN_MAID_TAG: u64 = MAIDSAFE_DATA_TAG + 6;
+    pub const MAID_TAG: u64 = MAIDSAFE_DATA_TAG + 7;
+    pub const MPID_TAG: u64 = MAIDSAFE_DATA_TAG + 8;
+    pub const PUBLIC_MAID_TAG: u64 = MAIDSAFE_DATA_TAG + 9;
+    pub const PUBLIC_MPID_TAG: u64 = MAIDSAFE_DATA_TAG + 10;
 }
