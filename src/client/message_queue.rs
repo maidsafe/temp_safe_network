@@ -29,9 +29,9 @@ const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 /// of previously fetched ImmutableData (because the very nature of such data implies Immutability)
 /// enabling fast re-retrieval and avoiding networking.
 pub struct MessageQueue {
-    local_cache          : LruCache<XorName, Data>,
-    data_senders         : HashMap<XorName, Vec<mpsc::Sender<::translated_events::DataReceivedEvent>>>,
-    error_senders        : Vec<mpsc::Sender<::translated_events::OperationFailureEvent>>,
+    local_cache: LruCache<XorName, Data>,
+    data_senders: HashMap<XorName, Vec<mpsc::Sender<::translated_events::DataReceivedEvent>>>,
+    error_senders: Vec<mpsc::Sender<::translated_events::OperationFailureEvent>>,
     network_event_senders: Vec<mpsc::Sender<::translated_events::NetworkEvent>>,
     routing_message_cache: LruCache<XorName, Data>,
 }
@@ -41,13 +41,13 @@ impl MessageQueue {
     /// add observer since one will not receive data until one asks for it. Thus there is enough
     /// chance to add an observer before requesting data.
     pub fn new(routing_event_receiver: mpsc::Receiver<Event>,
-               network_event_senders : Vec<mpsc::Sender<::translated_events::NetworkEvent>>,
-               error_senders         : Vec<mpsc::Sender<::translated_events::OperationFailureEvent>>) -> (Arc<Mutex<MessageQueue>>,
-                                                                                                          RaiiThreadJoiner) {
+               network_event_senders: Vec<mpsc::Sender<::translated_events::NetworkEvent>>,
+               error_senders: Vec<mpsc::Sender<::translated_events::OperationFailureEvent>>)
+               -> (Arc<Mutex<MessageQueue>>, RaiiThreadJoiner) {
         let message_queue = Arc::new(Mutex::new(MessageQueue {
-            local_cache          : LruCache::with_capacity(1000),
-            data_senders         : HashMap::new(),
-            error_senders        : error_senders,
+            local_cache: LruCache::with_capacity(1000),
+            data_senders: HashMap::new(),
+            error_senders: error_senders,
             network_event_senders: network_event_senders,
             routing_message_cache: LruCache::with_capacity(1000),
         }));
@@ -58,24 +58,31 @@ impl MessageQueue {
                 match it {
                     Event::Response(msg) => {
                         match msg.content {
-                            ResponseContent::GetSuccess(data) => {
+                            ResponseContent::GetSuccess(data, _) => {
                                 let data_name = data.name();
                                 let mut dead_sender_positions = Vec::<usize>::new();
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                let _ = queue_guard.routing_message_cache.insert(data_name.clone(), data);
-                                if let Some(mut specific_data_senders) = queue_guard.data_senders.get_mut(&data_name) {
+                                let _ = queue_guard.routing_message_cache
+                                                   .insert(data_name.clone(), data);
+                                if let Some(mut specific_data_senders) =
+                                       queue_guard.data_senders.get_mut(&data_name) {
                                     for it in specific_data_senders.iter().enumerate() {
                                         if it.1.send(::translated_events::DataReceivedEvent::DataReceived).is_err() {
                                             dead_sender_positions.push(it.0);
                                         }
                                     }
 
-                                    MessageQueue::purge_dead_senders(&mut specific_data_senders, dead_sender_positions);
+                                    MessageQueue::purge_dead_senders(&mut specific_data_senders,
+                                                                     dead_sender_positions);
                                 }
-                            },
-                            _ => warn!("Received Response Message: {:?} ;; This is currently not supported.", msg),
+                            }
+                            _ => {
+                                warn!("Received Response Message: {:?} ;; This is currently not \
+                                       supported.",
+                                      msg)
+                            }
                         }
-                    },
+                    }
                     Event::Connected => {
                         let mut dead_sender_positions = Vec::<usize>::new();
                         let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
@@ -85,53 +92,13 @@ impl MessageQueue {
                             }
                         }
 
-                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_senders, dead_sender_positions);
-                    },
-                    Event::Disconnected => {
-                        let mut dead_sender_positions = Vec::<usize>::new();
-                        let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                        for it in queue_guard.network_event_senders.iter().enumerate() {
-                            if it.1.send(::translated_events::NetworkEvent::Disconnected).is_err() {
-                                dead_sender_positions.push(it.0);
-                            }
-                        }
-
-                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_senders, dead_sender_positions);
-                    },
-                    Event::Terminated => {
-                        let mut dead_sender_positions = Vec::<usize>::new();
-                        let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                        for it in queue_guard.error_senders.iter().enumerate() {
-                            if it.1.send(::translated_events::OperationFailureEvent::Terminated).is_err() {
-                                dead_sender_positions.push(it.0);
-                            }
-                        }
-
-                        MessageQueue::purge_dead_senders(&mut queue_guard.error_senders, dead_sender_positions);
-
-                        dead_sender_positions = Vec::new();
-                        for it in queue_guard.network_event_senders.iter().enumerate() {
-                            if it.1.send(::translated_events::NetworkEvent::Terminated).is_err() {
-                                dead_sender_positions.push(it.0);
-                            }
-                        }
-
-                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_senders, dead_sender_positions);
-
-                        for mut it in queue_guard.data_senders.iter_mut() {
-                            dead_sender_positions = Vec::new();
-                            for specific_senders in it.1.iter().enumerate() {
-                                if specific_senders.1.send(::translated_events::DataReceivedEvent::Terminated).is_err() {
-                                    dead_sender_positions.push(specific_senders.0);
-                                }
-                            }
-
-                            MessageQueue::purge_dead_senders(&mut it.1, dead_sender_positions);
-                        }
-
-                        break;
-                    },
-                    _ => debug!("Received Routing Event: {:?} ;; This is currently not supported.", it),
+                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_senders,
+                                                         dead_sender_positions);
+                    }
+                    _ => {
+                        debug!("Received Routing Event: {:?} ;; This is currently not supported.",
+                               it)
+                    }
                 }
             }
         });
@@ -149,7 +116,8 @@ impl MessageQueue {
         self.error_senders.push(sender);
     }
 
-    pub fn add_network_event_observer(&mut self, sender: mpsc::Sender<::translated_events::NetworkEvent>) {
+    pub fn add_network_event_observer(&mut self,
+                                      sender: mpsc::Sender<::translated_events::NetworkEvent>) {
         self.network_event_senders.push(sender);
     }
 
@@ -166,7 +134,10 @@ impl MessageQueue {
     }
 
     pub fn get_response(&mut self, location: &XorName) -> Result<Data, CoreError> {
-        self.routing_message_cache.get(location).ok_or(CoreError::RoutingMessageCacheMiss).map(|elt| elt.clone())
+        self.routing_message_cache
+            .get(location)
+            .ok_or(CoreError::RoutingMessageCacheMiss)
+            .map(|elt| elt.clone())
     }
 
     fn purge_dead_senders<T>(senders: &mut Vec<mpsc::Sender<T>>, positions: Vec<usize>) {

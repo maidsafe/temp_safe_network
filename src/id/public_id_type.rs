@@ -44,7 +44,13 @@ impl PublicIdType {
         let type_tag = revocation_id.type_tags().2;
         let public_keys = id_type.public_keys().clone();
         let revocation_public_key = revocation_id.public_key();
-        let combined_iter = (public_keys.0).0.into_iter().chain((public_keys.1).0.into_iter().chain(revocation_public_key.0.into_iter()));
+        let combined_iter = (public_keys.0)
+                                .0
+                                .into_iter()
+                                .chain((public_keys.1)
+                                           .0
+                                           .into_iter()
+                                           .chain(revocation_public_key.0.into_iter()));
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -54,21 +60,30 @@ impl PublicIdType {
         }
         let message_length = combined.len();
 
-        let signature = revocation_id.sign(&combined).into_iter().skip(message_length).collect::<Vec<_>>();
+        let signature = revocation_id.sign(&combined)
+                                     .into_iter()
+                                     .skip(message_length)
+                                     .collect::<Vec<_>>();
         let mut signature_arr = [0; sign::SIGNATUREBYTES];
 
         for it in signature.into_iter().take(sign::SIGNATUREBYTES).enumerate() {
             signature_arr[it.0] = it.1;
         }
 
-        PublicIdType { type_tag: type_tag, public_keys: public_keys,
-             revocation_public_key: revocation_id.public_key().clone(),
-             signature: sign::Signature(signature_arr) }
+        PublicIdType {
+            type_tag: type_tag,
+            public_keys: public_keys,
+            revocation_public_key: revocation_id.public_key().clone(),
+            signature: sign::Signature(signature_arr),
+        }
     }
 
     /// Returns the name
     pub fn name(&self) -> XorName {
-        let combined_iter = (self.public_keys.0).0.into_iter().chain((self.public_keys.1).0.into_iter());
+        let combined_iter = (self.public_keys.0)
+                                .0
+                                .into_iter()
+                                .chain((self.public_keys.1).0.into_iter());
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -101,7 +116,7 @@ impl PublicIdType {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ::id::Random;
+    use id::Random;
     use sodiumoxide::crypto::sign;
     use maidsafe_utilities::serialisation::{serialise, deserialise};
 
@@ -147,9 +162,14 @@ mod test {
         let type_tag = public_maid.type_tag;
         let public_id_keys = public_maid.public_keys;
         let public_revocation_key = public_maid.revocation_public_key;
-        let combined_keys = (public_id_keys.0).0.into_iter().chain((public_id_keys.1).0
-                                                .into_iter().chain(public_revocation_key.0
-                                                .into_iter()));
+        let combined_keys = (public_id_keys.0)
+                                .0
+                                .into_iter()
+                                .chain((public_id_keys.1)
+                                           .0
+                                           .into_iter()
+                                           .chain(public_revocation_key.0
+                                                                       .into_iter()));
         let mut combined = Vec::new();
 
         for iter in combined_keys {
@@ -160,7 +180,10 @@ mod test {
         }
 
         let message_length = combined.len();
-        let signature_vec = revocation_maid.sign(&combined).into_iter().skip(message_length).collect::<Vec<_>>();
+        let signature_vec = revocation_maid.sign(&combined)
+                                           .into_iter()
+                                           .skip(message_length)
+                                           .collect::<Vec<_>>();
 
         assert_eq!(signature_vec.len(), sign::SIGNATUREBYTES);
 

@@ -13,24 +13,21 @@
 // KIND, either express or implied.
 //
 // Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.                                                                 */
+// relating to use of the SAFE Network Software.
 
 use routing::InterfaceError;
 
+// TODO(Spandan) This is a mess with new routing - get it sorted once sprint begins
 /// Reception of reqested Data
 pub enum DataReceivedEvent {
     /// Received Data
     DataReceived,
-    /// Graceful Exit Condition
-    Terminated,
 }
 
 /// Netowork Events that Client Modules need to deal with
 pub enum NetworkEvent {
     /// The client engine is connected to atleast one peer
     Connected,
-    /// The client has lost connection to all peers
-    Disconnected,
     /// Graceful Exit Condition
     Terminated,
 }

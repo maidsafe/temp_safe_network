@@ -17,7 +17,7 @@
 /// Common utility functions for writting test cases
 pub mod test_utils;
 
-use ::rand::Rng;
+use rand::Rng;
 use errors::CoreError;
 use sodiumoxide::crypto::{box_, secretbox};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
@@ -29,7 +29,8 @@ use maidsafe_utilities::serialisation::{serialise, deserialise};
 pub fn hybrid_encrypt(plain_text: &[u8],
                       asym_nonce: &box_::Nonce,
                       asym_public_key: &box_::PublicKey,
-                      asym_secret_key: &box_::SecretKey) -> Result<Vec<u8>, CoreError> {
+                      asym_secret_key: &box_::SecretKey)
+                      -> Result<Vec<u8>, CoreError> {
     let sym_key = secretbox::gen_key();
     let sym_nonce = secretbox::gen_nonce();
 
@@ -39,7 +40,10 @@ pub fn hybrid_encrypt(plain_text: &[u8],
     }
 
     let sym_cipher_text = secretbox::seal(plain_text, &sym_nonce, &sym_key);
-    let asym_cipher_text = box_::seal(&asym_plain_text, asym_nonce, asym_public_key, asym_secret_key);
+    let asym_cipher_text = box_::seal(&asym_plain_text,
+                                      asym_nonce,
+                                      asym_public_key,
+                                      asym_secret_key);
 
     Ok(try!(serialise(&(asym_cipher_text, sym_cipher_text))))
 }
@@ -48,13 +52,15 @@ pub fn hybrid_encrypt(plain_text: &[u8],
 pub fn hybrid_decrypt(cipher_text: &[u8],
                       asym_nonce: &box_::Nonce,
                       asym_public_key: &box_::PublicKey,
-                      asym_secret_key: &box_::SecretKey) -> Result<Vec<u8>, CoreError> {
+                      asym_secret_key: &box_::SecretKey)
+                      -> Result<Vec<u8>, CoreError> {
     let (asym_cipher_text, sym_cipher_text): (Vec<u8>, Vec<u8>) = try!(deserialise(cipher_text));
 
     let asym_plain_text = try!(box_::open(&asym_cipher_text,
                                           asym_nonce,
                                           asym_public_key,
-                                          asym_secret_key).map_err(|_| CoreError::AsymmetricDecipherFailure));
+                                          asym_secret_key)
+                                   .map_err(|_| CoreError::AsymmetricDecipherFailure));
 
     if asym_plain_text.len() != secretbox::KEYBYTES + secretbox::NONCEBYTES {
         Err(::errors::CoreError::AsymmetricDecipherFailure)
@@ -69,7 +75,8 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
             sym_nonce.0[it.0] = *it.1;
         }
 
-        secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key).map_err(|()| CoreError::SymmetricDecipherFailure)
+        secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key)
+            .map_err(|()| CoreError::SymmetricDecipherFailure)
     }
 }
 
@@ -84,7 +91,8 @@ pub fn generate_random_string(length: usize) -> Result<String, CoreError> {
 
 /// Generate a random vector of given length
 pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
-                                                   where T: ::rand::Rand {
+    where T: ::rand::Rand
+{
     let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
         error!("{:?}", error);
         CoreError::RandomDataGenerationFailure
@@ -125,8 +133,14 @@ mod test {
         let (public_key, secret_key) = box_::gen_keypair();
 
         // Encrypt
-        let cipher_text_0 = unwrap_result!(hybrid_encrypt(&plain_text_0[..], &nonce, &public_key, &secret_key));
-        let cipher_text_1 = unwrap_result!(hybrid_encrypt(&plain_text_1[..], &nonce, &public_key, &secret_key));
+        let cipher_text_0 = unwrap_result!(hybrid_encrypt(&plain_text_0[..],
+                                                          &nonce,
+                                                          &public_key,
+                                                          &secret_key));
+        let cipher_text_1 = unwrap_result!(hybrid_encrypt(&plain_text_1[..],
+                                                          &nonce,
+                                                          &public_key,
+                                                          &secret_key));
 
         // Same Plain Texts
         assert_eq!(plain_text_0, plain_text_1);
@@ -135,8 +149,14 @@ mod test {
         assert!(cipher_text_0 != cipher_text_1);
 
         // Decrypt
-        let deciphered_plain_text_0 = unwrap_result!(hybrid_decrypt(&cipher_text_0, &nonce, &public_key, &secret_key));
-        let deciphered_plain_text_1 = unwrap_result!(hybrid_decrypt(&cipher_text_1, &nonce, &public_key, &secret_key));
+        let deciphered_plain_text_0 = unwrap_result!(hybrid_decrypt(&cipher_text_0,
+                                                                    &nonce,
+                                                                    &public_key,
+                                                                    &secret_key));
+        let deciphered_plain_text_1 = unwrap_result!(hybrid_decrypt(&cipher_text_1,
+                                                                    &nonce,
+                                                                    &public_key,
+                                                                    &secret_key));
 
         // Should have decrypted to the same Plain Texts
         assert_eq!(plain_text_0, deciphered_plain_text_0);

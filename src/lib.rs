@@ -44,8 +44,10 @@ extern crate sodiumoxide;
 extern crate lru_time_cache;
 extern crate self_encryption;
 extern crate rustc_serialize;
-#[macro_use] extern crate log;
-#[macro_use] extern crate maidsafe_utilities;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate maidsafe_utilities;
 
 /// Public and Private Id types
 pub mod id;

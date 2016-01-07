@@ -42,7 +42,9 @@ pub struct Account {
 #[allow(dead_code)]
 impl Account {
     /// Create a new Session Packet with Randomly generated Maid keys for the user
-    pub fn new(user_root_dir_id: Option<XorName>, maidsafe_config_root_dir_id: Option<XorName>) -> Account {
+    pub fn new(user_root_dir_id: Option<XorName>,
+               maidsafe_config_root_dir_id: Option<XorName>)
+               -> Account {
         let an_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();
         let maid = ::id::IdType::new(&an_maid);
         let public_maid = ::id::PublicIdType::new(&maid, &an_maid);
@@ -117,7 +119,7 @@ impl Account {
             None => {
                 self.user_root_dir_id = Some(user_root_dir_id);
                 true
-            },
+            }
         }
     }
 
@@ -130,13 +132,15 @@ impl Account {
     }
 
     /// Set maidsafe configuration specific root directory ID
-    pub fn set_maidsafe_config_root_dir_id(&mut self, maidsafe_config_root_dir_id: XorName) -> bool {
+    pub fn set_maidsafe_config_root_dir_id(&mut self,
+                                           maidsafe_config_root_dir_id: XorName)
+                                           -> bool {
         match self.maidsafe_config_root_dir_id {
             Some(_) => false,
             None => {
                 self.maidsafe_config_root_dir_id = Some(maidsafe_config_root_dir_id);
                 true
-            },
+            }
         }
     }
 
@@ -151,15 +155,20 @@ impl Account {
 
     /// Symmetric decryption of Session Packet using User's credentials. Credentials are passed
     /// through key-derivation-function first
-    pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Account, CoreError> {
+    pub fn decrypt(encrypted_self: &[u8],
+                   password: &[u8],
+                   pin: &[u8])
+                   -> Result<Account, CoreError> {
         let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
         let decrypted_self = try!(secretbox::open(encrypted_self, &nonce, &key)
-                                            .map_err(|_| CoreError::SymmetricDecipherFailure));
+                                      .map_err(|_| CoreError::SymmetricDecipherFailure));
 
         Ok(try!(deserialise(&decrypted_self)))
     }
 
-    fn generate_crypto_keys(password: &[u8], pin: &[u8]) -> Result<(secretbox::Key, secretbox::Nonce), CoreError> {
+    fn generate_crypto_keys(password: &[u8],
+                            pin: &[u8])
+                            -> Result<(secretbox::Key, secretbox::Nonce), CoreError> {
         let mut output = [0; secretbox::KEYBYTES + secretbox::NONCEBYTES];
         try!(Account::derive_key(&mut output[..], password, pin));
 
@@ -191,13 +200,17 @@ impl Account {
                     *it.1 = hashed_pin.0[it.0];
                 }
             } else {
-                return Err(CoreError::UnsupportedSaltSizeForPwHash)
+                return Err(CoreError::UnsupportedSaltSizeForPwHash);
             }
         }
 
-        try!(pwhash::derive_key(output, input, &salt, pwhash::OPSLIMIT_INTERACTIVE, pwhash::MEMLIMIT_INTERACTIVE)
-                    .map_err(|_| CoreError::UnsuccessfulPwHash)
-                    .map(|_| Ok(())))
+        try!(pwhash::derive_key(output,
+                                input,
+                                &salt,
+                                pwhash::OPSLIMIT_INTERACTIVE,
+                                pwhash::MEMLIMIT_INTERACTIVE)
+                 .map_err(|_| CoreError::UnsuccessfulPwHash)
+                 .map(|_| Ok(())))
     }
 }
 
@@ -217,21 +230,33 @@ mod test {
     fn generating_network_id() {
         let keyword1 = "user1".to_owned();
 
-        let user1_id1 = unwrap_result!(Account::generate_network_id(keyword1.as_bytes(), 0.to_string().as_bytes()));
-        let user1_id2 = unwrap_result!(Account::generate_network_id(keyword1.as_bytes(), 1234.to_string().as_bytes()));
-        let user1_id3 = unwrap_result!(Account::generate_network_id(keyword1.as_bytes(), ::std::u32::MAX.to_string().as_bytes()));
+        let user1_id1 = unwrap_result!(Account::generate_network_id(keyword1.as_bytes(),
+                                                                    0.to_string().as_bytes()));
+        let user1_id2 = unwrap_result!(Account::generate_network_id(keyword1.as_bytes(),
+                                                                    1234.to_string().as_bytes()));
+        let user1_id3 = unwrap_result!(Account::generate_network_id(keyword1.as_bytes(),
+                                                                    ::std::u32::MAX.to_string()
+                                                                                   .as_bytes()));
 
         assert!(user1_id1 != user1_id2);
         assert!(user1_id1 != user1_id3);
         assert!(user1_id2 != user1_id3);
-        assert_eq!(user1_id1, unwrap_result!(Account::generate_network_id(keyword1.as_bytes(), 0.to_string().as_bytes())));
-        assert_eq!(user1_id2, unwrap_result!(Account::generate_network_id(keyword1.as_bytes(), 1234.to_string().as_bytes())));
-        assert_eq!(user1_id3, unwrap_result!(Account::generate_network_id(keyword1.as_bytes(), ::std::u32::MAX.to_string().as_bytes())));
+        assert_eq!(user1_id1,
+                   unwrap_result!(Account::generate_network_id(keyword1.as_bytes(),
+                                                               0.to_string().as_bytes())));
+        assert_eq!(user1_id2,
+                   unwrap_result!(Account::generate_network_id(keyword1.as_bytes(),
+                                                               1234.to_string().as_bytes())));
+        assert_eq!(user1_id3,
+                   unwrap_result!(Account::generate_network_id(keyword1.as_bytes(),
+                                                               ::std::u32::MAX.to_string()
+                                                                              .as_bytes())));
 
         let keyword2 = "user2".to_owned();
-        assert!(unwrap_result!(Account::generate_network_id(keyword1.as_bytes(), 248.to_string().as_bytes()))
-                !=
-                unwrap_result!(Account::generate_network_id(keyword2.as_bytes(), 248.to_string().as_bytes())));
+        assert!(unwrap_result!(Account::generate_network_id(keyword1.as_bytes(),
+                                                            248.to_string().as_bytes())) !=
+                unwrap_result!(Account::generate_network_id(keyword2.as_bytes(),
+                                                            248.to_string().as_bytes())));
     }
 
     #[test]
@@ -239,24 +264,32 @@ mod test {
         let password1 = "super great password".to_owned();
         let password2 = "even better password".to_owned();
         {
-            let keys1 = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(), 0.to_string().as_bytes()));
-            let keys2 = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(), 1234.to_string().as_bytes()));
-            let keys3 = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(), ::std::u32::MAX.to_string().as_bytes()));
+            let keys1 = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(),
+                                                                     0.to_string().as_bytes()));
+            let keys2 = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(),
+                                                                     1234.to_string().as_bytes()));
+            let keys3 = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(),
+                                                                     ::std::u32::MAX.to_string()
+                                                                                    .as_bytes()));
 
             assert!(keys1 != keys2);
             assert!(keys1 != keys3);
             assert!(keys2 != keys3);
         }
         {
-            let keys1 = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(), 0.to_string().as_bytes()));
-            let keys2 = unwrap_result!(Account::generate_crypto_keys(password2.as_bytes(), 0.to_string().as_bytes()));
+            let keys1 = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(),
+                                                                     0.to_string().as_bytes()));
+            let keys2 = unwrap_result!(Account::generate_crypto_keys(password2.as_bytes(),
+                                                                     0.to_string().as_bytes()));
 
             assert!(keys1 != keys2);
             assert!(keys1 != keys2);
         }
         {
-            let keys  = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(), 0.to_string().as_bytes()));
-            let again = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(), 0.to_string().as_bytes()));
+            let keys = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(),
+                                                                    0.to_string().as_bytes()));
+            let again = unwrap_result!(Account::generate_crypto_keys(password1.as_bytes(),
+                                                                     0.to_string().as_bytes()));
             assert_eq!(keys, again);
             assert_eq!(keys, again);
         }
@@ -265,7 +298,8 @@ mod test {
     #[test]
     fn serialisation() {
         let account = Account::new(None, None);
-        let deserialised_account = unwrap_result!(deserialise(&unwrap_result!(serialise(&account))));
+        let deserialised_account =
+            unwrap_result!(deserialise(&unwrap_result!(serialise(&account))));
         assert_eq!(account, deserialised_account);
     }
 
@@ -276,7 +310,8 @@ mod test {
         let password = "impossible to guess".to_owned();
         let pin = 1000u16;
 
-        let encrypted_account = unwrap_result!(account.encrypt(password.as_bytes(), pin.to_string().as_bytes()));
+        let encrypted_account = unwrap_result!(account.encrypt(password.as_bytes(),
+                                                               pin.to_string().as_bytes()));
         assert!(encrypted_account.len() > 0);
         assert!(encrypted_account != unwrap_result!(serialise(&account)));
 

@@ -24,22 +24,23 @@ use client::message_queue::MessageQueue;
 /// ResponseGetter is a lazy evaluated response getter. It will fetch either from local cache or
 /// wait for the MessageQueue to notify it of the incoming response from the network.
 pub struct ResponseGetter {
-    data_channel : Option<(mpsc::Sender<::translated_events::DataReceivedEvent>,
-                           mpsc::Receiver<::translated_events::DataReceivedEvent>)>,
-    message_queue : Arc<Mutex<MessageQueue>>,
+    data_channel: Option<(mpsc::Sender<::translated_events::DataReceivedEvent>,
+                          mpsc::Receiver<::translated_events::DataReceivedEvent>)>,
+    message_queue: Arc<Mutex<MessageQueue>>,
     requested_name: XorName,
     requested_type: DataRequest,
 }
 
 impl ResponseGetter {
     /// Create a new instance of ResponseGetter
-    pub fn new(data_channel  : Option<(mpsc::Sender<::translated_events::DataReceivedEvent>,
-                                       mpsc::Receiver<::translated_events::DataReceivedEvent>)>,
-               message_queue : Arc<Mutex<MessageQueue>>,
-               requested_type: DataRequest) -> ResponseGetter {
+    pub fn new(data_channel: Option<(mpsc::Sender<::translated_events::DataReceivedEvent>,
+                                     mpsc::Receiver<::translated_events::DataReceivedEvent>)>,
+               message_queue: Arc<Mutex<MessageQueue>>,
+               requested_type: DataRequest)
+               -> ResponseGetter {
         ResponseGetter {
-            data_channel  : data_channel,
-            message_queue : message_queue,
+            data_channel: data_channel,
+            message_queue: message_queue,
             requested_name: requested_type.name(),
             requested_type: requested_type,
         }
@@ -59,8 +60,7 @@ impl ResponseGetter {
                     }
 
                     Ok(response)
-                },
-                ::translated_events::DataReceivedEvent::Terminated => return Err(CoreError::OperationAborted),
+                }
             }
         } else {
             let mut msg_queue = unwrap_result!(self.message_queue.lock());
