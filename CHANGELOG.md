@@ -1,5 +1,9 @@
 # Safe Core - Change Log
 
+## [0.5.0]
+- Refactored to comply with new routing API
+- Compiles and passes tests with Mock with stable Rust
+
 ## [0.4.0]
 - Refactored to comply with new routing API
 
