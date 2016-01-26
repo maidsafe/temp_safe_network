@@ -33,7 +33,9 @@ use sodiumoxide::crypto::{box_, sign};
 use self::response_getter::ResponseGetter;
 use sodiumoxide::crypto::hash::{sha256, sha512};
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event};
+use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event, PlainData};
+use mpid_messaging::{Header, MpidMessage, MpidMessageWrapper};
+use maidsafe_utilities::serialisation::serialise;
 
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
@@ -347,6 +349,33 @@ impl Client {
         };
 
         Ok(try!(self.routing.send_put_request(dst, data)))
+    }
+
+    /// Send a message to receiver via the network. This is non-blocking.
+    pub fn send_message(&self, msg_subject: Vec<u8>, msg_content: Vec<u8>,
+                        receiver: XorName) -> Result<(), CoreError> {
+        let dst = try!(self.get_default_client_manager_address());
+        let header = Header {
+            sender: dst.clone(),
+            receiver: receiver.clone(),
+            subject_field: msg_subject,
+        };
+        let mpid_message = MpidMessageWrapper::MpidMessage(MpidMessage {
+            msg_header : header,
+            msg_content : msg_content,
+        });
+
+        let (serialised_message, message_hash) = match serialise(&mpid_message) {
+            Ok(encoded) => (encoded.clone(), sha512::hash(&encoded[..])),
+            Err(error) => {
+                error!("Failed to serialise mpid message: {:?}", error);
+                return Err(CoreError::UnsuccessfulEncodeDecode(error));
+            }
+        };
+        let message = Data::PlainData(
+                PlainData::new(XorName(message_hash.0), serialised_message));
+
+        Ok(try!(self.routing.send_put_request(Authority::ClientManager(dst.clone()), message)))
     }
 
     /// Post data onto the network
