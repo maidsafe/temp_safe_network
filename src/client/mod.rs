@@ -366,23 +366,43 @@ impl Client {
         self.put(data, Some(Authority::ClientManager(mpid_account.clone())))
     }
 
+    /// Delete a message from own or sender's outbox. This is non-blocking.
+    pub fn delete_message(&self, target_account: &XorName, mpid_message: &MpidMessage)
+            -> Result<(), CoreError> {
+        let name = unwrap_option!(mpid_messaging::mpid_message_name(mpid_message),
+                                  "Failed to calculate the name of a mpid_message");
+        let serialised_message = unwrap_result!(serialise(mpid_message));
+        let data = Data::PlainData(PlainData::new(name, serialised_message));
+        self.delete(data, Some(Authority::ClientManager(target_account.clone())))
+    }
+
+    /// Delete a header from own inbox. This is non-blocking.
+    pub fn delete_header(&self, account: &XorName, mpid_header: &MpidHeader)
+            -> Result<(), CoreError> {
+        let name = unwrap_option!(mpid_messaging::mpid_header_name(mpid_header),
+                                  "Failed to calculate the name of a mpid_header");
+        let serialised_message = unwrap_result!(serialise(mpid_header));
+        let data = Data::PlainData(PlainData::new(name, serialised_message));
+        self.delete(data, Some(Authority::ClientManager(account.clone())))
+    }
+
     /// Register as an online mpid_messaging client to the network. This is non-blocking.
     pub fn register_online(&self, mpid_account: &XorName) -> Result<(), CoreError> {
-        self.post_messaging_request(mpid_account, MpidMessageWrapper::Online)
+        self.messaging_post_request(mpid_account, MpidMessageWrapper::Online)
     }
 
     /// Query the targeted messages' header that still in the outbox. This is non-blocking.
     pub fn query_outbox_headers(&self, mpid_account: &XorName, headers: Vec<XorName>)
             -> Result<(), CoreError> {
-        self.post_messaging_request(mpid_account, MpidMessageWrapper::OutboxHas(headers))
+        self.messaging_post_request(mpid_account, MpidMessageWrapper::OutboxHas(headers))
     }
 
     /// Get the list of messages' headers that still in the outbox. This is non-blocking.
     pub fn get_outbox_headers(&self, mpid_account: &XorName) -> Result<(), CoreError> {
-        self.post_messaging_request(mpid_account, MpidMessageWrapper::GetOutboxHeaders)
+        self.messaging_post_request(mpid_account, MpidMessageWrapper::GetOutboxHeaders)
     }
 
-    fn post_messaging_request(&self, mpid_account: &XorName, request: MpidMessageWrapper)
+    fn messaging_post_request(&self, mpid_account: &XorName, request: MpidMessageWrapper)
         -> Result<(), CoreError> {
         let serialised_request = unwrap_result!(serialise(&request));
         let data = Data::PlainData(PlainData::new(mpid_account.clone(), serialised_request));
