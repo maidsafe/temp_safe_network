@@ -33,7 +33,9 @@ use sodiumoxide::crypto::{box_, sign};
 use self::response_getter::ResponseGetter;
 use sodiumoxide::crypto::hash::{sha256, sha512};
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event};
+use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event, PlainData};
+use mpid_messaging::{self, MpidHeader, MpidMessage, MpidMessageWrapper};
+use maidsafe_utilities::serialisation::serialise;
 
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
@@ -347,6 +349,22 @@ impl Client {
         };
 
         Ok(try!(self.routing.send_put_request(dst, data)))
+    }
+
+    /// Send a message to receiver via the network. This is non-blocking.
+    pub fn send_message(&self, sender_name: &XorName, msg_metadata: Vec<u8>, msg_content: Vec<u8>,
+                        receiver: XorName, secret_key: &sign::SecretKey) -> Result<(), CoreError> {
+        let dst = try!(self.get_default_client_manager_address());
+        let mpid_header = unwrap_option!(MpidHeader::new(sender_name.clone(), msg_metadata, secret_key),
+                                         "Failed in composing a mpid_header");
+        let mpid_message = unwrap_option!(MpidMessage::new(mpid_header, receiver, msg_content, secret_key),
+                                          "Failed in composing a mpid_message");
+        let request = MpidMessageWrapper::PutMessage(mpid_message.clone());
+        let serialised_request = unwrap_result!(serialise(&request));
+        let name = unwrap_option!(mpid_messaging::mpid_message_name(&mpid_message),
+                                  "Failed in calculate the name of a mpid_message");
+        let data = Data::PlainData(PlainData::new(name, serialised_request));
+        Ok(try!(self.routing.send_put_request(Authority::ClientManager(dst.clone()), data)))
     }
 
     /// Post data onto the network

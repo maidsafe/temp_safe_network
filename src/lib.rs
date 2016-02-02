@@ -48,6 +48,7 @@ extern crate rustc_serialize;
 extern crate log;
 #[macro_use]
 extern crate maidsafe_utilities;
+extern crate mpid_messaging;
 
 /// Public and Private Id types
 pub mod id;
