@@ -194,6 +194,6 @@ mod test {
         }
 
         let signature = sign::Signature(signature_arr);
-        assert!(::utility::slice_equal(&signature.0, &public_maid.signature().0));
+        assert!(&signature.0[..] == &public_maid.signature().0[..]);
     }
 }

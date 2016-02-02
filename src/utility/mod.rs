@@ -113,11 +113,6 @@ pub fn generate_random_array_u8_64() -> Result<[u8; 64], CoreError> {
     Ok(arr)
 }
 
-/// Returns true if both slices are equal in length, and have equal contents
-pub fn slice_equal<T: PartialEq>(lhs: &[T], rhs: &[T]) -> bool {
-    lhs.len() == rhs.len() && lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -193,17 +188,8 @@ mod test {
         let arr1 = unwrap_result!(generate_random_array_u8_64());
         let arr2 = unwrap_result!(generate_random_array_u8_64());
 
-        assert!(!slice_equal(&arr0, &arr1));
-        assert!(!slice_equal(&arr0, &arr2));
-        assert!(!slice_equal(&arr1, &arr2));
-    }
-
-    #[test]
-    fn slice_eqality() {
-        let arr0 = unwrap_result!(generate_random_array_u8_64());
-        let arr1 = unwrap_result!(generate_random_array_u8_64());
-
-        assert!(slice_equal(&arr0, &arr0));
-        assert!(!slice_equal(&arr0, &arr1));
+        assert!(&arr0[..] != &arr1[..]);
+        assert!(&arr0[..] != &arr2[..]);
+        assert!(&arr1[..] != &arr2[..]);
     }
 }

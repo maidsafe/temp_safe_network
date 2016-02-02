@@ -133,7 +133,7 @@ mod test {
 
         assert_eq!(pub_sign_arr_before, pub_sign_arr_after);
         assert_eq!(pub_asym_arr_before, pub_asym_arr_after);
-        assert!(::utility::slice_equal(&sec_sign_arr_before, &sec_sign_arr_after));
+        assert!(&sec_sign_arr_before[..] == &sec_sign_arr_after[..]);
         assert_eq!(sec_asym_arr_before, sec_asym_arr_after);
     }
 
