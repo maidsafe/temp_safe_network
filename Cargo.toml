@@ -19,7 +19,7 @@ rustc-serialize = "~0.3.16"
 self_encryption = "~0.2.5"
 sodiumoxide = "~0.0.9"
 xor_name = "~0.0.1"
-mpid_messaging = "~0.0.1"
+mpid_messaging = "~0.0.3"
 
 [features]
 use-mock-routing = []
