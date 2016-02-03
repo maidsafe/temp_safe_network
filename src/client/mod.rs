@@ -367,22 +367,23 @@ impl Client {
     }
 
     /// Delete a message from own or sender's outbox. This is non-blocking.
-    pub fn delete_message(&self, target_account: &XorName, mpid_message: &MpidMessage)
+    pub fn delete_message(&self, target_account: &XorName, message_name: &XorName)
             -> Result<(), CoreError> {
-        let name = unwrap_option!(mpid_messaging::mpid_message_name(mpid_message),
-                                  "Failed to calculate the name of a mpid_message");
-        let serialised_message = unwrap_result!(serialise(mpid_message));
-        let data = Data::PlainData(PlainData::new(name, serialised_message));
-        self.delete(data, Some(Authority::ClientManager(target_account.clone())))
+        self.messaging_delete_request(target_account, message_name,
+                                      MpidMessageWrapper::DeleteMessage(message_name.clone()))
     }
 
     /// Delete a header from own inbox. This is non-blocking.
-    pub fn delete_header(&self, account: &XorName, mpid_header: &MpidHeader)
+    pub fn delete_header(&self, mpid_account: &XorName, header_name: &XorName)
             -> Result<(), CoreError> {
-        let name = unwrap_option!(mpid_messaging::mpid_header_name(mpid_header),
-                                  "Failed to calculate the name of a mpid_header");
-        let serialised_message = unwrap_result!(serialise(mpid_header));
-        let data = Data::PlainData(PlainData::new(name, serialised_message));
+        self.messaging_delete_request(mpid_account, header_name,
+                                      MpidMessageWrapper::DeleteHeader(header_name.clone()))
+    }
+
+    fn messaging_delete_request(&self, account: &XorName, name: &XorName,
+                                request: MpidMessageWrapper) -> Result<(), CoreError> {
+        let serialised_request = unwrap_result!(serialise(&request));
+        let data = Data::PlainData(PlainData::new(name.clone(), serialised_request));
         self.delete(data, Some(Authority::ClientManager(account.clone())))
     }
 
