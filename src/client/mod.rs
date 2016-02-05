@@ -385,26 +385,42 @@ impl Client {
     }
 
     /// Register as an online mpid_messaging client to the network. This is non-blocking.
-    pub fn register_online(&self, mpid_account: &XorName) -> Result<(), CoreError> {
+    pub fn register_online(&self, mpid_account: &XorName) -> Result<ResponseGetter, CoreError> {
         self.messaging_post_request(mpid_account, MpidMessageWrapper::Online)
     }
 
     /// Query the targeted messages' header that still in the outbox. This is non-blocking.
     pub fn query_outbox_headers(&self, mpid_account: &XorName, headers: Vec<XorName>)
-            -> Result<(), CoreError> {
+            -> Result<ResponseGetter, CoreError> {
         self.messaging_post_request(mpid_account, MpidMessageWrapper::OutboxHas(headers))
     }
 
     /// Get the list of messages' headers that still in the outbox. This is non-blocking.
-    pub fn get_outbox_headers(&self, mpid_account: &XorName) -> Result<(), CoreError> {
+    pub fn get_outbox_headers(&self, mpid_account: &XorName) -> Result<ResponseGetter, CoreError> {
         self.messaging_post_request(mpid_account, MpidMessageWrapper::GetOutboxHeaders)
     }
 
+    // TODO: the message_queue is a LRUcache without timeout, it needs to check whether a
+    //       non-responded request will sit in the cache fowever and block the later on
+    //       post requests, as all such request will bearing the same name - mpid_account
     fn messaging_post_request(&self, mpid_account: &XorName, request: MpidMessageWrapper)
-        -> Result<(), CoreError> {
+            -> Result<ResponseGetter, CoreError> {
+        let data_request = DataRequest::PlainData(mpid_account.clone());
+
+        let mut msg_queue = unwrap_result!(self.message_queue.lock());
+        if msg_queue.local_cache_check(mpid_account) {
+            return Ok(ResponseGetter::new(None, self.message_queue.clone(), data_request));
+        }
+
         let serialised_request = unwrap_result!(serialise(&request));
         let data = Data::PlainData(PlainData::new(mpid_account.clone(), serialised_request));
-        self.post(data, Some(Authority::ClientManager(mpid_account.clone())))
+        try!(self.post(data, Some(Authority::ClientManager(mpid_account.clone()))));
+
+        let (msg_event_sender, msg_event_receiver) = mpsc::channel();
+        self.add_data_receive_event_observer(mpid_account.clone(), msg_event_sender.clone());
+        Ok(ResponseGetter::new(Some((msg_event_sender, msg_event_receiver)),
+                               self.message_queue.clone(),
+                               data_request))
     }
 
     /// Post data onto the network
