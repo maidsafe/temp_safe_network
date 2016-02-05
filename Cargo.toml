@@ -18,8 +18,8 @@ routing = "~0.6.1"
 rustc-serialize = "~0.3.16"
 self_encryption = "~0.2.5"
 sodiumoxide = "~0.0.9"
-xor_name = "~0.0.1"
-mpid_messaging = "~0.0.4"
+xor_name = "~0.0.3"
+mpid_messaging = "~0.1.0"
 
 [features]
 use-mock-routing = []
