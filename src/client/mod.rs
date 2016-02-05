@@ -34,7 +34,7 @@ use self::response_getter::ResponseGetter;
 use sodiumoxide::crypto::hash::{sha256, sha512};
 use maidsafe_utilities::thread::RaiiThreadJoiner;
 use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event, PlainData};
-use mpid_messaging::{MpidMessage, MpidMessageWrapper};
+use mpid_messaging::{MpidHeader, MpidMessage, MpidMessageWrapper};
 use maidsafe_utilities::serialisation::serialise;
 
 #[cfg(feature = "use-mock-routing")]
@@ -398,6 +398,28 @@ impl Client {
     /// Get the list of messages' headers that still in the outbox. This is non-blocking.
     pub fn get_outbox_headers(&self, mpid_account: &XorName) -> Result<(), CoreError> {
         self.messaging_post_request(mpid_account, MpidMessageWrapper::GetOutboxHeaders)
+    }
+
+    /// Get the full message from the sender. This is non-blocking.
+    pub fn get_message(&self, mpid_header: &MpidHeader) -> Result<ResponseGetter, CoreError> {
+        let msg_name = unwrap_result!(mpid_header.name());
+        let msg_request = DataRequest::PlainData(msg_name.clone());
+
+        let mut msg_queue = unwrap_result!(self.message_queue.lock());
+        if msg_queue.local_cache_check(&msg_name) {
+            return Ok(ResponseGetter::new(None, self.message_queue.clone(), msg_request));
+        }
+
+        let request = MpidMessageWrapper::GetMessage(mpid_header.clone());
+        let serialised_request = unwrap_result!(serialise(&request));
+        let data = Data::PlainData(PlainData::new(msg_name.clone(), serialised_request));
+        try!(self.post(data, Some(Authority::ClientManager(mpid_header.sender().clone()))));
+
+        let (msg_event_sender, msg_event_receiver) = mpsc::channel();
+        self.add_data_receive_event_observer(msg_name, msg_event_sender.clone());
+        Ok(ResponseGetter::new(Some((msg_event_sender, msg_event_receiver)),
+                               self.message_queue.clone(),
+                               msg_request))
     }
 
     fn messaging_post_request(&self, mpid_account: &XorName, request: MpidMessageWrapper)
