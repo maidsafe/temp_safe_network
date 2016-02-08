@@ -354,11 +354,11 @@ impl Client {
     /// Send a message to receiver via the network. This is non-blocking.
     pub fn send_message(&self, mpid_account: &XorName, msg_metadata: Vec<u8>, msg_content: Vec<u8>,
                         receiver: XorName, secret_key: &sign::SecretKey) -> Result<(), CoreError> {
-        let mpid_message = unwrap_result!(MpidMessage::new(mpid_account.clone(), msg_metadata,
-                                                           receiver, msg_content, secret_key));
+        let mpid_message = try!(MpidMessage::new(mpid_account.clone(), msg_metadata,
+                                                 receiver, msg_content, secret_key));
         let request = MpidMessageWrapper::PutMessage(mpid_message.clone());
-        let serialised_request = unwrap_result!(serialise(&request));
-        let name = unwrap_result!(mpid_message.name());
+        let serialised_request = try!(serialise(&request));
+        let name = try!(mpid_message.name());
         let data = Data::PlainData(PlainData::new(name, serialised_request));
         self.put(data, Some(Authority::ClientManager(mpid_account.clone())))
     }
@@ -379,7 +379,7 @@ impl Client {
 
     fn messaging_delete_request(&self, account: &XorName, name: &XorName,
                                 request: MpidMessageWrapper) -> Result<(), CoreError> {
-        let serialised_request = unwrap_result!(serialise(&request));
+        let serialised_request = try!(serialise(&request));
         let data = Data::PlainData(PlainData::new(name.clone(), serialised_request));
         self.delete(data, Some(Authority::ClientManager(account.clone())))
     }
@@ -412,7 +412,7 @@ impl Client {
             return Ok(ResponseGetter::new(None, self.message_queue.clone(), data_request));
         }
 
-        let serialised_request = unwrap_result!(serialise(&request));
+        let serialised_request = try!(serialise(&request));
         let data = Data::PlainData(PlainData::new(mpid_account.clone(), serialised_request));
         try!(self.post(data, Some(Authority::ClientManager(mpid_account.clone()))));
 

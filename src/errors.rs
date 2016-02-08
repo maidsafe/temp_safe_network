@@ -17,6 +17,7 @@
 
 use std::sync::mpsc;
 use maidsafe_utilities::serialisation::SerialisationError;
+use mpid_messaging;
 
 /// Intended for converting Client Errors into numeric codes for propagating some error information
 /// across FFI boundaries and specially to C.
@@ -57,6 +58,8 @@ pub enum CoreError {
     UnsuccessfulPwHash,
     /// Blocking operation was cancelled
     OperationAborted,
+    /// MpidMessaging Error
+    MpidMessagingError(mpid_messaging::Error),
 }
 
 impl<'a> From<&'a str> for CoreError {
@@ -89,6 +92,12 @@ impl From<mpsc::RecvError> for CoreError {
     }
 }
 
+impl From<mpid_messaging::Error> for CoreError {
+    fn from(error: mpid_messaging::Error) -> CoreError {
+        CoreError::MpidMessagingError(error)
+    }
+}
+
 impl Into<i32> for CoreError {
     fn into(self) -> i32 {
         match self {
@@ -108,6 +117,7 @@ impl Into<i32> for CoreError {
             CoreError::UnsupportedSaltSizeForPwHash => CLIENT_ERROR_START_RANGE - 14,
             CoreError::UnsuccessfulPwHash => CLIENT_ERROR_START_RANGE - 15,
             CoreError::OperationAborted => CLIENT_ERROR_START_RANGE - 16,
+            CoreError::MpidMessagingError(_) => CLIENT_ERROR_START_RANGE - 17,
         }
     }
 }
@@ -147,6 +157,7 @@ impl ::std::fmt::Debug for CoreError {
             }
             CoreError::UnsuccessfulPwHash => write!(f, "CoreError::UnsuccessfulPwHash"),
             CoreError::OperationAborted => write!(f, "CoreError::OperationAborted"),
+            CoreError::MpidMessagingError(ref err) => write!(f, "CoreError::MpidMessagingError -> {:?}", err),
         }
     }
 }
