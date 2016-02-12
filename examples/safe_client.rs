@@ -119,7 +119,7 @@ fn main() {
                     let mut messaging_option = String::new();
                     let _ = std::io::stdin().read_line(&mut messaging_option);
                     messaging_option = messaging_option.trim().to_string();
-                    if messaging_option != "Y" && messaging_option != "y" {
+                    if messaging_option == "Y" || messaging_option == "y" {
                         messaging(&client);
                     }
 
