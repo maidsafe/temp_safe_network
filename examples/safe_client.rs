@@ -50,6 +50,11 @@ use safe_core::client::response_getter::ResponseGetter;
 use sodiumoxide::crypto::hash::sha512;
 use xor_name::XorName;
 
+#[cfg(feature = "use-mock-routing")]
+const MOCK_NETWORK: bool = true;
+#[cfg(not(feature = "use-mock-routing"))]
+const MOCK_NETWORK: bool = false;
+
 fn main() {
     maidsafe_utilities::log::init(true);
 
@@ -134,15 +139,11 @@ fn main() {
             match Client::log_in(keyword, pin, password) {
                 Ok(client) => {
                     println!("Account Login Successful !!");
-
-                    println!("\nDo you want to continue with the mpid messaging feature (enter Y for yes) ?");
-                    let mut messaging_option = String::new();
-                    let _ = std::io::stdin().read_line(&mut messaging_option);
-                    messaging_option = messaging_option.trim().to_string();
-                    if messaging_option == "Y" || messaging_option == "y" {
+                    if MOCK_NETWORK {
+                        println!("Messaging feature has been skipped as mock routing is being used !!");
+                    } else {
                         messaging(&client);
                     }
-
                     break;
                 }
                 Err(error)  => println!("Account Login Failed !! Reason: {:?}\n\n", error),
@@ -152,6 +153,14 @@ fn main() {
 }
 
 fn messaging(client: &Client) {
+    println!("\nDo you want to continue with the mpid messaging feature (enter Y for yes) ?");
+    let mut messaging_option = String::new();
+    let _ = std::io::stdin().read_line(&mut messaging_option);
+    messaging_option = messaging_option.trim().to_string();
+    if messaging_option != "Y" && messaging_option != "y" {
+        return;
+    }
+
     println!("\n------------ Creating mpid account, enter a memorable name ---------------");
     let mut account_name = String::new();
     let _ = std::io::stdin().read_line(&mut account_name);
