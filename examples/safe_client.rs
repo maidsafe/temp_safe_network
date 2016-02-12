@@ -35,10 +35,25 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
 
+extern crate mpid_messaging;
+extern crate routing;
 extern crate safe_core;
+extern crate sodiumoxide;
+extern crate xor_name;
 #[macro_use] extern crate maidsafe_utilities;
 
+use maidsafe_utilities::serialisation::deserialise;
+use mpid_messaging::MpidMessageWrapper;
+use routing::Data;
 use safe_core::client::Client;
+use safe_core::client::response_getter::ResponseGetter;
+use sodiumoxide::crypto::hash::sha512;
+use xor_name::XorName;
+
+#[cfg(feature = "use-mock-routing")]
+const MOCK_NETWORK: bool = true;
+#[cfg(not(feature = "use-mock-routing"))]
+const MOCK_NETWORK: bool = false;
 
 fn main() {
     maidsafe_utilities::log::init(true);
@@ -122,12 +137,87 @@ fn main() {
         {
             println!("\nTrying to log in ...");
             match Client::log_in(keyword, pin, password) {
-                Ok(_) => {
+                Ok(client) => {
                     println!("Account Login Successful !!");
+                    if MOCK_NETWORK {
+                        println!("Messaging feature has been skipped as mock routing is being used !!");
+                    } else {
+                        messaging(&client);
+                    }
                     break;
                 }
                 Err(error)  => println!("Account Login Failed !! Reason: {:?}\n\n", error),
             }
         }
     }
+}
+
+fn messaging(client: &Client) {
+    println!("\nDo you want to continue with the mpid messaging feature (enter Y for yes) ?");
+    let mut messaging_option = String::new();
+    let _ = std::io::stdin().read_line(&mut messaging_option);
+    messaging_option = messaging_option.trim().to_string();
+    if messaging_option != "Y" && messaging_option != "y" {
+        return;
+    }
+
+    println!("\n------------ Creating mpid account, enter a memorable name ---------------");
+    let mut account_name = String::new();
+    let _ = std::io::stdin().read_line(&mut account_name);
+    let mpid_account = XorName(sha512::hash(&account_name.into_bytes()).0);
+    let response_getter = unwrap_result!(client.register_online(&mpid_account));
+
+    loop {
+        println!("\n------- messaging options: r for receive, s for send, t for terminate -------");
+        let mut operation = String::new();
+        let _ = std::io::stdin().read_line(&mut operation);
+        operation = operation.trim().to_string();
+        if operation == "r" {
+            receive_mpid_message(&response_getter);
+        } else if operation == "s" {
+            send_mpid_message(&client, &mpid_account);
+        } else if operation == "t" {
+            break;
+        }
+    }
+}
+
+fn receive_mpid_message(response_getter: &ResponseGetter) {
+    loop {
+        match response_getter.get() {
+            Ok(data) => {
+                match data {
+                    Data::PlainData(plain_data) => {
+                        let mpid_message_wrapper : MpidMessageWrapper = unwrap_result!(deserialise(plain_data.value()));
+                        match mpid_message_wrapper {
+                            MpidMessageWrapper::PutMessage(mpid_message) => {
+                                println!("received mpid message {:?}", mpid_message);
+                                break;
+                            }
+                            _ => println!("unknown received mpid_message_wrapper"),
+                        }
+                    }
+                    _ => println!("unknown received data"),
+                }
+            }
+            Err(_) => {}
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+    }
+}
+
+fn send_mpid_message(client: &Client, mpid_account: &XorName) {
+    let mut receiver_name = String::new();
+    let mut msg_metadata = String::new();
+    let mut msg_content = String::new();
+    println!("\n------------ enter receiver's memorable name ---------------");
+    let _ = std::io::stdin().read_line(&mut receiver_name);
+    let receiver_account = XorName(sha512::hash(&receiver_name.into_bytes()).0);
+    println!("\n------------ enter metadata of the message ---------------");
+    let _ = std::io::stdin().read_line(&mut msg_metadata);
+    println!("\n------------ enter content of the message ---------------");
+    let _ = std::io::stdin().read_line(&mut msg_content);
+    let secret_key = unwrap_result!(client.get_secret_signing_key());
+    let _ = client.send_message(mpid_account, msg_metadata.into_bytes(),
+                                msg_content.into_bytes(), receiver_account, &secret_key);
 }
