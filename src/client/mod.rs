@@ -348,7 +348,11 @@ impl Client {
             }
         };
 
-        Ok(try!(self.routing.send_put_request(dst, data)))
+        let result = Ok(try!(self.routing.send_put_request(dst, data)));
+        // TODO (Viv): This should be removed once we handle the appropriate success and failure
+        //             results sent back from the network.
+        ::std::thread::sleep(::std::time::Duration::from_secs(5));
+        result
     }
 
     /// Send a message to receiver via the network. This is non-blocking.
