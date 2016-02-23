@@ -1,5 +1,9 @@
 # Safe Core - Change Log
 
+## [0.6.0]
+- Migrated to Routing 0.7.0
+- Switched LOGIN_PACKET_TYPE_TAG to 0
+
 ## [0.5.0]
 - Refactored to comply with new routing API
 - Compiles and passes tests with Mock with stable Rust
