@@ -1,4 +1,6 @@
 # Safe Core - Change Log
+## [0.6.1]
+- self_encryption updated to 0.2.6
 
 ## [0.6.0]
 - Migrated to Routing 0.7.0
