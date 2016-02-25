@@ -34,7 +34,7 @@ impl SelfEncryptionStorage {
 }
 
 impl ::self_encryption::Storage for SelfEncryptionStorage {
-    fn get(&self, name: Vec<u8>) -> Vec<u8> {
+    fn get(&self, name: &[u8]) -> Vec<u8> {
         let mut name_id = [0u8; 64];
         assert_eq!(name.len(), 64);
         for i in 0..64 {
