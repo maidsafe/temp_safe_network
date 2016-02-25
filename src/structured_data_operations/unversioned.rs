@@ -19,7 +19,7 @@ use client::Client;
 use xor_name::XorName;
 use errors::CoreError;
 use std::sync::{Arc, Mutex};
-use self_encryption::datamap;
+use self_encryption::{DataMap, SelfEncryptor};
 use sodiumoxide::crypto::{box_, sign};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use routing::{StructuredData, ImmutableData, ImmutableDataType, Data, DataRequest};
@@ -28,7 +28,7 @@ use routing::{StructuredData, ImmutableData, ImmutableDataType, Data, DataReques
 #[derive(Clone, RustcEncodable, RustcDecodable, PartialEq)]
 enum DataTypeEncoding {
     ContainsData(Vec<u8>),
-    ContainsDataMap(datamap::DataMap),
+    ContainsDataMap(DataMap),
     ContainsDataMapName(XorName),
 }
 
@@ -62,8 +62,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
 
         },
         ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-            let mut se = ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()),
-                                                                                            datamap::DataMap::None);
+            let mut se = SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), DataMap::None);
             se.write(&data, 0);
             let data_map = se.close();
 
@@ -121,9 +120,7 @@ pub fn get_data(client: Arc<Mutex<Client>>,
     match try!(get_decoded_stored_data(&struct_data.get_data(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
-            let mut se =
-                ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client),
-                                                      data_map);
+            let mut se = SelfEncryptor::new(::SelfEncryptionStorage::new(client), data_map);
             let length = se.len();
             Ok(se.read(0, length))
         }
@@ -135,7 +132,7 @@ pub fn get_data(client: Arc<Mutex<Client>>,
                     match try!(get_decoded_stored_data(&immutable_data.value(),
                                                        data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
-                            let mut se = ::self_encryption::SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), data_map);
+                            let mut se = SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), data_map);
                             let length = se.len();
                             Ok(se.read(0, length))
                         }
