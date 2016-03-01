@@ -13,15 +13,17 @@
 // KIND, either express or implied.
 //
 // Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.                                                                 */
+// relating to use of the SAFE Network Software.
 
 use errors::CoreError;
 use xor_name::XorName;
 use lru_time_cache::LruCache;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{Sender, Receiver};
 use routing::{Data, Event, ResponseContent};
 use maidsafe_utilities::thread::RaiiThreadJoiner;
+use translated_events::{OperationFailureEvent, NetworkEvent, DataReceivedEvent};
 
 const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 
@@ -30,9 +32,9 @@ const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 /// enabling fast re-retrieval and avoiding networking.
 pub struct MessageQueue {
     local_cache: LruCache<XorName, Data>,
-    data_senders: HashMap<XorName, Vec<mpsc::Sender<::translated_events::DataReceivedEvent>>>,
-    error_senders: Vec<mpsc::Sender<::translated_events::OperationFailureEvent>>,
-    network_event_senders: Vec<mpsc::Sender<::translated_events::NetworkEvent>>,
+    data_senders: HashMap<XorName, Vec<Sender<DataReceivedEvent>>>,
+    error_senders: Vec<Sender<OperationFailureEvent>>,
+    network_event_observers: Vec<Sender<NetworkEvent>>,
     routing_message_cache: LruCache<XorName, Data>,
 }
 
@@ -40,15 +42,15 @@ impl MessageQueue {
     /// Create a new instance of MessageQueue. `data_senders` can be added later via function to
     /// add observer since one will not receive data until one asks for it. Thus there is enough
     /// chance to add an observer before requesting data.
-    pub fn new(routing_event_receiver: mpsc::Receiver<Event>,
-               network_event_senders: Vec<mpsc::Sender<::translated_events::NetworkEvent>>,
-               error_senders: Vec<mpsc::Sender<::translated_events::OperationFailureEvent>>)
+    pub fn new(routing_event_receiver: Receiver<Event>,
+               network_event_observers: Vec<Sender<NetworkEvent>>,
+               error_senders: Vec<Sender<OperationFailureEvent>>)
                -> (Arc<Mutex<MessageQueue>>, RaiiThreadJoiner) {
         let message_queue = Arc::new(Mutex::new(MessageQueue {
             local_cache: LruCache::with_capacity(1000),
             data_senders: HashMap::new(),
             error_senders: error_senders,
-            network_event_senders: network_event_senders,
+            network_event_observers: network_event_observers,
             routing_message_cache: LruCache::with_capacity(1000),
         }));
 
@@ -67,7 +69,7 @@ impl MessageQueue {
                                 if let Some(mut specific_data_senders) =
                                        queue_guard.data_senders.get_mut(&data_name) {
                                     for it in specific_data_senders.iter().enumerate() {
-                                        if it.1.send(::translated_events::DataReceivedEvent::DataReceived).is_err() {
+                                        if it.1.send(DataReceivedEvent::DataReceived).is_err() {
                                             dead_sender_positions.push(it.0);
                                         }
                                     }
@@ -86,13 +88,25 @@ impl MessageQueue {
                     Event::Connected => {
                         let mut dead_sender_positions = Vec::<usize>::new();
                         let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                        for it in queue_guard.network_event_senders.iter().enumerate() {
-                            if it.1.send(::translated_events::NetworkEvent::Connected).is_err() {
+                        for it in queue_guard.network_event_observers.iter().enumerate() {
+                            if it.1.send(NetworkEvent::Connected).is_err() {
                                 dead_sender_positions.push(it.0);
                             }
                         }
 
-                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_senders,
+                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
+                                                         dead_sender_positions);
+                    }
+                    Event::Disconnected => {
+                        let mut dead_sender_positions = Vec::<usize>::new();
+                        let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
+                        for it in queue_guard.network_event_observers.iter().enumerate() {
+                            if it.1.send(NetworkEvent::Disconnected).is_err() {
+                                dead_sender_positions.push(it.0);
+                            }
+                        }
+
+                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
                                                          dead_sender_positions);
                     }
                     _ => {
@@ -108,17 +122,16 @@ impl MessageQueue {
 
     pub fn add_data_receive_event_observer(&mut self,
                                            data_name: XorName,
-                                           sender   : mpsc::Sender<::translated_events::DataReceivedEvent>) {
+                                           sender: Sender<DataReceivedEvent>) {
         self.data_senders.entry(data_name).or_insert(Vec::new()).push(sender);
     }
 
-    pub fn add_operation_failure_event_observer(&mut self, sender: mpsc::Sender<::translated_events::OperationFailureEvent>) {
+    pub fn add_operation_failure_event_observer(&mut self, sender: Sender<OperationFailureEvent>) {
         self.error_senders.push(sender);
     }
 
-    pub fn add_network_event_observer(&mut self,
-                                      sender: mpsc::Sender<::translated_events::NetworkEvent>) {
-        self.network_event_senders.push(sender);
+    pub fn add_network_event_observer(&mut self, sender: Sender<NetworkEvent>) {
+        self.network_event_observers.push(sender);
     }
 
     pub fn local_cache_check(&mut self, key: &XorName) -> bool {
@@ -140,7 +153,7 @@ impl MessageQueue {
             .map(|elt| elt.clone())
     }
 
-    fn purge_dead_senders<T>(senders: &mut Vec<mpsc::Sender<T>>, positions: Vec<usize>) {
+    fn purge_dead_senders<T>(senders: &mut Vec<Sender<T>>, positions: Vec<usize>) {
         let mut delta = 0;
         for val in positions {
             let _ = senders.remove(val - delta);

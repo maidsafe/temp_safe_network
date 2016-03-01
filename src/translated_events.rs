@@ -28,6 +28,9 @@ pub enum DataReceivedEvent {
 pub enum NetworkEvent {
     /// The client engine is connected to atleast one peer
     Connected,
+    /// The client engine is disconnected from the network (under usual circumstances this would
+    /// indicate that client connection to proxy node has been lost)
+    Disconnected,
     /// Graceful Exit Condition
     Terminated,
 }
