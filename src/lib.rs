@@ -41,6 +41,7 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
 
+extern crate time;
 extern crate rand;
 extern crate routing;
 extern crate xor_name;
@@ -55,8 +56,8 @@ extern crate maidsafe_utilities;
 extern crate mpid_messaging;
 
 /// Core module
-#[macro_use]pub mod core;
-// /// Nfs module;
-// pub mod nfs;
+pub mod core;
+/// Nfs module;
+pub mod nfs;
 // /// Dns module;
 // pub mod dns;
