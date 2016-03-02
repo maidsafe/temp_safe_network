@@ -15,17 +15,18 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use errors::CoreError;
+use core::errors::CoreError;
 use xor_name::XorName;
 use routing::{DataRequest, Data};
 use std::sync::{Arc, Mutex, mpsc};
-use client::message_queue::MessageQueue;
+use core::client::message_queue::MessageQueue;
+use core::translated_events::DataReceivedEvent;
 
 /// ResponseGetter is a lazy evaluated response getter. It will fetch either from local cache or
 /// wait for the MessageQueue to notify it of the incoming response from the network.
 pub struct ResponseGetter {
-    data_channel: Option<(mpsc::Sender<::translated_events::DataReceivedEvent>,
-                          mpsc::Receiver<::translated_events::DataReceivedEvent>)>,
+    data_channel: Option<(mpsc::Sender<DataReceivedEvent>,
+                          mpsc::Receiver<DataReceivedEvent>)>,
     message_queue: Arc<Mutex<MessageQueue>>,
     requested_name: XorName,
     requested_type: DataRequest,
@@ -33,8 +34,8 @@ pub struct ResponseGetter {
 
 impl ResponseGetter {
     /// Create a new instance of ResponseGetter
-    pub fn new(data_channel: Option<(mpsc::Sender<::translated_events::DataReceivedEvent>,
-                                     mpsc::Receiver<::translated_events::DataReceivedEvent>)>,
+    pub fn new(data_channel: Option<(mpsc::Sender<DataReceivedEvent>,
+                                     mpsc::Receiver<DataReceivedEvent>)>,
                message_queue: Arc<Mutex<MessageQueue>>,
                requested_type: DataRequest)
                -> ResponseGetter {
@@ -51,7 +52,7 @@ impl ResponseGetter {
     pub fn get(&self) -> Result<Data, CoreError> {
         if let Some((_, ref data_receiver)) = self.data_channel {
             match try!(data_receiver.recv()) {
-                ::translated_events::DataReceivedEvent::DataReceived => {
+                DataReceivedEvent::DataReceived => {
                     let mut msg_queue = unwrap_result!(self.message_queue.lock());
                     let response = try!(msg_queue.get_response(&self.requested_name));
 
@@ -70,9 +71,9 @@ impl ResponseGetter {
 
     /// Extract associated sender. This will help cancel the blocking wait at will if so desired.
     /// All that is needed is to extract the sender before doing a `get()` and then while blocking
-    /// on `get()` fire `sender.send(::translated_events::DataReceivedEvent::Terminated)` to
+    /// on `get()` fire `sender.send(DataReceivedEvent::Terminated)` to
     /// gracefully exit the receiver.
-    pub fn get_sender(&self) -> Option<&mpsc::Sender<::translated_events::DataReceivedEvent>> {
+    pub fn get_sender(&self) -> Option<&mpsc::Sender<DataReceivedEvent>> {
         self.data_channel.as_ref().and_then(|&(ref sender, _)| Some(sender))
     }
 }

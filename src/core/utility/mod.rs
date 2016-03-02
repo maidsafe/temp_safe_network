@@ -18,7 +18,7 @@
 pub mod test_utils;
 
 use rand::Rng;
-use errors::CoreError;
+use core::errors::CoreError;
 use sodiumoxide::crypto::{box_, secretbox};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 
@@ -63,7 +63,7 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
                                    .map_err(|_| CoreError::AsymmetricDecipherFailure));
 
     if asym_plain_text.len() != secretbox::KEYBYTES + secretbox::NONCEBYTES {
-        Err(::errors::CoreError::AsymmetricDecipherFailure)
+        Err(CoreError::AsymmetricDecipherFailure)
     } else {
         let mut sym_key = secretbox::Key([0u8; secretbox::KEYBYTES]);
         let mut sym_nonce = secretbox::Nonce([0u8; secretbox::NONCEBYTES]);

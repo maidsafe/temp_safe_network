@@ -157,7 +157,9 @@ impl ::std::fmt::Debug for CoreError {
             }
             CoreError::UnsuccessfulPwHash => write!(f, "CoreError::UnsuccessfulPwHash"),
             CoreError::OperationAborted => write!(f, "CoreError::OperationAborted"),
-            CoreError::MpidMessagingError(ref err) => write!(f, "CoreError::MpidMessagingError -> {:?}", err),
+            CoreError::MpidMessagingError(ref err) => {
+                write!(f, "CoreError::MpidMessagingError -> {:?}", err)
+            }
         }
     }
 }

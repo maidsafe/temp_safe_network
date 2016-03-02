@@ -16,16 +16,17 @@
 // relating to use of the SAFE Network Software.
 
 use xor_name::XorName;
-use errors::CoreError;
+use core::errors::CoreError;
 use sodiumoxide::crypto::{box_, sign};
 use sodiumoxide::crypto::hash::sha512;
+use core::id::RevocationIdType;
 
 /// IdType
 ///
 /// #Examples
 ///
 /// ```
-/// use ::safe_core::id::{IdType, RevocationIdType, MaidTypeTags};
+/// use ::safe_core::core::id::{IdType, RevocationIdType, MaidTypeTags};
 /// // Creating new IdType
 /// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>());
 ///
@@ -39,7 +40,7 @@ pub struct IdType {
 
 impl IdType {
     /// Invoked to create an instance of IdType
-    pub fn new(revocation_id: &::id::RevocationIdType) -> IdType {
+    pub fn new(revocation_id: &RevocationIdType) -> IdType {
         let asym_keys = box_::gen_keypair();
         let signing_keys = sign::gen_keypair();
 
@@ -103,24 +104,25 @@ impl IdType {
 mod test {
     extern crate rand;
 
-    use id::Random;
+    use core::id::Random;
     use self::rand::Rng;
     use sodiumoxide::crypto::{box_, sign};
     use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use core::id::{IdType, RevocationIdType, MaidTypeTags};
 
-    impl Random for ::id::IdType {
-        fn generate_random() -> ::id::IdType {
-            ::id::IdType::new(&::id::RevocationIdType::new::<::id::MaidTypeTags>())
+    impl Random for IdType {
+        fn generate_random() -> IdType {
+            IdType::new(&RevocationIdType::new::<MaidTypeTags>())
         }
     }
 
     #[test]
     fn serialisation_maid() {
-        let obj_before = ::id::IdType::generate_random();
+        let obj_before = IdType::generate_random();
 
         let serialised_obj = unwrap_result!(serialise(&obj_before));
 
-        let obj_after: ::id::IdType = unwrap_result!(deserialise(&serialised_obj));
+        let obj_after: IdType = unwrap_result!(deserialise(&serialised_obj));
 
         let &(sign::PublicKey(pub_sign_arr_before),
               box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
@@ -139,8 +141,8 @@ mod test {
 
     #[test]
     fn generation() {
-        let maid1 = ::id::IdType::generate_random();
-        let maid2 = ::id::IdType::generate_random();
+        let maid1 = IdType::generate_random();
+        let maid2 = IdType::generate_random();
         let maid2_clone = maid2.clone();
 
         assert_eq!(maid2, maid2_clone);
@@ -160,7 +162,7 @@ mod test {
             assert!(sign::verify(&sign2, &maid1.public_keys().0).is_err());
         }
         {
-            let maid3 = ::id::IdType::generate_random();
+            let maid3 = IdType::generate_random();
 
             let encrypt1 = maid1.seal(&random_bytes, &maid3.public_keys().1);
             let encrypt2 = maid2.seal(&random_bytes, &maid3.public_keys().1);

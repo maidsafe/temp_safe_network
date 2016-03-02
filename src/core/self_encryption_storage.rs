@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use client::Client;
+use core::client::Client;
 use xor_name::XorName;
 use std::sync::{Arc, Mutex};
 use routing::{ImmutableData, ImmutableDataType, Data, DataRequest};
@@ -43,7 +43,7 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
 
         let mut client = unwrap_result!(self.client.lock());
         let immutable_data_request = DataRequest::Immutable(XorName::new(name_id),
-                                                                ImmutableDataType::Normal);
+                                                            ImmutableDataType::Normal);
         match unwrap_result!(client.get(immutable_data_request, None)).get() {
             Ok(ref data) => {
                 match data {

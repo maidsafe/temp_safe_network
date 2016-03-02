@@ -18,6 +18,7 @@
 use xor_name::XorName;
 use sodiumoxide::crypto::sign;
 use sodiumoxide::crypto::hash::sha512;
+use core::id::IdTypeTags;
 
 /// RevocationIdType
 ///
@@ -26,7 +27,8 @@ use sodiumoxide::crypto::hash::sha512;
 /// ```
 /// // Generating public and secret keys using sodiumoxide
 /// // Create RevocationIdType
-/// let _an_maid = ::safe_core::id::RevocationIdType::new::<::safe_core::id::MaidTypeTags>();
+/// use safe_core::core::id;
+/// let _an_maid = id::RevocationIdType::new::<id::MaidTypeTags>();
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct RevocationIdType {
@@ -40,7 +42,7 @@ impl RevocationIdType {
     /// Default contructed RevocationIdType instance is returned
     #[allow(unsafe_code)]
     pub fn new<TypeTags>() -> RevocationIdType
-        where TypeTags: ::id::IdTypeTags
+        where TypeTags: IdTypeTags
     {
         let (pub_sign_key, sec_sign_key) = sign::gen_keypair();
         let type_tags: TypeTags = unsafe { ::std::mem::uninitialized() };
@@ -97,20 +99,20 @@ mod test {
     use rand;
     use super::*;
     use rand::Rng;
-    use id::Random;
+    use core::id::{MpidTypeTags, MaidTypeTags, Random};
     use sodiumoxide::crypto::sign;
     use maidsafe_utilities::serialisation::{serialise, deserialise};
 
 
     impl Random for RevocationIdType {
         fn generate_random() -> RevocationIdType {
-            RevocationIdType::new::<::id::MaidTypeTags>()
+            RevocationIdType::new::<MaidTypeTags>()
         }
     }
 
     #[test]
     fn create_an_mpid() {
-        let _ = RevocationIdType::new::<::id::MpidTypeTags>();
+        let _ = RevocationIdType::new::<MpidTypeTags>();
     }
 
     #[test]

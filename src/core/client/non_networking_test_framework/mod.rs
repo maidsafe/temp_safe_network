@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use rand;
+use std::mem;
 use std::thread;
 use xor_name::XorName;
 use std::time::Duration;
@@ -81,7 +82,7 @@ fn get_storage() -> DataStore {
                 }
             }
 
-            STORAGE = ::std::mem::transmute(Box::new(PersistentStorageSimulation {
+            STORAGE = mem::transmute(Box::new(PersistentStorageSimulation {
                 data_store: Arc::new(Mutex::new(memory_storage)),
             }));
         });
@@ -290,9 +291,11 @@ mod test {
     use std::sync::mpsc;
     use xor_name::XorName;
     use std::collections::HashMap;
-    use client::user_account::Account;
-    use client::message_queue::MessageQueue;
-    use client::response_getter::ResponseGetter;
+    use core::client::user_account::Account;
+    use core::client::message_queue::MessageQueue;
+    use core::client::response_getter::ResponseGetter;
+    use core::translated_events::NetworkEvent;
+    use core::utility;
     use maidsafe_utilities::serialisation::{serialise, deserialise};
     use routing::{FullId, StructuredData, ImmutableData, ImmutableDataType, Data, DataRequest,
                   Authority};
@@ -328,12 +331,12 @@ mod test {
         let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap_result!(network_event_receiver.recv()) {
-            ::translated_events::NetworkEvent::Connected => (),
+            NetworkEvent::Connected => (),
             _ => panic!("Could not Connect !!"),
         }
 
         // Construct ImmutableData
-        let orig_raw_data: Vec<u8> = unwrap_result!(::utility::generate_random_vector(100));
+        let orig_raw_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(100));
         let orig_immutable_data = ImmutableData::new(ImmutableDataType::Normal,
                                                      orig_raw_data.clone());
         let orig_data = Data::Immutable(orig_immutable_data);
@@ -423,20 +426,20 @@ mod test {
         let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap_result!(network_event_receiver.recv()) {
-            ::translated_events::NetworkEvent::Connected => (),
+            NetworkEvent::Connected => (),
             _ => panic!("Could not Bootstrap !!"),
         }
 
         // Construct ImmutableData
-        let orig_raw_data: Vec<u8> = unwrap_result!(::utility::generate_random_vector(100));
+        let orig_raw_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(100));
         let orig_immutable_data = ImmutableData::new(ImmutableDataType::Normal, orig_raw_data);
         let orig_data_immutable = Data::Immutable(orig_immutable_data);
 
         const TYPE_TAG: u64 = 999;
 
         // Construct StructuredData, 1st version, for this ImmutableData
-        let keyword = unwrap_result!(::utility::generate_random_string(10));
-        let pin = unwrap_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(utility::generate_random_string(10));
+        let pin = unwrap_result!(utility::generate_random_string(10));
         let user_id = unwrap_result!(Account::generate_network_id(keyword.as_bytes(),
                                                                   pin.to_string().as_bytes()));
         let mut account_version = unwrap_result!(StructuredData::new(TYPE_TAG,
@@ -520,7 +523,7 @@ mod test {
         }
 
         // Construct ImmutableData
-        let new_data: Vec<u8> = unwrap_result!(::utility::generate_random_vector(100));
+        let new_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(100));
         let new_immutable_data = ImmutableData::new(ImmutableDataType::Normal, new_data);
         let new_data_immutable = Data::Immutable(new_immutable_data);
 

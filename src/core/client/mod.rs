@@ -25,7 +25,7 @@ mod message_queue;
 mod non_networking_test_framework;
 
 use xor_name::XorName;
-use errors::CoreError;
+use core::errors::CoreError;
 use self::user_account::Account;
 use std::sync::{Arc, Mutex, mpsc};
 use self::message_queue::MessageQueue;
@@ -37,7 +37,8 @@ use maidsafe_utilities::thread::RaiiThreadJoiner;
 use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event, PlainData};
 use mpid_messaging::{MpidMessage, MpidMessageWrapper};
 use maidsafe_utilities::serialisation::serialise;
-use translated_events::{OperationFailureEvent, NetworkEvent, DataReceivedEvent};
+use core::translated_events::{OperationFailureEvent, NetworkEvent, DataReceivedEvent};
+use core::utility;
 
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
@@ -282,10 +283,10 @@ impl Client {
             }
         };
 
-        ::utility::hybrid_encrypt(data_to_encrypt,
-                                  &nonce,
-                                  &account.get_public_maid().public_keys().1,
-                                  &account.get_maid().secret_keys().1)
+        utility::hybrid_encrypt(data_to_encrypt,
+                                &nonce,
+                                &account.get_public_maid().public_keys().1,
+                                &account.get_maid().secret_keys().1)
     }
 
     /// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
@@ -308,10 +309,10 @@ impl Client {
             }
         };
 
-        ::utility::hybrid_decrypt(data_to_decrypt,
-                                  &nonce,
-                                  &account.get_public_maid().public_keys().1,
-                                  &account.get_maid().secret_keys().1)
+        utility::hybrid_decrypt(data_to_decrypt,
+                                &nonce,
+                                &account.get_public_maid().public_keys().1,
+                                &account.get_maid().secret_keys().1)
     }
 
     /// Get data from the network. This is non-blocking.
@@ -601,22 +602,24 @@ impl SessionPacketEncryptionKeys {
 mod test {
     use super::*;
     use xor_name::XorName;
-    use client::response_getter::ResponseGetter;
+    use core::client::response_getter::ResponseGetter;
     use routing::{ImmutableDataType, ImmutableData, DataRequest, Data, StructuredData};
+    use core::utility;
+    use core::errors::CoreError;
 
     #[test]
     fn account_creation() {
-        let keyword = unwrap_result!(::utility::generate_random_string(10));
-        let password = unwrap_result!(::utility::generate_random_string(10));
-        let pin = unwrap_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(utility::generate_random_string(10));
+        let password = unwrap_result!(utility::generate_random_string(10));
+        let pin = unwrap_result!(utility::generate_random_string(10));
         let _ = unwrap_result!(Client::create_account(keyword, pin, password));
     }
 
     #[test]
     fn account_login() {
-        let keyword = unwrap_result!(::utility::generate_random_string(10));
-        let password = unwrap_result!(::utility::generate_random_string(10));
-        let pin = unwrap_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(utility::generate_random_string(10));
+        let password = unwrap_result!(utility::generate_random_string(10));
+        let pin = unwrap_result!(utility::generate_random_string(10));
 
         // Creation should pass
         let _ = unwrap_result!(Client::create_account(keyword.clone(),
@@ -630,14 +633,14 @@ mod test {
     #[test]
     fn unregistered_client() {
         let immut_data = ImmutableData::new(ImmutableDataType::Normal,
-                                            unwrap_result!(::utility::generate_random_vector(30)));
+                                            unwrap_result!(utility::generate_random_vector(30)));
         let orig_data = Data::Immutable(immut_data);
 
         // Registered Client PUTs something onto the network
         {
-            let keyword = unwrap_result!(::utility::generate_random_string(10));
-            let password = unwrap_result!(::utility::generate_random_string(10));
-            let pin = unwrap_result!(::utility::generate_random_string(10));
+            let keyword = unwrap_result!(utility::generate_random_string(10));
+            let password = unwrap_result!(utility::generate_random_string(10));
+            let pin = unwrap_result!(utility::generate_random_string(10));
 
             // Creation should pass
             let client = unwrap_result!(Client::create_account(keyword, pin, password));
@@ -652,12 +655,12 @@ mod test {
         assert_eq!(rxd_data, orig_data);
 
         // Operations Not Allowed for Unregistered Client
-        let rand_name = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+        let rand_name = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
 
         match (unregistered_client.set_user_root_directory_id(rand_name.clone()),
                unregistered_client.set_configuration_root_directory_id(rand_name)) {
-            (Err(::errors::CoreError::OperationForbiddenForClient),
-             Err(::errors::CoreError::OperationForbiddenForClient)) => (),
+            (Err(CoreError::OperationForbiddenForClient),
+             Err(CoreError::OperationForbiddenForClient)) => (),
             _ => panic!("Unexpected !!"),
         };
     }
@@ -665,9 +668,9 @@ mod test {
     #[test]
     fn user_root_dir_id_creation() {
         // Construct Client
-        let keyword = unwrap_result!(::utility::generate_random_string(10));
-        let password = unwrap_result!(::utility::generate_random_string(10));
-        let pin = unwrap_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(utility::generate_random_string(10));
+        let password = unwrap_result!(utility::generate_random_string(10));
+        let pin = unwrap_result!(utility::generate_random_string(10));
 
         let mut client = unwrap_result!(Client::create_account(keyword.clone(),
                                                                pin.clone(),
@@ -691,9 +694,9 @@ mod test {
     #[test]
     fn maidsafe_config_root_dir_id_creation() {
         // Construct Client
-        let keyword = unwrap_result!(::utility::generate_random_string(10));
-        let password = unwrap_result!(::utility::generate_random_string(10));
-        let pin = unwrap_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(utility::generate_random_string(10));
+        let password = unwrap_result!(utility::generate_random_string(10));
+        let pin = unwrap_result!(utility::generate_random_string(10));
 
         let mut client = unwrap_result!(Client::create_account(keyword.clone(),
                                                                pin.clone(),
@@ -718,9 +721,9 @@ mod test {
     #[test]
     fn hybrid_encryption_decryption() {
         // Construct Client
-        let keyword = unwrap_result!(::utility::generate_random_string(10));
-        let password = unwrap_result!(::utility::generate_random_string(10));
-        let pin = unwrap_result!(::utility::generate_random_string(10));
+        let keyword = unwrap_result!(utility::generate_random_string(10));
+        let password = unwrap_result!(utility::generate_random_string(10));
+        let pin = unwrap_result!(utility::generate_random_string(10));
 
         let client = unwrap_result!(Client::create_account(keyword, pin, password));
 
@@ -760,13 +763,13 @@ mod test {
         // Decryption without passing Nonce for something encrypted with passing Nonce - Should Fail
         match client.hybrid_decrypt(&cipher_text_0, None) {
             Ok(_) => panic!("Should have failed !"),
-            Err(::errors::CoreError::AsymmetricDecipherFailure) => (),
+            Err(CoreError::AsymmetricDecipherFailure) => (),
             Err(error) => panic!("{:?}", error),
         }
         // Decryption passing Nonce for something encrypted without passing Nonce - Should Fail
         match client.hybrid_decrypt(&cipher_text_3, Some(&nonce)) {
             Ok(_) => panic!("Should have failed !"),
-            Err(::errors::CoreError::AsymmetricDecipherFailure) => (),
+            Err(CoreError::AsymmetricDecipherFailure) => (),
             Err(error) => panic!("{:?}", error),
         }
 
@@ -779,13 +782,13 @@ mod test {
 
     #[test]
     fn version_caching() {
-        let mut client = unwrap_result!(::utility::test_utils::get_client());
+        let mut client = unwrap_result!(utility::test_utils::get_client());
 
         // Version Caching should work for ImmutableData
         {
             let immut_data =
                 ImmutableData::new(ImmutableDataType::Normal,
-                                   unwrap_result!(::utility::generate_random_vector(10)));
+                                   unwrap_result!(utility::generate_random_vector(10)));
             let data = Data::Immutable(immut_data);
 
             unwrap_result!(client.put(data.clone(), None));
@@ -800,7 +803,7 @@ mod test {
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
-                    Err(::errors::CoreError::VersionCacheMiss) => (),
+                    Err(CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),
                 }
             }
@@ -817,7 +820,7 @@ mod test {
         // Version Caching should NOT work for StructuredData
         {
             const TYPE_TAG: u64 = 15000;
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
 
             let struct_data = unwrap_result!(StructuredData::new(TYPE_TAG,
                                                                  id.clone(),
@@ -840,7 +843,7 @@ mod test {
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
-                    Err(::errors::CoreError::VersionCacheMiss) => (),
+                    Err(CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),
                 }
             }
@@ -856,7 +859,7 @@ mod test {
 
                 match response_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
-                    Err(::errors::CoreError::VersionCacheMiss) => (),
+                    Err(CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),
                 }
             }

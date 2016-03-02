@@ -14,15 +14,16 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use client::Client;
-use errors::CoreError;
+use core::client::Client;
+use core::errors::CoreError;
 use sodiumoxide::crypto::sign;
+use core::utility;
 
 /// Gnerates a random mock client for testing
 pub fn get_client() -> Result<Client, CoreError> {
-    let pin = try!(::utility::generate_random_string(10));
-    let keyword = try!(::utility::generate_random_string(10));
-    let password = try!(::utility::generate_random_string(10));
+    let pin = try!(utility::generate_random_string(10));
+    let keyword = try!(utility::generate_random_string(10));
+    let password = try!(utility::generate_random_string(10));
 
     Client::create_account(keyword, pin, password)
 }

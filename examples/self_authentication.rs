@@ -36,9 +36,10 @@
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
 
 extern crate safe_core;
-#[macro_use] extern crate maidsafe_utilities;
+#[macro_use]
+extern crate maidsafe_utilities;
 
-use safe_core::client::Client;
+use safe_core::core::client::Client;
 
 fn main() {
     maidsafe_utilities::log::init(true);
@@ -78,7 +79,9 @@ fn main() {
         {
             println!("\nTrying to create an account ...");
 
-            let _ = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+            let _ = unwrap_result!(Client::create_account(keyword.clone(),
+                                                          pin.clone(),
+                                                          password.clone()));
             println!("Account Created Successfully !!");
         }
 
@@ -126,7 +129,7 @@ fn main() {
                     println!("Account Login Successful !!");
                     break;
                 }
-                Err(error)  => println!("Account Login Failed !! Reason: {:?}\n\n", error),
+                Err(error) => println!("Account Login Failed !! Reason: {:?}\n\n", error),
             }
         }
     }

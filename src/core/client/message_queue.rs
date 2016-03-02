@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use errors::CoreError;
+use core::errors::CoreError;
 use xor_name::XorName;
 use lru_time_cache::LruCache;
 use std::collections::HashMap;
@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, Receiver};
 use routing::{Data, Event, ResponseContent};
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use translated_events::{OperationFailureEvent, NetworkEvent, DataReceivedEvent};
+use core::translated_events::{OperationFailureEvent, NetworkEvent, DataReceivedEvent};
 
 const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 

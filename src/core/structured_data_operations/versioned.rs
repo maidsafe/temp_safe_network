@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use client::Client;
+use core::client::Client;
 use xor_name::XorName;
-use errors::CoreError;
+use core::errors::CoreError;
 use sodiumoxide::crypto::sign;
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use routing::{StructuredData, ImmutableData, ImmutableDataType, Data, DataRequest};
-use structured_data_operations::{DataFitResult, check_if_data_can_fit_in_structured_data};
+use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_structured_data};
 
 /// Create the StructuredData to manage versioned data.
 pub fn create(client: &Client,
@@ -71,7 +71,7 @@ pub fn append_version(client: &mut Client,
                 private_signing_key)
 }
 
-fn create_impl(client: &::client::Client,
+fn create_impl(client: &Client,
                version_names_to_store: &Vec<XorName>,
                tag_type: u64,
                identifier: XorName,
@@ -109,8 +109,7 @@ fn get_immutable_data(client: &mut Client,
                       struct_data: &StructuredData)
                       -> Result<ImmutableData, CoreError> {
     let name = try!(deserialise(&struct_data.get_data()));
-    let response_getter = try!(client.get(DataRequest::Immutable(name,
-                                                                     ImmutableDataType::Normal),
+    let response_getter = try!(client.get(DataRequest::Immutable(name, ImmutableDataType::Normal),
                                           None));
     let data = try!(response_getter.get());
     match data {
@@ -123,19 +122,20 @@ fn get_immutable_data(client: &mut Client,
 mod test {
     use super::*;
     use xor_name::XorName;
+    use core::utility;
 
-    const TAG_ID: u64 = ::MAIDSAFE_TAG + 1001;
+    const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1001;
 
     #[test]
     fn save_and_retrieve_immutable_data() {
-        let mut client = unwrap_result!(::utility::test_utils::get_client());
+        let mut client = unwrap_result!(utility::test_utils::get_client());
 
-        let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
-        let owners = ::utility::test_utils::generate_public_keys(1);
+        let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
+        let owners = utility::test_utils::generate_public_keys(1);
         let prev_owners = Vec::new();
-        let ref secret_key = ::utility::test_utils::generate_secret_keys(1)[0];
+        let ref secret_key = utility::test_utils::generate_secret_keys(1)[0];
 
-        let version_0 = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+        let version_0 = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
 
         let mut structured_data_result = create(&client,
                                                 version_0.clone(),
@@ -151,7 +151,7 @@ mod test {
         let mut versions = unwrap_result!(versions_res);
         assert_eq!(versions.len(), 1);
 
-        let version_1 = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+        let version_1 = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
 
         structured_data_result = append_version(&mut client,
                                                 structured_data,

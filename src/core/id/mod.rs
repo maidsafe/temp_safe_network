@@ -82,7 +82,9 @@ pub trait Random {
 /// All Maidsafe ID tags
 #[allow(missing_docs)]
 pub mod data_tags {
-    pub const MAIDSAFE_DATA_TAG: u64 = ::MAIDSAFE_TAG + 100;
+    use core;
+
+    pub const MAIDSAFE_DATA_TAG: u64 = core::MAIDSAFE_TAG + 100;
     pub const AN_MPID_TAG: u64 = MAIDSAFE_DATA_TAG + 5;
     pub const AN_MAID_TAG: u64 = MAIDSAFE_DATA_TAG + 6;
     pub const MAID_TAG: u64 = MAIDSAFE_DATA_TAG + 7;

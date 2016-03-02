@@ -15,14 +15,18 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use client::Client;
+use core::client::Client;
 use xor_name::XorName;
-use errors::CoreError;
+use core::errors::CoreError;
 use std::sync::{Arc, Mutex};
 use self_encryption::{DataMap, SelfEncryptor};
 use sodiumoxide::crypto::{box_, sign};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use routing::{StructuredData, ImmutableData, ImmutableDataType, Data, DataRequest};
+use core::utility;
+use core::structured_data_operations;
+use core::structured_data_operations::DataFitResult;
+use core::SelfEncryptionStorage;
 
 #[allow(variant_size_differences)]
 #[derive(Clone, RustcEncodable, RustcDecodable, PartialEq)]
@@ -35,7 +39,7 @@ enum DataTypeEncoding {
 /// Create StructuredData in accordance with data-encoding rules abstracted from user. For
 /// StructuredData created with create, data must be obtained using the complementary function
 /// defined in this module to get_data()
-pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
+pub fn create(client: Arc<Mutex<Client>>,
               tag_type: u64,
               id: XorName,
               version: u64,
@@ -48,10 +52,10 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsData(data.clone()),
                                                        data_encryption_keys));
 
-    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
+    match try!(structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
                                                                                       owner_keys.clone(),
                                                                                       prev_owner_keys.clone())) {
-        ::structured_data_operations::DataFitResult::DataFits => {
+        DataFitResult::DataFits => {
             Ok(try!(StructuredData::new(tag_type,
                                         id,
                                         version,
@@ -61,17 +65,17 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                                         Some(private_signing_key))))
 
         },
-        ::structured_data_operations::DataFitResult::DataDoesNotFit => {
-            let mut se = SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), DataMap::None);
+        DataFitResult::DataDoesNotFit => {
+            let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), DataMap::None);
             se.write(&data, 0);
             let data_map = se.close();
 
             let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMap(data_map.clone()),
                                                                                                  data_encryption_keys));
-            match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
+            match try!(structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
                                                                                               owner_keys.clone(),
                                                                                               prev_owner_keys.clone())) {
-                ::structured_data_operations::DataFitResult::DataFits => {
+                DataFitResult::DataFits => {
                     Ok(try!(StructuredData::new(tag_type,
                                                 id,
                                                 version,
@@ -81,7 +85,7 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                                                 Some(private_signing_key))))
 
                 },
-                ::structured_data_operations::DataFitResult::DataDoesNotFit => {
+                DataFitResult::DataDoesNotFit => {
                     let immutable_data = ImmutableData::new(ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
                     let data = Data::Immutable(immutable_data);
@@ -90,10 +94,10 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name),
                                                                        data_encryption_keys));
 
-                    match try!(::structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
+                    match try!(structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
                                                                                                       owner_keys.clone(),
                                                                                                       prev_owner_keys.clone())) {
-                        ::structured_data_operations::DataFitResult::DataFits => {
+                        DataFitResult::DataFits => {
                             Ok(try!(StructuredData::new(tag_type,
                                                         id,
                                                         version,
@@ -102,13 +106,13 @@ pub fn create(client: ::std::sync::Arc<::std::sync::Mutex<::client::Client>>,
                                                         prev_owner_keys,
                                                         Some(private_signing_key))))
                         },
-                        _ => Err(::errors::CoreError::StructuredDataHeaderSizeProhibitive),
+                        _ => Err(CoreError::StructuredDataHeaderSizeProhibitive),
                     }
                 },
-                ::structured_data_operations::DataFitResult::NoDataCanFit => Err(CoreError::StructuredDataHeaderSizeProhibitive),
+                DataFitResult::NoDataCanFit => Err(CoreError::StructuredDataHeaderSizeProhibitive),
             }
         },
-        ::structured_data_operations::DataFitResult::NoDataCanFit => Err(CoreError::StructuredDataHeaderSizeProhibitive),
+        DataFitResult::NoDataCanFit => Err(CoreError::StructuredDataHeaderSizeProhibitive),
     }
 }
 
@@ -120,7 +124,7 @@ pub fn get_data(client: Arc<Mutex<Client>>,
     match try!(get_decoded_stored_data(&struct_data.get_data(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
-            let mut se = SelfEncryptor::new(::SelfEncryptionStorage::new(client), data_map);
+            let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client), data_map);
             let length = se.len();
             Ok(se.read(0, length))
         }
@@ -133,15 +137,15 @@ pub fn get_data(client: Arc<Mutex<Client>>,
                                                        data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
                             let mut se =
-                                SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()),
+                                SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()),
                                                    data_map);
                             let length = se.len();
                             Ok(se.read(0, length))
                         }
-                        _ => Err(::errors::CoreError::ReceivedUnexpectedData),
+                        _ => Err(CoreError::ReceivedUnexpectedData),
                     }
                 }
-                _ => Err(::errors::CoreError::ReceivedUnexpectedData),
+                _ => Err(CoreError::ReceivedUnexpectedData),
             }
         }
     }
@@ -154,10 +158,10 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
                              -> Result<Vec<u8>, CoreError> {
     let serialised_data = try!(serialise(&data));
     if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_encryption_keys {
-        ::utility::hybrid_encrypt(&serialised_data,
-                                  nonce,
-                                  public_encryp_key,
-                                  secret_encryp_key)
+        utility::hybrid_encrypt(&serialised_data,
+                                nonce,
+                                public_encryp_key,
+                                secret_encryp_key)
     } else {
         Ok(serialised_data)
     }
@@ -171,10 +175,10 @@ fn get_decoded_stored_data(raw_data: &Vec<u8>,
     let data: _;
     let data_to_deserialise = if let Some((public_encryp_key, secret_encryp_key, nonce)) =
                                      data_decryption_keys {
-        data = try!(::utility::hybrid_decrypt(&raw_data,
-                                              nonce,
-                                              public_encryp_key,
-                                              secret_encryp_key));
+        data = try!(utility::hybrid_decrypt(&raw_data,
+                                            nonce,
+                                            public_encryp_key,
+                                            secret_encryp_key));
         &data
     } else {
         raw_data
@@ -189,21 +193,22 @@ mod test {
     use xor_name::XorName;
     use std::sync::{Arc, Mutex};
     use sodiumoxide::crypto::box_;
+    use core::utility;
 
-    const TAG_ID: u64 = ::MAIDSAFE_TAG + 1000;
+    const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1000;
 
     #[test]
     fn create_and_get_unversionsed_structured_data() {
         let keys = box_::gen_keypair();
         let data_decryption_keys = (&keys.0, &keys.1, &box_::gen_nonce());
-        let client = Arc::new(Mutex::new(unwrap_result!(::utility::test_utils::get_client())));
+        let client = Arc::new(Mutex::new(unwrap_result!(utility::test_utils::get_client())));
         // Empty Data
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = Vec::new();
-            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -220,11 +225,11 @@ mod test {
         }
         // Empty Data- with decryption_keys
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = Vec::new();
-            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -243,11 +248,11 @@ mod test {
         }
         // Data of size 75 KB
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
-            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -264,11 +269,11 @@ mod test {
         }
         // Data of size 75 KB with 200 owners
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
-            let owners = ::utility::test_utils::get_max_sized_public_keys(200);
+            let owners = utility::test_utils::get_max_sized_public_keys(200);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -285,11 +290,11 @@ mod test {
         }
         // Data of size 75 KB with MAX owners
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
-            let owners = ::utility::test_utils::get_max_sized_public_keys(515);
+            let owners = utility::test_utils::get_max_sized_public_keys(515);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -306,11 +311,11 @@ mod test {
         }
         // Data of size 75 KB with MAX owners - with decryption_keys
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
-            let owners = ::utility::test_utils::get_max_sized_public_keys(510);
+            let owners = utility::test_utils::get_max_sized_public_keys(510);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -329,11 +334,11 @@ mod test {
         }
         // Data of size 80 KB with MAX + 1 - No Data could be fit - Should result in error
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 80];
-            let owners = ::utility::test_utils::get_max_sized_public_keys(517);
+            let owners = utility::test_utils::get_max_sized_public_keys(517);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -347,11 +352,11 @@ mod test {
         }
         // Data of size 100 KB
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 102400];
-            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -368,11 +373,11 @@ mod test {
         }
         // Data of size 200 KB
         {
-            let id = XorName::new(unwrap_result!(::utility::generate_random_array_u8_64()));
+            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 204801];
-            let owners = ::utility::test_utils::get_max_sized_public_keys(1);
+            let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = ::utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,

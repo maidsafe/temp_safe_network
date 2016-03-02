@@ -54,26 +54,9 @@ extern crate log;
 extern crate maidsafe_utilities;
 extern crate mpid_messaging;
 
-/// Public and Private Id types
-pub mod id;
-/// Safe-Core Errors
-pub mod errors;
-/// Self-Authentication and Gateway Module
-pub mod client;
-/// Utility functions
-pub mod utility;
-/// Events filtered from set of Routing provided events, on which the Client Modules must
-/// specifically act
-pub mod translated_events;
-/// Implements the Self Encryption storage trait
-pub mod self_encryption_storage;
-/// Helper functions to handle StructuredData related operations
-pub mod structured_data_operations;
-
-pub use self_encryption_storage::SelfEncryptionStorage;
-
-/// All Maidsafe tagging should positive-offset from this
-pub const MAIDSAFE_TAG: u64 = 5483_000;
-/// All StructuredData tagging should positive-offset from this if the operation needs to go
-/// through this safe_core crate
-pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;
+/// Core module
+#[macro_use]pub mod core;
+// /// Nfs module;
+// pub mod nfs;
+// /// Dns module;
+// pub mod dns;

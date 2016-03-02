@@ -18,13 +18,14 @@
 use xor_name::XorName;
 use sodiumoxide::crypto::{box_, sign};
 use sodiumoxide::crypto::hash::sha512;
+use core::id::{IdType, RevocationIdType};
 
 /// PublicIdType
 ///
 /// #Examples
 ///
 /// ```
-/// use ::safe_core::id::{IdType, RevocationIdType, MaidTypeTags, PublicIdType};
+/// use ::safe_core::core::id::{IdType, RevocationIdType, MaidTypeTags, PublicIdType};
 ///
 /// let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
 /// let maid = IdType::new(&revocation_maid);
@@ -40,7 +41,7 @@ pub struct PublicIdType {
 
 impl PublicIdType {
     /// An instanstance of the PublicIdType can be created using the new()
-    pub fn new(id_type: &::id::IdType, revocation_id: &::id::RevocationIdType) -> PublicIdType {
+    pub fn new(id_type: &IdType, revocation_id: &RevocationIdType) -> PublicIdType {
         let type_tag = revocation_id.type_tags().2;
         let public_keys = id_type.public_keys().clone();
         let revocation_public_key = revocation_id.public_key();
@@ -116,28 +117,28 @@ impl PublicIdType {
 #[cfg(test)]
 mod test {
     use super::*;
-    use id::Random;
     use sodiumoxide::crypto::sign;
     use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use core::id::{IdType, RevocationIdType, MaidTypeTags, MpidTypeTags, Random};
 
     impl Random for PublicIdType {
         fn generate_random() -> PublicIdType {
-            let revocation_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();
-            let maid = ::id::IdType::new(&revocation_maid);
+            let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
+            let maid = IdType::new(&revocation_maid);
             PublicIdType::new(&maid, &revocation_maid)
         }
     }
 
     #[test]
     fn create_public_mpid() {
-        let revocation_mpid = ::id::RevocationIdType::new::<::id::MpidTypeTags>();
-        let mpid = ::id::IdType::new(&revocation_mpid);
+        let revocation_mpid = RevocationIdType::new::<MpidTypeTags>();
+        let mpid = IdType::new(&revocation_mpid);
         let _ = PublicIdType::new(&mpid, &revocation_mpid);
     }
 
     #[test]
     fn serialisation_public_maid() {
-        let obj_before: PublicIdType = ::id::Random::generate_random();
+        let obj_before: PublicIdType = Random::generate_random();
 
         let serialised_obj = unwrap_result!(serialise(&obj_before));
         let obj_after: PublicIdType = unwrap_result!(deserialise(&serialised_obj));
@@ -156,8 +157,8 @@ mod test {
 
     #[test]
     fn invariant_check() {
-        let revocation_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();
-        let maid = ::id::IdType::new(&revocation_maid);
+        let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
+        let maid = IdType::new(&revocation_maid);
         let public_maid = PublicIdType::new(&maid, &revocation_maid);
         let type_tag = public_maid.type_tag;
         let public_id_keys = public_maid.public_keys;

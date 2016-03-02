@@ -13,27 +13,28 @@
 // KIND, either express or implied.
 //
 // Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.                                                                */
+// relating to use of the SAFE Network Software.
 
-use errors::CoreError;
+use core::errors::CoreError;
 use xor_name::XorName;
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::secretbox;
 use sodiumoxide::crypto::hash::{sha256, sha512};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
+use core::id::{IdType, PublicIdType, RevocationIdType, MaidTypeTags, MpidTypeTags};
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also his Root
 /// Directory ID if he has put data onto the network.
 #[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
 pub struct Account {
-    an_maid: ::id::RevocationIdType,
-    maid: ::id::IdType,
-    public_maid: ::id::PublicIdType,
+    an_maid: RevocationIdType,
+    maid: IdType,
+    public_maid: PublicIdType,
 
-    an_mpid: ::id::RevocationIdType,
-    mpid: ::id::IdType,
-    public_mpid: ::id::PublicIdType,
+    an_mpid: RevocationIdType,
+    mpid: IdType,
+    public_mpid: PublicIdType,
 
     user_root_dir_id: Option<XorName>,
     maidsafe_config_root_dir_id: Option<XorName>,
@@ -45,13 +46,13 @@ impl Account {
     pub fn new(user_root_dir_id: Option<XorName>,
                maidsafe_config_root_dir_id: Option<XorName>)
                -> Account {
-        let an_maid = ::id::RevocationIdType::new::<::id::MaidTypeTags>();
-        let maid = ::id::IdType::new(&an_maid);
-        let public_maid = ::id::PublicIdType::new(&maid, &an_maid);
+        let an_maid = RevocationIdType::new::<MaidTypeTags>();
+        let maid = IdType::new(&an_maid);
+        let public_maid = PublicIdType::new(&maid, &an_maid);
 
-        let an_mpid = ::id::RevocationIdType::new::<::id::MpidTypeTags>();
-        let mpid = ::id::IdType::new(&an_mpid);
-        let public_mpid = ::id::PublicIdType::new(&mpid, &an_mpid);
+        let an_mpid = RevocationIdType::new::<MpidTypeTags>();
+        let mpid = IdType::new(&an_mpid);
+        let public_mpid = PublicIdType::new(&mpid, &an_mpid);
 
         Account {
             an_maid: an_maid,
@@ -75,32 +76,32 @@ impl Account {
     }
 
     /// Get user's AnMAID
-    pub fn get_an_maid(&self) -> &::id::RevocationIdType {
+    pub fn get_an_maid(&self) -> &RevocationIdType {
         &self.an_maid
     }
 
     /// Get user's MAID
-    pub fn get_maid(&self) -> &::id::IdType {
+    pub fn get_maid(&self) -> &IdType {
         &self.maid
     }
 
     /// Get user's Public-MAID
-    pub fn get_public_maid(&self) -> &::id::PublicIdType {
+    pub fn get_public_maid(&self) -> &PublicIdType {
         &self.public_maid
     }
 
     /// Get user's AnMPID
-    pub fn get_an_mpid(&self) -> &::id::RevocationIdType {
+    pub fn get_an_mpid(&self) -> &RevocationIdType {
         &self.an_mpid
     }
 
     /// Get user's MPID
-    pub fn get_mpid(&self) -> &::id::IdType {
+    pub fn get_mpid(&self) -> &IdType {
         &self.mpid
     }
 
     /// Get user's Public-MPID
-    pub fn get_public_mpid(&self) -> &::id::PublicIdType {
+    pub fn get_public_mpid(&self) -> &PublicIdType {
         &self.public_mpid
     }
 
