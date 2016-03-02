@@ -17,6 +17,10 @@
 
 use routing::InterfaceError;
 
+/// Network Events will be translated into values starting from this number for propagating them
+/// beyond the FFI boudaries when required
+pub const NETWORK_EVENT_START_RANGE: i32 = 0;
+
 // TODO(Spandan) This is a mess with new routing - get it sorted once sprint begins
 /// Reception of reqested Data
 pub enum DataReceivedEvent {
@@ -33,6 +37,16 @@ pub enum NetworkEvent {
     Disconnected,
     /// Graceful Exit Condition
     Terminated,
+}
+
+impl Into<i32> for NetworkEvent {
+    fn into(self) -> i32 {
+        match self {
+            NetworkEvent::Connected => NETWORK_EVENT_START_RANGE,
+            NetworkEvent::Disconnected => NETWORK_EVENT_START_RANGE + 1,
+            NetworkEvent::Terminated => NETWORK_EVENT_START_RANGE + 2,
+        }
+    }
 }
 
 /// Failures in operations that Client Modules need to deal with
