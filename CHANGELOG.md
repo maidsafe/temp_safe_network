@@ -1,4 +1,7 @@
 # Safe Core - Change Log
+## [0.7.0]
+- Disconnect event detection and translation to ffi compatible value
+
 ## [0.6.1]
 - self_encryption updated to 0.2.6
 
