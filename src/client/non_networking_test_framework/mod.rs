@@ -347,8 +347,7 @@ mod test {
 
         // GET ImmutableData should pass
         {
-            let data_request = DataRequest::Immutable(orig_data.name(),
-                                                          ImmutableDataType::Normal);
+            let data_request = DataRequest::Immutable(orig_data.name(), ImmutableDataType::Normal);
 
             let (data_event_sender, data_event_receiver) = mpsc::channel();
             unwrap_result!(message_queue.lock())
@@ -386,8 +385,7 @@ mod test {
 
         // GET ImmutableData should pass
         {
-            let data_request = DataRequest::Immutable(orig_data.name(),
-                                                          ImmutableDataType::Normal);
+            let data_request = DataRequest::Immutable(orig_data.name(), ImmutableDataType::Normal);
 
             let (data_event_sender, data_event_receiver) = mpsc::channel();
             unwrap_result!(message_queue.lock())
@@ -500,9 +498,8 @@ mod test {
             let mut location_vec =
                 unwrap_result!(deserialise::<Vec<XorName>>(received_structured_data.get_data()));
             let immut_data_request = DataRequest::Immutable(unwrap_option!(location_vec.pop(),
-                                                                               "Value must \
-                                                                                exist !"),
-                                                                ImmutableDataType::Normal);
+                                                                           "Value must exist !"),
+                                                            ImmutableDataType::Normal);
 
             let (data_event_sender, data_event_receiver) = mpsc::channel();
             unwrap_result!(message_queue.lock())
@@ -622,7 +619,7 @@ mod test {
         // GET new ImmutableData should pass
         {
             let immut_data_request = DataRequest::Immutable(location_vec[1].clone(),
-                                                                ImmutableDataType::Normal);
+                                                            ImmutableDataType::Normal);
 
             let (data_event_sender, data_event_receiver) = mpsc::channel();
             unwrap_result!(message_queue.lock())
@@ -645,7 +642,7 @@ mod test {
         // GET original ImmutableData should pass
         {
             let immut_data_request = DataRequest::Immutable(location_vec[0].clone(),
-                                                                ImmutableDataType::Normal);
+                                                            ImmutableDataType::Normal);
 
             let (data_event_sender, data_event_receiver) = mpsc::channel();
             unwrap_result!(message_queue.lock())

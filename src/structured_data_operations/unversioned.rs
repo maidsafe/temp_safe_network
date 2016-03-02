@@ -132,7 +132,9 @@ pub fn get_data(client: Arc<Mutex<Client>>,
                     match try!(get_decoded_stored_data(&immutable_data.value(),
                                                        data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
-                            let mut se = SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()), data_map);
+                            let mut se =
+                                SelfEncryptor::new(::SelfEncryptionStorage::new(client.clone()),
+                                                   data_map);
                             let length = se.len();
                             Ok(se.read(0, length))
                         }
