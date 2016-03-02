@@ -26,5 +26,8 @@ xor_name = "~0.0.4"
 optional = true
 version = "~0.0.44"
 
+[dev-dependencies]
+regex = "~0.1.55"
+
 [features]
 use-mock-routing = []
