@@ -15,15 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::errors::CoreError;
-use xor_name::XorName;
-use lru_time_cache::LruCache;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, Receiver};
-use routing::{Data, Event, ResponseContent};
+
+use core::errors::CoreError;
+use core::translated_events::{NetworkEvent, ResponseEvent};
+
+use xor_name::XorName;
+use lru_time_cache::LruCache;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use core::translated_events::{OperationFailureEvent, NetworkEvent, DataReceivedEvent};
+use routing::{MessageId, Data, Event, ResponseContent, RequestMessage, RequestContent};
 
 const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 
@@ -32,10 +34,8 @@ const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 /// enabling fast re-retrieval and avoiding networking.
 pub struct MessageQueue {
     local_cache: LruCache<XorName, Data>,
-    data_senders: HashMap<XorName, Vec<Sender<DataReceivedEvent>>>,
-    error_senders: Vec<Sender<OperationFailureEvent>>,
     network_event_observers: Vec<Sender<NetworkEvent>>,
-    routing_message_cache: LruCache<XorName, Data>,
+    response_observers: HashMap<MessageId, Sender<ResponseEvent>>,
 }
 
 impl MessageQueue {
@@ -43,15 +43,12 @@ impl MessageQueue {
     /// add observer since one will not receive data until one asks for it. Thus there is enough
     /// chance to add an observer before requesting data.
     pub fn new(routing_event_receiver: Receiver<Event>,
-               network_event_observers: Vec<Sender<NetworkEvent>>,
-               error_senders: Vec<Sender<OperationFailureEvent>>)
+               network_event_observers: Vec<Sender<NetworkEvent>>)
                -> (Arc<Mutex<MessageQueue>>, RaiiThreadJoiner) {
         let message_queue = Arc::new(Mutex::new(MessageQueue {
             local_cache: LruCache::with_capacity(1000),
-            data_senders: HashMap::new(),
-            error_senders: error_senders,
             network_event_observers: network_event_observers,
-            routing_message_cache: LruCache::with_capacity(1000),
+            response_observers: HashMap::new(),
         }));
 
         let message_queue_cloned = message_queue.clone();
@@ -60,22 +57,99 @@ impl MessageQueue {
                 match it {
                     Event::Response(msg) => {
                         match msg.content {
-                            ResponseContent::GetSuccess(data, _) => {
-                                let data_name = data.name();
-                                let mut dead_sender_positions = Vec::<usize>::new();
+                            ResponseContent::GetSuccess(data, msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                let _ = queue_guard.routing_message_cache
-                                                   .insert(data_name.clone(), data);
-                                if let Some(mut specific_data_senders) =
-                                       queue_guard.data_senders.get_mut(&data_name) {
-                                    for it in specific_data_senders.iter().enumerate() {
-                                        if it.1.send(DataReceivedEvent::DataReceived).is_err() {
-                                            dead_sender_positions.push(it.0);
-                                        }
-                                    }
-
-                                    MessageQueue::purge_dead_senders(&mut specific_data_senders,
-                                                                     dead_sender_positions);
+                                if let Some(mut response_observer) =
+                                       queue_guard.response_observers.remove(&msg_id) {
+                                    let _ = response_observer.send(ResponseEvent::Get(Ok(data)));
+                                }
+                            }
+                            ResponseContent::GetFailure {
+                                id,
+                                request: RequestMessage {
+                                    content: RequestContent::Get(data_req, _),
+                                    ..
+                                },
+                                ..
+                            } => {
+                                let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
+                                if let Some(mut response_observer) =
+                                       queue_guard.response_observers.remove(&id) {
+                                    let response =
+                                        ResponseEvent::Get(Err(CoreError::GetFailure(data_req)));
+                                    let _ = response_observer.send(response);
+                                }
+                            }
+                            ResponseContent::PutSuccess(_, msg_id) => {
+                                let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
+                                if let Some(mut response_observer) =
+                                       queue_guard.response_observers.remove(&msg_id) {
+                                    let _ =
+                                        response_observer.send(ResponseEvent::MutationResp(Ok(())));
+                                }
+                            }
+                            ResponseContent::PutFailure {
+                                id,
+                                request: RequestMessage {
+                                    content: RequestContent::Put(data, _),
+                                    ..
+                                },
+                                ..
+                            } => {
+                                let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
+                                if let Some(mut response_observer) =
+                                       queue_guard.response_observers.remove(&id) {
+                                    let response =
+                                        ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
+                                    let _ = response_observer.send(response);
+                                }
+                            }
+                            ResponseContent::PostSuccess(_, msg_id) => {
+                                let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
+                                if let Some(mut response_observer) =
+                                       queue_guard.response_observers.remove(&msg_id) {
+                                    let _ =
+                                        response_observer.send(ResponseEvent::MutationResp(Ok(())));
+                                }
+                            }
+                            ResponseContent::PostFailure {
+                                id,
+                                request: RequestMessage {
+                                    content: RequestContent::Post(data, _),
+                                    ..
+                                },
+                                ..
+                            } => {
+                                let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
+                                if let Some(mut response_observer) =
+                                       queue_guard.response_observers.remove(&id) {
+                                    let response =
+                                        ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
+                                    let _ = response_observer.send(response);
+                                }
+                            }
+                            ResponseContent::DeleteSuccess(_, msg_id) => {
+                                let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
+                                if let Some(mut response_observer) =
+                                       queue_guard.response_observers.remove(&msg_id) {
+                                    let _ =
+                                        response_observer.send(ResponseEvent::MutationResp(Ok(())));
+                                }
+                            }
+                            ResponseContent::DeleteFailure {
+                                id,
+                                request: RequestMessage {
+                                    content: RequestContent::Delete(data, _),
+                                    ..
+                                },
+                                ..
+                            } => {
+                                let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
+                                if let Some(mut response_observer) =
+                                       queue_guard.response_observers.remove(&id) {
+                                    let response =
+                                        ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
+                                    let _ = response_observer.send(response);
                                 }
                             }
                             _ => {
@@ -120,14 +194,10 @@ impl MessageQueue {
         (message_queue, RaiiThreadJoiner::new(receiver_joiner))
     }
 
-    pub fn add_data_receive_event_observer(&mut self,
-                                           data_name: XorName,
-                                           sender: Sender<DataReceivedEvent>) {
-        self.data_senders.entry(data_name).or_insert(Vec::new()).push(sender);
-    }
-
-    pub fn add_operation_failure_event_observer(&mut self, sender: Sender<OperationFailureEvent>) {
-        self.error_senders.push(sender);
+    pub fn register_response_observer(&mut self,
+                                      msg_id: MessageId,
+                                      sender: Sender<ResponseEvent>) {
+        let _ = self.response_observers.insert(msg_id, sender);
     }
 
     pub fn add_network_event_observer(&mut self, sender: Sender<NetworkEvent>) {
@@ -144,13 +214,6 @@ impl MessageQueue {
 
     pub fn local_cache_insert(&mut self, key: XorName, value: Data) {
         let _ = self.local_cache.insert(key, value);
-    }
-
-    pub fn get_response(&mut self, location: &XorName) -> Result<Data, CoreError> {
-        self.routing_message_cache
-            .get(location)
-            .ok_or(CoreError::RoutingMessageCacheMiss)
-            .map(|elt| elt.clone())
     }
 
     fn purge_dead_senders<T>(senders: &mut Vec<Sender<T>>, positions: Vec<usize>) {

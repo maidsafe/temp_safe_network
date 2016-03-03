@@ -121,11 +121,9 @@ impl RoutingMock {
 
     pub fn send_get_request(&mut self,
                             _dst: Authority,
-                            request_for: DataRequest)
-                            -> Result<MessageId, InterfaceError> {
-        let message_id = MessageId::new();
-        let cloned_message_id = message_id.clone();
-
+                            request_for: DataRequest,
+                            msg_id: MessageId)
+                            -> Result<(), InterfaceError> {
         let data_store = get_storage();
         let cloned_sender = self.sender.clone();
 
@@ -146,8 +144,7 @@ impl RoutingMock {
                             }
                             _ => false,
                         } {
-                            let response_content = ResponseContent::GetSuccess(data,
-                                                                               cloned_message_id);
+                            let response_content = ResponseContent::GetSuccess(data, msg_id);
                             let response_msg = ResponseMessage {
                                 src: Authority::NaeManager(data_name.clone()),
                                 dst: Authority::Client {
@@ -168,15 +165,14 @@ impl RoutingMock {
             };
         });
 
-        Ok(message_id)
+        Ok(())
     }
 
     pub fn send_put_request(&self,
                             _dst: Authority,
-                            data: Data)
-                            -> Result<MessageId, InterfaceError> {
-        let message_id = MessageId::new();
-
+                            data: Data,
+                            _msg_id: MessageId)
+                            -> Result<(), InterfaceError> {
         let data_store = get_storage();
 
         let data_name = data.name();
@@ -210,15 +206,14 @@ impl RoutingMock {
             }
         });
 
-        Ok(message_id)
+        Ok(())
     }
 
     pub fn send_post_request(&self,
                              _dst: Authority,
-                             data: Data)
-                             -> Result<MessageId, InterfaceError> {
-        let message_id = MessageId::new();
-
+                             data: Data,
+                             _msg_id: MessageId)
+                             -> Result<(), InterfaceError> {
         let data_store = get_storage();
 
         let data_name = data.name();
@@ -255,15 +250,14 @@ impl RoutingMock {
             }
         });
 
-        Ok(message_id)
+        Ok(())
     }
 
     pub fn send_delete_request(&self,
                                _dst: Authority,
-                               data: Data)
-                               -> Result<MessageId, InterfaceError> {
-        let message_id = MessageId::new();
-
+                               data: Data,
+                               _msg_id: MessageId)
+                               -> Result<(), InterfaceError> {
         let data_store = get_storage();
 
         let data_name = data.name();
@@ -300,7 +294,7 @@ impl RoutingMock {
             }
         });
 
-        Ok(message_id)
+        Ok(())
     }
 }
 
@@ -365,8 +359,9 @@ mod test {
 
         // First PUT should succeed
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
-                                                             orig_data.clone()));
+        unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
+                                                     orig_data.clone(),
+                                                     MessageId::new()));
 
         // GET ImmutableData should pass
         {
@@ -377,8 +372,9 @@ mod test {
                 .add_data_receive_event_observer(data_request.name(), data_event_sender.clone());
 
             // TODO Routing API changed - use the returned value
-            let _ = unwrap_result!(mock_routing.send_get_request(location_nae_mgr.clone(),
-                                                                 data_request.clone()));
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr.clone(),
+                                                         data_request.clone(),
+                                                         MessageId::new()));
 
             let response_getter = ResponseGetter::new(Some((data_event_sender,
                                                             data_event_receiver)),
@@ -392,8 +388,9 @@ mod test {
 
         // Subsequent PUTs for same ImmutableData should succeed - De-duplication
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
-                                                             orig_data.clone()));
+        unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
+                                                     orig_data.clone(),
+                                                     MessageId::new()));
 
         // Construct Backup ImmutableData
         let new_immutable_data = ImmutableData::new(ImmutableDataType::Backup, orig_raw_data);
@@ -401,18 +398,21 @@ mod test {
 
         // Subsequent PUTs for same ImmutableData of different type should fail
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
-                                                             new_data));
+        unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
+                                                     new_data,
+                                                     MessageId::new()));
 
         // POSTs for ImmutableData should fail
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_post_request(location_nae_mgr.clone(),
-                                                              orig_data.clone()));
+        unwrap_result!(mock_routing.send_post_request(location_nae_mgr.clone(),
+                                                      orig_data.clone(),
+                                                      MessageId::new()));
 
         // DELETEs of ImmutableData should fail
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_delete_request(location_client_mgr,
-                                                                orig_data.clone()));
+        unwrap_result!(mock_routing.send_delete_request(location_client_mgr,
+                                                        orig_data.clone(),
+                                                        MessageId::new()));
 
         // GET ImmutableData should pass
         {
@@ -423,8 +423,9 @@ mod test {
                 .add_data_receive_event_observer(data_request.name(), data_event_sender.clone());
 
             // TODO Routing API changed - use the returned value
-            let _ = unwrap_result!(mock_routing.send_get_request(location_nae_mgr,
-                                                                 data_request.clone()));
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr,
+                                                         data_request.clone(),
+                                                         MessageId::new()));
 
             let response_getter = ResponseGetter::new(Some((data_event_sender,
                                                             data_event_receiver)),
@@ -490,13 +491,15 @@ mod test {
 
         // First PUT of StructuredData should succeed
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
-                                                             data_account_version.clone()));
+        unwrap_result!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
+                                                     data_account_version.clone(),
+                                                     MessageId::new()));
 
         // PUT for ImmutableData should succeed
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_put_request(location_client_mgr_immut.clone(),
-                                                             orig_data_immutable.clone()));
+        unwrap_result!(mock_routing.send_put_request(location_client_mgr_immut.clone(),
+                                                     orig_data_immutable.clone(),
+                                                     MessageId::new()));
 
         let mut received_structured_data: StructuredData;
 
@@ -510,8 +513,9 @@ mod test {
                                                  data_event_sender.clone());
 
             // TODO Routing API changed - use the returned value
-            let _ = unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
-                                                                 struct_data_request.clone()));
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
+                                                         struct_data_request.clone(),
+                                                         MessageId::new()));
 
             let response_getter = ResponseGetter::new(Some((data_event_sender,
                                                             data_event_receiver)),
@@ -543,8 +547,9 @@ mod test {
                                                  data_event_sender.clone());
 
             // TODO Routing API changed - use the returned value
-            let _ = unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut.clone(),
-                                                                 immut_data_request.clone()));
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut.clone(),
+                                                         immut_data_request.clone(),
+                                                         MessageId::new()));
 
             let response_getter = ResponseGetter::new(Some((data_event_sender,
                                                             data_event_receiver)),
@@ -563,8 +568,9 @@ mod test {
 
         // PUT for new ImmutableData should succeed
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_put_request(location_client_mgr_immut,
-                                                             new_data_immutable.clone()));
+        unwrap_result!(mock_routing.send_put_request(location_client_mgr_immut,
+                                                     new_data_immutable.clone(),
+                                                     MessageId::new()));
 
         // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Versioning
         let invalid_version_account_version = unwrap_result!(StructuredData::new(TYPE_TAG,
@@ -606,23 +612,27 @@ mod test {
 
         // Subsequent PUTs for same StructuredData should fail
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
-                                                             data_account_version.clone()));
+        unwrap_result!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
+                                                     data_account_version.clone(),
+                                                     MessageId::new()));
 
         // Subsequent POSTSs for same StructuredData should fail if versioning is invalid
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                      invalid_version_data_account_version));
+        unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
+                                                      invalid_version_data_account_version,
+                                                      MessageId::new()));
 
         // Subsequent POSTSs for same StructuredData should fail if signature is invalid
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                      invalid_signature_data_account_version));
+        unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
+                                                      invalid_signature_data_account_version,
+                                                      MessageId::new()));
 
         // Subsequent POSTSs for existing StructuredData version should pass for valid update
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                              data_account_version.clone()));
+        unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
+                                                      data_account_version.clone(),
+                                                      MessageId::new()));
 
         // GET for new StructuredData version should pass
         {
@@ -634,8 +644,9 @@ mod test {
                                                  data_event_sender.clone());
 
             // TODO Routing API changed - use the returned value
-            let _ = unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
-                                                                 struct_data_request.clone()));
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
+                                                         struct_data_request.clone(),
+                                                         MessageId::new()));
 
             let response_getter = ResponseGetter::new(Some((data_event_sender,
                                                             data_event_receiver)),
@@ -670,8 +681,9 @@ mod test {
                                                  data_event_sender.clone());
 
             // TODO Routing API changed - use the returned value
-            let _ = unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut.clone(),
-                                                                 immut_data_request.clone()));
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut.clone(),
+                                                         immut_data_request.clone(),
+                                                         MessageId::new()));
 
             let response_getter = ResponseGetter::new(Some((data_event_sender,
                                                             data_event_receiver)),
@@ -694,8 +706,9 @@ mod test {
                                                  data_event_sender.clone());
 
             // TODO Routing API changed - use the returned value
-            let _ = unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut,
-                                                                 immut_data_request.clone()));
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut,
+                                                         immut_data_request.clone(),
+                                                         MessageId::new()));
 
             let response_getter = ResponseGetter::new(Some((data_event_sender,
                                                             data_event_receiver)),
@@ -709,8 +722,9 @@ mod test {
 
         // DELETE of Structured Data without version bump should fail
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_delete_request(location_client_mgr_struct.clone(),
-                                                        data_account_version.clone()));
+        unwrap_result!(mock_routing.send_delete_request(location_client_mgr_struct.clone(),
+                                                        data_account_version.clone(),
+                                                        MessageId::new()));
 
         // GET for StructuredData version should still pass
         {
@@ -722,8 +736,9 @@ mod test {
                                                  data_event_sender.clone());
 
             // TODO Routing API changed - use the returned value
-            let _ = unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct,
-                                                                 struct_data_request.clone()));
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct,
+                                                         struct_data_request.clone(),
+                                                         MessageId::new()));
 
             let response_getter = ResponseGetter::new(Some((data_event_sender,
                                                             data_event_receiver)),
@@ -752,7 +767,8 @@ mod test {
 
         // DELETE of Structured Data with version bump should pass
         // TODO Routing API changed - use the returned value
-        let _ = unwrap_result!(mock_routing.send_delete_request(location_client_mgr_struct,
-                                                                data_account_version));
+        unwrap_result!(mock_routing.send_delete_request(location_client_mgr_struct,
+                                                        data_account_version,
+                                                        MessageId::new()));
     }
 }

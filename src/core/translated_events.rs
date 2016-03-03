@@ -15,17 +15,21 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use routing::InterfaceError;
+use core::errors::CoreError;
+use routing::{Data, InterfaceError};
 
 /// Network Events will be translated into values starting from this number for propagating them
 /// beyond the FFI boudaries when required
 pub const NETWORK_EVENT_START_RANGE: i32 = 0;
 
-// TODO(Spandan) This is a mess with new routing - get it sorted once sprint begins
-/// Reception of reqested Data
-pub enum DataReceivedEvent {
-    /// Received Data
-    DataReceived,
+/// These events are received as a response to a GET/PUT/POST/DELETE requests made by clients
+pub enum ResponseEvent {
+    /// Response to a previous GET request
+    GetResp(Result<Data, CoreError>),
+    /// Response to a previous Mutating (PUT/POST/DELETE) request
+    MutationResp(Result<(), CoreError>),
+    /// Graceful Exit Condition
+    Terminated,
 }
 
 /// Netowork Events that Client Modules need to deal with
@@ -47,16 +51,4 @@ impl Into<i32> for NetworkEvent {
             NetworkEvent::Terminated => NETWORK_EVENT_START_RANGE + 2,
         }
     }
-}
-
-/// Failures in operations that Client Modules need to deal with
-pub enum OperationFailureEvent {
-    /// PUT request failed
-    PutFailure(InterfaceError),
-    /// POST request failed
-    PostFailure(InterfaceError),
-    /// DELETE request failed
-    DeleteFailure(InterfaceError),
-    /// Graceful Exit Condition
-    Terminated,
 }

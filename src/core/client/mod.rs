@@ -34,7 +34,7 @@ use std::sync::mpsc::Sender;
 use self::response_getter::ResponseGetter;
 use sodiumoxide::crypto::hash::{sha256, sha512};
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event, PlainData};
+use routing::{MessageId, FullId, StructuredData, Data, DataRequest, Authority, Event, PlainData};
 use mpid_messaging::{MpidMessage, MpidMessageWrapper};
 use maidsafe_utilities::serialisation::serialise;
 use core::translated_events::{OperationFailureEvent, NetworkEvent, DataReceivedEvent};
@@ -336,7 +336,7 @@ impl Client {
         self.add_data_receive_event_observer(request_for.name(), data_event_sender.clone());
 
         // TODO Routing API changed - use the returned value
-        let _ = try!(self.routing.send_get_request(dst, request_for.clone()));
+        try!(self.routing.send_get_request(dst, request_for.clone(), MessageId::new()));
 
         Ok(ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                self.message_queue.clone(),
@@ -353,7 +353,7 @@ impl Client {
         };
 
         // TODO Routing API changed - use the returned value
-        let _ = try!(self.routing.send_put_request(dst, data));
+        try!(self.routing.send_put_request(dst, data, MessageId::new()));
         // TODO (Viv): This should be removed once we handle the appropriate success and failure
         //             results sent back from the network.
         ::std::thread::sleep(::std::time::Duration::from_secs(5));
@@ -461,7 +461,7 @@ impl Client {
         };
 
         // TODO Routing API changed - use the returned value
-        let _ = try!(self.routing.send_post_request(dst, data));
+        try!(self.routing.send_post_request(dst, data, MessageId::new()));
         Ok(())
     }
 
@@ -473,7 +473,7 @@ impl Client {
         };
 
         // TODO Routing API changed - use the returned value
-        let _ = try!(self.routing.send_delete_request(dst, data));
+        try!(self.routing.send_delete_request(dst, data, MessageId::new()));
         Ok(())
     }
 
