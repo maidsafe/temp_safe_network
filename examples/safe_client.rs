@@ -40,13 +40,14 @@ extern crate routing;
 extern crate safe_core;
 extern crate sodiumoxide;
 extern crate xor_name;
-#[macro_use] extern crate maidsafe_utilities;
+#[macro_use]
+extern crate maidsafe_utilities;
 
 use maidsafe_utilities::serialisation::deserialise;
 use mpid_messaging::MpidMessageWrapper;
 use routing::Data;
-use safe_core::client::Client;
-use safe_core::client::response_getter::ResponseGetter;
+use safe_core::core::client::Client;
+use safe_core::core::client::response_getter::ResponseGetter;
 use sodiumoxide::crypto::hash::sha512;
 use xor_name::XorName;
 
@@ -93,7 +94,9 @@ fn main() {
         {
             println!("\nTrying to create an account ...");
 
-            let _ = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+            let _ = unwrap_result!(Client::create_account(keyword.clone(),
+                                                          pin.clone(),
+                                                          password.clone()));
             println!("Account Created Successfully !!");
         }
 
@@ -140,13 +143,14 @@ fn main() {
                 Ok(client) => {
                     println!("Account Login Successful !!");
                     if MOCK_NETWORK {
-                        println!("Messaging feature has been skipped as mock routing is being used !!");
+                        println!("Messaging feature has been skipped as mock routing is being \
+                                  used !!");
                     } else {
                         messaging(&client);
                     }
                     break;
                 }
-                Err(error)  => println!("Account Login Failed !! Reason: {:?}\n\n", error),
+                Err(error) => println!("Account Login Failed !! Reason: {:?}\n\n", error),
             }
         }
     }
@@ -188,7 +192,8 @@ fn receive_mpid_message(response_getter: &ResponseGetter) {
             Ok(data) => {
                 match data {
                     Data::Plain(plain_data) => {
-                        let mpid_message_wrapper : MpidMessageWrapper = unwrap_result!(deserialise(plain_data.value()));
+                        let mpid_message_wrapper: MpidMessageWrapper =
+                            unwrap_result!(deserialise(plain_data.value()));
                         match mpid_message_wrapper {
                             MpidMessageWrapper::PutMessage(mpid_message) => {
                                 println!("received mpid message {:?}", mpid_message);
@@ -218,6 +223,9 @@ fn send_mpid_message(client: &Client, mpid_account: &XorName) {
     println!("\n------------ enter content of the message ---------------");
     let _ = std::io::stdin().read_line(&mut msg_content);
     let secret_key = unwrap_result!(client.get_secret_signing_key());
-    let _ = client.send_message(mpid_account, msg_metadata.into_bytes(),
-                                msg_content.into_bytes(), receiver_account, &secret_key);
+    let _ = client.send_message(mpid_account,
+                                msg_metadata.into_bytes(),
+                                msg_content.into_bytes(),
+                                receiver_account,
+                                &secret_key);
 }
