@@ -1,4 +1,7 @@
 # Safe Core - Change Log
+## [0.8.0]
+- Nfs and Dns modules and examples merged into safe_core.
+
 ## [0.7.0]
 - Disconnect event detection and translation to ffi compatible value
 
