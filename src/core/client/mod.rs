@@ -335,7 +335,8 @@ impl Client {
         let (data_event_sender, data_event_receiver) = mpsc::channel();
         self.add_data_receive_event_observer(request_for.name(), data_event_sender.clone());
 
-        try!(self.routing.send_get_request(dst, request_for.clone()));
+        // TODO Routing API changed - use the returned value
+        let _ = try!(self.routing.send_get_request(dst, request_for.clone()));
 
         Ok(ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
                                self.message_queue.clone(),
@@ -351,11 +352,12 @@ impl Client {
             }
         };
 
-        let result = Ok(try!(self.routing.send_put_request(dst, data)));
+        // TODO Routing API changed - use the returned value
+        let _ = try!(self.routing.send_put_request(dst, data));
         // TODO (Viv): This should be removed once we handle the appropriate success and failure
         //             results sent back from the network.
         ::std::thread::sleep(::std::time::Duration::from_secs(5));
-        result
+        Ok(())
     }
 
     /// Send a message to receiver via the network. This is non-blocking.
@@ -458,7 +460,9 @@ impl Client {
             None => Authority::NaeManager(data.name()),
         };
 
-        Ok(try!(self.routing.send_post_request(dst, data)))
+        // TODO Routing API changed - use the returned value
+        let _ = try!(self.routing.send_post_request(dst, data));
+        Ok(())
     }
 
     /// Delete data from the network
@@ -468,7 +472,9 @@ impl Client {
             None => Authority::NaeManager(data.name()),
         };
 
-        Ok(try!(self.routing.send_delete_request(dst, data)))
+        // TODO Routing API changed - use the returned value
+        let _ = try!(self.routing.send_delete_request(dst, data));
+        Ok(())
     }
 
     /// Returns the public encryption key
