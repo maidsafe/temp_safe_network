@@ -42,15 +42,18 @@ extern crate routing;
 extern crate safe_core;
 extern crate sodiumoxide;
 
-use routing::Data;
 use std::sync::{Arc, Mutex};
+
 use regex::Regex;
+
 use safe_core::core::client::Client;
+
 use safe_core::nfs::helper::file_helper::FileHelper;
 use safe_core::nfs::helper::directory_helper::DirectoryHelper;
+use safe_core::nfs::{UNVERSIONED_DIRECTORY_LISTING_TAG, AccessLevel};
+
 use safe_core::dns::errors::DnsError;
 use safe_core::dns::dns_operations::DnsOperations;
-use safe_core::nfs::{UNVERSIONED_DIRECTORY_LISTING_TAG, AccessLevel};
 
 const DEFAULT_SERVICE: &'static str = "www";
 const HOME_PAGE_FILE_NAME: &'static str = "index.html";
@@ -115,14 +118,13 @@ fn create_dns_record(client: Arc<Mutex<Client>>,
 
     let owners = vec![try!(client.lock().unwrap().get_public_signing_key()).clone()];
     let secret_signing_key = try!(client.lock().unwrap().get_secret_signing_key()).clone();
-    let dns_struct_data = try!(dns_operations.register_dns(long_name,
-                                                           &public_messaging_encryption_key,
-                                                           &secret_messaging_encryption_key,
-                                                           &vec![],
-                                                           owners,
-                                                           &secret_signing_key,
-                                                           None));
-    Ok(try!(unwrap_result!(client.lock()).put(Data::Structured(dns_struct_data), None)))
+    dns_operations.register_dns(long_name,
+                                &public_messaging_encryption_key,
+                                &secret_messaging_encryption_key,
+                                &vec![],
+                                owners,
+                                &secret_signing_key,
+                                None)
 }
 
 fn delete_dns_record(client: Arc<Mutex<Client>>,
@@ -139,8 +141,7 @@ fn delete_dns_record(client: Arc<Mutex<Client>>,
 
     println!("Deleting Dns...");
 
-    let dns_struct_data = try!(dns_operations.delete_dns(&long_name, &secret_signing_key));
-    Ok(try!(unwrap_result!(client.lock()).delete(Data::Structured(dns_struct_data), None)))
+    dns_operations.delete_dns(&long_name, &secret_signing_key)
 }
 
 fn display_dns_records(dns_operations: &DnsOperations) -> Result<(), DnsError> {
@@ -195,12 +196,10 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
 
     let secret_signing_key = try!(client.lock().unwrap().get_secret_signing_key()).clone();
 
-    let struct_data = try!(dns_operations.add_service(&long_name,
-                                                      (service_name, dir_key.clone()),
-                                                      &secret_signing_key,
-                                                      None));
-
-    Ok(try!(client.lock().unwrap().post(Data::Structured(struct_data), None)))
+    dns_operations.add_service(&long_name,
+                               (service_name, dir_key.clone()),
+                               &secret_signing_key,
+                               None)
 }
 
 fn remove_service(client: Arc<Mutex<Client>>,
@@ -221,11 +220,7 @@ fn remove_service(client: Arc<Mutex<Client>>,
     println!("Removing Service...");
 
     let secret_signing_key = try!(client.lock().unwrap().get_secret_signing_key()).clone();
-    let struct_data = try!(dns_operations.remove_service(&long_name,
-                                                         service_name,
-                                                         &secret_signing_key,
-                                                         None));
-    Ok(try!(client.lock().unwrap().post(Data::Structured(struct_data), None)))
+    dns_operations.remove_service(&long_name, service_name, &secret_signing_key, None)
 }
 
 fn display_services(dns_operations: &DnsOperations) -> Result<(), DnsError> {

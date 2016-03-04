@@ -74,7 +74,8 @@ impl DirectoryHelper {
 
         let structured_data = try!(self.save_directory_listing(&directory));
         debug!("Posting PUT request to network to save structured data for directory ...");
-        try!(unwrap_result!(self.client.lock()).put(Data::Structured(structured_data), None));
+        try!(try!(unwrap_result!(self.client.lock()).put(Data::Structured(structured_data), None))
+                 .get());
         if let Some(mut parent_directory) = parent_directory {
             parent_directory.upsert_sub_directory(directory.get_metadata().clone());
             Ok((directory, try!(self.update(parent_directory))))
@@ -356,8 +357,9 @@ impl DirectoryHelper {
                                      encryption_keys))
         };
         debug!("Posting updated structured data to the network ...");
-        try!(unwrap_result!(self.client.lock())
-                 .post(Data::Structured(updated_structured_data), None));
+        try!(try!(unwrap_result!(self.client.lock())
+                      .post(Data::Structured(updated_structured_data), None))
+                 .get());
         Ok(())
     }
 
@@ -369,7 +371,8 @@ impl DirectoryHelper {
         let immutable_data = ImmutableData::new(data_type, data);
         let name = immutable_data.name();
         debug!("Posting PUT request to save immutable data to the network ...");
-        try!(unwrap_result!(self.client.lock()).put(Data::Immutable(immutable_data), None));
+        try!(try!(unwrap_result!(self.client.lock()).put(Data::Immutable(immutable_data), None))
+                 .get());
         Ok(name)
     }
 

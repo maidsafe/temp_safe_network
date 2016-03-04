@@ -18,28 +18,28 @@
 use core::errors::CoreError;
 use xor_name::XorName;
 use routing::{DataRequest, Data};
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{Sender, Receiver};
 use core::client::message_queue::MessageQueue;
-use core::translated_events::DataReceivedEvent;
+use core::translated_events::ResponseEvent;
 
-/// ResponseGetter is a lazy evaluated response getter. It will fetch either from local cache or
-/// wait for the MessageQueue to notify it of the incoming response from the network.
-pub struct ResponseGetter {
-    data_channel: Option<(mpsc::Sender<DataReceivedEvent>,
-                          mpsc::Receiver<DataReceivedEvent>)>,
+/// GetResponseGetter is a lazy evaluated response getter for GET Requests. It will fetch either
+/// from local cache or wait for the MessageQueue to notify it of the incoming response from the
+/// network
+pub struct GetResponseGetter {
+    data_channel: Option<(Sender<ResponseEvent>, Receiver<ResponseEvent>)>,
     message_queue: Arc<Mutex<MessageQueue>>,
     requested_name: XorName,
     requested_type: DataRequest,
 }
 
-impl ResponseGetter {
-    /// Create a new instance of ResponseGetter
-    pub fn new(data_channel: Option<(mpsc::Sender<DataReceivedEvent>,
-                                     mpsc::Receiver<DataReceivedEvent>)>,
+impl GetResponseGetter {
+    /// Create a new instance of GetResponseGetter
+    pub fn new(data_channel: Option<(Sender<ResponseEvent>, Receiver<ResponseEvent>)>,
                message_queue: Arc<Mutex<MessageQueue>>,
                requested_type: DataRequest)
-               -> ResponseGetter {
-        ResponseGetter {
+               -> GetResponseGetter {
+        GetResponseGetter {
             data_channel: data_channel,
             message_queue: message_queue,
             requested_name: requested_type.name(),
@@ -52,16 +52,17 @@ impl ResponseGetter {
     pub fn get(&self) -> Result<Data, CoreError> {
         if let Some((_, ref data_receiver)) = self.data_channel {
             match try!(data_receiver.recv()) {
-                DataReceivedEvent::DataReceived => {
-                    let mut msg_queue = unwrap_result!(self.message_queue.lock());
-                    let response = try!(msg_queue.get_response(&self.requested_name));
-
+                ResponseEvent::GetResp(result) => {
+                    let data = try!(result);
                     if let DataRequest::Immutable(..) = self.requested_type {
-                        msg_queue.local_cache_insert(self.requested_name.clone(), response.clone());
+                        let mut msg_queue = unwrap_result!(self.message_queue.lock());
+                        msg_queue.local_cache_insert(self.requested_name.clone(), data.clone());
                     }
 
-                    Ok(response)
+                    Ok(data)
                 }
+                ResponseEvent::Terminated => Err(CoreError::OperationAborted),
+                _ => Err(CoreError::ReceivedUnexpectedData),
             }
         } else {
             let mut msg_queue = unwrap_result!(self.message_queue.lock());
@@ -71,9 +72,40 @@ impl ResponseGetter {
 
     /// Extract associated sender. This will help cancel the blocking wait at will if so desired.
     /// All that is needed is to extract the sender before doing a `get()` and then while blocking
-    /// on `get()` fire `sender.send(DataReceivedEvent::Terminated)` to
-    /// gracefully exit the receiver.
-    pub fn get_sender(&self) -> Option<&mpsc::Sender<DataReceivedEvent>> {
+    /// on `get()` fire `sender.send(ResponseEvent::Terminated)` to gracefully exit the receiver.
+    pub fn get_sender(&self) -> Option<&Sender<ResponseEvent>> {
         self.data_channel.as_ref().and_then(|&(ref sender, _)| Some(sender))
+    }
+}
+
+/// MutationResponseGetter is a lazy evaluated response getter for mutating network requests such
+/// as PUT/POST/DELETE. It will fetch either from local cache or wait for the MessageQueue to notify
+/// it of the incoming response from the network
+pub struct MutationResponseGetter {
+    data_channel: (Sender<ResponseEvent>, Receiver<ResponseEvent>),
+}
+
+impl MutationResponseGetter {
+    /// Create a new instance of MutationResponseGetter
+    pub fn new(data_channel: (Sender<ResponseEvent>, Receiver<ResponseEvent>))
+               -> MutationResponseGetter {
+        MutationResponseGetter { data_channel: data_channel }
+    }
+
+    /// Get response when it comes from the network as informed by MessageQueue. This is blocking
+    pub fn get(&self) -> Result<(), CoreError> {
+        let (_, ref data_receiver) = self.data_channel;
+        match try!(data_receiver.recv()) {
+            ResponseEvent::MutationResp(result) => result,
+            ResponseEvent::Terminated => Err(CoreError::OperationAborted),
+            _ => Err(CoreError::ReceivedUnexpectedData),
+        }
+    }
+
+    /// Extract associated sender. This will help cancel the blocking wait at will if so desired.
+    /// All that is needed is to extract the sender before doing a `get()` and then while blocking
+    /// on `get()` fire `sender.send(ResponseEvent::Terminated)` to gracefully exit the receiver.
+    pub fn get_sender(&self) -> &Sender<ResponseEvent> {
+        &self.data_channel.0
     }
 }

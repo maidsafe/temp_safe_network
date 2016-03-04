@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// ResponseGetter is a lazy evaluated response getter.
+/// Lazy evaluated response getter.
 pub mod response_getter;
 
 mod user_account;
@@ -24,21 +24,23 @@ mod message_queue;
 #[cfg(feature = "use-mock-routing")]
 mod non_networking_test_framework;
 
-use xor_name::XorName;
-use core::errors::CoreError;
-use self::user_account::Account;
-use std::sync::{Arc, Mutex, mpsc};
-use self::message_queue::MessageQueue;
-use sodiumoxide::crypto::{box_, sign};
 use std::sync::mpsc::Sender;
-use self::response_getter::ResponseGetter;
-use sodiumoxide::crypto::hash::{sha256, sha512};
-use maidsafe_utilities::thread::RaiiThreadJoiner;
-use routing::{FullId, StructuredData, Data, DataRequest, Authority, Event, PlainData};
-use mpid_messaging::{MpidMessage, MpidMessageWrapper};
-use maidsafe_utilities::serialisation::serialise;
-use core::translated_events::{OperationFailureEvent, NetworkEvent, DataReceivedEvent};
+use std::sync::{Arc, Mutex, mpsc};
+
+use self::user_account::Account;
+use self::message_queue::MessageQueue;
+use self::response_getter::{MutationResponseGetter, GetResponseGetter};
+
 use core::utility;
+use core::errors::CoreError;
+use core::translated_events::NetworkEvent;
+
+use xor_name::XorName;
+use maidsafe_utilities::thread::RaiiThreadJoiner;
+use routing::{MessageId, FullId, StructuredData, Data, DataRequest, Authority, Event};
+
+use sodiumoxide::crypto::{box_, sign};
+use sodiumoxide::crypto::hash::{sha256, sha512};
 
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
@@ -51,7 +53,7 @@ const LOGIN_PACKET_TYPE_TAG: u64 = 0;
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
 /// essentially a non-blocking Client with upper layers having an option to either block and wait
-/// on the returned ResponseGetter for receiving network response or spawn a new thread. The Client
+/// on the returned ResponseGetters for receiving network response or spawn a new thread. The Client
 /// itself is however well equipped for parallel and non-blocking PUTs and GETS.
 pub struct Client {
     account: Option<Account>,
@@ -73,8 +75,7 @@ impl Client {
 
         let routing = try!(Client::get_new_routing(routing_sender, None));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
-                                                             vec![network_event_sender],
-                                                             Vec::new());
+                                                             vec![network_event_sender]);
 
         match try!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -109,8 +110,7 @@ impl Client {
 
         let routing = try!(Client::get_new_routing(routing_sender, Some(id_packet)));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
-                                                             vec![network_event_sender],
-                                                             Vec::new());
+                                                             vec![network_event_sender]);
 
         match try!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -146,7 +146,8 @@ impl Client {
                                                            vec![account.get_public_maid().public_keys().0.clone()],
                                                            Vec::new(),
                                                            Some(&account.get_maid().secret_keys().0)));
-            try!(client.put(Data::Structured(account_version), None));
+
+            try!(try!(client.put(Data::Structured(account_version), None)).get());
         }
 
         Ok(client)
@@ -162,9 +163,9 @@ impl Client {
         let session_packet_request = DataRequest::Structured(user_id.clone(),
                                                              LOGIN_PACKET_TYPE_TAG);
 
-        let response_getter = try!(unregistered_client.get(session_packet_request, None));
+        let resp_getter = try!(unregistered_client.get(session_packet_request, None));
 
-        if let Data::Structured(session_packet) = try!(response_getter.get()) {
+        if let Data::Structured(session_packet) = try!(resp_getter.get()) {
             let decrypted_session_packet = try!(Account::decrypt(session_packet.get_data(),
                                                                  password.as_bytes(),
                                                                  pin.as_bytes()));
@@ -190,8 +191,7 @@ impl Client {
 
             let routing = try!(Client::get_new_routing(routing_sender, Some(id_packet)));
             let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
-                                                                 vec![network_event_sender],
-                                                                 Vec::new());
+                                                                 vec![network_event_sender]);
 
             match try!(network_event_receiver.recv()) {
                 NetworkEvent::Connected => (),
@@ -319,11 +319,11 @@ impl Client {
     pub fn get(&mut self,
                request_for: DataRequest,
                opt_dst: Option<Authority>)
-               -> Result<ResponseGetter, CoreError> {
+               -> Result<GetResponseGetter, CoreError> {
         if let DataRequest::Immutable(..) = request_for {
             let mut msg_queue = unwrap_result!(self.message_queue.lock());
             if msg_queue.local_cache_check(&request_for.name()) {
-                return Ok(ResponseGetter::new(None, self.message_queue.clone(), request_for));
+                return Ok(GetResponseGetter::new(None, self.message_queue.clone(), request_for));
             }
         }
 
@@ -332,19 +332,21 @@ impl Client {
             None => Authority::NaeManager(request_for.name()),
         };
 
-        let (data_event_sender, data_event_receiver) = mpsc::channel();
-        self.add_data_receive_event_observer(request_for.name(), data_event_sender.clone());
+        let (tx, rx) = mpsc::channel();
+        let msg_id = MessageId::new();
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
 
-        // TODO Routing API changed - use the returned value
-        let _ = try!(self.routing.send_get_request(dst, request_for.clone()));
+        try!(self.routing.send_get_request(dst, request_for.clone(), msg_id));
 
-        Ok(ResponseGetter::new(Some((data_event_sender, data_event_receiver)),
-                               self.message_queue.clone(),
-                               request_for))
+        Ok(GetResponseGetter::new(Some((tx, rx)), self.message_queue.clone(), request_for))
     }
 
     /// Put data onto the network. This is non-blocking.
-    pub fn put(&self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+    pub fn put(&self,
+               data: Data,
+               opt_dst: Option<Authority>)
+               -> Result<MutationResponseGetter, CoreError> {
         let dst = match opt_dst {
             Some(auth) => auth,
             None => {
@@ -352,130 +354,149 @@ impl Client {
             }
         };
 
-        // TODO Routing API changed - use the returned value
-        let _ = try!(self.routing.send_put_request(dst, data));
-        // TODO (Viv): This should be removed once we handle the appropriate success and failure
-        //             results sent back from the network.
-        ::std::thread::sleep(::std::time::Duration::from_secs(5));
-        Ok(())
-    }
+        let (tx, rx) = mpsc::channel();
+        let msg_id = MessageId::new();
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
 
-    /// Send a message to receiver via the network. This is non-blocking.
-    pub fn send_message(&self,
-                        mpid_account: &XorName,
-                        msg_metadata: Vec<u8>,
-                        msg_content: Vec<u8>,
-                        receiver: XorName,
-                        secret_key: &sign::SecretKey)
-                        -> Result<(), CoreError> {
-        let mpid_message = try!(MpidMessage::new(mpid_account.clone(),
-                                                 msg_metadata,
-                                                 receiver,
-                                                 msg_content,
-                                                 secret_key));
-        let request = MpidMessageWrapper::PutMessage(mpid_message.clone());
-        let serialised_request = try!(serialise(&request));
-        let name = try!(mpid_message.name());
-        let data = Data::Plain(PlainData::new(name, serialised_request));
-        self.put(data, Some(Authority::ClientManager(mpid_account.clone())))
-    }
+        try!(self.routing.send_put_request(dst, data, msg_id));
 
-    /// Delete a message from own or sender's outbox. This is non-blocking.
-    pub fn delete_message(&self,
-                          target_account: &XorName,
-                          message_name: &XorName)
-                          -> Result<(), CoreError> {
-        self.messaging_delete_request(target_account,
-                                      message_name,
-                                      MpidMessageWrapper::DeleteMessage(message_name.clone()))
-    }
-
-    /// Delete a header from own inbox. This is non-blocking.
-    pub fn delete_header(&self,
-                         mpid_account: &XorName,
-                         header_name: &XorName)
-                         -> Result<(), CoreError> {
-        self.messaging_delete_request(mpid_account,
-                                      header_name,
-                                      MpidMessageWrapper::DeleteHeader(header_name.clone()))
-    }
-
-    fn messaging_delete_request(&self,
-                                account: &XorName,
-                                name: &XorName,
-                                request: MpidMessageWrapper)
-                                -> Result<(), CoreError> {
-        let serialised_request = try!(serialise(&request));
-        let data = Data::Plain(PlainData::new(name.clone(), serialised_request));
-        self.delete(data, Some(Authority::ClientManager(account.clone())))
-    }
-
-    /// Register as an online mpid_messaging client to the network. This is non-blocking.
-    pub fn register_online(&self, mpid_account: &XorName) -> Result<ResponseGetter, CoreError> {
-        self.messaging_post_request(mpid_account, MpidMessageWrapper::Online)
-    }
-
-    /// Query the targeted messages' header that still in the outbox. This is non-blocking.
-    pub fn query_outbox_headers(&self,
-                                mpid_account: &XorName,
-                                headers: Vec<XorName>)
-                                -> Result<ResponseGetter, CoreError> {
-        self.messaging_post_request(mpid_account, MpidMessageWrapper::OutboxHas(headers))
-    }
-
-    /// Get the list of messages' headers that still in the outbox. This is non-blocking.
-    pub fn get_outbox_headers(&self, mpid_account: &XorName) -> Result<ResponseGetter, CoreError> {
-        self.messaging_post_request(mpid_account, MpidMessageWrapper::GetOutboxHeaders)
-    }
-
-    // TODO: the message_queue is a LRUcache without timeout, it needs to check whether a
-    //       non-responded request will sit in the cache fowever and block the later on
-    //       post requests, as all such request will bearing the same name - mpid_account
-    fn messaging_post_request(&self,
-                              mpid_account: &XorName,
-                              request: MpidMessageWrapper)
-                              -> Result<ResponseGetter, CoreError> {
-        let data_request = DataRequest::Plain(mpid_account.clone());
-
-        let mut msg_queue = unwrap_result!(self.message_queue.lock());
-        if msg_queue.local_cache_check(mpid_account) {
-            return Ok(ResponseGetter::new(None, self.message_queue.clone(), data_request));
-        }
-
-        let serialised_request = try!(serialise(&request));
-        let data = Data::Plain(PlainData::new(mpid_account.clone(), serialised_request));
-        try!(self.post(data, Some(Authority::ClientManager(mpid_account.clone()))));
-
-        let (msg_event_sender, msg_event_receiver) = mpsc::channel();
-        self.add_data_receive_event_observer(mpid_account.clone(), msg_event_sender.clone());
-        Ok(ResponseGetter::new(Some((msg_event_sender, msg_event_receiver)),
-                               self.message_queue.clone(),
-                               data_request))
+        Ok(MutationResponseGetter::new((tx, rx)))
     }
 
     /// Post data onto the network
-    pub fn post(&self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+    pub fn post(&self,
+                data: Data,
+                opt_dst: Option<Authority>)
+                -> Result<MutationResponseGetter, CoreError> {
         let dst = match opt_dst {
             Some(auth) => auth,
             None => Authority::NaeManager(data.name()),
         };
 
-        // TODO Routing API changed - use the returned value
-        let _ = try!(self.routing.send_post_request(dst, data));
-        Ok(())
+        let (tx, rx) = mpsc::channel();
+        let msg_id = MessageId::new();
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
+
+        try!(self.routing.send_post_request(dst, data, msg_id));
+
+        Ok(MutationResponseGetter::new((tx, rx)))
     }
 
     /// Delete data from the network
-    pub fn delete(&self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+    pub fn delete(&self,
+                  data: Data,
+                  opt_dst: Option<Authority>)
+                  -> Result<MutationResponseGetter, CoreError> {
         let dst = match opt_dst {
             Some(auth) => auth,
             None => Authority::NaeManager(data.name()),
         };
 
-        // TODO Routing API changed - use the returned value
-        let _ = try!(self.routing.send_delete_request(dst, data));
-        Ok(())
+        let (tx, rx) = mpsc::channel();
+        let msg_id = MessageId::new();
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
+
+        try!(self.routing.send_delete_request(dst, data, msg_id));
+
+        Ok(MutationResponseGetter::new((tx, rx)))
     }
+
+    // TODO Redo this since response handling is integrated - For Qi right now
+    // /// Send a message to receiver via the network. This is non-blocking.
+    // pub fn send_message(&self,
+    //                     mpid_account: &XorName,
+    //                     msg_metadata: Vec<u8>,
+    //                     msg_content: Vec<u8>,
+    //                     receiver: XorName,
+    //                     secret_key: &sign::SecretKey)
+    //                     -> Result<MutationResponseGetter, CoreError> {
+    //     let mpid_message = try!(MpidMessage::new(mpid_account.clone(),
+    //                                              msg_metadata,
+    //                                              receiver,
+    //                                              msg_content,
+    //                                              secret_key));
+    //     let request = MpidMessageWrapper::PutMessage(mpid_message.clone());
+    //     let serialised_request = try!(serialise(&request));
+    //     let name = try!(mpid_message.name());
+    //     let data = Data::Plain(PlainData::new(name, serialised_request));
+    //     self.put(data, Some(Authority::ClientManager(mpid_account.clone())))
+    // }
+
+    // /// Delete a message from own or sender's outbox. This is non-blocking.
+    // pub fn delete_message(&self,
+    //                       target_account: &XorName,
+    //                       message_name: &XorName)
+    //                       -> Result<(), CoreError> {
+    //     self.messaging_delete_request(target_account,
+    //                                   message_name,
+    //                                   MpidMessageWrapper::DeleteMessage(message_name.clone()))
+    // }
+
+    // /// Delete a header from own inbox. This is non-blocking.
+    // pub fn delete_header(&self,
+    //                      mpid_account: &XorName,
+    //                      header_name: &XorName)
+    //                      -> Result<MutationResponseGetter, CoreError> {
+    //     self.messaging_delete_request(mpid_account,
+    //                                   header_name,
+    //                                   MpidMessageWrapper::DeleteHeader(header_name.clone()))
+    // }
+
+    // fn messaging_delete_request(&self,
+    //                             account: &XorName,
+    //                             name: &XorName,
+    //                             request: MpidMessageWrapper)
+    //                             -> Result<MutationResponseGetter, CoreError> {
+    //     let serialised_request = try!(serialise(&request));
+    //     let data = Data::Plain(PlainData::new(name.clone(), serialised_request));
+    //     self.delete(data, Some(Authority::ClientManager(account.clone())))
+    // }
+
+    // /// Register as an online mpid_messaging client to the network. This is non-blocking.
+    // pub fn register_online(&self, mpid_account: &XorName) -> Result<ResponseGetter, CoreError> {
+    //     self.messaging_post_request(mpid_account, MpidMessageWrapper::Online)
+    // }
+
+    // /// Query the targeted messages' header that still in the outbox. This is non-blocking.
+    // pub fn query_outbox_headers(&self,
+    //                             mpid_account: &XorName,
+    //                             headers: Vec<XorName>)
+    //                             -> Result<ResponseGetter, CoreError> {
+    //     self.messaging_post_request(mpid_account, MpidMessageWrapper::OutboxHas(headers))
+    // }
+
+    // /// Get the list of messages' headers that still in the outbox. This is non-blocking.
+    // pub fn get_outbox_headers(&self, mpid_account: &XorName) -> Result<ResponseGetter, CoreError> {
+    //     self.messaging_post_request(mpid_account, MpidMessageWrapper::GetOutboxHeaders)
+    // }
+
+    // // TODO: the message_queue is a LRUcache without timeout, it needs to check whether a
+    // //       non-responded request will sit in the cache fowever and block the later on
+    // //       post requests, as all such request will bearing the same name - mpid_account
+    // fn messaging_post_request(&self,
+    //                           mpid_account: &XorName,
+    //                           request: MpidMessageWrapper)
+    //                           -> Result<ResponseGetter, CoreError> {
+    //     let data_request = DataRequest::Plain(mpid_account.clone());
+
+    //     let mut msg_queue = unwrap_result!(self.message_queue.lock());
+    //     if msg_queue.local_cache_check(mpid_account) {
+    //         return Ok(ResponseGetter::new(None, self.message_queue.clone(), data_request));
+    //     }
+
+    //     let serialised_request = try!(serialise(&request));
+    //     let data = Data::Plain(PlainData::new(mpid_account.clone(), serialised_request));
+    //     try!(self.post(data, Some(Authority::ClientManager(mpid_account.clone()))));
+
+    //     let (msg_event_sender, msg_event_receiver) = mpsc::channel();
+    //     self.add_data_receive_event_observer(mpid_account.clone(), msg_event_sender.clone());
+    //     Ok(ResponseGetter::new(Some((msg_event_sender, msg_event_receiver)),
+    //                            self.message_queue.clone(),
+    //                            data_request))
+    // }
 
     /// Returns the public encryption key
     pub fn get_public_encryption_key(&self) -> Result<&box_::PublicKey, CoreError> {
@@ -499,20 +520,6 @@ impl Client {
     pub fn get_secret_signing_key(&self) -> Result<&sign::SecretKey, CoreError> {
         let account = try!(self.account.as_ref().ok_or(CoreError::OperationForbiddenForClient));
         Ok(&account.get_maid().secret_keys().0)
-    }
-
-    /// Add observers for Data Recieve Events
-    pub fn add_data_receive_event_observer(&self,
-                                           data_name: XorName,
-                                           sender: Sender<DataReceivedEvent>) {
-        unwrap_result!(self.message_queue.lock())
-            .add_data_receive_event_observer(data_name, sender);
-    }
-
-    /// Add observers for Operation Failure Events like `PutFailure`, `PostFailure`, `DeleteFailure`,
-    /// `Terminated`
-    pub fn add_operation_failure_event_observer(&self, sender: Sender<OperationFailureEvent>) {
-        unwrap_result!(self.message_queue.lock()).add_operation_failure_event_observer(sender);
     }
 
     /// Add observers for Network Events like `Connected`, `Disconnected`, `Terminated`
@@ -551,14 +558,14 @@ impl Client {
         let session_packet_request = DataRequest::Structured(session_packet_id.clone(),
                                                              LOGIN_PACKET_TYPE_TAG);
 
-        let response_getter = try!(self.get(session_packet_request, None));
+        let resp_getter = try!(self.get(session_packet_request, None));
 
         let account = try!(self.account.as_ref().ok_or(CoreError::OperationForbiddenForClient));
         let session_packet_keys = try!(self.session_packet_keys
                                            .as_ref()
                                            .ok_or(CoreError::OperationForbiddenForClient));
 
-        if let Data::Structured(retrieved_session_packet) = try!(response_getter.get()) {
+        if let Data::Structured(retrieved_session_packet) = try!(resp_getter.get()) {
             let encrypted_account = try!(account.encrypt(session_packet_keys.get_password(),
                                                          session_packet_keys.get_pin()));
 
@@ -569,7 +576,7 @@ impl Client {
                                          vec![account.get_public_maid().public_keys().0.clone()],
                                          Vec::new(),
                                          Some(&account.get_maid().secret_keys().0)));
-            self.post(Data::Structured(new_account_version), None)
+            try!(self.post(Data::Structured(new_account_version), None)).get()
         } else {
             Err(CoreError::ReceivedUnexpectedData)
         }
@@ -607,11 +614,13 @@ impl SessionPacketEncryptionKeys {
 #[cfg(test)]
 mod test {
     use super::*;
-    use xor_name::XorName;
-    use core::client::response_getter::ResponseGetter;
-    use routing::{ImmutableDataType, ImmutableData, DataRequest, Data, StructuredData};
+
     use core::utility;
     use core::errors::CoreError;
+    use core::client::response_getter::GetResponseGetter;
+
+    use xor_name::XorName;
+    use routing::{ImmutableDataType, ImmutableData, DataRequest, Data, StructuredData};
 
     #[test]
     fn account_creation() {
@@ -650,7 +659,7 @@ mod test {
 
             // Creation should pass
             let client = unwrap_result!(Client::create_account(keyword, pin, password));
-            unwrap_result!(client.put(orig_data.clone(), None));
+            unwrap_result!(unwrap_result!(client.put(orig_data.clone(), None)).get());
         }
 
         // Unregistered Client should be able to retrieve the data
@@ -797,17 +806,17 @@ mod test {
                                    unwrap_result!(utility::generate_random_vector(10)));
             let data = Data::Immutable(immut_data);
 
-            unwrap_result!(client.put(data.clone(), None));
+            unwrap_result!(unwrap_result!(client.put(data.clone(), None)).get());
 
             let data_request = DataRequest::Immutable(data.name(), ImmutableDataType::Normal);
 
             // Should not initially be in version cache
             {
-                let response_getter = ResponseGetter::new(None,
-                                                          client.message_queue.clone(),
-                                                          data_request.clone());
+                let resp_getter = GetResponseGetter::new(None,
+                                                         client.message_queue.clone(),
+                                                         data_request.clone());
 
-                match response_getter.get() {
+                match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
                     Err(CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),
@@ -817,10 +826,10 @@ mod test {
             let response_getter = unwrap_result!(client.get(data_request.clone(), None));
             assert_eq!(unwrap_result!(response_getter.get()), data);
 
-            let response_getter = ResponseGetter::new(None,
-                                                      client.message_queue.clone(),
-                                                      data_request);
-            assert_eq!(unwrap_result!(response_getter.get()), data);
+            let resp_getter = GetResponseGetter::new(None,
+                                                     client.message_queue.clone(),
+                                                     data_request);
+            assert_eq!(unwrap_result!(resp_getter.get()), data);
         }
 
         // Version Caching should NOT work for StructuredData
@@ -837,17 +846,17 @@ mod test {
                                                                  None));
             let data = Data::Structured(struct_data);
 
-            unwrap_result!(client.put(data.clone(), None));
+            unwrap_result!(unwrap_result!(client.put(data.clone(), None)).get());
 
             let data_request = DataRequest::Structured(id, TYPE_TAG);
 
             // Should not initially be in version cache
             {
-                let response_getter = ResponseGetter::new(None,
-                                                          client.message_queue.clone(),
-                                                          data_request.clone());
+                let resp_getter = GetResponseGetter::new(None,
+                                                         client.message_queue.clone(),
+                                                         data_request.clone());
 
-                match response_getter.get() {
+                match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
                     Err(CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),
@@ -859,11 +868,11 @@ mod test {
 
             // Should not be in version cache even after fetch
             {
-                let response_getter = ResponseGetter::new(None,
-                                                          client.message_queue.clone(),
-                                                          data_request);
+                let resp_getter = GetResponseGetter::new(None,
+                                                         client.message_queue.clone(),
+                                                         data_request);
 
-                match response_getter.get() {
+                match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
                     Err(CoreError::VersionCacheMiss) => (),
                     Err(error) => panic!("{:?}", error),

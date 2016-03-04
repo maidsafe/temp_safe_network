@@ -66,7 +66,7 @@ impl DnsOperations {
                         data_encryption_keys: Option<(&box_::PublicKey,
                                                       &box_::SecretKey,
                                                       &box_::Nonce)>)
-                        -> Result<StructuredData, DnsError> {
+                        -> Result<(), DnsError> {
         debug!("Registering {:?} dns ...", long_name);
         let mut saved_configs = try!(dns_configuration::get_dns_configuaration_data(self.client
                                                                                         .clone()));
@@ -81,6 +81,18 @@ impl DnsOperations {
                 encryption_key: public_messaging_encryption_key.clone(),
             };
 
+            let struct_data = try!(unversioned::create(self.client.clone(),
+                                                       DNS_TAG,
+                                                       identifier,
+                                                       0,
+                                                       try!(serialise(&dns_record)),
+                                                       owners,
+                                                       vec![],
+                                                       private_signing_key,
+                                                       data_encryption_keys));
+            try!(try!(unwrap_result!(self.client.lock()).put(Data::Structured(struct_data), None))
+                     .get());
+
             debug!("Adding encryption key pair to saved dns configuration ...");
             saved_configs.push(dns_configuration::DnsConfiguation {
                 long_name: long_name,
@@ -90,15 +102,7 @@ impl DnsOperations {
             try!(dns_configuration::write_dns_configuaration_data(self.client.clone(),
                                                                   &saved_configs));
 
-            Ok(try!(unversioned::create(self.client.clone(),
-                                        DNS_TAG,
-                                        identifier,
-                                        0,
-                                        try!(serialise(&dns_record)),
-                                        owners,
-                                        vec![],
-                                        private_signing_key,
-                                        data_encryption_keys)))
+            Ok(())
         }
     }
 
@@ -106,7 +110,7 @@ impl DnsOperations {
     pub fn delete_dns(&self,
                       long_name: &String,
                       private_signing_key: &sign::SecretKey)
-                      -> Result<StructuredData, DnsError> {
+                      -> Result<(), DnsError> {
         let mut saved_configs = try!(dns_configuration::get_dns_configuaration_data(self.client
                                                                                         .clone()));
         let pos = try!(saved_configs.iter()
@@ -115,19 +119,24 @@ impl DnsOperations {
 
         let prev_struct_data = try!(self.get_housing_structured_data(long_name));
 
+        let struct_data = try!(unversioned::create(self.client.clone(),
+                                                   DNS_TAG,
+                                                   prev_struct_data.get_identifier().clone(),
+                                                   prev_struct_data.get_version() + 1,
+                                                   vec![],
+                                                   prev_struct_data.get_owner_keys().clone(),
+                                                   prev_struct_data.get_previous_owner_keys()
+                                                                   .clone(),
+                                                   private_signing_key,
+                                                   None));
+        try!(try!(unwrap_result!(self.client.lock()).delete(Data::Structured(struct_data), None))
+                 .get());
+
         debug!("Removing dns saved configs at {:?} position ...", pos);
         let _ = saved_configs.remove(pos);
         try!(dns_configuration::write_dns_configuaration_data(self.client.clone(), &saved_configs));
 
-        Ok(try!(unversioned::create(self.client.clone(),
-                                    DNS_TAG,
-                                    prev_struct_data.get_identifier().clone(),
-                                    prev_struct_data.get_version() + 1,
-                                    vec![],
-                                    prev_struct_data.get_owner_keys().clone(),
-                                    prev_struct_data.get_previous_owner_keys().clone(),
-                                    private_signing_key,
-                                    None)))
+        Ok(())
     }
 
     /// Get all the Dns-names registered by the user so far in the network.
@@ -202,7 +211,7 @@ impl DnsOperations {
                        data_encryption_decryption_keys: Option<(&box_::PublicKey,
                                                                 &box_::SecretKey,
                                                                 &box_::Nonce)>)
-                       -> Result<StructuredData, DnsError> {
+                       -> Result<(), DnsError> {
         self.add_remove_service_impl(long_name,
                                      (new_service.0, Some(new_service.1)),
                                      private_signing_key,
@@ -217,7 +226,7 @@ impl DnsOperations {
                           data_encryption_decryption_keys: Option<(&box_::PublicKey,
                                                                    &box_::SecretKey,
                                                                    &box_::Nonce)>)
-                          -> Result<StructuredData, DnsError> {
+                          -> Result<(), DnsError> {
         self.add_remove_service_impl(long_name,
                                      (service_to_remove, None),
                                      private_signing_key,
@@ -241,7 +250,7 @@ impl DnsOperations {
                                data_encryption_decryption_keys: Option<(&box_::PublicKey,
                                                                         &box_::SecretKey,
                                                                         &box_::Nonce)>)
-                               -> Result<StructuredData, DnsError> {
+                               -> Result<(), DnsError> {
         let _ = try!(self.find_dns_record(long_name));
 
         let is_add_service = service.1.is_some();
@@ -266,15 +275,21 @@ impl DnsOperations {
                 let _ = dns_record.services.remove(&service.0);
             }
 
-            Ok(try!(unversioned::create(self.client.clone(),
-                                        DNS_TAG,
-                                        prev_struct_data.get_identifier().clone(),
-                                        prev_struct_data.get_version() + 1,
-                                        try!(serialise(&dns_record)),
-                                        prev_struct_data.get_owner_keys().clone(),
-                                        prev_struct_data.get_previous_owner_keys().clone(),
-                                        private_signing_key,
-                                        data_encryption_decryption_keys)))
+            let struct_data = try!(unversioned::create(self.client.clone(),
+                                                       DNS_TAG,
+                                                       prev_struct_data.get_identifier().clone(),
+                                                       prev_struct_data.get_version() + 1,
+                                                       try!(serialise(&dns_record)),
+                                                       prev_struct_data.get_owner_keys().clone(),
+                                                       prev_struct_data.get_previous_owner_keys()
+                                                                       .clone(),
+                                                       private_signing_key,
+                                                       data_encryption_decryption_keys));
+            try!(try!(unwrap_result!(self.client.lock())
+                          .post(Data::Structured(struct_data), None))
+                     .get());
+
+            Ok(())
         }
     }
 
@@ -315,16 +330,20 @@ struct Dns {
 #[cfg(test)]
 mod test {
     use super::*;
-    use xor_name::XorName;
-    use routing::Data;
-    use nfs::metadata::directory_key::DirectoryKey;
-    use core::utility;
-    use core::utility::test_utils;
-    use core::client::Client;
+
     use std::sync::{Arc, Mutex};
-    use nfs::AccessLevel;
-    use sodiumoxide::crypto::box_;
+
     use dns::errors::DnsError;
+
+    use nfs::AccessLevel;
+    use nfs::metadata::directory_key::DirectoryKey;
+
+    use core::utility;
+    use core::client::Client;
+    use core::utility::test_utils;
+
+    use xor_name::XorName;
+    use sodiumoxide::crypto::box_;
 
     #[test]
     fn register_and_delete_dns() {
@@ -341,15 +360,13 @@ mod test {
                                      .clone();
 
         // Register
-        let mut struct_data = unwrap_result!(dns_operations.register_dns(dns_name.clone(),
-                                                                         &messaging_keypair.0,
-                                                                         &messaging_keypair.1,
-                                                                         &vec![],
-                                                                         owners.clone(),
-                                                                         &secret_signing_key,
-                                                                         None));
-
-        unwrap_result!(unwrap_result!(client.lock()).put(Data::Structured(struct_data), None));
+        unwrap_result!(dns_operations.register_dns(dns_name.clone(),
+                                                   &messaging_keypair.0,
+                                                   &messaging_keypair.1,
+                                                   &vec![],
+                                                   owners.clone(),
+                                                   &secret_signing_key,
+                                                   None));
 
         // Get Services
         let services = unwrap_result!(dns_operations.get_all_services(&dns_name, None));
@@ -369,17 +386,16 @@ mod test {
         }
 
         // Delete
-        struct_data = unwrap_result!(dns_operations.delete_dns(&dns_name, &secret_signing_key));
-        unwrap_result!(unwrap_result!(client.lock()).delete(Data::Structured(struct_data), None));
+        unwrap_result!(dns_operations.delete_dns(&dns_name, &secret_signing_key));
 
         // Registering again should be allowed
-        let _ = unwrap_result!(dns_operations.register_dns(dns_name,
-                                                           &messaging_keypair.0,
-                                                           &messaging_keypair.1,
-                                                           &vec![],
-                                                           owners,
-                                                           &secret_signing_key,
-                                                           None));
+        unwrap_result!(dns_operations.register_dns(dns_name,
+                                                   &messaging_keypair.0,
+                                                   &messaging_keypair.1,
+                                                   &vec![],
+                                                   owners,
+                                                   &secret_signing_key,
+                                                   None));
     }
 
     #[test]
@@ -414,15 +430,13 @@ mod test {
                                      .clone();
 
         // Register
-        let mut struct_data = unwrap_result!(dns_operations.register_dns(dns_name.clone(),
-                                                                         &messaging_keypair.0,
-                                                                         &messaging_keypair.1,
-                                                                         &services,
-                                                                         owners.clone(),
-                                                                         &secret_signing_key,
-                                                                         None));
-
-        unwrap_result!(unwrap_result!(client.lock()).put(Data::Structured(struct_data), None));
+        unwrap_result!(dns_operations.register_dns(dns_name.clone(),
+                                                   &messaging_keypair.0,
+                                                   &messaging_keypair.1,
+                                                   &services,
+                                                   owners.clone(),
+                                                   &secret_signing_key,
+                                                   None));
 
         // Get all dns-names
         let dns_records_vec = unwrap_result!(dns_operations.get_all_registered_names());
@@ -440,24 +454,29 @@ mod test {
         assert!(services.iter()
                         .all(|&(ref a, _)| services_vec.iter().find(|b| *a == **b).is_some()));
 
-        // TODO(Spandan) update all test cases for negative GET's once it is figured out how
-        // match dns_operations.get_service_home_directory_key(&"bogus".to_string(), &services[0].0, None) {
-        //     Ok(_) => panic!("Should have been an error"),
-        //     Err(DnsError::DnsRecordNotFound) => (),
-        //     Err(error) => panic!("{:?}", error),
-        // }
+        match dns_operations.get_service_home_directory_key(&"bogus".to_string(),
+                                                            &services[0].0,
+                                                            None) {
+            Ok(_) => panic!("Should have been an error"),
+            Err(DnsError::DnsRecordNotFound) => (),
+            Err(error) => panic!("{:?}", error),
+        }
 
         // Get information about a service - the home-directory and its type
-        let home_dir_key = unwrap_result!(dns_operations_unregistered.get_service_home_directory_key(&dns_name, &services[1].0, None));
+        let home_dir_key_result =
+            dns_operations_unregistered.get_service_home_directory_key(&dns_name,
+                                                                       &services[1].0,
+                                                                       None);
+        let home_dir_key = unwrap_result!(home_dir_key_result);
         assert_eq!(home_dir_key, services[1].1);
 
         // Remove a service
         let removed_service = services.remove(1);
-        struct_data = unwrap_result!(dns_operations.remove_service(&dns_name,
-                                                                   removed_service.0.clone(),
-                                                                   &secret_signing_key,
-                                                                   None));
-        unwrap_result!(unwrap_result!(client.lock()).post(Data::Structured(struct_data), None));
+        unwrap_result!(dns_operations.remove_service(&dns_name,
+                                                     removed_service.0.clone(),
+                                                     &secret_signing_key,
+                                                     None));
+        ::std::thread::sleep(::std::time::Duration::from_secs(1));
 
         // Get all services
         let services_vec = unwrap_result!(dns_operations_unregistered.get_all_services(&dns_name,
@@ -466,13 +485,14 @@ mod test {
         assert!(services.iter()
                         .all(|&(ref a, _)| services_vec.iter().find(|b| *a == **b).is_some()));
 
-        // TODO(Spandan) update all test cases for negative GET's once it is figured out how
         // Try to enquire about a deleted service
-        // match dns_operations.get_service_home_directory_key(&dns_name, &removed_service.0, None) {
-        //     Ok(_) => panic!("Should have been an error"),
-        //     Err(DnsError::ServiceNotFound) => (),
-        //     Err(error) => panic!("{:?}", error),
-        // }
+        match dns_operations_unregistered.get_service_home_directory_key(&dns_name,
+                                                                         &removed_service.0,
+                                                                         None) {
+            Ok(_) => panic!("Should have been an error"),
+            Err(DnsError::ServiceNotFound) => (),
+            Err(error) => panic!("{:?}", error),
+        }
 
         // Add a service
         services.push(("added-service".to_string(),
@@ -481,12 +501,10 @@ mod test {
                                          false,
                                          AccessLevel::Public)));
         let services_size = services.len();
-        struct_data = unwrap_result!(dns_operations.add_service(&dns_name,
-                                                                services[services_size - 1]
-                                                                    .clone(),
-                                                                &secret_signing_key,
-                                                                None));
-        unwrap_result!(unwrap_result!(client.lock()).post(Data::Structured(struct_data), None));
+        unwrap_result!(dns_operations.add_service(&dns_name,
+                                                  services[services_size - 1].clone(),
+                                                  &secret_signing_key,
+                                                  None));
 
         // Get all services
         let services_vec = unwrap_result!(dns_operations_unregistered.get_all_services(&dns_name,

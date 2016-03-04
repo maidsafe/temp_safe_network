@@ -17,11 +17,12 @@
 
 use std::fmt;
 
+use core::utility;
 use nfs::errors::NfsError;
 use nfs::metadata::file_metadata::FileMetadata;
-use core::utility;
-use self_encryption::DataMap;
+
 use xor_name::XorName;
+use self_encryption::DataMap;
 
 /// Representation of a File to be put into the network. Could be text, music, video etc any kind
 /// of file
