@@ -19,7 +19,7 @@ use core::errors::CoreError;
 use sodiumoxide::crypto::sign;
 use core::utility;
 
-/// Gnerates a random mock client for testing
+/// Generates a random mock client for testing
 pub fn get_client() -> Result<Client, CoreError> {
     let pin = try!(utility::generate_random_string(10));
     let keyword = try!(utility::generate_random_string(10));
@@ -28,22 +28,22 @@ pub fn get_client() -> Result<Client, CoreError> {
     Client::create_account(keyword, pin, password)
 }
 
-/// Gnerates Random Public Keys
+/// Generates random public keys
 pub fn generate_public_keys(len: usize) -> Vec<sign::PublicKey> {
     (0..len).map(|_| sign::gen_keypair().0).collect()
 }
 
-/// Gnerates Random Secret Keys
+/// Generates random secret keys
 pub fn generate_secret_keys(len: usize) -> Vec<sign::SecretKey> {
     (0..len).map(|_| sign::gen_keypair().1).collect()
 }
 
-/// Gnerates public keys of maximun size
+/// Generates public keys of maximum size
 pub fn get_max_sized_public_keys(len: usize) -> Vec<sign::PublicKey> {
     ::std::iter::repeat(sign::PublicKey([::std::u8::MAX; sign::PUBLICKEYBYTES])).take(len).collect()
 }
 
-/// Gnerates secret keys of maximun size
+/// Generates secret keys of maximum size
 pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
     ::std::iter::repeat(sign::SecretKey([::std::u8::MAX; sign::SECRETKEYBYTES])).take(len).collect()
 }

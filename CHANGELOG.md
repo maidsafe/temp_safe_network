@@ -1,4 +1,9 @@
 # Safe Core - Change Log
+
+## [0.9.0]
+- Updated response handling in line with network behaviour changes.
+- Updated dependencies.
+
 ## [0.8.0]
 - Nfs and Dns modules and examples merged into safe_core.
 
