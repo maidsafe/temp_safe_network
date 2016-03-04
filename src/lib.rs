@@ -59,7 +59,7 @@ extern crate mpid_messaging;
 
 /// Core module
 pub mod core;
-// /// Nfs module;
-// pub mod nfs;
+/// Nfs module;
+pub mod nfs;
 // /// Dns module;
 // pub mod dns;
