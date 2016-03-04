@@ -41,12 +41,12 @@ bench = false
 
 [[example]]
 name = "rest_api"
-test = false
+test = true
 bench = false
 
 [[example]]
 name = "simulate_browser"
-test = false
+test = true
 bench = false
 
 [features]
