@@ -198,6 +198,7 @@ mod test {
     const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1000;
 
     #[test]
+    #[ignore]
     fn create_and_get_unversionsed_structured_data() {
         let keys = box_::gen_keypair();
         let data_decryption_keys = (&keys.0, &keys.1, &box_::gen_nonce());

@@ -102,6 +102,7 @@ mod test {
     const FIXED_SIZE_OF_KEY: usize = 196;
 
     #[test]
+    #[ignore]
     fn approximate_space_for_data() {
         // Assertion based on Fixed Key sizes
         {
@@ -134,6 +135,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn data_can_fit_in_structured_data() {
         // Assertion based on Fixed Key sizes
         // Maximum of 516 keys can be accomodated after serialisation. Thus the fixed key tests work
