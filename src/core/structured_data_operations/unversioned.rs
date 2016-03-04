@@ -198,8 +198,7 @@ mod test {
     const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1000;
 
     #[test]
-    #[ignore]
-    fn create_and_get_unversionsed_structured_data() {
+    fn create_and_get_unversioned_structured_data() {
         let keys = box_::gen_keypair();
         let data_decryption_keys = (&keys.0, &keys.1, &box_::gen_nonce());
         let client = Arc::new(Mutex::new(unwrap_result!(utility::test_utils::get_client())));
@@ -293,7 +292,7 @@ mod test {
         {
             let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
-            let owners = utility::test_utils::get_max_sized_public_keys(515);
+            let owners = utility::test_utils::get_max_sized_public_keys(903);
             let prev_owners = Vec::new();
             let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
@@ -314,7 +313,7 @@ mod test {
         {
             let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 75];
-            let owners = utility::test_utils::get_max_sized_public_keys(510);
+            let owners = utility::test_utils::get_max_sized_public_keys(900);
             let prev_owners = Vec::new();
             let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
@@ -337,7 +336,7 @@ mod test {
         {
             let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
             let data = vec![99u8; 1024 * 80];
-            let owners = utility::test_utils::get_max_sized_public_keys(517);
+            let owners = utility::test_utils::get_max_sized_public_keys(905);
             let prev_owners = Vec::new();
             let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
