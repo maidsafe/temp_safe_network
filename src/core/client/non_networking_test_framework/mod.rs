@@ -49,16 +49,6 @@ struct PersistentStorageSimulation {
     data_store: DataStore,
 }
 
-// This is a hack because presently cbor isn't able to encode HashMap<NameType, Vec<u8>>
-pub fn convert_hashmap_to_vec(hashmap: &HashMap<XorName, Vec<u8>>) -> Vec<(XorName, Vec<u8>)> {
-    hashmap.iter().map(|a| (a.0.clone(), a.1.clone())).collect()
-}
-
-// This is a hack because presently cbor isn't able to encode HashMap<NameType, Vec<u8>>
-pub fn convert_vec_to_hashmap(vec: Vec<(XorName, Vec<u8>)>) -> HashMap<XorName, Vec<u8>> {
-    vec.into_iter().collect()
-}
-
 #[allow(unsafe_code)]
 fn get_storage() -> DataStore {
     static mut STORAGE: *const PersistentStorageSimulation =
@@ -77,9 +67,7 @@ fn get_storage() -> DataStore {
                     Vec::with_capacity(unwrap_result!(file.metadata()).len() as usize);
                 if let Ok(_) = file.read_to_end(&mut raw_disk_data) {
                     if raw_disk_data.len() != 0 {
-                        let vec: Vec<(XorName, Vec<u8>)>;
-                        vec = unwrap_result!(deserialise(&raw_disk_data));
-                        memory_storage = convert_vec_to_hashmap(vec);
+                        memory_storage = unwrap_result!(deserialise(&raw_disk_data));
                     }
                 }
             }
@@ -98,7 +86,7 @@ fn sync_disk_storage(memory_storage: &HashMap<XorName, Vec<u8>>) {
     temp_dir_pathbuf.push(STORAGE_FILE_NAME);
 
     let mut file = unwrap_result!(::std::fs::File::create(temp_dir_pathbuf));
-    let _ = file.write_all(&unwrap_result!(serialise(&convert_hashmap_to_vec(memory_storage))));
+    let _ = file.write_all(&unwrap_result!(serialise(&memory_storage)));
     unwrap_result!(file.sync_all());
 }
 
@@ -476,11 +464,9 @@ mod test {
         let mut map_before = HashMap::<XorName, Vec<u8>>::new();
         let _ = map_before.insert(XorName::new([1; 64]), vec![1; 10]);
 
-        let vec_before = convert_hashmap_to_vec(&map_before);
-        let serialised_data = unwrap_result!(serialise(&vec_before));
+        let serialised_data = unwrap_result!(serialise(&map_before));
 
-        let vec_after: Vec<(XorName, Vec<u8>)> = unwrap_result!(deserialise(&serialised_data));
-        let map_after = convert_vec_to_hashmap(vec_after);
+        let map_after: HashMap<XorName, Vec<u8>> = unwrap_result!(deserialise(&serialised_data));
         assert_eq!(map_before, map_after);
     }
 
