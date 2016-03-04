@@ -16,8 +16,10 @@
 // relating to use of the SAFE Network Software.
 
 use std::sync::mpsc;
-use maidsafe_utilities::serialisation::SerialisationError;
+
 use mpid_messaging;
+use routing::{DataRequest, Data};
+use maidsafe_utilities::serialisation::SerialisationError;
 
 /// Intended for converting Client Errors into numeric codes for propagating some error information
 /// across FFI boundaries and specially to C.
@@ -37,8 +39,6 @@ pub enum CoreError {
     ReceivedUnexpectedData,
     /// No such data found in local version cache
     VersionCacheMiss,
-    /// No such data found in routing-filled cache
-    RoutingMessageCacheMiss,
     /// Cannot overwrite a root directory if it already exists
     RootDirectoryAlreadyExists,
     /// Unable to obtain generator for random data
@@ -60,6 +60,10 @@ pub enum CoreError {
     OperationAborted,
     /// MpidMessaging Error
     MpidMessagingError(mpid_messaging::Error),
+    /// Performing a GET operation failed
+    GetFailure(DataRequest),
+    /// Performing a network mutating operation such as PUT/POST/DELETE failed
+    MutationFailure(Data),
 }
 
 impl<'a> From<&'a str> for CoreError {
@@ -107,17 +111,18 @@ impl Into<i32> for CoreError {
             CoreError::SymmetricDecipherFailure => CLIENT_ERROR_START_RANGE - 3,
             CoreError::ReceivedUnexpectedData => CLIENT_ERROR_START_RANGE - 4,
             CoreError::VersionCacheMiss => CLIENT_ERROR_START_RANGE - 5,
-            CoreError::RoutingMessageCacheMiss => CLIENT_ERROR_START_RANGE - 6,
-            CoreError::RootDirectoryAlreadyExists => CLIENT_ERROR_START_RANGE - 8,
-            CoreError::RandomDataGenerationFailure => CLIENT_ERROR_START_RANGE - 9,
-            CoreError::OperationForbiddenForClient => CLIENT_ERROR_START_RANGE - 10,
-            CoreError::Unexpected(_) => CLIENT_ERROR_START_RANGE - 11,
-            CoreError::RoutingError(_) => CLIENT_ERROR_START_RANGE - 12,
-            CoreError::RoutingInterfaceError(_) => CLIENT_ERROR_START_RANGE - 13,
-            CoreError::UnsupportedSaltSizeForPwHash => CLIENT_ERROR_START_RANGE - 14,
-            CoreError::UnsuccessfulPwHash => CLIENT_ERROR_START_RANGE - 15,
-            CoreError::OperationAborted => CLIENT_ERROR_START_RANGE - 16,
-            CoreError::MpidMessagingError(_) => CLIENT_ERROR_START_RANGE - 17,
+            CoreError::RootDirectoryAlreadyExists => CLIENT_ERROR_START_RANGE - 7,
+            CoreError::RandomDataGenerationFailure => CLIENT_ERROR_START_RANGE - 8,
+            CoreError::OperationForbiddenForClient => CLIENT_ERROR_START_RANGE - 9,
+            CoreError::Unexpected(_) => CLIENT_ERROR_START_RANGE - 10,
+            CoreError::RoutingError(_) => CLIENT_ERROR_START_RANGE - 11,
+            CoreError::RoutingInterfaceError(_) => CLIENT_ERROR_START_RANGE - 12,
+            CoreError::UnsupportedSaltSizeForPwHash => CLIENT_ERROR_START_RANGE - 13,
+            CoreError::UnsuccessfulPwHash => CLIENT_ERROR_START_RANGE - 14,
+            CoreError::OperationAborted => CLIENT_ERROR_START_RANGE - 15,
+            CoreError::MpidMessagingError(_) => CLIENT_ERROR_START_RANGE - 16,
+            CoreError::GetFailure(_) => CLIENT_ERROR_START_RANGE - 17,
+            CoreError::MutationFailure(_) => CLIENT_ERROR_START_RANGE - 18,
         }
     }
 }
@@ -137,7 +142,6 @@ impl ::std::fmt::Debug for CoreError {
             CoreError::SymmetricDecipherFailure => write!(f, "CoreError::SymmetricDecipherFailure"),
             CoreError::ReceivedUnexpectedData => write!(f, "CoreError::ReceivedUnexpectedData"),
             CoreError::VersionCacheMiss => write!(f, "CoreError::VersionCacheMiss"),
-            CoreError::RoutingMessageCacheMiss => write!(f, "CoreError::RoutingMessageCacheMiss"),
             CoreError::RootDirectoryAlreadyExists => {
                 write!(f, "CoreError::RootDirectoryAlreadyExists")
             }
@@ -159,6 +163,12 @@ impl ::std::fmt::Debug for CoreError {
             CoreError::OperationAborted => write!(f, "CoreError::OperationAborted"),
             CoreError::MpidMessagingError(ref err) => {
                 write!(f, "CoreError::MpidMessagingError -> {:?}", err)
+            }
+            CoreError::GetFailure(ref data_req) => {
+                write!(f, "CoreError::GetFailure::{{{:?}}}", data_req)
+            }
+            CoreError::MutationFailure(ref data) => {
+                write!(f, "CoreError::MutationFailure::{{{:?}}}", data)
             }
         }
     }

@@ -23,18 +23,20 @@ use std::time::Duration;
 use std::io::{Read, Write};
 use std::collections::HashMap;
 use sodiumoxide::crypto::sign;
+use sodiumoxide::crypto::hash::sha512;
 use std::sync::{Arc, Mutex, mpsc};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use routing::{FullId, Data, DataRequest, InterfaceError, Event, Authority, ResponseContent,
-              ResponseMessage, RoutingError, MessageId};
+              ResponseMessage, RoutingError, MessageId, RequestContent, RequestMessage};
+use core::utility;
 
 type DataStore = Arc<Mutex<HashMap<XorName, Vec<u8>>>>;
 
 const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
 const NETWORK_CONNECT_DELAY_SIMULATION_THREAD: &'static str = "NetworkConnectDelaySimulation";
 
-// TODO(Spandan) Activating these (ie., non-zero values) will require an update to all test cases.
-// See how it is intended to be handled.
+// Activating these (ie., non-zero values) will require an update to all test cases. Once activated
+// the GET's should only be performed once success from PUT's/POST's/DELETE's have been obtained.
 //
 // These will allow to code properly for behavioral anomalies like GETs reaching the address faster
 // than PUTs. So a proper delay will help code better logic against scenarios where it is required
@@ -102,6 +104,7 @@ fn sync_disk_storage(memory_storage: &HashMap<XorName, Vec<u8>>) {
 
 pub struct RoutingMock {
     sender: mpsc::Sender<Event>,
+    client_auth: Authority,
 }
 
 impl RoutingMock {
@@ -116,9 +119,20 @@ impl RoutingMock {
             let _ = cloned_sender.send(Event::Connected);
         });
 
-        Ok(RoutingMock { sender: sender })
+        let client_auth = Authority::Client {
+            client_key: sign::gen_keypair().0,
+            peer_id: rand::random(),
+            proxy_node_name: rand::random(),
+        };
+        Ok(RoutingMock {
+            sender: sender,
+            client_auth: client_auth,
+        })
     }
 
+    // Note: destination authority is ignored (everywhere in Mock) because the clients can direct
+    // data to wherever they want. It is only the requirement of maidsafe-routing that GET's should
+    // go to MaidManagers etc.
     pub fn send_get_request(&mut self,
                             _dst: Authority,
                             request_for: DataRequest,
@@ -126,10 +140,18 @@ impl RoutingMock {
                             -> Result<(), InterfaceError> {
         let data_store = get_storage();
         let cloned_sender = self.sender.clone();
+        let client_auth = self.client_auth.clone();
 
         let _ = thread::spawn(move || {
-            thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS));
+            thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS));
             let data_name = request_for.name();
+            let nae_auth = Authority::NaeManager(data_name.clone());
+            let req_msg = RequestMessage {
+                src: client_auth.clone(),
+                dst: nae_auth.clone(),
+                content: RequestContent::Get(request_for.clone(), msg_id.clone()),
+            };
+
             match unwrap_result!(data_store.lock()).get(&data_name) {
                 Some(raw_data) => {
                     if let Ok(data) = deserialise::<Data>(raw_data) {
@@ -144,24 +166,34 @@ impl RoutingMock {
                             }
                             _ => false,
                         } {
-                            let response_content = ResponseContent::GetSuccess(data, msg_id);
-                            let response_msg = ResponseMessage {
-                                src: Authority::NaeManager(data_name.clone()),
-                                dst: Authority::Client {
-                                    client_key: sign::gen_keypair().0,
-                                    peer_id: rand::random(),
-                                    proxy_node_name: rand::random(),
-                                },
-                                content: response_content,
+                            let resp_content = ResponseContent::GetSuccess(data, msg_id);
+                            let resp_msg = ResponseMessage {
+                                src: nae_auth,
+                                dst: client_auth,
+                                content: resp_content,
                             };
 
-                            if let Err(error) = cloned_sender.send(Event::Response(response_msg)) {
-                                error!("Get-Request Send Failure: {:?}", error);
+                            if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                                error!("Get-Response Send Failure: {:?}", error);
+                            }
+                        } else {
+                            let resp_msg = RoutingMock::construct_failure_resp(nae_auth,
+                                                                               client_auth,
+                                                                               req_msg);
+                            if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                                error!("Get-Response Send Failure: {:?}", error);
                             }
                         }
                     }
                 }
-                None => (),
+                None => {
+                    let resp_msg = RoutingMock::construct_failure_resp(nae_auth,
+                                                                       client_auth,
+                                                                       req_msg);
+                    if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                        error!("Get-Response Send Failure: {:?}", error);
+                    }
+                }
             };
         });
 
@@ -171,11 +203,21 @@ impl RoutingMock {
     pub fn send_put_request(&self,
                             _dst: Authority,
                             data: Data,
-                            _msg_id: MessageId)
+                            msg_id: MessageId)
                             -> Result<(), InterfaceError> {
         let data_store = get_storage();
+        let cloned_sender = self.sender.clone();
+        let client_auth = self.client_auth.clone();
 
         let data_name = data.name();
+        // NaeManager is used as the destination authority here because in the Mock we assume that
+        // MaidManagers always pass the PUT. Errors if any can come only from NaeManagers
+        let nae_auth = Authority::NaeManager(data_name.clone());
+        let req_msg = RequestMessage {
+            src: client_auth.clone(),
+            dst: nae_auth.clone(),
+            content: RequestContent::Put(data.clone(), msg_id.clone()),
+        };
 
         let mut data_store_mutex_guard = unwrap_result!(data_store.lock());
         let success = if data_store_mutex_guard.contains_key(&data_name) {
@@ -201,8 +243,25 @@ impl RoutingMock {
 
         let _ = thread::spawn(move || {
             thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS));
-            if !success {
-                // TODO(Spandan) Check how routing is going to handle PUT errors
+            if success {
+                let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
+                let digest = sha512::hash(&rand_data);
+
+                let resp_content = ResponseContent::PutSuccess(digest, msg_id);
+                let resp_msg = ResponseMessage {
+                    src: nae_auth,
+                    dst: client_auth,
+                    content: resp_content,
+                };
+
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Put-Response Send Failure: {:?}", error);
+                }
+            } else {
+                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg);
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Put-Response Send Failure: {:?}", error);
+                }
             }
         });
 
@@ -212,11 +271,19 @@ impl RoutingMock {
     pub fn send_post_request(&self,
                              _dst: Authority,
                              data: Data,
-                             _msg_id: MessageId)
+                             msg_id: MessageId)
                              -> Result<(), InterfaceError> {
         let data_store = get_storage();
+        let cloned_sender = self.sender.clone();
+        let client_auth = self.client_auth.clone();
 
         let data_name = data.name();
+        let nae_auth = Authority::NaeManager(data_name.clone());
+        let req_msg = RequestMessage {
+            src: client_auth.clone(),
+            dst: nae_auth.clone(),
+            content: RequestContent::Post(data.clone(), msg_id.clone()),
+        };
 
         let mut data_store_mutex_guard = unwrap_result!(data_store.lock());
         let success = if data_store_mutex_guard.contains_key(&data_name) {
@@ -245,8 +312,25 @@ impl RoutingMock {
 
         let _ = thread::spawn(move || {
             thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS));
-            if !success {
-                // TODO(Spandan) Check how routing is going to handle POST errors
+            if success {
+                let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
+                let digest = sha512::hash(&rand_data);
+
+                let resp_content = ResponseContent::PostSuccess(digest, msg_id);
+                let resp_msg = ResponseMessage {
+                    src: nae_auth,
+                    dst: client_auth,
+                    content: resp_content,
+                };
+
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Post-Response Send Failure: {:?}", error);
+                }
+            } else {
+                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg);
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Post-Response Send Failure: {:?}", error);
+                }
             }
         });
 
@@ -256,11 +340,19 @@ impl RoutingMock {
     pub fn send_delete_request(&self,
                                _dst: Authority,
                                data: Data,
-                               _msg_id: MessageId)
+                               msg_id: MessageId)
                                -> Result<(), InterfaceError> {
         let data_store = get_storage();
+        let cloned_sender = self.sender.clone();
+        let client_auth = self.client_auth.clone();
 
         let data_name = data.name();
+        let nae_auth = Authority::NaeManager(data_name.clone());
+        let req_msg = RequestMessage {
+            src: client_auth.clone(),
+            dst: nae_auth.clone(),
+            content: RequestContent::Delete(data.clone(), msg_id.clone()),
+        };
 
         let mut data_store_mutex_guard = unwrap_result!(data_store.lock());
         let success = if data_store_mutex_guard.contains_key(&data_name) {
@@ -289,12 +381,75 @@ impl RoutingMock {
 
         let _ = thread::spawn(move || {
             thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS));
-            if !success {
-                // TODO(Spandan) Check how routing is going to handle DELETE errors
+            if success {
+                let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
+                let digest = sha512::hash(&rand_data);
+
+                let resp_content = ResponseContent::DeleteSuccess(digest, msg_id);
+                let resp_msg = ResponseMessage {
+                    src: nae_auth,
+                    dst: client_auth,
+                    content: resp_content,
+                };
+
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Delete-Response Send Failure: {:?}", error);
+                }
+            } else {
+                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg);
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Delete-Response Send Failure: {:?}", error);
+                }
             }
         });
 
         Ok(())
+    }
+
+    fn construct_failure_resp(src: Authority,
+                              dst: Authority,
+                              req_msg: RequestMessage)
+                              -> ResponseMessage {
+        let resp_content = match req_msg.content {
+            RequestContent::Get(_, msg_id) => {
+                ResponseContent::GetFailure {
+                    id: msg_id,
+                    request: req_msg,
+                    external_error_indicator: Vec::new(),
+                }
+            }
+            RequestContent::Put(_, msg_id) => {
+                ResponseContent::PutFailure {
+                    id: msg_id,
+                    request: req_msg,
+                    external_error_indicator: Vec::new(),
+                }
+            }
+            RequestContent::Post(_, msg_id) => {
+                ResponseContent::PostFailure {
+                    id: msg_id,
+                    request: req_msg,
+                    external_error_indicator: Vec::new(),
+                }
+            }
+            RequestContent::Delete(_, msg_id) => {
+                ResponseContent::DeleteFailure {
+                    id: msg_id,
+                    request: req_msg,
+                    external_error_indicator: Vec::new(),
+                }
+            }
+            _ => {
+                unreachable!("Cannot handle {:?} in this function. Report as bug",
+                             req_msg.content)
+            }
+        };
+
+        ResponseMessage {
+            src: src,
+            dst: dst,
+            content: resp_content,
+        }
     }
 }
 
@@ -302,16 +457,19 @@ impl RoutingMock {
 mod test {
     use super::*;
     use std::sync::mpsc;
-    use xor_name::XorName;
     use std::collections::HashMap;
-    use core::client::user_account::Account;
-    use core::client::message_queue::MessageQueue;
-    use core::client::response_getter::ResponseGetter;
-    use core::translated_events::NetworkEvent;
+
     use core::utility;
+    use core::errors::CoreError;
+    use core::client::user_account::Account;
+    use core::translated_events::NetworkEvent;
+    use core::client::message_queue::MessageQueue;
+    use core::client::response_getter::{GetResponseGetter, MutationResponseGetter};
+
+    use xor_name::XorName;
     use maidsafe_utilities::serialisation::{serialise, deserialise};
     use routing::{FullId, StructuredData, ImmutableData, ImmutableDataType, Data, DataRequest,
-                  Authority};
+                  Authority, MessageId};
 
     #[test]
     fn map_serialisation() {
@@ -339,8 +497,7 @@ mod test {
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
-                                                              vec![network_event_sender],
-                                                              Vec::new());
+                                                              vec![network_event_sender]);
         let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap_result!(network_event_receiver.recv()) {
@@ -358,84 +515,113 @@ mod test {
         let location_client_mgr = Authority::ClientManager(orig_data.name());
 
         // First PUT should succeed
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
-                                                     orig_data.clone(),
-                                                     MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
+                                                         orig_data.clone(),
+                                                         msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            unwrap_result!(resp_getter.get());
+        }
 
         // GET ImmutableData should pass
         {
             let data_request = DataRequest::Immutable(orig_data.name(), ImmutableDataType::Normal);
 
-            let (data_event_sender, data_event_receiver) = mpsc::channel();
-            unwrap_result!(message_queue.lock())
-                .add_data_receive_event_observer(data_request.name(), data_event_sender.clone());
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
 
-            // TODO Routing API changed - use the returned value
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+
             unwrap_result!(mock_routing.send_get_request(location_nae_mgr.clone(),
                                                          data_request.clone(),
-                                                         MessageId::new()));
+                                                         msg_id));
 
-            let response_getter = ResponseGetter::new(Some((data_event_sender,
-                                                            data_event_receiver)),
-                                                      message_queue.clone(),
-                                                      data_request);
-            match response_getter.get() {
-                Ok(data) => assert_eq!(data, orig_data),
-                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
-            }
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     data_request);
+
+            assert_eq!(unwrap_result!(resp_getter.get()), orig_data);
         }
 
         // Subsequent PUTs for same ImmutableData should succeed - De-duplication
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
-                                                     orig_data.clone(),
-                                                     MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
 
-        // Construct Backup ImmutableData
-        let new_immutable_data = ImmutableData::new(ImmutableDataType::Backup, orig_raw_data);
-        let new_data = Data::Immutable(new_immutable_data.clone());
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
+                                                         orig_data.clone(),
+                                                         msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
 
-        // Subsequent PUTs for same ImmutableData of different type should fail
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_put_request(location_client_mgr.clone(),
-                                                     new_data,
-                                                     MessageId::new()));
+            unwrap_result!(resp_getter.get());
+        }
 
         // POSTs for ImmutableData should fail
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_post_request(location_nae_mgr.clone(),
-                                                      orig_data.clone(),
-                                                      MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_post_request(location_nae_mgr.clone(),
+                                                          orig_data.clone(),
+                                                          msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            match resp_getter.get() {
+                Ok(_) => panic!("Expected Post Failure!"),
+                Err(CoreError::MutationFailure(_)) => (),
+                Err(err) => panic!("Unexpected: {:?}", err),
+            }
+        }
 
         // DELETEs of ImmutableData should fail
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_delete_request(location_client_mgr,
-                                                        orig_data.clone(),
-                                                        MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_delete_request(location_client_mgr,
+                                                            orig_data.clone(),
+                                                            msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            match resp_getter.get() {
+                Ok(_) => panic!("Expected Delete Failure!"),
+                Err(CoreError::MutationFailure(_)) => (),
+                Err(err) => panic!("Unexpected: {:?}", err),
+            }
+        }
 
         // GET ImmutableData should pass
         {
             let data_request = DataRequest::Immutable(orig_data.name(), ImmutableDataType::Normal);
 
-            let (data_event_sender, data_event_receiver) = mpsc::channel();
-            unwrap_result!(message_queue.lock())
-                .add_data_receive_event_observer(data_request.name(), data_event_sender.clone());
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
 
-            // TODO Routing API changed - use the returned value
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+
             unwrap_result!(mock_routing.send_get_request(location_nae_mgr,
                                                          data_request.clone(),
-                                                         MessageId::new()));
+                                                         msg_id));
 
-            let response_getter = ResponseGetter::new(Some((data_event_sender,
-                                                            data_event_receiver)),
-                                                      message_queue.clone(),
-                                                      data_request);
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     data_request);
 
-            match response_getter.get() {
-                Ok(data) => assert_eq!(data, orig_data),
-                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
-            }
+            assert_eq!(unwrap_result!(resp_getter.get()), orig_data);
         }
     }
 
@@ -452,8 +638,7 @@ mod test {
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
-                                                              vec![network_event_sender],
-                                                              Vec::new());
+                                                              vec![network_event_sender]);
         let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap_result!(network_event_receiver.recv()) {
@@ -473,13 +658,15 @@ mod test {
         let pin = unwrap_result!(utility::generate_random_string(10));
         let user_id = unwrap_result!(Account::generate_network_id(keyword.as_bytes(),
                                                                   pin.to_string().as_bytes()));
-        let mut account_version = unwrap_result!(StructuredData::new(TYPE_TAG,
-                                                                     user_id.clone(),
-                                                                     0,
-                                                                     unwrap_result!(serialise(&vec![orig_data_immutable.name()])),
-                                                                     vec![account_packet.get_public_maid().public_keys().0.clone()],
-                                                                     Vec::new(),
-                                                                     Some(&account_packet.get_maid().secret_keys().0)));
+        let account_ver_res =
+            StructuredData::new(TYPE_TAG,
+                                user_id.clone(),
+                                0,
+                                unwrap_result!(serialise(&vec![orig_data_immutable.name()])),
+                                vec![account_packet.get_public_maid().public_keys().0.clone()],
+                                Vec::new(),
+                                Some(&account_packet.get_maid().secret_keys().0));
+        let mut account_version = unwrap_result!(account_ver_res);
         let mut data_account_version = Data::Structured(account_version);
 
 
@@ -490,16 +677,34 @@ mod test {
         let location_client_mgr_struct = Authority::ClientManager(data_account_version.name());
 
         // First PUT of StructuredData should succeed
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
-                                                     data_account_version.clone(),
-                                                     MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
+                                                         data_account_version.clone(),
+                                                         msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            unwrap_result!(resp_getter.get());
+        }
 
         // PUT for ImmutableData should succeed
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_put_request(location_client_mgr_immut.clone(),
-                                                     orig_data_immutable.clone(),
-                                                     MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_put_request(location_client_mgr_immut.clone(),
+                                                         orig_data_immutable.clone(),
+                                                         msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            unwrap_result!(resp_getter.get());
+        }
 
         let mut received_structured_data: StructuredData;
 
@@ -507,29 +712,25 @@ mod test {
         {
             let struct_data_request = DataRequest::Structured(user_id.clone(), TYPE_TAG);
 
-            let (data_event_sender, data_event_receiver) = mpsc::channel();
-            unwrap_result!(message_queue.lock())
-                .add_data_receive_event_observer(struct_data_request.name(),
-                                                 data_event_sender.clone());
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
 
-            // TODO Routing API changed - use the returned value
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+
             unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
                                                          struct_data_request.clone(),
-                                                         MessageId::new()));
+                                                         msg_id));
 
-            let response_getter = ResponseGetter::new(Some((data_event_sender,
-                                                            data_event_receiver)),
-                                                      message_queue.clone(),
-                                                      struct_data_request);
-            match response_getter.get() {
-                Ok(data) => {
-                    assert_eq!(data, data_account_version);
-                    match data {
-                        Data::Structured(struct_data) => received_structured_data = struct_data,
-                        _ => panic!("Unexpected!"),
-                    }
-                }
-                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     struct_data_request);
+
+            let data = unwrap_result!(resp_getter.get());
+            assert_eq!(data, data_account_version);
+            match data {
+                Data::Structured(struct_data) => received_structured_data = struct_data,
+                _ => unreachable!("Unexpected! {:?}", data),
             }
         }
 
@@ -541,24 +742,21 @@ mod test {
                                                                            "Value must exist !"),
                                                             ImmutableDataType::Normal);
 
-            let (data_event_sender, data_event_receiver) = mpsc::channel();
-            unwrap_result!(message_queue.lock())
-                .add_data_receive_event_observer(immut_data_request.name(),
-                                                 data_event_sender.clone());
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
 
-            // TODO Routing API changed - use the returned value
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+
             unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut.clone(),
                                                          immut_data_request.clone(),
-                                                         MessageId::new()));
+                                                         msg_id));
 
-            let response_getter = ResponseGetter::new(Some((data_event_sender,
-                                                            data_event_receiver)),
-                                                      message_queue.clone(),
-                                                      immut_data_request);
-            match response_getter.get() {
-                Ok(data) => assert_eq!(data, orig_data_immutable),
-                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
-            }
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     immut_data_request);
+
+            assert_eq!(unwrap_result!(resp_getter.get()), orig_data_immutable);
         }
 
         // Construct ImmutableData
@@ -567,10 +765,19 @@ mod test {
         let new_data_immutable = Data::Immutable(new_immutable_data);
 
         // PUT for new ImmutableData should succeed
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_put_request(location_client_mgr_immut,
-                                                     new_data_immutable.clone(),
-                                                     MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_put_request(location_client_mgr_immut,
+                                                         new_data_immutable.clone(),
+                                                         msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            unwrap_result!(resp_getter.get());
+        }
 
         // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Versioning
         let invalid_version_account_version = unwrap_result!(StructuredData::new(TYPE_TAG,
@@ -600,69 +807,118 @@ mod test {
         let invalid_signature_data_account_version =
             Data::Structured(invalid_signature_account_version);
 
+        let data_for_version_2 = unwrap_result!(serialise(&vec![orig_data_immutable.name(),
+                                                                new_data_immutable.name()]));
         // Construct StructuredData, 2nd version, for this ImmutableData - Valid
         account_version = unwrap_result!(StructuredData::new(TYPE_TAG,
                                                              user_id.clone(),
                                                              1,
-                                                             unwrap_result!(serialise(&vec![orig_data_immutable.name(), new_data_immutable.name()])),
-                                                             vec![account_packet.get_public_maid().public_keys().0.clone()],
+                                                             data_for_version_2,
+                                                             vec![account_packet.get_public_maid()
+                                                                  .public_keys()
+                                                                  .0
+                                                                  .clone()],
                                                              Vec::new(),
-                                                             Some(&account_packet.get_maid().secret_keys().0)));
+                                                             Some(&account_packet.get_maid()
+                                                                                 .secret_keys()
+                                                                                 .0)));
         data_account_version = Data::Structured(account_version);
 
         // Subsequent PUTs for same StructuredData should fail
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
-                                                     data_account_version.clone(),
-                                                     MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
+                                                         data_account_version.clone(),
+                                                         msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            match resp_getter.get() {
+                Ok(_) => panic!("Expected Put Failure!"),
+                Err(CoreError::MutationFailure(_)) => (),
+                Err(err) => panic!("Unexpected: {:?}", err),
+            }
+        }
 
         // Subsequent POSTSs for same StructuredData should fail if versioning is invalid
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                      invalid_version_data_account_version,
-                                                      MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
+                                                          invalid_version_data_account_version,
+                                                          msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            match resp_getter.get() {
+                Ok(_) => panic!("Expected Post Failure!"),
+                Err(CoreError::MutationFailure(_)) => (),
+                Err(err) => panic!("Unexpected: {:?}", err),
+            }
+        }
 
         // Subsequent POSTSs for same StructuredData should fail if signature is invalid
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                      invalid_signature_data_account_version,
-                                                      MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
+                                                          invalid_signature_data_account_version,
+                                                          msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            match resp_getter.get() {
+                Ok(_) => panic!("Expected Post Failure!"),
+                Err(CoreError::MutationFailure(_)) => (),
+                Err(err) => panic!("Unexpected: {:?}", err),
+            }
+        }
 
         // Subsequent POSTSs for existing StructuredData version should pass for valid update
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                      data_account_version.clone(),
-                                                      MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
+                                                          data_account_version.clone(),
+                                                          msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            unwrap_result!(resp_getter.get());
+        }
 
         // GET for new StructuredData version should pass
         {
             let struct_data_request = DataRequest::Structured(user_id.clone(), TYPE_TAG);
 
-            let (data_event_sender, data_event_receiver) = mpsc::channel();
-            unwrap_result!(message_queue.lock())
-                .add_data_receive_event_observer(struct_data_request.name(),
-                                                 data_event_sender.clone());
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
 
-            // TODO Routing API changed - use the returned value
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+
             unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
                                                          struct_data_request.clone(),
-                                                         MessageId::new()));
+                                                         msg_id));
 
-            let response_getter = ResponseGetter::new(Some((data_event_sender,
-                                                            data_event_receiver)),
-                                                      message_queue.clone(),
-                                                      struct_data_request);
-            match response_getter.get() {
-                Ok(data) => {
-                    assert_eq!(data, data_account_version);
-                    match data {
-                        Data::Structured(structured_data) => {
-                            received_structured_data = structured_data
-                        }
-                        _ => panic!("Unexpected!"),
-                    }
-                }
-                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     struct_data_request);
+
+            let data = unwrap_result!(resp_getter.get());
+            assert_eq!(data, data_account_version);
+            match data {
+                Data::Structured(struct_data) => received_structured_data = struct_data,
+                _ => unreachable!("Unexpected! {:?}", data),
             }
         }
 
@@ -675,24 +931,21 @@ mod test {
             let immut_data_request = DataRequest::Immutable(location_vec[1].clone(),
                                                             ImmutableDataType::Normal);
 
-            let (data_event_sender, data_event_receiver) = mpsc::channel();
-            unwrap_result!(message_queue.lock())
-                .add_data_receive_event_observer(immut_data_request.name(),
-                                                 data_event_sender.clone());
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
 
-            // TODO Routing API changed - use the returned value
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+
             unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut.clone(),
                                                          immut_data_request.clone(),
-                                                         MessageId::new()));
+                                                         msg_id));
 
-            let response_getter = ResponseGetter::new(Some((data_event_sender,
-                                                            data_event_receiver)),
-                                                      message_queue.clone(),
-                                                      immut_data_request);
-            match response_getter.get() {
-                Ok(data) => assert_eq!(data, new_data_immutable),
-                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
-            }
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     immut_data_request);
+
+            assert_eq!(unwrap_result!(resp_getter.get()), new_data_immutable);
         }
 
         // GET original ImmutableData should pass
@@ -700,59 +953,66 @@ mod test {
             let immut_data_request = DataRequest::Immutable(location_vec[0].clone(),
                                                             ImmutableDataType::Normal);
 
-            let (data_event_sender, data_event_receiver) = mpsc::channel();
-            unwrap_result!(message_queue.lock())
-                .add_data_receive_event_observer(immut_data_request.name(),
-                                                 data_event_sender.clone());
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
 
-            // TODO Routing API changed - use the returned value
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+
             unwrap_result!(mock_routing.send_get_request(location_nae_mgr_immut,
                                                          immut_data_request.clone(),
-                                                         MessageId::new()));
+                                                         msg_id));
 
-            let response_getter = ResponseGetter::new(Some((data_event_sender,
-                                                            data_event_receiver)),
-                                                      message_queue.clone(),
-                                                      immut_data_request);
-            match response_getter.get() {
-                Ok(data) => assert_eq!(data, orig_data_immutable),
-                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
-            }
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     immut_data_request);
+
+            assert_eq!(unwrap_result!(resp_getter.get()), orig_data_immutable);
         }
 
         // DELETE of Structured Data without version bump should fail
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_delete_request(location_client_mgr_struct.clone(),
-                                                        data_account_version.clone(),
-                                                        MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_delete_request(location_client_mgr_struct.clone(),
+                                                            data_account_version.clone(),
+                                                            msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            match resp_getter.get() {
+                Ok(_) => panic!("Expected Delete Failure!"),
+                Err(CoreError::MutationFailure(_)) => (),
+                Err(err) => panic!("Unexpected: {:?}", err),
+            }
+        }
 
         // GET for StructuredData version should still pass
         {
             let struct_data_request = DataRequest::Structured(user_id.clone(), TYPE_TAG);
 
-            let (data_event_sender, data_event_receiver) = mpsc::channel();
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
             unwrap_result!(message_queue.lock())
-                .add_data_receive_event_observer(struct_data_request.name(),
-                                                 data_event_sender.clone());
+                .register_response_observer(msg_id.clone(), tx.clone());
 
-            // TODO Routing API changed - use the returned value
-            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct,
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
                                                          struct_data_request.clone(),
-                                                         MessageId::new()));
+                                                         msg_id));
 
-            let response_getter = ResponseGetter::new(Some((data_event_sender,
-                                                            data_event_receiver)),
-                                                      message_queue.clone(),
-                                                      struct_data_request);
-            match response_getter.get() {
-                Ok(data) => assert_eq!(data, data_account_version),
-                Err(error) => panic!("Should have found data put before by a PUT {:?}", error),
-            }
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     struct_data_request);
+
+            assert_eq!(unwrap_result!(resp_getter.get()), data_account_version);
         }
 
         // Construct StructuredData, 3rd version, for DELETE - Valid
         account_version = unwrap_result!(StructuredData::new(TYPE_TAG,
-                                                             user_id,
+                                                             user_id.clone(),
                                                              2,
                                                              Vec::new(),
                                                              vec![account_packet.get_public_maid()
@@ -766,9 +1026,43 @@ mod test {
         data_account_version = Data::Structured(account_version);
 
         // DELETE of Structured Data with version bump should pass
-        // TODO Routing API changed - use the returned value
-        unwrap_result!(mock_routing.send_delete_request(location_client_mgr_struct,
-                                                        data_account_version,
-                                                        MessageId::new()));
+        {
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap_result!(mock_routing.send_delete_request(location_client_mgr_struct,
+                                                            data_account_version,
+                                                            msg_id));
+            let resp_getter = MutationResponseGetter::new((tx, rx));
+
+            unwrap_result!(resp_getter.get());
+        }
+
+        // GET for DELETED StructuredData version should fail
+        {
+            let struct_data_request = DataRequest::Structured(user_id, TYPE_TAG);
+
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock())
+                .register_response_observer(msg_id.clone(), tx.clone());
+
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr_struct,
+                                                         struct_data_request.clone(),
+                                                         msg_id));
+
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)),
+                                                     message_queue.clone(),
+                                                     struct_data_request);
+
+            match resp_getter.get() {
+                Ok(_) => panic!("Expected Get Failure!"),
+                Err(CoreError::GetFailure(_)) => (),
+                Err(err) => panic!("Unexpected: {:?}", err),
+            }
+        }
     }
 }

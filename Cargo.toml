@@ -29,5 +29,25 @@ version = "~0.0.44"
 [dev-dependencies]
 regex = "~0.1.55"
 
+[[example]]
+name = "self_authentication"
+test = true
+bench = false
+
+[[example]]
+name = "safe_client"
+test = false
+bench = false
+
+[[example]]
+name = "rest_api"
+test = false
+bench = false
+
+[[example]]
+name = "simulate_browser"
+test = false
+bench = false
+
 [features]
 use-mock-routing = []

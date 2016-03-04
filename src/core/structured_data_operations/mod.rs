@@ -136,7 +136,8 @@ mod test {
     #[test]
     fn data_can_fit_in_structured_data() {
         // Assertion based on Fixed Key sizes
-        // Maximum of 516 keys can be accomodated after serialisation. Thus the fixed key tests work on that calculation
+        // Maximum of 516 keys can be accomodated after serialisation. Thus the fixed key tests work
+        // on that calculation
         {
             let mut keys = test_utils::get_max_sized_public_keys(1);
             assert_eq!(DataFitResult::DataFits,

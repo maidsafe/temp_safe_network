@@ -89,7 +89,7 @@ pub fn create(client: Arc<Mutex<Client>>,
                     let immutable_data = ImmutableData::new(ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
                     let data = Data::Immutable(immutable_data);
-                    try!(unwrap_result!(client.lock()).put(data, None));
+                    try!(try!(unwrap_result!(client.lock()).put(data, None)).get());
 
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name),
                                                                        data_encryption_keys));

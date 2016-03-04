@@ -59,9 +59,10 @@ impl MessageQueue {
                         match msg.content {
                             ResponseContent::GetSuccess(data, msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                if let Some(mut response_observer) =
-                                       queue_guard.response_observers.remove(&msg_id) {
-                                    let _ = response_observer.send(ResponseEvent::Get(Ok(data)));
+                                if let Some(response_observer) = queue_guard.response_observers
+                                                                            .remove(&msg_id) {
+                                    let _ =
+                                        response_observer.send(ResponseEvent::GetResp(Ok(data)));
                                 }
                             }
                             ResponseContent::GetFailure {
@@ -73,17 +74,17 @@ impl MessageQueue {
                                 ..
                             } => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                if let Some(mut response_observer) =
-                                       queue_guard.response_observers.remove(&id) {
+                                if let Some(response_observer) = queue_guard.response_observers
+                                                                            .remove(&id) {
                                     let response =
-                                        ResponseEvent::Get(Err(CoreError::GetFailure(data_req)));
+                                        ResponseEvent::GetResp(Err(CoreError::GetFailure(data_req)));
                                     let _ = response_observer.send(response);
                                 }
                             }
                             ResponseContent::PutSuccess(_, msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                if let Some(mut response_observer) =
-                                       queue_guard.response_observers.remove(&msg_id) {
+                                if let Some(response_observer) = queue_guard.response_observers
+                                                                            .remove(&msg_id) {
                                     let _ =
                                         response_observer.send(ResponseEvent::MutationResp(Ok(())));
                                 }
@@ -97,8 +98,8 @@ impl MessageQueue {
                                 ..
                             } => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                if let Some(mut response_observer) =
-                                       queue_guard.response_observers.remove(&id) {
+                                if let Some(response_observer) = queue_guard.response_observers
+                                                                            .remove(&id) {
                                     let response =
                                         ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
                                     let _ = response_observer.send(response);
@@ -106,8 +107,8 @@ impl MessageQueue {
                             }
                             ResponseContent::PostSuccess(_, msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                if let Some(mut response_observer) =
-                                       queue_guard.response_observers.remove(&msg_id) {
+                                if let Some(response_observer) = queue_guard.response_observers
+                                                                            .remove(&msg_id) {
                                     let _ =
                                         response_observer.send(ResponseEvent::MutationResp(Ok(())));
                                 }
@@ -121,8 +122,8 @@ impl MessageQueue {
                                 ..
                             } => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                if let Some(mut response_observer) =
-                                       queue_guard.response_observers.remove(&id) {
+                                if let Some(response_observer) = queue_guard.response_observers
+                                                                            .remove(&id) {
                                     let response =
                                         ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
                                     let _ = response_observer.send(response);
@@ -130,8 +131,8 @@ impl MessageQueue {
                             }
                             ResponseContent::DeleteSuccess(_, msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                if let Some(mut response_observer) =
-                                       queue_guard.response_observers.remove(&msg_id) {
+                                if let Some(response_observer) = queue_guard.response_observers
+                                                                            .remove(&msg_id) {
                                     let _ =
                                         response_observer.send(ResponseEvent::MutationResp(Ok(())));
                                 }
@@ -145,8 +146,8 @@ impl MessageQueue {
                                 ..
                             } => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
-                                if let Some(mut response_observer) =
-                                       queue_guard.response_observers.remove(&id) {
+                                if let Some(response_observer) = queue_guard.response_observers
+                                                                            .remove(&id) {
                                     let response =
                                         ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
                                     let _ = response_observer.send(response);
