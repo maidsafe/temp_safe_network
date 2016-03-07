@@ -19,7 +19,7 @@ use xor_name::XorName;
 use core::errors::CoreError;
 use sodiumoxide::crypto::{box_, sign};
 use sodiumoxide::crypto::hash::sha512;
-use core::id::RevocationIdType;
+use core::id::revocation_id_type::RevocationIdType;
 
 /// IdType
 ///
