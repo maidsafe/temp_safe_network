@@ -205,6 +205,13 @@ mod test {
             assert_eq!(unwrap_result!(reader.read(0, size)), vec![1u8; 50]);
         }
         {
+            // versions
+            let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
+                                      "File not found");
+            let versions = unwrap_result!(file_helper.get_versions(&file, &directory));
+            assert_eq!(versions.len(), 2);
+        }
+        {
             // update - partial rewrite
             let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
                                       "File not found");

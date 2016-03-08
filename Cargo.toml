@@ -34,6 +34,11 @@ bench = false
 name = "self_authentication"
 
 [[example]]
+test = false
+bench = false
+name = "safe_client"
+
+[[example]]
 bench = false
 name = "rest_api"
 
