@@ -1,6 +1,7 @@
 environment:
   global:
     RUST_BACKTRACE: 1
+    RUST_TEST_THREADS: 1
     Features: "use-mock-routing"
   matrix:
     - RUST_VERSION: stable
@@ -25,7 +26,7 @@ install:
         . ".\Install libsodium.ps1"
 
 platform:
-  - x86
+#  - x86
   - x64
 
 configuration:
