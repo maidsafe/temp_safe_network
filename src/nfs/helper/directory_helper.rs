@@ -360,6 +360,7 @@ impl DirectoryHelper {
         try!(try!(unwrap_result!(self.client.lock())
                       .post(Data::Structured(updated_structured_data), None))
                  .get());
+        println!("Successful post");
         Ok(())
     }
 
