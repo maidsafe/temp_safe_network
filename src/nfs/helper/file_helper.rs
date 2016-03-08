@@ -182,7 +182,6 @@ mod test {
             let (updated_directory, _) = unwrap_result!(writer.close());
             directory = updated_directory;
             assert!(directory.find_file(&file_name).is_some());
-            println!("Created .....");
         }
         {
             // read
@@ -192,7 +191,6 @@ mod test {
             assert_eq!(unwrap_result!(reader.read(0, size)), vec![0u8; 100]);
         }
         {
-            println!("Updating .....");
             // update - full rewrite
             let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
                                       "File not found");
@@ -206,17 +204,8 @@ mod test {
             let mut reader = file_helper.read(file);
             let size = reader.size();
             assert_eq!(unwrap_result!(reader.read(0, size)), vec![1u8; 50]);
-            println!("Updated .....");
         }
         {
-            // versions
-            let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
-                                      "File not found");
-            let versions = unwrap_result!(file_helper.get_versions(&file, &directory));
-            assert_eq!(versions.len(), 2);
-        }
-        {
-            println!("Updating 2nd time .....");
             // update - partial rewrite
             let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
                                       "File not found");
@@ -232,7 +221,6 @@ mod test {
             let data = unwrap_result!(reader.read(0, size));
             assert_eq!(&data[0..10], [2u8; 10]);
             assert_eq!(&data[10..20], [1u8; 10]);
-            println!("Updated 2nd time .....");
         }
         {
             // versions

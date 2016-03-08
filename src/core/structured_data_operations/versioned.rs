@@ -61,7 +61,6 @@ pub fn append_version(client: &mut Client,
     // client.delete(immut_data);
     let mut versions = try!(get_all_versions(client, &struct_data));
     versions.push(version_to_append);
-    println!("Versions currently - {}", versions.len());
     create_impl(client,
                 &versions,
                 struct_data.get_type_tag(),
