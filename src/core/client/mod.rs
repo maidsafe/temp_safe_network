@@ -222,8 +222,8 @@ impl Client {
     }
 
     /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
-    /// store it. It will be retireved when the user logs into his account. Root directory ID is
-    /// necessary to fetch all of user's data as all further data is encoded as meta-information
+    /// store it. It will be retrieved when the user logs into their account. Root directory ID is
+    /// necessary to fetch all of the user's data as all further data is encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
     pub fn set_user_root_directory_id(&mut self, root_dir_id: XorName) -> Result<(), CoreError> {
         if try!(self.account.as_mut().ok_or(CoreError::OperationForbiddenForClient))
@@ -240,9 +240,10 @@ impl Client {
     }
 
     /// Create an entry for the Maidsafe configuration specific Root Directory ID into the
-    /// session packet, encrypt and store it. It will be retireved when the user logs into
-    /// his account. Root directory ID is necessary to fetch all of configuration data as all further
-    /// data is encoded as meta-information into the config Root Directory or one of its subdirectories.
+    /// session packet, encrypt and store it. It will be retrieved when the user logs into
+    /// their account. Root directory ID is necessary to fetch all of configuration data as all
+    /// further data is encoded as meta-information into the config Root Directory or one of its
+    /// subdirectories.
     pub fn set_configuration_root_directory_id(&mut self,
                                                root_dir_id: XorName)
                                                -> Result<(), CoreError> {

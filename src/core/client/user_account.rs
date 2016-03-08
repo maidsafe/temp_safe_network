@@ -24,8 +24,8 @@ use maidsafe_utilities::serialisation::{serialise, deserialise};
 use core::id::{IdType, PublicIdType, RevocationIdType, MaidTypeTags, MpidTypeTags};
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
-/// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also his Root
-/// Directory ID if he has put data onto the network.
+/// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also their Root
+/// Directory ID if they have put data onto the network.
 #[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
 pub struct Account {
     an_maid: RevocationIdType,
