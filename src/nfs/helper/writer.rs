@@ -82,6 +82,7 @@ impl Writer {
 
         file.get_mut_metadata().set_modified_time(::time::now_utc());
         file.get_mut_metadata().set_size(size);
+        file.get_mut_metadata().increment_version();
 
         directory.upsert_file(file.clone());
 

@@ -23,6 +23,7 @@ use time::{self, Timespec, Tm};
 pub struct FileMetadata {
     name: String,
     size: u64,
+    version: u64,
     created_time: Tm,
     modified_time: Tm,
     user_metadata: Vec<u8>,
@@ -34,10 +35,18 @@ impl FileMetadata {
         FileMetadata {
             name: name,
             size: 0,
+            // Version 0 is considered as invalid - do not change to version 0. This is used as
+            // default vaule in comparisons.
+            version: 1,
             created_time: time::now_utc(),
             modified_time: time::now_utc(),
             user_metadata: user_metadata,
         }
+    }
+
+    /// Get version
+    pub fn get_version(&self) -> u64 {
+        self.version
     }
 
     /// Get time of creation
@@ -72,6 +81,11 @@ impl FileMetadata {
         self.name = name;
     }
 
+    /// Increment the file version
+    pub fn increment_version(&mut self) {
+        self.version = self.version.wrapping_add(1);
+    }
+
     /// Set the size of file
     pub fn set_size(&mut self, size: u64) {
         self.size = size;
@@ -96,11 +110,12 @@ impl Encodable for FileMetadata {
         e.emit_struct("FileMetadata", 7, |e| {
             try!(e.emit_struct_field("name", 0, |e| self.name.encode(e)));
             try!(e.emit_struct_field("size", 1, |e| self.size.encode(e)));
-            try!(e.emit_struct_field("created_time_sec", 2, |e| created_time.sec.encode(e)));
-            try!(e.emit_struct_field("created_time_nsec", 3, |e| created_time.nsec.encode(e)));
-            try!(e.emit_struct_field("modified_time_sec", 4, |e| modified_time.sec.encode(e)));
-            try!(e.emit_struct_field("modified_time_nsec", 5, |e| modified_time.nsec.encode(e)));
-            try!(e.emit_struct_field("user_metadata", 6, |e| self.user_metadata.encode(e)));
+            try!(e.emit_struct_field("version", 2, |e| self.version.encode(e)));
+            try!(e.emit_struct_field("created_time_sec", 3, |e| created_time.sec.encode(e)));
+            try!(e.emit_struct_field("created_time_nsec", 4, |e| created_time.nsec.encode(e)));
+            try!(e.emit_struct_field("modified_time_sec", 5, |e| modified_time.sec.encode(e)));
+            try!(e.emit_struct_field("modified_time_nsec", 6, |e| modified_time.nsec.encode(e)));
+            try!(e.emit_struct_field("user_metadata", 7, |e| self.user_metadata.encode(e)));
 
             Ok(())
         })
@@ -113,22 +128,23 @@ impl Decodable for FileMetadata {
             Ok(FileMetadata {
                 name: try!(d.read_struct_field("name", 0, |d| Decodable::decode(d))),
                 size: try!(d.read_struct_field("size", 1, |d| Decodable::decode(d))),
+                version: try!(d.read_struct_field("version", 2, |d| Decodable::decode(d))),
                 created_time: ::time::at_utc(Timespec {
-                    sec: try!(d.read_struct_field("created_time_sec", 2, |d| Decodable::decode(d))),
+                    sec: try!(d.read_struct_field("created_time_sec", 3, |d| Decodable::decode(d))),
                     nsec: try!(d.read_struct_field("created_time_nsec",
-                                                   3,
+                                                   4,
                                                    |d| Decodable::decode(d))),
                 }),
                 modified_time: ::time::at_utc(Timespec {
                     sec: try!(d.read_struct_field("modified_time_sec",
-                                                  4,
+                                                  5,
                                                   |d| Decodable::decode(d))),
                     nsec: try!(d.read_struct_field("modified_time_nsec",
-                                                   5,
+                                                   6,
                                                    |d| Decodable::decode(d))),
                 }),
                 user_metadata: try!(d.read_struct_field("user_metadata",
-                                                        6,
+                                                        7,
                                                         |d| Decodable::decode(d))),
             })
         })

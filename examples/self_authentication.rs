@@ -41,6 +41,7 @@ extern crate safe_core;
 extern crate maidsafe_utilities;
 
 use safe_core::core::client::Client;
+use safe_core::core::errors::CoreError;
 
 fn main() {
     maidsafe_utilities::log::init(true);
@@ -80,9 +81,15 @@ fn main() {
         {
             println!("\nTrying to create an account ...");
 
-            let _ = unwrap_result!(Client::create_account(keyword.clone(),
-                                                          pin.clone(),
-                                                          password.clone()));
+            match Client::create_account(keyword.clone(), pin.clone(), password.clone()) {
+                Ok(_) => (),
+                Err(CoreError::MutationFailure(_)) => {
+                    println!("This domain is already taken. Please retry with different Keyword \
+                              and/or PIN");
+                    return;
+                }
+                Err(err) => panic!("{:?}", err),
+            }
             println!("Account Created Successfully !!");
         }
 
