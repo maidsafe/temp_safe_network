@@ -120,7 +120,9 @@ impl FileHelper {
         let sdv_versions = try!(directory_helper.get_versions(parent_directory.get_key().get_id(),
                                                               parent_directory.get_key()
                                                                               .get_type_tag()));
-        let mut modified_time = ::time::empty_tm();
+
+        // Because Version 0 is invalid, so can be made an initial comparison value
+        let mut file_version = 0;
         for version_id in sdv_versions {
             let directory_listing =
                 try!(directory_helper.get_by_version(parent_directory.get_key().get_id(),
@@ -130,8 +132,8 @@ impl FileHelper {
             if let Some(file) = directory_listing.get_files().iter().find(|&entry| {
                 entry.get_name() == file.get_name()
             }) {
-                if *file.get_metadata().get_modified_time() != modified_time {
-                    modified_time = file.get_metadata().get_modified_time().clone();
+                if file.get_metadata().get_version() != file_version {
+                    file_version = file.get_metadata().get_version();
                     versions.push(file.clone());
                 }
             }
@@ -173,7 +175,6 @@ mod test {
         let file_helper = FileHelper::new(client.clone());
         let file_name = "hello.txt".to_string();
         {
-            println!("Creating .....");
             // create
             let mut writer = unwrap_result!(file_helper.create(file_name.clone(),
                                                                Vec::new(),

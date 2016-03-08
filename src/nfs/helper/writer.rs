@@ -80,10 +80,9 @@ impl Writer {
 
         file.set_datamap(self.self_encryptor.close());
 
-        let current_time = ::time::now_utc();
-        println!("Time - {:?}", current_time);
-        file.get_mut_metadata().set_modified_time(current_time);
+        file.get_mut_metadata().set_modified_time(::time::now_utc());
         file.get_mut_metadata().set_size(size);
+        file.get_mut_metadata().increment_version();
 
         directory.upsert_file(file.clone());
 
