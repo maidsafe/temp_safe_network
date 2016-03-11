@@ -36,7 +36,6 @@ name = "self_authentication"
 [[example]]
 bench = false
 name = "safe_client"
-test = false
 
 [[example]]
 bench = false

@@ -61,8 +61,7 @@ impl MessageQueue {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
-                                    let _ =
-                                        response_observer.send(ResponseEvent::GetResp(Ok(data)));
+                                    let _ = response_observer.send(ResponseEvent::GetResp(Ok(data)));
                                 }
                             }
                             ResponseContent::GetFailure {
@@ -76,8 +75,7 @@ impl MessageQueue {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&id) {
-                                    let response =
-                                        ResponseEvent::GetResp(Err(CoreError::GetFailure(data_req)));
+                                    let response = ResponseEvent::GetResp(Err(CoreError::GetFailure(data_req)));
                                     let _ = response_observer.send(response);
                                 }
                             }
@@ -85,8 +83,7 @@ impl MessageQueue {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
-                                    let _ =
-                                        response_observer.send(ResponseEvent::MutationResp(Ok(())));
+                                    let _ = response_observer.send(ResponseEvent::MutationResp(Ok(())));
                                 }
                             }
                             ResponseContent::PutFailure {
@@ -100,8 +97,7 @@ impl MessageQueue {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&id) {
-                                    let response =
-                                        ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
+                                    let response = ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
                                     let _ = response_observer.send(response);
                                 }
                             }
@@ -109,8 +105,7 @@ impl MessageQueue {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
-                                    let _ =
-                                        response_observer.send(ResponseEvent::MutationResp(Ok(())));
+                                    let _ = response_observer.send(ResponseEvent::MutationResp(Ok(())));
                                 }
                             }
                             ResponseContent::PostFailure {
@@ -124,8 +119,7 @@ impl MessageQueue {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&id) {
-                                    let response =
-                                        ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
+                                    let response = ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
                                     let _ = response_observer.send(response);
                                 }
                             }
@@ -133,8 +127,7 @@ impl MessageQueue {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
-                                    let _ =
-                                        response_observer.send(ResponseEvent::MutationResp(Ok(())));
+                                    let _ = response_observer.send(ResponseEvent::MutationResp(Ok(())));
                                 }
                             }
                             ResponseContent::DeleteFailure {
@@ -148,14 +141,12 @@ impl MessageQueue {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&id) {
-                                    let response =
-                                        ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
+                                    let response = ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
                                     let _ = response_observer.send(response);
                                 }
                             }
                             _ => {
-                                warn!("Received Response Message: {:?} ;; This is currently not \
-                                       supported.",
+                                warn!("Received Response Message: {:?} ;; This is currently not supported.",
                                       msg)
                             }
                         }
@@ -195,9 +186,7 @@ impl MessageQueue {
         (message_queue, RaiiThreadJoiner::new(receiver_joiner))
     }
 
-    pub fn register_response_observer(&mut self,
-                                      msg_id: MessageId,
-                                      sender: Sender<ResponseEvent>) {
+    pub fn register_response_observer(&mut self, msg_id: MessageId, sender: Sender<ResponseEvent>) {
         let _ = self.response_observers.insert(msg_id, sender);
     }
 
