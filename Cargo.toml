@@ -24,7 +24,7 @@ xor_name = "~0.1.0"
 
 [dependencies.clippy]
 optional = true
-version = "~0.0.48"
+version = "~0.0.49"
 
 [dev-dependencies]
 regex = "~0.1.55"
