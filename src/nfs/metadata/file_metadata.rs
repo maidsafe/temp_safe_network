@@ -23,10 +23,10 @@ use time::{self, Timespec, Tm};
 pub struct FileMetadata {
     name: String,
     size: u64,
-    version: u64,
     created_time: Tm,
     modified_time: Tm,
     user_metadata: Vec<u8>,
+    version: u64,
 }
 
 impl FileMetadata {
@@ -110,12 +110,12 @@ impl Encodable for FileMetadata {
         e.emit_struct("FileMetadata", 7, |e| {
             try!(e.emit_struct_field("name", 0, |e| self.name.encode(e)));
             try!(e.emit_struct_field("size", 1, |e| self.size.encode(e)));
-            try!(e.emit_struct_field("version", 2, |e| self.version.encode(e)));
-            try!(e.emit_struct_field("created_time_sec", 3, |e| created_time.sec.encode(e)));
-            try!(e.emit_struct_field("created_time_nsec", 4, |e| created_time.nsec.encode(e)));
-            try!(e.emit_struct_field("modified_time_sec", 5, |e| modified_time.sec.encode(e)));
-            try!(e.emit_struct_field("modified_time_nsec", 6, |e| modified_time.nsec.encode(e)));
-            try!(e.emit_struct_field("user_metadata", 7, |e| self.user_metadata.encode(e)));
+            try!(e.emit_struct_field("created_time_sec", 2, |e| created_time.sec.encode(e)));
+            try!(e.emit_struct_field("created_time_nsec", 3, |e| created_time.nsec.encode(e)));
+            try!(e.emit_struct_field("modified_time_sec", 4, |e| modified_time.sec.encode(e)));
+            try!(e.emit_struct_field("modified_time_nsec", 5, |e| modified_time.nsec.encode(e)));
+            try!(e.emit_struct_field("user_metadata", 6, |e| self.user_metadata.encode(e)));
+            try!(e.emit_struct_field("version", 7, |e| self.version.encode(e)));
 
             Ok(())
         })
@@ -128,24 +128,16 @@ impl Decodable for FileMetadata {
             Ok(FileMetadata {
                 name: try!(d.read_struct_field("name", 0, |d| Decodable::decode(d))),
                 size: try!(d.read_struct_field("size", 1, |d| Decodable::decode(d))),
-                version: try!(d.read_struct_field("version", 2, |d| Decodable::decode(d))),
                 created_time: ::time::at_utc(Timespec {
-                    sec: try!(d.read_struct_field("created_time_sec", 3, |d| Decodable::decode(d))),
-                    nsec: try!(d.read_struct_field("created_time_nsec",
-                                                   4,
-                                                   |d| Decodable::decode(d))),
+                    sec: try!(d.read_struct_field("created_time_sec", 2, |d| Decodable::decode(d))),
+                    nsec: try!(d.read_struct_field("created_time_nsec", 3, |d| Decodable::decode(d))),
                 }),
                 modified_time: ::time::at_utc(Timespec {
-                    sec: try!(d.read_struct_field("modified_time_sec",
-                                                  5,
-                                                  |d| Decodable::decode(d))),
-                    nsec: try!(d.read_struct_field("modified_time_nsec",
-                                                   6,
-                                                   |d| Decodable::decode(d))),
+                    sec: try!(d.read_struct_field("modified_time_sec", 4, |d| Decodable::decode(d))),
+                    nsec: try!(d.read_struct_field("modified_time_nsec", 5, |d| Decodable::decode(d))),
                 }),
-                user_metadata: try!(d.read_struct_field("user_metadata",
-                                                        7,
-                                                        |d| Decodable::decode(d))),
+                user_metadata: try!(d.read_struct_field("user_metadata", 6, |d| Decodable::decode(d))),
+                version: try!(d.read_struct_field("version", 7, |d| Decodable::decode(d))),
             })
         })
     }
