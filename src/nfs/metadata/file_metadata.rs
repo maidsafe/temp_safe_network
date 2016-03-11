@@ -45,7 +45,7 @@ impl FileMetadata {
     }
 
     /// Get version
-    pub fn get_version(&self) -> u64 {
+    pub fn get_version(&self) -> u32 {
         self.version
     }
 
