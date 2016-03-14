@@ -1,5 +1,9 @@
 # Safe Core - Change Log
 
+## [0.11.0]
+- Reintegrated messaging API.
+- Fixed a bug in file metadata serialisation which caused the frontend app to crash on Windows.
+
 ## [0.10.0]
 - Code made more resilient to precision of time resolution on host machines by including dedicated version counter in file metadata. This is also part of public API.
 - self_authentication example gives better error message on trying to hijack pre-existing user network name.
