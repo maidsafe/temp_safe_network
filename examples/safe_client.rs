@@ -44,13 +44,14 @@ extern crate xor_name;
 #[macro_use]
 extern crate maidsafe_utilities;
 
-use maidsafe_utilities::serialisation::deserialise;
-use mpid_messaging::MpidMessageWrapper;
-use routing::Data;
 use safe_core::core::client::Client;
-use safe_core::core::client::response_getter::ResponseGetter;
-use sodiumoxide::crypto::hash::sha512;
+use safe_core::core::client::response_getter::GetResponseGetter;
+
+use routing::Data;
 use xor_name::XorName;
+use sodiumoxide::crypto::hash::sha512;
+use mpid_messaging::MpidMessageWrapper;
+use maidsafe_utilities::serialisation::deserialise;
 
 #[cfg(feature = "use-mock-routing")]
 const MOCK_NETWORK: bool = true;
@@ -170,7 +171,7 @@ fn messaging(client: &Client) {
     let mut account_name = String::new();
     let _ = std::io::stdin().read_line(&mut account_name);
     let mpid_account = XorName(sha512::hash(&account_name.into_bytes()).0);
-    let response_getter = unwrap_result!(client.register_online(&mpid_account));
+    let response_getter = unwrap_result!(client.register_online(mpid_account));
 
     loop {
         println!("\n------- messaging options: r for receive, s for send, t for terminate -------");
@@ -180,14 +181,14 @@ fn messaging(client: &Client) {
         if operation == "r" {
             receive_mpid_message(&response_getter);
         } else if operation == "s" {
-            send_mpid_message(&client, &mpid_account);
+            send_mpid_message(&client, mpid_account);
         } else if operation == "t" {
             break;
         }
     }
 }
 
-fn receive_mpid_message(response_getter: &ResponseGetter) {
+fn receive_mpid_message(response_getter: &GetResponseGetter) {
     loop {
         match response_getter.get() {
             Ok(data) => {
@@ -212,7 +213,7 @@ fn receive_mpid_message(response_getter: &ResponseGetter) {
     }
 }
 
-fn send_mpid_message(client: &Client, mpid_account: &XorName) {
+fn send_mpid_message(client: &Client, mpid_account: XorName) {
     let mut receiver_name = String::new();
     let mut msg_metadata = String::new();
     let mut msg_content = String::new();
