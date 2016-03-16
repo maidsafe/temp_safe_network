@@ -57,9 +57,9 @@ Usage:
   client_stress_test [options]
 
 Options:
-  -i <count>, --immutable=<count>   Number of ImmutableData chunks to Put
-                                          and Get [default: 100].
-  -h, --help                              Display this help message and exit.
+  -i <count>, --immutable=<count>   Number of ImmutableData chunks to Put and
+                                    Get [default: 100].
+  -h, --help                        Display this help message and exit.
 ";
 
 #[derive(Debug, RustcDecodable)]
