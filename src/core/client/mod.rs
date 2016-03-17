@@ -38,7 +38,8 @@ use core::translated_events::NetworkEvent;
 use xor_name::XorName;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
 use maidsafe_utilities::serialisation::serialise;
-use mpid_messaging::{MpidMessage, MpidMessageWrapper};
+use safe_network_common::TYPE_TAG_SESSION_PACKET;
+use safe_network_common::messaging::{MpidMessage, MpidMessageWrapper};
 use routing::{MessageId, FullId, StructuredData, Data, DataRequest, PlainData, Authority, Event};
 
 use sodiumoxide::crypto::{box_, sign};
@@ -50,7 +51,6 @@ use self::non_networking_test_framework::RoutingMock as Routing;
 use routing::Client as Routing;
 
 const LOGIC_ERROR: &'static str = "Logic Error !! Report as bug.";
-const LOGIN_PACKET_TYPE_TAG: u64 = 0;
 
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
@@ -132,7 +132,7 @@ impl Client {
             let session_packet_keys = unwrap_option!(client.session_packet_keys.as_ref(), LOGIC_ERROR);
 
             let session_packet_id = unwrap_option!(client.session_packet_id.as_ref(), LOGIC_ERROR).clone();
-            let account_version = try!(StructuredData::new(LOGIN_PACKET_TYPE_TAG,
+            let account_version = try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                            session_packet_id,
                                                            0,
                                                            try!(account.encrypt(session_packet_keys.get_password(),
@@ -154,7 +154,7 @@ impl Client {
         let mut unregistered_client = try!(Client::create_unregistered_client());
         let user_id = try!(Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
 
-        let session_packet_request = DataRequest::Structured(user_id.clone(), LOGIN_PACKET_TYPE_TAG);
+        let session_packet_request = DataRequest::Structured(user_id.clone(), TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(unregistered_client.get(session_packet_request, None));
 
@@ -529,7 +529,7 @@ impl Client {
                                          .as_ref()
                                          .ok_or(CoreError::OperationForbiddenForClient))
                                     .clone();
-        let session_packet_request = DataRequest::Structured(session_packet_id.clone(), LOGIN_PACKET_TYPE_TAG);
+        let session_packet_request = DataRequest::Structured(session_packet_id.clone(), TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(self.get(session_packet_request, None));
 
@@ -542,7 +542,7 @@ impl Client {
             let encrypted_account = try!(account.encrypt(session_packet_keys.get_password(),
                                                          session_packet_keys.get_pin()));
 
-            let new_account_version = try!(StructuredData::new(LOGIN_PACKET_TYPE_TAG,
+            let new_account_version = try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                                session_packet_id,
                                                                retrieved_session_packet.get_version() + 1,
                                                                encrypted_account,
@@ -596,6 +596,7 @@ mod test {
     use core::client::response_getter::GetResponseGetter;
 
     use xor_name::XorName;
+    use safe_network_common::client_errors::MutationError;
     use routing::{ImmutableDataType, ImmutableData, DataRequest, Data, StructuredData};
 
     #[test]
@@ -603,7 +604,32 @@ mod test {
         let keyword = unwrap_result!(utility::generate_random_string(10));
         let password = unwrap_result!(utility::generate_random_string(10));
         let pin = unwrap_result!(utility::generate_random_string(10));
-        let _ = unwrap_result!(Client::create_account(keyword, pin, password));
+
+        // Account creation for the 1st time - should succeed
+        let _ = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+
+        // Account creation - same keyword, pin and password - should fail
+        match Client::create_account(keyword.clone(), pin.clone(), password.clone()) {
+            Ok(_) => panic!("Account name hijaking should fail !"),
+            Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
+            Err(err) => panic!("{:?}", err),
+        }
+
+        // Account creation - same keyword and pin - different password - should fail
+        let new_password = unwrap_result!(utility::generate_random_string(10));
+        match Client::create_account(keyword.clone(), pin.clone(), new_password) {
+            Ok(_) => panic!("Account name hijaking should fail !"),
+            Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
+            Err(err) => panic!("{:?}", err),
+        }
+
+        // Account creation - same keyword and password - different pin - should succeed
+        let new_pin = unwrap_result!(utility::generate_random_string(10));
+        let _ = unwrap_result!(Client::create_account(keyword, new_pin, password.clone()));
+
+        // Account creation - same pin and password - different keyword - should succeed
+        let new_keyword = unwrap_result!(utility::generate_random_string(10));
+        let _ = unwrap_result!(Client::create_account(new_keyword, pin, password));
     }
 
     #[test]

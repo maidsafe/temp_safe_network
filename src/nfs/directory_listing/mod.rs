@@ -102,8 +102,9 @@ impl DirectoryListing {
                    directory_id: &XorName,
                    data: Vec<u8>)
                    -> Result<DirectoryListing, NfsError> {
-        let decrypted_data_map = try!(unwrap_result!(client.lock()).hybrid_decrypt(&data,
-                Some(&DirectoryListing::generate_nonce(directory_id))));
+        let decrypted_data_map = try!(unwrap_result!(client.lock())
+                                          .hybrid_decrypt(&data,
+                                                          Some(&DirectoryListing::generate_nonce(directory_id))));
         let datamap: DataMap = try!(deserialise(&decrypted_data_map));
         let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), datamap);
         let length = se.len();
@@ -120,10 +121,9 @@ impl DirectoryListing {
         se.write(&serialised_data, 0);
         let datamap = se.close();
         let serialised_data_map = try!(serialise(&datamap));
-        Ok(try!(unwrap_result!(client.lock())
-                    .hybrid_encrypt(&serialised_data_map,
-                                    Some(&DirectoryListing::generate_nonce(&self.get_key()
-                                                                                .get_id())))))
+        Ok(try!(unwrap_result!(client.lock()).hybrid_encrypt(&serialised_data_map,
+                                                             Some(&DirectoryListing::generate_nonce(&self.get_key()
+                                                                                                         .get_id())))))
     }
 
     /// Get DirectoryInfo of sub_directory within a DirectoryListing.
@@ -260,8 +260,8 @@ mod test {
                                                                      None));
         let encrypted_data = unwrap_result!(directory_listing.encrypt(client.clone()));
         let decrypted_listing = unwrap_result!(DirectoryListing::decrypt(client.clone(),
-                                                     directory_listing.get_key().get_id(),
-                                                     encrypted_data));
+                                                                         directory_listing.get_key().get_id(),
+                                                                         encrypted_data));
         assert_eq!(directory_listing, decrypted_listing);
     }
 
@@ -273,8 +273,7 @@ mod test {
                                                                          true,
                                                                          AccessLevel::Private,
                                                                          None));
-        let mut file = unwrap_result!(File::new(FileMetadata::new("index.html".to_string(),
-                                                                  Vec::new()),
+        let mut file = unwrap_result!(File::new(FileMetadata::new("index.html".to_string(), Vec::new()),
                                                 DataMap::None));
         assert!(directory_listing.find_file(file.get_name()).is_none());
         directory_listing.upsert_file(file.clone());
@@ -283,8 +282,7 @@ mod test {
         file.get_mut_metadata().set_name("home.html".to_string());
         directory_listing.upsert_file(file.clone());
         assert_eq!(directory_listing.get_files().len(), 1);
-        let file2 = unwrap_result!(File::new(FileMetadata::new("demo.html".to_string(),
-                                                               Vec::new()),
+        let file2 = unwrap_result!(File::new(FileMetadata::new("demo.html".to_string(), Vec::new()),
                                              DataMap::None));
         directory_listing.upsert_file(file2.clone());
         assert_eq!(directory_listing.get_files().len(), 2);
@@ -339,19 +337,18 @@ mod test {
                                                                                  .get_name()),
                                "Directory not found");
         let _ = unwrap_option!(directory_listing.find_sub_directory(sub_directory_two.get_metadata()
-                                                                                 .get_name()),
-                           "Directory not found");
+                                                                                     .get_name()),
+                               "Directory not found");
 
         let _ = unwrap_result!(directory_listing.remove_sub_directory(sub_directory.get_metadata()
-                                                                               .get_name()));
+                                                                                   .get_name()));
         assert!(directory_listing.find_sub_directory(sub_directory.get_metadata().get_name())
                                  .is_none());
         assert!(directory_listing.find_sub_directory(sub_directory_two.get_metadata().get_name())
                                  .is_some());
         assert_eq!(directory_listing.get_sub_directories().len(), 1);
 
-        let _ = unwrap_result!(directory_listing.remove_sub_directory(
-                sub_directory_two.get_metadata().get_name()));
+        let _ = unwrap_result!(directory_listing.remove_sub_directory(sub_directory_two.get_metadata().get_name()));
         assert_eq!(directory_listing.get_sub_directories().len(), 0);
     }
 }

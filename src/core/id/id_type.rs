@@ -90,13 +90,8 @@ impl IdType {
     }
 
     /// Verifies and decrypts the data
-    pub fn open(&self,
-                data: &[u8],
-                nonce: &box_::Nonce,
-                from: &box_::PublicKey)
-                -> Result<Vec<u8>, CoreError> {
-        box_::open(&data, &nonce, &from, &self.secret_keys.1)
-            .map_err(|_| CoreError::AsymmetricDecipherFailure)
+    pub fn open(&self, data: &[u8], nonce: &box_::Nonce, from: &box_::PublicKey) -> Result<Vec<u8>, CoreError> {
+        box_::open(&data, &nonce, &from, &self.secret_keys.1).map_err(|_| CoreError::AsymmetricDecipherFailure)
     }
 }
 

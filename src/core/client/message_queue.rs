@@ -25,6 +25,8 @@ use core::translated_events::{NetworkEvent, ResponseEvent};
 use xor_name::XorName;
 use lru_time_cache::LruCache;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
+use maidsafe_utilities::serialisation::deserialise;
+use safe_network_common::client_errors::{MutationError, GetError};
 use routing::{MessageId, Data, Event, ResponseContent, RequestMessage, RequestContent};
 
 const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
@@ -70,13 +72,23 @@ impl MessageQueue {
                                     content: RequestContent::Get(data_req, _),
                                     ..
                                 },
-                                ..
+                                external_error_indicator,
                             } => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&id) {
-                                    let response = ResponseEvent::GetResp(Err(CoreError::GetFailure(data_req)));
-                                    let _ = response_observer.send(response);
+                                    let reason: GetError = match deserialise(&external_error_indicator) {
+                                        Ok(err) => err,
+                                        Err(err) => {
+                                            warn!("Could not obtain GET Failure reason - {:?}", err);
+                                            GetError::Unknown
+                                        }
+                                    };
+                                    let err = Err(CoreError::GetFailure {
+                                        request: data_req,
+                                        reason: reason,
+                                    });
+                                    let _ = response_observer.send(ResponseEvent::GetResp(err));
                                 }
                             }
                             ResponseContent::PutSuccess(_, msg_id) => {
@@ -92,13 +104,23 @@ impl MessageQueue {
                                     content: RequestContent::Put(data, _),
                                     ..
                                 },
-                                ..
+                                external_error_indicator,
                             } => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&id) {
-                                    let response = ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
-                                    let _ = response_observer.send(response);
+                                    let reason: MutationError = match deserialise(&external_error_indicator) {
+                                        Ok(err) => err,
+                                        Err(err) => {
+                                            warn!("Could not obtain PUT Failure reason - {:?}", err);
+                                            MutationError::Unknown
+                                        }
+                                    };
+                                    let err = Err(CoreError::MutationFailure {
+                                        data: data,
+                                        reason: reason,
+                                    });
+                                    let _ = response_observer.send(ResponseEvent::MutationResp(err));
                                 }
                             }
                             ResponseContent::PostSuccess(_, msg_id) => {
@@ -114,13 +136,23 @@ impl MessageQueue {
                                     content: RequestContent::Post(data, _),
                                     ..
                                 },
-                                ..
+                                external_error_indicator,
                             } => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&id) {
-                                    let response = ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
-                                    let _ = response_observer.send(response);
+                                    let reason: MutationError = match deserialise(&external_error_indicator) {
+                                        Ok(err) => err,
+                                        Err(err) => {
+                                            warn!("Could not obtain POST Failure reason - {:?}", err);
+                                            MutationError::Unknown
+                                        }
+                                    };
+                                    let err = Err(CoreError::MutationFailure {
+                                        data: data,
+                                        reason: reason,
+                                    });
+                                    let _ = response_observer.send(ResponseEvent::MutationResp(err));
                                 }
                             }
                             ResponseContent::DeleteSuccess(_, msg_id) => {
@@ -136,13 +168,23 @@ impl MessageQueue {
                                     content: RequestContent::Delete(data, _),
                                     ..
                                 },
-                                ..
+                                external_error_indicator,
                             } => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&id) {
-                                    let response = ResponseEvent::MutationResp(Err(CoreError::MutationFailure(data)));
-                                    let _ = response_observer.send(response);
+                                    let reason: MutationError = match deserialise(&external_error_indicator) {
+                                        Ok(err) => err,
+                                        Err(err) => {
+                                            warn!("Could not obtain DELETE Failure reason - {:?}", err);
+                                            MutationError::Unknown
+                                        }
+                                    };
+                                    let err = Err(CoreError::MutationFailure {
+                                        data: data,
+                                        reason: reason,
+                                    });
+                                    let _ = response_observer.send(ResponseEvent::MutationResp(err));
                                 }
                             }
                             _ => {
