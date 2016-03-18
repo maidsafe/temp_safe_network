@@ -1,5 +1,10 @@
 # Safe Core - Change Log
 
+## [0.12.0]
+- Integrated with safe_network_common.
+- Response handling in case of errors made complete with reason for errors coded in.
+- Mock routing updated to give correct reason in cases for errors. All corresponding test cases update to thoroughly test most of scenarios.
+
 ## [0.11.0]
 - Reintegrated messaging API.
 - Fixed a bug in file metadata serialisation which caused the frontend app to crash on Windows.
