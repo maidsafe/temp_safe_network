@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.12.1]
+- Updated dependencies.
+
 ## [0.12.0]
 - Integrated with safe_network_common.
 - Response handling in case of errors made complete with reason for errors coded in.
