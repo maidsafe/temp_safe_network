@@ -160,24 +160,14 @@ impl Decodable for DirectoryMetadata {
                 name: try!(d.read_struct_field("name", 1, |d| Decodable::decode(d))),
                 created_time: ::time::at_utc(::time::Timespec {
                     sec: try!(d.read_struct_field("created_time_sec", 2, |d| Decodable::decode(d))),
-                    nsec: try!(d.read_struct_field("created_time_nsec",
-                                                   3,
-                                                   |d| Decodable::decode(d))),
+                    nsec: try!(d.read_struct_field("created_time_nsec", 3, |d| Decodable::decode(d))),
                 }),
                 modified_time: ::time::at_utc(::time::Timespec {
-                    sec: try!(d.read_struct_field("modified_time_sec",
-                                                  4,
-                                                  |d| Decodable::decode(d))),
-                    nsec: try!(d.read_struct_field("modified_time_nsec",
-                                                   5,
-                                                   |d| Decodable::decode(d))),
+                    sec: try!(d.read_struct_field("modified_time_sec", 4, |d| Decodable::decode(d))),
+                    nsec: try!(d.read_struct_field("modified_time_nsec", 5, |d| Decodable::decode(d))),
                 }),
-                user_metadata: try!(d.read_struct_field("user_metadata",
-                                                        6,
-                                                        |d| Decodable::decode(d))),
-                parent_dir_key: try!(d.read_struct_field("parent_dir_key",
-                                                         7,
-                                                         |d| Decodable::decode(d))),
+                user_metadata: try!(d.read_struct_field("user_metadata", 6, |d| Decodable::decode(d))),
+                parent_dir_key: try!(d.read_struct_field("parent_dir_key", 7, |d| Decodable::decode(d))),
             })
         })
     }
@@ -229,8 +219,14 @@ mod test {
         let id = XorName::new(unwrap_result!((utility::generate_random_array_u8_64())));
         let modified_time = ::time::now_utc();
         let mut obj_before = unwrap_result!(DirectoryMetadata::new("hello.txt".to_string(),
-                99u64, true, AccessLevel::Private, Vec::new(),
-                Some(DirectoryKey::new(id, 100u64, false, AccessLevel::Private))));
+                                                                   99u64,
+                                                                   true,
+                                                                   AccessLevel::Private,
+                                                                   Vec::new(),
+                                                                   Some(DirectoryKey::new(id,
+                                                                                          100u64,
+                                                                                          false,
+                                                                                          AccessLevel::Private))));
         let user_metadata = "{mime: \"application/json\"}".to_string().into_bytes();
         obj_before.set_user_metadata(user_metadata.clone());
         obj_before.set_modified_time(modified_time.clone());

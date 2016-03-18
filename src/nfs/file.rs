@@ -91,8 +91,7 @@ mod test {
     #[test]
     fn serialise_deserialise() {
         let obj_before = unwrap_result!(File::new(FileMetadata::new("Home".to_string(),
-                                                                    "{mime:\"application/json\"\
-                                                                     }"
+                                                                    "{mime:\"application/json\"}"
                                                                         .to_string()
                                                                         .into_bytes()),
                                                   DataMap::None));

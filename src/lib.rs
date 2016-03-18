@@ -42,6 +42,8 @@
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
 #![cfg_attr(feature="clippy", allow(use_debug))]
 
+#[macro_use]
+extern crate log;
 extern crate time;
 extern crate rand;
 extern crate routing;
@@ -51,10 +53,8 @@ extern crate lru_time_cache;
 extern crate self_encryption;
 extern crate rustc_serialize;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate maidsafe_utilities;
-extern crate mpid_messaging;
+extern crate safe_network_common;
 
 /// Core module
 pub mod core;

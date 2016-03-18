@@ -17,8 +17,9 @@
 
 use std::sync::mpsc;
 
-use mpid_messaging;
 use routing::{DataRequest, Data};
+use safe_network_common::messaging;
+use safe_network_common::client_errors::{GetError, MutationError};
 use maidsafe_utilities::serialisation::SerialisationError;
 
 /// Intended for converting Client Errors into numeric codes for propagating some error information
@@ -59,11 +60,21 @@ pub enum CoreError {
     /// Blocking operation was cancelled
     OperationAborted,
     /// MpidMessaging Error
-    MpidMessagingError(mpid_messaging::Error),
+    MpidMessagingError(messaging::Error),
     /// Performing a GET operation failed
-    GetFailure(DataRequest),
+    GetFailure {
+        /// Orignal request that was made to the network
+        request: DataRequest,
+        /// Reason for failure
+        reason: GetError,
+    },
     /// Performing a network mutating operation such as PUT/POST/DELETE failed
-    MutationFailure(Data),
+    MutationFailure {
+        /// Orignal data that was sent to the network
+        data: Data,
+        /// Reason for failure
+        reason: MutationError,
+    },
 }
 
 impl<'a> From<&'a str> for CoreError {
@@ -96,8 +107,8 @@ impl From<mpsc::RecvError> for CoreError {
     }
 }
 
-impl From<mpid_messaging::Error> for CoreError {
-    fn from(error: mpid_messaging::Error) -> CoreError {
+impl From<messaging::Error> for CoreError {
+    fn from(error: messaging::Error) -> CoreError {
         CoreError::MpidMessagingError(error)
     }
 }
@@ -111,18 +122,27 @@ impl Into<i32> for CoreError {
             CoreError::SymmetricDecipherFailure => CLIENT_ERROR_START_RANGE - 3,
             CoreError::ReceivedUnexpectedData => CLIENT_ERROR_START_RANGE - 4,
             CoreError::VersionCacheMiss => CLIENT_ERROR_START_RANGE - 5,
-            CoreError::RootDirectoryAlreadyExists => CLIENT_ERROR_START_RANGE - 7,
-            CoreError::RandomDataGenerationFailure => CLIENT_ERROR_START_RANGE - 8,
-            CoreError::OperationForbiddenForClient => CLIENT_ERROR_START_RANGE - 9,
-            CoreError::Unexpected(_) => CLIENT_ERROR_START_RANGE - 10,
-            CoreError::RoutingError(_) => CLIENT_ERROR_START_RANGE - 11,
-            CoreError::RoutingInterfaceError(_) => CLIENT_ERROR_START_RANGE - 12,
-            CoreError::UnsupportedSaltSizeForPwHash => CLIENT_ERROR_START_RANGE - 13,
-            CoreError::UnsuccessfulPwHash => CLIENT_ERROR_START_RANGE - 14,
-            CoreError::OperationAborted => CLIENT_ERROR_START_RANGE - 15,
-            CoreError::MpidMessagingError(_) => CLIENT_ERROR_START_RANGE - 16,
-            CoreError::GetFailure(_) => CLIENT_ERROR_START_RANGE - 17,
-            CoreError::MutationFailure(_) => CLIENT_ERROR_START_RANGE - 18,
+            CoreError::RootDirectoryAlreadyExists => CLIENT_ERROR_START_RANGE - 6,
+            CoreError::RandomDataGenerationFailure => CLIENT_ERROR_START_RANGE - 7,
+            CoreError::OperationForbiddenForClient => CLIENT_ERROR_START_RANGE - 8,
+            CoreError::Unexpected(_) => CLIENT_ERROR_START_RANGE - 9,
+            CoreError::RoutingError(_) => CLIENT_ERROR_START_RANGE - 10,
+            CoreError::RoutingInterfaceError(_) => CLIENT_ERROR_START_RANGE - 11,
+            CoreError::UnsupportedSaltSizeForPwHash => CLIENT_ERROR_START_RANGE - 12,
+            CoreError::UnsuccessfulPwHash => CLIENT_ERROR_START_RANGE - 13,
+            CoreError::OperationAborted => CLIENT_ERROR_START_RANGE - 14,
+            CoreError::MpidMessagingError(_) => CLIENT_ERROR_START_RANGE - 15,
+            CoreError::GetFailure { reason: GetError::NoSuchAccount, .. } => CLIENT_ERROR_START_RANGE - 16,
+            CoreError::GetFailure { reason: GetError::NoSuchData, .. } => CLIENT_ERROR_START_RANGE - 17,
+            CoreError::GetFailure { reason: GetError::Unknown, .. } => CLIENT_ERROR_START_RANGE - 18,
+            CoreError::MutationFailure { reason: MutationError::NoSuchAccount, .. } => CLIENT_ERROR_START_RANGE - 19,
+            CoreError::MutationFailure { reason: MutationError::AccountExists, .. } => CLIENT_ERROR_START_RANGE - 20,
+            CoreError::MutationFailure { reason: MutationError::NoSuchData, .. } => CLIENT_ERROR_START_RANGE - 21,
+            CoreError::MutationFailure { reason: MutationError::DataExists, .. } => CLIENT_ERROR_START_RANGE - 22,
+            CoreError::MutationFailure { reason: MutationError::LowBalance, .. } => CLIENT_ERROR_START_RANGE - 23,
+            CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. } => CLIENT_ERROR_START_RANGE - 24,
+            CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. } => CLIENT_ERROR_START_RANGE - 25,
+            CoreError::MutationFailure { reason: MutationError::Unknown, .. } => CLIENT_ERROR_START_RANGE - 26,
         }
     }
 }
@@ -136,39 +156,31 @@ impl ::std::fmt::Debug for CoreError {
             CoreError::UnsuccessfulEncodeDecode(ref err) => {
                 write!(f, "CoreError::UnsuccessfulEncodeDecode -> {:?}", err)
             }
-            CoreError::AsymmetricDecipherFailure => {
-                write!(f, "CoreError::AsymmetricDecipherFailure")
-            }
+            CoreError::AsymmetricDecipherFailure => write!(f, "CoreError::AsymmetricDecipherFailure"),
             CoreError::SymmetricDecipherFailure => write!(f, "CoreError::SymmetricDecipherFailure"),
             CoreError::ReceivedUnexpectedData => write!(f, "CoreError::ReceivedUnexpectedData"),
             CoreError::VersionCacheMiss => write!(f, "CoreError::VersionCacheMiss"),
-            CoreError::RootDirectoryAlreadyExists => {
-                write!(f, "CoreError::RootDirectoryAlreadyExists")
-            }
-            CoreError::RandomDataGenerationFailure => {
-                write!(f, "CoreError::RandomDataGenerationFailure")
-            }
-            CoreError::OperationForbiddenForClient => {
-                write!(f, "CoreError::OperationForbiddenForClient")
-            }
+            CoreError::RootDirectoryAlreadyExists => write!(f, "CoreError::RootDirectoryAlreadyExists"),
+            CoreError::RandomDataGenerationFailure => write!(f, "CoreError::RandomDataGenerationFailure"),
+            CoreError::OperationForbiddenForClient => write!(f, "CoreError::OperationForbiddenForClient"),
             CoreError::Unexpected(ref err) => write!(f, "CoreError::Unexpected::{{{:?}}}", err),
             CoreError::RoutingError(ref err) => write!(f, "CoreError::RoutingError -> {:?}", err),
-            CoreError::RoutingInterfaceError(ref err) => {
-                write!(f, "CoreError::RoutingInterfaceError -> {:?}", err)
-            }
-            CoreError::UnsupportedSaltSizeForPwHash => {
-                write!(f, "CoreError::UnsupportedSaltSizeForPwHash")
-            }
+            CoreError::RoutingInterfaceError(ref err) => write!(f, "CoreError::RoutingInterfaceError -> {:?}", err),
+            CoreError::UnsupportedSaltSizeForPwHash => write!(f, "CoreError::UnsupportedSaltSizeForPwHash"),
             CoreError::UnsuccessfulPwHash => write!(f, "CoreError::UnsuccessfulPwHash"),
             CoreError::OperationAborted => write!(f, "CoreError::OperationAborted"),
-            CoreError::MpidMessagingError(ref err) => {
-                write!(f, "CoreError::MpidMessagingError -> {:?}", err)
+            CoreError::MpidMessagingError(ref err) => write!(f, "CoreError::MpidMessagingError -> {:?}", err),
+            CoreError::GetFailure { ref request, ref reason, } => {
+                write!(f,
+                       "CoreError::GetFailure::{{ reason: {:?}, request: {:?}}}",
+                       reason,
+                       request)
             }
-            CoreError::GetFailure(ref data_req) => {
-                write!(f, "CoreError::GetFailure::{{{:?}}}", data_req)
-            }
-            CoreError::MutationFailure(ref data) => {
-                write!(f, "CoreError::MutationFailure::{{{:?}}}", data)
+            CoreError::MutationFailure { ref data, ref reason, } => {
+                write!(f,
+                       "CoreError::MutationFailure::{{ reason: {:?}, data: {:?}}}",
+                       reason,
+                       data)
             }
         }
     }

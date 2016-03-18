@@ -26,6 +26,8 @@ use sodiumoxide::crypto::sign;
 use sodiumoxide::crypto::hash::sha512;
 use std::sync::{Arc, Mutex, mpsc};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
+use safe_network_common::TYPE_TAG_SESSION_PACKET;
+use safe_network_common::client_errors::{GetError, MutationError};
 use routing::{FullId, Data, DataRequest, InterfaceError, Event, Authority, ResponseContent, ResponseMessage,
               RoutingError, MessageId, RequestContent, RequestMessage};
 use core::utility;
@@ -154,20 +156,34 @@ impl RoutingMock {
                             };
 
                             if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                                error!("Get-Response Send Failure: {:?}", error);
+                                error!("Get-Response mpsc-send failure: {:?}", error);
                             }
                         } else {
-                            let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg);
+                            let ext_err = match serialise(&GetError::NoSuchData) {
+                                Ok(serialised_err) => serialised_err,
+                                Err(err) => {
+                                    warn!("Could not serialise client-vault error - {:?}", err);
+                                    Vec::new()
+                                }
+                            };
+                            let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg, ext_err);
                             if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                                error!("Get-Response Send Failure: {:?}", error);
+                                error!("Get-Response mpsc-send failure: {:?}", error);
                             }
                         }
                     }
                 }
                 None => {
-                    let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg);
+                    let ext_err = match serialise(&GetError::NoSuchData) {
+                        Ok(serialised_err) => serialised_err,
+                        Err(err) => {
+                            warn!("Could not serialise client-vault error - {:?}", err);
+                            Vec::new()
+                        }
+                    };
+                    let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg, ext_err);
                     if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                        error!("Get-Response Send Failure: {:?}", error);
+                        error!("Get-Response mpsc-send failure: {:?}", error);
                     }
                 }
             };
@@ -192,30 +208,55 @@ impl RoutingMock {
         };
 
         let mut data_store_mutex_guard = unwrap_result!(data_store.lock());
-        let success = if data_store_mutex_guard.contains_key(&data_name) {
-            if let Data::Immutable(immut_data) = data {
-                match deserialise(unwrap_option!(data_store_mutex_guard.get(&data_name),
-                                                 "Programming Error - Report this as a Bug.")) {
-                    Ok(Data::Immutable(immut_data_stored)) => {
-                        // Immutable data is de-duplicated so always allowed
-                        immut_data_stored.get_type_tag() == immut_data.get_type_tag()
+        let err = if data_store_mutex_guard.contains_key(&data_name) {
+            match data {
+                Data::Immutable(immut_data) => {
+                    match deserialise(unwrap_option!(data_store_mutex_guard.get(&data_name),
+                                                     "Programming Error - Report this as a Bug.")) {
+                        Ok(Data::Immutable(immut_data_stored)) => {
+                            // Immutable data is de-duplicated so always allowed
+                            if immut_data_stored.get_type_tag() == immut_data.get_type_tag() {
+                                None
+                            } else {
+                                Some(MutationError::DataExists)
+                            }
+                        }
+                        Ok(_) => Some(MutationError::DataExists),
+                        Err(_) => Some(MutationError::Unknown),
                     }
-                    _ => false,
                 }
-            } else {
-                false
+                Data::Structured(struct_data) => {
+                    if struct_data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
+                        Some(MutationError::AccountExists)
+                    } else {
+                        Some(MutationError::DataExists)
+                    }
+                }
+                _ => Some(MutationError::DataExists),
             }
         } else if let Ok(raw_data) = serialise(&data) {
             let _ = data_store_mutex_guard.insert(data_name, raw_data);
             sync_disk_storage(&*data_store_mutex_guard);
-            true
+            None
         } else {
-            false
+            Some(MutationError::Unknown)
         };
 
         let _ = thread::spawn(move || {
             thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS));
-            if success {
+            if let Some(reason) = err {
+                let ext_err = match serialise(&reason) {
+                    Ok(serialised_err) => serialised_err,
+                    Err(err) => {
+                        warn!("Could not serialise client-vault error - {:?}", err);
+                        Vec::new()
+                    }
+                };
+                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg, ext_err);
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Put-Response mpsc-send failure: {:?}", error);
+                }
+            } else {
                 let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
                 let digest = sha512::hash(&rand_data);
 
@@ -227,12 +268,7 @@ impl RoutingMock {
                 };
 
                 if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                    error!("Put-Response Send Failure: {:?}", error);
-                }
-            } else {
-                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg);
-                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                    error!("Put-Response Send Failure: {:?}", error);
+                    error!("Put-Response mpsc-send failure: {:?}", error);
                 }
             }
         });
@@ -254,32 +290,44 @@ impl RoutingMock {
         };
 
         let mut data_store_mutex_guard = unwrap_result!(data_store.lock());
-        let success = if data_store_mutex_guard.contains_key(&data_name) {
-            let raw_data_result = serialise(&data);
-            match (raw_data_result,
-                   data,
-                   deserialise(unwrap_option!(data_store_mutex_guard.get(&data_name),
-                                              "Programming Error - Report this as a Bug."))) {
-                (Ok(raw_data),
-                 Data::Structured(struct_data_new),
-                 Ok(Data::Structured(struct_data_stored))) => {
-                    if let Ok(_) = struct_data_stored.validate_self_against_successor(&struct_data_new) {
-                        let _ = data_store_mutex_guard.insert(data_name, raw_data);
-                        sync_disk_storage(&*data_store_mutex_guard);
-                        true
-                    } else {
-                        false
+        let err = if data_store_mutex_guard.contains_key(&data_name) {
+            if let Data::Structured(ref struct_data_new) = data {
+                match (serialise(&data),
+                       deserialise(unwrap_option!(data_store_mutex_guard.get(&data_name),
+                                                  "Programming Error - Report this as a Bug."))) {
+                    (Ok(raw_data), Ok(Data::Structured(struct_data_stored))) => {
+                        if let Ok(_) = struct_data_stored.validate_self_against_successor(&struct_data_new) {
+                            let _ = data_store_mutex_guard.insert(data_name, raw_data);
+                            sync_disk_storage(&*data_store_mutex_guard);
+                            None
+                        } else {
+                            Some(MutationError::InvalidSuccessor)
+                        }
                     }
+                    _ => Some(MutationError::Unknown),
                 }
-                _ => false,
+            } else {
+                Some(MutationError::InvalidOperation)
             }
         } else {
-            false
+            Some(MutationError::NoSuchData)
         };
 
         let _ = thread::spawn(move || {
             thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS));
-            if success {
+            if let Some(reason) = err {
+                let ext_err = match serialise(&reason) {
+                    Ok(serialised_err) => serialised_err,
+                    Err(err) => {
+                        warn!("Could not serialise client-vault error - {:?}", err);
+                        Vec::new()
+                    }
+                };
+                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg, ext_err);
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Post-Response mpsc-send failure: {:?}", error);
+                }
+            } else {
                 let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
                 let digest = sha512::hash(&rand_data);
 
@@ -291,12 +339,7 @@ impl RoutingMock {
                 };
 
                 if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                    error!("Post-Response Send Failure: {:?}", error);
-                }
-            } else {
-                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg);
-                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                    error!("Post-Response Send Failure: {:?}", error);
+                    error!("Post-Response mpsc-send failure: {:?}", error);
                 }
             }
         });
@@ -318,32 +361,44 @@ impl RoutingMock {
         };
 
         let mut data_store_mutex_guard = unwrap_result!(data_store.lock());
-        let success = if data_store_mutex_guard.contains_key(&data_name) {
-            let raw_data_result = serialise(&data);
-            match (raw_data_result,
-                   data,
-                   deserialise(unwrap_option!(data_store_mutex_guard.get(&data_name),
-                                              "Programming Error - Report this as a Bug."))) {
-                (Ok(_),
-                 Data::Structured(struct_data_new),
-                 Ok(Data::Structured(struct_data_stored))) => {
-                    if let Ok(_) = struct_data_stored.validate_self_against_successor(&struct_data_new) {
-                        let _ = data_store_mutex_guard.remove(&data_name);
-                        sync_disk_storage(&*data_store_mutex_guard);
-                        true
-                    } else {
-                        false
+        let err = if data_store_mutex_guard.contains_key(&data_name) {
+            if let Data::Structured(ref struct_data_new) = data {
+                match (serialise(&data),
+                       deserialise(unwrap_option!(data_store_mutex_guard.get(&data_name),
+                                                  "Programming Error - Report this as a Bug."))) {
+                    (Ok(_), Ok(Data::Structured(struct_data_stored))) => {
+                        if let Ok(_) = struct_data_stored.validate_self_against_successor(&struct_data_new) {
+                            let _ = data_store_mutex_guard.remove(&data_name);
+                            sync_disk_storage(&*data_store_mutex_guard);
+                            None
+                        } else {
+                            Some(MutationError::InvalidSuccessor)
+                        }
                     }
+                    _ => Some(MutationError::Unknown),
                 }
-                _ => false,
+            } else {
+                Some(MutationError::InvalidOperation)
             }
         } else {
-            false
+            Some(MutationError::NoSuchData)
         };
 
         let _ = thread::spawn(move || {
             thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS));
-            if success {
+            if let Some(reason) = err {
+                let ext_err = match serialise(&reason) {
+                    Ok(serialised_err) => serialised_err,
+                    Err(err) => {
+                        warn!("Could not serialise client-vault error - {:?}", err);
+                        Vec::new()
+                    }
+                };
+                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg, ext_err);
+                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
+                    error!("Delete-Response mpsc-send failure: {:?}", error);
+                }
+            } else {
                 let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
                 let digest = sha512::hash(&rand_data);
 
@@ -355,12 +410,7 @@ impl RoutingMock {
                 };
 
                 if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                    error!("Delete-Response Send Failure: {:?}", error);
-                }
-            } else {
-                let resp_msg = RoutingMock::construct_failure_resp(nae_auth, client_auth, req_msg);
-                if let Err(error) = cloned_sender.send(Event::Response(resp_msg)) {
-                    error!("Delete-Response Send Failure: {:?}", error);
+                    error!("Delete-Response mpsc-send failure: {:?}", error);
                 }
             }
         });
@@ -368,34 +418,38 @@ impl RoutingMock {
         Ok(())
     }
 
-    fn construct_failure_resp(src: Authority, dst: Authority, req_msg: RequestMessage) -> ResponseMessage {
+    fn construct_failure_resp(src: Authority,
+                              dst: Authority,
+                              req_msg: RequestMessage,
+                              ext_err: Vec<u8>)
+                              -> ResponseMessage {
         let resp_content = match req_msg.content {
             RequestContent::Get(_, msg_id) => {
                 ResponseContent::GetFailure {
                     id: msg_id,
                     request: req_msg,
-                    external_error_indicator: Vec::new(),
+                    external_error_indicator: ext_err,
                 }
             }
             RequestContent::Put(_, msg_id) => {
                 ResponseContent::PutFailure {
                     id: msg_id,
                     request: req_msg,
-                    external_error_indicator: Vec::new(),
+                    external_error_indicator: ext_err,
                 }
             }
             RequestContent::Post(_, msg_id) => {
                 ResponseContent::PostFailure {
                     id: msg_id,
                     request: req_msg,
-                    external_error_indicator: Vec::new(),
+                    external_error_indicator: ext_err,
                 }
             }
             RequestContent::Delete(_, msg_id) => {
                 ResponseContent::DeleteFailure {
                     id: msg_id,
                     request: req_msg,
-                    external_error_indicator: Vec::new(),
+                    external_error_indicator: ext_err,
                 }
             }
             _ => {
@@ -427,6 +481,7 @@ mod test {
 
     use xor_name::XorName;
     use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use safe_network_common::client_errors::{GetError, MutationError};
     use routing::{FullId, StructuredData, ImmutableData, ImmutableDataType, Data, DataRequest, Authority, MessageId};
 
     #[test]
@@ -467,6 +522,26 @@ mod test {
 
         let location_nae_mgr = Authority::NaeManager(orig_data.name());
         let location_client_mgr = Authority::ClientManager(orig_data.name());
+
+        // GET ImmutableData should fail
+        {
+            let data_request = DataRequest::Immutable(orig_data.name(), ImmutableDataType::Normal);
+
+            let (tx, rx) = mpsc::channel();
+            let msg_id = MessageId::new();
+
+            unwrap_result!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
+
+            unwrap_result!(mock_routing.send_get_request(location_nae_mgr.clone(), data_request.clone(), msg_id));
+
+            let resp_getter = GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), data_request);
+
+            match resp_getter.get() {
+                Ok(_) => panic!("Expected Get Failure!"),
+                Err(CoreError::GetFailure { reason: GetError::NoSuchData, .. }) => (),
+                Err(err) => panic!("Unexpected: {:?}", err),
+            }
+        }
 
         // First PUT should succeed
         {
@@ -519,7 +594,7 @@ mod test {
 
             match resp_getter.get() {
                 Ok(_) => panic!("Expected Post Failure!"),
-                Err(CoreError::MutationFailure(_)) => (),
+                Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. }) => (),
                 Err(err) => panic!("Unexpected: {:?}", err),
             }
         }
@@ -535,7 +610,7 @@ mod test {
 
             match resp_getter.get() {
                 Ok(_) => panic!("Expected Delete Failure!"),
-                Err(CoreError::MutationFailure(_)) => (),
+                Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. }) => (),
                 Err(err) => panic!("Unexpected: {:?}", err),
             }
         }
@@ -755,7 +830,7 @@ mod test {
 
             match resp_getter.get() {
                 Ok(_) => panic!("Expected Put Failure!"),
-                Err(CoreError::MutationFailure(_)) => (),
+                Err(CoreError::MutationFailure { reason: MutationError::DataExists, .. }) => (),
                 Err(err) => panic!("Unexpected: {:?}", err),
             }
         }
@@ -773,7 +848,7 @@ mod test {
 
             match resp_getter.get() {
                 Ok(_) => panic!("Expected Post Failure!"),
-                Err(CoreError::MutationFailure(_)) => (),
+                Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => (),
                 Err(err) => panic!("Unexpected: {:?}", err),
             }
         }
@@ -791,7 +866,7 @@ mod test {
 
             match resp_getter.get() {
                 Ok(_) => panic!("Expected Post Failure!"),
-                Err(CoreError::MutationFailure(_)) => (),
+                Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => (),
                 Err(err) => panic!("Unexpected: {:?}", err),
             }
         }
@@ -883,7 +958,7 @@ mod test {
 
             match resp_getter.get() {
                 Ok(_) => panic!("Expected Delete Failure!"),
-                Err(CoreError::MutationFailure(_)) => (),
+                Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => (),
                 Err(err) => panic!("Unexpected: {:?}", err),
             }
         }
@@ -948,7 +1023,7 @@ mod test {
 
             match resp_getter.get() {
                 Ok(_) => panic!("Expected Get Failure!"),
-                Err(CoreError::GetFailure(_)) => (),
+                Err(CoreError::GetFailure { reason: GetError::NoSuchData, .. }) => (),
                 Err(err) => panic!("Unexpected: {:?}", err),
             }
         }

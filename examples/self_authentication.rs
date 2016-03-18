@@ -39,9 +39,11 @@
 extern crate safe_core;
 #[macro_use]
 extern crate maidsafe_utilities;
+extern crate safe_network_common;
 
 use safe_core::core::client::Client;
 use safe_core::core::errors::CoreError;
+use safe_network_common::client_errors::MutationError;
 
 fn main() {
     maidsafe_utilities::log::init(true);
@@ -83,9 +85,8 @@ fn main() {
 
             match Client::create_account(keyword.clone(), pin.clone(), password.clone()) {
                 Ok(_) => (),
-                Err(CoreError::MutationFailure(_)) => {
-                    println!("This domain is already taken. Please retry with different Keyword \
-                              and/or PIN");
+                Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => {
+                    println!("ERROR: This domain is already taken. Please retry with different Keyword and/or PIN");
                     return;
                 }
                 Err(err) => panic!("{:?}", err),
@@ -137,7 +138,7 @@ fn main() {
                     println!("Account Login Successful !!");
                     break;
                 }
-                Err(error) => println!("Account Login Failed !! Reason: {:?}\n\n", error),
+                Err(error) => println!("ERROR: Account Login Failed !!\nReason: {:?}\n\n", error),
             }
         }
     }

@@ -53,8 +53,8 @@ pub fn create(client: Arc<Mutex<Client>>,
                                                        data_encryption_keys));
 
     match try!(structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
-                                                                                      owner_keys.clone(),
-                                                                                      prev_owner_keys.clone())) {
+                                                                                    owner_keys.clone(),
+                                                                                    prev_owner_keys.clone())) {
         DataFitResult::DataFits => {
             Ok(try!(StructuredData::new(tag_type,
                                         id,
@@ -63,18 +63,17 @@ pub fn create(client: Arc<Mutex<Client>>,
                                         owner_keys,
                                         prev_owner_keys,
                                         Some(private_signing_key))))
-
-        },
+        }
         DataFitResult::DataDoesNotFit => {
             let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), DataMap::None);
             se.write(&data, 0);
             let data_map = se.close();
 
             let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMap(data_map.clone()),
-                                                                                                 data_encryption_keys));
+                                                               data_encryption_keys));
             match try!(structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
-                                                                                              owner_keys.clone(),
-                                                                                              prev_owner_keys.clone())) {
+                                                                                            owner_keys.clone(),
+                                                                                            prev_owner_keys.clone())) {
                 DataFitResult::DataFits => {
                     Ok(try!(StructuredData::new(tag_type,
                                                 id,
@@ -83,8 +82,7 @@ pub fn create(client: Arc<Mutex<Client>>,
                                                 owner_keys,
                                                 prev_owner_keys,
                                                 Some(private_signing_key))))
-
-                },
+                }
                 DataFitResult::DataDoesNotFit => {
                     let immutable_data = ImmutableData::new(ImmutableDataType::Normal, data_to_store);
                     let name = immutable_data.name();
@@ -108,10 +106,10 @@ pub fn create(client: Arc<Mutex<Client>>,
                         },
                         _ => Err(CoreError::StructuredDataHeaderSizeProhibitive),
                     }
-                },
+                }
                 DataFitResult::NoDataCanFit => Err(CoreError::StructuredDataHeaderSizeProhibitive),
             }
-        },
+        }
         DataFitResult::NoDataCanFit => Err(CoreError::StructuredDataHeaderSizeProhibitive),
     }
 }
@@ -133,12 +131,9 @@ pub fn get_data(client: Arc<Mutex<Client>>,
             let response_getter = try!(unwrap_result!(client.lock()).get(request, None));
             match try!(response_getter.get()) {
                 Data::Immutable(immutable_data) => {
-                    match try!(get_decoded_stored_data(&immutable_data.value(),
-                                                       data_decryption_keys)) {
+                    match try!(get_decoded_stored_data(&immutable_data.value(), data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
-                            let mut se =
-                                SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()),
-                                                   data_map);
+                            let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), data_map);
                             let length = se.len();
                             Ok(se.read(0, length))
                         }
@@ -152,9 +147,7 @@ pub fn get_data(client: Arc<Mutex<Client>>,
 }
 
 fn get_encoded_data_to_store(data: DataTypeEncoding,
-                             data_encryption_keys: Option<(&box_::PublicKey,
-                                                           &box_::SecretKey,
-                                                           &box_::Nonce)>)
+                             data_encryption_keys: Option<(&box_::PublicKey, &box_::SecretKey, &box_::Nonce)>)
                              -> Result<Vec<u8>, CoreError> {
     let serialised_data = try!(serialise(&data));
     if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_encryption_keys {
@@ -168,17 +161,11 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
 }
 
 fn get_decoded_stored_data(raw_data: &Vec<u8>,
-                           data_decryption_keys: Option<(&box_::PublicKey,
-                                                         &box_::SecretKey,
-                                                         &box_::Nonce)>)
+                           data_decryption_keys: Option<(&box_::PublicKey, &box_::SecretKey, &box_::Nonce)>)
                            -> Result<DataTypeEncoding, CoreError> {
     let data: _;
-    let data_to_deserialise = if let Some((public_encryp_key, secret_encryp_key, nonce)) =
-                                     data_decryption_keys {
-        data = try!(utility::hybrid_decrypt(&raw_data,
-                                            nonce,
-                                            public_encryp_key,
-                                            secret_encryp_key));
+    let data_to_deserialise = if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_decryption_keys {
+        data = try!(utility::hybrid_decrypt(&raw_data, nonce, public_encryp_key, secret_encryp_key));
         &data
     } else {
         raw_data
