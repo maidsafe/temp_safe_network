@@ -46,7 +46,7 @@ use safe_core::core::errors::CoreError;
 use safe_network_common::client_errors::MutationError;
 
 fn main() {
-    maidsafe_utilities::log::init(true);
+    unwrap_result!(maidsafe_utilities::log::init(true));
 
     let mut keyword = String::new();
     let mut password = String::new();
