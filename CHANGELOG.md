@@ -1,5 +1,9 @@
 # Safe Core - Change Log
 
+## [0.13.0]
+- Added minimal support for mock crust.
+- Updated dependencies.
+
 ## [0.12.1]
 - Updated dependencies.
 
