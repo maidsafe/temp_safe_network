@@ -49,3 +49,4 @@ name = "simulate_browser"
 
 [features]
 use-mock-routing = []
+use-mock-crust = ["routing/use-mock-crust"]
