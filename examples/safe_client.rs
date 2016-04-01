@@ -59,7 +59,7 @@ const MOCK_NETWORK: bool = true;
 const MOCK_NETWORK: bool = false;
 
 fn main() {
-    maidsafe_utilities::log::init(true);
+    unwrap_result!(maidsafe_utilities::log::init(true));
 
     let mut keyword = String::new();
     let mut password = String::new();
