@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.14.0]
+- Migrate to Routing 0.13.0.
+
 ## [0.13.1]
 - Updated dependencies.
 
