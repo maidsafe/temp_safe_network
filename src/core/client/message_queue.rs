@@ -91,7 +91,7 @@ impl MessageQueue {
                                     let _ = response_observer.send(ResponseEvent::GetResp(err));
                                 }
                             }
-                            ResponseContent::PutSuccess(_, msg_id) => {
+                            ResponseContent::PutSuccess(msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
@@ -123,7 +123,7 @@ impl MessageQueue {
                                     let _ = response_observer.send(ResponseEvent::MutationResp(err));
                                 }
                             }
-                            ResponseContent::PostSuccess(_, msg_id) => {
+                            ResponseContent::PostSuccess(msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
@@ -155,7 +155,7 @@ impl MessageQueue {
                                     let _ = response_observer.send(ResponseEvent::MutationResp(err));
                                 }
                             }
-                            ResponseContent::DeleteSuccess(_, msg_id) => {
+                            ResponseContent::DeleteSuccess(msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
