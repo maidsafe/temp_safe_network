@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.13.2]
+- Updated dependencies.
+
 ## [0.13.1]
 - Updated dependencies.
 
