@@ -1,5 +1,18 @@
 # Safe Core - Change Log
 
+## [0.14.1]
+- Updated dependencies.
+
+## [0.14.0]
+- Migrate to Routing 0.13.0.
+
+## [0.13.1]
+- Updated dependencies.
+
+## [0.13.0]
+- Added minimal support for mock crust.
+- Updated dependencies.
+
 ## [0.12.1]
 - Updated dependencies.
 

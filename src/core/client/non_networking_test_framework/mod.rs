@@ -23,14 +23,12 @@ use std::time::Duration;
 use std::io::{Read, Write};
 use std::collections::HashMap;
 use sodiumoxide::crypto::sign;
-use sodiumoxide::crypto::hash::sha512;
 use std::sync::{Arc, Mutex, mpsc};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use safe_network_common::TYPE_TAG_SESSION_PACKET;
 use safe_network_common::client_errors::{GetError, MutationError};
 use routing::{FullId, Data, DataRequest, InterfaceError, Event, Authority, ResponseContent, ResponseMessage,
               RoutingError, MessageId, RequestContent, RequestMessage};
-use core::utility;
 
 type DataStore = Arc<Mutex<HashMap<XorName, Vec<u8>>>>;
 
@@ -96,7 +94,8 @@ pub struct RoutingMock {
 }
 
 impl RoutingMock {
-    pub fn new(sender: mpsc::Sender<Event>, _id: Option<FullId>) -> Result<RoutingMock, RoutingError> {
+    pub fn new(sender: mpsc::Sender<Event>, _id: Option<FullId>, _use_data_cache: bool)
+        -> Result<RoutingMock, RoutingError> {
         ::sodiumoxide::init();
 
         let cloned_sender = sender.clone();
@@ -257,10 +256,7 @@ impl RoutingMock {
                     error!("Put-Response mpsc-send failure: {:?}", error);
                 }
             } else {
-                let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
-                let digest = sha512::hash(&rand_data);
-
-                let resp_content = ResponseContent::PutSuccess(digest, msg_id);
+                let resp_content = ResponseContent::PutSuccess(msg_id);
                 let resp_msg = ResponseMessage {
                     src: nae_auth,
                     dst: client_auth,
@@ -328,10 +324,7 @@ impl RoutingMock {
                     error!("Post-Response mpsc-send failure: {:?}", error);
                 }
             } else {
-                let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
-                let digest = sha512::hash(&rand_data);
-
-                let resp_content = ResponseContent::PostSuccess(digest, msg_id);
+                let resp_content = ResponseContent::PostSuccess(msg_id);
                 let resp_msg = ResponseMessage {
                     src: nae_auth,
                     dst: client_auth,
@@ -399,10 +392,7 @@ impl RoutingMock {
                     error!("Delete-Response mpsc-send failure: {:?}", error);
                 }
             } else {
-                let rand_data: Vec<u8> = unwrap_result!(utility::generate_random_vector(10));
-                let digest = sha512::hash(&rand_data);
-
-                let resp_content = ResponseContent::DeleteSuccess(digest, msg_id);
+                let resp_content = ResponseContent::DeleteSuccess(msg_id);
                 let resp_msg = ResponseMessage {
                     src: nae_auth,
                     dst: client_auth,
@@ -508,7 +498,7 @@ mod test {
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
-        let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet)));
+        let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet), true));
 
         match unwrap_result!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -645,7 +635,7 @@ mod test {
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
-        let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet)));
+        let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet), true));
 
         match unwrap_result!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),

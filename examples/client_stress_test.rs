@@ -69,7 +69,7 @@ struct Args {
 }
 
 fn main() {
-    maidsafe_utilities::log::init(true);
+    unwrap_result!(maidsafe_utilities::log::init(true));
 
     let args: Args = Docopt::new(USAGE)
                          .and_then(|docopt| docopt.decode())

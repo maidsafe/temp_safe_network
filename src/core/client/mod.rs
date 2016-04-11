@@ -521,7 +521,7 @@ impl Client {
     }
 
     fn get_new_routing(sender: Sender<Event>, id_packet: Option<FullId>) -> Result<Routing, CoreError> {
-        Ok(try!(Routing::new(sender, id_packet)))
+        Ok(try!(Routing::new(sender, id_packet, true)))
     }
 
     fn update_session_packet(&mut self) -> Result<(), CoreError> {
