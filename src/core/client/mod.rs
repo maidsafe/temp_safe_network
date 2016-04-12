@@ -40,7 +40,7 @@ use maidsafe_utilities::thread::RaiiThreadJoiner;
 use maidsafe_utilities::serialisation::serialise;
 use safe_network_common::TYPE_TAG_SESSION_PACKET;
 use safe_network_common::messaging::{MpidMessage, MpidMessageWrapper};
-use routing::{MessageId, FullId, StructuredData, Data, DataRequest, PlainData, Authority, Event};
+use routing::{MessageId, FullId, StructuredData, Data, DataRequest, PlainData, Authority};
 
 use sodiumoxide::crypto::{box_, sign};
 use sodiumoxide::crypto::hash::{sha256, sha512};
@@ -75,7 +75,7 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = try!(Client::get_new_routing(routing_sender, None));
+        let routing = try!(Routing::new(routing_sender, None, true));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
 
         match try!(network_event_receiver.recv()) {
@@ -106,7 +106,7 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = try!(Client::get_new_routing(routing_sender, Some(id_packet)));
+        let routing = try!(Routing::new(routing_sender, Some(id_packet), true));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
 
         match try!(network_event_receiver.recv()) {
@@ -182,7 +182,7 @@ impl Client {
             let (routing_sender, routing_receiver) = mpsc::channel();
             let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-            let routing = try!(Client::get_new_routing(routing_sender, Some(id_packet)));
+            let routing = try!(Routing::new(routing_sender, Some(id_packet), true));
             let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
 
             match try!(network_event_receiver.recv()) {
@@ -518,10 +518,6 @@ impl Client {
         }
 
         Ok(())
-    }
-
-    fn get_new_routing(sender: Sender<Event>, id_packet: Option<FullId>) -> Result<Routing, CoreError> {
-        Ok(try!(Routing::new(sender, id_packet, true)))
     }
 
     fn update_session_packet(&mut self) -> Result<(), CoreError> {
