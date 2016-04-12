@@ -1,8 +1,5 @@
 # Safe Core - Change Log
 
-## [0.14.2]
-- Remove feature use-mock-crust
-
 ## [0.14.1]
 - Updated dependencies.
 
