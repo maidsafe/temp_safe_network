@@ -94,8 +94,10 @@ pub struct RoutingMock {
 }
 
 impl RoutingMock {
-    pub fn new(sender: mpsc::Sender<Event>, _id: Option<FullId>, _use_data_cache: bool)
-        -> Result<RoutingMock, RoutingError> {
+    pub fn new(sender: mpsc::Sender<Event>,
+               _id: Option<FullId>,
+               _use_data_cache: bool)
+               -> Result<RoutingMock, RoutingError> {
         ::sodiumoxide::init();
 
         let cloned_sender = sender.clone();
@@ -130,7 +132,7 @@ impl RoutingMock {
         let _ = thread::spawn(move || {
             thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS));
             let data_name = request_for.name();
-            let nae_auth = Authority::NaeManager(data_name.clone());
+            let nae_auth = Authority::NaeManager(data_name);
             let req_msg = RequestMessage {
                 src: client_auth.clone(),
                 dst: nae_auth.clone(),
@@ -199,7 +201,7 @@ impl RoutingMock {
         let data_name = data.name();
         // NaeManager is used as the destination authority here because in the Mock we assume that
         // MaidManagers always pass the PUT. Errors if any can come only from NaeManagers
-        let nae_auth = Authority::NaeManager(data_name.clone());
+        let nae_auth = Authority::NaeManager(data_name);
         let req_msg = RequestMessage {
             src: client_auth.clone(),
             dst: nae_auth.clone(),
@@ -256,7 +258,7 @@ impl RoutingMock {
                     error!("Put-Response mpsc-send failure: {:?}", error);
                 }
             } else {
-                let resp_content = ResponseContent::PutSuccess(msg_id);
+                let resp_content = ResponseContent::PutSuccess(data_name, msg_id);
                 let resp_msg = ResponseMessage {
                     src: nae_auth,
                     dst: client_auth,
@@ -278,7 +280,7 @@ impl RoutingMock {
         let client_auth = self.client_auth.clone();
 
         let data_name = data.name();
-        let nae_auth = Authority::NaeManager(data_name.clone());
+        let nae_auth = Authority::NaeManager(data_name);
         let req_msg = RequestMessage {
             src: client_auth.clone(),
             dst: nae_auth.clone(),
@@ -324,7 +326,7 @@ impl RoutingMock {
                     error!("Post-Response mpsc-send failure: {:?}", error);
                 }
             } else {
-                let resp_content = ResponseContent::PostSuccess(msg_id);
+                let resp_content = ResponseContent::PostSuccess(data_name, msg_id);
                 let resp_msg = ResponseMessage {
                     src: nae_auth,
                     dst: client_auth,
@@ -346,7 +348,7 @@ impl RoutingMock {
         let client_auth = self.client_auth.clone();
 
         let data_name = data.name();
-        let nae_auth = Authority::NaeManager(data_name.clone());
+        let nae_auth = Authority::NaeManager(data_name);
         let req_msg = RequestMessage {
             src: client_auth.clone(),
             dst: nae_auth.clone(),
@@ -392,7 +394,7 @@ impl RoutingMock {
                     error!("Delete-Response mpsc-send failure: {:?}", error);
                 }
             } else {
-                let resp_content = ResponseContent::DeleteSuccess(msg_id);
+                let resp_content = ResponseContent::DeleteSuccess(data_name, msg_id);
                 let resp_msg = ResponseMessage {
                     src: nae_auth,
                     dst: client_auth,
