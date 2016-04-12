@@ -1,7 +1,7 @@
 # Safe Core - Change Log
 
 ## [0.14.2]
-- Pointing to and conforming to the latest Routing
+- Pointing and conforming to Routing 0.15.0
 - Removal of feature use-mock-crust
 - internal code improvement - removing now-a-one-liner function
 
