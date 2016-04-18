@@ -105,3 +105,98 @@ pub fn get_data(client: Arc<Mutex<Client>>,
         _ => Err(CoreError::ReceivedUnexpectedData),
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use std::sync::{Arc, Mutex};
+
+    use routing::Data;
+    use core::utility;
+    use core::utility::test_utils;
+    // use sodiumoxide::crypto::box_;
+
+    #[test]
+    fn immut_data_create_retrieve_10_mb() {
+        // Unencrypted
+        {
+            let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
+
+            let data_to_put = unwrap_result!(utility::generate_random_vector(1024)); // 10 MB data
+            // let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MB data
+
+            let immut_data_before = unwrap_result!(create(client.clone(), data_to_put.clone(), None));
+            let data_name = immut_data_before.name();
+            let resp_getter = unwrap_result!(unwrap_result!(client.lock())
+                                                 .put(Data::Immutable(immut_data_before), None));
+            unwrap_result!(resp_getter.get());
+
+            let data_got = unwrap_result!(get_data(client.clone(), data_name, None));
+
+            assert_eq!(data_to_put, data_got);
+        }
+
+        // Encrypted
+        // {
+        // let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
+        // let (pk, sk) = box_::gen_keypair();
+        // let nonce = box_::gen_nonce();
+        //
+        // let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MB data
+        //
+        // let immut_data_before = unwrap_result!(create(client.clone(),
+        // data_to_put.clone(),
+        // Some((&pk, &sk, &nonce))));
+        // let data_name = immut_data_before.name();
+        // let resp_getter = unwrap_result!(unwrap_result!(client.lock())
+        // .put(Data::Immutable(immut_data_before), None));
+        // unwrap_result!(resp_getter.get());
+        //
+        // let data_got = unwrap_result!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))));
+        //
+        // assert_eq!(data_to_put, data_got);
+        // }
+        //
+        // Put unencrypted Retrieve encrypted - Should fail
+        // {
+        // let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
+        // let (pk, sk) = box_::gen_keypair();
+        // let nonce = box_::gen_nonce();
+        //
+        // let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MB data
+        //
+        // let immut_data_before = unwrap_result!(create(client.clone(), data_to_put.clone(), None));
+        // let data_name = immut_data_before.name();
+        // let resp_getter = unwrap_result!(unwrap_result!(client.lock())
+        // .put(Data::Immutable(immut_data_before), None));
+        // unwrap_result!(resp_getter.get());
+        //
+        // let data_got = unwrap_result!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))));
+        //
+        // assert!(data_to_put != data_got);
+        // }
+        //
+        // Put encrypted Retrieve unencrypted - Should fail
+        // {
+        // let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
+        // let (pk, sk) = box_::gen_keypair();
+        // let nonce = box_::gen_nonce();
+        //
+        // let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MB data
+        //
+        // let immut_data_before = unwrap_result!(create(client.clone(),
+        // data_to_put.clone(),
+        // Some((&pk, &sk, &nonce))));
+        // let data_name = immut_data_before.name();
+        // let resp_getter = unwrap_result!(unwrap_result!(client.lock())
+        // .put(Data::Immutable(immut_data_before), None));
+        // unwrap_result!(resp_getter.get());
+        //
+        // let data_got = unwrap_result!(get_data(client.clone(), data_name, None));
+        //
+        // assert!(data_to_put != data_got);
+        // }
+        //
+    }
+}
