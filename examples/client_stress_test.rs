@@ -47,7 +47,7 @@ extern crate maidsafe_utilities;
 use safe_core::core::client::Client;
 
 use docopt::Docopt;
-use routing::{Data, DataRequest, ImmutableData, ImmutableDataType};
+use routing::{Data, DataIdentifier, ImmutableData};
 use rand::{thread_rng, Rng};
 use rand::distributions::{IndependentSample, Range};
 
@@ -88,9 +88,7 @@ fn main() {
     println!("\n\tAccount Creation");
     println!("\t================");
     println!("\nTrying to create an account ...");
-    let mut client = unwrap_result!(Client::create_account(keyword.clone(),
-                                                           pin.clone(),
-                                                           password.clone()));
+    let mut client = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
     println!("Account Created Successfully !!");
 
     // Put and Get ImmutableData chunks
@@ -101,14 +99,14 @@ fn main() {
     for i in 0..immutable_data_count {
         // Construct data
         let contents: Vec<u8> = generate_random_data();
-        let data = Data::Immutable(ImmutableData::new(ImmutableDataType::Normal, contents));
+        let data = Data::Immutable(ImmutableData::new(contents));
         let data_name = data.name();
         // Put the data to the network and block until we get a response
         let put_response_getter = unwrap_result!(client.put(data.clone(), None));
         unwrap_result!(put_response_getter.get());
         println!("Put chunk {}", i);
         // Get the data
-        let data_request = DataRequest::Immutable(data_name, ImmutableDataType::Normal);
+        let data_request = DataIdentifier::Immutable(data_name);
         let get_response_getter = unwrap_result!(client.get(data_request, None));
         let retrieved_data = unwrap_result!(get_response_getter.get());
         assert_eq!(data, retrieved_data);
@@ -119,7 +117,7 @@ fn main() {
 
     // Get all the chunks again
     for i in 0..immutable_data_count {
-        let data_request = DataRequest::Immutable(stored_data[i].name(), ImmutableDataType::Normal);
+        let data_request = DataIdentifier::Immutable(stored_data[i].name());
         let get_response_getter = unwrap_result!(client.get(data_request, None));
         let retrieved_data = unwrap_result!(get_response_getter.get());
         assert_eq!(stored_data[i], retrieved_data);

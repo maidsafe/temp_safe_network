@@ -69,7 +69,7 @@ impl MessageQueue {
                             ResponseContent::GetFailure {
                                 id,
                                 request: RequestMessage {
-                                    content: RequestContent::Get(data_req, _),
+                                    content: RequestContent::Get(data_id, _),
                                     ..
                                 },
                                 external_error_indicator,
@@ -85,7 +85,7 @@ impl MessageQueue {
                                         }
                                     };
                                     let err = Err(CoreError::GetFailure {
-                                        request: data_req,
+                                        data_id: data_id,
                                         reason: reason,
                                     });
                                     let _ = response_observer.send(ResponseEvent::GetResp(err));

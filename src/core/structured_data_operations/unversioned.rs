@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 use self_encryption::{DataMap, SelfEncryptor};
 use sodiumoxide::crypto::{box_, sign};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
-use routing::{StructuredData, ImmutableData, ImmutableDataType, Data, DataRequest};
+use routing::{StructuredData, ImmutableData, Data, DataIdentifier};
 use core::utility;
 use core::structured_data_operations;
 use core::structured_data_operations::DataFitResult;
@@ -84,7 +84,7 @@ pub fn create(client: Arc<Mutex<Client>>,
                                                 Some(private_signing_key))))
                 }
                 DataFitResult::DataDoesNotFit => {
-                    let immutable_data = ImmutableData::new(ImmutableDataType::Normal, data_to_store);
+                    let immutable_data = ImmutableData::new(data_to_store);
                     let name = immutable_data.name();
                     let data = Data::Immutable(immutable_data);
                     try!(try!(unwrap_result!(client.lock()).put(data, None)).get());
@@ -92,9 +92,10 @@ pub fn create(client: Arc<Mutex<Client>>,
                     let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMapName(name),
                                                                        data_encryption_keys));
 
-                    match try!(structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
-                                                                                                      owner_keys.clone(),
-                                                                                                      prev_owner_keys.clone())) {
+                    match try!(structured_data_operations::
+                               check_if_data_can_fit_in_structured_data(&data_to_store,
+                                                                        owner_keys.clone(),
+                                                                        prev_owner_keys.clone())) {
                         DataFitResult::DataFits => {
                             Ok(try!(StructuredData::new(tag_type,
                                                         id,
@@ -103,7 +104,7 @@ pub fn create(client: Arc<Mutex<Client>>,
                                                         owner_keys,
                                                         prev_owner_keys,
                                                         Some(private_signing_key))))
-                        },
+                        }
                         _ => Err(CoreError::StructuredDataHeaderSizeProhibitive),
                     }
                 }
@@ -127,7 +128,7 @@ pub fn get_data(client: Arc<Mutex<Client>>,
             Ok(se.read(0, length))
         }
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
-            let request = DataRequest::Immutable(data_map_name, ImmutableDataType::Normal);
+            let request = DataIdentifier::Immutable(data_map_name);
             let response_getter = try!(unwrap_result!(client.lock()).get(request, None));
             match try!(response_getter.get()) {
                 Data::Immutable(immutable_data) => {
