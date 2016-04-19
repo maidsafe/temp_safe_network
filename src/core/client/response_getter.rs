@@ -17,7 +17,7 @@
 
 use core::errors::CoreError;
 use xor_name::XorName;
-use routing::{DataRequest, Data};
+use routing::{DataIdentifier, Data};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, Receiver};
 use core::client::message_queue::MessageQueue;
@@ -30,20 +30,20 @@ pub struct GetResponseGetter {
     data_channel: Option<(Sender<ResponseEvent>, Receiver<ResponseEvent>)>,
     message_queue: Arc<Mutex<MessageQueue>>,
     requested_name: XorName,
-    requested_type: DataRequest,
+    requested_id: DataIdentifier,
 }
 
 impl GetResponseGetter {
     /// Create a new instance of GetResponseGetter
     pub fn new(data_channel: Option<(Sender<ResponseEvent>, Receiver<ResponseEvent>)>,
                message_queue: Arc<Mutex<MessageQueue>>,
-               requested_type: DataRequest)
+               requested_id: DataIdentifier)
                -> GetResponseGetter {
         GetResponseGetter {
             data_channel: data_channel,
             message_queue: message_queue,
-            requested_name: requested_type.name(),
-            requested_type: requested_type,
+            requested_name: requested_id.name(),
+            requested_id: requested_id,
         }
     }
 
@@ -54,7 +54,7 @@ impl GetResponseGetter {
             match try!(data_receiver.recv()) {
                 ResponseEvent::GetResp(result) => {
                     let data = try!(result);
-                    if let DataRequest::Immutable(..) = self.requested_type {
+                    if let DataIdentifier::Immutable(..) = self.requested_id {
                         let mut msg_queue = unwrap_result!(self.message_queue.lock());
                         msg_queue.local_cache_insert(self.requested_name.clone(), data.clone());
                     }

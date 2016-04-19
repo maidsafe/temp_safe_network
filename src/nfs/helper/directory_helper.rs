@@ -22,7 +22,7 @@ use nfs::directory_listing::DirectoryListing;
 use xor_name::XorName;
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use nfs::metadata::directory_key::DirectoryKey;
-use routing::{ImmutableData, ImmutableDataType, StructuredData, Data, DataRequest};
+use routing::{ImmutableData, StructuredData, Data, DataIdentifier};
 use core::client::Client;
 use core::errors::CoreError;
 use core::structured_data_operations::{unversioned, versioned};
@@ -120,7 +120,7 @@ impl DirectoryHelper {
                           access_level: &AccessLevel,
                           version: XorName)
                           -> Result<DirectoryListing, NfsError> {
-        let immutable_data = try!(self.get_immutable_data(version, ImmutableDataType::Normal));
+        let immutable_data = try!(self.get_immutable_data(version));
         match *access_level {
             AccessLevel::Private => {
                 DirectoryListing::decrypt(self.client.clone(),
@@ -261,7 +261,7 @@ impl DirectoryHelper {
                 AccessLevel::Private => try!(directory.encrypt(self.client.clone())),
                 AccessLevel::Public => try!(serialise(&directory)),
             };
-            let version = try!(self.save_as_immutable_data(serialised_data, ImmutableDataType::Normal));
+            let version = try!(self.save_as_immutable_data(serialised_data));
             Ok(try!(versioned::create(&*unwrap_result!(self.client.lock()),
                                       version,
                                       directory.get_key().get_type_tag(),
@@ -306,7 +306,7 @@ impl DirectoryHelper {
                 AccessLevel::Private => try!(directory.encrypt(self.client.clone())),
                 AccessLevel::Public => try!(serialise(&directory)),
             };
-            let version = try!(self.save_as_immutable_data(serialised_data, ImmutableDataType::Normal));
+            let version = try!(self.save_as_immutable_data(serialised_data));
             try!(versioned::append_version(&mut *unwrap_result!(self.client.lock()),
                                            structured_data,
                                            version,
@@ -337,8 +337,8 @@ impl DirectoryHelper {
     }
 
     /// Saves the data as ImmutableData in the network and returns the name
-    fn save_as_immutable_data(&self, data: Vec<u8>, data_type: ImmutableDataType) -> Result<XorName, NfsError> {
-        let immutable_data = ImmutableData::new(data_type, data);
+    fn save_as_immutable_data(&self, data: Vec<u8>) -> Result<XorName, NfsError> {
+        let immutable_data = ImmutableData::new(data);
         let name = immutable_data.name();
         debug!("Posting PUT request to save immutable data to the network ...");
         try!(try!(unwrap_result!(self.client.lock()).put(Data::Immutable(immutable_data), None)).get());
@@ -347,7 +347,7 @@ impl DirectoryHelper {
 
     /// Get StructuredData from the Network
     fn get_structured_data(&self, id: &XorName, type_tag: u64) -> Result<StructuredData, NfsError> {
-        let request = DataRequest::Structured(id.clone(), type_tag);
+        let request = DataIdentifier::Structured(id.clone(), type_tag);
         debug!("Getting structured data from the network ...");
         let response_getter = try!(unwrap_result!(self.client.lock()).get(request, None));
         match try!(response_getter.get()) {
@@ -357,8 +357,8 @@ impl DirectoryHelper {
     }
 
     /// Get ImmutableData from the Network
-    fn get_immutable_data(&self, id: XorName, data_type: ImmutableDataType) -> Result<ImmutableData, NfsError> {
-        let request = DataRequest::Immutable(id, data_type);
+    fn get_immutable_data(&self, id: XorName) -> Result<ImmutableData, NfsError> {
+        let request = DataIdentifier::Immutable(id);
         debug!("Getting immutable data from the network ...");
         let response_getter = try!(unwrap_result!(self.client.lock()).get(request, None));
         match try!(response_getter.get()) {

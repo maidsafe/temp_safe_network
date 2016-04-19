@@ -20,7 +20,7 @@ use xor_name::XorName;
 use core::errors::CoreError;
 use sodiumoxide::crypto::sign;
 use maidsafe_utilities::serialisation::{serialise, deserialise};
-use routing::{StructuredData, ImmutableData, ImmutableDataType, Data, DataRequest};
+use routing::{StructuredData, ImmutableData, Data, DataIdentifier};
 use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_structured_data};
 
 /// Create the StructuredData to manage versioned data.
@@ -78,8 +78,7 @@ fn create_impl(client: &Client,
                prev_owner_keys: Vec<sign::PublicKey>,
                private_signing_key: &sign::SecretKey)
                -> Result<StructuredData, CoreError> {
-    let immutable_data = ImmutableData::new(ImmutableDataType::Normal,
-                                            try!(serialise(version_names_to_store)));
+    let immutable_data = ImmutableData::new(try!(serialise(version_names_to_store)));
     let name_of_immutable_data = immutable_data.name();
 
     let encoded_name = try!(serialise(&name_of_immutable_data));
@@ -103,8 +102,7 @@ fn create_impl(client: &Client,
 
 fn get_immutable_data(client: &mut Client, struct_data: &StructuredData) -> Result<ImmutableData, CoreError> {
     let name = try!(deserialise(&struct_data.get_data()));
-    let response_getter = try!(client.get(DataRequest::Immutable(name, ImmutableDataType::Normal),
-                                          None));
+    let response_getter = try!(client.get(DataIdentifier::Immutable(name), None));
     let data = try!(response_getter.get());
     match data {
         Data::Immutable(immutable_data) => Ok(immutable_data),

@@ -56,6 +56,9 @@ extern crate rustc_serialize;
 extern crate maidsafe_utilities;
 extern crate safe_network_common;
 
+#[cfg(feature = "use-mock-routing")]
+extern crate bincode;
+
 /// Core module
 pub mod core;
 /// Nfs module;
