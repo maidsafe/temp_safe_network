@@ -40,7 +40,7 @@ use maidsafe_utilities::thread::RaiiThreadJoiner;
 use maidsafe_utilities::serialisation::serialise;
 use safe_network_common::TYPE_TAG_SESSION_PACKET;
 use safe_network_common::messaging::{MpidMessage, MpidMessageWrapper};
-use routing::{MessageId, FullId, StructuredData, Data, DataRequest, PlainData, Authority, Event};
+use routing::{MessageId, FullId, StructuredData, Data, DataIdentifier, PlainData, Authority};
 
 use sodiumoxide::crypto::{box_, sign};
 use sodiumoxide::crypto::hash::{sha256, sha512};
@@ -75,7 +75,7 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = try!(Client::get_new_routing(routing_sender, None));
+        let routing = try!(Routing::new(routing_sender, None, true));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
 
         match try!(network_event_receiver.recv()) {
@@ -106,7 +106,7 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = try!(Client::get_new_routing(routing_sender, Some(id_packet)));
+        let routing = try!(Routing::new(routing_sender, Some(id_packet), true));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
 
         match try!(network_event_receiver.recv()) {
@@ -154,7 +154,7 @@ impl Client {
         let mut unregistered_client = try!(Client::create_unregistered_client());
         let user_id = try!(Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
 
-        let session_packet_request = DataRequest::Structured(user_id.clone(), TYPE_TAG_SESSION_PACKET);
+        let session_packet_request = DataIdentifier::Structured(user_id.clone(), TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(unregistered_client.get(session_packet_request, None));
 
@@ -182,7 +182,7 @@ impl Client {
             let (routing_sender, routing_receiver) = mpsc::channel();
             let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-            let routing = try!(Client::get_new_routing(routing_sender, Some(id_packet)));
+            let routing = try!(Routing::new(routing_sender, Some(id_packet), true));
             let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
 
             match try!(network_event_receiver.recv()) {
@@ -306,10 +306,10 @@ impl Client {
 
     /// Get data from the network. This is non-blocking.
     pub fn get(&mut self,
-               request_for: DataRequest,
+               request_for: DataIdentifier,
                opt_dst: Option<Authority>)
                -> Result<GetResponseGetter, CoreError> {
-        if let DataRequest::Immutable(..) = request_for {
+        if let DataIdentifier::Immutable(..) = request_for {
             let mut msg_queue = unwrap_result!(self.message_queue.lock());
             if msg_queue.local_cache_check(&request_for.name()) {
                 return Ok(GetResponseGetter::new(None, self.message_queue.clone(), request_for));
@@ -456,7 +456,7 @@ impl Client {
                               mpid_account: XorName,
                               request: MpidMessageWrapper)
                               -> Result<GetResponseGetter, CoreError> {
-        let data_request = DataRequest::Plain(mpid_account);
+        let data_request = DataIdentifier::Plain(mpid_account);
 
         {
             let mut msg_queue = unwrap_result!(self.message_queue.lock());
@@ -520,16 +520,12 @@ impl Client {
         Ok(())
     }
 
-    fn get_new_routing(sender: Sender<Event>, id_packet: Option<FullId>) -> Result<Routing, CoreError> {
-        Ok(try!(Routing::new(sender, id_packet, true)))
-    }
-
     fn update_session_packet(&mut self) -> Result<(), CoreError> {
         let session_packet_id = try!(self.session_packet_id
                                          .as_ref()
                                          .ok_or(CoreError::OperationForbiddenForClient))
                                     .clone();
-        let session_packet_request = DataRequest::Structured(session_packet_id.clone(), TYPE_TAG_SESSION_PACKET);
+        let session_packet_request = DataIdentifier::Structured(session_packet_id.clone(), TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(self.get(session_packet_request, None));
 
@@ -597,7 +593,7 @@ mod test {
 
     use xor_name::XorName;
     use safe_network_common::client_errors::MutationError;
-    use routing::{ImmutableDataType, ImmutableData, DataRequest, Data, StructuredData};
+    use routing::{ImmutableData, DataIdentifier, Data, StructuredData};
 
     #[test]
     fn account_creation() {
@@ -647,8 +643,7 @@ mod test {
 
     #[test]
     fn unregistered_client() {
-        let immut_data = ImmutableData::new(ImmutableDataType::Normal,
-                                            unwrap_result!(utility::generate_random_vector(30)));
+        let immut_data = ImmutableData::new(unwrap_result!(utility::generate_random_vector(30)));
         let orig_data = Data::Immutable(immut_data);
 
         // Registered Client PUTs something onto the network
@@ -664,7 +659,7 @@ mod test {
 
         // Unregistered Client should be able to retrieve the data
         let mut unregistered_client = unwrap_result!(Client::create_unregistered_client());
-        let request = DataRequest::Immutable(orig_data.name(), ImmutableDataType::Normal);
+        let request = DataIdentifier::Immutable(orig_data.name());
         let rxd_data = unwrap_result!(unwrap_result!(unregistered_client.get(request, None)).get());
 
         assert_eq!(rxd_data, orig_data);
@@ -795,13 +790,12 @@ mod test {
 
         // Version Caching should work for ImmutableData
         {
-            let immut_data = ImmutableData::new(ImmutableDataType::Normal,
-                                                unwrap_result!(utility::generate_random_vector(10)));
+            let immut_data = ImmutableData::new(unwrap_result!(utility::generate_random_vector(10)));
             let data = Data::Immutable(immut_data);
 
             unwrap_result!(unwrap_result!(client.put(data.clone(), None)).get());
 
-            let data_request = DataRequest::Immutable(data.name(), ImmutableDataType::Normal);
+            let data_request = DataIdentifier::Immutable(data.name());
 
             // Should not initially be in version cache
             {
@@ -837,7 +831,7 @@ mod test {
 
             unwrap_result!(unwrap_result!(client.put(data.clone(), None)).get());
 
-            let data_request = DataRequest::Structured(id, TYPE_TAG);
+            let data_request = DataIdentifier::Structured(id, TYPE_TAG);
 
             // Should not initially be in version cache
             {

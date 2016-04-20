@@ -42,8 +42,6 @@
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
 #![cfg_attr(feature="clippy", allow(use_debug))]
 
-#![cfg(not(feature = "use-mock-crust"))]
-
 #[macro_use]
 extern crate log;
 extern crate time;
@@ -57,6 +55,9 @@ extern crate rustc_serialize;
 #[macro_use]
 extern crate maidsafe_utilities;
 extern crate safe_network_common;
+
+#[cfg(feature = "use-mock-routing")]
+extern crate bincode;
 
 /// Core module
 pub mod core;

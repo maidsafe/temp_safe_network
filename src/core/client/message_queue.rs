@@ -69,7 +69,7 @@ impl MessageQueue {
                             ResponseContent::GetFailure {
                                 id,
                                 request: RequestMessage {
-                                    content: RequestContent::Get(data_req, _),
+                                    content: RequestContent::Get(data_id, _),
                                     ..
                                 },
                                 external_error_indicator,
@@ -85,13 +85,13 @@ impl MessageQueue {
                                         }
                                     };
                                     let err = Err(CoreError::GetFailure {
-                                        request: data_req,
+                                        data_id: data_id,
                                         reason: reason,
                                     });
                                     let _ = response_observer.send(ResponseEvent::GetResp(err));
                                 }
                             }
-                            ResponseContent::PutSuccess(msg_id) => {
+                            ResponseContent::PutSuccess(_, msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
@@ -123,7 +123,7 @@ impl MessageQueue {
                                     let _ = response_observer.send(ResponseEvent::MutationResp(err));
                                 }
                             }
-                            ResponseContent::PostSuccess(msg_id) => {
+                            ResponseContent::PostSuccess(_, msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {
@@ -155,7 +155,7 @@ impl MessageQueue {
                                     let _ = response_observer.send(ResponseEvent::MutationResp(err));
                                 }
                             }
-                            ResponseContent::DeleteSuccess(msg_id) => {
+                            ResponseContent::DeleteSuccess(_, msg_id) => {
                                 let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                                 if let Some(response_observer) = queue_guard.response_observers
                                                                             .remove(&msg_id) {

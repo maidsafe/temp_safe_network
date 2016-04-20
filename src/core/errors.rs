@@ -17,7 +17,7 @@
 
 use std::sync::mpsc;
 
-use routing::{DataRequest, Data};
+use routing::{DataIdentifier, Data};
 use safe_network_common::messaging;
 use safe_network_common::client_errors::{GetError, MutationError};
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -64,7 +64,7 @@ pub enum CoreError {
     /// Performing a GET operation failed
     GetFailure {
         /// Orignal request that was made to the network
-        request: DataRequest,
+        data_id: DataIdentifier,
         /// Reason for failure
         reason: GetError,
     },
@@ -171,11 +171,11 @@ impl ::std::fmt::Debug for CoreError {
             CoreError::UnsuccessfulPwHash => write!(f, "CoreError::UnsuccessfulPwHash"),
             CoreError::OperationAborted => write!(f, "CoreError::OperationAborted"),
             CoreError::MpidMessagingError(ref err) => write!(f, "CoreError::MpidMessagingError -> {:?}", err),
-            CoreError::GetFailure { ref request, ref reason, } => {
+            CoreError::GetFailure { ref data_id, ref reason, } => {
                 write!(f,
                        "CoreError::GetFailure::{{ reason: {:?}, request: {:?}}}",
                        reason,
-                       request)
+                       data_id)
             }
             CoreError::MutationFailure { ref data, ref reason, } => {
                 write!(f,

@@ -19,7 +19,7 @@ use std::convert::From;
 use std::sync::{Arc, Mutex};
 
 use xor_name::XorName;
-use routing::{Data, DataRequest, StructuredData};
+use routing::{Data, DataIdentifier, StructuredData};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use core::client::Client;
 use dns::errors::DnsError;
@@ -288,7 +288,7 @@ impl DnsOperations {
 
     fn get_housing_structured_data(&self, long_name: &String) -> Result<StructuredData, DnsError> {
         let identifier = XorName::new(sha512::hash(long_name.as_bytes()).0);
-        let request = DataRequest::Structured(identifier, TYPE_TAG_DNS_PACKET);
+        let request = DataIdentifier::Structured(identifier, TYPE_TAG_DNS_PACKET);
         debug!("Retrieving structured data from network for {:?} dns ...",
                long_name);
         let response_getter = try!(unwrap_result!(self.client.lock()).get(request, None));
