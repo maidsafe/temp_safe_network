@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.14.3]
+- Dependency update
+
 ## [0.14.2]
 - Pointing and conforming to Routing 0.15.0
 - Removal of feature use-mock-crust
