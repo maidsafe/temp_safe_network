@@ -120,11 +120,11 @@ mod test {
     // TODO It takes a very long time in debug mode - it is due to S.E crate.
     #[test]
     fn immut_data_create_retrieve_10_mb() {
+            let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
+
         // Unencrypted
         {
             let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
-
-            let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
 
             let immut_data_before = unwrap_result!(create(client.clone(), data_to_put.clone(), None));
             let data_name = immut_data_before.name();
@@ -142,8 +142,6 @@ mod test {
             let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
             let (pk, sk) = box_::gen_keypair();
             let nonce = box_::gen_nonce();
-
-            let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
 
             let immut_data_before = unwrap_result!(create(client.clone(),
                                                           data_to_put.clone(),
@@ -164,8 +162,6 @@ mod test {
             let (pk, sk) = box_::gen_keypair();
             let nonce = box_::gen_nonce();
 
-            let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
-
             let immut_data_before = unwrap_result!(create(client.clone(), data_to_put.clone(), None));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
@@ -180,8 +176,6 @@ mod test {
             let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
             let (pk, sk) = box_::gen_keypair();
             let nonce = box_::gen_nonce();
-
-            let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
 
             let immut_data_before = unwrap_result!(create(client.clone(),
                                                           data_to_put.clone(),
