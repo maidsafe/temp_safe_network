@@ -120,7 +120,7 @@ mod test {
     // TODO It takes a very long time in debug mode - it is due to S.E crate.
     #[test]
     fn immut_data_create_retrieve_10_mb() {
-            let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
+        let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
 
         // Unencrypted
         {
