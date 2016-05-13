@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.14.5]
+- Updating routing to 0.19.1
+
 ## [0.14.4]
 - Dependency update
 
