@@ -42,6 +42,7 @@
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
 #![cfg_attr(feature="clippy", allow(use_debug))]
 
+extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate time;
@@ -65,3 +66,5 @@ pub mod core;
 pub mod nfs;
 /// Dns module;
 pub mod dns;
+/// Ffi module;
+pub mod ffi;
