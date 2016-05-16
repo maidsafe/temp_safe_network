@@ -11,6 +11,7 @@ version = "0.14.5"
 
 [dependencies]
 bincode = "~0.5.4"
+libc = "~0.2.11"
 log = "~0.3.6"
 lru_time_cache = "~0.3.0"
 maidsafe_utilities = "~0.5.4"
@@ -22,6 +23,10 @@ self_encryption = "~0.3.1"
 sodiumoxide = "~0.0.10"
 time = "~0.1.35"
 xor_name = "~0.1.0"
+
+[lib]
+crate_type = ["staticlib", "dylib", "rlib"]
+name = "safe_core"
 
 [dependencies.clippy]
 optional = true
