@@ -38,7 +38,7 @@ pub fn initialise_dns_configuaration(client: Arc<Mutex<Client>>) -> Result<(), D
     let dir_helper = DirectoryHelper::new(client.clone());
     let dir_listing =
         try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
-    let file_helper = FileHelper::new(client.clone());
+    let mut file_helper = FileHelper::new(client.clone());
     match file_helper.create(DNS_CONFIG_FILE_NAME.to_string(), vec![], dir_listing) {
         Ok(writer) => {
             let _ = try!(writer.close());
@@ -58,9 +58,9 @@ pub fn get_dns_configuaration_data(client: Arc<Mutex<Client>>)
         .iter()
         .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
         .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted));
-    let file_helper = FileHelper::new(client.clone());
+    let mut file_helper = FileHelper::new(client.clone());
     debug!("Reading dns configuration data from file ...");
-    let mut reader = file_helper.read(file);
+    let mut reader = try!(file_helper.read(file));
     let size = reader.size();
     if size != 0 {
         Ok(try!(deserialise(&try!(reader.read(0, size)))))
@@ -80,10 +80,10 @@ pub fn write_dns_configuaration_data(client: Arc<Mutex<Client>>,
             .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
             .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted))
         .clone();
-    let file_helper = FileHelper::new(client.clone());
+    let mut file_helper = FileHelper::new(client.clone());
     let mut writer = try!(file_helper.update_content(file, Mode::Overwrite, dir_listing));
     debug!("Writing dns configuration data ...");
-    writer.write(&try!(serialise(&config)), 0);
+    try!(writer.write(&try!(serialise(&config)), 0));
     let _ = try!(writer.close());
     Ok(())
 }

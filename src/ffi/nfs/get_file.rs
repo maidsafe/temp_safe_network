@@ -75,14 +75,14 @@ mod test {
 
     fn create_test_file(parameter_packet: &ParameterPacket) {
         let app_dir_key = unwrap_option!(parameter_packet.clone().app_root_dir_key, "");
-        let file_helper = FileHelper::new(parameter_packet.client.clone());
+        let mut file_helper = FileHelper::new(parameter_packet.client.clone());
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir = unwrap_result!(dir_helper.get(&app_dir_key));
         let mut writer = unwrap_result!(file_helper.create(TEST_FILE_NAME.to_string(),
                                                            Vec::new(),
                                                            app_root_dir));
         let data = vec![10u8; 20];
-        writer.write(&data[..], 0);
+        writer.write(&data[..], 0).expect("");
         let _ = unwrap_result!(writer.close());
     }
 

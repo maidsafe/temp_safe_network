@@ -57,7 +57,7 @@ impl Action for ModifyFile {
             .map(|file| file.clone())
             .ok_or(FfiError::InvalidPath));
 
-        let file_helper = FileHelper::new(params.client);
+        let mut file_helper = FileHelper::new(params.client);
 
         let mut metadata_updated = false;
         if let Some(ref name) = self.new_values.name {
@@ -84,7 +84,7 @@ impl Action for ModifyFile {
             let mut writer = try!(file_helper.update_content(file.clone(), mode, dir_of_file));
             let bytes = try!(parse_result!(file_content_params.bytes.from_base64(),
                                            "Failed to convert from base64"));
-            writer.write(&bytes[..], offset);
+            try!(writer.write(&bytes[..], offset));
             let _ = try!(writer.close());
         }
 
@@ -118,7 +118,7 @@ mod test {
 
     fn create_test_file(parameter_packet: &ParameterPacket) {
         let app_root_dir_key = unwrap_option!(parameter_packet.clone().app_root_dir_key, "");
-        let file_helper = FileHelper::new(parameter_packet.client.clone());
+        let mut file_helper = FileHelper::new(parameter_packet.client.clone());
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir = unwrap_result!(dir_helper.get(&app_root_dir_key));
         let writer = unwrap_result!(file_helper.create(TEST_FILE_NAME.to_string(),
@@ -228,8 +228,8 @@ mod test {
                                   "File not found");
         let file_size = file.get_metadata().get_size();
         assert!(file_size > 0);
-        let file_helper = FileHelper::new(parameter_packet.client.clone());
-        let mut reader = file_helper.read(file);
+        let mut file_helper = FileHelper::new(parameter_packet.client.clone());
+        let mut reader = file_helper.read(file).expect("");
         let size = reader.size();
         assert_eq!(size, file_size);
         let data = unwrap_result!(reader.read(0, size));

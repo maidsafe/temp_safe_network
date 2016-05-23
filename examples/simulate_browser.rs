@@ -179,7 +179,7 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
                                                   AccessLevel::Public,
                                                   None));
 
-    let file_helper = FileHelper::new(client.clone());
+    let mut file_helper = FileHelper::new(client.clone());
     let mut writer = try!(file_helper.create(HOME_PAGE_FILE_NAME.to_string(), vec![], dir_listing));
 
     println!("\nEnter text that you want to display on the Home-Page:");
@@ -189,7 +189,7 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
 
     println!("Creating Home Page for the Service...");
 
-    writer.write(text.as_bytes(), 0);
+    try!(writer.write(text.as_bytes(), 0));
     let (updated_parent_dir_listing, _) = try!(writer.close());
     let dir_key = updated_parent_dir_listing.get_key();
 
@@ -290,8 +290,8 @@ fn parse_url_and_get_home_page(client: Arc<Mutex<Client>>,
         .iter()
         .find(|a| *a.get_name() == HOME_PAGE_FILE_NAME.to_string())
         .ok_or(DnsError::Unexpected("Could not find homepage !!".to_string())));
-    let file_helper = FileHelper::new(client.clone());
-    let mut reader = file_helper.read(file);
+    let mut file_helper = FileHelper::new(client.clone());
+    let mut reader = try!(file_helper.read(file));
     let size = reader.size();
     let content = try!(reader.read(0, size));
 

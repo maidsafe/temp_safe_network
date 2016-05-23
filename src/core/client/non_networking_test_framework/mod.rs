@@ -235,7 +235,7 @@ impl RoutingMock {
                         // Immutable data is de-duplicated so always allowed
                         Ok(Data::Immutable(_)) => None,
                         Ok(_) => Some(MutationError::DataExists),
-                        Err(_) => Some(MutationError::Unknown),
+                        Err(error) => Some(MutationError::NetworkOther(format!("{}", error))),
                     }
                 }
                 Data::Structured(struct_data) => {
@@ -252,7 +252,7 @@ impl RoutingMock {
             sync_disk_storage(&*data_store_mutex_guard);
             None
         } else {
-            Some(MutationError::Unknown)
+            Some(MutationError::NetworkOther("Serialisation error".to_owned()))
         };
 
         let _ = thread::spawn(move || {
@@ -321,7 +321,7 @@ impl RoutingMock {
                             Some(MutationError::InvalidSuccessor)
                         }
                     }
-                    _ => Some(MutationError::Unknown),
+                    _ => Some(MutationError::NetworkOther("Serialisation error".to_owned())),
                 }
             } else {
                 Some(MutationError::InvalidOperation)
@@ -396,7 +396,7 @@ impl RoutingMock {
                             Some(MutationError::InvalidSuccessor)
                         }
                     }
-                    _ => Some(MutationError::Unknown),
+                    _ => Some(MutationError::NetworkOther("Serialisation error".to_owned())),
                 }
             } else {
                 Some(MutationError::InvalidOperation)

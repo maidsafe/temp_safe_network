@@ -66,10 +66,10 @@ pub fn create(client: Arc<Mutex<Client>>,
                                         Some(private_signing_key))))
         }
         DataFitResult::DataDoesNotFit => {
-            let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()),
-                                            DataMap::None);
-            se.write(&data, 0);
-            let data_map = se.close();
+            let mut storage = SelfEncryptionStorage::new(client.clone());
+            let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, DataMap::None));
+            try!(self_encryptor.write(&data, 0));
+            let data_map = try!(self_encryptor.close());
 
             let data_to_store =
                 try!(get_encoded_data_to_store(DataTypeEncoding::ContainsDataMap(data_map.clone()),
@@ -127,9 +127,10 @@ pub fn get_data(client: Arc<Mutex<Client>>,
     match try!(get_decoded_stored_data(&struct_data.get_data(), data_decryption_keys)) {
         DataTypeEncoding::ContainsData(data) => Ok(data),
         DataTypeEncoding::ContainsDataMap(data_map) => {
-            let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client), data_map);
-            let length = se.len();
-            Ok(se.read(0, length))
+            let mut storage = SelfEncryptionStorage::new(client);
+            let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
+            let length = self_encryptor.len();
+            Ok(try!(self_encryptor.read(0, length)))
         }
         DataTypeEncoding::ContainsDataMapName(data_map_name) => {
             let request = DataIdentifier::Immutable(data_map_name);
@@ -139,11 +140,11 @@ pub fn get_data(client: Arc<Mutex<Client>>,
                     match try!(get_decoded_stored_data(&immutable_data.value(),
                                                        data_decryption_keys)) {
                         DataTypeEncoding::ContainsDataMap(data_map) => {
-                            let mut se =
-                                SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()),
-                                                   data_map);
-                            let length = se.len();
-                            Ok(se.read(0, length))
+                            let mut storage = SelfEncryptionStorage::new(client);
+                            let mut self_encryptor = try!(SelfEncryptor::new(&mut storage,
+                                                                             data_map));
+                            let length = self_encryptor.len();
+                            Ok(try!(self_encryptor.read(0, length)))
                         }
                         _ => Err(CoreError::ReceivedUnexpectedData),
                     }

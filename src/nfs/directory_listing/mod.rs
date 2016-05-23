@@ -104,22 +104,24 @@ impl DirectoryListing {
                    -> Result<DirectoryListing, NfsError> {
         let decrypted_data_map = try!(unwrap_result!(client.lock())
             .hybrid_decrypt(&data, Some(&DirectoryListing::generate_nonce(directory_id))));
-        let datamap: DataMap = try!(deserialise(&decrypted_data_map));
-        let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), datamap);
-        let length = se.len();
+        let data_map: DataMap = try!(deserialise(&decrypted_data_map));
+        let mut storage = SelfEncryptionStorage::new(client.clone());
+        let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
+        let length = self_encryptor.len();
         debug!("Reading encrypted storage of length {:?} ...", length);
-        let serialised_directory_listing = se.read(0, length);
+        let serialised_directory_listing = try!(self_encryptor.read(0, length));
         Ok(try!(deserialise(&serialised_directory_listing)))
     }
 
     /// Encrypts the directory listing
     pub fn encrypt(&self, client: Arc<Mutex<Client>>) -> Result<Vec<u8>, NfsError> {
         let serialised_data = try!(serialise(&self));
-        let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), DataMap::None);
+        let mut storage = SelfEncryptionStorage::new(client.clone());
+        let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, DataMap::None));
         debug!("Writing to storage using self encryption ...");
-        se.write(&serialised_data, 0);
-        let datamap = se.close();
-        let serialised_data_map = try!(serialise(&datamap));
+        try!(self_encryptor.write(&serialised_data, 0));
+        let data_map = try!(self_encryptor.close());
+        let serialised_data_map = try!(serialise(&data_map));
         Ok(try!(unwrap_result!(client.lock())
             .hybrid_encrypt(&serialised_data_map,
                             Some(&DirectoryListing::generate_nonce(&self.get_key()

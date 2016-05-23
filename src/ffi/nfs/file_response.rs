@@ -56,8 +56,8 @@ pub fn get_response(file: &File,
         None
     };
     let start_position = offset as u64;
-    let file_helper = FileHelper::new(client);
-    let mut reader = file_helper.read(&file);
+    let mut file_helper = FileHelper::new(client);
+    let mut reader = try!(file_helper.read(&file));
     let mut size = length as u64;
     if size == 0 {
         size = reader.size() - start_position;

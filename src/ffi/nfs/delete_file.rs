@@ -60,7 +60,7 @@ mod test {
     fn delete_file() {
         let parameter_packet = unwrap_result!(test_utils::get_parameter_packet(false));
 
-        let file_helper = FileHelper::new(parameter_packet.client.clone());
+        let mut file_helper = FileHelper::new(parameter_packet.client.clone());
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir_key = unwrap_option!(parameter_packet.clone().app_root_dir_key, "");
         let mut app_root_dir = unwrap_result!(dir_helper.get(&app_root_dir_key));

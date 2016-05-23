@@ -257,11 +257,11 @@ fn file_operation(option: u32,
             // Create file
             let directory = try!(get_child_directory(client.clone(), directory));
             let data = get_user_string("text to be saved as a file").into_bytes();
-            let file_helper = FileHelper::new(client);
+            let mut file_helper = FileHelper::new(client);
             let mut writer =
                 try!(file_helper.create(get_user_string("File name"), vec![], directory));
 
-            writer.write(&data[..], 0);
+            try!(writer.write(&data[..], 0));
             let _ = try!(writer.close());
             println!("File created");
         }
@@ -274,10 +274,10 @@ fn file_operation(option: u32,
                 return Err(NfsError::FileNotFound);
             };
             let data = get_user_string("text to be saved as a file").into_bytes();
-            let file_helper = FileHelper::new(client);
+            let mut file_helper = FileHelper::new(client);
             let mut writer =
                 try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory.clone()));
-            writer.write(&data[..], 0);
+            try!(writer.write(&data[..], 0));
             let _ = try!(writer.close());
             println!("File Updated");
         }
@@ -289,8 +289,8 @@ fn file_operation(option: u32,
             } else {
                 return Err(NfsError::FileNotFound);
             };
-            let file_helper = FileHelper::new(client);
-            let mut reader = file_helper.read(file);
+            let mut file_helper = FileHelper::new(client);
+            let mut reader = try!(file_helper.read(file));
             let data_read = try!(reader.read(0, file.get_metadata().get_size()));
 
             match String::from_utf8(data_read) {
@@ -306,7 +306,7 @@ fn file_operation(option: u32,
             let directory = try!(get_child_directory(client.clone(), directory));
             let file_name = get_user_string("File name");
             let file = try!(directory.find_file(&file_name).ok_or(NfsError::FileNotFound));
-            let file_helper = FileHelper::new(client);
+            let mut file_helper = FileHelper::new(client);
             let versions = try!(file_helper.get_versions(&file, &directory));
             let ref file_version;
             if versions.len() == 1 {
@@ -331,7 +331,7 @@ fn file_operation(option: u32,
                 }
             }
 
-            let mut reader = file_helper.read(file_version);
+            let mut reader = try!(file_helper.read(file_version));
             let data_read = try!(reader.read(0, file_version.get_metadata().get_size()));
 
             match String::from_utf8(data_read) {

@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use nfs::errors::NfsError;
 use nfs::file::File;
 use core::client::Client;
-use core::SelfEncryptionStorage;
+use core::{SelfEncryptionStorage, SelfEncryptionStorageError};
 use self_encryption::SelfEncryptor;
 
 /// Reader is used to read contents of a File. It can read in chunks if the file happens to be very
@@ -28,20 +28,21 @@ use self_encryption::SelfEncryptor;
 #[allow(dead_code)]
 pub struct Reader<'a> {
     client: Arc<Mutex<Client>>,
-    self_encryptor: SelfEncryptor<SelfEncryptionStorage>,
+    self_encryptor: SelfEncryptor<'a, SelfEncryptionStorageError, SelfEncryptionStorage>,
     file: &'a File,
 }
 
 impl<'a> Reader<'a> {
     /// Create a new instance of Reader
-    pub fn new(client: Arc<Mutex<Client>>, file: &'a File) -> Reader {
-        let se_storage = SelfEncryptionStorage::new(client.clone());
-
-        Reader {
+    pub fn new(client: Arc<Mutex<Client>>,
+               storage: &'a mut SelfEncryptionStorage,
+               file: &'a File)
+               -> Result<Reader<'a>, NfsError> {
+        Ok(Reader {
             client: client.clone(),
-            self_encryptor: SelfEncryptor::new(se_storage, file.get_datamap().clone()),
+            self_encryptor: try!(SelfEncryptor::new(storage, file.get_datamap().clone())),
             file: file,
-        }
+        })
     }
 
     /// Returns the total size of the file/blob
@@ -58,7 +59,7 @@ impl<'a> Reader<'a> {
             debug!("Reading {len} bytes of data from file starting at offset of {pos} bytes ...",
                    len = length,
                    pos = position);
-            Ok(self.self_encryptor.read(position, length))
+            Ok(try!(self.self_encryptor.read(position, length)))
         }
     }
 }

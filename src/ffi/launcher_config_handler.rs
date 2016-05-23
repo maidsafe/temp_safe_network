@@ -132,9 +132,9 @@ impl ConfigHandler {
                             present at this stage - Report bug.")
                 .clone();
 
-        let file_helper = FileHelper::new(self.client.clone());
+        let mut file_helper = FileHelper::new(self.client.clone());
         let mut writer = try!(file_helper.update_content(file, Overwrite, dir_listing));
-        writer.write(&try!(serialise(&global_configs)), 0);
+        try!(writer.write(&try!(serialise(&global_configs)), 0));
         let _ = try!(writer.close());
 
         Ok(())
@@ -148,7 +148,7 @@ impl ConfigHandler {
             LAUNCHER_GLOBAL_DIRECTORY_NAME.to_string()));
 
         let global_configs = {
-            let file_helper = FileHelper::new(self.client.clone());
+            let mut file_helper = FileHelper::new(self.client.clone());
             let file = match dir_listing.get_files()
                 .iter()
                 .find(|file| file.get_name() == LAUNCHER_GLOBAL_CONFIG_FILE_NAME)
@@ -171,7 +171,7 @@ impl ConfigHandler {
                         .clone()
                 }
             };
-            let mut reader = file_helper.read(&file);
+            let mut reader = try!(file_helper.read(&file));
 
             let size = reader.size();
 

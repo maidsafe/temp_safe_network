@@ -53,6 +53,7 @@ macro_rules! ffi_ptr_try {
 ///
 /// ```
 /// # #[macro_use] extern crate safe_core;
+/// # #[allow(unused)]
 /// #[derive(Debug)]
 /// enum SomeSpecialError {
 ///     Zero,

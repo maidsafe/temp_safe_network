@@ -49,7 +49,7 @@ impl Action for CreateFile {
                                                                  &tokens,
                                                                  Some(&start_dir_key)));
 
-        let file_helper = FileHelper::new(params.client);
+        let mut file_helper = FileHelper::new(params.client);
         let bin_metadata = try!(parse_result!(self.user_metadata.from_base64(),
                                               "Failed Converting from Base64."));
 

@@ -15,12 +15,16 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use std::error::Error;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::mpsc;
 
+use core::SelfEncryptionStorageError;
 use routing::{DataIdentifier, Data};
 use safe_network_common::messaging;
 use safe_network_common::client_errors::{GetError, MutationError};
 use maidsafe_utilities::serialisation::SerialisationError;
+use self_encryption::SelfEncryptionError;
 
 /// Intended for converting Client Errors into numeric codes for propagating some error information
 /// across FFI boundaries and specially to C.
@@ -63,18 +67,20 @@ pub enum CoreError {
     MpidMessagingError(messaging::Error),
     /// Performing a GET operation failed
     GetFailure {
-        /// Orignal request that was made to the network
+        /// Original request that was made to the network
         data_id: DataIdentifier,
         /// Reason for failure
         reason: GetError,
     },
     /// Performing a network mutating operation such as PUT/POST/DELETE failed
     MutationFailure {
-        /// Orignal data that was sent to the network
+        /// Original data that was sent to the network
         data: Data,
         /// Reason for failure
         reason: MutationError,
     },
+    /// Error while self-encrypting data
+    SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
 }
 
 impl<'a> From<&'a str> for CoreError {
@@ -113,6 +119,12 @@ impl From<messaging::Error> for CoreError {
     }
 }
 
+impl From<SelfEncryptionError<SelfEncryptionStorageError>> for CoreError {
+    fn from(error: SelfEncryptionError<SelfEncryptionStorageError>) -> CoreError {
+        CoreError::SelfEncryption(error)
+    }
+}
+
 impl Into<i32> for CoreError {
     fn into(self) -> i32 {
         match self {
@@ -138,7 +150,7 @@ impl Into<i32> for CoreError {
             CoreError::GetFailure { reason: GetError::NoSuchData, .. } => {
                 CLIENT_ERROR_START_RANGE - 17
             }
-            CoreError::GetFailure { reason: GetError::Unknown, .. } => {
+            CoreError::GetFailure { reason: GetError::NetworkOther(_), .. } => {
                 CLIENT_ERROR_START_RANGE - 18
             }
             CoreError::MutationFailure { reason: MutationError::NoSuchAccount, .. } => {
@@ -162,65 +174,188 @@ impl Into<i32> for CoreError {
             CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. } => {
                 CLIENT_ERROR_START_RANGE - 25
             }
-            CoreError::MutationFailure { reason: MutationError::Unknown, .. } => {
+            CoreError::MutationFailure { reason: MutationError::NetworkOther(_), .. } => {
                 CLIENT_ERROR_START_RANGE - 26
             }
             CoreError::MutationFailure { reason: MutationError::NetworkFull, .. } => {
                 CLIENT_ERROR_START_RANGE - 27
             }
+            CoreError::SelfEncryption(_) => CLIENT_ERROR_START_RANGE - 28,
         }
     }
 }
 
-impl ::std::fmt::Debug for CoreError {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl Debug for CoreError {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        try!(write!(formatter, "{}", self.description()));
         match *self {
             CoreError::StructuredDataHeaderSizeProhibitive => {
-                write!(f, "CoreError::StructuredDataHeaderSizeProhibitive")
+                write!(formatter, "CoreError::StructuredDataHeaderSizeProhibitive")
             }
-            CoreError::UnsuccessfulEncodeDecode(ref err) => {
-                write!(f, "CoreError::UnsuccessfulEncodeDecode -> {:?}", err)
+            CoreError::UnsuccessfulEncodeDecode(ref error) => {
+                write!(formatter,
+                       "CoreError::UnsuccessfulEncodeDecode -> {:?}",
+                       error)
             }
             CoreError::AsymmetricDecipherFailure => {
-                write!(f, "CoreError::AsymmetricDecipherFailure")
+                write!(formatter, "CoreError::AsymmetricDecipherFailure")
             }
-            CoreError::SymmetricDecipherFailure => write!(f, "CoreError::SymmetricDecipherFailure"),
-            CoreError::ReceivedUnexpectedData => write!(f, "CoreError::ReceivedUnexpectedData"),
-            CoreError::VersionCacheMiss => write!(f, "CoreError::VersionCacheMiss"),
+            CoreError::SymmetricDecipherFailure => {
+                write!(formatter, "CoreError::SymmetricDecipherFailure")
+            }
+            CoreError::ReceivedUnexpectedData => {
+                write!(formatter, "CoreError::ReceivedUnexpectedData")
+            }
+            CoreError::VersionCacheMiss => write!(formatter, "CoreError::VersionCacheMiss"),
             CoreError::RootDirectoryAlreadyExists => {
-                write!(f, "CoreError::RootDirectoryAlreadyExists")
+                write!(formatter, "CoreError::RootDirectoryAlreadyExists")
             }
             CoreError::RandomDataGenerationFailure => {
-                write!(f, "CoreError::RandomDataGenerationFailure")
+                write!(formatter, "CoreError::RandomDataGenerationFailure")
             }
             CoreError::OperationForbiddenForClient => {
-                write!(f, "CoreError::OperationForbiddenForClient")
+                write!(formatter, "CoreError::OperationForbiddenForClient")
             }
-            CoreError::Unexpected(ref err) => write!(f, "CoreError::Unexpected::{{{:?}}}", err),
-            CoreError::RoutingError(ref err) => write!(f, "CoreError::RoutingError -> {:?}", err),
-            CoreError::RoutingInterfaceError(ref err) => {
-                write!(f, "CoreError::RoutingInterfaceError -> {:?}", err)
+            CoreError::Unexpected(ref error) => {
+                write!(formatter, "CoreError::Unexpected::{{{:?}}}", error)
+            }
+            CoreError::RoutingError(ref error) => {
+                write!(formatter, "CoreError::RoutingError -> {:?}", error)
+            }
+            CoreError::RoutingInterfaceError(ref error) => {
+                write!(formatter, "CoreError::RoutingInterfaceError -> {:?}", error)
             }
             CoreError::UnsupportedSaltSizeForPwHash => {
-                write!(f, "CoreError::UnsupportedSaltSizeForPwHash")
+                write!(formatter, "CoreError::UnsupportedSaltSizeForPwHash")
             }
-            CoreError::UnsuccessfulPwHash => write!(f, "CoreError::UnsuccessfulPwHash"),
-            CoreError::OperationAborted => write!(f, "CoreError::OperationAborted"),
-            CoreError::MpidMessagingError(ref err) => {
-                write!(f, "CoreError::MpidMessagingError -> {:?}", err)
+            CoreError::UnsuccessfulPwHash => write!(formatter, "CoreError::UnsuccessfulPwHash"),
+            CoreError::OperationAborted => write!(formatter, "CoreError::OperationAborted"),
+            CoreError::MpidMessagingError(ref error) => {
+                write!(formatter, "CoreError::MpidMessagingError -> {:?}", error)
             }
             CoreError::GetFailure { ref data_id, ref reason } => {
-                write!(f,
+                write!(formatter,
                        "CoreError::GetFailure::{{ reason: {:?}, request: {:?}}}",
                        reason,
                        data_id)
             }
             CoreError::MutationFailure { ref data, ref reason } => {
-                write!(f,
+                write!(formatter,
                        "CoreError::MutationFailure::{{ reason: {:?}, data: {:?}}}",
                        reason,
                        data)
             }
+            CoreError::SelfEncryption(ref error) => {
+                write!(formatter, "CoreError::SelfEncryption -> {:?}", error)
+            }
+        }
+    }
+}
+
+impl Display for CoreError {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        match *self {
+            CoreError::StructuredDataHeaderSizeProhibitive => {
+                write!(formatter,
+                       "StructuredData doesn't have enough space available to accommodate user \
+                        data")
+            }
+            CoreError::UnsuccessfulEncodeDecode(ref error) => {
+                write!(formatter,
+                       "Error while serialising/deserialising: {}",
+                       error)
+            }
+            CoreError::AsymmetricDecipherFailure => {
+                write!(formatter, "Asymmetric decryption failed")
+            }
+            CoreError::SymmetricDecipherFailure => write!(formatter, "Symmetric decryption failed"),
+            CoreError::ReceivedUnexpectedData => write!(formatter, "Received unexpected data"),
+            CoreError::VersionCacheMiss => {
+                write!(formatter, "No such data found in local version cache")
+            }
+            CoreError::RootDirectoryAlreadyExists => {
+                write!(formatter,
+                       "Cannot overwrite a root directory if it already exists")
+            }
+            CoreError::RandomDataGenerationFailure => {
+                write!(formatter, "Unable to obtain generator for random data")
+            }
+            CoreError::OperationForbiddenForClient => {
+                write!(formatter, "Forbidden operation requested for this Client")
+            }
+            CoreError::Unexpected(ref error) => {
+                write!(formatter, "Unexpected (probably a logic error): {}", error)
+            }
+            CoreError::RoutingError(ref error) => {
+                // TODO - use `{}` once `RoutingError` implements `std::error::Error`.
+                write!(formatter, "Routing internal error: {:?}", error)
+            }
+            CoreError::RoutingInterfaceError(ref error) => {
+                // TODO - use `{}` once `InterfaceError` implements `std::error::Error`.
+                write!(formatter, "Routing interface error -> {:?}", error)
+            }
+            CoreError::UnsupportedSaltSizeForPwHash => {
+                write!(formatter,
+                       "Unable to pack into or operate with size of Salt")
+            }
+            CoreError::UnsuccessfulPwHash => {
+                write!(formatter,
+                       "Unable to complete computation for password hashing")
+            }
+            CoreError::OperationAborted => write!(formatter, "Blocking operation was cancelled"),
+            CoreError::MpidMessagingError(ref error) => {
+                write!(formatter, "Mpid messaging error: {}", error)
+            }
+            CoreError::GetFailure { ref reason, .. } => {
+                write!(formatter, "Failed to Get from network: {}", reason)
+            }
+            CoreError::MutationFailure { ref reason, .. } => {
+                write!(formatter,
+                       "Failed to Put/Post/Delete on network: {}",
+                       reason)
+            }
+            CoreError::SelfEncryption(ref error) => {
+                write!(formatter, "Self-encryption error: {}", error)
+            }
+        }
+    }
+}
+
+impl Error for CoreError {
+    fn description(&self) -> &str {
+        match *self {
+            CoreError::StructuredDataHeaderSizeProhibitive => "SD Header too large",
+            CoreError::UnsuccessfulEncodeDecode(_) => "Serialisation error",
+            CoreError::AsymmetricDecipherFailure => "Asymmetric decryption failure",
+            CoreError::SymmetricDecipherFailure => "Symmetric decryption failure",
+            CoreError::ReceivedUnexpectedData => "Received unexpected data",
+            CoreError::VersionCacheMiss => "Version cache miss",
+            CoreError::RootDirectoryAlreadyExists => "Root directory already exists",
+            CoreError::RandomDataGenerationFailure => "Cannot obtain RNG",
+            CoreError::OperationForbiddenForClient => "Operation forbidden",
+            CoreError::Unexpected(_) => "Unexpected error",
+            // TODO - use `error.description()` once `RoutingError` implements `std::error::Error`.
+            CoreError::RoutingError(_) => "Routing internal error",
+            // TODO - use `error.description()` once `InterfaceError` implements `std::error::Error`
+            CoreError::RoutingInterfaceError(_) => "Routing interface error",
+            CoreError::UnsupportedSaltSizeForPwHash => "Unsupported size of salt",
+            CoreError::UnsuccessfulPwHash => "Failed while password hashing",
+            CoreError::OperationAborted => "Operation aborted",
+            CoreError::MpidMessagingError(_) => "Mpid messaging error",
+            CoreError::GetFailure { ref reason, .. } => reason.description(),
+            CoreError::MutationFailure { ref reason, .. } => reason.description(),
+            CoreError::SelfEncryption(ref error) => error.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        match *self {
+            // TODO - add `RoutingError` and `InternalError` once they implement `std::error::Error`
+            CoreError::UnsuccessfulEncodeDecode(ref error) => Some(error),
+            CoreError::MpidMessagingError(ref error) => Some(error),
+            CoreError::GetFailure { ref reason, .. } => Some(reason),
+            CoreError::MutationFailure { ref reason, .. } => Some(reason),
+            _ => None,
         }
     }
 }

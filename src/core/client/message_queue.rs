@@ -81,8 +81,11 @@ impl MessageQueue {
                                     let reason = match deserialise(&external_error_indicator) {
                                         Ok(err) => err,
                                         Err(err) => {
-                                            warn!("Couldn't obtain GET Failure reason: {:?}", err);
-                                            GetError::Unknown
+                                            let err_msg =
+                                                format!("Couldn't obtain GET Failure reason: {:?}",
+                                                        err);
+                                            warn!("{}", err_msg);
+                                            GetError::NetworkOther(err_msg)
                                         }
                                     };
                                     let err = Err(CoreError::GetFailure {
@@ -114,8 +117,11 @@ impl MessageQueue {
                                     let reason = match deserialise(&external_error_indicator) {
                                         Ok(err) => err,
                                         Err(err) => {
-                                            warn!("Couldn't obtain PUT Failure reason: {:?}", err);
-                                            MutationError::Unknown
+                                            let err_msg =
+                                                format!("Couldn't obtain PUT Failure reason: {:?}",
+                                                        err);
+                                            warn!("{}", err_msg);
+                                            MutationError::NetworkOther(err_msg)
                                         }
                                     };
                                     let err = Err(CoreError::MutationFailure {
@@ -149,8 +155,11 @@ impl MessageQueue {
                                             match deserialise(&external_error_indicator) {
                                         Ok(err) => err,
                                         Err(err) => {
-                                            warn!("Couldn't obtain POST Failure reason: {:?}", err);
-                                            MutationError::Unknown
+                                            let err_msg =
+                                                format!("Couldn't obtain POST Failure reason: {:?}",
+                                                        err);
+                                            warn!("{}", err_msg);
+                                            MutationError::NetworkOther(err_msg)
                                         }
                                     };
                                     let err = Err(CoreError::MutationFailure {
@@ -183,9 +192,12 @@ impl MessageQueue {
                                     let reason: MutationError =
                                             match deserialise(&external_error_indicator) {
                                         Ok(err) => err,
-                                        Err(e) => {
-                                            warn!("Couldn't obtain DELETE Failure reason: {:?}", e);
-                                            MutationError::Unknown
+                                        Err(err) => {
+                                            let err_msg =
+                                                format!("Couldn't obtain DEL Failure reason: {:?}",
+                                                        err);
+                                            warn!("{}", err_msg);
+                                            MutationError::NetworkOther(err_msg)
                                         }
                                     };
                                     let err = Err(CoreError::MutationFailure {

@@ -10,11 +10,12 @@ repository = "https://github.com/maidsafe/safe_core"
 version = "0.14.6"
 
 [dependencies]
-bincode = "~0.5.4"
+bincode = "~0.5.6"
+clippy = {version = "~0.0.69", optional = true}
 libc = "~0.2.11"
 log = "~0.3.6"
-lru_time_cache = "~0.3.0"
-maidsafe_utilities = "~0.5.4"
+lru_time_cache = "~0.4.0"
+maidsafe_utilities = "~0.6.0"
 rand = "~0.3.14"
 routing = "~0.19.1"
 rustc-serialize = "~0.3.19"
@@ -24,17 +25,13 @@ sodiumoxide = "~0.0.10"
 time = "~0.1.35"
 xor_name = "~0.1.0"
 
+[dev-dependencies]
+docopt = "~0.6.80"
+regex = "~0.1.71"
+
 [lib]
 crate_type = ["staticlib", "dylib", "rlib"]
 name = "safe_core"
-
-[dependencies.clippy]
-optional = true
-version = "~0.0.67"
-
-[dev-dependencies]
-docopt = "~0.6.80"
-regex = "~0.1.65"
 
 [[example]]
 bench = false

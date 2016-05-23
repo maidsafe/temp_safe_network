@@ -15,49 +15,60 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::client::Client;
-use xor_name::XorName;
 use std::sync::{Arc, Mutex};
+
+use core::client::Client;
+use core::errors::CoreError;
+use core::self_encryption_storage_error::SelfEncryptionStorageError;
 use routing::{ImmutableData, Data, DataIdentifier};
+use self_encryption::Storage;
+use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network storage is the concrete type which self-encryption crate will use to put or get data
 /// from the network
 pub struct SelfEncryptionStorage {
+    // TODO - No need for `client` to be mutex-protected any more since SelfEncryptor is no longer
+    // multi-threaded.
     client: Arc<Mutex<Client>>,
 }
 
 impl SelfEncryptionStorage {
     /// Create a new SelfEncryptionStorage instance
-    pub fn new(client: Arc<Mutex<Client>>) -> Arc<SelfEncryptionStorage> {
-        Arc::new(SelfEncryptionStorage { client: client })
+    pub fn new(client: Arc<Mutex<Client>>) -> SelfEncryptionStorage {
+        SelfEncryptionStorage { client: client }
     }
 }
 
-impl ::self_encryption::Storage for SelfEncryptionStorage {
-    fn get(&self, name: &[u8]) -> Vec<u8> {
-        let mut name_id = [0u8; 64];
-        assert_eq!(name.len(), 64);
-        for i in 0..64 {
+impl Storage<SelfEncryptionStorageError> for SelfEncryptionStorage {
+    fn get(&self, name: &[u8]) -> Result<Vec<u8>, SelfEncryptionStorageError> {
+        if name.len() != XOR_NAME_LEN {
+            return Err(SelfEncryptionStorageError(Box::new(CoreError::Unexpected("Requested \
+                                                                                  `name` is \
+                                                                                  incorrect \
+                                                                                  size."
+                .to_owned()))));
+        }
+        let mut name_id = [0u8; XOR_NAME_LEN];
+        for i in 0..XOR_NAME_LEN {
             name_id[i] = name[i];
         }
 
-        let mut client = unwrap_result!(self.client.lock());
+        let mut client = self.client.lock().expect("Failed to lock client mutex.");
         let immutable_data_request = DataIdentifier::Immutable(XorName::new(name_id));
-        match unwrap_result!(client.get(immutable_data_request, None)).get() {
-            Ok(ref data) => {
-                match data {
-                    &Data::Immutable(ref rxd_data) => rxd_data.value().clone(),
-                    _ => Vec::new(),
-                }
+        match try!(try!(client.get(immutable_data_request, None)).get()) {
+            Data::Immutable(ref received_data) => Ok(received_data.value().clone()),
+            _ => {
+                Err(SelfEncryptionStorageError(Box::new(CoreError::Unexpected("Wrong data type \
+                                                                               returned from \
+                                                                               network."
+                    .to_owned()))))
             }
-            Err(_) => Vec::new(),
         }
     }
 
-    fn put(&self, _: Vec<u8>, data: Vec<u8>) {
+    fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Result<(), SelfEncryptionStorageError> {
         let immutable_data = ImmutableData::new(data);
-        unwrap_result!(unwrap_result!(unwrap_result!(self.client.lock())
-                .put(Data::Immutable(immutable_data), None))
-            .get());
+        let client = self.client.lock().expect("Failed to lock client mutex.");
+        Ok(try!(try!(client.put(Data::Immutable(immutable_data), None)).get()))
     }
 }
