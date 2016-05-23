@@ -50,10 +50,12 @@ pub fn create(client: Arc<Mutex<Client>>,
     let serialised_dm = try!(serialise(&data_map));
     let mut immut_data = if let Some((pk, sk, nonce)) = encryption_keys {
         let cipher_text = try!(utility::hybrid_encrypt(&serialised_dm, nonce, pk, sk));
-        let encoded_cipher_text = try!(serialise(&DataTypeEncoding::SerialisedDataMap(cipher_text)));
+        let encoded_cipher_text =
+            try!(serialise(&DataTypeEncoding::SerialisedDataMap(cipher_text)));
         ImmutableData::new(encoded_cipher_text)
     } else {
-        let encoded_plain_text = try!(serialise(&DataTypeEncoding::SerialisedDataMap(serialised_dm)));
+        let encoded_plain_text =
+            try!(serialise(&DataTypeEncoding::SerialisedDataMap(serialised_dm)));
         ImmutableData::new(encoded_plain_text)
     };
 
@@ -120,16 +122,18 @@ mod test {
     // TODO It takes a very long time in debug mode - it is due to S.E crate.
     #[test]
     fn immut_data_create_retrieve_10_mb() {
-        let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
+        // 10 MB of data
+        let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10));
 
         // Unencrypted
         {
             let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
 
-            let immut_data_before = unwrap_result!(create(client.clone(), data_to_put.clone(), None));
+            let immut_data_before =
+                unwrap_result!(create(client.clone(), data_to_put.clone(), None));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
-                                                 .put(Data::Immutable(immut_data_before), None));
+                .put(Data::Immutable(immut_data_before), None));
             unwrap_result!(resp_getter.get());
 
             let data_got = unwrap_result!(get_data(client.clone(), data_name, None));
@@ -148,10 +152,11 @@ mod test {
                                                           Some((&pk, &sk, &nonce))));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
-                                                 .put(Data::Immutable(immut_data_before), None));
+                .put(Data::Immutable(immut_data_before), None));
             unwrap_result!(resp_getter.get());
 
-            let data_got = unwrap_result!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))));
+            let data_got =
+                unwrap_result!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))));
 
             assert_eq!(data_to_put, data_got);
         }
@@ -162,10 +167,11 @@ mod test {
             let (pk, sk) = box_::gen_keypair();
             let nonce = box_::gen_nonce();
 
-            let immut_data_before = unwrap_result!(create(client.clone(), data_to_put.clone(), None));
+            let immut_data_before =
+                unwrap_result!(create(client.clone(), data_to_put.clone(), None));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
-                                                 .put(Data::Immutable(immut_data_before), None));
+                .put(Data::Immutable(immut_data_before), None));
             unwrap_result!(resp_getter.get());
 
             assert!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))).is_err());
@@ -182,7 +188,7 @@ mod test {
                                                           Some((&pk, &sk, &nonce))));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
-                                                 .put(Data::Immutable(immut_data_before), None));
+                .put(Data::Immutable(immut_data_before), None));
             unwrap_result!(resp_getter.get());
 
             assert!(get_data(client.clone(), data_name, None).is_err());

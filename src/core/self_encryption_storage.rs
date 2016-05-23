@@ -56,7 +56,8 @@ impl ::self_encryption::Storage for SelfEncryptionStorage {
 
     fn put(&self, _: Vec<u8>, data: Vec<u8>) {
         let immutable_data = ImmutableData::new(data);
-        unwrap_result!(unwrap_result!(unwrap_result!(self.client.lock()).put(Data::Immutable(immutable_data), None))
-                           .get());
+        unwrap_result!(unwrap_result!(unwrap_result!(self.client.lock())
+                .put(Data::Immutable(immutable_data), None))
+            .get());
     }
 }

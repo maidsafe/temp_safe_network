@@ -87,7 +87,8 @@ pub struct MutationResponseGetter {
 
 impl MutationResponseGetter {
     /// Create a new instance of MutationResponseGetter
-    pub fn new(data_channel: (Sender<ResponseEvent>, Receiver<ResponseEvent>)) -> MutationResponseGetter {
+    pub fn new(data_channel: (Sender<ResponseEvent>, Receiver<ResponseEvent>))
+               -> MutationResponseGetter {
         MutationResponseGetter { data_channel: data_channel }
     }
 

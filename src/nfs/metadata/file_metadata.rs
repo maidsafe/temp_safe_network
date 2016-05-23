@@ -130,13 +130,21 @@ impl Decodable for FileMetadata {
                 size: try!(d.read_struct_field("size", 1, |d| Decodable::decode(d))),
                 created_time: ::time::at_utc(Timespec {
                     sec: try!(d.read_struct_field("created_time_sec", 2, |d| Decodable::decode(d))),
-                    nsec: try!(d.read_struct_field("created_time_nsec", 3, |d| Decodable::decode(d))),
+                    nsec: try!(d.read_struct_field("created_time_nsec",
+                                                   3,
+                                                   |d| Decodable::decode(d))),
                 }),
                 modified_time: ::time::at_utc(Timespec {
-                    sec: try!(d.read_struct_field("modified_time_sec", 4, |d| Decodable::decode(d))),
-                    nsec: try!(d.read_struct_field("modified_time_nsec", 5, |d| Decodable::decode(d))),
+                    sec: try!(d.read_struct_field("modified_time_sec",
+                                                  4,
+                                                  |d| Decodable::decode(d))),
+                    nsec: try!(d.read_struct_field("modified_time_nsec",
+                                                   5,
+                                                   |d| Decodable::decode(d))),
                 }),
-                user_metadata: try!(d.read_struct_field("user_metadata", 6, |d| Decodable::decode(d))),
+                user_metadata: try!(d.read_struct_field("user_metadata",
+                                                        6,
+                                                        |d| Decodable::decode(d))),
                 version: try!(d.read_struct_field("version", 7, |d| Decodable::decode(d))),
             })
         })

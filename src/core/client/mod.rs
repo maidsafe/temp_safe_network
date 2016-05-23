@@ -76,7 +76,8 @@ impl Client {
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
         let routing = try!(Routing::new(routing_sender, None, true));
-        let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
+        let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
+                                                             vec![network_event_sender]);
 
         match try!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -96,7 +97,10 @@ impl Client {
 
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
-    pub fn create_account(keyword: String, pin: String, password: String) -> Result<Client, CoreError> {
+    pub fn create_account(keyword: String,
+                          pin: String,
+                          password: String)
+                          -> Result<Client, CoreError> {
         let account_packet = Account::new(None, None);
         let id_packet = FullId::with_keys((account_packet.get_maid().public_keys().1.clone(),
                                            account_packet.get_maid().secret_keys().1.clone()),
@@ -107,7 +111,8 @@ impl Client {
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
         let routing = try!(Routing::new(routing_sender, Some(id_packet), true));
-        let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
+        let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
+                                                             vec![network_event_sender]);
 
         match try!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -122,24 +127,27 @@ impl Client {
             routing: routing,
             _raii_joiner: raii_joiner,
             message_queue: message_queue,
-            session_packet_id: Some(try!(Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()))),
+            session_packet_id: Some(try!(Account::generate_network_id(keyword.as_bytes(),
+                                                                      pin.as_bytes()))),
             session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
             client_manager_addr: Some(client_manager_addr),
         };
 
         {
             let account = unwrap_option!(client.account.as_ref(), LOGIC_ERROR);
-            let session_packet_keys = unwrap_option!(client.session_packet_keys.as_ref(), LOGIC_ERROR);
+            let session_packet_keys = unwrap_option!(client.session_packet_keys.as_ref(),
+                                                     LOGIC_ERROR);
 
-            let session_packet_id = unwrap_option!(client.session_packet_id.as_ref(), LOGIC_ERROR).clone();
+            let session_packet_id = unwrap_option!(client.session_packet_id.as_ref(), LOGIC_ERROR)
+                .clone();
             let account_version = try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                                           session_packet_id,
-                                                           0,
-                                                           try!(account.encrypt(session_packet_keys.get_password(),
-                                                                                session_packet_keys.get_pin())),
-                                                           vec![account.get_public_maid().public_keys().0.clone()],
-                                                           Vec::new(),
-                                                           Some(&account.get_maid().secret_keys().0)));
+                                         session_packet_id,
+                                         0,
+                                         try!(account.encrypt(session_packet_keys.get_password(),
+                                                      session_packet_keys.get_pin())),
+                                         vec![account.get_public_maid().public_keys().0.clone()],
+                                         Vec::new(),
+                                         Some(&account.get_maid().secret_keys().0)));
 
             try!(try!(client.put(Data::Structured(account_version), None)).get());
         }
@@ -154,7 +162,8 @@ impl Client {
         let mut unregistered_client = try!(Client::create_unregistered_client());
         let user_id = try!(Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
 
-        let session_packet_request = DataIdentifier::Structured(user_id.clone(), TYPE_TAG_SESSION_PACKET);
+        let session_packet_request = DataIdentifier::Structured(user_id.clone(),
+                                                                TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(unregistered_client.get(session_packet_request, None));
 
@@ -163,27 +172,28 @@ impl Client {
                                                                  password.as_bytes(),
                                                                  pin.as_bytes()));
             let id_packet = FullId::with_keys((decrypted_session_packet.get_maid()
-                                                                       .public_keys()
-                                                                       .1
-                                                                       .clone(),
+                                                  .public_keys()
+                                                  .1
+                                                  .clone(),
                                                decrypted_session_packet.get_maid()
-                                                                       .secret_keys()
-                                                                       .1
-                                                                       .clone()),
+                                                  .secret_keys()
+                                                  .1
+                                                  .clone()),
                                               (decrypted_session_packet.get_maid()
-                                                                       .public_keys()
-                                                                       .0
-                                                                       .clone(),
+                                                  .public_keys()
+                                                  .0
+                                                  .clone(),
                                                decrypted_session_packet.get_maid()
-                                                                       .secret_keys()
-                                                                       .0
-                                                                       .clone()));
+                                                  .secret_keys()
+                                                  .0
+                                                  .clone()));
 
             let (routing_sender, routing_receiver) = mpsc::channel();
             let (network_event_sender, network_event_receiver) = mpsc::channel();
 
             let routing = try!(Routing::new(routing_sender, Some(id_packet), true));
-            let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver, vec![network_event_sender]);
+            let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
+                                                                 vec![network_event_sender]);
 
             match try!(network_event_receiver.recv()) {
                 NetworkEvent::Connected => (),
@@ -191,9 +201,9 @@ impl Client {
             }
 
             let hash_sign_key = sha512::hash(&(decrypted_session_packet.get_maid()
-                                                                       .public_keys()
-                                                                       .0)
-                                                  .0);
+                    .public_keys()
+                    .0)
+                .0);
             let client_manager_addr = XorName::new(hash_sign_key.0);
 
             let client = Client {
@@ -201,7 +211,8 @@ impl Client {
                 routing: routing,
                 _raii_joiner: raii_joiner,
                 message_queue: message_queue,
-                session_packet_id: Some(try!(Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()))),
+                session_packet_id: Some(try!(Account::generate_network_id(keyword.as_bytes(),
+                                                                          pin.as_bytes()))),
                 session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
                 client_manager_addr: Some(client_manager_addr),
             };
@@ -217,7 +228,8 @@ impl Client {
     /// necessary to fetch all of the user's data as all further data is encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
     pub fn set_user_root_directory_id(&mut self, root_dir_id: XorName) -> Result<(), CoreError> {
-        if try!(self.account.as_mut().ok_or(CoreError::OperationForbiddenForClient)).set_user_root_dir_id(root_dir_id) {
+        if try!(self.account.as_mut().ok_or(CoreError::OperationForbiddenForClient))
+            .set_user_root_dir_id(root_dir_id) {
             self.update_session_packet()
         } else {
             Err(CoreError::RootDirectoryAlreadyExists)
@@ -234,9 +246,11 @@ impl Client {
     /// their account. Root directory ID is necessary to fetch all of configuration data as all
     /// further data is encoded as meta-information into the config Root Directory or one of its
     /// subdirectories.
-    pub fn set_configuration_root_directory_id(&mut self, root_dir_id: XorName) -> Result<(), CoreError> {
+    pub fn set_configuration_root_directory_id(&mut self,
+                                               root_dir_id: XorName)
+                                               -> Result<(), CoreError> {
         if try!(self.account.as_mut().ok_or(CoreError::OperationForbiddenForClient))
-               .set_maidsafe_config_root_dir_id(root_dir_id) {
+            .set_maidsafe_config_root_dir_id(root_dir_id) {
             self.update_session_packet()
         } else {
             Err(CoreError::RootDirectoryAlreadyExists)
@@ -249,10 +263,11 @@ impl Client {
         self.account.as_ref().and_then(|account| account.get_maidsafe_config_root_dir_id())
     }
 
-    /// Combined Asymmectric and Symmetric encryption. The data is encrypted using random Key and
-    /// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text produces different
-    /// cipher-texts for each fresh symmetric encryption. The Key and IV are then asymmetrically
-    /// enrypted using Public-MAID and the whole thing is then serialised into a single Vec<u8>.
+    /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and
+    /// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text produces
+    /// different cipher-texts for each fresh symmetric encryption. The Key and IV are then
+    /// asymmetrically encrypted using Public-MAID and the whole thing is then serialised into a
+    /// single `Vec<u8>`.
     pub fn hybrid_encrypt(&self,
                           data_to_encrypt: &[u8],
                           nonce_opt: Option<&box_::Nonce>)
@@ -323,7 +338,8 @@ impl Client {
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
 
         try!(self.routing.send_get_request(dst, request_for.clone(), msg_id));
 
@@ -331,15 +347,21 @@ impl Client {
     }
 
     /// Put data onto the network. This is non-blocking.
-    pub fn put(&self, data: Data, opt_dst: Option<Authority>) -> Result<MutationResponseGetter, CoreError> {
+    pub fn put(&self,
+               data: Data,
+               opt_dst: Option<Authority>)
+               -> Result<MutationResponseGetter, CoreError> {
         let dst = match opt_dst {
             Some(auth) => auth,
-            None => Authority::ClientManager(try!(self.get_default_client_manager_address()).clone()),
+            None => {
+                Authority::ClientManager(try!(self.get_default_client_manager_address()).clone())
+            }
         };
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
 
         try!(self.routing.send_put_request(dst, data, msg_id));
 
@@ -347,7 +369,10 @@ impl Client {
     }
 
     /// Post data onto the network
-    pub fn post(&self, data: Data, opt_dst: Option<Authority>) -> Result<MutationResponseGetter, CoreError> {
+    pub fn post(&self,
+                data: Data,
+                opt_dst: Option<Authority>)
+                -> Result<MutationResponseGetter, CoreError> {
         let dst = match opt_dst {
             Some(auth) => auth,
             None => Authority::NaeManager(data.name()),
@@ -355,7 +380,8 @@ impl Client {
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
 
         try!(self.routing.send_post_request(dst, data, msg_id));
 
@@ -363,7 +389,10 @@ impl Client {
     }
 
     /// Delete data from the network
-    pub fn delete(&self, data: Data, opt_dst: Option<Authority>) -> Result<MutationResponseGetter, CoreError> {
+    pub fn delete(&self,
+                  data: Data,
+                  opt_dst: Option<Authority>)
+                  -> Result<MutationResponseGetter, CoreError> {
         let dst = match opt_dst {
             Some(auth) => auth,
             None => Authority::NaeManager(data.name()),
@@ -371,7 +400,8 @@ impl Client {
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
 
         try!(self.routing.send_delete_request(dst, data, msg_id));
 
@@ -446,7 +476,9 @@ impl Client {
     }
 
     /// Get the list of messages' headers that still in the outbox. This is non-blocking.
-    pub fn get_outbox_headers(&self, mpid_account: XorName) -> Result<GetResponseGetter, CoreError> {
+    pub fn get_outbox_headers(&self,
+                              mpid_account: XorName)
+                              -> Result<GetResponseGetter, CoreError> {
         self.messaging_post_request(mpid_account, MpidMessageWrapper::GetOutboxHeaders)
     }
 
@@ -471,7 +503,8 @@ impl Client {
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
+        unwrap_result!(self.message_queue.lock())
+            .register_response_observer(msg_id.clone(), tx.clone());
 
         Ok(GetResponseGetter::new(Some((tx, rx)), self.message_queue.clone(), data_request))
     }
@@ -511,7 +544,9 @@ impl Client {
     }
 
     /// Set the default address where the PUTs and DELETEs will go to for this client
-    pub fn set_default_client_manager_address(&mut self, address: XorName) -> Result<(), CoreError> {
+    pub fn set_default_client_manager_address(&mut self,
+                                              address: XorName)
+                                              -> Result<(), CoreError> {
         match self.client_manager_addr.as_mut() {
             Some(contained_address) => *contained_address = address,
             None => return Err(CoreError::OperationForbiddenForClient),
@@ -522,32 +557,33 @@ impl Client {
 
     fn update_session_packet(&mut self) -> Result<(), CoreError> {
         let session_packet_id = try!(self.session_packet_id
-                                         .as_ref()
-                                         .ok_or(CoreError::OperationForbiddenForClient))
-                                    .clone();
-        let session_packet_request = DataIdentifier::Structured(session_packet_id.clone(), TYPE_TAG_SESSION_PACKET);
+                .as_ref()
+                .ok_or(CoreError::OperationForbiddenForClient))
+            .clone();
+        let session_packet_request = DataIdentifier::Structured(session_packet_id.clone(),
+                                                                TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(self.get(session_packet_request, None));
 
         let account = try!(self.account.as_ref().ok_or(CoreError::OperationForbiddenForClient));
         let session_packet_keys = try!(self.session_packet_keys
-                                           .as_ref()
-                                           .ok_or(CoreError::OperationForbiddenForClient));
+            .as_ref()
+            .ok_or(CoreError::OperationForbiddenForClient));
 
         if let Data::Structured(retrieved_session_packet) = try!(resp_getter.get()) {
             let encrypted_account = try!(account.encrypt(session_packet_keys.get_password(),
                                                          session_packet_keys.get_pin()));
 
             let new_account_version = try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                                               session_packet_id,
-                                                               retrieved_session_packet.get_version() + 1,
-                                                               encrypted_account,
-                                                               vec![account.get_public_maid()
-                                                                           .public_keys()
-                                                                           .0
-                                                                           .clone()],
-                                                               Vec::new(),
-                                                               Some(&account.get_maid().secret_keys().0)));
+                                         session_packet_id,
+                                         retrieved_session_packet.get_version() + 1,
+                                         encrypted_account,
+                                         vec![account.get_public_maid()
+                                                  .public_keys()
+                                                  .0
+                                                  .clone()],
+                                         Vec::new(),
+                                         Some(&account.get_maid().secret_keys().0)));
             try!(self.post(Data::Structured(new_account_version), None)).get()
         } else {
             Err(CoreError::ReceivedUnexpectedData)
@@ -582,7 +618,6 @@ impl SessionPacketEncryptionKeys {
 }
 
 /// //////////////////////////////////////////////////////////////
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -602,7 +637,8 @@ mod test {
         let pin = unwrap_result!(utility::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let _ =
+            unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         // Account creation - same keyword, pin and password - should fail
         match Client::create_account(keyword.clone(), pin.clone(), password.clone()) {
@@ -635,7 +671,8 @@ mod test {
         let pin = unwrap_result!(utility::generate_random_string(10));
 
         // Creation should pass
-        let _ = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let _ =
+            unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         // Correct Credentials - Login Should Pass
         let _ = unwrap_result!(Client::log_in(keyword, pin, password));
@@ -682,7 +719,8 @@ mod test {
         let password = unwrap_result!(utility::generate_random_string(10));
         let pin = unwrap_result!(utility::generate_random_string(10));
 
-        let mut client = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let mut client =
+            unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -706,7 +744,8 @@ mod test {
         let password = unwrap_result!(utility::generate_random_string(10));
         let pin = unwrap_result!(utility::generate_random_string(10));
 
-        let mut client = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let mut client =
+            unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -739,8 +778,10 @@ mod test {
 
         // Encrypt passing Nonce
         let nonce = ::sodiumoxide::crypto::box_::gen_nonce();
-        let cipher_text_0 = unwrap_result!(client.hybrid_encrypt(&plain_text_original_0[..], Some(&nonce)));
-        let cipher_text_1 = unwrap_result!(client.hybrid_encrypt(&plain_text_original_1[..], Some(&nonce)));
+        let cipher_text_0 =
+            unwrap_result!(client.hybrid_encrypt(&plain_text_original_0[..], Some(&nonce)));
+        let cipher_text_1 =
+            unwrap_result!(client.hybrid_encrypt(&plain_text_original_1[..], Some(&nonce)));
 
         // Encrypt without passing Nonce
         let cipher_text_2 = unwrap_result!(client.hybrid_encrypt(&plain_text_original_0[..], None));
@@ -790,7 +831,8 @@ mod test {
 
         // Version Caching should work for ImmutableData
         {
-            let immut_data = ImmutableData::new(unwrap_result!(utility::generate_random_vector(10)));
+            let immut_data =
+                ImmutableData::new(unwrap_result!(utility::generate_random_vector(10)));
             let data = Data::Immutable(immut_data);
 
             unwrap_result!(unwrap_result!(client.put(data.clone(), None)).get());
@@ -799,7 +841,9 @@ mod test {
 
             // Should not initially be in version cache
             {
-                let resp_getter = GetResponseGetter::new(None, client.message_queue.clone(), data_request.clone());
+                let resp_getter = GetResponseGetter::new(None,
+                                                         client.message_queue.clone(),
+                                                         data_request.clone());
 
                 match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
@@ -811,7 +855,8 @@ mod test {
             let response_getter = unwrap_result!(client.get(data_request.clone(), None));
             assert_eq!(unwrap_result!(response_getter.get()), data);
 
-            let resp_getter = GetResponseGetter::new(None, client.message_queue.clone(), data_request);
+            let resp_getter =
+                GetResponseGetter::new(None, client.message_queue.clone(), data_request);
             assert_eq!(unwrap_result!(resp_getter.get()), data);
         }
 
@@ -835,7 +880,9 @@ mod test {
 
             // Should not initially be in version cache
             {
-                let resp_getter = GetResponseGetter::new(None, client.message_queue.clone(), data_request.clone());
+                let resp_getter = GetResponseGetter::new(None,
+                                                         client.message_queue.clone(),
+                                                         data_request.clone());
 
                 match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
@@ -849,7 +896,8 @@ mod test {
 
             // Should not be in version cache even after fetch
             {
-                let resp_getter = GetResponseGetter::new(None, client.message_queue.clone(), data_request);
+                let resp_getter =
+                    GetResponseGetter::new(None, client.message_queue.clone(), data_request);
 
                 match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),

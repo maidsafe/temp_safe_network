@@ -44,7 +44,9 @@ pub fn create(client: &Client,
 }
 
 /// Get the complete version list
-pub fn get_all_versions(client: &mut Client, struct_data: &StructuredData) -> Result<Vec<XorName>, CoreError> {
+pub fn get_all_versions(client: &mut Client,
+                        struct_data: &StructuredData)
+                        -> Result<Vec<XorName>, CoreError> {
     let immut_data = try!(get_immutable_data(client, struct_data));
     Ok(try!(deserialise(&immut_data.value())))
 }
@@ -83,7 +85,9 @@ fn create_impl(client: &Client,
 
     let encoded_name = try!(serialise(&name_of_immutable_data));
 
-    match try!(check_if_data_can_fit_in_structured_data(&encoded_name, owner_keys.clone(), prev_owner_keys.clone())) {
+    match try!(check_if_data_can_fit_in_structured_data(&encoded_name,
+                                                        owner_keys.clone(),
+                                                        prev_owner_keys.clone())) {
         DataFitResult::DataFits => {
             let data = Data::Immutable(immutable_data);
             try!(try!(client.put(data, None)).get());
@@ -100,7 +104,9 @@ fn create_impl(client: &Client,
     }
 }
 
-fn get_immutable_data(client: &mut Client, struct_data: &StructuredData) -> Result<ImmutableData, CoreError> {
+fn get_immutable_data(client: &mut Client,
+                      struct_data: &StructuredData)
+                      -> Result<ImmutableData, CoreError> {
     let name = try!(deserialise(&struct_data.get_data()));
     let response_getter = try!(client.get(DataIdentifier::Immutable(name), None));
     let data = try!(response_getter.get());
@@ -145,7 +151,8 @@ mod test {
 
         let version_1 = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
 
-        structured_data_result = append_version(&mut client, structured_data, version_1.clone(), secret_key);
+        structured_data_result =
+            append_version(&mut client, structured_data, version_1.clone(), secret_key);
         structured_data = unwrap_result!(structured_data_result);
         versions_res = get_all_versions(&mut client, &structured_data);
         versions = unwrap_result!(versions_res);

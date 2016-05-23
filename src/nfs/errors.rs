@@ -91,10 +91,16 @@ impl fmt::Debug for NfsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             NfsError::CoreError(ref error) => write!(f, "NfsError::CoreError -> {:?}", error),
-            NfsError::DirectoryAlreadyExistsWithSameName => write!(f, "NfsError::DirectoryAlreadyExistsWithSameName"),
-            NfsError::DestinationAndSourceAreSame => write!(f, "NfsError::DestinationAndSourceAreSame"),
+            NfsError::DirectoryAlreadyExistsWithSameName => {
+                write!(f, "NfsError::DirectoryAlreadyExistsWithSameName")
+            }
+            NfsError::DestinationAndSourceAreSame => {
+                write!(f, "NfsError::DestinationAndSourceAreSame")
+            }
             NfsError::DirectoryNotFound => write!(f, "NfsError::DirectoryNotFound"),
-            NfsError::FileAlreadyExistsWithSameName => write!(f, "NfsError::FileAlreadyExistsWithSameName"),
+            NfsError::FileAlreadyExistsWithSameName => {
+                write!(f, "NfsError::FileAlreadyExistsWithSameName")
+            }
             NfsError::FileDoesNotMatch => write!(f, "NfsError::FileDoesNotMatch"),
             NfsError::FileNotFound => write!(f, "NfsError::FileNotFound"),
             NfsError::InvalidRangeSpecified => write!(f, "NfsError::InvalidRangeSpecified"),

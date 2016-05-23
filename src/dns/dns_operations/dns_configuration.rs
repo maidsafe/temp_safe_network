@@ -36,7 +36,8 @@ pub struct DnsConfiguation {
 
 pub fn initialise_dns_configuaration(client: Arc<Mutex<Client>>) -> Result<(), DnsError> {
     let dir_helper = DirectoryHelper::new(client.clone());
-    let dir_listing = try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
+    let dir_listing =
+        try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
     let file_helper = FileHelper::new(client.clone());
     match file_helper.create(DNS_CONFIG_FILE_NAME.to_string(), vec![], dir_listing) {
         Ok(writer) => {
@@ -48,13 +49,15 @@ pub fn initialise_dns_configuaration(client: Arc<Mutex<Client>>) -> Result<(), D
     }
 }
 
-pub fn get_dns_configuaration_data(client: Arc<Mutex<Client>>) -> Result<Vec<DnsConfiguation>, DnsError> {
+pub fn get_dns_configuaration_data(client: Arc<Mutex<Client>>)
+                                   -> Result<Vec<DnsConfiguation>, DnsError> {
     let dir_helper = DirectoryHelper::new(client.clone());
-    let dir_listing = try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
+    let dir_listing =
+        try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
     let file = try!(dir_listing.get_files()
-                               .iter()
-                               .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
-                               .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted));
+        .iter()
+        .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
+        .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted));
     let file_helper = FileHelper::new(client.clone());
     debug!("Reading dns configuration data from file ...");
     let mut reader = file_helper.read(file);
@@ -70,12 +73,13 @@ pub fn write_dns_configuaration_data(client: Arc<Mutex<Client>>,
                                      config: &Vec<DnsConfiguation>)
                                      -> Result<(), DnsError> {
     let dir_helper = DirectoryHelper::new(client.clone());
-    let dir_listing = try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
+    let dir_listing =
+        try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
     let file = try!(dir_listing.get_files()
-                               .iter()
-                               .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
-                               .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted))
-                   .clone();
+            .iter()
+            .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
+            .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted))
+        .clone();
     let file_helper = FileHelper::new(client.clone());
     let mut writer = try!(file_helper.update_content(file, Mode::Overwrite, dir_listing));
     debug!("Writing dns configuration data ...");

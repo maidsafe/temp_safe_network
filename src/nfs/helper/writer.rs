@@ -44,7 +44,11 @@ pub struct Writer {
 
 impl Writer {
     /// Create new instance of Writer
-    pub fn new(client: Arc<Mutex<Client>>, mode: Mode, parent_directory: DirectoryListing, file: File) -> Writer {
+    pub fn new(client: Arc<Mutex<Client>>,
+               mode: Mode,
+               parent_directory: DirectoryListing,
+               file: File)
+               -> Writer {
         let datamap = match mode {
             Mode::Modify => file.get_datamap().clone(),
             Mode::Overwrite => DataMap::None,

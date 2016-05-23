@@ -60,7 +60,7 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
                                           asym_nonce,
                                           asym_public_key,
                                           asym_secret_key)
-                                   .map_err(|_| CoreError::AsymmetricDecipherFailure));
+        .map_err(|_| CoreError::AsymmetricDecipherFailure));
 
     if asym_plain_text.len() != secretbox::KEYBYTES + secretbox::NONCEBYTES {
         Err(CoreError::AsymmetricDecipherFailure)
@@ -75,7 +75,8 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
             sym_nonce.0[it.0] = *it.1;
         }
 
-        secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key).map_err(|()| CoreError::SymmetricDecipherFailure)
+        secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key)
+            .map_err(|()| CoreError::SymmetricDecipherFailure)
     }
 }
 
@@ -127,8 +128,10 @@ mod test {
         let (public_key, secret_key) = box_::gen_keypair();
 
         // Encrypt
-        let cipher_text_0 = unwrap_result!(hybrid_encrypt(&plain_text_0[..], &nonce, &public_key, &secret_key));
-        let cipher_text_1 = unwrap_result!(hybrid_encrypt(&plain_text_1[..], &nonce, &public_key, &secret_key));
+        let cipher_text_0 =
+            unwrap_result!(hybrid_encrypt(&plain_text_0[..], &nonce, &public_key, &secret_key));
+        let cipher_text_1 =
+            unwrap_result!(hybrid_encrypt(&plain_text_1[..], &nonce, &public_key, &secret_key));
 
         // Same Plain Texts
         assert_eq!(plain_text_0, plain_text_1);
@@ -137,8 +140,10 @@ mod test {
         assert!(cipher_text_0 != cipher_text_1);
 
         // Decrypt
-        let deciphered_plain_text_0 = unwrap_result!(hybrid_decrypt(&cipher_text_0, &nonce, &public_key, &secret_key));
-        let deciphered_plain_text_1 = unwrap_result!(hybrid_decrypt(&cipher_text_1, &nonce, &public_key, &secret_key));
+        let deciphered_plain_text_0 =
+            unwrap_result!(hybrid_decrypt(&cipher_text_0, &nonce, &public_key, &secret_key));
+        let deciphered_plain_text_1 =
+            unwrap_result!(hybrid_decrypt(&cipher_text_1, &nonce, &public_key, &secret_key));
 
         // Should have decrypted to the same Plain Texts
         assert_eq!(plain_text_0, deciphered_plain_text_0);

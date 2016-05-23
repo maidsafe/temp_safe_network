@@ -77,8 +77,9 @@ impl FileHelper {
                            -> Result<Option<DirectoryListing>, NfsError> {
         {
             let existing_file = try!(parent_directory.find_file_by_id(file.get_id())
-                                                     .ok_or(NfsError::FileNotFound));
-            if existing_file.get_name() != file.get_name() && parent_directory.find_file(file.get_name()).is_some() {
+                .ok_or(NfsError::FileNotFound));
+            if existing_file.get_name() != file.get_name() &&
+               parent_directory.find_file(file.get_name()).is_some() {
                 return Err(NfsError::FileAlreadyExistsWithSameName);
             }
         }
@@ -99,7 +100,7 @@ impl FileHelper {
                           -> Result<Writer, NfsError> {
         {
             let existing_file = try!(parent_directory.find_file(file.get_name())
-                                                     .ok_or(NfsError::FileNotFound));
+                .ok_or(NfsError::FileNotFound));
             if *existing_file != file {
                 return Err(NfsError::FileDoesNotMatch);
             }
@@ -109,24 +110,28 @@ impl FileHelper {
 
 
     /// Return the versions of a directory containing modified versions of a file
-    pub fn get_versions(&self, file: &File, parent_directory: &DirectoryListing) -> Result<Vec<File>, NfsError> {
+    pub fn get_versions(&self,
+                        file: &File,
+                        parent_directory: &DirectoryListing)
+                        -> Result<Vec<File>, NfsError> {
         let mut versions = Vec::<File>::new();
         let directory_helper = DirectoryHelper::new(self.client.clone());
 
         let sdv_versions = try!(directory_helper.get_versions(parent_directory.get_key().get_id(),
                                                               parent_directory.get_key()
-                                                                              .get_type_tag()));
+                                                                  .get_type_tag()));
 
         // Because Version 0 is invalid, so can be made an initial comparison value
         let mut file_version = 0;
         for version_id in sdv_versions {
-            let directory_listing = try!(directory_helper.get_by_version(parent_directory.get_key().get_id(),
-                                                                         parent_directory.get_key()
-                                                                                         .get_access_level(),
-                                                                         version_id.clone()));
+            let directory_listing =
+                try!(directory_helper.get_by_version(parent_directory.get_key().get_id(),
+                                                     parent_directory.get_key()
+                                                         .get_access_level(),
+                                                     version_id.clone()));
             if let Some(file) = directory_listing.get_files()
-                                                 .iter()
-                                                 .find(|&entry| entry.get_name() == file.get_name()) {
+                .iter()
+                .find(|&entry| entry.get_name() == file.get_name()) {
                 if file.get_metadata().get_version() != file_version {
                     file_version = file.get_metadata().get_version();
                     versions.push(file.clone());
@@ -162,16 +167,17 @@ mod test {
         let client = get_client();
         let dir_helper = DirectoryHelper::new(client.clone());
         let (mut directory, _) = unwrap_result!(dir_helper.create("DirName".to_string(),
-                                                                  ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                                                                  Vec::new(),
-                                                                  true,
-                                                                  AccessLevel::Private,
-                                                                  None));
+                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                    Vec::new(),
+                    true,
+                    AccessLevel::Private,
+                    None));
         let file_helper = FileHelper::new(client.clone());
         let file_name = "hello.txt".to_string();
         {
             // create
-            let mut writer = unwrap_result!(file_helper.create(file_name.clone(), Vec::new(), directory));
+            let mut writer =
+                unwrap_result!(file_helper.create(file_name.clone(), Vec::new(), directory));
             writer.write(&vec![0u8; 100], 0);
             let (updated_directory, _) = unwrap_result!(writer.close());
             directory = updated_directory;
@@ -188,7 +194,8 @@ mod test {
             // update - full rewrite
             let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
                                       "File not found");
-            let mut writer = unwrap_result!(file_helper.update_content(file, Mode::Overwrite, directory));
+            let mut writer =
+                unwrap_result!(file_helper.update_content(file, Mode::Overwrite, directory));
             writer.write(&vec![1u8; 50], 0);
             let (updated_directory, _) = unwrap_result!(writer.close());
             directory = updated_directory;
@@ -201,7 +208,8 @@ mod test {
             // update - partial rewrite
             let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
                                       "File not found");
-            let mut writer = unwrap_result!(file_helper.update_content(file, Mode::Modify, directory));
+            let mut writer =
+                unwrap_result!(file_helper.update_content(file, Mode::Modify, directory));
             writer.write(&vec![2u8; 10], 0);
             let (updated_directory, _) = unwrap_result!(writer.close());
             directory = updated_directory;

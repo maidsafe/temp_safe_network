@@ -54,9 +54,9 @@ impl IdType {
     /// Returns name
     pub fn name(&self) -> XorName {
         let combined_iter = (&self.public_keys.0)
-                                .0
-                                .into_iter()
-                                .chain((&self.public_keys.1).0.into_iter());
+            .0
+            .into_iter()
+            .chain((&self.public_keys.1).0.into_iter());
         let mut combined = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -90,8 +90,13 @@ impl IdType {
     }
 
     /// Verifies and decrypts the data
-    pub fn open(&self, data: &[u8], nonce: &box_::Nonce, from: &box_::PublicKey) -> Result<Vec<u8>, CoreError> {
-        box_::open(&data, &nonce, &from, &self.secret_keys.1).map_err(|_| CoreError::AsymmetricDecipherFailure)
+    pub fn open(&self,
+                data: &[u8],
+                nonce: &box_::Nonce,
+                from: &box_::PublicKey)
+                -> Result<Vec<u8>, CoreError> {
+        box_::open(&data, &nonce, &from, &self.secret_keys.1)
+            .map_err(|_| CoreError::AsymmetricDecipherFailure)
     }
 }
 
@@ -119,14 +124,14 @@ mod test {
 
         let obj_after: IdType = unwrap_result!(deserialise(&serialised_obj));
 
-        let &(sign::PublicKey(pub_sign_arr_before),
-              box_::PublicKey(pub_asym_arr_before)) = obj_before.public_keys();
-        let &(sign::PublicKey(pub_sign_arr_after),
-              box_::PublicKey(pub_asym_arr_after)) = obj_after.public_keys();
-        let &(sign::SecretKey(sec_sign_arr_before),
-              box_::SecretKey(sec_asym_arr_before)) = &obj_before.secret_keys;
-        let &(sign::SecretKey(sec_sign_arr_after),
-              box_::SecretKey(sec_asym_arr_after)) = &obj_after.secret_keys;
+        let &(sign::PublicKey(pub_sign_arr_before), box_::PublicKey(pub_asym_arr_before)) =
+            obj_before.public_keys();
+        let &(sign::PublicKey(pub_sign_arr_after), box_::PublicKey(pub_asym_arr_after)) =
+            obj_after.public_keys();
+        let &(sign::SecretKey(sec_sign_arr_before), box_::SecretKey(sec_asym_arr_before)) =
+            &obj_before.secret_keys;
+        let &(sign::SecretKey(sec_sign_arr_after), box_::SecretKey(sec_asym_arr_after)) =
+            &obj_after.secret_keys;
 
         assert_eq!(pub_sign_arr_before, pub_sign_arr_after);
         assert_eq!(pub_asym_arr_before, pub_asym_arr_after);

@@ -96,7 +96,9 @@ fn main() {
         {
             println!("\nTrying to create an account ...");
 
-            let _ = unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+            let _ = unwrap_result!(Client::create_account(keyword.clone(),
+                                                          pin.clone(),
+                                                          password.clone()));
             println!("Account Created Successfully !!");
         }
 
@@ -143,7 +145,8 @@ fn main() {
                 Ok(client) => {
                     println!("Account Login Successful !!");
                     if MOCK_NETWORK {
-                        println!("Messaging feature has been skipped as mock routing is being used !!");
+                        println!("Messaging feature has been skipped as mock routing is being \
+                                  used !!");
                     } else {
                         messaging(&client);
                     }
@@ -191,7 +194,8 @@ fn receive_mpid_message(response_getter: &GetResponseGetter) {
             Ok(data) => {
                 match data {
                     Data::Plain(plain_data) => {
-                        let mpid_message_wrapper: MpidMessageWrapper = unwrap_result!(deserialise(plain_data.value()));
+                        let mpid_message_wrapper: MpidMessageWrapper =
+                            unwrap_result!(deserialise(plain_data.value()));
                         match mpid_message_wrapper {
                             MpidMessageWrapper::PutMessage(mpid_message) => {
                                 println!("received mpid message {:?}", mpid_message);

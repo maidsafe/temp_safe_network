@@ -57,7 +57,8 @@ mod test {
         let client0 = unwrap_result!(get_client());
         let client1 = unwrap_result!(get_client());
 
-        assert!(unwrap_result!(client0.get_public_signing_key()) != unwrap_result!(client1.get_public_signing_key()));
+        assert!(unwrap_result!(client0.get_public_signing_key()) !=
+                unwrap_result!(client1.get_public_signing_key()));
         assert!(unwrap_result!(client0.get_public_encryption_key()) !=
                 unwrap_result!(client1.get_public_encryption_key()));
     }
