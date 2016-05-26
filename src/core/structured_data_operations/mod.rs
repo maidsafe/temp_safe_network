@@ -20,10 +20,10 @@ pub mod unversioned;
 /// Versioned-Structured Data
 pub mod versioned;
 
-use xor_name::XorName;
 use core::errors::CoreError;
-use routing::StructuredData;
+use routing::{StructuredData, XorName, XOR_NAME_LEN};
 use sodiumoxide::crypto::sign;
+use std::{u8, u64};
 use maidsafe_utilities::serialisation::serialise;
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
@@ -51,9 +51,9 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<sign::PublicKey>,
         prev_owner_keys.len()
     };
 
-    let mut structured_data = try!(StructuredData::new(::std::u64::MAX,
-                                                       XorName::new([::std::u8::MAX; 64]),
-                                                       ::std::u64::MAX,
+    let mut structured_data = try!(StructuredData::new(u64::MAX,
+                                                       XorName([u8::MAX; XOR_NAME_LEN]),
+                                                       u64::MAX,
                                                        Vec::new(),
                                                        owner_keys,
                                                        prev_owner_keys,
@@ -61,7 +61,7 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<sign::PublicKey>,
 
     // Fill it with rest of signatures
     structured_data.replace_signatures(
-        vec![sign::Signature([::std::u8::MAX; sign::SIGNATUREBYTES]); max_signatures_possible]);
+        vec![sign::Signature([u8::MAX; sign::SIGNATUREBYTES]); max_signatures_possible]);
 
     let serialised_structured_data_len = try!(serialise(&structured_data)).len() +
                                          PADDING_SIZE_IN_BYTES;
@@ -97,7 +97,7 @@ mod test {
     use core::utility::test_utils;
 
     // Refers the fixed size of the get_approximate_space_for_data fn without signatures
-    const DEFAULT_FIXED_SIZE: usize = ::routing::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - 1144;
+    const DEFAULT_FIXED_SIZE: usize = ::routing::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - 1112;
     // 112 is the size of a signature after serialisation.
     const FIXED_SIZE_OF_SIGNATURE: usize = 112;
 

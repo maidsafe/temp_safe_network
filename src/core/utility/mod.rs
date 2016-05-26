@@ -100,19 +100,6 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
     Ok((0..length).map(|_| os_rng.gen()).collect())
 }
 
-/// Generate a random array of 64 u8's
-pub fn generate_random_array_u8_64() -> Result<[u8; 64], CoreError> {
-    let mut arr = [0; 64];
-    let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
-        error!("{:?}", error);
-        CoreError::RandomDataGenerationFailure
-    }));
-    for it in arr.iter_mut() {
-        *it = os_rng.gen();
-    }
-    Ok(arr)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -172,16 +159,5 @@ mod test {
         assert!(vec0 != vec1);
         assert!(vec0 != vec2);
         assert!(vec1 != vec2);
-    }
-
-    #[test]
-    fn random_array() {
-        let arr0 = unwrap_result!(generate_random_array_u8_64());
-        let arr1 = unwrap_result!(generate_random_array_u8_64());
-        let arr2 = unwrap_result!(generate_random_array_u8_64());
-
-        assert!(&arr0[..] != &arr1[..]);
-        assert!(&arr0[..] != &arr2[..]);
-        assert!(&arr1[..] != &arr2[..]);
     }
 }

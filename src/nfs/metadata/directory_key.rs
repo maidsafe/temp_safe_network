@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use nfs::AccessLevel;
-use xor_name::XorName;
+use routing::XorName;
 
 /// DirectoryKey represnts the meta information about a directory
 /// A directory can be feteched with the DirectoryKey
@@ -64,20 +64,20 @@ impl DirectoryKey {
 #[cfg(test)]
 mod test {
     use super::*;
-    use xor_name::XorName;
+    use rand;
+    use routing::XorName;
     use maidsafe_utilities::serialisation::{serialise, deserialise};
-    use core::utility;
     use nfs::AccessLevel;
 
     /// Should be able to serialise & deserialise the DirectoryKey
     #[test]
     fn serailise_and_deserialise_directory_key() {
-        let id = XorName(unwrap_result!(utility::generate_random_array_u8_64()));
+        let id: XorName = rand::random();
         let tag = 10u64;
         let versioned = false;
         let access_level = AccessLevel::Private;
 
-        let directory_key = DirectoryKey::new(id.clone(), tag, versioned, access_level.clone());
+        let directory_key = DirectoryKey::new(id, tag, versioned, access_level.clone());
 
         let serialised = unwrap_result!(serialise(&directory_key));
         let deserilaised_key: DirectoryKey = unwrap_result!(deserialise(&serialised));

@@ -20,9 +20,8 @@ use std::sync::{Arc, Mutex};
 use core::client::Client;
 use core::errors::CoreError;
 use core::self_encryption_storage_error::SelfEncryptionStorageError;
-use routing::{ImmutableData, Data, DataIdentifier};
+use routing::{ImmutableData, Data, DataIdentifier, XorName, XOR_NAME_LEN};
 use self_encryption::Storage;
-use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network storage is the concrete type which self-encryption crate will use to put or get data
 /// from the network
@@ -54,7 +53,7 @@ impl Storage<SelfEncryptionStorageError> for SelfEncryptionStorage {
         }
 
         let mut client = self.client.lock().expect("Failed to lock client mutex.");
-        let immutable_data_request = DataIdentifier::Immutable(XorName::new(name_id));
+        let immutable_data_request = DataIdentifier::Immutable(XorName(name_id));
         match try!(try!(client.get(immutable_data_request, None)).get()) {
             Data::Immutable(ref received_data) => Ok(received_data.value().clone()),
             _ => {

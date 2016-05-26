@@ -18,21 +18,20 @@
 use std::sync::{Arc, Mutex};
 
 use core::utility;
-use xor_name::XorName;
 use core::client::Client;
 use core::errors::CoreError;
 use core::SelfEncryptionStorage;
 use self_encryption::{DataMap, SelfEncryptor};
 use sodiumoxide::crypto::box_::{PublicKey, SecretKey, Nonce};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
-use routing::{Data, DataIdentifier, ImmutableData};
+use routing::{Data, DataIdentifier, ImmutableData, XorName};
 
 // TODO(Spandan) Ask Routing to define this constant and use it from there
 const MAX_IMMUT_DATA_SIZE_IN_BYTES: usize = 1024 * 1024;
 
 #[derive(RustcEncodable, RustcDecodable)]
 enum DataTypeEncoding {
-    SerialisedDataMap(Vec<u8>),
+    Serialised(Vec<u8>),
     DataMap(DataMap),
 }
 
@@ -52,12 +51,11 @@ pub fn create(client: Arc<Mutex<Client>>,
     let mut immut_data = if let Some((public_key, secret_key, nonce)) = encryption_keys {
         let cipher_text =
             try!(utility::hybrid_encrypt(&serialised_data_map, nonce, public_key, secret_key));
-        let encoded_cipher_text =
-            try!(serialise(&DataTypeEncoding::SerialisedDataMap(cipher_text)));
+        let encoded_cipher_text = try!(serialise(&DataTypeEncoding::Serialised(cipher_text)));
         ImmutableData::new(encoded_cipher_text)
     } else {
         let encoded_plain_text =
-            try!(serialise(&DataTypeEncoding::SerialisedDataMap(serialised_data_map)));
+            try!(serialise(&DataTypeEncoding::Serialised(serialised_data_map)));
         ImmutableData::new(encoded_plain_text)
     };
 
@@ -93,7 +91,7 @@ pub fn get_data(client: Arc<Mutex<Client>>,
             }
 
             match try!(deserialise(&immut_data.value())) {
-                DataTypeEncoding::SerialisedDataMap(serialised_data_map) => {
+                DataTypeEncoding::Serialised(serialised_data_map) => {
                     let data_map = if let Some((public_key, secret_key, nonce)) = decryption_keys {
                         let plain_text = try!(utility::hybrid_decrypt(&serialised_data_map,
                                                                       nonce,

@@ -62,10 +62,10 @@ pub fn get_dns_configuaration_data(client: Arc<Mutex<Client>>)
     debug!("Reading dns configuration data from file ...");
     let mut reader = try!(file_helper.read(file));
     let size = reader.size();
-    if size != 0 {
-        Ok(try!(deserialise(&try!(reader.read(0, size)))))
-    } else {
+    if size == 0 {
         Ok(vec![])
+    } else {
+        Ok(try!(deserialise(&try!(reader.read(0, size)))))
     }
 }
 

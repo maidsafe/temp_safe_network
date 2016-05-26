@@ -40,16 +40,14 @@ extern crate safe_network_common;
 extern crate routing;
 extern crate safe_core;
 extern crate sodiumoxide;
-extern crate xor_name;
 #[macro_use]
 extern crate maidsafe_utilities;
 
 use safe_core::core::client::Client;
 use safe_core::core::client::response_getter::GetResponseGetter;
 
-use routing::Data;
-use xor_name::XorName;
-use sodiumoxide::crypto::hash::sha512;
+use routing::{Data, XorName};
+use sodiumoxide::crypto::hash::sha256;
 use safe_network_common::messaging::MpidMessageWrapper;
 use maidsafe_utilities::serialisation::deserialise;
 
@@ -170,7 +168,7 @@ fn messaging(client: &Client) {
     println!("\n------------ Creating mpid account, enter a memorable name ---------------");
     let mut account_name = String::new();
     let _ = std::io::stdin().read_line(&mut account_name);
-    let mpid_account = XorName(sha512::hash(&account_name.into_bytes()).0);
+    let mpid_account = XorName(sha256::hash(&account_name.into_bytes()).0);
     let response_getter = unwrap_result!(client.register_online(mpid_account));
 
     loop {
@@ -219,7 +217,7 @@ fn send_mpid_message(client: &Client, mpid_account: XorName) {
     let mut msg_content = String::new();
     println!("\n------------ enter receiver's memorable name ---------------");
     let _ = std::io::stdin().read_line(&mut receiver_name);
-    let receiver_account = XorName(sha512::hash(&receiver_name.into_bytes()).0);
+    let receiver_account = XorName(sha256::hash(&receiver_name.into_bytes()).0);
     println!("\n------------ enter metadata of the message ---------------");
     let _ = std::io::stdin().read_line(&mut msg_metadata);
     println!("\n------------ enter content of the message ---------------");

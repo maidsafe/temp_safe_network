@@ -20,7 +20,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::mpsc;
 
 use core::SelfEncryptionStorageError;
-use routing::{DataIdentifier, Data};
+use routing::DataIdentifier;
 use safe_network_common::messaging;
 use safe_network_common::client_errors::{GetError, MutationError};
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -74,8 +74,8 @@ pub enum CoreError {
     },
     /// Performing a network mutating operation such as PUT/POST/DELETE failed
     MutationFailure {
-        /// Original data that was sent to the network
-        data: Data,
+        /// Orignal data that was sent to the network
+        data_id: DataIdentifier,
         /// Reason for failure
         reason: MutationError,
     },
@@ -239,11 +239,11 @@ impl Debug for CoreError {
                        reason,
                        data_id)
             }
-            CoreError::MutationFailure { ref data, ref reason } => {
+            CoreError::MutationFailure { ref data_id, ref reason } => {
                 write!(formatter,
-                       "CoreError::MutationFailure::{{ reason: {:?}, data: {:?}}}",
+                       "CoreError::MutationFailure::{{ reason: {:?}, data_id: {:?}}}",
                        reason,
-                       data)
+                       data_id)
             }
             CoreError::SelfEncryption(ref error) => {
                 write!(formatter, "CoreError::SelfEncryption -> {:?}", error)

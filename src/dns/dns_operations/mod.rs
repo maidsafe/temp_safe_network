@@ -18,8 +18,7 @@
 use std::convert::From;
 use std::sync::{Arc, Mutex};
 
-use xor_name::XorName;
-use routing::{Data, DataIdentifier, StructuredData};
+use routing::{Data, DataIdentifier, StructuredData, XorName};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use core::client::Client;
 use dns::errors::DnsError;
@@ -28,7 +27,7 @@ use nfs::metadata::directory_key::DirectoryKey;
 use core::errors::CoreError;
 use core::structured_data_operations::unversioned;
 use sodiumoxide::crypto::{sign, box_};
-use sodiumoxide::crypto::hash::sha512;
+use sodiumoxide::crypto::hash::sha256;
 use safe_network_common::TYPE_TAG_DNS_PACKET;
 use safe_network_common::client_errors::MutationError;
 
@@ -75,7 +74,7 @@ impl DnsOperations {
         if saved_configs.iter().any(|config| config.long_name == long_name) {
             Err(DnsError::DnsNameAlreadyRegistered)
         } else {
-            let identifier = XorName::new(sha512::hash(long_name.as_bytes()).0);
+            let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
 
             let dns_record = Dns {
                 long_name: long_name.clone(),
@@ -315,7 +314,7 @@ impl DnsOperations {
     }
 
     fn get_housing_structured_data(&self, long_name: &String) -> Result<StructuredData, DnsError> {
-        let identifier = XorName::new(sha512::hash(long_name.as_bytes()).0);
+        let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
         let request = DataIdentifier::Structured(identifier, TYPE_TAG_DNS_PACKET);
         debug!("Retrieving structured data from network for {:?} dns ...",
                long_name);
@@ -350,7 +349,7 @@ mod test {
     use core::client::Client;
     use core::utility::test_utils;
 
-    use xor_name::XorName;
+    use routing::{XorName, XOR_NAME_LEN};
     use sodiumoxide::crypto::box_;
 
     #[test]
@@ -438,13 +437,21 @@ mod test {
         let dns_name = unwrap_result!(utility::generate_random_string(10));
         let messaging_keypair = box_::gen_keypair();
 
-        let mut services =
-            vec![("www".to_string(),
-                  DirectoryKey::new(XorName::new([123; 64]), 15000, false, AccessLevel::Public)),
-                 ("blog".to_string(),
-                  DirectoryKey::new(XorName::new([123; 64]), 15000, false, AccessLevel::Public)),
-                 ("bad-ass".to_string(),
-                  DirectoryKey::new(XorName::new([123; 64]), 15000, false, AccessLevel::Public))];
+        let mut services = vec![("www".to_string(),
+                                 DirectoryKey::new(XorName([123; XOR_NAME_LEN]),
+                                                   15000,
+                                                   false,
+                                                   AccessLevel::Public)),
+                                ("blog".to_string(),
+                                 DirectoryKey::new(XorName([123; XOR_NAME_LEN]),
+                                                   15000,
+                                                   false,
+                                                   AccessLevel::Public)),
+                                ("bad-ass".to_string(),
+                                 DirectoryKey::new(XorName([123; XOR_NAME_LEN]),
+                                                   15000,
+                                                   false,
+                                                   AccessLevel::Public))];
 
         let owners = vec![unwrap_result!(unwrap_result!(client.lock()).get_public_signing_key())
                               .clone()];
@@ -519,7 +526,7 @@ mod test {
 
         // Add a service
         services.push(("added-service".to_string(),
-                       DirectoryKey::new(XorName::new([126; 64]),
+                       DirectoryKey::new(XorName([126; XOR_NAME_LEN]),
                                          15000,
                                          false,
                                          AccessLevel::Public)));

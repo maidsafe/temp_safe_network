@@ -15,10 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use xor_name::XorName;
+use routing::XorName;
 use core::errors::CoreError;
 use sodiumoxide::crypto::{box_, sign};
-use sodiumoxide::crypto::hash::sha512;
+use sodiumoxide::crypto::hash::sha256;
 use core::id::revocation_id_type::RevocationIdType;
 
 /// IdType
@@ -64,7 +64,7 @@ impl IdType {
         for i in self.type_tag.to_string().into_bytes().into_iter() {
             combined.push(i);
         }
-        XorName(sha512::hash(&combined).0)
+        XorName(sha256::hash(&combined).0)
     }
 
     /// Returns the PublicKeys
@@ -79,14 +79,14 @@ impl IdType {
 
     /// Signs the data with the SecretKey and returns the Signed data
     pub fn sign(&self, data: &[u8]) -> Vec<u8> {
-        return sign::sign(&data, &self.secret_keys.0);
+        sign::sign(&data, &self.secret_keys.0)
     }
 
     /// Encrypts and authenticates data. It returns a ciphertext and the Nonce.
     pub fn seal(&self, data: &[u8], to: &box_::PublicKey) -> (Vec<u8>, box_::Nonce) {
         let nonce = box_::gen_nonce();
         let sealed = box_::seal(data, &nonce, &to, &self.secret_keys.1);
-        return (sealed, nonce);
+        (sealed, nonce)
     }
 
     /// Verifies and decrypts the data

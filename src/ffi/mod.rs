@@ -367,25 +367,23 @@ fn get_parameter_packet<D>(client: Arc<Mutex<Client>>,
 {
 
     let module: String =
-        try!(parse_result!(json_decoder.read_struct_field("module", 0, |d| Decodable::decode(d)),
+        try!(parse_result!(json_decoder.read_struct_field("module", 0, Decodable::decode),
                            ""));
     let action: String =
-        try!(parse_result!(json_decoder.read_struct_field("action", 1, |d| Decodable::decode(d)),
+        try!(parse_result!(json_decoder.read_struct_field("action", 1, Decodable::decode),
                            ""));
     let base64_safe_drive_dir_key: Option<String> =
-        json_decoder.read_struct_field("safe_drive_dir_key", 2, |d| Decodable::decode(d))
+        json_decoder.read_struct_field("safe_drive_dir_key", 2, Decodable::decode)
             .ok();
 
     let base64_app_dir_key: Option<String> =
-        json_decoder.read_struct_field("app_dir_key", 3, |d| Decodable::decode(d))
+        json_decoder.read_struct_field("app_dir_key", 3, Decodable::decode)
             .ok();
     let safe_drive_access: bool = if base64_safe_drive_dir_key.is_none() {
         false
     } else {
-        try!(parse_result!(json_decoder.read_struct_field("safe_drive_access",
-                                                          4,
-                                                          |d| Decodable::decode(d)),
-                           ""))
+        try!(parse_result!(
+                json_decoder.read_struct_field("safe_drive_access", 4, Decodable::decode), ""))
     };
     let app_root_dir_key: Option<DirectoryKey> = if let Some(app_dir_key) = base64_app_dir_key {
         let serialised_app_dir_key: Vec<u8> = try!(parse_result!(app_dir_key[..].from_base64(),

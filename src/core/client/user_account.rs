@@ -16,10 +16,10 @@
 // relating to use of the SAFE Network Software.
 
 use core::errors::CoreError;
-use xor_name::XorName;
+use routing::{XorName, XOR_NAME_LEN};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::secretbox;
-use sodiumoxide::crypto::hash::{sha256, sha512};
+use sodiumoxide::crypto::hash::sha256;
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use core::id::{IdType, PublicIdType, RevocationIdType, MaidTypeTags, MpidTypeTags};
 
@@ -69,7 +69,7 @@ impl Account {
     /// Generate User's Identity for the network using supplied credentials in a deterministic way.
     /// This is similar to the username in various places.
     pub fn generate_network_id(keyword: &[u8], pin: &[u8]) -> Result<XorName, CoreError> {
-        let mut id = XorName::new([0; 64]);
+        let mut id = XorName([0; XOR_NAME_LEN]);
         try!(Account::derive_key(&mut id.0[..], keyword, pin));
 
         Ok(id)
@@ -195,8 +195,8 @@ impl Account {
                 for it in salt_bytes.iter_mut().enumerate() {
                     *it.1 = hashed_pin.0[it.0];
                 }
-            } else if salt_bytes.len() == sha512::DIGESTBYTES {
-                let hashed_pin = sha512::hash(user_salt);
+            } else if salt_bytes.len() == sha256::DIGESTBYTES {
+                let hashed_pin = sha256::hash(user_salt);
                 for it in salt_bytes.iter_mut().enumerate() {
                     *it.1 = hashed_pin.0[it.0];
                 }

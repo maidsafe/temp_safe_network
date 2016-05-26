@@ -15,9 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use xor_name::XorName;
+use routing::XorName;
 use sodiumoxide::crypto::{box_, sign};
-use sodiumoxide::crypto::hash::sha512;
+use sodiumoxide::crypto::hash::sha256;
 use core::id::{IdType, RevocationIdType};
 
 /// PublicIdType
@@ -95,7 +95,7 @@ impl PublicIdType {
         for i in 0..sign::SIGNATUREBYTES {
             combined.push(self.signature.0[i]);
         }
-        XorName(sha512::hash(&combined).0)
+        XorName(sha256::hash(&combined).0)
     }
 
     /// Returns the PublicKeys

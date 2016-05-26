@@ -126,26 +126,18 @@ impl Decodable for FileMetadata {
     fn decode<D: Decoder>(d: &mut D) -> Result<FileMetadata, D::Error> {
         d.read_struct("FileMetadata", 8, |d| {
             Ok(FileMetadata {
-                name: try!(d.read_struct_field("name", 0, |d| Decodable::decode(d))),
-                size: try!(d.read_struct_field("size", 1, |d| Decodable::decode(d))),
+                name: try!(d.read_struct_field("name", 0, Decodable::decode)),
+                size: try!(d.read_struct_field("size", 1, Decodable::decode)),
                 created_time: ::time::at_utc(Timespec {
-                    sec: try!(d.read_struct_field("created_time_sec", 2, |d| Decodable::decode(d))),
-                    nsec: try!(d.read_struct_field("created_time_nsec",
-                                                   3,
-                                                   |d| Decodable::decode(d))),
+                    sec: try!(d.read_struct_field("created_time_sec", 2, Decodable::decode)),
+                    nsec: try!(d.read_struct_field("created_time_nsec", 3, Decodable::decode)),
                 }),
                 modified_time: ::time::at_utc(Timespec {
-                    sec: try!(d.read_struct_field("modified_time_sec",
-                                                  4,
-                                                  |d| Decodable::decode(d))),
-                    nsec: try!(d.read_struct_field("modified_time_nsec",
-                                                   5,
-                                                   |d| Decodable::decode(d))),
+                    sec: try!(d.read_struct_field("modified_time_sec", 4, Decodable::decode)),
+                    nsec: try!(d.read_struct_field("modified_time_nsec", 5, Decodable::decode)),
                 }),
-                user_metadata: try!(d.read_struct_field("user_metadata",
-                                                        6,
-                                                        |d| Decodable::decode(d))),
-                version: try!(d.read_struct_field("version", 7, |d| Decodable::decode(d))),
+                user_metadata: try!(d.read_struct_field("user_metadata", 6, Decodable::decode)),
+                version: try!(d.read_struct_field("version", 7, Decodable::decode)),
             })
         })
     }

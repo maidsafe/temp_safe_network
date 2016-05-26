@@ -16,11 +16,10 @@
 // relating to use of the SAFE Network Software.
 
 use core::client::Client;
-use xor_name::XorName;
 use core::errors::CoreError;
 use sodiumoxide::crypto::sign;
 use maidsafe_utilities::serialisation::{serialise, deserialise};
-use routing::{StructuredData, ImmutableData, Data, DataIdentifier};
+use routing::{StructuredData, ImmutableData, Data, DataIdentifier, XorName};
 use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_structured_data};
 
 /// Create the StructuredData to manage versioned data.
@@ -119,7 +118,8 @@ fn get_immutable_data(client: &mut Client,
 #[cfg(test)]
 mod test {
     use super::*;
-    use xor_name::XorName;
+    use rand;
+    use routing::XorName;
     use core::utility;
 
     const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1001;
@@ -128,12 +128,12 @@ mod test {
     fn save_and_retrieve_immutable_data() {
         let mut client = unwrap_result!(utility::test_utils::get_client());
 
-        let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
+        let id: XorName = rand::random();
         let owners = utility::test_utils::generate_public_keys(1);
         let prev_owners = Vec::new();
         let ref secret_key = utility::test_utils::generate_secret_keys(1)[0];
 
-        let version_0 = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
+        let version_0: XorName = rand::random();
 
         let mut structured_data_result = create(&client,
                                                 version_0.clone(),
@@ -149,7 +149,7 @@ mod test {
         let mut versions = unwrap_result!(versions_res);
         assert_eq!(versions.len(), 1);
 
-        let version_1 = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
+        let version_1: XorName = rand::random();
 
         structured_data_result =
             append_version(&mut client, structured_data, version_1.clone(), secret_key);

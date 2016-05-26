@@ -38,10 +38,12 @@
 #![allow(unused_extern_crates)]#[macro_use]
 extern crate maidsafe_utilities;
 extern crate time;
+extern crate routing;
 extern crate safe_core;
 
 use std::sync::{Arc, Mutex};
 
+use routing::XOR_NAME_LEN;
 use safe_core::core::client::Client;
 use safe_core::nfs::{self, AccessLevel};
 use safe_core::nfs::errors::NfsError;
@@ -107,13 +109,13 @@ fn get_user_string(placeholder: &str) -> String {
     txt
 }
 
-fn format_version_id(version_id: &[u8; 64]) -> String {
+fn format_version_id(version_id: &[u8; XOR_NAME_LEN]) -> String {
     let mut version = String::new();
     for j in 0..4 {
         version.push_str(&version_id[j].to_string()[..]);
     }
     version.push_str("..");
-    for j in 60..64 {
+    for j in (XOR_NAME_LEN - 4)..XOR_NAME_LEN {
         version.push_str(&version_id[j].to_string()[..]);
     }
     version

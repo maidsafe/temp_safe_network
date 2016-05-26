@@ -35,15 +35,15 @@ use core::utility;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
 
-use xor_name::XorName;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
 use maidsafe_utilities::serialisation::serialise;
 use safe_network_common::TYPE_TAG_SESSION_PACKET;
 use safe_network_common::messaging::{MpidMessage, MpidMessageWrapper};
-use routing::{MessageId, FullId, StructuredData, Data, DataIdentifier, PlainData, Authority};
+use routing::{MessageId, FullId, StructuredData, Data, DataIdentifier, PlainData, Authority,
+              XorName};
 
 use sodiumoxide::crypto::{box_, sign};
-use sodiumoxide::crypto::hash::{sha256, sha512};
+use sodiumoxide::crypto::hash::sha256;
 
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
@@ -119,8 +119,8 @@ impl Client {
             _ => return Err(CoreError::OperationAborted),
         }
 
-        let hash_sign_key = sha512::hash(&(account_packet.get_maid().public_keys().0).0);
-        let client_manager_addr = XorName::new(hash_sign_key.0);
+        let hash_sign_key = sha256::hash(&(account_packet.get_maid().public_keys().0).0);
+        let client_manager_addr = XorName(hash_sign_key.0);
 
         let client = Client {
             account: Some(account_packet),
@@ -200,11 +200,11 @@ impl Client {
                 _ => return Err(CoreError::OperationAborted),
             }
 
-            let hash_sign_key = sha512::hash(&(decrypted_session_packet.get_maid()
+            let hash_sign_key = sha256::hash(&(decrypted_session_packet.get_maid()
                     .public_keys()
                     .0)
                 .0);
-            let client_manager_addr = XorName::new(hash_sign_key.0);
+            let client_manager_addr = XorName(hash_sign_key.0);
 
             let client = Client {
                 account: Some(decrypted_session_packet),
@@ -626,9 +626,9 @@ mod test {
     use core::errors::CoreError;
     use core::client::response_getter::GetResponseGetter;
 
-    use xor_name::XorName;
+    use rand;
+    use routing::{ImmutableData, DataIdentifier, Data, StructuredData, XorName, XOR_NAME_LEN};
     use safe_network_common::client_errors::MutationError;
-    use routing::{ImmutableData, DataIdentifier, Data, StructuredData};
 
     #[test]
     fn account_creation() {
@@ -702,7 +702,7 @@ mod test {
         assert_eq!(rxd_data, orig_data);
 
         // Operations Not Allowed for Unregistered Client
-        let rand_name = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
+        let rand_name: XorName = rand::random();
 
         match (unregistered_client.set_user_root_directory_id(rand_name.clone()),
                unregistered_client.set_configuration_root_directory_id(rand_name)) {
@@ -725,7 +725,7 @@ mod test {
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
 
-        let root_dir_id = XorName::new([99u8; 64]);
+        let root_dir_id = XorName([99u8; XOR_NAME_LEN]);
         unwrap_result!(client.set_user_root_directory_id(root_dir_id.clone()));
 
         // Correct Credentials - Login Should Pass
@@ -750,7 +750,7 @@ mod test {
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
 
-        let root_dir_id = XorName::new([99u8; 64]);
+        let root_dir_id = XorName([99u8; XOR_NAME_LEN]);
         unwrap_result!(client.set_configuration_root_directory_id(root_dir_id.clone()));
 
         // Correct Credentials - Login Should Pass
@@ -863,7 +863,7 @@ mod test {
         // Version Caching should NOT work for StructuredData
         {
             const TYPE_TAG: u64 = 15000;
-            let id = XorName::new(unwrap_result!(utility::generate_random_array_u8_64()));
+            let id: XorName = rand::random();
 
             let struct_data = unwrap_result!(StructuredData::new(TYPE_TAG,
                                                                  id.clone(),

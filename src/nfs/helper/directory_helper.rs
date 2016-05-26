@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 
 use nfs::errors::NfsError;
 use nfs::directory_listing::DirectoryListing;
-use xor_name::XorName;
+use routing::XorName;
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::{ImmutableData, StructuredData, Data, DataIdentifier};

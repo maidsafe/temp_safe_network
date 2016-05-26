@@ -22,7 +22,7 @@ use sodiumoxide::crypto::box_;
 
 use nfs::errors::NfsError;
 use nfs::file::File;
-use xor_name::XorName;
+use routing::XorName;
 use maidsafe_utilities::serialisation::{serialise, deserialise};
 use nfs::AccessLevel;
 use nfs::metadata::directory_key::DirectoryKey;
