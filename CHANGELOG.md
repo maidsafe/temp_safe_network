@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.15.0]
+- Upgrade to new routing and self_encryption.
+
 ## [0.14.6]
 - Merge safe_ffi into safe_core.
 
