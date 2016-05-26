@@ -15,9 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use xor_name::XorName;
+use routing::XorName;
 use sodiumoxide::crypto::sign;
-use sodiumoxide::crypto::hash::sha512;
+use sodiumoxide::crypto::hash::sha256;
 use core::id::IdTypeTags;
 
 /// RevocationIdType
@@ -65,7 +65,7 @@ impl RevocationIdType {
         for i in self.type_tags.0.to_string().into_bytes().into_iter() {
             combined.push(i);
         }
-        XorName(sha512::hash(&combined).0)
+        XorName(sha256::hash(&combined).0)
     }
 
     /// Returns type tags
@@ -90,7 +90,7 @@ impl RevocationIdType {
 
     /// Signs the data with the SecretKey of the AnMaid and recturns the Signed Data
     pub fn sign(&self, data: &[u8]) -> Vec<u8> {
-        return sign::sign(&data, &self.secret_key);
+        sign::sign(&data, &self.secret_key)
     }
 }
 

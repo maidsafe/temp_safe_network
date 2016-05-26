@@ -97,8 +97,8 @@ fn main() {
     unwrap_result!(maidsafe_utilities::log::init(true));
 
     let args: Args = Docopt::new(USAGE)
-                         .and_then(|docopt| docopt.decode())
-                         .unwrap_or_else(|error| error.exit());
+        .and_then(|docopt| docopt.decode())
+        .unwrap_or_else(|error| error.exit());
 
     let immutable_data_count = unwrap_option!(args.flag_immutable, "");
     let structured_data_count = unwrap_option!(args.flag_structured, "");

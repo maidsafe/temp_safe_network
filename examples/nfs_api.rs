@@ -38,10 +38,12 @@
 #![allow(unused_extern_crates)]#[macro_use]
 extern crate maidsafe_utilities;
 extern crate time;
+extern crate routing;
 extern crate safe_core;
 
 use std::sync::{Arc, Mutex};
 
+use routing::XOR_NAME_LEN;
 use safe_core::core::client::Client;
 use safe_core::nfs::{self, AccessLevel};
 use safe_core::nfs::errors::NfsError;
@@ -107,29 +109,33 @@ fn get_user_string(placeholder: &str) -> String {
     txt
 }
 
-fn format_version_id(version_id: &[u8; 64]) -> String {
+fn format_version_id(version_id: &[u8; XOR_NAME_LEN]) -> String {
     let mut version = String::new();
     for j in 0..4 {
         version.push_str(&version_id[j].to_string()[..]);
     }
     version.push_str("..");
-    for j in 60..64 {
+    for j in (XOR_NAME_LEN - 4)..XOR_NAME_LEN {
         version.push_str(&version_id[j].to_string()[..]);
     }
     version
 }
 
-fn get_child_directory(client: Arc<Mutex<Client>>, directory: &mut DirectoryListing)
-        -> Result<DirectoryListing, NfsError> {
+fn get_child_directory(client: Arc<Mutex<Client>>,
+                       directory: &mut DirectoryListing)
+                       -> Result<DirectoryListing, NfsError> {
     let ref directory_name = get_user_string("Directory name");
-    let directory_metadata = try!(directory.find_sub_directory(directory_name).ok_or(NfsError::DirectoryNotFound));
+    let directory_metadata = try!(directory.find_sub_directory(directory_name)
+        .ok_or(NfsError::DirectoryNotFound));
     let directory_helper = DirectoryHelper::new(client);
 
     directory_helper.get(directory_metadata.get_key())
 }
 
-fn directory_operation(option: u32, client: Arc<Mutex<Client>>, mut directory: &mut DirectoryListing)
-        -> Result<(), NfsError> {
+fn directory_operation(option: u32,
+                       client: Arc<Mutex<Client>>,
+                       mut directory: &mut DirectoryListing)
+                       -> Result<(), NfsError> {
     match option {
         1 => {
             // Create directory
@@ -189,8 +195,7 @@ fn directory_operation(option: u32, client: Arc<Mutex<Client>>, mut directory: &
                 println!("\t =========================       ==========");
                 for metatata in directory_metadata {
                     println!("\t {:?} \t {}",
-                             time::strftime("%d-%m-%Y %H:%M UTC",
-                                            &metatata.get_created_time())
+                             time::strftime("%d-%m-%Y %H:%M UTC", &metatata.get_created_time())
                                  .unwrap(),
                              metatata.get_name());
                 }
@@ -216,7 +221,8 @@ fn directory_operation(option: u32, client: Arc<Mutex<Client>>, mut directory: &
         4 => {
             // Delete directory
             let directory_helper = DirectoryHelper::new(client.clone());
-            let _ = try!(directory_helper.delete(&mut directory, &get_user_string("Directory name")));
+            let _ =
+                try!(directory_helper.delete(&mut directory, &get_user_string("Directory name")));
             println!("Directory deleted");
         }
         _ => {}
@@ -224,21 +230,26 @@ fn directory_operation(option: u32, client: Arc<Mutex<Client>>, mut directory: &
     Ok(())
 }
 
-fn file_operation(option: u32, client: Arc<Mutex<Client>>, directory: &mut DirectoryListing) -> Result<(), NfsError> {
+fn file_operation(option: u32,
+                  client: Arc<Mutex<Client>>,
+                  directory: &mut DirectoryListing)
+                  -> Result<(), NfsError> {
     match option {
         5 => {
             // List files
             let directory = try!(get_child_directory(client, directory));
             let files: Vec<File> = directory.get_files().clone();
             if files.is_empty() {
-                println!("No Files found in Directory - {}", directory.get_metadata().get_name());
+                println!("No Files found in Directory - {}",
+                         directory.get_metadata().get_name());
             } else {
                 println!("List of Files");
                 println!("\t        Modified On                Name ");
                 println!("\t =========================      ===========");
                 for file in files {
                     println!("\t {:?} \t {}",
-                             time::strftime("%d-%m-%Y %H:%M UTC", &file.get_metadata().get_modified_time())
+                             time::strftime("%d-%m-%Y %H:%M UTC",
+                                            &file.get_metadata().get_modified_time())
                                  .unwrap(),
                              file.get_name());
                 }
@@ -248,10 +259,11 @@ fn file_operation(option: u32, client: Arc<Mutex<Client>>, directory: &mut Direc
             // Create file
             let directory = try!(get_child_directory(client.clone(), directory));
             let data = get_user_string("text to be saved as a file").into_bytes();
-            let file_helper = FileHelper::new(client);
-            let mut writer = try!(file_helper.create(get_user_string("File name"), vec![], directory));
+            let mut file_helper = FileHelper::new(client);
+            let mut writer =
+                try!(file_helper.create(get_user_string("File name"), vec![], directory));
 
-            writer.write(&data[..], 0);
+            try!(writer.write(&data[..], 0));
             let _ = try!(writer.close());
             println!("File created");
         }
@@ -264,9 +276,10 @@ fn file_operation(option: u32, client: Arc<Mutex<Client>>, directory: &mut Direc
                 return Err(NfsError::FileNotFound);
             };
             let data = get_user_string("text to be saved as a file").into_bytes();
-            let file_helper = FileHelper::new(client);
-            let mut writer = try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory.clone()));
-            writer.write(&data[..], 0);
+            let mut file_helper = FileHelper::new(client);
+            let mut writer =
+                try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory.clone()));
+            try!(writer.write(&data[..], 0));
             let _ = try!(writer.close());
             println!("File Updated");
         }
@@ -278,8 +291,8 @@ fn file_operation(option: u32, client: Arc<Mutex<Client>>, directory: &mut Direc
             } else {
                 return Err(NfsError::FileNotFound);
             };
-            let file_helper = FileHelper::new(client);
-            let mut reader = file_helper.read(file);
+            let mut file_helper = FileHelper::new(client);
+            let mut reader = try!(file_helper.read(file));
             let data_read = try!(reader.read(0, file.get_metadata().get_size()));
 
             match String::from_utf8(data_read) {
@@ -295,7 +308,7 @@ fn file_operation(option: u32, client: Arc<Mutex<Client>>, directory: &mut Direc
             let directory = try!(get_child_directory(client.clone(), directory));
             let file_name = get_user_string("File name");
             let file = try!(directory.find_file(&file_name).ok_or(NfsError::FileNotFound));
-            let file_helper = FileHelper::new(client);
+            let mut file_helper = FileHelper::new(client);
             let versions = try!(file_helper.get_versions(&file, &directory));
             let ref file_version;
             if versions.len() == 1 {
@@ -305,12 +318,13 @@ fn file_operation(option: u32, client: Arc<Mutex<Client>>, directory: &mut Direc
                 for i in 0..versions.len() {
                     println!("\t{} Modified at {:?}",
                              i + 1,
-                             time::strftime("%d-%m-%Y %H:%M UTC", &versions[i].get_metadata().get_modified_time())
+                             time::strftime("%d-%m-%Y %H:%M UTC",
+                                            &versions[i].get_metadata().get_modified_time())
                                  .unwrap())
                 }
                 match get_user_string("Number corresponding to the version")
-                          .trim()
-                          .parse::<usize>() {
+                    .trim()
+                    .parse::<usize>() {
                     Ok(index) => file_version = &versions[index - 1],
                     Err(_) => {
                         println!("Invalid input : Fetching latest version");
@@ -319,7 +333,7 @@ fn file_operation(option: u32, client: Arc<Mutex<Client>>, directory: &mut Direc
                 }
             }
 
-            let mut reader = file_helper.read(file_version);
+            let mut reader = try!(file_helper.read(file_version));
             let data_read = try!(reader.read(0, file_version.get_metadata().get_size()));
 
             match String::from_utf8(data_read) {
@@ -348,13 +362,15 @@ fn file_operation(option: u32, client: Arc<Mutex<Client>>, directory: &mut Direc
                 println!("No directories found");
                 return Ok(());
             } else {
-                match directory_metadata.iter().find(|metadata| *metadata.get_name() == to_dir_name) {
+                match directory_metadata.iter()
+                    .find(|metadata| *metadata.get_name() == to_dir_name) {
                     Some(to_dir) => {
                         if from_directory.get_key() == to_dir.get_key() {
                             return Err(NfsError::DestinationAndSourceAreSame);
                         }
                         let file_name = &get_user_string("File name");
-                        let file = try!(from_directory.find_file(file_name).ok_or(NfsError::FileNotFound));
+                        let file = try!(from_directory.find_file(file_name)
+                            .ok_or(NfsError::FileNotFound));
                         let directory_helper = DirectoryHelper::new(client);
                         let mut destination = try!(directory_helper.get(to_dir.get_key()));
                         if destination.find_file(file_name).is_some() {
@@ -403,7 +419,9 @@ fn main() {
                 Ok(selection) => {
                     match selection {
                         1...4 => {
-                            match directory_operation(selection, client.clone(), &mut root_directory) {
+                            match directory_operation(selection,
+                                                      client.clone(),
+                                                      &mut root_directory) {
                                 Err(msg) => println!("Failed: {:?}", msg),
                                 Ok(_) => (),
                             }

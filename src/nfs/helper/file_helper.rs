@@ -25,17 +25,22 @@ use nfs::helper::reader::Reader;
 use nfs::helper::writer::{Mode, Writer};
 use nfs::metadata::file_metadata::FileMetadata;
 use core::client::Client;
+use core::SelfEncryptionStorage;
 use self_encryption::DataMap;
 
 /// File provides helper functions to perform Operations on Files
 pub struct FileHelper {
     client: Arc<Mutex<Client>>,
+    storage: SelfEncryptionStorage,
 }
 
 impl FileHelper {
     /// Create a new FileHelper instance
     pub fn new(client: Arc<Mutex<Client>>) -> FileHelper {
-        FileHelper { client: client }
+        FileHelper {
+            client: client.clone(),
+            storage: SelfEncryptionStorage::new(client),
+        }
     }
 
     /// Helper function to create a file in a directory listing
@@ -43,7 +48,7 @@ impl FileHelper {
     /// can be written to the network
     /// The file is actually saved in the directory listing only after
     /// `writer.close()` is invoked
-    pub fn create(&self,
+    pub fn create(&mut self,
                   name: String,
                   user_metatdata: Vec<u8>,
                   parent_directory: DirectoryListing)
@@ -52,7 +57,11 @@ impl FileHelper {
             Some(_) => Err(NfsError::FileAlreadyExistsWithSameName),
             None => {
                 let file = try!(File::new(FileMetadata::new(name, user_metatdata), DataMap::None));
-                Ok(Writer::new(self.client.clone(), Mode::Overwrite, parent_directory, file))
+                Ok(try!(Writer::new(self.client.clone(),
+                                    &mut self.storage,
+                                    Mode::Overwrite,
+                                    parent_directory,
+                                    file)))
             }
         }
     }
@@ -77,8 +86,9 @@ impl FileHelper {
                            -> Result<Option<DirectoryListing>, NfsError> {
         {
             let existing_file = try!(parent_directory.find_file_by_id(file.get_id())
-                                                     .ok_or(NfsError::FileNotFound));
-            if existing_file.get_name() != file.get_name() && parent_directory.find_file(file.get_name()).is_some() {
+                .ok_or(NfsError::FileNotFound));
+            if existing_file.get_name() != file.get_name() &&
+               parent_directory.find_file(file.get_name()).is_some() {
                 return Err(NfsError::FileAlreadyExistsWithSameName);
             }
         }
@@ -92,41 +102,49 @@ impl FileHelper {
     /// can be written to the network
     /// The file is actually saved in the directory listing only after
     /// `writer.close()` is invoked
-    pub fn update_content(&self,
+    pub fn update_content(&mut self,
                           file: File,
                           mode: Mode,
                           parent_directory: DirectoryListing)
                           -> Result<Writer, NfsError> {
         {
             let existing_file = try!(parent_directory.find_file(file.get_name())
-                                                     .ok_or(NfsError::FileNotFound));
+                .ok_or(NfsError::FileNotFound));
             if *existing_file != file {
                 return Err(NfsError::FileDoesNotMatch);
             }
         }
-        Ok(Writer::new(self.client.clone(), mode, parent_directory, file))
+        Ok(try!(Writer::new(self.client.clone(),
+                            &mut self.storage,
+                            mode,
+                            parent_directory,
+                            file)))
     }
 
 
     /// Return the versions of a directory containing modified versions of a file
-    pub fn get_versions(&self, file: &File, parent_directory: &DirectoryListing) -> Result<Vec<File>, NfsError> {
+    pub fn get_versions(&self,
+                        file: &File,
+                        parent_directory: &DirectoryListing)
+                        -> Result<Vec<File>, NfsError> {
         let mut versions = Vec::<File>::new();
         let directory_helper = DirectoryHelper::new(self.client.clone());
 
         let sdv_versions = try!(directory_helper.get_versions(parent_directory.get_key().get_id(),
                                                               parent_directory.get_key()
-                                                                              .get_type_tag()));
+                                                                  .get_type_tag()));
 
         // Because Version 0 is invalid, so can be made an initial comparison value
         let mut file_version = 0;
         for version_id in sdv_versions {
-            let directory_listing = try!(directory_helper.get_by_version(parent_directory.get_key().get_id(),
-                                                                         parent_directory.get_key()
-                                                                                         .get_access_level(),
-                                                                         version_id.clone()));
+            let directory_listing =
+                try!(directory_helper.get_by_version(parent_directory.get_key().get_id(),
+                                                     parent_directory.get_key()
+                                                         .get_access_level(),
+                                                     version_id.clone()));
             if let Some(file) = directory_listing.get_files()
-                                                 .iter()
-                                                 .find(|&entry| entry.get_name() == file.get_name()) {
+                .iter()
+                .find(|&entry| entry.get_name() == file.get_name()) {
                 if file.get_metadata().get_version() != file_version {
                     file_version = file.get_metadata().get_version();
                     versions.push(file.clone());
@@ -137,8 +155,8 @@ impl FileHelper {
     }
 
     /// Returns a reader for reading the file contents
-    pub fn read<'a>(&self, file: &'a File) -> Reader<'a> {
-        Reader::new(self.client.clone(), file)
+    pub fn read<'a>(&'a mut self, file: &'a File) -> Result<Reader<'a>, NfsError> {
+        Reader::new(self.client.clone(), &mut self.storage, file)
     }
 }
 
@@ -162,17 +180,18 @@ mod test {
         let client = get_client();
         let dir_helper = DirectoryHelper::new(client.clone());
         let (mut directory, _) = unwrap_result!(dir_helper.create("DirName".to_string(),
-                                                                  ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                                                                  Vec::new(),
-                                                                  true,
-                                                                  AccessLevel::Private,
-                                                                  None));
-        let file_helper = FileHelper::new(client.clone());
+                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                    Vec::new(),
+                    true,
+                    AccessLevel::Private,
+                    None));
+        let mut file_helper = FileHelper::new(client.clone());
         let file_name = "hello.txt".to_string();
         {
             // create
-            let mut writer = unwrap_result!(file_helper.create(file_name.clone(), Vec::new(), directory));
-            writer.write(&vec![0u8; 100], 0);
+            let mut writer =
+                unwrap_result!(file_helper.create(file_name.clone(), Vec::new(), directory));
+            writer.write(&vec![0u8; 100], 0).expect("");
             let (updated_directory, _) = unwrap_result!(writer.close());
             directory = updated_directory;
             assert!(directory.find_file(&file_name).is_some());
@@ -180,7 +199,7 @@ mod test {
         {
             // read
             let file = unwrap_option!(directory.find_file(&file_name), "File not found");
-            let mut reader = file_helper.read(file);
+            let mut reader = file_helper.read(file).expect("");
             let size = reader.size();
             assert_eq!(unwrap_result!(reader.read(0, size)), vec![0u8; 100]);
         }
@@ -188,12 +207,15 @@ mod test {
             // update - full rewrite
             let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
                                       "File not found");
-            let mut writer = unwrap_result!(file_helper.update_content(file, Mode::Overwrite, directory));
-            writer.write(&vec![1u8; 50], 0);
-            let (updated_directory, _) = unwrap_result!(writer.close());
-            directory = updated_directory;
+            {
+                let mut writer =
+                    unwrap_result!(file_helper.update_content(file, Mode::Overwrite, directory));
+                writer.write(&vec![1u8; 50], 0).expect("");
+                let (updated_directory, _) = unwrap_result!(writer.close());
+                directory = updated_directory;
+            }
             let file = unwrap_option!(directory.find_file(&file_name), "File not found");
-            let mut reader = file_helper.read(file);
+            let mut reader = file_helper.read(file).expect("");
             let size = reader.size();
             assert_eq!(unwrap_result!(reader.read(0, size)), vec![1u8; 50]);
         }
@@ -201,12 +223,15 @@ mod test {
             // update - partial rewrite
             let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
                                       "File not found");
-            let mut writer = unwrap_result!(file_helper.update_content(file, Mode::Modify, directory));
-            writer.write(&vec![2u8; 10], 0);
-            let (updated_directory, _) = unwrap_result!(writer.close());
-            directory = updated_directory;
+            {
+                let mut writer =
+                    unwrap_result!(file_helper.update_content(file, Mode::Modify, directory));
+                writer.write(&vec![2u8; 10], 0).expect("");
+                let (updated_directory, _) = unwrap_result!(writer.close());
+                directory = updated_directory;
+            }
             let file = unwrap_option!(directory.find_file(&file_name), "File not found");
-            let mut reader = file_helper.read(file);
+            let mut reader = file_helper.read(file).expect("");
             let size = reader.size();
             let data = unwrap_result!(reader.read(0, size));
             assert_eq!(&data[0..10], [2u8; 10]);

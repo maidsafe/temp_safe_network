@@ -15,9 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use xor_name::XorName;
+use routing::XorName;
 use sodiumoxide::crypto::{box_, sign};
-use sodiumoxide::crypto::hash::sha512;
+use sodiumoxide::crypto::hash::sha256;
 use core::id::{IdType, RevocationIdType};
 
 /// PublicIdType
@@ -46,12 +46,12 @@ impl PublicIdType {
         let public_keys = id_type.public_keys().clone();
         let revocation_public_key = revocation_id.public_key();
         let combined_iter = (public_keys.0)
-                                .0
-                                .into_iter()
-                                .chain((public_keys.1)
-                                           .0
-                                           .into_iter()
-                                           .chain(revocation_public_key.0.into_iter()));
+            .0
+            .into_iter()
+            .chain((public_keys.1)
+                .0
+                .into_iter()
+                .chain(revocation_public_key.0.into_iter()));
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -62,9 +62,9 @@ impl PublicIdType {
         let message_length = combined.len();
 
         let signature = revocation_id.sign(&combined)
-                                     .into_iter()
-                                     .skip(message_length)
-                                     .collect::<Vec<_>>();
+            .into_iter()
+            .skip(message_length)
+            .collect::<Vec<_>>();
         let mut signature_arr = [0; sign::SIGNATUREBYTES];
 
         for it in signature.into_iter().take(sign::SIGNATUREBYTES).enumerate() {
@@ -82,9 +82,9 @@ impl PublicIdType {
     /// Returns the name
     pub fn name(&self) -> XorName {
         let combined_iter = (self.public_keys.0)
-                                .0
-                                .into_iter()
-                                .chain((self.public_keys.1).0.into_iter());
+            .0
+            .into_iter()
+            .chain((self.public_keys.1).0.into_iter());
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -95,7 +95,7 @@ impl PublicIdType {
         for i in 0..sign::SIGNATUREBYTES {
             combined.push(self.signature.0[i]);
         }
-        XorName(sha512::hash(&combined).0)
+        XorName(sha256::hash(&combined).0)
     }
 
     /// Returns the PublicKeys
@@ -164,13 +164,13 @@ mod test {
         let public_id_keys = public_maid.public_keys;
         let public_revocation_key = public_maid.revocation_public_key;
         let combined_keys = (public_id_keys.0)
-                                .0
-                                .into_iter()
-                                .chain((public_id_keys.1)
-                                           .0
-                                           .into_iter()
-                                           .chain(public_revocation_key.0
-                                                                       .into_iter()));
+            .0
+            .into_iter()
+            .chain((public_id_keys.1)
+                .0
+                .into_iter()
+                .chain(public_revocation_key.0
+                    .into_iter()));
         let mut combined = Vec::new();
 
         for iter in combined_keys {
@@ -182,9 +182,9 @@ mod test {
 
         let message_length = combined.len();
         let signature_vec = revocation_maid.sign(&combined)
-                                           .into_iter()
-                                           .skip(message_length)
-                                           .collect::<Vec<_>>();
+            .into_iter()
+            .skip(message_length)
+            .collect::<Vec<_>>();
 
         assert_eq!(signature_vec.len(), sign::SIGNATUREBYTES);
 

@@ -22,10 +22,10 @@ use nfs::directory_listing::DirectoryListing;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::file::File;
 use core::client::Client;
-use core::SelfEncryptionStorage;
+use core::{SelfEncryptionStorage, SelfEncryptionStorageError};
 use self_encryption::{DataMap, SelfEncryptor};
 
-/// Mode of the writter
+/// Mode of the writer
 pub enum Mode {
     /// Will create new data
     Overwrite,
@@ -35,33 +35,38 @@ pub enum Mode {
 
 /// Writer is used to write contents to a File and especially in chunks if the file happens to be
 /// too large
-pub struct Writer {
+pub struct Writer<'a> {
     client: Arc<Mutex<Client>>,
     file: File,
     parent_directory: DirectoryListing,
-    self_encryptor: SelfEncryptor<SelfEncryptionStorage>,
+    self_encryptor: SelfEncryptor<'a, SelfEncryptionStorageError, SelfEncryptionStorage>,
 }
 
-impl Writer {
+impl<'a> Writer<'a> {
     /// Create new instance of Writer
-    pub fn new(client: Arc<Mutex<Client>>, mode: Mode, parent_directory: DirectoryListing, file: File) -> Writer {
-        let datamap = match mode {
+    pub fn new(client: Arc<Mutex<Client>>,
+               storage: &'a mut SelfEncryptionStorage,
+               mode: Mode,
+               parent_directory: DirectoryListing,
+               file: File)
+               -> Result<Writer<'a>, NfsError> {
+        let data_map = match mode {
             Mode::Modify => file.get_datamap().clone(),
             Mode::Overwrite => DataMap::None,
         };
 
-        Writer {
+        Ok(Writer {
             client: client.clone(),
             file: file,
             parent_directory: parent_directory,
-            self_encryptor: SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), datamap),
-        }
+            self_encryptor: try!(SelfEncryptor::new(storage, data_map)),
+        })
     }
 
     /// Data of a file/blob can be written in smaller chunks
-    pub fn write(&mut self, data: &[u8], position: u64) {
+    pub fn write(&mut self, data: &[u8], position: u64) -> Result<(), NfsError> {
         debug!("Writing file data at position {:?} ...", position);
-        self.self_encryptor.write(data, position);
+        Ok(try!(self.self_encryptor.write(data, position)))
     }
 
     /// close is invoked only after all the data is completely written
@@ -74,7 +79,7 @@ impl Writer {
         let mut directory = self.parent_directory;
         let size = self.self_encryptor.len();
 
-        file.set_datamap(self.self_encryptor.close());
+        file.set_datamap(try!(self.self_encryptor.close()));
 
         file.get_mut_metadata().set_modified_time(::time::now_utc());
         file.get_mut_metadata().set_size(size);

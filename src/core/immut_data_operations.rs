@@ -18,53 +18,56 @@
 use std::sync::{Arc, Mutex};
 
 use core::utility;
-use xor_name::XorName;
 use core::client::Client;
 use core::errors::CoreError;
 use core::SelfEncryptionStorage;
 use self_encryption::{DataMap, SelfEncryptor};
 use sodiumoxide::crypto::box_::{PublicKey, SecretKey, Nonce};
 use maidsafe_utilities::serialisation::{serialise, deserialise};
-use routing::{Data, DataIdentifier, ImmutableData};
+use routing::{Data, DataIdentifier, ImmutableData, XorName};
 
 // TODO(Spandan) Ask Routing to define this constant and use it from there
 const MAX_IMMUT_DATA_SIZE_IN_BYTES: usize = 1024 * 1024;
 
 #[derive(RustcEncodable, RustcDecodable)]
 enum DataTypeEncoding {
-    SerialisedDataMap(Vec<u8>),
+    Serialised(Vec<u8>),
     DataMap(DataMap),
 }
 
 /// Create and obtain immutable data out of the given raw data. The API will encrypt the right
-/// content if the keys are provided and will ensure the max immutable data chunk size is
+/// content if the keys are provided and will ensure the maximum immutable data chunk size is
 /// respected.
 pub fn create(client: Arc<Mutex<Client>>,
               data: Vec<u8>,
               encryption_keys: Option<(&PublicKey, &SecretKey, &Nonce)>)
               -> Result<ImmutableData, CoreError> {
-    let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), DataMap::None);
-    se.write(&data, 0);
-    let mut data_map = se.close();
+    let mut storage = SelfEncryptionStorage::new(client.clone());
+    let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, DataMap::None));
+    try!(self_encryptor.write(&data, 0));
+    let mut data_map = try!(self_encryptor.close());
 
-    let serialised_dm = try!(serialise(&data_map));
-    let mut immut_data = if let Some((pk, sk, nonce)) = encryption_keys {
-        let cipher_text = try!(utility::hybrid_encrypt(&serialised_dm, nonce, pk, sk));
-        let encoded_cipher_text = try!(serialise(&DataTypeEncoding::SerialisedDataMap(cipher_text)));
+    let mut serialised_data_map = try!(serialise(&data_map));
+    let mut immut_data = if let Some((public_key, secret_key, nonce)) = encryption_keys {
+        let cipher_text =
+            try!(utility::hybrid_encrypt(&serialised_data_map, nonce, public_key, secret_key));
+        let encoded_cipher_text = try!(serialise(&DataTypeEncoding::Serialised(cipher_text)));
         ImmutableData::new(encoded_cipher_text)
     } else {
-        let encoded_plain_text = try!(serialise(&DataTypeEncoding::SerialisedDataMap(serialised_dm)));
+        let encoded_plain_text =
+            try!(serialise(&DataTypeEncoding::Serialised(serialised_data_map)));
         ImmutableData::new(encoded_plain_text)
     };
 
-    let mut serialised_id = try!(serialise(&immut_data));
-    while serialised_id.len() > MAX_IMMUT_DATA_SIZE_IN_BYTES {
-        let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), DataMap::None);
-        se.write(&serialised_id, 0);
-        data_map = se.close();
-        let encoded_dm = try!(serialise(&DataTypeEncoding::DataMap(data_map)));
-        immut_data = ImmutableData::new(encoded_dm);
-        serialised_id = try!(serialise(&immut_data));
+    let mut serialised_data = try!(serialise(&immut_data));
+    while serialised_data.len() > MAX_IMMUT_DATA_SIZE_IN_BYTES {
+        let mut storage = SelfEncryptionStorage::new(client.clone());
+        let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, DataMap::None));
+        try!(self_encryptor.write(&serialised_data, 0));
+        data_map = try!(self_encryptor.close());
+        serialised_data_map = try!(serialise(&DataTypeEncoding::DataMap(data_map)));
+        immut_data = ImmutableData::new(serialised_data_map);
+        serialised_data = try!(serialise(&immut_data));
     }
 
     Ok(immut_data)
@@ -75,29 +78,33 @@ pub fn get_data(client: Arc<Mutex<Client>>,
                 immut_data_name: XorName,
                 decryption_keys: Option<(&PublicKey, &SecretKey, &Nonce)>)
                 -> Result<Vec<u8>, CoreError> {
-    let data_req = DataIdentifier::Immutable(immut_data_name);
-    let resp_getter = try!(unwrap_result!(client.lock()).get(data_req, None));
+    let data_identifier = DataIdentifier::Immutable(immut_data_name);
+    let response_getter = try!(client.lock().expect("Couldn't lock").get(data_identifier, None));
 
-    match try!(resp_getter.get()) {
-        Data::Immutable(mut id) => {
-            while let Ok(DataTypeEncoding::DataMap(dm)) = deserialise(&id.value()) {
-                let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), dm);
-                let length = se.len();
-                id = try!(deserialise(&se.read(0, length)));
+    match try!(response_getter.get()) {
+        Data::Immutable(mut immut_data) => {
+            let mut storage = SelfEncryptionStorage::new(client.clone());
+            while let Ok(DataTypeEncoding::DataMap(data_map)) = deserialise(&immut_data.value()) {
+                let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
+                let length = self_encryptor.len();
+                immut_data = try!(deserialise(&try!(self_encryptor.read(0, length))));
             }
 
-            match try!(deserialise(&id.value())) {
-                DataTypeEncoding::SerialisedDataMap(encoded_dm) => {
-                    let dm = if let Some((pk, sk, nonce)) = decryption_keys {
-                        let plain_text = try!(utility::hybrid_decrypt(&encoded_dm, nonce, pk, sk));
+            match try!(deserialise(&immut_data.value())) {
+                DataTypeEncoding::Serialised(serialised_data_map) => {
+                    let data_map = if let Some((public_key, secret_key, nonce)) = decryption_keys {
+                        let plain_text = try!(utility::hybrid_decrypt(&serialised_data_map,
+                                                                      nonce,
+                                                                      public_key,
+                                                                      secret_key));
                         try!(deserialise(&plain_text))
                     } else {
-                        try!(deserialise(&encoded_dm))
+                        try!(deserialise(&serialised_data_map))
                     };
 
-                    let mut se = SelfEncryptor::new(SelfEncryptionStorage::new(client.clone()), dm);
-                    let length = se.len();
-                    Ok(se.read(0, length))
+                    let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
+                    let length = self_encryptor.len();
+                    Ok(try!(self_encryptor.read(0, length)))
                 }
                 _ => Err(CoreError::ReceivedUnexpectedData),
             }
@@ -120,16 +127,18 @@ mod test {
     // TODO It takes a very long time in debug mode - it is due to S.E crate.
     #[test]
     fn immut_data_create_retrieve_10_mb() {
-        let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10)); // 10 MiB data
+        // 10 MB of data
+        let data_to_put = unwrap_result!(utility::generate_random_vector(1024 * 1024 * 10));
 
         // Unencrypted
         {
             let client = Arc::new(Mutex::new(unwrap_result!(test_utils::get_client())));
 
-            let immut_data_before = unwrap_result!(create(client.clone(), data_to_put.clone(), None));
+            let immut_data_before =
+                unwrap_result!(create(client.clone(), data_to_put.clone(), None));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
-                                                 .put(Data::Immutable(immut_data_before), None));
+                .put(Data::Immutable(immut_data_before), None));
             unwrap_result!(resp_getter.get());
 
             let data_got = unwrap_result!(get_data(client.clone(), data_name, None));
@@ -148,10 +157,11 @@ mod test {
                                                           Some((&pk, &sk, &nonce))));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
-                                                 .put(Data::Immutable(immut_data_before), None));
+                .put(Data::Immutable(immut_data_before), None));
             unwrap_result!(resp_getter.get());
 
-            let data_got = unwrap_result!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))));
+            let data_got =
+                unwrap_result!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))));
 
             assert_eq!(data_to_put, data_got);
         }
@@ -162,10 +172,11 @@ mod test {
             let (pk, sk) = box_::gen_keypair();
             let nonce = box_::gen_nonce();
 
-            let immut_data_before = unwrap_result!(create(client.clone(), data_to_put.clone(), None));
+            let immut_data_before =
+                unwrap_result!(create(client.clone(), data_to_put.clone(), None));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
-                                                 .put(Data::Immutable(immut_data_before), None));
+                .put(Data::Immutable(immut_data_before), None));
             unwrap_result!(resp_getter.get());
 
             assert!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))).is_err());
@@ -182,7 +193,7 @@ mod test {
                                                           Some((&pk, &sk, &nonce))));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap_result!(unwrap_result!(client.lock())
-                                                 .put(Data::Immutable(immut_data_before), None));
+                .put(Data::Immutable(immut_data_before), None));
             unwrap_result!(resp_getter.get());
 
             assert!(get_data(client.clone(), data_name, None).is_err());

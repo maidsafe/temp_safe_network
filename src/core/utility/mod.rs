@@ -60,7 +60,7 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
                                           asym_nonce,
                                           asym_public_key,
                                           asym_secret_key)
-                                   .map_err(|_| CoreError::AsymmetricDecipherFailure));
+        .map_err(|_| CoreError::AsymmetricDecipherFailure));
 
     if asym_plain_text.len() != secretbox::KEYBYTES + secretbox::NONCEBYTES {
         Err(CoreError::AsymmetricDecipherFailure)
@@ -75,7 +75,8 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
             sym_nonce.0[it.0] = *it.1;
         }
 
-        secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key).map_err(|()| CoreError::SymmetricDecipherFailure)
+        secretbox::open(&sym_cipher_text, &sym_nonce, &sym_key)
+            .map_err(|()| CoreError::SymmetricDecipherFailure)
     }
 }
 
@@ -99,19 +100,6 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
     Ok((0..length).map(|_| os_rng.gen()).collect())
 }
 
-/// Generate a random array of 64 u8's
-pub fn generate_random_array_u8_64() -> Result<[u8; 64], CoreError> {
-    let mut arr = [0; 64];
-    let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
-        error!("{:?}", error);
-        CoreError::RandomDataGenerationFailure
-    }));
-    for it in arr.iter_mut() {
-        *it = os_rng.gen();
-    }
-    Ok(arr)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -127,8 +115,10 @@ mod test {
         let (public_key, secret_key) = box_::gen_keypair();
 
         // Encrypt
-        let cipher_text_0 = unwrap_result!(hybrid_encrypt(&plain_text_0[..], &nonce, &public_key, &secret_key));
-        let cipher_text_1 = unwrap_result!(hybrid_encrypt(&plain_text_1[..], &nonce, &public_key, &secret_key));
+        let cipher_text_0 =
+            unwrap_result!(hybrid_encrypt(&plain_text_0[..], &nonce, &public_key, &secret_key));
+        let cipher_text_1 =
+            unwrap_result!(hybrid_encrypt(&plain_text_1[..], &nonce, &public_key, &secret_key));
 
         // Same Plain Texts
         assert_eq!(plain_text_0, plain_text_1);
@@ -137,8 +127,10 @@ mod test {
         assert!(cipher_text_0 != cipher_text_1);
 
         // Decrypt
-        let deciphered_plain_text_0 = unwrap_result!(hybrid_decrypt(&cipher_text_0, &nonce, &public_key, &secret_key));
-        let deciphered_plain_text_1 = unwrap_result!(hybrid_decrypt(&cipher_text_1, &nonce, &public_key, &secret_key));
+        let deciphered_plain_text_0 =
+            unwrap_result!(hybrid_decrypt(&cipher_text_0, &nonce, &public_key, &secret_key));
+        let deciphered_plain_text_1 =
+            unwrap_result!(hybrid_decrypt(&cipher_text_1, &nonce, &public_key, &secret_key));
 
         // Should have decrypted to the same Plain Texts
         assert_eq!(plain_text_0, deciphered_plain_text_0);
@@ -167,16 +159,5 @@ mod test {
         assert!(vec0 != vec1);
         assert!(vec0 != vec2);
         assert!(vec1 != vec2);
-    }
-
-    #[test]
-    fn random_array() {
-        let arr0 = unwrap_result!(generate_random_array_u8_64());
-        let arr1 = unwrap_result!(generate_random_array_u8_64());
-        let arr2 = unwrap_result!(generate_random_array_u8_64());
-
-        assert!(&arr0[..] != &arr1[..]);
-        assert!(&arr0[..] != &arr2[..]);
-        assert!(&arr1[..] != &arr2[..]);
     }
 }

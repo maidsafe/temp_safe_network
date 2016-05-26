@@ -17,11 +17,11 @@
 
 use std::fmt;
 
-use core::utility;
 use nfs::errors::NfsError;
 use nfs::metadata::file_metadata::FileMetadata;
 
-use xor_name::XorName;
+use rand::{Rand, OsRng};
+use routing::XorName;
 use self_encryption::DataMap;
 
 /// Representation of a File to be put into the network. Could be text, music, video etc any kind
@@ -37,7 +37,7 @@ impl File {
     /// Create a new instance of File
     pub fn new(metadata: FileMetadata, datamap: DataMap) -> Result<File, NfsError> {
         Ok(File {
-            id: XorName::new(try!(utility::generate_random_array_u8_64())),
+            id: Rand::rand(&mut OsRng::new().expect("Failed to create OsRng.")),
             metadata: metadata,
             datamap: datamap,
         })

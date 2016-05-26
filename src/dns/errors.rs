@@ -93,9 +93,13 @@ impl ::std::fmt::Debug for DnsError {
             DnsError::DnsRecordNotFound => write!(f, "DnsError::DnsRecordNotFound"),
             DnsError::ServiceAlreadyExists => write!(f, "DnsError::ServiceAlreadyExists"),
             DnsError::ServiceNotFound => write!(f, "DnsError::ServiceNotFound"),
-            DnsError::DnsConfigFileNotFoundOrCorrupted => write!(f, "DnsError::DnsConfigFileNotFoundOrCorrupted"),
+            DnsError::DnsConfigFileNotFoundOrCorrupted => {
+                write!(f, "DnsError::DnsConfigFileNotFoundOrCorrupted")
+            }
             DnsError::Unexpected(ref error) => write!(f, "DnsError::Unexpected::{{{:?}}}", error),
-            DnsError::UnsuccessfulEncodeDecode(ref err) => write!(f, "DnsError::UnsuccessfulEncodeDecode -> {:?}", err),
+            DnsError::UnsuccessfulEncodeDecode(ref err) => {
+                write!(f, "DnsError::UnsuccessfulEncodeDecode -> {:?}", err)
+            }
         }
     }
 }

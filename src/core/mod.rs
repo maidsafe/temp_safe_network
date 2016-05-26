@@ -28,12 +28,15 @@ pub mod utility;
 pub mod translated_events;
 /// Implements the Self Encryption storage trait
 pub mod self_encryption_storage;
+/// Implements the Self Encryption storage error trait
+pub mod self_encryption_storage_error;
 /// Helper functions to handle ImmutableData related operations
 pub mod immut_data_operations;
 /// Helper functions to handle StructuredData related operations
 pub mod structured_data_operations;
 
 pub use self::self_encryption_storage::SelfEncryptionStorage;
+pub use self::self_encryption_storage_error::SelfEncryptionStorageError;
 
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;

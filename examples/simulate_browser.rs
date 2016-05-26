@@ -85,9 +85,8 @@ fn handle_login() -> Arc<Mutex<Client>> {
     // Account Creation
     {
         println!("\nTrying to create an account ...");
-        let _ = unwrap_result!(Client::create_account(keyword.clone(),
-                                                      pin.clone(),
-                                                      password.clone()));
+        let _ =
+            unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
         println!("Account Creation Successful !!");
     }
 
@@ -111,8 +110,8 @@ fn create_dns_record(client: Arc<Mutex<Client>>,
     long_name = long_name.trim().to_string();
 
     println!("\nGenerating messaging ecryption keys for you...");
-    let (public_messaging_encryption_key,
-         secret_messaging_encryption_key) = sodiumoxide::crypto::box_::gen_keypair();
+    let (public_messaging_encryption_key, secret_messaging_encryption_key) =
+        sodiumoxide::crypto::box_::gen_keypair();
 
     println!("Registering Dns...");
 
@@ -180,7 +179,7 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
                                                   AccessLevel::Public,
                                                   None));
 
-    let file_helper = FileHelper::new(client.clone());
+    let mut file_helper = FileHelper::new(client.clone());
     let mut writer = try!(file_helper.create(HOME_PAGE_FILE_NAME.to_string(), vec![], dir_listing));
 
     println!("\nEnter text that you want to display on the Home-Page:");
@@ -190,7 +189,7 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
 
     println!("Creating Home Page for the Service...");
 
-    writer.write(text.as_bytes(), 0);
+    try!(writer.write(text.as_bytes(), 0));
     let (updated_parent_dir_listing, _) = try!(writer.close());
     let dir_key = updated_parent_dir_listing.get_key();
 
@@ -250,38 +249,29 @@ fn parse_url_and_get_home_page(client: Arc<Mutex<Client>>,
     let _ = std::io::stdin().read_line(&mut url);
     url = url.trim().to_string();
 
-    let re_with_service = try!(Regex::new(r"safe:([^.]+?)\.([^.]+?\.[^.]+)$").map_err(|_| {
-        DnsError::Unexpected("Failed to form Regular-Expression !!".to_string())
-    }));
-    let re_without_service = try!(Regex::new(r"safe:([^.]+?\.[^.]+)$").map_err(|_| {
-        DnsError::Unexpected("Failed to form Regular-Expression !!".to_string())
-    }));
+    let re_with_service = try!(Regex::new(r"safe:([^.]+?)\.([^.]+?\.[^.]+)$")
+        .map_err(|_| DnsError::Unexpected("Failed to form Regular-Expression !!".to_string())));
+    let re_without_service = try!(Regex::new(r"safe:([^.]+?\.[^.]+)$")
+        .map_err(|_| DnsError::Unexpected("Failed to form Regular-Expression !!".to_string())));
 
     let long_name;
     let service_name;
 
     if re_with_service.is_match(&url) {
         let captures = try!(re_with_service.captures(&url)
-                                           .ok_or(DnsError::Unexpected("Could not capture \
-                                                                        items in Url !!"
-                                                                           .to_string())));
+            .ok_or(DnsError::Unexpected("Could not capture items in Url !!".to_string())));
         let caps_0 = try!(captures.at(1)
-                                  .ok_or(DnsError::Unexpected("Could not access a capture !!"
-                                                                  .to_string())));
+            .ok_or(DnsError::Unexpected("Could not access a capture !!".to_string())));
         let caps_1 = try!(captures.at(2)
-                                  .ok_or(DnsError::Unexpected("Could not access a capture !!"
-                                                                  .to_string())));
+            .ok_or(DnsError::Unexpected("Could not access a capture !!".to_string())));
 
         long_name = caps_1.to_string();
         service_name = caps_0.to_string();
     } else if re_without_service.is_match(&url) {
         let captures = try!(re_without_service.captures(&url)
-                                              .ok_or(DnsError::Unexpected("Could not capture \
-                                                                           items in Url !!"
-                                                                              .to_string())));
+            .ok_or(DnsError::Unexpected("Could not capture items in Url !!".to_string())));
         let caps_0 = try!(captures.at(1)
-                                  .ok_or(DnsError::Unexpected("Could not access a capture !!"
-                                                                  .to_string())));
+            .ok_or(DnsError::Unexpected("Could not access a capture !!".to_string())));
 
         long_name = caps_0.to_string();
         service_name = DEFAULT_SERVICE.to_string();
@@ -291,19 +281,17 @@ fn parse_url_and_get_home_page(client: Arc<Mutex<Client>>,
 
     println!("Fetching data...");
 
-    let dir_key = try!(dns_operations.get_service_home_directory_key(&long_name,
-                                                                     &service_name,
-                                                                     None));
+    let dir_key =
+        try!(dns_operations.get_service_home_directory_key(&long_name, &service_name, None));
     let directory_helper = DirectoryHelper::new(client.clone());
     let dir_listing = try!(directory_helper.get(&dir_key));
 
     let file = try!(dir_listing.get_files()
-                               .iter()
-                               .find(|a| *a.get_name() == HOME_PAGE_FILE_NAME.to_string())
-                               .ok_or(DnsError::Unexpected("Could not find homepage !!"
-                                                               .to_string())));
-    let file_helper = FileHelper::new(client.clone());
-    let mut reader = file_helper.read(file);
+        .iter()
+        .find(|a| *a.get_name() == HOME_PAGE_FILE_NAME.to_string())
+        .ok_or(DnsError::Unexpected("Could not find homepage !!".to_string())));
+    let mut file_helper = FileHelper::new(client.clone());
+    let mut reader = try!(file_helper.read(file));
     let size = reader.size();
     let content = try!(reader.read(0, size));
 
@@ -313,7 +301,7 @@ fn parse_url_and_get_home_page(client: Arc<Mutex<Client>>,
     println!("{}",
              try!(String::from_utf8(content).map_err(|_| {
                  DnsError::Unexpected("Cannot convert contents to displayable string !!"
-                                          .to_string())
+                     .to_string())
              })));
 
     Ok(())

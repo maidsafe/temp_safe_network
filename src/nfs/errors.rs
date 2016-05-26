@@ -19,6 +19,8 @@ use std::fmt;
 
 use maidsafe_utilities::serialisation::SerialisationError;
 use core::errors::{CoreError, CLIENT_ERROR_START_RANGE};
+use core::SelfEncryptionStorageError;
+use self_encryption::SelfEncryptionError;
 
 /// Intended for converting NFS Errors into numeric codes for propagating some error information
 /// across FFI boundaries and specially to C.
@@ -49,6 +51,8 @@ pub enum NfsError {
     Unexpected(String),
     /// Unsuccessful Serialisation or Deserialisation
     UnsuccessfulEncodeDecode(SerialisationError),
+    /// Error while self-encrypting/-decrypting data
+    SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
 }
 
 impl From<CoreError> for NfsError {
@@ -69,6 +73,12 @@ impl<'a> From<&'a str> for NfsError {
     }
 }
 
+impl From<SelfEncryptionError<SelfEncryptionStorageError>> for NfsError {
+    fn from(error: SelfEncryptionError<SelfEncryptionStorageError>) -> NfsError {
+        NfsError::SelfEncryption(error)
+    }
+}
+
 impl Into<i32> for NfsError {
     fn into(self) -> i32 {
         match self {
@@ -83,6 +93,7 @@ impl Into<i32> for NfsError {
             NfsError::ParameterIsNotValid => NFS_ERROR_START_RANGE - 8,
             NfsError::Unexpected(_) => NFS_ERROR_START_RANGE - 9,
             NfsError::UnsuccessfulEncodeDecode(_) => NFS_ERROR_START_RANGE - 10,
+            NfsError::SelfEncryption(_) => NFS_ERROR_START_RANGE - 11,
         }
     }
 }
@@ -91,10 +102,16 @@ impl fmt::Debug for NfsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             NfsError::CoreError(ref error) => write!(f, "NfsError::CoreError -> {:?}", error),
-            NfsError::DirectoryAlreadyExistsWithSameName => write!(f, "NfsError::DirectoryAlreadyExistsWithSameName"),
-            NfsError::DestinationAndSourceAreSame => write!(f, "NfsError::DestinationAndSourceAreSame"),
+            NfsError::DirectoryAlreadyExistsWithSameName => {
+                write!(f, "NfsError::DirectoryAlreadyExistsWithSameName")
+            }
+            NfsError::DestinationAndSourceAreSame => {
+                write!(f, "NfsError::DestinationAndSourceAreSame")
+            }
             NfsError::DirectoryNotFound => write!(f, "NfsError::DirectoryNotFound"),
-            NfsError::FileAlreadyExistsWithSameName => write!(f, "NfsError::FileAlreadyExistsWithSameName"),
+            NfsError::FileAlreadyExistsWithSameName => {
+                write!(f, "NfsError::FileAlreadyExistsWithSameName")
+            }
             NfsError::FileDoesNotMatch => write!(f, "NfsError::FileDoesNotMatch"),
             NfsError::FileNotFound => write!(f, "NfsError::FileNotFound"),
             NfsError::InvalidRangeSpecified => write!(f, "NfsError::InvalidRangeSpecified"),
@@ -102,6 +119,9 @@ impl fmt::Debug for NfsError {
             NfsError::Unexpected(ref error) => write!(f, "NfsError::Unexpected -> {:?}", error),
             NfsError::UnsuccessfulEncodeDecode(ref error) => {
                 write!(f, "NfsError::UnsuccessfulEncodeDecode -> {:?}", error)
+            }
+            NfsError::SelfEncryption(ref error) => {
+                write!(f, "NfsError::SelfEncrpytion -> {:?}", error)
             }
         }
     }

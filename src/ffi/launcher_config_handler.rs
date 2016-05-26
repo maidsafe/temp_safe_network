@@ -16,10 +16,10 @@
 // relating to use of the SAFE Network Software.
 
 use ffi::errors::FfiError;
-use xor_name::XorName;
+use routing::XorName;
 use std::sync::{Arc, Mutex};
 use core::client::Client;
-use sodiumoxide::crypto::hash::sha512;
+use sodiumoxide::crypto::hash::sha256;
 use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode::Overwrite;
 use nfs::directory_listing::DirectoryListing;
@@ -85,7 +85,7 @@ impl ConfigHandler {
         let mut id_str = String::new();
         id_str.push_str(&app_key);
         id_str.push_str(&vendor);
-        XorName::new(sha512::hash(id_str.as_bytes()).0)
+        XorName(sha256::hash(id_str.as_bytes()).0)
     }
 
     fn get_app_dir_name(&self, app_name: &String, directory_listing: &DirectoryListing) -> String {
@@ -132,9 +132,9 @@ impl ConfigHandler {
                             present at this stage - Report bug.")
                 .clone();
 
-        let file_helper = FileHelper::new(self.client.clone());
+        let mut file_helper = FileHelper::new(self.client.clone());
         let mut writer = try!(file_helper.update_content(file, Overwrite, dir_listing));
-        writer.write(&try!(serialise(&global_configs)), 0);
+        try!(writer.write(&try!(serialise(&global_configs)), 0));
         let _ = try!(writer.close());
 
         Ok(())
@@ -148,7 +148,7 @@ impl ConfigHandler {
             LAUNCHER_GLOBAL_DIRECTORY_NAME.to_string()));
 
         let global_configs = {
-            let file_helper = FileHelper::new(self.client.clone());
+            let mut file_helper = FileHelper::new(self.client.clone());
             let file = match dir_listing.get_files()
                 .iter()
                 .find(|file| file.get_name() == LAUNCHER_GLOBAL_CONFIG_FILE_NAME)
@@ -171,14 +171,14 @@ impl ConfigHandler {
                         .clone()
                 }
             };
-            let mut reader = file_helper.read(&file);
+            let mut reader = try!(file_helper.read(&file));
 
             let size = reader.size();
 
-            if size != 0 {
-                try!(deserialise(&try!(reader.read(0, size))))
-            } else {
+            if size == 0 {
                 Vec::new()
+            } else {
+                try!(deserialise(&try!(reader.read(0, size))))
             }
         };
 

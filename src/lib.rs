@@ -39,8 +39,9 @@
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
-#![cfg_attr(feature="clippy", allow(use_debug))]
+#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
+                                   option_unwrap_used))]
+#![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))] // TODO: Fix doc_markdown errors.
 
 extern crate libc;
 #[macro_use]
@@ -48,7 +49,6 @@ extern crate log;
 extern crate time;
 extern crate rand;
 extern crate routing;
-extern crate xor_name;
 extern crate sodiumoxide;
 extern crate lru_time_cache;
 extern crate self_encryption;
