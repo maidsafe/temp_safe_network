@@ -1,5 +1,9 @@
 # Safe Core - Change Log
 
+## [0.15.1]
+- Upgrade routing to 0.22.0
+- Upgrade safe_network_common to 0.3.0
+
 ## [0.15.0]
 - Upgrade to new routing and self_encryption.
 
