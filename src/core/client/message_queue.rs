@@ -17,7 +17,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{Receiver, Sender};
 
 use core::errors::CoreError;
 use core::translated_events::{NetworkEvent, ResponseEvent};
@@ -25,8 +25,8 @@ use core::translated_events::{NetworkEvent, ResponseEvent};
 use lru_time_cache::LruCache;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
 use maidsafe_utilities::serialisation::deserialise;
-use safe_network_common::client_errors::{MutationError, GetError};
-use routing::{MessageId, Data, Event, Response, XorName};
+use safe_network_common::client_errors::{GetError, MutationError};
+use routing::{Data, Event, MessageId, Response, XorName};
 
 const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 
@@ -129,6 +129,7 @@ fn handle_response(response: Response, mut queue_guard: MutexGuard<MessageQueue>
                 let _ = response_observer.send(ResponseEvent::MutationResp(err));
             }
         }
+        _ => (),
     }
 }
 
@@ -164,7 +165,7 @@ impl MessageQueue {
                         MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
                                                          dead_sender_positions);
                     }
-                    Event::Disconnected => {
+                    Event::Terminate => {
                         let mut dead_sender_positions = Vec::<usize>::new();
                         let mut queue_guard = unwrap_result!(message_queue_cloned.lock());
                         for it in queue_guard.network_event_observers.iter().enumerate() {

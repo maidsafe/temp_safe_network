@@ -26,10 +26,10 @@ use sodiumoxide::crypto::sign;
 use std::sync::{Arc, Mutex, mpsc};
 use safe_network_common::TYPE_TAG_SESSION_PACKET;
 use safe_network_common::client_errors::{GetError, MutationError};
-use maidsafe_utilities::serialisation::{serialise, deserialise, serialise_with_limit,
-                                        deserialise_with_limit};
-use routing::{FullId, Data, DataIdentifier, InterfaceError, Event, Authority, Response,
-              RoutingError, MessageId, Request, XorName};
+use maidsafe_utilities::serialisation::{deserialise, deserialise_with_limit, serialise,
+                                        serialise_with_limit};
+use routing::{Authority, Data, DataIdentifier, Event, FullId, InterfaceError, MessageId, Request,
+              Response, RoutingError, XorName};
 
 type DataStore = Arc<Mutex<HashMap<XorName, Vec<u8>>>>;
 
@@ -100,8 +100,7 @@ pub struct RoutingMock {
 
 impl RoutingMock {
     pub fn new(sender: mpsc::Sender<Event>,
-               _id: Option<FullId>,
-               _use_data_cache: bool)
+               _id: Option<FullId>)
                -> Result<RoutingMock, RoutingError> {
         ::sodiumoxide::init();
 
@@ -475,10 +474,10 @@ mod test {
     use core::client::message_queue::MessageQueue;
     use core::client::response_getter::{GetResponseGetter, MutationResponseGetter};
 
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use safe_network_common::client_errors::{GetError, MutationError};
-    use routing::{FullId, StructuredData, ImmutableData, DataIdentifier, Data, Authority,
-                  MessageId, XorName, XOR_NAME_LEN};
+    use routing::{Authority, Data, DataIdentifier, FullId, ImmutableData, MessageId,
+                  StructuredData, XOR_NAME_LEN, XorName};
 
     #[test]
     fn map_serialisation() {
@@ -505,8 +504,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing =
-            unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet), true));
+        let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap_result!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -672,8 +670,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing =
-            unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet), true));
+        let mut mock_routing = unwrap_result!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap_result!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),

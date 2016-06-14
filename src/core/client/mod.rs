@@ -29,7 +29,7 @@ use std::sync::{Arc, Mutex, mpsc};
 
 use self::user_account::Account;
 use self::message_queue::MessageQueue;
-use self::response_getter::{MutationResponseGetter, GetResponseGetter};
+use self::response_getter::{GetResponseGetter, MutationResponseGetter};
 
 use core::utility;
 use core::errors::CoreError;
@@ -39,7 +39,7 @@ use maidsafe_utilities::thread::RaiiThreadJoiner;
 use maidsafe_utilities::serialisation::serialise;
 use safe_network_common::TYPE_TAG_SESSION_PACKET;
 use safe_network_common::messaging::{MpidMessage, MpidMessageWrapper};
-use routing::{MessageId, FullId, StructuredData, Data, DataIdentifier, PlainData, Authority,
+use routing::{Authority, Data, DataIdentifier, FullId, MessageId, PlainData, StructuredData,
               XorName};
 
 use sodiumoxide::crypto::{box_, sign};
@@ -75,7 +75,7 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = try!(Routing::new(routing_sender, None, true));
+        let routing = try!(Routing::new(routing_sender, None));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                              vec![network_event_sender]);
 
@@ -110,7 +110,7 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = try!(Routing::new(routing_sender, Some(id_packet), true));
+        let routing = try!(Routing::new(routing_sender, Some(id_packet)));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                              vec![network_event_sender]);
 
@@ -191,7 +191,7 @@ impl Client {
             let (routing_sender, routing_receiver) = mpsc::channel();
             let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-            let routing = try!(Routing::new(routing_sender, Some(id_packet), true));
+            let routing = try!(Routing::new(routing_sender, Some(id_packet)));
             let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                                  vec![network_event_sender]);
 
@@ -627,7 +627,7 @@ mod test {
     use core::client::response_getter::GetResponseGetter;
 
     use rand;
-    use routing::{ImmutableData, DataIdentifier, Data, StructuredData, XorName, XOR_NAME_LEN};
+    use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XOR_NAME_LEN, XorName};
     use safe_network_common::client_errors::MutationError;
 
     #[test]

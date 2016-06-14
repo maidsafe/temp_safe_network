@@ -16,9 +16,9 @@
 // relating to use of the SAFE Network Software.
 
 use core::errors::CoreError;
-use routing::{DataIdentifier, Data, XorName};
+use routing::{Data, DataIdentifier, XorName};
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{Receiver, Sender};
 use core::client::message_queue::MessageQueue;
 use core::translated_events::ResponseEvent;
 
