@@ -16,12 +16,12 @@
 // relating to use of the SAFE Network Software.
 
 use core::errors::CoreError;
-use routing::{XorName, XOR_NAME_LEN};
+use routing::{XOR_NAME_LEN, XorName};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::secretbox;
 use sodiumoxide::crypto::hash::sha256;
-use maidsafe_utilities::serialisation::{serialise, deserialise};
-use core::id::{IdType, PublicIdType, RevocationIdType, MaidTypeTags, MpidTypeTags};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+use core::id::{IdType, MaidTypeTags, MpidTypeTags, PublicIdType, RevocationIdType};
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also their Root
@@ -218,7 +218,7 @@ impl Account {
 #[cfg(test)]
 mod test {
     use super::*;
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
 
     #[test]
     fn generating_new_account() {
