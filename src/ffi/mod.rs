@@ -357,6 +357,42 @@ pub fn drop_vector(ptr: *mut u8, size: int32_t, capacity: int32_t) {
     let _ = unsafe { Vec::from_raw_parts(ptr, size as usize, capacity as usize) };
 }
 
+/// Return the amount of calls that were done to `get`
+#[no_mangle]
+#[allow(unsafe_code)]
+pub extern "C" fn client_issued_gets(ffi_handle: *mut FfiHandle) -> u64 {
+    let client = cast_from_ffi_handle(ffi_handle);
+    let guard = client.lock().unwrap();
+    guard.issued_gets()
+}
+
+/// Return the amount of calls that were done to `put`
+#[no_mangle]
+#[allow(unsafe_code)]
+pub extern "C" fn client_issued_puts(ffi_handle: *mut FfiHandle) -> u64 {
+    let client = cast_from_ffi_handle(ffi_handle);
+    let guard = client.lock().unwrap();
+    guard.issued_puts()
+}
+
+/// Return the amount of calls that were done to `post`
+#[no_mangle]
+#[allow(unsafe_code)]
+pub extern "C" fn client_issued_posts(ffi_handle: *mut FfiHandle) -> u64 {
+    let client = cast_from_ffi_handle(ffi_handle);
+    let guard = client.lock().unwrap();
+    guard.issued_posts()
+}
+
+/// Return the amount of calls that were done to `delete`
+#[no_mangle]
+#[allow(unsafe_code)]
+pub extern "C" fn client_issued_deletes(ffi_handle: *mut FfiHandle) -> u64 {
+    let client = cast_from_ffi_handle(ffi_handle);
+    let guard = client.lock().unwrap();
+    guard.issued_deletes()
+}
+
 fn get_parameter_packet<D>(client: Arc<Mutex<Client>>,
                            json_decoder: &mut D)
                            -> Result<(String, String, ParameterPacket), FfiError>
