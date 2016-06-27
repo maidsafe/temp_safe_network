@@ -20,11 +20,12 @@ pub mod unversioned;
 /// Versioned-Structured Data
 pub mod versioned;
 
+use std::{u8, u64};
+
 use core::errors::CoreError;
+use maidsafe_utilities::serialisation::serialise;
 use routing::{StructuredData, XorName, XOR_NAME_LEN};
 use sodiumoxide::crypto::sign;
-use std::{u8, u64};
-use maidsafe_utilities::serialisation::serialise;
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
 const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: usize = 70;
