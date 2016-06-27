@@ -38,6 +38,7 @@ use core::translated_events::NetworkEvent;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
 use maidsafe_utilities::serialisation::serialise;
 use safe_network_common::TYPE_TAG_SESSION_PACKET;
+use safe_network_common::client_errors::MutationError;
 use safe_network_common::messaging::{MpidMessage, MpidMessageWrapper};
 use routing::{Authority, Data, DataIdentifier, FullId, MessageId, PlainData, StructuredData,
               XorName};
@@ -163,7 +164,7 @@ impl Client {
                                          Some(&account.get_maid().secret_keys().0)))
             };
 
-            try!(try!(client.put(Data::Structured(account_version), None)).get());
+            try!(client.put_recover(Data::Structured(account_version), None));
         }
 
         Ok(client)
@@ -390,6 +391,54 @@ impl Client {
         Ok(MutationResponseGetter::new((tx, rx)))
     }
 
+    /// Put data to the network. Unlike `put` this method is blocking and will return success if
+    /// the data has already been put to the network.
+    pub fn put_recover(&mut self,
+                       data: Data,
+                       opt_dst: Option<Authority>)
+                        -> Result<(), CoreError>
+    {
+        let data_owners = match data {
+            Data::Structured(ref sd) => sd.get_owner_keys().clone(),
+            _ => {
+                // Don't do recovery for non-structured-data.
+                return try!(self.put(data, opt_dst)).get()
+            },
+        };
+
+        let data_id = data.identifier();
+        let put_error = match self.put(data, opt_dst.clone()) {
+            Ok(getter) => {
+                match getter.get() {
+                    // Success! We're done.
+                    Ok(()) => return Ok(()),
+                    Err(e) => e,
+                }
+            },
+            Err(e) => e,
+        };
+
+        match self.get(data_id, opt_dst) {
+            Err(_) => Err(put_error),
+            Ok(getter) => match getter.get() {
+                Err(_) => Err(put_error),
+                Ok(get_data) => {
+                    match get_data {
+                        Data::Structured(ref sd) => {
+                            if *sd.get_owner_keys() == data_owners {
+                                Ok(())
+                            }
+                            else {
+                                Err(put_error)
+                            }
+                        }
+                        _ => Err(put_error),
+                    }
+                }
+            }
+        }
+    }
+
     /// Post data onto the network
     pub fn post(&mut self,
                 data: Data,
@@ -432,6 +481,16 @@ impl Client {
         try!(self.routing.send_delete_request(dst, data, msg_id));
 
         Ok(MutationResponseGetter::new((tx, rx)))
+    }
+
+    /// A blocking version of `delete` that returns success if the data was already not present on
+    /// the network.
+    pub fn delete_recover(&mut self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+        match self.delete(data, opt_dst).and_then(|g| g.get()) {
+            Ok(()) => Ok(()),
+            Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 
     // TODO Redo this since response handling is integrated - For Qi right now

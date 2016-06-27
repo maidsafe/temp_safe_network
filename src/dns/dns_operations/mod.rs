@@ -29,9 +29,9 @@ use core::structured_data_operations::unversioned;
 use sodiumoxide::crypto::{sign, box_};
 use sodiumoxide::crypto::hash::sha256;
 use safe_network_common::TYPE_TAG_DNS_PACKET;
-use safe_network_common::client_errors::MutationError;
+use safe_network_common::client_errors::{GetError, MutationError};
 
-mod dns_configuration;
+pub mod dns_configuration;
 
 /// This is a representational structure for all safe-dns operations
 pub struct DnsOperations {
@@ -69,7 +69,7 @@ impl DnsOperations {
                                                       &box_::Nonce)>)
                         -> Result<(), DnsError> {
         debug!("Registering {:?} dns ...", long_name);
-        let mut saved_configs = try!(dns_configuration::get_dns_configuaration_data(self.client
+        let mut saved_configs = try!(dns_configuration::get_dns_configuration_data(self.client
                                                                                         .clone()));
         if saved_configs.iter().any(|config| config.long_name == long_name) {
             Err(DnsError::DnsNameAlreadyRegistered)
@@ -91,9 +91,9 @@ impl DnsOperations {
                                                        vec![],
                                                        private_signing_key,
                                                        data_encryption_keys));
-            match try!(unwrap_result!(self.client.lock())
-                           .put(Data::Structured(struct_data), None))
-                      .get() {
+            match unwrap_result!(self.client.lock())
+                            .put_recover(Data::Structured(struct_data), None)
+            {
                 Ok(()) => (),
                 Err(CoreError::MutationFailure { reason: MutationError::DataExists, .. }) => {
                     return Err(DnsError::DnsNameAlreadyRegistered)
@@ -102,13 +102,13 @@ impl DnsOperations {
             }
 
             debug!("Adding encryption key pair to saved dns configuration ...");
-            saved_configs.push(dns_configuration::DnsConfiguation {
+            saved_configs.push(dns_configuration::DnsConfiguration {
                 long_name: long_name,
                 encryption_keypair: (public_messaging_encryption_key.clone(),
                                      secret_messaging_encryption_key.clone()),
             });
-            try!(dns_configuration::write_dns_configuaration_data(self.client.clone(),
-                                                                  &saved_configs));
+            try!(dns_configuration::write_dns_configuration_data(self.client.clone(),
+                                                                 &saved_configs));
 
             Ok(())
         }
@@ -119,37 +119,40 @@ impl DnsOperations {
                       long_name: &String,
                       private_signing_key: &sign::SecretKey)
                       -> Result<(), DnsError> {
-        let mut saved_configs = try!(dns_configuration::get_dns_configuaration_data(self.client
+        let mut saved_configs = try!(dns_configuration::get_dns_configuration_data(self.client
                                                                                         .clone()));
         let pos = try!(saved_configs.iter()
                                     .position(|config| config.long_name == *long_name)
                                     .ok_or(DnsError::DnsRecordNotFound));
 
-        let prev_struct_data = try!(self.get_housing_structured_data(long_name));
-
-        let struct_data = try!(unversioned::create(self.client.clone(),
-                                                   TYPE_TAG_DNS_PACKET,
-                                                   prev_struct_data.get_identifier().clone(),
-                                                   prev_struct_data.get_version() + 1,
-                                                   vec![],
-                                                   prev_struct_data.get_owner_keys().clone(),
-                                                   prev_struct_data.get_previous_owner_keys()
-                                                                   .clone(),
-                                                   private_signing_key,
-                                                   None));
-        try!(try!(unwrap_result!(self.client.lock()).delete(Data::Structured(struct_data), None))
-                 .get());
+        match self.get_housing_structured_data(long_name) {
+            Ok(prev_struct_data) => {
+                let struct_data = try!(unversioned::create(self.client.clone(),
+                                                           TYPE_TAG_DNS_PACKET,
+                                                           prev_struct_data.get_identifier().clone(),
+                                                           prev_struct_data.get_version() + 1,
+                                                           vec![],
+                                                           prev_struct_data.get_owner_keys().clone(),
+                                                           prev_struct_data.get_previous_owner_keys()
+                                                                           .clone(),
+                                                           private_signing_key,
+                                                           None));
+                try!(unwrap_result!(self.client.lock()).delete_recover(Data::Structured(struct_data), None));
+            },
+            Err(DnsError::CoreError(CoreError::GetFailure { reason: GetError::NoSuchData, .. })) => (),
+            Err(e) => return Err(e),
+        };
 
         debug!("Removing dns saved configs at {:?} position ...", pos);
         let _ = saved_configs.remove(pos);
-        try!(dns_configuration::write_dns_configuaration_data(self.client.clone(), &saved_configs));
+        try!(dns_configuration::write_dns_configuration_data(self.client.clone(), &saved_configs));
 
         Ok(())
     }
 
     /// Get all the Dns-names registered by the user so far in the network.
     pub fn get_all_registered_names(&self) -> Result<Vec<String>, DnsError> {
-        dns_configuration::get_dns_configuaration_data(self.client.clone())
+        dns_configuration::get_dns_configuration_data(self.client.clone())
             .map(|v| v.iter().map(|a| a.long_name.clone()).collect())
     }
 
@@ -243,8 +246,8 @@ impl DnsOperations {
 
     fn find_dns_record(&self,
                        long_name: &String)
-                       -> Result<dns_configuration::DnsConfiguation, DnsError> {
-        let config_vec = try!(dns_configuration::get_dns_configuaration_data(self.client.clone()));
+                       -> Result<dns_configuration::DnsConfiguration, DnsError> {
+        let config_vec = try!(dns_configuration::get_dns_configuration_data(self.client.clone()));
         config_vec.iter()
                   .find(|config| config.long_name == *long_name)
                   .map(|v| v.clone())
@@ -362,6 +365,34 @@ mod test {
                                                     .get_secret_signing_key())
                                      .clone();
 
+        // Trying to delete before we've registered should give the right error.
+        match dns_operations.delete_dns(&dns_name, &secret_signing_key) {
+            Ok(x) => panic!("Deleting before we registered should have been an error.
+                             Instead we got: {:?}", x),
+            Err(DnsError::DnsRecordNotFound) => (),
+            Err(e) => panic!("Got the wrong error: {:?}", e),
+        };
+
+        // Trying to delete when it's in our config but not on the network should succeed.
+        let mut saved_configs = unwrap_result!(dns_configuration::get_dns_configuration_data(dns_operations.client
+                                                                                        .clone()));
+        saved_configs.push(dns_configuration::DnsConfiguration {
+            long_name: dns_name.clone(),
+            encryption_keypair: (messaging_keypair.0.clone(),
+                                 messaging_keypair.1.clone()),
+        });
+        unwrap_result!(dns_configuration::write_dns_configuration_data(dns_operations.client.clone(),
+                                                                       &saved_configs));
+        unwrap_result!(dns_operations.delete_dns(&dns_name, &secret_signing_key));
+
+        // Trying to delete a second time should error again.
+        match dns_operations.delete_dns(&dns_name, &secret_signing_key) {
+            Ok(x) => panic!("Deleting before we registered should have been an error.
+                             Instead we got: {:?}", x),
+            Err(DnsError::DnsRecordNotFound) => (),
+            Err(e) => panic!("Got the wrong error: {:?}", e),
+        };
+
         // Register
         unwrap_result!(dns_operations.register_dns(dns_name.clone(),
                                                    &messaging_keypair.0,
@@ -376,6 +407,32 @@ mod test {
         assert_eq!(services.len(), 0);
 
         // Re-registering by the same client is not allowed
+        match dns_operations.register_dns(dns_name.clone(),
+                                          &messaging_keypair.0,
+                                          &messaging_keypair.1,
+                                          &vec![],
+                                          owners.clone(),
+                                          &secret_signing_key,
+                                          None) {
+            Ok(_) => panic!("Should have been an error"),
+            Err(DnsError::DnsNameAlreadyRegistered) => (),
+            Err(error) => panic!("{:?}", error),
+        }
+
+        // Pretend that the last registration failed at our end. Re-registering should succeed.
+        unwrap_result!(dns_configuration::write_dns_configuration_data(dns_operations.client.clone(),
+                                                                       &[]));
+        unwrap_result!(dns_operations.register_dns(dns_name.clone(),
+                                                   &messaging_keypair.0,
+                                                   &messaging_keypair.1,
+                                                   &vec![],
+                                                   owners.clone(),
+                                                   &secret_signing_key,
+                                                   None));
+
+
+        // Re-registering by the same client is not allowed again (check that we're back in a sane
+        // state).
         match dns_operations.register_dns(dns_name.clone(),
                                           &messaging_keypair.0,
                                           &messaging_keypair.1,
