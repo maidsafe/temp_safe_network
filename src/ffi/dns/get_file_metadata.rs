@@ -15,11 +15,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use rustc_serialize::json;
 use dns::dns_operations::DnsOperations;
 use ffi::{helper, ParameterPacket, ResponseType, Action};
 use ffi::errors::FfiError;
 use nfs::helper::directory_helper::DirectoryHelper;
+use rustc_serialize::json;
 
 #[derive(RustcDecodable, Debug)]
 pub struct GetFileMetadata {
