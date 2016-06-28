@@ -152,7 +152,8 @@ impl Client {
                 let session_packet_keys = unwrap_option!(client.session_packet_keys.as_ref(),
                                                          LOGIC_ERROR);
 
-                let session_packet_id = unwrap_option!(client.session_packet_id.as_ref(), LOGIC_ERROR);
+                let session_packet_id = unwrap_option!(client.session_packet_id.as_ref(),
+                                                       LOGIC_ERROR);
                 try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                          *session_packet_id,
                                          0,
@@ -176,8 +177,7 @@ impl Client {
         let mut unregistered_client = try!(Client::create_unregistered_client());
         let user_id = try!(Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
 
-        let session_packet_request = DataIdentifier::Structured(user_id,
-                                                                TYPE_TAG_SESSION_PACKET);
+        let session_packet_request = DataIdentifier::Structured(user_id, TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(unregistered_client.get(session_packet_request, None));
 
@@ -340,7 +340,7 @@ impl Client {
                request_for: DataIdentifier,
                opt_dst: Option<Authority>)
                -> Result<GetResponseGetter, CoreError> {
-        self.issued_gets +=1;
+        self.issued_gets += 1;
 
         if let DataIdentifier::Immutable(..) = request_for {
             let mut msg_queue = unwrap_result!(self.message_queue.lock());
@@ -356,8 +356,7 @@ impl Client {
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id, tx.clone());
+        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id, tx.clone());
 
         try!(self.routing.send_get_request(dst, request_for.clone(), msg_id));
 
@@ -373,15 +372,12 @@ impl Client {
 
         let dst = match opt_dst {
             Some(auth) => auth,
-            None => {
-                Authority::ClientManager(*try!(self.get_default_client_manager_address()))
-            }
+            None => Authority::ClientManager(*try!(self.get_default_client_manager_address())),
         };
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id, tx.clone());
+        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id, tx.clone());
 
         try!(self.routing.send_put_request(dst, data, msg_id));
 
@@ -390,46 +386,52 @@ impl Client {
 
     /// Put data to the network. Unlike `put` this method is blocking and will return success if
     /// the data has already been put to the network.
-    pub fn put_recover(&mut self,
-                       data: Data,
-                       opt_dst: Option<Authority>)
-                        -> Result<(), CoreError>
-    {
+    pub fn put_recover(&mut self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
         let data_owners = match data {
             Data::Structured(ref sd) => sd.get_owner_keys().clone(),
             _ => {
                 // Don't do recovery for non-structured-data.
-                return try!(self.put(data, opt_dst)).get()
-            },
+                return try!(self.put(data, opt_dst)).get();
+            }
         };
 
         let data_id = data.identifier();
-        let put_error = match self.put(data, opt_dst.clone()) {
+        let put_err = match self.put(data, opt_dst.clone()) {
             Ok(getter) => {
                 match getter.get() {
                     // Success! We're done.
                     Ok(()) => return Ok(()),
                     Err(e) => e,
                 }
-            },
+            }
             Err(e) => e,
         };
 
+        if let CoreError::MutationFailure { reason: MutationError::LowBalance, .. } = put_err {
+            return Err(put_err);
+        }
+
+        debug!("Put failed: {:?}. Trying to recover...", put_err);
+
         match self.get(data_id, opt_dst) {
-            Err(_) => Err(put_error),
-            Ok(getter) => match getter.get() {
-                Err(_) => Err(put_error),
-                Ok(get_data) => {
-                    match get_data {
-                        Data::Structured(ref sd) => {
-                            if *sd.get_owner_keys() == data_owners {
-                                Ok(())
-                            }
-                            else {
-                                Err(put_error)
-                            }
+            Err(_) => Err(put_err),
+            Ok(getter) => {
+                match getter.get() {
+                    Err(_) => {
+                        debug!("Address space is vacant but unable to PUT one");
+                        Err(put_err)
+                    }
+                    Ok(Data::Structured(ref sd)) => {
+                        if *sd.get_owner_keys() == data_owners {
+                            Ok(())
+                        } else {
+                            debug!("Data exists but we are not the owner");
+                            Err(put_err)
                         }
-                        _ => Err(put_error),
+                    }
+                    Ok(data) => {
+                        debug!("Address space already occupied by: {:?}", data);
+                        Err(put_err)
                     }
                 }
             }
@@ -450,8 +452,7 @@ impl Client {
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id, tx.clone());
+        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id, tx.clone());
 
         try!(self.routing.send_post_request(dst, data, msg_id));
 
@@ -472,8 +473,7 @@ impl Client {
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id, tx.clone());
+        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id, tx.clone());
 
         try!(self.routing.send_delete_request(dst, data, msg_id));
 
@@ -482,7 +482,10 @@ impl Client {
 
     /// A blocking version of `delete` that returns success if the data was already not present on
     /// the network.
-    pub fn delete_recover(&mut self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+    pub fn delete_recover(&mut self,
+                          data: Data,
+                          opt_dst: Option<Authority>)
+                          -> Result<(), CoreError> {
         match self.delete(data, opt_dst).and_then(|g| g.get()) {
             Ok(()) |
             Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => Ok(()),
@@ -545,7 +548,9 @@ impl Client {
     }
 
     /// Register as an online mpid_messaging client to the network. This is non-blocking.
-    pub fn register_online(&mut self, mpid_account: XorName) -> Result<GetResponseGetter, CoreError> {
+    pub fn register_online(&mut self,
+                           mpid_account: XorName)
+                           -> Result<GetResponseGetter, CoreError> {
         self.messaging_post_request(mpid_account, MpidMessageWrapper::Online)
     }
 
@@ -585,8 +590,7 @@ impl Client {
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
-        unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id, tx.clone());
+        unwrap_result!(self.message_queue.lock()).register_response_observer(msg_id, tx.clone());
 
         Ok(GetResponseGetter::new(Some((tx, rx)), self.message_queue.clone(), data_request))
     }
@@ -639,8 +643,8 @@ impl Client {
 
     fn update_session_packet(&mut self) -> Result<(), CoreError> {
         let session_packet_id = *try!(self.session_packet_id
-                .as_ref()
-                .ok_or(CoreError::OperationForbiddenForClient));
+            .as_ref()
+            .ok_or(CoreError::OperationForbiddenForClient));
         let session_packet_request = DataIdentifier::Structured(session_packet_id,
                                                                 TYPE_TAG_SESSION_PACKET);
 
@@ -648,13 +652,14 @@ impl Client {
 
         if let Data::Structured(retrieved_session_packet) = try!(resp_getter.get()) {
             let new_account_version = {
-                let account = try!(self.account.as_ref()
-                                   .ok_or(CoreError::OperationForbiddenForClient));
+                let account = try!(self.account
+                    .as_ref()
+                    .ok_or(CoreError::OperationForbiddenForClient));
 
                 let encrypted_account = {
                     let session_packet_keys = try!(self.session_packet_keys
-                                                   .as_ref()
-                                                   .ok_or(CoreError::OperationForbiddenForClient));
+                        .as_ref()
+                        .ok_or(CoreError::OperationForbiddenForClient));
                     try!(account.encrypt(session_packet_keys.get_password(),
                                          session_packet_keys.get_pin()))
                 };
@@ -664,9 +669,9 @@ impl Client {
                                          retrieved_session_packet.get_version() + 1,
                                          encrypted_account,
                                          vec![account.get_public_maid()
-                                              .public_keys()
-                                              .0
-                                              .clone()],
+                                                  .public_keys()
+                                                  .0
+                                                  .clone()],
                                          Vec::new(),
                                          Some(&account.get_maid().secret_keys().0)))
             };
@@ -947,9 +952,8 @@ mod test {
 
             // Should not initially be in version cache
             {
-                let resp_getter = GetResponseGetter::new(None,
-                                                         client.message_queue.clone(),
-                                                         data_request);
+                let resp_getter =
+                    GetResponseGetter::new(None, client.message_queue.clone(), data_request);
 
                 match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
@@ -986,9 +990,8 @@ mod test {
 
             // Should not initially be in version cache
             {
-                let resp_getter = GetResponseGetter::new(None,
-                                                         client.message_queue.clone(),
-                                                         data_request);
+                let resp_getter =
+                    GetResponseGetter::new(None, client.message_queue.clone(), data_request);
 
                 match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),

@@ -20,15 +20,16 @@ use ffi::errors::FfiError;
 use ffi::{Action, ParameterPacket, ResponseType};
 use rustc_serialize::{Decodable, Decoder};
 
-mod get_file;
-mod delete_dns;
 mod add_service;
-mod register_dns;
-mod get_services;
-mod get_long_names;
 mod delete_service;
-mod register_public_id;
+mod delete_dns;
+mod register_dns;
+mod get_file;
+mod get_file_metadata;
+mod get_long_names;
 mod get_service_directory;
+mod get_services;
+mod register_public_id;
 
 pub fn action_dispatcher<D>(action: String,
                             params: ParameterPacket,
@@ -95,6 +96,12 @@ fn get_action<D>(action: String, decoder: &mut D) -> Result<Box<Action>, FfiErro
                                         }),
                                         "")))
         }
+        "get-file-metadata" => {
+            Box::new(try!(parse_result!(decoder.read_struct_field("data", 0, |d| {
+                                          get_file_metadata::GetFileMetadata::decode(d)
+                                       }),
+                                       "")))
+         }
         _ => {
             return Err(FfiError::SpecificParseError(format!("Unsupported action {:?} for this \
                                                              endpoint.",
