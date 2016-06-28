@@ -43,7 +43,7 @@ impl PublicIdType {
     /// An instanstance of the PublicIdType can be created using the new()
     pub fn new(id_type: &IdType, revocation_id: &RevocationIdType) -> PublicIdType {
         let type_tag = revocation_id.type_tags().2;
-        let public_keys = id_type.public_keys().clone();
+        let public_keys = id_type.public_keys();
         let revocation_public_key = revocation_id.public_key();
         let combined_iter = (public_keys.0)
             .0
@@ -73,8 +73,8 @@ impl PublicIdType {
 
         PublicIdType {
             type_tag: type_tag,
-            public_keys: public_keys,
-            revocation_public_key: revocation_id.public_key().clone(),
+            public_keys: *public_keys,
+            revocation_public_key: *revocation_id.public_key(),
             signature: sign::Signature(signature_arr),
         }
     }

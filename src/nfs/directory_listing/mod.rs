@@ -63,7 +63,7 @@ impl DirectoryListing {
 
     /// Returns the DirectoryKey representing the DirectoryListing
     pub fn get_key(&self) -> &DirectoryKey {
-        &self.metadata.get_key()
+        self.metadata.get_key()
     }
 
     /// Get Directory metadata
@@ -77,7 +77,7 @@ impl DirectoryListing {
     }
 
     /// Get all files in this DirectoryListing
-    pub fn get_files(&self) -> &Vec<File> {
+    pub fn get_files(&self) -> &[File] {
         &self.files
     }
 
@@ -87,7 +87,7 @@ impl DirectoryListing {
     }
 
     /// Get all subdirectories in this DirectoryListing
-    pub fn get_sub_directories(&self) -> &Vec<DirectoryMetadata> {
+    pub fn get_sub_directories(&self) -> &[DirectoryMetadata] {
         &self.sub_directories
     }
 
@@ -130,7 +130,7 @@ impl DirectoryListing {
 
     /// Get DirectoryInfo of sub_directory within a DirectoryListing.
     /// Returns the Option<DirectoryInfo> for the directory_name from the DirectoryListing
-    pub fn find_file(&self, file_name: &String) -> Option<&File> {
+    pub fn find_file(&self, file_name: &str) -> Option<&File> {
         self.get_files().iter().find(|file| *file.get_name() == *file_name)
     }
 
@@ -142,7 +142,7 @@ impl DirectoryListing {
 
     /// Get DirectoryInfo of sub_directory within a DirectoryListing.
     /// Returns the Option<DirectoryInfo> for the directory_name from the DirectoryListing
-    pub fn find_sub_directory(&self, directory_name: &String) -> Option<&DirectoryMetadata> {
+    pub fn find_sub_directory(&self, directory_name: &str) -> Option<&DirectoryMetadata> {
         self.get_sub_directories().iter().find(|info| *info.get_name() == *directory_name)
     }
 
@@ -154,7 +154,7 @@ impl DirectoryListing {
 
     /// If file is present in the DirectoryListing then replace it else insert it
     pub fn upsert_file(&mut self, file: File) {
-        let modified_time = file.get_metadata().get_modified_time().clone();
+        let modified_time = *file.get_metadata().get_modified_time();
         // TODO try using the below approach for efficiency - also try the same
         // in upsert_sub_directory
         //     if let Some(mut existing_file) = self.files.iter_mut().find(
@@ -175,7 +175,7 @@ impl DirectoryListing {
     /// If DirectoryMetadata is present in the sub_directories of DirectoryListing
     /// then replace it else insert it
     pub fn upsert_sub_directory(&mut self, directory_metadata: DirectoryMetadata) {
-        let modified_time = directory_metadata.get_modified_time().clone();
+        let modified_time = *directory_metadata.get_modified_time();
         if let Some(index) = self.sub_directories
             .iter()
             .position(|entry| *entry.get_key().get_id() == *directory_metadata.get_key().get_id()) {
@@ -191,7 +191,7 @@ impl DirectoryListing {
     }
 
     /// Remove a sub_directory
-    pub fn remove_sub_directory(&mut self, directory_name: &String) -> Result<(), NfsError> {
+    pub fn remove_sub_directory(&mut self, directory_name: &str) -> Result<(), NfsError> {
         let index = try!(self.get_sub_directories()
             .iter()
             .position(|dir_info| *dir_info.get_name() == *directory_name)
@@ -202,7 +202,7 @@ impl DirectoryListing {
     }
 
     /// Remove a file
-    pub fn remove_file(&mut self, file_name: &String) -> Result<(), NfsError> {
+    pub fn remove_file(&mut self, file_name: &str) -> Result<(), NfsError> {
         let index = try!(self.get_files()
             .iter()
             .position(|file| *file.get_name() == *file_name)

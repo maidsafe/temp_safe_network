@@ -49,7 +49,7 @@ impl File {
     }
 
     /// Get the name of the File
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> &str {
         self.metadata.get_name()
     }
 

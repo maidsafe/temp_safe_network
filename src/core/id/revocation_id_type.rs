@@ -37,6 +37,7 @@ pub struct RevocationIdType {
     secret_key: sign::SecretKey,
 }
 
+#[cfg_attr(feature="clippy", allow(new_without_default))]
 impl RevocationIdType {
     /// An instance of RevocationIdType can be created by invoking the new()
     /// Default contructed RevocationIdType instance is returned
@@ -90,7 +91,7 @@ impl RevocationIdType {
 
     /// Signs the data with the SecretKey of the AnMaid and recturns the Signed Data
     pub fn sign(&self, data: &[u8]) -> Vec<u8> {
-        sign::sign(&data, &self.secret_key)
+        sign::sign(data, &self.secret_key)
     }
 }
 

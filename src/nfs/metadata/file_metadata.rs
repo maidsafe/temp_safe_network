@@ -61,7 +61,7 @@ impl FileMetadata {
 
     /// Get name associated with the structure (file or directory) that this metadata is a part
     /// of
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
@@ -71,7 +71,7 @@ impl FileMetadata {
     }
 
     /// Get user setteble custom metadata
-    pub fn get_user_metadata(&self) -> &Vec<u8> {
+    pub fn get_user_metadata(&self) -> &[u8] {
         &self.user_metadata
     }
 

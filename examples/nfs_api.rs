@@ -48,7 +48,6 @@ use safe_core::core::client::Client;
 use safe_core::nfs::{self, AccessLevel};
 use safe_core::nfs::errors::NfsError;
 use safe_core::nfs::directory_listing::DirectoryListing;
-use safe_core::nfs::file::File;
 use safe_core::nfs::helper::directory_helper::DirectoryHelper;
 use safe_core::nfs::helper::file_helper::FileHelper;
 use safe_core::nfs::helper::writer::Mode;
@@ -238,7 +237,7 @@ fn file_operation(option: u32,
         5 => {
             // List files
             let directory = try!(get_child_directory(client, directory));
-            let files: Vec<File> = directory.get_files().clone();
+            let files = directory.get_files();
             if files.is_empty() {
                 println!("No Files found in Directory - {}",
                          directory.get_metadata().get_name());

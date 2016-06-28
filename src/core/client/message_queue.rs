@@ -211,10 +211,8 @@ impl MessageQueue {
     }
 
     fn purge_dead_senders<T>(senders: &mut Vec<Sender<T>>, positions: Vec<usize>) {
-        let mut delta = 0;
-        for val in positions {
+        for (delta, val) in positions.into_iter().enumerate() {
             let _ = senders.remove(val - delta);
-            delta += 1;
         }
     }
 }

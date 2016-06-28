@@ -34,7 +34,7 @@ impl MoveDirectory {
     fn get_directory(&self,
                      params: &ParameterPacket,
                      shared: bool,
-                     path: &String)
+                     path: &str)
                      -> Result<DirectoryListing, FfiError> {
         let start_dir_key = if shared {
             try!(params.clone()
@@ -66,11 +66,11 @@ impl Action for MoveDirectory {
         }
         let org_parent_of_src_dir = src_dir.get_metadata().get_key().clone();
         if self.retain_source {
-            let name = src_dir.get_metadata().get_name().clone();
-            let user_metadata = src_dir.get_metadata().get_user_metadata().clone();
+            let name = src_dir.get_metadata().get_name().to_owned();
+            let user_metadata = src_dir.get_metadata().get_user_metadata().to_owned();
             let access_level = src_dir.get_metadata().get_access_level().clone();
-            let created_time = src_dir.get_metadata().get_created_time().clone();
-            let modified_time = src_dir.get_metadata().get_modified_time().clone();
+            let created_time = *src_dir.get_metadata().get_created_time();
+            let modified_time = *src_dir.get_metadata().get_modified_time();
             let mut dir = try!(DirectoryListing::new(name,
                                                      src_dir.get_metadata()
                                                          .get_key()
