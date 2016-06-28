@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use ffi::errors::FfiError;
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, helper, ParameterPacket, ResponseType};
 use rustc_serialize::json;
 
 #[derive(RustcDecodable, Debug)]
