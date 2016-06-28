@@ -279,7 +279,7 @@ pub extern "C" fn get_safe_drive_key(c_size: *mut int32_t,
 }
 
 /// Discard and clean up the previously allocated client. Use this only if the client is obtained
-/// from one of the client obtainment functions in this crate (`crate_account`, `log_in`,
+/// from one of the client obtainment functions in this crate (`create_account`, `log_in`,
 /// `create_unregistered_client`). Using `client_handle` after a call to this functions is
 /// undefined behaviour.
 #[no_mangle]
