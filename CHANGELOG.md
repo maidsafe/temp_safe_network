@@ -1,5 +1,16 @@
 # Safe Core - Change Log
 
+## [0.16.0]
+- Update dependencies
+- Refactor FFI as `Box::into_raw()` is stable
+- Refactor FFI to deal with pointer to concrete types instead of ptr to void for more type safety
+- Fix undefined behaviour in transmute to unrelated type in FFI
+- Fix non-termination of background thread which got exposed after fixing the above
+- Reorder Imports
+- Resolve many Clippy errors
+- Expose functionality to collect stats on GETs/PUTs/POSTs/DELETEs
+- Error recovery for failure in intermediary steps of a composite operation (like DNS register and delete).
+
 ## [0.15.1]
 - Upgrade routing to 0.22.0
 - Upgrade safe_network_common to 0.3.0
