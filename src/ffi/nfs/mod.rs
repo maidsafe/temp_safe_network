@@ -26,6 +26,7 @@ mod delete_dir;
 mod delete_file;
 mod get_dir;
 mod get_file;
+mod get_file_metadata;
 mod move_dir;
 mod move_file;
 mod modify_dir;
@@ -109,7 +110,12 @@ fn get_action<D>(action: String, decoder: &mut D) -> Result<Box<Action>, FfiErro
                                         }),
                                         "")))
         }
-
+        "get-file-metadata" => {
+            Box::new(try!(parse_result!(decoder.read_struct_field("data", 0, |d| {
+                                          get_file_metadata::GetFileMetadata::decode(d)
+                                       }),
+                                       "")))
+         }
         _ => {
             return Err(FfiError::SpecificParseError(format!("Unsupported action {:?} for this \
                                                              endpoint.",
