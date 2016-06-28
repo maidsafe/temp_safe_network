@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::{mem, thread};
-use std::sync::{Arc, mpsc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
 use bincode::SizeLimit;
