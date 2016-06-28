@@ -177,8 +177,8 @@ impl DnsOperations {
                             -> Result<Vec<String>, DnsError> {
         // Allow unregistered clients to access this function
         match self.find_dns_record(long_name) {
-            Ok(_) => (),
-            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) => (),
+            Ok(_) |
+            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) |
             Err(DnsError::NfsError(NfsError::CoreError(
                 CoreError::OperationForbiddenForClient))) => (),
             Err(error) => return Err(error),
@@ -200,10 +200,10 @@ impl DnsOperations {
                                           -> Result<DirectoryKey, DnsError> {
         // Allow unregistered clients to access this function
         match self.find_dns_record(long_name) {
-            Ok(_) => (),
-            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) => (),
+            Ok(_) |
+            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) |
             Err(DnsError::NfsError(NfsError::CoreError(
-                CoreError::OperationForbiddenForClient))) => (),
+                CoreError::OperationForbiddenForClient))) |
             Err(DnsError::DnsRecordNotFound) => (),
             Err(error) => return Err(error),
         };

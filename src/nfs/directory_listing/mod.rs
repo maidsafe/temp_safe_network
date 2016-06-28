@@ -216,9 +216,7 @@ impl DirectoryListing {
     pub fn generate_nonce(directory_id: &XorName) -> box_::Nonce {
         let mut nonce = [0u8; box_::NONCEBYTES];
         let min_length = cmp::min(nonce.len(), directory_id.0.len());
-        for i in 0..min_length {
-            nonce[i] = directory_id.0[i];
-        }
+        nonce.clone_from_slice(&directory_id.0[..min_length]);
         box_::Nonce(nonce)
     }
 }
@@ -297,12 +295,12 @@ mod test {
         let _ = unwrap_option!(directory_listing.find_file(file2.get_name()),
                                "File not found");
 
-        let _ = unwrap_result!(directory_listing.remove_file(file.get_metadata().get_name()));
+        unwrap_result!(directory_listing.remove_file(file.get_metadata().get_name()));
         assert!(directory_listing.find_file(file.get_name()).is_none());
         assert!(directory_listing.find_file(file2.get_name()).is_some());
         assert_eq!(directory_listing.get_files().len(), 1);
 
-        let _ = unwrap_result!(directory_listing.remove_file(file2.get_metadata().get_name()));
+        unwrap_result!(directory_listing.remove_file(file2.get_metadata().get_name()));
         assert_eq!(directory_listing.get_files().len(), 0);
     }
 
@@ -345,7 +343,7 @@ mod test {
                                        .get_name()),
                                "Directory not found");
 
-        let _ = unwrap_result!(directory_listing.remove_sub_directory(sub_directory.get_metadata()
+        unwrap_result!(directory_listing.remove_sub_directory(sub_directory.get_metadata()
             .get_name()));
         assert!(directory_listing.find_sub_directory(sub_directory.get_metadata().get_name())
             .is_none());
@@ -353,7 +351,7 @@ mod test {
             .is_some());
         assert_eq!(directory_listing.get_sub_directories().len(), 1);
 
-        let _ = unwrap_result!(directory_listing.remove_sub_directory(
+        unwrap_result!(directory_listing.remove_sub_directory(
             sub_directory_two.get_metadata().get_name()));
         assert_eq!(directory_listing.get_sub_directories().len(), 0);
     }

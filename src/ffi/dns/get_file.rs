@@ -20,7 +20,6 @@ use dns::dns_operations::DnsOperations;
 use ffi::{helper, ParameterPacket, ResponseType, Action};
 use ffi::errors::FfiError;
 use ffi::nfs::file_response::get_response;
-use nfs::helper::directory_helper::DirectoryHelper;
 
 #[derive(RustcDecodable, Debug)]
 pub struct GetFile {
@@ -43,14 +42,9 @@ impl Action for GetFile {
                                                                                None));
         let mut tokens = helper::tokenise_path(&self.file_path, false);
         let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
-        let file_dir = if tokens.len() > 0 {
-            try!(helper::get_final_subdirectory(params.client.clone(),
+        let file_dir = try!(helper::get_final_subdirectory(params.client.clone(),
                                                 &tokens,
-                                                Some(&directory_key)))
-        } else {
-            let dir_helper = DirectoryHelper::new(params.client.clone());
-            try!(dir_helper.get(&directory_key))
-        };
+                                                Some(&directory_key)));
         let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
         let response = try!(get_response(file,
                                          params.client,
