@@ -38,7 +38,7 @@ pub fn c_char_ptr_to_string(c_char_ptr: *const c_char) -> Result<String, FfiErro
 
 pub fn tokenise_path(path: &str, keep_empty_splits: bool) -> Vec<String> {
     path.split(|element| element == '/')
-        .filter(|token| keep_empty_splits || token.len() != 0)
+        .filter(|token| keep_empty_splits || !token.is_empty())
         .map(|token| token.to_string())
         .collect()
 }

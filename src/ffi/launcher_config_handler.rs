@@ -83,8 +83,8 @@ impl ConfigHandler {
 
     fn get_app_id(&self, app_key: &str, vendor: &str) -> XorName {
         let mut id_str = String::new();
-        id_str.push_str(&app_key);
-        id_str.push_str(&vendor);
+        id_str.push_str(app_key);
+        id_str.push_str(vendor);
         XorName(sha256::hash(id_str.as_bytes()).0)
     }
 

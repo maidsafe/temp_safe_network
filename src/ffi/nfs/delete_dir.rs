@@ -38,7 +38,7 @@ impl Action for DeleteDir {
                 .ok_or(FfiError::from("Application directory key is not present")))))
         };
 
-        let mut parent_dir = if tokens.len() == 0 {
+        let mut parent_dir = if tokens.is_empty() {
             root_dir
         } else {
             try!(helper::get_final_subdirectory(params.client,

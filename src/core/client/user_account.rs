@@ -249,10 +249,11 @@ mod test {
                                                                    .as_bytes())));
 
         let keyword2 = "user2".to_owned();
-        assert!(unwrap_result!(Account::generate_network_id(keyword1.as_bytes(),
-                                                            248.to_string().as_bytes())) !=
-                unwrap_result!(Account::generate_network_id(keyword2.as_bytes(),
-                                                            248.to_string().as_bytes())));
+        let gen_id1 = Account::generate_network_id(keyword1.as_bytes(),
+                                                   248.to_string().as_bytes());
+        let gen_id2 = Account::generate_network_id(keyword2.as_bytes(),
+                                                   248.to_string().as_bytes());
+        assert!(unwrap_result!(gen_id1) != unwrap_result!(gen_id2));
     }
 
     #[test]
