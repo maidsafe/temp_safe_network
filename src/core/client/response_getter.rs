@@ -55,7 +55,7 @@ impl GetResponseGetter {
                     let data = try!(result);
                     if let DataIdentifier::Immutable(..) = self.requested_id {
                         let mut msg_queue = unwrap_result!(self.message_queue.lock());
-                        msg_queue.local_cache_insert(self.requested_name.clone(), data.clone());
+                        msg_queue.local_cache_insert(self.requested_name, data.clone());
                     }
 
                     Ok(data)

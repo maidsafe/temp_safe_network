@@ -112,9 +112,8 @@ mod test {
                         -> Result<(), errors::FfiError> {
         let (msg_public_key, msg_secret_key) = box_::gen_keypair();
         let services = vec![(service_name.clone(), (directory_key.clone()))];
-        let public_signing_key = try!(unwrap_result!(params.client.lock())
-                                          .get_public_signing_key())
-                                     .clone();
+        let public_signing_key = *try!(unwrap_result!(params.client.lock())
+                                          .get_public_signing_key());
         let secret_signing_key = try!(unwrap_result!(params.client.lock())
                                           .get_secret_signing_key())
                                      .clone();

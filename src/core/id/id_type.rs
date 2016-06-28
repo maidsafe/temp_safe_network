@@ -79,13 +79,13 @@ impl IdType {
 
     /// Signs the data with the SecretKey and returns the Signed data
     pub fn sign(&self, data: &[u8]) -> Vec<u8> {
-        sign::sign(&data, &self.secret_keys.0)
+        sign::sign(data, &self.secret_keys.0)
     }
 
     /// Encrypts and authenticates data. It returns a ciphertext and the Nonce.
     pub fn seal(&self, data: &[u8], to: &box_::PublicKey) -> (Vec<u8>, box_::Nonce) {
         let nonce = box_::gen_nonce();
-        let sealed = box_::seal(data, &nonce, &to, &self.secret_keys.1);
+        let sealed = box_::seal(data, &nonce, to, &self.secret_keys.1);
         (sealed, nonce)
     }
 
@@ -95,7 +95,7 @@ impl IdType {
                 nonce: &box_::Nonce,
                 from: &box_::PublicKey)
                 -> Result<Vec<u8>, CoreError> {
-        box_::open(&data, &nonce, &from, &self.secret_keys.1)
+        box_::open(data, nonce, from, &self.secret_keys.1)
             .map_err(|_| CoreError::AsymmetricDecipherFailure)
     }
 }

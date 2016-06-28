@@ -111,9 +111,9 @@ impl Client {
                           password: String)
                           -> Result<Client, CoreError> {
         let account_packet = Account::new(None, None);
-        let id_packet = FullId::with_keys((account_packet.get_maid().public_keys().1.clone(),
+        let id_packet = FullId::with_keys((account_packet.get_maid().public_keys().1,
                                            account_packet.get_maid().secret_keys().1.clone()),
-                                          (account_packet.get_maid().public_keys().0.clone(),
+                                          (account_packet.get_maid().public_keys().0,
                                            account_packet.get_maid().secret_keys().0.clone()));
 
         let (routing_sender, routing_receiver) = mpsc::channel();
@@ -152,10 +152,9 @@ impl Client {
                 let session_packet_keys = unwrap_option!(client.session_packet_keys.as_ref(),
                                                          LOGIC_ERROR);
 
-                let session_packet_id = unwrap_option!(client.session_packet_id.as_ref(), LOGIC_ERROR)
-                    .clone();
+                let session_packet_id = unwrap_option!(client.session_packet_id.as_ref(), LOGIC_ERROR);
                 try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                         session_packet_id,
+                                         *session_packet_id,
                                          0,
                                          try!(account.encrypt(session_packet_keys.get_password(),
                                                               session_packet_keys.get_pin())),
@@ -177,7 +176,7 @@ impl Client {
         let mut unregistered_client = try!(Client::create_unregistered_client());
         let user_id = try!(Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
 
-        let session_packet_request = DataIdentifier::Structured(user_id.clone(),
+        let session_packet_request = DataIdentifier::Structured(user_id,
                                                                 TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(unregistered_client.get(session_packet_request, None));
@@ -188,16 +187,14 @@ impl Client {
                                                                  pin.as_bytes()));
             let id_packet = FullId::with_keys((decrypted_session_packet.get_maid()
                                                   .public_keys()
-                                                  .1
-                                                  .clone(),
+                                                  .1,
                                                decrypted_session_packet.get_maid()
                                                   .secret_keys()
                                                   .1
                                                   .clone()),
                                               (decrypted_session_packet.get_maid()
                                                   .public_keys()
-                                                  .0
-                                                  .clone(),
+                                                  .0,
                                                decrypted_session_packet.get_maid()
                                                   .secret_keys()
                                                   .0
@@ -307,7 +304,7 @@ impl Client {
         };
 
         utility::hybrid_encrypt(data_to_encrypt,
-                                &nonce,
+                                nonce,
                                 &account.get_public_maid().public_keys().1,
                                 &account.get_maid().secret_keys().1)
     }
@@ -333,7 +330,7 @@ impl Client {
         };
 
         utility::hybrid_decrypt(data_to_decrypt,
-                                &nonce,
+                                nonce,
                                 &account.get_public_maid().public_keys().1,
                                 &account.get_maid().secret_keys().1)
     }
@@ -360,7 +357,7 @@ impl Client {
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
         unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id.clone(), tx.clone());
+            .register_response_observer(msg_id, tx.clone());
 
         try!(self.routing.send_get_request(dst, request_for.clone(), msg_id));
 
@@ -377,14 +374,14 @@ impl Client {
         let dst = match opt_dst {
             Some(auth) => auth,
             None => {
-                Authority::ClientManager(try!(self.get_default_client_manager_address()).clone())
+                Authority::ClientManager(*try!(self.get_default_client_manager_address()))
             }
         };
 
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
         unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id.clone(), tx.clone());
+            .register_response_observer(msg_id, tx.clone());
 
         try!(self.routing.send_put_request(dst, data, msg_id));
 
@@ -454,7 +451,7 @@ impl Client {
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
         unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id.clone(), tx.clone());
+            .register_response_observer(msg_id, tx.clone());
 
         try!(self.routing.send_post_request(dst, data, msg_id));
 
@@ -476,7 +473,7 @@ impl Client {
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
         unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id.clone(), tx.clone());
+            .register_response_observer(msg_id, tx.clone());
 
         try!(self.routing.send_delete_request(dst, data, msg_id));
 
@@ -487,7 +484,7 @@ impl Client {
     /// the network.
     pub fn delete_recover(&mut self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
         match self.delete(data, opt_dst).and_then(|g| g.get()) {
-            Ok(()) => Ok(()),
+            Ok(()) |
             Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => Ok(()),
             Err(e) => Err(e),
         }
@@ -523,7 +520,7 @@ impl Client {
                           -> Result<MutationResponseGetter, CoreError> {
         self.messaging_delete_request(target_account,
                                       message_name,
-                                      MpidMessageWrapper::DeleteMessage(message_name.clone()))
+                                      MpidMessageWrapper::DeleteMessage(message_name))
     }
 
     /// Delete a header from own inbox. This is non-blocking.
@@ -533,7 +530,7 @@ impl Client {
                          -> Result<MutationResponseGetter, CoreError> {
         self.messaging_delete_request(mpid_account,
                                       header_name,
-                                      MpidMessageWrapper::DeleteHeader(header_name.clone()))
+                                      MpidMessageWrapper::DeleteHeader(header_name))
     }
 
     fn messaging_delete_request(&mut self,
@@ -589,7 +586,7 @@ impl Client {
         let (tx, rx) = mpsc::channel();
         let msg_id = MessageId::new();
         unwrap_result!(self.message_queue.lock())
-            .register_response_observer(msg_id.clone(), tx.clone());
+            .register_response_observer(msg_id, tx.clone());
 
         Ok(GetResponseGetter::new(Some((tx, rx)), self.message_queue.clone(), data_request))
     }
@@ -641,11 +638,10 @@ impl Client {
     }
 
     fn update_session_packet(&mut self) -> Result<(), CoreError> {
-        let session_packet_id = try!(self.session_packet_id
+        let session_packet_id = *try!(self.session_packet_id
                 .as_ref()
-                .ok_or(CoreError::OperationForbiddenForClient))
-            .clone();
-        let session_packet_request = DataIdentifier::Structured(session_packet_id.clone(),
+                .ok_or(CoreError::OperationForbiddenForClient));
+        let session_packet_request = DataIdentifier::Structured(session_packet_id,
                                                                 TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(self.get(session_packet_request, None));
@@ -814,7 +810,7 @@ mod test {
         // Operations Not Allowed for Unregistered Client
         let rand_name: XorName = rand::random();
 
-        match (unregistered_client.set_user_root_directory_id(rand_name.clone()),
+        match (unregistered_client.set_user_root_directory_id(rand_name),
                unregistered_client.set_configuration_root_directory_id(rand_name)) {
             (Err(CoreError::OperationForbiddenForClient),
              Err(CoreError::OperationForbiddenForClient)) => (),
@@ -953,7 +949,7 @@ mod test {
             {
                 let resp_getter = GetResponseGetter::new(None,
                                                          client.message_queue.clone(),
-                                                         data_request.clone());
+                                                         data_request);
 
                 match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
@@ -962,7 +958,7 @@ mod test {
                 }
             }
 
-            let response_getter = unwrap_result!(client.get(data_request.clone(), None));
+            let response_getter = unwrap_result!(client.get(data_request, None));
             assert_eq!(unwrap_result!(response_getter.get()), data);
 
             let resp_getter =
@@ -992,7 +988,7 @@ mod test {
             {
                 let resp_getter = GetResponseGetter::new(None,
                                                          client.message_queue.clone(),
-                                                         data_request.clone());
+                                                         data_request);
 
                 match resp_getter.get() {
                     Ok(_) => panic!("Should not have found data in version cache !!"),
@@ -1001,7 +997,7 @@ mod test {
                 }
             }
 
-            let response_getter = unwrap_result!(client.get(data_request.clone(), None));
+            let response_getter = unwrap_result!(client.get(data_request, None));
             assert_eq!(unwrap_result!(response_getter.get()), data);
 
             // Should not be in version cache even after fetch

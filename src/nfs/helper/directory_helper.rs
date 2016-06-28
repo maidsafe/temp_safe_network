@@ -87,11 +87,11 @@ impl DirectoryHelper {
     /// Returns Option<parent_directory's parent>
     pub fn delete(&self,
                   parent_directory: &mut DirectoryListing,
-                  directory_to_delete: &String)
+                  directory_to_delete: &str)
                   -> Result<Option<DirectoryListing>, NfsError> {
         try!(parent_directory.remove_sub_directory(directory_to_delete));
         parent_directory.get_mut_metadata().set_modified_time(::time::now_utc());
-        self.update(&parent_directory)
+        self.update(parent_directory)
     }
 
     /// Updates an existing DirectoryListing in the network.
@@ -157,9 +157,8 @@ impl DirectoryHelper {
 
             let encryption_keys = match *access_level {
                 AccessLevel::Private => {
-                    private_key = try!(unwrap_result!(self.client.lock())
-                            .get_public_encryption_key())
-                        .clone();
+                    private_key = *try!(unwrap_result!(self.client.lock())
+                            .get_public_encryption_key());
                     secret_key = try!(unwrap_result!(self.client.lock())
                             .get_secret_encryption_key())
                         .clone();
@@ -181,7 +180,7 @@ impl DirectoryHelper {
     pub fn get_user_root_directory_listing(&self) -> Result<DirectoryListing, NfsError> {
         let root_directory_id = unwrap_result!(self.client.lock())
             .get_user_root_directory_id()
-            .map(|id| id.clone());
+            .map(|id| *id);
         match root_directory_id {
             Some(id) => {
                 debug!("Retrieving directory at id {:?} ...", id);
@@ -213,7 +212,7 @@ impl DirectoryHelper {
                                                -> Result<DirectoryListing, NfsError> {
         let config_dir_id = unwrap_result!(self.client.lock())
             .get_configuration_root_directory_id()
-            .map(|id| id.clone());
+            .map(|id| *id);
         let mut config_directory_listing = match config_dir_id {
             Some(id) => {
                 debug!("Retrieving root configuration directory at id {:?} ...", id);
@@ -267,7 +266,7 @@ impl DirectoryHelper {
                               directory: &DirectoryListing)
                               -> Result<StructuredData, NfsError> {
         let signing_key = try!(unwrap_result!(self.client.lock()).get_secret_signing_key()).clone();
-        let owner_key = try!(unwrap_result!(self.client.lock()).get_public_signing_key()).clone();
+        let owner_key = *try!(unwrap_result!(self.client.lock()).get_public_signing_key());
         let access_level = directory.get_key().get_access_level();
         let versioned = directory.get_key().is_versioned();
 
@@ -286,8 +285,7 @@ impl DirectoryHelper {
                                       Vec::new(),
                                       &signing_key)))
         } else {
-            let private_key = try!(unwrap_result!(self.client.lock()).get_public_encryption_key())
-                .clone();
+            let private_key = *try!(unwrap_result!(self.client.lock()).get_public_encryption_key());
             let secret_key = try!(unwrap_result!(self.client.lock()).get_secret_encryption_key())
                 .clone();
             let nonce = DirectoryListing::generate_nonce(directory.get_key().get_id());
@@ -314,7 +312,7 @@ impl DirectoryHelper {
                                                             directory.get_key().get_type_tag()));
 
         let signing_key = try!(unwrap_result!(self.client.lock()).get_secret_signing_key()).clone();
-        let owner_key = try!(unwrap_result!(self.client.lock()).get_public_signing_key()).clone();
+        let owner_key = *try!(unwrap_result!(self.client.lock()).get_public_signing_key());
         let access_level = directory.get_key().get_access_level();
         let versioned = directory.get_key().is_versioned();
 
@@ -329,8 +327,7 @@ impl DirectoryHelper {
                                            version,
                                            &signing_key))
         } else {
-            let private_key = try!(unwrap_result!(self.client.lock()).get_public_encryption_key())
-                .clone();
+            let private_key = *try!(unwrap_result!(self.client.lock()).get_public_encryption_key());
             let secret_key = try!(unwrap_result!(self.client.lock()).get_secret_encryption_key())
                 .clone();
             let nonce = DirectoryListing::generate_nonce(directory.get_key().get_id());
@@ -368,7 +365,7 @@ impl DirectoryHelper {
 
     /// Get StructuredData from the Network
     fn get_structured_data(&self, id: &XorName, type_tag: u64) -> Result<StructuredData, NfsError> {
-        let request = DataIdentifier::Structured(id.clone(), type_tag);
+        let request = DataIdentifier::Structured(*id, type_tag);
         debug!("Getting structured data from the network ...");
         let response_getter = try!(unwrap_result!(self.client.lock()).get(request, None));
         match try!(response_getter.get()) {
@@ -522,10 +519,10 @@ mod test {
             unwrap_result!(dir_helper.get_configuration_directory_listing("DNS".to_string()));
         assert_eq!(config_dir.get_metadata().get_name().clone(),
                    "DNS".to_string());
-        let id = config_dir.get_key().get_id().clone();
+        let id = config_dir.get_key().get_id();
         let config_dir =
             unwrap_result!(dir_helper.get_configuration_directory_listing("DNS".to_string()));
-        assert_eq!(config_dir.get_key().get_id().clone(), id);
+        assert_eq!(config_dir.get_key().get_id(), id);
     }
 
     #[test]

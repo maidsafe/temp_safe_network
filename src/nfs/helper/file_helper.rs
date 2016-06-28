@@ -75,7 +75,7 @@ impl FileHelper {
         debug!("Deleting {:?} file from directory listing ...", file_name);
         try!(parent_directory.remove_file(&file_name));
         let directory_helper = DirectoryHelper::new(self.client.clone());
-        directory_helper.update(&parent_directory)
+        directory_helper.update(parent_directory)
     }
 
     /// Updates the file metadata.
@@ -94,7 +94,7 @@ impl FileHelper {
         }
         parent_directory.upsert_file(file);
         let directory_helper = DirectoryHelper::new(self.client.clone());
-        directory_helper.update(&parent_directory)
+        directory_helper.update(parent_directory)
     }
 
     /// Helper function to Update content of a file in a directory listing
@@ -252,7 +252,7 @@ mod test {
             let _ = unwrap_result!(file_helper.update_metadata(file, &mut directory));
             let file = unwrap_option!(directory.find_file(&file_name).map(|file| file.clone()),
                                       "File not found");
-            assert_eq!(*file.get_metadata().get_user_metadata(), vec![12u8; 10]);
+            assert_eq!(*file.get_metadata().get_user_metadata(), [12u8; 10][..]);
         }
         {
             // Delete

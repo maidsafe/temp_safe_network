@@ -195,11 +195,6 @@ impl Account {
                 for it in salt_bytes.iter_mut().enumerate() {
                     *it.1 = hashed_pin.0[it.0];
                 }
-            } else if salt_bytes.len() == sha256::DIGESTBYTES {
-                let hashed_pin = sha256::hash(user_salt);
-                for it in salt_bytes.iter_mut().enumerate() {
-                    *it.1 = hashed_pin.0[it.0];
-                }
             } else {
                 return Err(CoreError::UnsupportedSaltSizeForPwHash);
             }

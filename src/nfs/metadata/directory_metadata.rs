@@ -86,7 +86,7 @@ impl DirectoryMetadata {
 
     /// Get name associated with the structure (file or directory) that this metadata is a part
     /// of
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
@@ -101,7 +101,7 @@ impl DirectoryMetadata {
     }
 
     /// Get user setteble custom metadata
-    pub fn get_user_metadata(&self) -> &Vec<u8> {
+    pub fn get_user_metadata(&self) -> &[u8] {
         &self.user_metadata
     }
 
@@ -229,11 +229,11 @@ mod test {
                                                                          AccessLevel::Private))));
         let user_metadata = "{mime: \"application/json\"}".to_string().into_bytes();
         obj_before.set_user_metadata(user_metadata.clone());
-        obj_before.set_modified_time(modified_time.clone());
+        obj_before.set_modified_time(modified_time);
         obj_before.set_name("index.txt".to_string());
         let serialised_data = unwrap_result!(serialise(&obj_before));
         let obj_after: DirectoryMetadata = unwrap_result!(deserialise(&serialised_data));
-        assert_eq!(user_metadata, *obj_after.get_user_metadata());
+        assert_eq!(*user_metadata, *obj_after.get_user_metadata());
         assert_eq!(modified_time, *obj_after.get_modified_time());
         assert_eq!("index.txt".to_string(), *obj_after.get_name());
     }

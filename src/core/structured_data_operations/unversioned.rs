@@ -170,7 +170,7 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
     }
 }
 
-fn get_decoded_stored_data(raw_data: &Vec<u8>,
+fn get_decoded_stored_data(raw_data: &[u8],
                            data_decryption_keys: Option<(&box_::PublicKey,
                                                          &box_::SecretKey,
                                                          &box_::Nonce)>)

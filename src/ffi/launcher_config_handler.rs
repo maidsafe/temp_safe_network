@@ -52,9 +52,9 @@ impl ConfigHandler {
         let app_id = self.get_app_id(&app_key, &vendor);
 
         let (configs, _) = try!(self.get_launcher_global_config_and_dir());
-        let app_dir_key = match configs.iter()
+        let app_dir_key = match configs.into_iter()
             .find(|config| config.app_id == app_id)
-            .map(|config| config.clone()) {
+            .map(|config| config) {
             Some(config) => config.app_root_dir_key.clone(),
             None => {
                 let dir_helper = DirectoryHelper::new(self.client.clone());
@@ -81,14 +81,14 @@ impl ConfigHandler {
         Ok(app_dir_key)
     }
 
-    fn get_app_id(&self, app_key: &String, vendor: &String) -> XorName {
+    fn get_app_id(&self, app_key: &str, vendor: &str) -> XorName {
         let mut id_str = String::new();
         id_str.push_str(&app_key);
         id_str.push_str(&vendor);
         XorName(sha256::hash(id_str.as_bytes()).0)
     }
 
-    fn get_app_dir_name(&self, app_name: &String, directory_listing: &DirectoryListing) -> String {
+    fn get_app_dir_name(&self, app_name: &str, directory_listing: &DirectoryListing) -> String {
         let mut dir_name = format!("{}-Root-Dir", &app_name);
         if directory_listing.find_sub_directory(&dir_name).is_some() {
             let mut index = 1u8;

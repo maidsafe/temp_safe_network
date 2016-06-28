@@ -65,7 +65,7 @@ pub fn get_safe_drive_key(client: Arc<Mutex<Client>>) -> Result<DirectoryKey, Ff
 }
 
 pub fn get_final_subdirectory(client: Arc<Mutex<Client>>,
-                              tokens: &Vec<String>,
+                              tokens: &[String],
                               starting_directory: Option<&DirectoryKey>)
                               -> Result<DirectoryListing, FfiError> {
     let dir_helper = DirectoryHelper::new(client);

@@ -73,7 +73,7 @@ pub fn get_approximate_space_for_data(owner_keys: Vec<sign::PublicKey>,
 }
 
 /// Check if it is possible to fit the given data into the given StructuredData
-pub fn check_if_data_can_fit_in_structured_data(data: &Vec<u8>,
+pub fn check_if_data_can_fit_in_structured_data(data: &[u8],
                                                 owner_keys: Vec<sign::PublicKey>,
                                                 prev_owner_keys: Vec<sign::PublicKey>)
                                                 -> Result<DataFitResult, CoreError> {
@@ -145,7 +145,7 @@ mod test {
         {
             let mut keys = test_utils::get_max_sized_public_keys(1);
             assert_eq!(DataFitResult::DataFits,
-                unwrap_result!(check_if_data_can_fit_in_structured_data(&Vec::with_capacity(0),
+                unwrap_result!(check_if_data_can_fit_in_structured_data(&[],
                                                                         keys.clone(),
                                                                         Vec::new())));
             assert_eq!(DataFitResult::DataDoesNotFit,
@@ -158,7 +158,7 @@ mod test {
                                                                                Vec::new())));
             keys.extend(test_utils::get_max_sized_public_keys(902));
             assert_eq!(DataFitResult::DataFits,
-                 unwrap_result!(check_if_data_can_fit_in_structured_data(&Vec::with_capacity(0),
+                 unwrap_result!(check_if_data_can_fit_in_structured_data(&[],
                                                                          keys.clone(),
                                                                          Vec::new())));
             assert_eq!(DataFitResult::DataDoesNotFit,
@@ -167,7 +167,7 @@ mod test {
                                                                                Vec::new())));
             keys.extend(test_utils::get_max_sized_public_keys(1));
             assert_eq!(DataFitResult::NoDataCanFit,
-                 unwrap_result!(check_if_data_can_fit_in_structured_data(&Vec::with_capacity(0),
+                 unwrap_result!(check_if_data_can_fit_in_structured_data(&[],
                                                                          keys.clone(),
                                                                          Vec::new())));
         }
@@ -175,17 +175,17 @@ mod test {
         {
             let mut keys = test_utils::generate_public_keys(250);
             assert_eq!(DataFitResult::DataFits,
-                       unwrap_result!(check_if_data_can_fit_in_structured_data(&Vec::new(),
+                       unwrap_result!(check_if_data_can_fit_in_structured_data(&[],
                                                                                keys.clone(),
                                                                                Vec::new())));
             assert_eq!(DataFitResult::DataFits,
                        unwrap_result!(check_if_data_can_fit_in_structured_data(
-                           &Vec::new(),
+                           &[],
                            test_utils::generate_public_keys(1),
                            keys.clone())));
             keys.extend(test_utils::generate_public_keys(750));
             assert_eq!(DataFitResult::NoDataCanFit,
-                       unwrap_result!(check_if_data_can_fit_in_structured_data(&Vec::new(),
+                       unwrap_result!(check_if_data_can_fit_in_structured_data(&[],
                                                                                keys,
                                                                                Vec::new())));
         }

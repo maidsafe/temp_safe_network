@@ -34,7 +34,7 @@ impl MoveFile {
     fn get_directory_and_file(&self,
                               params: &ParameterPacket,
                               shared: bool,
-                              path: &String)
+                              path: &str)
                               -> Result<(DirectoryListing, String), FfiError> {
         let start_dir_key = if shared {
             try!(params.clone()
@@ -57,7 +57,7 @@ impl MoveFile {
     fn get_directory(&self,
                      params: &ParameterPacket,
                      shared: bool,
-                     path: &String)
+                     path: &str)
                      -> Result<DirectoryListing, FfiError> {
         let start_dir_key = if shared {
             try!(params.clone()

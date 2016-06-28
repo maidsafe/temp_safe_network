@@ -29,7 +29,7 @@ impl Action for RegisterPublicId {
         let (msg_public_key, msg_secret_key) = box_::gen_keypair();
         let services = vec![];
         let public_signing_key =
-            try!(unwrap_result!(params.client.lock()).get_public_signing_key()).clone();
+            *try!(unwrap_result!(params.client.lock()).get_public_signing_key());
         let secret_signing_key =
             try!(unwrap_result!(params.client.lock()).get_secret_signing_key()).clone();
         let dns_operation = try!(DnsOperations::new(params.client

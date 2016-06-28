@@ -91,7 +91,7 @@ fn get_directory_info(dir_metadata: &DirectoryMetadata) -> DirectoryInfo {
     let modified_time = dir_metadata.get_modified_time().to_timespec();
 
     DirectoryInfo {
-        name: dir_metadata.get_name().clone(),
+        name: dir_metadata.get_name().to_owned(),
         is_private: *dir_key.get_access_level() == ::nfs::AccessLevel::Private,
         is_versioned: dir_key.is_versioned(),
         user_metadata: (*dir_metadata.get_user_metadata()).to_base64(config::get_base64_config()),
@@ -108,7 +108,7 @@ fn get_file_info(file_metadata: &FileMetadata) -> FileInfo {
     let created_time = file_metadata.get_created_time().to_timespec();
     let modified_time = file_metadata.get_modified_time().to_timespec();
     FileInfo {
-        name: file_metadata.get_name().clone(),
+        name: file_metadata.get_name().to_owned(),
         size: file_metadata.get_size() as i64,
         user_metadata: (*file_metadata.get_user_metadata()).to_base64(config::get_base64_config()),
         creation_time_sec: created_time.sec,

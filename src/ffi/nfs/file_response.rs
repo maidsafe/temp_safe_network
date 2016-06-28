@@ -74,7 +74,7 @@ fn get_file_metadata(file_metadata: &FileMetadata) -> Metadata {
     let created_time = file_metadata.get_created_time().to_timespec();
     let modified_time = file_metadata.get_modified_time().to_timespec();
     Metadata {
-        name: file_metadata.get_name().clone(),
+        name: file_metadata.get_name().to_owned(),
         size: file_metadata.get_size() as i64,
         user_metadata: (*file_metadata.get_user_metadata()).to_base64(config::get_base64_config()),
         creation_time_sec: created_time.sec,

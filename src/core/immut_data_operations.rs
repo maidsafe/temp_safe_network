@@ -84,7 +84,7 @@ pub fn get_data(client: Arc<Mutex<Client>>,
     match try!(response_getter.get()) {
         Data::Immutable(mut immut_data) => {
             let mut storage = SelfEncryptionStorage::new(client.clone());
-            while let Ok(DataTypeEncoding::DataMap(data_map)) = deserialise(&immut_data.value()) {
+            while let Ok(DataTypeEncoding::DataMap(data_map)) = deserialise(immut_data.value()) {
                 let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
                 let length = self_encryptor.len();
                 immut_data = try!(deserialise(&try!(self_encryptor.read(0, length))));
