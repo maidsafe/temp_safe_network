@@ -23,6 +23,7 @@ use routing::{StructuredData, ImmutableData, Data, DataIdentifier, XorName};
 use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_structured_data};
 
 /// Create the StructuredData to manage versioned data.
+#[cfg_attr(feature="clippy", allow(too_many_arguments))]
 pub fn create(client: &mut Client,
               version_name_to_store: XorName,
               tag_type: u64,
@@ -33,7 +34,7 @@ pub fn create(client: &mut Client,
               private_signing_key: &sign::SecretKey)
               -> Result<StructuredData, CoreError> {
     create_impl(client,
-                &vec![version_name_to_store],
+                &[version_name_to_store],
                 tag_type,
                 identifier,
                 version,
@@ -70,6 +71,7 @@ pub fn append_version(client: &mut Client,
                 private_signing_key)
 }
 
+#[cfg_attr(feature="clippy", allow(too_many_arguments))]
 fn create_impl(client: &mut Client,
                version_names_to_store: &[XorName],
                tag_type: u64,

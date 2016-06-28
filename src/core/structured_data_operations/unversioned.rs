@@ -38,6 +38,7 @@ enum DataTypeEncoding {
 /// Create StructuredData in accordance with data-encoding rules abstracted from user. For
 /// StructuredData created with create, data must be obtained using the complementary function
 /// defined in this module to get_data()
+#[cfg_attr(feature="clippy", allow(too_many_arguments))]
 pub fn create(client: Arc<Mutex<Client>>,
               tag_type: u64,
               id: XorName,

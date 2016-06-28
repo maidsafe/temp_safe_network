@@ -32,7 +32,7 @@ use nfs::helper::directory_helper::DirectoryHelper;
 #[allow(unsafe_code)]
 pub fn c_char_ptr_to_string(c_char_ptr: *const c_char) -> Result<String, FfiError> {
     let cstr = unsafe { CStr::from_ptr(c_char_ptr) };
-    Ok(try!(String::from_utf8(cstr.to_bytes().iter().map(|a| *a).collect())
+    Ok(try!(String::from_utf8(cstr.to_bytes().iter().cloned().collect())
         .map_err(|error| FfiError::from(error.description()))))
 }
 
@@ -47,7 +47,7 @@ pub fn get_safe_drive_key(client: Arc<Mutex<Client>>) -> Result<DirectoryKey, Ff
     let safe_drive_dir_name = SAFE_DRIVE_DIR_NAME.to_string();
     let dir_helper = DirectoryHelper::new(client);
     let mut root_dir = try!(dir_helper.get_user_root_directory_listing());
-    let dir_metadata = match root_dir.find_sub_directory(&safe_drive_dir_name).map(|d| d.clone()) {
+    let dir_metadata = match root_dir.find_sub_directory(&safe_drive_dir_name).cloned() {
         Some(metadata) => metadata,
         None => {
             let (created_dir, _) = try!(dir_helper.create(safe_drive_dir_name,

@@ -82,7 +82,7 @@ impl Action for MoveDirectory {
                                                      access_level,
                                                      src_dir.get_metadata()
                                                          .get_parent_dir_key()
-                                                         .map(|key| key.clone())));
+                                                         .cloned()));
             src_dir.get_files().iter().all(|file| {
                 dir.get_mut_files().push(file.clone());
                 true

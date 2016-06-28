@@ -180,7 +180,7 @@ impl DirectoryHelper {
     pub fn get_user_root_directory_listing(&self) -> Result<DirectoryListing, NfsError> {
         let root_directory_id = unwrap_result!(self.client.lock())
             .get_user_root_directory_id()
-            .map(|id| *id);
+            .cloned();
         match root_directory_id {
             Some(id) => {
                 debug!("Retrieving directory at id {:?} ...", id);
@@ -212,7 +212,7 @@ impl DirectoryHelper {
                                                -> Result<DirectoryListing, NfsError> {
         let config_dir_id = unwrap_result!(self.client.lock())
             .get_configuration_root_directory_id()
-            .map(|id| *id);
+            .cloned();
         let mut config_directory_listing = match config_dir_id {
             Some(id) => {
                 debug!("Retrieving root configuration directory at id {:?} ...", id);
