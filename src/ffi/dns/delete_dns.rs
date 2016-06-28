@@ -28,7 +28,7 @@ impl Action for DeleteDns {
         let signing_key = try!(unwrap_result!(params.client.lock()).get_secret_signing_key())
             .clone();
         let dns_ops = try!(DnsOperations::new(params.client));
-        let _ = try!(dns_ops.delete_dns(&self.long_name, &signing_key));
+        try!(dns_ops.delete_dns(&self.long_name, &signing_key));
 
         Ok(None)
     }

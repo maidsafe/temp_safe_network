@@ -84,8 +84,8 @@ impl ConfigHandler {
 
     fn get_app_id(&self, app_key: &str, vendor: &str) -> XorName {
         let mut id_str = String::new();
-        id_str.push_str(&app_key);
-        id_str.push_str(&vendor);
+        id_str.push_str(app_key);
+        id_str.push_str(vendor);
         XorName(sha256::hash(id_str.as_bytes()).0)
     }
 
@@ -153,7 +153,7 @@ impl ConfigHandler {
             let file = match dir_listing.get_files()
                 .iter()
                 .find(|file| file.get_name() == LAUNCHER_GLOBAL_CONFIG_FILE_NAME)
-                .map(|f| f.clone()) {
+                .cloned() {
                 Some(file) => file,
                 None => {
                     dir_listing =
@@ -167,7 +167,7 @@ impl ConfigHandler {
                                        .find(|file| {
                                            file.get_name() == LAUNCHER_GLOBAL_CONFIG_FILE_NAME
                                        })
-                                       .map(|f| f.clone()),
+                                       .cloned(),
                                    "Error")
                         .clone()
                 }

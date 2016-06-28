@@ -110,6 +110,8 @@ pub struct FfiHandle {
     client: Arc<Mutex<Client>>,
     network_thread_terminator: Option<Sender<NetworkEvent>>,
     raii_joiner: Option<RaiiThreadJoiner>,
+
+    #[cfg_attr(feature="clippy", allow(type_complexity))]
     network_event_observers: Arc<Mutex<Vec<extern "C" fn(i32)>>>,
 }
 
@@ -205,7 +207,7 @@ pub extern "C" fn register_network_event_observer(ffi_handle: *mut FfiHandle,
                 if let NetworkEvent::Terminated = event {
                     break;
                 }
-                let ref cbs = *unwrap_result!(callbacks.lock());
+                let cbs = &*unwrap_result!(callbacks.lock());
                 let event_ffi_val = event.into();
                 for cb in cbs {
                     cb(event_ffi_val);
@@ -237,7 +239,7 @@ pub extern "C" fn get_app_dir_key(c_app_name: *const c_char,
     let vendor: String = ffi_ptr_try!(helper::c_char_ptr_to_string(c_vendor), c_result);
     let handler = launcher_config_handler::ConfigHandler::new(client);
     let dir_key = ffi_ptr_try!(handler.get_app_dir_key(app_name, app_id, vendor), c_result);
-    let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(|e| FfiError::from(e)),
+    let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from),
                                            c_result);
     serialised_data.shrink_to_fit();
     unsafe {
@@ -262,7 +264,7 @@ pub extern "C" fn get_safe_drive_key(c_size: *mut int32_t,
                                      -> *const u8 {
     let client = cast_from_ffi_handle(ffi_handle);
     let dir_key = ffi_ptr_try!(helper::get_safe_drive_key(client), c_result);
-    let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(|e| FfiError::from(e)),
+    let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from),
                                            c_result);
     serialised_data.shrink_to_fit();
     unsafe {
