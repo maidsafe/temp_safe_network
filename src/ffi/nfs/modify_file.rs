@@ -54,7 +54,7 @@ impl Action for ModifyFile {
                                                                   Some(&start_dir_key)));
 
         let mut file = try!(dir_of_file.find_file(&file_name)
-            .map(|file| file.clone())
+            .cloned()
             .ok_or(FfiError::InvalidPath));
 
         let mut file_helper = FileHelper::new(params.client);
@@ -263,7 +263,7 @@ mod test {
 
         let app_root_dir = unwrap_result!(dir_helper.get(&app_root_dir_key));
         let file = unwrap_option!(app_root_dir.find_file(&TEST_FILE_NAME.to_string())
-                                      .map(|a| a.clone()),
+                                      .cloned(),
                                   "File not found");
         assert_eq!(file.get_datamap().len(), file_size);
     }

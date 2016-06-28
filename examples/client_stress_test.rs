@@ -113,13 +113,13 @@ fn main() {
     let pin_range = Range::new(0u16, 9999);
     let pin = pin_range.ind_sample(&mut rng).to_string();
 
-    let mut client = if !args.flag_get_only {
+    let mut client = if args.flag_get_only {
+        unwrap_result!(Client::log_in(keyword.clone(), pin.clone(), password.clone()))
+    } else {
         println!("\n\tAccount Creation");
         println!("\t================");
         println!("\nTrying to create an account ...");
         unwrap_result!(Client::create_account(keyword.clone(), pin.clone(), password.clone()))
-    } else {
-        unwrap_result!(Client::log_in(keyword.clone(), pin.clone(), password.clone()))
     };
     println!("Logged in successfully !!");
     let public_key = unwrap_result!(client.get_public_signing_key()).clone();

@@ -29,10 +29,10 @@ impl Action for DeleteService {
         let signing_key = try!(unwrap_result!(params.client.lock()).get_secret_signing_key())
             .clone();
         let dns_ops = try!(DnsOperations::new(params.client));
-        let _ = try!(dns_ops.remove_service(&self.long_name,
-                                            self.service_name.clone(),
-                                            &signing_key,
-                                            None));
+        try!(dns_ops.remove_service(&self.long_name,
+                                    self.service_name.clone(),
+                                    &signing_key,
+                                    None));
 
         Ok(None)
     }

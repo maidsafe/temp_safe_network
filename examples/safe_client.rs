@@ -34,7 +34,7 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
-#![cfg_attr(feature="clippy", allow(use_debug))]
+#![cfg_attr(feature="clippy", allow(use_debug, print_stdout))]
 
 extern crate safe_network_common;
 extern crate routing;
@@ -188,24 +188,21 @@ fn messaging(client: &mut Client) {
 
 fn receive_mpid_message(response_getter: &GetResponseGetter) {
     loop {
-        match response_getter.get() {
-            Ok(data) => {
-                match data {
-                    Data::Plain(plain_data) => {
-                        let mpid_message_wrapper: MpidMessageWrapper =
-                            unwrap_result!(deserialise(plain_data.value()));
-                        match mpid_message_wrapper {
-                            MpidMessageWrapper::PutMessage(mpid_message) => {
-                                println!("received mpid message {:?}", mpid_message);
-                                break;
-                            }
-                            _ => println!("unknown received mpid_message_wrapper"),
+        if let Ok(data) = response_getter.get() {
+            match data {
+                Data::Plain(plain_data) => {
+                    let mpid_message_wrapper: MpidMessageWrapper =
+                        unwrap_result!(deserialise(plain_data.value()));
+                    match mpid_message_wrapper {
+                        MpidMessageWrapper::PutMessage(mpid_message) => {
+                            println!("received mpid message {:?}", mpid_message);
+                            break;
                         }
+                        _ => println!("unknown received mpid_message_wrapper"),
                     }
-                    _ => println!("unknown received data"),
                 }
+                _ => println!("unknown received data"),
             }
-            Err(_) => {}
         }
         std::thread::sleep(std::time::Duration::from_millis(1000));
     }

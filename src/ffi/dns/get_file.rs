@@ -19,7 +19,6 @@ use dns::dns_operations::DnsOperations;
 use ffi::{helper, ParameterPacket, ResponseType, Action};
 use ffi::errors::FfiError;
 use ffi::nfs::file_response::get_response;
-use nfs::helper::directory_helper::DirectoryHelper;
 use rustc_serialize::json;
 
 #[derive(RustcDecodable, Debug)]
@@ -43,14 +42,9 @@ impl Action for GetFile {
                                                                                None));
         let mut tokens = helper::tokenise_path(&self.file_path, false);
         let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
-        let file_dir = if tokens.len() > 0 {
-            try!(helper::get_final_subdirectory(params.client.clone(),
-                                                &tokens,
-                                                Some(&directory_key)))
-        } else {
-            let dir_helper = DirectoryHelper::new(params.client.clone());
-            try!(dir_helper.get(&directory_key))
-        };
+        let file_dir = try!(helper::get_final_subdirectory(params.client.clone(),
+                                                           &tokens,
+                                                           Some(&directory_key)));
         let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
         let response = try!(get_response(file,
                                          params.client,
@@ -80,13 +74,9 @@ mod test {
                           file_content: Vec<u8>)
                           -> Result<DirectoryKey, errors::FfiError> {
         let directory_helper = DirectoryHelper::new(params.clone().client);
-        let mut file_directory =
-            try!(directory_helper.get(&try!(params.clone()
-                                                  .app_root_dir_key
-                                                  .ok_or(errors::FfiError::from("Application \
-                                                                                 directory \
-                                                                                 key is not \
-                                                                                 present")))));
+        let mut file_directory = try!(directory_helper.get(&try!(params.clone()
+            .app_root_dir_key
+            .ok_or(errors::FfiError::from("Application directory key is not present")))));
 
         let (file_directory, _) = try!(directory_helper.create(String::from("public-dir"),
                                                                UNVERSIONED_DIRECTORY_LISTING_TAG,
@@ -113,12 +103,11 @@ mod test {
         let (msg_public_key, msg_secret_key) = box_::gen_keypair();
         let services = vec![(service_name.clone(), (directory_key.clone()))];
         let public_signing_key = *try!(unwrap_result!(params.client.lock())
-                                          .get_public_signing_key());
-        let secret_signing_key = try!(unwrap_result!(params.client.lock())
-                                          .get_secret_signing_key())
-                                     .clone();
+            .get_public_signing_key());
+        let secret_signing_key =
+            try!(unwrap_result!(params.client.lock()).get_secret_signing_key()).clone();
         let dns_operation = try!(DnsOperations::new(params.client
-                                                          .clone()));
+            .clone()));
         try!(dns_operation.register_dns(public_name.clone(),
                                         &msg_public_key,
                                         &msg_secret_key,

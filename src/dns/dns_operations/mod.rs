@@ -57,6 +57,7 @@ impl DnsOperations {
     }
 
     /// Register one's own Dns - eg., pepsico.com, spandansharma.com, krishnakumar.in etc
+    #[cfg_attr(feature="clippy", allow(too_many_arguments))]
     pub fn register_dns(&self,
                         long_name: String,
                         public_messaging_encryption_key: &box_::PublicKey,
@@ -78,7 +79,7 @@ impl DnsOperations {
 
             let dns_record = Dns {
                 long_name: long_name.clone(),
-                services: services.iter().map(|a| a.clone()).collect(),
+                services: services.iter().cloned().collect(),
                 encryption_key: *public_messaging_encryption_key,
             };
 
@@ -176,8 +177,8 @@ impl DnsOperations {
                             -> Result<Vec<String>, DnsError> {
         // Allow unregistered clients to access this function
         match self.find_dns_record(long_name) {
-            Ok(_) => (),
-            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) => (),
+            Ok(_) |
+            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) |
             Err(DnsError::NfsError(NfsError::CoreError(
                 CoreError::OperationForbiddenForClient))) => (),
             Err(error) => return Err(error),
@@ -185,7 +186,7 @@ impl DnsOperations {
 
         let (_, dns_record) =
             try!(self.get_housing_structured_data_and_dns_record(long_name, data_decryption_keys));
-        Ok(dns_record.services.keys().map(|a| a.clone()).collect())
+        Ok(dns_record.services.keys().cloned().collect())
     }
 
     /// Get the home directory (eg., homepage containing HOME.html, INDEX.html) for the given
@@ -199,10 +200,10 @@ impl DnsOperations {
                                           -> Result<DirectoryKey, DnsError> {
         // Allow unregistered clients to access this function
         match self.find_dns_record(long_name) {
-            Ok(_) => (),
-            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) => (),
+            Ok(_) |
+            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) |
             Err(DnsError::NfsError(NfsError::CoreError(
-                CoreError::OperationForbiddenForClient))) => (),
+                CoreError::OperationForbiddenForClient))) |
             Err(DnsError::DnsRecordNotFound) => (),
             Err(error) => return Err(error),
         };
@@ -210,7 +211,7 @@ impl DnsOperations {
             try!(self.get_housing_structured_data_and_dns_record(long_name, data_decryption_keys));
         dns_record.services
                   .get(service_name)
-                  .map(|v| v.clone())
+                  .cloned()
                   .ok_or(DnsError::ServiceNotFound)
     }
 
@@ -250,7 +251,7 @@ impl DnsOperations {
         let config_vec = try!(dns_configuration::get_dns_configuration_data(self.client.clone()));
         config_vec.iter()
                   .find(|config| config.long_name == *long_name)
-                  .map(|v| v.clone())
+                  .cloned()
                   .ok_or(DnsError::DnsRecordNotFound)
     }
 
@@ -397,7 +398,7 @@ mod test {
         unwrap_result!(dns_operations.register_dns(dns_name.clone(),
                                                    &messaging_keypair.0,
                                                    &messaging_keypair.1,
-                                                   &vec![],
+                                                   &[],
                                                    owners.clone(),
                                                    &secret_signing_key,
                                                    None));
@@ -410,7 +411,7 @@ mod test {
         match dns_operations.register_dns(dns_name.clone(),
                                           &messaging_keypair.0,
                                           &messaging_keypair.1,
-                                          &vec![],
+                                          &[],
                                           owners.clone(),
                                           &secret_signing_key,
                                           None) {
@@ -425,7 +426,7 @@ mod test {
         unwrap_result!(dns_operations.register_dns(dns_name.clone(),
                                                    &messaging_keypair.0,
                                                    &messaging_keypair.1,
-                                                   &vec![],
+                                                   &[],
                                                    owners.clone(),
                                                    &secret_signing_key,
                                                    None));
@@ -436,7 +437,7 @@ mod test {
         match dns_operations.register_dns(dns_name.clone(),
                                           &messaging_keypair.0,
                                           &messaging_keypair.1,
-                                          &vec![],
+                                          &[],
                                           owners.clone(),
                                           &secret_signing_key,
                                           None) {
@@ -461,7 +462,7 @@ mod test {
             match dns_operations.register_dns(dns_name.clone(),
                                               &messaging_keypair.0,
                                               &messaging_keypair.1,
-                                              &vec![],
+                                              &[],
                                               owners.clone(),
                                               &secret_signing_key,
                                               None) {
@@ -478,7 +479,7 @@ mod test {
         unwrap_result!(dns_operations.register_dns(dns_name,
                                                    &messaging_keypair.0,
                                                    &messaging_keypair.1,
-                                                   &vec![],
+                                                   &[],
                                                    owners,
                                                    &secret_signing_key,
                                                    None));

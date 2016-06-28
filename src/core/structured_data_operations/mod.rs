@@ -150,11 +150,11 @@ mod test {
                                                                         keys.clone(),
                                                                         Vec::new())));
             assert_eq!(DataFitResult::DataDoesNotFit,
-                       unwrap_result!(check_if_data_can_fit_in_structured_data(&vec![1u8; 102400],
+                       unwrap_result!(check_if_data_can_fit_in_structured_data(&[1u8; 102400],
                                                                                keys.clone(),
                                                                                Vec::new())));
             assert_eq!(DataFitResult::DataDoesNotFit,
-                       unwrap_result!(check_if_data_can_fit_in_structured_data(&vec![1u8; 103424],
+                       unwrap_result!(check_if_data_can_fit_in_structured_data(&[1u8; 103424],
                                                                                keys.clone(),
                                                                                Vec::new())));
             keys.extend(test_utils::get_max_sized_public_keys(902));
@@ -163,7 +163,7 @@ mod test {
                                                                          keys.clone(),
                                                                          Vec::new())));
             assert_eq!(DataFitResult::DataDoesNotFit,
-                       unwrap_result!(check_if_data_can_fit_in_structured_data(&vec![0u8; 102400],
+                       unwrap_result!(check_if_data_can_fit_in_structured_data(&[0u8; 102400],
                                                                                keys.clone(),
                                                                                Vec::new())));
             keys.extend(test_utils::get_max_sized_public_keys(1));

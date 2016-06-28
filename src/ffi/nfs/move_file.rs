@@ -87,7 +87,7 @@ impl Action for MoveFile {
         if dest_dir.find_file(&src_file_name).is_some() {
             return Err(FfiError::from(DirectoryAlreadyExistsWithSameName));
         }
-        let file = match src_dir.find_file(&src_file_name).map(|file| file.clone()) {
+        let file = match src_dir.find_file(&src_file_name).cloned() {
             Some(file) => file,
             None => return Err(FfiError::PathNotFound),
         };
