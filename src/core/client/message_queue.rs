@@ -23,7 +23,7 @@ use core::errors::CoreError;
 use core::translated_events::{NetworkEvent, ResponseEvent};
 
 use lru_time_cache::LruCache;
-use maidsafe_utilities::thread::RaiiThreadJoiner;
+use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
 use maidsafe_utilities::serialisation::deserialise;
 use routing::{Data, Event, MessageId, Response, XorName};
 use safe_network_common::client_errors::{GetError, MutationError};
@@ -147,7 +147,7 @@ impl MessageQueue {
         }));
 
         let message_queue_cloned = message_queue.clone();
-        let receiver_joiner = thread!(EVENT_RECEIVER_THREAD_NAME, move || {
+        let receiver_joiner = thread::named(EVENT_RECEIVER_THREAD_NAME, move || {
             for it in routing_event_receiver.iter() {
                 match it {
                     Event::Response { response, .. } => {
@@ -185,7 +185,7 @@ impl MessageQueue {
             }
         });
 
-        (message_queue, RaiiThreadJoiner::new(receiver_joiner))
+        (message_queue, receiver_joiner)
     }
 
     pub fn register_response_observer(&mut self,

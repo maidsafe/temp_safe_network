@@ -56,7 +56,7 @@ use ffi::errors::FfiError;
 use libc::{c_char, int32_t};
 use maidsafe_utilities::log as safe_log;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use maidsafe_utilities::thread::RaiiThreadJoiner;
+use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
 use nfs::metadata::directory_key::DirectoryKey;
 use rustc_serialize::base64::FromBase64;
 use rustc_serialize::{Decodable, Decoder, json};
@@ -202,7 +202,7 @@ pub extern "C" fn register_network_event_observer(ffi_handle: *mut FfiHandle,
         let cloned_tx = tx.clone();
         unwrap!(ffi_handle.client.lock()).add_network_event_observer(tx);
 
-        let raii_joiner = RaiiThreadJoiner::new(thread!("FfiNetworkEventObserver", move || {
+        let raii_joiner = thread::named("FfiNetworkEventObserver", move || {
             while let Ok(event) = rx.recv() {
                 if let NetworkEvent::Terminated = event {
                     break;
@@ -213,7 +213,7 @@ pub extern "C" fn register_network_event_observer(ffi_handle: *mut FfiHandle,
                     cb(event_ffi_val);
                 }
             }
-        }));
+        });
 
         ffi_handle.raii_joiner = Some(raii_joiner);
         ffi_handle.network_thread_terminator = Some(cloned_tx);
