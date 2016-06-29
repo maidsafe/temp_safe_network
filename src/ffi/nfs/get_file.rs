@@ -81,7 +81,7 @@ mod test {
         let mut writer =
             unwrap!(file_helper.create(TEST_FILE_NAME.to_string(), Vec::new(), app_root_dir));
         let data = vec![10u8; 20];
-        writer.write(&data[..], 0).expect("");
+        unwrap!(writer.write(&data[..], 0));
         let _ = unwrap!(writer.close());
     }
 

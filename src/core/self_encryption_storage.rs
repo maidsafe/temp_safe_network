@@ -52,7 +52,7 @@ impl Storage<SelfEncryptionStorageError> for SelfEncryptionStorage {
             name_id[i] = name[i];
         }
 
-        let mut client = self.client.lock().expect("Failed to lock client mutex.");
+        let mut client = unwrap!(self.client.lock(), "Failed to lock client mutex.");
         let immutable_data_request = DataIdentifier::Immutable(XorName(name_id));
         match try!(try!(client.get(immutable_data_request, None)).get()) {
             Data::Immutable(ref received_data) => Ok(received_data.value().clone()),
@@ -67,7 +67,7 @@ impl Storage<SelfEncryptionStorageError> for SelfEncryptionStorage {
 
     fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Result<(), SelfEncryptionStorageError> {
         let immutable_data = ImmutableData::new(data);
-        let mut client = self.client.lock().expect("Failed to lock client mutex.");
+        let mut client = unwrap!(self.client.lock(), "Failed to lock client mutex.");
         Ok(try!(client.put_recover(Data::Immutable(immutable_data), None)))
     }
 }

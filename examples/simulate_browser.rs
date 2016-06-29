@@ -117,8 +117,8 @@ fn create_dns_record(client: Arc<Mutex<Client>>,
 
     println!("Registering Dns...");
 
-    let owners = vec![try!(client.lock().unwrap().get_public_signing_key()).clone()];
-    let secret_signing_key = try!(client.lock().unwrap().get_secret_signing_key()).clone();
+    let owners = vec![try!(unwrap!(client.lock()).get_public_signing_key()).clone()];
+    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
     dns_operations.register_dns(long_name,
                                 &public_messaging_encryption_key,
                                 &secret_messaging_encryption_key,
@@ -138,7 +138,7 @@ fn delete_dns_record(client: Arc<Mutex<Client>>,
     let _ = std::io::stdin().read_line(&mut long_name);
     long_name = long_name.trim().to_string();
 
-    let secret_signing_key = try!(client.lock().unwrap().get_secret_signing_key()).clone();
+    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
 
     println!("Deleting Dns...");
 
@@ -196,7 +196,7 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
     let (updated_parent_dir_listing, _) = try!(writer.close());
     let dir_key = updated_parent_dir_listing.get_key();
 
-    let secret_signing_key = try!(client.lock().unwrap().get_secret_signing_key()).clone();
+    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
 
     dns_operations.add_service(&long_name,
                                (service_name, dir_key.clone()),
@@ -221,7 +221,7 @@ fn remove_service(client: Arc<Mutex<Client>>,
 
     println!("Removing Service...");
 
-    let secret_signing_key = try!(client.lock().unwrap().get_secret_signing_key()).clone();
+    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
     dns_operations.remove_service(&long_name, service_name, &secret_signing_key, None)
 }
 

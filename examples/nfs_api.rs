@@ -196,8 +196,8 @@ fn directory_operation(option: u32,
                 println!("\t =========================       ==========");
                 for metatata in directory_metadata {
                     println!("\t {:?} \t {}",
-                             time::strftime("%d-%m-%Y %H:%M UTC", &metatata.get_created_time())
-                                 .unwrap(),
+                             unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
+                                                    &metatata.get_created_time())),
                              metatata.get_name());
                 }
             }
@@ -249,9 +249,8 @@ fn file_operation(option: u32,
                 println!("\t =========================      ===========");
                 for file in files {
                     println!("\t {:?} \t {}",
-                             time::strftime("%d-%m-%Y %H:%M UTC",
-                                            &file.get_metadata().get_modified_time())
-                                 .unwrap(),
+                             unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
+                                                    &file.get_metadata().get_modified_time())),
                              file.get_name());
                 }
             }

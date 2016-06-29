@@ -42,7 +42,7 @@ impl DirectoryMetadata {
                user_metadata: Vec<u8>,
                parent_dir_key: Option<DirectoryKey>)
                -> Result<DirectoryMetadata, NfsError> {
-        let id = Rand::rand(&mut OsRng::new().expect("Failed to create OsRng."));
+        let id = Rand::rand(&mut unwrap!(OsRng::new(), "Failed to create OsRng."));
         Ok(DirectoryMetadata {
             key: DirectoryKey::new(id, type_tag, versioned, access_level),
             name: name,

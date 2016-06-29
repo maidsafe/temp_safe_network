@@ -190,7 +190,7 @@ mod test {
         {
             // create
             let mut writer = unwrap!(file_helper.create(file_name.clone(), Vec::new(), directory));
-            writer.write(&[0u8; 100], 0).expect("");
+            unwrap!(writer.write(&[0u8; 100], 0), "");
             let (updated_directory, _) = unwrap!(writer.close());
             directory = updated_directory;
             assert!(directory.find_file(&file_name).is_some());
@@ -198,7 +198,7 @@ mod test {
         {
             // read
             let file = unwrap!(directory.find_file(&file_name), "File not found");
-            let mut reader = file_helper.read(file).expect("");
+            let mut reader = unwrap!(file_helper.read(file), "");
             let size = reader.size();
             assert_eq!(unwrap!(reader.read(0, size)), vec![0u8; 100]);
         }
@@ -208,12 +208,12 @@ mod test {
             {
                 let mut writer =
                     unwrap!(file_helper.update_content(file, Mode::Overwrite, directory));
-                writer.write(&[1u8; 50], 0).expect("");
+                unwrap!(writer.write(&[1u8; 50], 0), "");
                 let (updated_directory, _) = unwrap!(writer.close());
                 directory = updated_directory;
             }
             let file = unwrap!(directory.find_file(&file_name), "File not found");
-            let mut reader = file_helper.read(file).expect("");
+            let mut reader = unwrap!(file_helper.read(file), "");
             let size = reader.size();
             assert_eq!(unwrap!(reader.read(0, size)), vec![1u8; 50]);
         }
@@ -222,12 +222,12 @@ mod test {
             let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
             {
                 let mut writer = unwrap!(file_helper.update_content(file, Mode::Modify, directory));
-                writer.write(&[2u8; 10], 0).expect("");
+                unwrap!(writer.write(&[2u8; 10], 0), "");
                 let (updated_directory, _) = unwrap!(writer.close());
                 directory = updated_directory;
             }
             let file = unwrap!(directory.find_file(&file_name), "File not found");
-            let mut reader = file_helper.read(file).expect("");
+            let mut reader = unwrap!(file_helper.read(file), "");
             let size = reader.size();
             let data = unwrap!(reader.read(0, size));
             assert_eq!(&data[0..10], [2u8; 10]);

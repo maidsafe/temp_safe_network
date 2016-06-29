@@ -78,7 +78,7 @@ pub fn get_data(client: Arc<Mutex<Client>>,
                 decryption_keys: Option<(&PublicKey, &SecretKey, &Nonce)>)
                 -> Result<Vec<u8>, CoreError> {
     let data_identifier = DataIdentifier::Immutable(immut_data_name);
-    let response_getter = try!(client.lock().expect("Couldn't lock").get(data_identifier, None));
+    let response_getter = try!(unwrap!(client.lock(), "Couldn't lock").get(data_identifier, None));
 
     match try!(response_getter.get()) {
         Data::Immutable(mut immut_data) => {

@@ -228,7 +228,7 @@ mod test {
         let file_size = file.get_metadata().get_size();
         assert!(file_size > 0);
         let mut file_helper = FileHelper::new(parameter_packet.client.clone());
-        let mut reader = file_helper.read(file).expect("");
+        let mut reader = unwrap!(file_helper.read(file));
         let size = reader.size();
         assert_eq!(size, file_size);
         let data = unwrap!(reader.read(0, size));

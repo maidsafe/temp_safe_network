@@ -361,7 +361,7 @@ pub fn drop_vector(ptr: *mut u8, size: int32_t, capacity: int32_t) {
 #[allow(unsafe_code)]
 pub extern "C" fn client_issued_gets(ffi_handle: *mut FfiHandle) -> u64 {
     let client = cast_from_ffi_handle(ffi_handle);
-    let guard = client.lock().unwrap();
+    let guard = unwrap!(client.lock());
     guard.issued_gets()
 }
 
@@ -370,7 +370,7 @@ pub extern "C" fn client_issued_gets(ffi_handle: *mut FfiHandle) -> u64 {
 #[allow(unsafe_code)]
 pub extern "C" fn client_issued_puts(ffi_handle: *mut FfiHandle) -> u64 {
     let client = cast_from_ffi_handle(ffi_handle);
-    let guard = client.lock().unwrap();
+    let guard = unwrap!(client.lock());
     guard.issued_puts()
 }
 
@@ -379,7 +379,7 @@ pub extern "C" fn client_issued_puts(ffi_handle: *mut FfiHandle) -> u64 {
 #[allow(unsafe_code)]
 pub extern "C" fn client_issued_posts(ffi_handle: *mut FfiHandle) -> u64 {
     let client = cast_from_ffi_handle(ffi_handle);
-    let guard = client.lock().unwrap();
+    let guard = unwrap!(client.lock());
     guard.issued_posts()
 }
 
@@ -388,7 +388,7 @@ pub extern "C" fn client_issued_posts(ffi_handle: *mut FfiHandle) -> u64 {
 #[allow(unsafe_code)]
 pub extern "C" fn client_issued_deletes(ffi_handle: *mut FfiHandle) -> u64 {
     let client = cast_from_ffi_handle(ffi_handle);
-    let guard = client.lock().unwrap();
+    let guard = unwrap!(client.lock());
     guard.issued_deletes()
 }
 

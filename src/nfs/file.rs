@@ -36,7 +36,7 @@ impl File {
     /// Create a new instance of File
     pub fn new(metadata: FileMetadata, datamap: DataMap) -> Result<File, NfsError> {
         Ok(File {
-            id: Rand::rand(&mut OsRng::new().expect("Failed to create OsRng.")),
+            id: Rand::rand(&mut unwrap!(OsRng::new(), "Failed to create OsRng.")),
             metadata: metadata,
             datamap: datamap,
         })
