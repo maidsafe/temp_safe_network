@@ -136,11 +136,12 @@ impl RoutingMock {
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
-        let err = if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
-            Some(GetError::NetworkOther("Max operations exhausted".to_string()))
-        } else {
-            None
-        };
+        let err =
+            if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
+                Some(GetError::NetworkOther("Max operations exhausted".to_string()))
+            } else {
+                None
+            };
 
         if err == None {
             if let Some(ref count) = self.max_ops_countdown {
@@ -247,35 +248,35 @@ impl RoutingMock {
         let request = Request::Put(data.clone(), msg_id.clone());
 
         let mut data_store_mutex_guard = unwrap!(data_store.lock());
-        let err = if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
-            Some(MutationError::NetworkOther("Max operations exhausted"
-                                             .to_string()))
-        } else if data_store_mutex_guard.contains_key(&data_name) {
-            match data {
-                Data::Immutable(_) => {
-                    match deserialise(unwrap!(data_store_mutex_guard.get(&data_name))) {
-                        // Immutable data is de-duplicated so always allowed
-                        Ok(Data::Immutable(_)) => None,
-                        Ok(_) => Some(MutationError::DataExists),
-                        Err(error) => Some(MutationError::NetworkOther(format!("{}", error))),
+        let err =
+            if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
+                Some(MutationError::NetworkOther("Max operations exhausted".to_string()))
+            } else if data_store_mutex_guard.contains_key(&data_name) {
+                match data {
+                    Data::Immutable(_) => {
+                        match deserialise(unwrap!(data_store_mutex_guard.get(&data_name))) {
+                            // Immutable data is de-duplicated so always allowed
+                            Ok(Data::Immutable(_)) => None,
+                            Ok(_) => Some(MutationError::DataExists),
+                            Err(error) => Some(MutationError::NetworkOther(format!("{}", error))),
+                        }
                     }
-                }
-                Data::Structured(struct_data) => {
-                    if struct_data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
-                        Some(MutationError::AccountExists)
-                    } else {
-                        Some(MutationError::DataExists)
+                    Data::Structured(struct_data) => {
+                        if struct_data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
+                            Some(MutationError::AccountExists)
+                        } else {
+                            Some(MutationError::DataExists)
+                        }
                     }
+                    _ => Some(MutationError::DataExists),
                 }
-                _ => Some(MutationError::DataExists),
-            }
-        } else if let Ok(raw_data) = serialise(&data) {
-            let _ = data_store_mutex_guard.insert(data_name, raw_data);
-            sync_disk_storage(&*data_store_mutex_guard);
-            None
-        } else {
-            Some(MutationError::NetworkOther("Serialisation error".to_owned()))
-        };
+            } else if let Ok(raw_data) = serialise(&data) {
+                let _ = data_store_mutex_guard.insert(data_name, raw_data);
+                sync_disk_storage(&*data_store_mutex_guard);
+                None
+            } else {
+                Some(MutationError::NetworkOther("Serialisation error".to_owned()))
+            };
 
         if err == None {
             if let Some(ref count) = self.max_ops_countdown {
@@ -331,8 +332,7 @@ impl RoutingMock {
         let mut data_store_mutex_guard = unwrap!(data_store.lock());
         let err = if data_store_mutex_guard.contains_key(&data_name) {
             if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
-                Some(MutationError::NetworkOther("Max operations exhausted"
-                                                 .to_string()))
+                Some(MutationError::NetworkOther("Max operations exhausted".to_string()))
             } else if let Data::Structured(ref sd_new) = data {
                 match (serialise(&data),
                        deserialise(unwrap!(data_store_mutex_guard.get(&data_name)))) {
@@ -406,30 +406,30 @@ impl RoutingMock {
         let request = Request::Delete(data.clone(), msg_id.clone());
 
         let mut data_store_mutex_guard = unwrap!(data_store.lock());
-        let err = if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
-            Some(MutationError::NetworkOther("Max operations exhausted"
-                                             .to_string()))
-        } else if data_store_mutex_guard.contains_key(&data_name) {
-            if let Data::Structured(ref sd_new) = data {
-                match (serialise(&data),
-                       deserialise(unwrap!(data_store_mutex_guard.get(&data_name)))) {
-                    (Ok(_), Ok(Data::Structured(sd_stored))) => {
-                        if let Ok(_) = sd_stored.validate_self_against_successor(&sd_new) {
-                            let _ = data_store_mutex_guard.remove(&data_name);
-                            sync_disk_storage(&*data_store_mutex_guard);
-                            None
-                        } else {
-                            Some(MutationError::InvalidSuccessor)
+        let err =
+            if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
+                Some(MutationError::NetworkOther("Max operations exhausted".to_string()))
+            } else if data_store_mutex_guard.contains_key(&data_name) {
+                if let Data::Structured(ref sd_new) = data {
+                    match (serialise(&data),
+                           deserialise(unwrap!(data_store_mutex_guard.get(&data_name)))) {
+                        (Ok(_), Ok(Data::Structured(sd_stored))) => {
+                            if let Ok(_) = sd_stored.validate_self_against_successor(&sd_new) {
+                                let _ = data_store_mutex_guard.remove(&data_name);
+                                sync_disk_storage(&*data_store_mutex_guard);
+                                None
+                            } else {
+                                Some(MutationError::InvalidSuccessor)
+                            }
                         }
+                        _ => Some(MutationError::NetworkOther("Serialisation error".to_owned())),
                     }
-                    _ => Some(MutationError::NetworkOther("Serialisation error".to_owned())),
+                } else {
+                    Some(MutationError::InvalidOperation)
                 }
             } else {
-                Some(MutationError::InvalidOperation)
-            }
-        } else {
-            Some(MutationError::NoSuchData)
-        };
+                Some(MutationError::NoSuchData)
+            };
 
         if err == None {
             if let Some(ref count) = self.max_ops_countdown {
