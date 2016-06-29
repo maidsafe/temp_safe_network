@@ -54,13 +54,13 @@ mod test {
 
     #[test]
     fn random_client() {
-        let client_0 = unwrap_result!(get_client());
-        let client_1 = unwrap_result!(get_client());
+        let client_0 = unwrap!(get_client());
+        let client_1 = unwrap!(get_client());
 
-        let sign_key_0 = unwrap_result!(client_0.get_public_signing_key());
-        let sign_key_1 = unwrap_result!(client_1.get_public_signing_key());
-        let pub_key_0 = unwrap_result!(client_0.get_public_encryption_key());
-        let pub_key_1 = unwrap_result!(client_1.get_public_encryption_key());
+        let sign_key_0 = unwrap!(client_0.get_public_signing_key());
+        let sign_key_1 = unwrap!(client_1.get_public_signing_key());
+        let pub_key_0 = unwrap!(client_0.get_public_encryption_key());
+        let pub_key_1 = unwrap!(client_1.get_public_encryption_key());
 
         assert!(sign_key_0 != sign_key_1);
         assert!(pub_key_0 != pub_key_1);
