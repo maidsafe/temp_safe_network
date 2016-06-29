@@ -180,7 +180,21 @@ impl Into<i32> for CoreError {
             CoreError::MutationFailure { reason: MutationError::NetworkFull, .. } => {
                 CLIENT_ERROR_START_RANGE - 27
             }
-            CoreError::SelfEncryption(_) => CLIENT_ERROR_START_RANGE - 28,
+            CoreError::SelfEncryption(SelfEncryptionError
+                                      ::Compression::<SelfEncryptionStorageError>) => {
+                CLIENT_ERROR_START_RANGE - 28
+            }
+            CoreError::SelfEncryption(SelfEncryptionError
+                                      ::Decryption::<SelfEncryptionStorageError>) => {
+                CLIENT_ERROR_START_RANGE - 29
+            }
+            CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
+                CLIENT_ERROR_START_RANGE - 30
+            }
+            CoreError::SelfEncryption(SelfEncryptionError
+                                      ::Storage
+                                      ::<SelfEncryptionStorageError>(
+                                          SelfEncryptionStorageError(err))) => (*err).into(),
         }
     }
 }
@@ -357,5 +371,37 @@ impl Error for CoreError {
             CoreError::MutationFailure { ref reason, .. } => Some(reason),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use core::SelfEncryptionStorageError;
+    use rand;
+    use routing::DataIdentifier;
+    use self_encryption::SelfEncryptionError;
+    use safe_network_common::client_errors::MutationError;
+
+    #[test]
+    fn self_encryption_error() {
+        let id = rand::random();
+        let core_err_0 = CoreError::MutationFailure {
+            data_id: DataIdentifier::Structured(id, 10000),
+            reason: MutationError::LowBalance,
+        };
+        let core_err_1 = CoreError::MutationFailure {
+            data_id: DataIdentifier::Structured(id, 10000),
+            reason: MutationError::LowBalance,
+        };
+
+        let se_err = SelfEncryptionError
+            ::Storage
+            ::<SelfEncryptionStorageError>(SelfEncryptionStorageError(Box::new(core_err_0)));
+        let core_from_se_err = CoreError::from(se_err);
+
+        assert_eq!(<CoreError as Into<i32>>::into(core_err_1),
+                   <CoreError as Into<i32>>::into(core_from_se_err));
     }
 }
