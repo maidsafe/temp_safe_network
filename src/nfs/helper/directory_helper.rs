@@ -20,12 +20,12 @@ use std::sync::{Arc, Mutex};
 use core::client::Client;
 use core::errors::CoreError;
 use core::structured_data_operations::{unversioned, versioned};
-use maidsafe_utilities::serialisation::{serialise, deserialise};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::AccessLevel;
 use nfs::errors::NfsError;
 use nfs::directory_listing::DirectoryListing;
 use nfs::metadata::directory_key::DirectoryKey;
-use routing::{ImmutableData, StructuredData, Data, DataIdentifier, XorName};
+use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 
 /// DirectoryHelper provides helper functions to perform Operations on Directory
 pub struct DirectoryHelper {
@@ -116,8 +116,7 @@ impl DirectoryHelper {
                         type_tag: u64)
                         -> Result<Vec<XorName>, NfsError> {
         let structured_data = try!(self.get_structured_data(directory_id, type_tag));
-        Ok(try!(versioned::get_all_versions(&mut *unwrap!(self.client.lock()),
-                                            &structured_data)))
+        Ok(try!(versioned::get_all_versions(&mut *unwrap!(self.client.lock()), &structured_data)))
     }
 
     /// Return the DirectoryListing for the specified version
@@ -156,10 +155,8 @@ impl DirectoryHelper {
 
             let encryption_keys = match *access_level {
                 AccessLevel::Private => {
-                    private_key = *try!(unwrap!(self.client.lock())
-                            .get_public_encryption_key());
-                    secret_key = try!(unwrap!(self.client.lock())
-                            .get_secret_encryption_key())
+                    private_key = *try!(unwrap!(self.client.lock()).get_public_encryption_key());
+                    secret_key = try!(unwrap!(self.client.lock()).get_secret_encryption_key())
                         .clone();
                     nonce = DirectoryListing::generate_nonce(directory_id);
 
@@ -285,8 +282,7 @@ impl DirectoryHelper {
                                       &signing_key)))
         } else {
             let private_key = *try!(unwrap!(self.client.lock()).get_public_encryption_key());
-            let secret_key = try!(unwrap!(self.client.lock()).get_secret_encryption_key())
-                .clone();
+            let secret_key = try!(unwrap!(self.client.lock()).get_secret_encryption_key()).clone();
             let nonce = DirectoryListing::generate_nonce(directory.get_key().get_id());
             let serialised_data = try!(serialise(&directory));
 
@@ -327,8 +323,7 @@ impl DirectoryHelper {
                                            &signing_key))
         } else {
             let private_key = *try!(unwrap!(self.client.lock()).get_public_encryption_key());
-            let secret_key = try!(unwrap!(self.client.lock()).get_secret_encryption_key())
-                .clone();
+            let secret_key = try!(unwrap!(self.client.lock()).get_secret_encryption_key()).clone();
             let nonce = DirectoryListing::generate_nonce(directory.get_key().get_id());
             let serialised_data = try!(serialise(&directory));
 
@@ -405,16 +400,14 @@ mod test {
                     AccessLevel::Private,
                     None));
         assert!(grand_parent.is_none());
-        assert_eq!(directory,
-                   unwrap!(dir_helper.get(directory.get_key())));
+        assert_eq!(directory, unwrap!(dir_helper.get(directory.get_key())));
         // Create a Child directory and update the parent_directory
-        let (mut child_directory, grand_parent) =
-            unwrap!(dir_helper.create("Child".to_string(),
-                                             ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                                             Vec::new(),
-                                             true,
-                                             AccessLevel::Private,
-                                             Some(&mut directory)));
+        let (mut child_directory, grand_parent) = unwrap!(dir_helper.create("Child".to_string(),
+                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                    Vec::new(),
+                    true,
+                    AccessLevel::Private,
+                    Some(&mut directory)));
         assert!(grand_parent.is_none());
         // Assert whether parent is updated
         let parent = unwrap!(dir_helper.get(directory.get_key()));
@@ -422,11 +415,11 @@ mod test {
 
         let (grand_child_directory, grand_parent) =
             unwrap!(dir_helper.create("Grand Child".to_string(),
-                                             ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                                             Vec::new(),
-                                             true,
-                                             AccessLevel::Private,
-                                             Some(&mut child_directory)));
+                                      ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                                      Vec::new(),
+                                      true,
+                                      AccessLevel::Private,
+                                      Some(&mut child_directory)));
         assert!(dir_helper.create("Grand Child".to_string(),
                     ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                     Vec::new(),
@@ -461,8 +454,7 @@ mod test {
             let test_client = unwrap!(test_utils::get_client());
             let client = Arc::new(Mutex::new(test_client));
             let dir_helper = DirectoryHelper::new(client.clone());
-            let retrieved_public_directory =
-                unwrap!(dir_helper.get(public_directory.get_key()));
+            let retrieved_public_directory = unwrap!(dir_helper.get(public_directory.get_key()));
             assert_eq!(retrieved_public_directory, public_directory);
         }
     }
@@ -486,8 +478,7 @@ mod test {
             let test_client = unwrap!(test_utils::get_client());
             let client = Arc::new(Mutex::new(test_client));
             let dir_helper = DirectoryHelper::new(client.clone());
-            let retrieved_public_directory =
-                unwrap!(dir_helper.get(public_directory.get_key()));
+            let retrieved_public_directory = unwrap!(dir_helper.get(public_directory.get_key()));
             assert_eq!(retrieved_public_directory, public_directory);
         }
     }
@@ -500,11 +491,11 @@ mod test {
 
         let mut root_dir = unwrap!(dir_helper.get_user_root_directory_listing());
         let (created_dir, _) = unwrap!(dir_helper.create("DirName".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                    Vec::new(),
-                    true,
-                    AccessLevel::Private,
-                    Some(&mut root_dir)));
+                                                         ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                                                         Vec::new(),
+                                                         true,
+                                                         AccessLevel::Private,
+                                                         Some(&mut root_dir)));
         let root_dir = unwrap!(dir_helper.get_user_root_directory_listing());
         assert!(root_dir.find_sub_directory(created_dir.get_metadata().get_name()).is_some());
     }
@@ -514,13 +505,11 @@ mod test {
         let test_client = unwrap!(test_utils::get_client());
         let client = Arc::new(Mutex::new(test_client));
         let dir_helper = DirectoryHelper::new(client.clone());
-        let config_dir =
-            unwrap!(dir_helper.get_configuration_directory_listing("DNS".to_string()));
+        let config_dir = unwrap!(dir_helper.get_configuration_directory_listing("DNS".to_string()));
         assert_eq!(config_dir.get_metadata().get_name().clone(),
                    "DNS".to_string());
         let id = config_dir.get_key().get_id();
-        let config_dir =
-            unwrap!(dir_helper.get_configuration_directory_listing("DNS".to_string()));
+        let config_dir = unwrap!(dir_helper.get_configuration_directory_listing("DNS".to_string()));
         assert_eq!(config_dir.get_key().get_id(), id);
     }
 
@@ -538,27 +527,27 @@ mod test {
                     None));
 
         let mut versions = unwrap!(dir_helper.get_versions(dir_listing.get_key().get_id(),
-                                                                  dir_listing.get_key()
-                                                                      .get_type_tag()));
+                                                           dir_listing.get_key()
+                                                               .get_type_tag()));
         assert_eq!(versions.len(), 1);
 
         dir_listing.get_mut_metadata().set_name("NewName".to_string());
         assert!(dir_helper.update(&dir_listing).is_ok());
 
         versions = unwrap!(dir_helper.get_versions(dir_listing.get_key().get_id(),
-                                                          dir_listing.get_key().get_type_tag()));
+                                                   dir_listing.get_key().get_type_tag()));
         assert_eq!(versions.len(), 2);
 
         let rxd_dir_listing =
             unwrap!(dir_helper.get_by_version(dir_listing.get_key().get_id(),
-                                                     dir_listing.get_key().get_access_level(),
-                                                     versions[versions.len() - 1].clone()));
+                                              dir_listing.get_key().get_access_level(),
+                                              versions[versions.len() - 1].clone()));
         assert_eq!(rxd_dir_listing, dir_listing);
 
-        let rxd_dir_listing =
-            unwrap!(dir_helper.get_by_version(dir_listing.get_key().get_id(),
-                                                     dir_listing.get_key().get_access_level(),
-                                                     versions[0].clone()));
+        let rxd_dir_listing = unwrap!(dir_helper.get_by_version(dir_listing.get_key().get_id(),
+                                                                dir_listing.get_key()
+                                                                    .get_access_level(),
+                                                                versions[0].clone()));
         assert_eq!(*rxd_dir_listing.get_metadata().get_name(),
                    "DirName2".to_string());
     }
@@ -576,16 +565,14 @@ mod test {
                     AccessLevel::Private,
                     None));
         assert!(grand_parent.is_none());
-        assert_eq!(directory,
-                   unwrap!(dir_helper.get(directory.get_key())));
+        assert_eq!(directory, unwrap!(dir_helper.get(directory.get_key())));
         // Create a Child directory and update the parent_directory
-        let (mut child_directory, grand_parent) =
-            unwrap!(dir_helper.create("Child".to_string(),
-                                             ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                                             Vec::new(),
-                                             true,
-                                             AccessLevel::Private,
-                                             Some(&mut directory)));
+        let (mut child_directory, grand_parent) = unwrap!(dir_helper.create("Child".to_string(),
+                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                    Vec::new(),
+                    true,
+                    AccessLevel::Private,
+                    Some(&mut directory)));
         assert!(grand_parent.is_none());
         // Assert whether parent is updated
         let parent = unwrap!(dir_helper.get(directory.get_key()));
@@ -593,25 +580,24 @@ mod test {
 
         let (grand_child_directory, grand_parent) =
             unwrap!(dir_helper.create("Grand Child".to_string(),
-                                             ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                                             Vec::new(),
-                                             true,
-                                             AccessLevel::Private,
-                                             Some(&mut child_directory)));
+                                      ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                                      Vec::new(),
+                                      true,
+                                      AccessLevel::Private,
+                                      Some(&mut child_directory)));
 
         let _ = unwrap!(grand_parent, "Grand Parent Should be updated");
 
         let delete_result = unwrap!(dir_helper.delete(&mut child_directory,
-                                                             grand_child_directory.get_metadata()
-                                                                 .get_name()));
-        let updated_grand_parent = unwrap!(delete_result,
-                                                  "Parent directory should be returned");
+                                                      grand_child_directory.get_metadata()
+                                                          .get_name()));
+        let updated_grand_parent = unwrap!(delete_result, "Parent directory should be returned");
         assert_eq!(*updated_grand_parent.get_metadata().get_id(),
                    *directory.get_metadata().get_id());
 
         let delete_result = unwrap!(dir_helper.delete(&mut directory,
-                                                             child_directory.get_metadata()
-                                                                 .get_name()));
+                                                      child_directory.get_metadata()
+                                                          .get_name()));
         assert!(delete_result.is_none());
     }
 }

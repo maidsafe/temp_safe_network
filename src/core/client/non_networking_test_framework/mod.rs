@@ -64,12 +64,11 @@ fn get_storage() -> DataStore {
             temp_dir_pathbuf.push(STORAGE_FILE_NAME);
 
             if let Ok(mut file) = ::std::fs::File::open(temp_dir_pathbuf) {
-                let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata())
-                    .len() as usize);
+                let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata()).len() as usize);
                 if let Ok(_) = file.read_to_end(&mut raw_disk_data) {
                     if raw_disk_data.len() != 0 {
                         memory_storage = unwrap!(deserialise_with_limit(&raw_disk_data,
-                                                                  SizeLimit::Infinite));
+                                                                        SizeLimit::Infinite));
                     }
                 }
             }
@@ -88,8 +87,7 @@ fn sync_disk_storage(memory_storage: &HashMap<XorName, Vec<u8>>) {
     temp_dir_pathbuf.push(STORAGE_FILE_NAME);
 
     let mut file = unwrap!(::std::fs::File::create(temp_dir_pathbuf));
-    let _ =
-        file.write_all(&unwrap!(serialise_with_limit(&memory_storage, SizeLimit::Infinite)));
+    let _ = file.write_all(&unwrap!(serialise_with_limit(&memory_storage, SizeLimit::Infinite)));
     unwrap!(file.sync_all());
 }
 
@@ -523,8 +521,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr.clone(),
                                                          data_id.clone(),
@@ -545,8 +542,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_put_request(location_client_mgr.clone(),
                                                          orig_data.clone(),
                                                          msg_id));
@@ -562,8 +558,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr.clone(),
                                                          data_id.clone(),
@@ -580,8 +575,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_put_request(location_client_mgr.clone(),
                                                          orig_data.clone(),
                                                          msg_id));
@@ -595,8 +589,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_post_request(location_nae_mgr.clone(),
                                                           orig_data.clone(),
                                                           msg_id));
@@ -616,8 +609,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_delete_request(location_client_mgr,
                                                             orig_data.clone(),
                                                             msg_id));
@@ -639,12 +631,9 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
-            unwrap!(mock_routing.send_get_request(location_nae_mgr,
-                                                         data_id.clone(),
-                                                         msg_id));
+            unwrap!(mock_routing.send_get_request(location_nae_mgr, data_id.clone(), msg_id));
 
             let resp_getter =
                 GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), data_id);
@@ -685,7 +674,7 @@ mod test {
         let keyword = unwrap!(utility::generate_random_string(10));
         let pin = unwrap!(utility::generate_random_string(10));
         let user_id = unwrap!(Account::generate_network_id(keyword.as_bytes(),
-                                                                  pin.to_string().as_bytes()));
+                                                           pin.to_string().as_bytes()));
         let account_ver_res =
             StructuredData::new(TYPE_TAG,
                                 user_id.clone(),
@@ -709,11 +698,10 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
-                                                         data_account_version.clone(),
-                                                         msg_id));
+                                                  data_account_version.clone(),
+                                                  msg_id));
             let resp_getter = MutationResponseGetter::new((tx, rx));
 
             unwrap!(resp_getter.get());
@@ -724,11 +712,10 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_put_request(location_client_mgr_immut.clone(),
-                                                         orig_data_immutable.clone(),
-                                                         msg_id));
+                                                  orig_data_immutable.clone(),
+                                                  msg_id));
             let resp_getter = MutationResponseGetter::new((tx, rx));
 
             unwrap!(resp_getter.get());
@@ -743,12 +730,11 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
-                                                         struct_data_id.clone(),
-                                                         msg_id));
+                                                  struct_data_id.clone(),
+                                                  msg_id));
 
             let resp_getter =
                 GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), struct_data_id);
@@ -766,17 +752,16 @@ mod test {
             let mut location_vec =
                 unwrap!(deserialise::<Vec<XorName>>(received_structured_data.get_data()));
             let immut_data_id = DataIdentifier::Immutable(unwrap!(location_vec.pop(),
-                                                                         "Value must exist !"));
+                                                                  "Value must exist !"));
 
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr_immut.clone(),
-                                                         immut_data_id.clone(),
-                                                         msg_id));
+                                                  immut_data_id.clone(),
+                                                  msg_id));
 
             let resp_getter =
                 GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), immut_data_id);
@@ -794,11 +779,10 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_put_request(location_client_mgr_immut,
-                                                         new_data_immutable.clone(),
-                                                         msg_id));
+                                                  new_data_immutable.clone(),
+                                                  msg_id));
             let resp_getter = MutationResponseGetter::new((tx, rx));
 
             unwrap!(resp_getter.get());
@@ -835,20 +819,20 @@ mod test {
             Data::Structured(invalid_signature_account_version);
 
         let data_for_version_2 = unwrap!(serialise(&vec![orig_data_immutable.name(),
-                                                                new_data_immutable.name()]));
+                                                         new_data_immutable.name()]));
         // Construct StructuredData, 2nd version, for this ImmutableData - Valid
         account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                             user_id.clone(),
-                                                             1,
-                                                             data_for_version_2,
-                                                             vec![account_packet.get_public_maid()
-                                                                      .public_keys()
-                                                                      .0
-                                                                      .clone()],
-                                                             Vec::new(),
-                                                             Some(&account_packet.get_maid()
-                                                                 .secret_keys()
-                                                                 .0)));
+                                                      user_id.clone(),
+                                                      1,
+                                                      data_for_version_2,
+                                                      vec![account_packet.get_public_maid()
+                                                               .public_keys()
+                                                               .0
+                                                               .clone()],
+                                                      Vec::new(),
+                                                      Some(&account_packet.get_maid()
+                                                          .secret_keys()
+                                                          .0)));
         data_account_version = Data::Structured(account_version);
 
         // Subsequent PUTs for same StructuredData should fail
@@ -856,11 +840,10 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_put_request(location_client_mgr_struct.clone(),
-                                                         data_account_version.clone(),
-                                                         msg_id));
+                                                  data_account_version.clone(),
+                                                  msg_id));
             let resp_getter = MutationResponseGetter::new((tx, rx));
 
             match resp_getter.get() {
@@ -875,11 +858,10 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                          invalid_version_data_account_version,
-                                                          msg_id));
+                                                   invalid_version_data_account_version,
+                                                   msg_id));
             let resp_getter = MutationResponseGetter::new((tx, rx));
 
             match resp_getter.get() {
@@ -896,11 +878,10 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                          invalid_signature_data_account_version,
-                                                          msg_id));
+                                                   invalid_signature_data_account_version,
+                                                   msg_id));
             let resp_getter = MutationResponseGetter::new((tx, rx));
 
             match resp_getter.get() {
@@ -917,11 +898,10 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_post_request(location_nae_mgr_struct.clone(),
-                                                          data_account_version.clone(),
-                                                          msg_id));
+                                                   data_account_version.clone(),
+                                                   msg_id));
             let resp_getter = MutationResponseGetter::new((tx, rx));
 
             unwrap!(resp_getter.get());
@@ -934,12 +914,11 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
-                                                         struct_data_id.clone(),
-                                                         msg_id));
+                                                  struct_data_id.clone(),
+                                                  msg_id));
 
             let resp_getter =
                 GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), struct_data_id);
@@ -963,12 +942,11 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr_immut.clone(),
-                                                         immut_data_id.clone(),
-                                                         msg_id));
+                                                  immut_data_id.clone(),
+                                                  msg_id));
 
             let resp_getter =
                 GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), immut_data_id);
@@ -983,8 +961,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr_immut,
                                                          immut_data_id.clone(),
@@ -1001,11 +978,10 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_delete_request(location_client_mgr_struct.clone(),
-                                                            data_account_version.clone(),
-                                                            msg_id));
+                                                     data_account_version.clone(),
+                                                     msg_id));
             let resp_getter = MutationResponseGetter::new((tx, rx));
 
             match resp_getter.get() {
@@ -1024,12 +1000,11 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr_struct.clone(),
-                                                         struct_data_id.clone(),
-                                                         msg_id));
+                                                  struct_data_id.clone(),
+                                                  msg_id));
 
             let resp_getter =
                 GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), struct_data_id);
@@ -1039,17 +1014,17 @@ mod test {
 
         // Construct StructuredData, 3rd version, for DELETE - Valid
         account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                             user_id.clone(),
-                                                             2,
-                                                             Vec::new(),
-                                                             vec![account_packet.get_public_maid()
-                                                                      .public_keys()
-                                                                      .0
-                                                                      .clone()],
-                                                             Vec::new(),
-                                                             Some(&account_packet.get_maid()
-                                                                 .secret_keys()
-                                                                 .0)));
+                                                      user_id.clone(),
+                                                      2,
+                                                      Vec::new(),
+                                                      vec![account_packet.get_public_maid()
+                                                               .public_keys()
+                                                               .0
+                                                               .clone()],
+                                                      Vec::new(),
+                                                      Some(&account_packet.get_maid()
+                                                          .secret_keys()
+                                                          .0)));
         data_account_version = Data::Structured(account_version);
 
         // DELETE of Structured Data with version bump should pass
@@ -1057,8 +1032,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
             unwrap!(mock_routing.send_delete_request(location_client_mgr_struct,
                                                             data_account_version,
                                                             msg_id));
@@ -1074,8 +1048,7 @@ mod test {
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
 
-            unwrap!(message_queue.lock())
-                .register_response_observer(msg_id.clone(), tx.clone());
+            unwrap!(message_queue.lock()).register_response_observer(msg_id.clone(), tx.clone());
 
             unwrap!(mock_routing.send_get_request(location_nae_mgr_struct,
                                                          struct_data_id.clone(),

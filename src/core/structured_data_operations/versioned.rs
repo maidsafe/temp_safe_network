@@ -18,8 +18,8 @@
 use core::client::Client;
 use core::errors::CoreError;
 use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_structured_data};
-use maidsafe_utilities::serialisation::{serialise, deserialise};
-use routing::{StructuredData, ImmutableData, Data, DataIdentifier, XorName};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 use sodiumoxide::crypto::sign;
 
 /// Create the StructuredData to manage versioned data.

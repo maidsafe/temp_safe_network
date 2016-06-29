@@ -118,8 +118,8 @@ impl PublicIdType {
 mod test {
     use super::*;
     use sodiumoxide::crypto::sign;
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
-    use core::id::{IdType, RevocationIdType, MaidTypeTags, MpidTypeTags, Random};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use core::id::{IdType, MaidTypeTags, MpidTypeTags, Random, RevocationIdType};
 
     impl Random for PublicIdType {
         fn generate_random() -> PublicIdType {

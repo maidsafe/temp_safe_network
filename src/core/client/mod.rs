@@ -744,8 +744,7 @@ mod test {
         let pin = unwrap!(utility::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ =
-            unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let _ = unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         // Account creation - same keyword, pin and password - should fail
         match Client::create_account(keyword.clone(), pin.clone(), password.clone()) {
@@ -778,8 +777,7 @@ mod test {
         let pin = unwrap!(utility::generate_random_string(10));
 
         // Creation should pass
-        let _ =
-            unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let _ = unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
 
         // Correct Credentials - Login Should Pass
         let _ = unwrap!(Client::log_in(keyword, pin, password));
@@ -938,8 +936,7 @@ mod test {
 
         // Version Caching should work for ImmutableData
         {
-            let immut_data =
-                ImmutableData::new(unwrap!(utility::generate_random_vector(10)));
+            let immut_data = ImmutableData::new(unwrap!(utility::generate_random_vector(10)));
             let data = Data::Immutable(immut_data);
 
             unwrap!(unwrap!(client.put(data.clone(), None)).get());
@@ -972,12 +969,12 @@ mod test {
             let id: XorName = rand::random();
 
             let struct_data = unwrap!(StructuredData::new(TYPE_TAG,
-                                                                 id.clone(),
-                                                                 0,
-                                                                 Vec::new(),
-                                                                 Vec::new(),
-                                                                 Vec::new(),
-                                                                 None));
+                                                          id.clone(),
+                                                          0,
+                                                          Vec::new(),
+                                                          Vec::new(),
+                                                          Vec::new(),
+                                                          None));
             let data = Data::Structured(struct_data);
 
             unwrap!(unwrap!(client.put(data.clone(), None)).get());

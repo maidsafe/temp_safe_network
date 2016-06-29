@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use nfs::helper::directory_helper::DirectoryHelper;
 
@@ -67,11 +67,11 @@ mod test {
         let app_root_dir_key = unwrap!(parameter_packet.clone().app_root_dir_key);
         let mut app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let _ = unwrap!(dir_helper.create("test_dir".to_string(),
-                                                 UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                 Vec::new(),
-                                                 false,
-                                                 AccessLevel::Private,
-                                                 Some(&mut app_root_dir)));
+                                          UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                          Vec::new(),
+                                          false,
+                                          AccessLevel::Private,
+                                          Some(&mut app_root_dir)));
 
 
         let mut request = DeleteDir {

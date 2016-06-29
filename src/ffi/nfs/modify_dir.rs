@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use nfs::helper::directory_helper::DirectoryHelper;
 
@@ -77,7 +77,7 @@ struct OptionalParams {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffi::{config, Action, ParameterPacket, test_utils};
+    use ffi::{Action, ParameterPacket, config, test_utils};
     use rustc_serialize::base64::ToBase64;
     use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
     use nfs::helper::directory_helper::DirectoryHelper;
@@ -90,11 +90,11 @@ mod test {
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let mut app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let _ = unwrap!(dir_helper.create(TEST_DIR_NAME.to_string(),
-                                                 UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                 Vec::new(),
-                                                 false,
-                                                 AccessLevel::Private,
-                                                 Some(&mut app_root_dir)));
+                                          UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                          Vec::new(),
+                                          false,
+                                          AccessLevel::Private,
+                                          Some(&mut app_root_dir)));
     }
 
     #[test]
@@ -146,10 +146,9 @@ mod test {
         let app_root_dir_key = unwrap!(parameter_packet.clone().app_root_dir_key);
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        let directory_key =
-            unwrap!(app_root_dir.find_sub_directory(&TEST_DIR_NAME.to_string()),
-                           "Directory not found")
-                .get_key();
+        let directory_key = unwrap!(app_root_dir.find_sub_directory(&TEST_DIR_NAME.to_string()),
+                                    "Directory not found")
+            .get_key();
         let mut directory_to_modify = unwrap!(dir_helper.get(directory_key));
         assert_eq!(directory_to_modify.get_metadata().get_user_metadata().len(),
                    0);

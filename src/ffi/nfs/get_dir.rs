@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use ffi::nfs::directory_response::convert_to_response;
 
@@ -63,11 +63,11 @@ mod test {
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let mut app_root_dir = unwrap!(dir_helper.get(&app_dir_key));
         let _ = unwrap!(dir_helper.create(TEST_DIR_NAME.to_string(),
-                                                 UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                 Vec::new(),
-                                                 false,
-                                                 AccessLevel::Private,
-                                                 Some(&mut app_root_dir)));
+                                          UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                          Vec::new(),
+                                          false,
+                                          AccessLevel::Private,
+                                          Some(&mut app_root_dir)));
     }
 
     #[test]

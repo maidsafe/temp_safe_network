@@ -18,7 +18,7 @@
 use nfs::AccessLevel;
 use nfs::errors::NfsError;
 use nfs::metadata::directory_key::DirectoryKey;
-use rand::{Rand, OsRng};
+use rand::{OsRng, Rand};
 use routing::XorName;
 use rustc_serialize::{Decodable, Decoder};
 
@@ -178,17 +178,17 @@ mod test {
     use rand;
     use routing::XorName;
     use nfs::metadata::directory_key::DirectoryKey;
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::AccessLevel;
 
     #[test]
     fn serialise_directorty_metadata_without_parent_directory() {
         let obj_before = unwrap!(DirectoryMetadata::new("hello.txt".to_string(),
-                                                               99u64,
-                                                               true,
-                                                               AccessLevel::Private,
-                                                               Vec::new(),
-                                                               None));
+                                                        99u64,
+                                                        true,
+                                                        AccessLevel::Private,
+                                                        Vec::new(),
+                                                        None));
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after = unwrap!(deserialise(&serialised_data));
         assert_eq!(obj_before, obj_after);
@@ -199,17 +199,17 @@ mod test {
         let id: XorName = rand::random();
         let parent_directory = DirectoryKey::new(id, 100u64, false, AccessLevel::Private);
         let obj_before = unwrap!(DirectoryMetadata::new("hello.txt".to_string(),
-                                                               99u64,
-                                                               true,
-                                                               AccessLevel::Private,
-                                                               "Some user metadata"
-                                                                   .to_string()
-                                                                   .into_bytes(),
-                                                               Some(parent_directory.clone())));
+                                                        99u64,
+                                                        true,
+                                                        AccessLevel::Private,
+                                                        "Some user metadata"
+                                                            .to_string()
+                                                            .into_bytes(),
+                                                        Some(parent_directory.clone())));
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after: DirectoryMetadata = unwrap!(deserialise(&serialised_data));
         assert_eq!(*unwrap!(obj_after.get_parent_dir_key(),
-                                "Directory should not be None"),
+                            "Directory should not be None"),
                    parent_directory);
     }
 

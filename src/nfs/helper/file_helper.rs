@@ -189,8 +189,7 @@ mod test {
         let file_name = "hello.txt".to_string();
         {
             // create
-            let mut writer =
-                unwrap!(file_helper.create(file_name.clone(), Vec::new(), directory));
+            let mut writer = unwrap!(file_helper.create(file_name.clone(), Vec::new(), directory));
             writer.write(&[0u8; 100], 0).expect("");
             let (updated_directory, _) = unwrap!(writer.close());
             directory = updated_directory;
@@ -205,8 +204,7 @@ mod test {
         }
         {
             // update - full rewrite
-            let file = unwrap!(directory.find_file(&file_name).cloned(),
-                                      "File not found");
+            let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
             {
                 let mut writer =
                     unwrap!(file_helper.update_content(file, Mode::Overwrite, directory));
@@ -221,11 +219,9 @@ mod test {
         }
         {
             // update - partial rewrite
-            let file = unwrap!(directory.find_file(&file_name).cloned(),
-                                      "File not found");
+            let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
             {
-                let mut writer =
-                    unwrap!(file_helper.update_content(file, Mode::Modify, directory));
+                let mut writer = unwrap!(file_helper.update_content(file, Mode::Modify, directory));
                 writer.write(&[2u8; 10], 0).expect("");
                 let (updated_directory, _) = unwrap!(writer.close());
                 directory = updated_directory;
@@ -239,19 +235,16 @@ mod test {
         }
         {
             // versions
-            let file = unwrap!(directory.find_file(&file_name).cloned(),
-                                      "File not found");
+            let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
             let versions = unwrap!(file_helper.get_versions(&file, &directory));
             assert_eq!(versions.len(), 3);
         }
         {
             // Update Metadata
-            let mut file = unwrap!(directory.find_file(&file_name).cloned(),
-                                          "File not found");
+            let mut file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
             file.get_mut_metadata().set_user_metadata(vec![12u8; 10]);
             let _ = unwrap!(file_helper.update_metadata(file, &mut directory));
-            let file = unwrap!(directory.find_file(&file_name).cloned(),
-                                      "File not found");
+            let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
             assert_eq!(*file.get_metadata().get_user_metadata(), [12u8; 10][..]);
         }
         {

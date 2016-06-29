@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use dns::dns_operations::DnsOperations;
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 
 #[derive(RustcDecodable, Debug)]
@@ -47,8 +47,7 @@ impl Action for AddService {
                                                              &tokens,
                                                              Some(&start_dir_key)));
 
-        let signing_key = try!(unwrap!(params.client.lock()).get_secret_signing_key())
-            .clone();
+        let signing_key = try!(unwrap!(params.client.lock()).get_secret_signing_key()).clone();
         let dns_operation = try!(DnsOperations::new(params.client.clone()));
         try!(dns_operation.add_service(&self.long_name,
                                        (self.service_name.clone(), dir_to_map.get_key().clone()),
@@ -78,11 +77,11 @@ mod test {
         let app_root_dir_key = &unwrap!(parameter_packet.clone().app_root_dir_key);
         let mut app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let _ = unwrap!(dir_helper.create(TEST_DIR_NAME.to_string(),
-                                                 UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                 Vec::new(),
-                                                 false,
-                                                 AccessLevel::Public,
-                                                 Some(&mut app_root_dir)));
+                                          UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                          Vec::new(),
+                                          false,
+                                          AccessLevel::Public,
+                                          Some(&mut app_root_dir)));
         let public_name = unwrap!(utility::generate_random_string(10));
         let mut register_request = RegisterDns {
             long_name: public_name.clone(),

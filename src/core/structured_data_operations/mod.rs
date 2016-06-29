@@ -20,11 +20,11 @@ pub mod unversioned;
 /// Versioned-Structured Data
 pub mod versioned;
 
-use std::{u8, u64};
+use std::{u64, u8};
 
 use core::errors::CoreError;
 use maidsafe_utilities::serialisation::serialise;
-use routing::{StructuredData, XorName, XOR_NAME_LEN};
+use routing::{StructuredData, XOR_NAME_LEN, XorName};
 use sodiumoxide::crypto::sign;
 
 const PADDING_SIZE_IN_BYTES: usize = 1024;
@@ -113,8 +113,7 @@ mod test {
             assert_eq!(unwrap!(get_approximate_space_for_data(keys.clone(), Vec::new())),
                        DEFAULT_FIXED_SIZE - (FIXED_SIZE_OF_SIGNATURE * keys.len()));
             keys.extend(test_utils::get_max_sized_public_keys(902)); // 904 keys Max
-            let max_used_space = unwrap!(get_approximate_space_for_data(keys.clone(),
-                                                                               Vec::new()));
+            let max_used_space = unwrap!(get_approximate_space_for_data(keys.clone(), Vec::new()));
             assert!((max_used_space < FIXED_SIZE_OF_SIGNATURE) && (max_used_space > 0));
             keys.extend(test_utils::get_max_sized_public_keys(1));
             let space = unwrap!(get_approximate_space_for_data(keys.clone(), Vec::new()));
@@ -156,39 +155,39 @@ mod test {
         {
             let mut keys = test_utils::get_max_sized_public_keys(1);
             assert_eq!(DataFitResult::DataFits,
-                unwrap!(check_if_data_can_fit_in_structured_data(&[],
+                       unwrap!(check_if_data_can_fit_in_structured_data(&[],
                                                                         keys.clone(),
                                                                         Vec::new())));
             assert_eq!(DataFitResult::DataDoesNotFit,
                        unwrap!(check_if_data_can_fit_in_structured_data(&[1u8; 102400],
-                                                                               keys.clone(),
-                                                                               Vec::new())));
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             assert_eq!(DataFitResult::DataDoesNotFit,
                        unwrap!(check_if_data_can_fit_in_structured_data(&[1u8; 103424],
-                                                                               keys.clone(),
-                                                                               Vec::new())));
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             keys.extend(test_utils::get_max_sized_public_keys(902));
             assert_eq!(DataFitResult::DataFits,
-                 unwrap!(check_if_data_can_fit_in_structured_data(&[],
-                                                                         keys.clone(),
-                                                                         Vec::new())));
+                       unwrap!(check_if_data_can_fit_in_structured_data(&[],
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             assert_eq!(DataFitResult::DataDoesNotFit,
                        unwrap!(check_if_data_can_fit_in_structured_data(&[0u8; 102400],
-                                                                               keys.clone(),
-                                                                               Vec::new())));
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             keys.extend(test_utils::get_max_sized_public_keys(1));
             assert_eq!(DataFitResult::NoDataCanFit,
-                 unwrap!(check_if_data_can_fit_in_structured_data(&[],
-                                                                         keys.clone(),
-                                                                         Vec::new())));
+                       unwrap!(check_if_data_can_fit_in_structured_data(&[],
+                                                                        keys.clone(),
+                                                                        Vec::new())));
         }
         // Empty data
         {
             let mut keys = test_utils::generate_public_keys(250);
             assert_eq!(DataFitResult::DataFits,
                        unwrap!(check_if_data_can_fit_in_structured_data(&[],
-                                                                               keys.clone(),
-                                                                               Vec::new())));
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             assert_eq!(DataFitResult::DataFits,
                        unwrap!(check_if_data_can_fit_in_structured_data(
                            &[],
@@ -196,9 +195,7 @@ mod test {
                            keys.clone())));
             keys.extend(test_utils::generate_public_keys(750));
             assert_eq!(DataFitResult::NoDataCanFit,
-                       unwrap!(check_if_data_can_fit_in_structured_data(&[],
-                                                                               keys,
-                                                                               Vec::new())));
+                       unwrap!(check_if_data_can_fit_in_structured_data(&[], keys, Vec::new())));
         }
         // Data of size 80kb
         {
@@ -206,28 +203,26 @@ mod test {
             let mut keys = test_utils::generate_public_keys(1);
             assert_eq!(DataFitResult::DataFits,
                        unwrap!(check_if_data_can_fit_in_structured_data(&data,
-                                                                               keys.clone(),
-                                                                               Vec::new())));
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             keys.extend(test_utils::generate_public_keys(98));
             assert_eq!(DataFitResult::DataFits,
                        unwrap!(check_if_data_can_fit_in_structured_data(&data,
-                                                                               keys.clone(),
-                                                                               Vec::new())));
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             keys.extend(test_utils::generate_public_keys(190));
             assert_eq!(DataFitResult::DataDoesNotFit,
                        unwrap!(check_if_data_can_fit_in_structured_data(&data,
-                                                                               keys.clone(),
-                                                                               Vec::new())));
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             keys.extend(test_utils::generate_public_keys(610));
             assert_eq!(DataFitResult::DataDoesNotFit,
                        unwrap!(check_if_data_can_fit_in_structured_data(&data,
-                                                                               keys.clone(),
-                                                                               Vec::new())));
+                                                                        keys.clone(),
+                                                                        Vec::new())));
             keys.extend(test_utils::generate_public_keys(15));
             assert_eq!(DataFitResult::NoDataCanFit,
-                       unwrap!(check_if_data_can_fit_in_structured_data(&data,
-                                                                               keys,
-                                                                               Vec::new())));
+                       unwrap!(check_if_data_can_fit_in_structured_data(&data, keys, Vec::new())));
         }
         // Data size of 100 kb
         {

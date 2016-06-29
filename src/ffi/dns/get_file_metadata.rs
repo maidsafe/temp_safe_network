@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use dns::dns_operations::DnsOperations;
-use ffi::{Action, helper, ParameterPacket, ResponseType};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use rustc_serialize::json;
 

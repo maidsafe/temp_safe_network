@@ -66,7 +66,7 @@ mod test {
     use super::*;
     use rand;
     use routing::XorName;
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::AccessLevel;
 
     /// Should be able to serialise & deserialise the DirectoryKey

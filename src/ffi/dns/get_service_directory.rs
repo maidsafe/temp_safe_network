@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use dns::dns_operations::DnsOperations;
-use ffi::{ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType};
 use ffi::nfs::directory_response;
 
 #[derive(RustcDecodable, Debug)]
@@ -59,15 +59,14 @@ mod test {
         let parameter_packet = unwrap!(test_utils::get_parameter_packet(false));
 
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
-        let mut app_root_dir =
-            unwrap!(dir_helper.get(&unwrap!(parameter_packet.clone()
-                                                              .app_root_dir_key)));
+        let mut app_root_dir = unwrap!(dir_helper.get(&unwrap!(parameter_packet.clone()
+            .app_root_dir_key)));
         let _ = unwrap!(dir_helper.create(TEST_DIR_NAME.to_string(),
-                                                 UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                 Vec::new(),
-                                                 false,
-                                                 AccessLevel::Public,
-                                                 Some(&mut app_root_dir)));
+                                          UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                          Vec::new(),
+                                          false,
+                                          AccessLevel::Public,
+                                          Some(&mut app_root_dir)));
         let public_name = unwrap!(utility::generate_random_string(10));
         let mut register_request = RegisterDns {
             long_name: public_name.clone(),

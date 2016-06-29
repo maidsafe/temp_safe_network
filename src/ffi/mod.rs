@@ -239,8 +239,7 @@ pub extern "C" fn get_app_dir_key(c_app_name: *const c_char,
     let vendor: String = ffi_ptr_try!(helper::c_char_ptr_to_string(c_vendor), c_result);
     let handler = launcher_config_handler::ConfigHandler::new(client);
     let dir_key = ffi_ptr_try!(handler.get_app_dir_key(app_name, app_id, vendor), c_result);
-    let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from),
-                                           c_result);
+    let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from), c_result);
     serialised_data.shrink_to_fit();
     unsafe {
         ptr::write(c_size, serialised_data.len() as i32);
@@ -264,8 +263,7 @@ pub extern "C" fn get_safe_drive_key(c_size: *mut int32_t,
                                      -> *const u8 {
     let client = cast_from_ffi_handle(ffi_handle);
     let dir_key = ffi_ptr_try!(helper::get_safe_drive_key(client), c_result);
-    let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from),
-                                           c_result);
+    let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from), c_result);
     serialised_data.shrink_to_fit();
     unsafe {
         ptr::write(c_size, serialised_data.len() as i32);
@@ -524,7 +522,7 @@ mod test {
                                           cstring_pin.as_ptr(),
                                           cstring_password.as_ptr(),
                                           ptr_to_client_handle),
-                                   0);
+                           0);
             }
 
             assert!(client_handle != ptr::null_mut());
@@ -541,7 +539,7 @@ mod test {
                                   cstring_pin.as_ptr(),
                                   cstring_password.as_ptr(),
                                   ptr_to_client_handle),
-                                   0);
+                           0);
             }
 
             assert!(client_handle != ptr::null_mut());

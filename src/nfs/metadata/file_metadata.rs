@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use rustc_serialize::{Encodable, Encoder, Decodable, Decoder};
+use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use time::{self, Timespec, Tm};
 
 /// FileMetadata about a File or a Directory
@@ -146,7 +146,7 @@ impl Decodable for FileMetadata {
 #[cfg(test)]
 mod test {
     use super::*;
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
 
     #[test]
     fn serialise_and_deserialise_file_metadata() {

@@ -107,8 +107,8 @@ mod test {
     use core::id::Random;
     use self::rand::Rng;
     use sodiumoxide::crypto::{box_, sign};
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
-    use core::id::{IdType, RevocationIdType, MaidTypeTags};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use core::id::{IdType, MaidTypeTags, RevocationIdType};
 
     impl Random for IdType {
         fn generate_random() -> IdType {

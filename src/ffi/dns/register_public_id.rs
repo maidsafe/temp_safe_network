@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use dns::dns_operations::DnsOperations;
-use ffi::{Action, ResponseType, ParameterPacket};
+use ffi::{Action, ParameterPacket, ResponseType};
 use sodiumoxide::crypto::box_;
 
 #[derive(RustcDecodable, Debug)]
@@ -28,10 +28,9 @@ impl Action for RegisterPublicId {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
         let (msg_public_key, msg_secret_key) = box_::gen_keypair();
         let services = vec![];
-        let public_signing_key =
-            *try!(unwrap!(params.client.lock()).get_public_signing_key());
-        let secret_signing_key =
-            try!(unwrap!(params.client.lock()).get_secret_signing_key()).clone();
+        let public_signing_key = *try!(unwrap!(params.client.lock()).get_public_signing_key());
+        let secret_signing_key = try!(unwrap!(params.client.lock()).get_secret_signing_key())
+            .clone();
         let dns_operation = try!(DnsOperations::new(params.client
             .clone()));
         try!(dns_operation.register_dns(self.long_name.clone(),

@@ -20,10 +20,10 @@ use std::sync::{Arc, Mutex};
 use core::client::Client;
 use core::errors::CoreError;
 use core::{SelfEncryptionStorage, utility};
-use maidsafe_utilities::serialisation::{serialise, deserialise};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, XorName};
 use self_encryption::{DataMap, SelfEncryptor};
-use sodiumoxide::crypto::box_::{PublicKey, SecretKey, Nonce};
+use sodiumoxide::crypto::box_::{Nonce, PublicKey, SecretKey};
 
 // TODO(Spandan) Ask Routing to define this constant and use it from there
 const MAX_IMMUT_DATA_SIZE_IN_BYTES: usize = 1024 * 1024;
@@ -133,8 +133,7 @@ mod test {
         {
             let client = Arc::new(Mutex::new(unwrap!(test_utils::get_client())));
 
-            let immut_data_before =
-                unwrap!(create(client.clone(), data_to_put.clone(), None));
+            let immut_data_before = unwrap!(create(client.clone(), data_to_put.clone(), None));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap!(unwrap!(client.lock())
                 .put(Data::Immutable(immut_data_before), None));
@@ -152,15 +151,14 @@ mod test {
             let nonce = box_::gen_nonce();
 
             let immut_data_before = unwrap!(create(client.clone(),
-                                                          data_to_put.clone(),
-                                                          Some((&pk, &sk, &nonce))));
+                                                   data_to_put.clone(),
+                                                   Some((&pk, &sk, &nonce))));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap!(unwrap!(client.lock())
                 .put(Data::Immutable(immut_data_before), None));
             unwrap!(resp_getter.get());
 
-            let data_got =
-                unwrap!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))));
+            let data_got = unwrap!(get_data(client.clone(), data_name, Some((&pk, &sk, &nonce))));
 
             assert_eq!(data_to_put, data_got);
         }
@@ -171,8 +169,7 @@ mod test {
             let (pk, sk) = box_::gen_keypair();
             let nonce = box_::gen_nonce();
 
-            let immut_data_before =
-                unwrap!(create(client.clone(), data_to_put.clone(), None));
+            let immut_data_before = unwrap!(create(client.clone(), data_to_put.clone(), None));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap!(unwrap!(client.lock())
                 .put(Data::Immutable(immut_data_before), None));
@@ -188,8 +185,8 @@ mod test {
             let nonce = box_::gen_nonce();
 
             let immut_data_before = unwrap!(create(client.clone(),
-                                                          data_to_put.clone(),
-                                                          Some((&pk, &sk, &nonce))));
+                                                   data_to_put.clone(),
+                                                   Some((&pk, &sk, &nonce))));
             let data_name = immut_data_before.name();
             let resp_getter = unwrap!(unwrap!(client.lock())
                 .put(Data::Immutable(immut_data_before), None));

@@ -22,8 +22,8 @@ use core::errors::CoreError;
 use core::SelfEncryptionStorage;
 use core::structured_data_operations::{self, DataFitResult};
 use core::utility;
-use maidsafe_utilities::serialisation::{serialise, deserialise};
-use routing::{StructuredData, ImmutableData, Data, DataIdentifier, XorName};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 use self_encryption::{DataMap, SelfEncryptor};
 use sodiumoxide::crypto::{box_, sign};
 
@@ -242,9 +242,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 Some(data_decryption_keys));
-            match get_data(client.clone(),
-                           &unwrap!(result),
-                           Some(data_decryption_keys)) {
+            match get_data(client.clone(), &unwrap!(result), Some(data_decryption_keys)) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }
@@ -328,9 +326,7 @@ mod test {
                                 prev_owners.clone(),
                                 secret_key,
                                 Some(data_decryption_keys));
-            match get_data(client.clone(),
-                           &unwrap!(result),
-                           Some(data_decryption_keys)) {
+            match get_data(client.clone(), &unwrap!(result), Some(data_decryption_keys)) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
                 Err(_) => panic!("Failed to fetch"),
             }

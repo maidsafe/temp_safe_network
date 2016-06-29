@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use ffi::nfs::file_response::get_response;
 use rustc_serialize::json;
@@ -78,9 +78,8 @@ mod test {
         let mut file_helper = FileHelper::new(parameter_packet.client.clone());
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir = unwrap!(dir_helper.get(&app_dir_key));
-        let mut writer = unwrap!(file_helper.create(TEST_FILE_NAME.to_string(),
-                                                           Vec::new(),
-                                                           app_root_dir));
+        let mut writer =
+            unwrap!(file_helper.create(TEST_FILE_NAME.to_string(), Vec::new(), app_root_dir));
         let data = vec![10u8; 20];
         writer.write(&data[..], 0).expect("");
         let _ = unwrap!(writer.close());

@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{Action, helper, ParameterPacket, ResponseType};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode;
@@ -107,8 +107,8 @@ struct FileContentParams {
 
 #[cfg(test)]
 mod test {
-    use super::{ModifyFile, FileContentParams, OptionalParams};
-    use ffi::{config, Action, ParameterPacket, test_utils};
+    use super::{FileContentParams, ModifyFile, OptionalParams};
+    use ffi::{Action, ParameterPacket, config, test_utils};
     use rustc_serialize::base64::ToBase64;
     use nfs::helper::directory_helper::DirectoryHelper;
     use nfs::helper::file_helper::FileHelper;
@@ -121,9 +121,8 @@ mod test {
         let mut file_helper = FileHelper::new(parameter_packet.client.clone());
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        let writer = unwrap!(file_helper.create(TEST_FILE_NAME.to_string(),
-                                                       Vec::new(),
-                                                       app_root_dir));
+        let writer =
+            unwrap!(file_helper.create(TEST_FILE_NAME.to_string(), Vec::new(), app_root_dir));
         let _ = unwrap!(writer.close());
     }
 
@@ -180,12 +179,12 @@ mod test {
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file(&TEST_FILE_NAME.to_string()),
-                                  "File not found");
+                           "File not found");
         assert_eq!(file.get_metadata().get_user_metadata().len(), 0);
         assert!(request.execute(parameter_packet).is_ok());
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file(&TEST_FILE_NAME.to_string()),
-                                  "File not found");
+                           "File not found");
         assert!(file.get_metadata().get_user_metadata().len() > 0);
         assert_eq!(file.get_metadata()
                        .get_user_metadata()
@@ -220,12 +219,12 @@ mod test {
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file(&TEST_FILE_NAME.to_string()),
-                                  "File not found");
+                           "File not found");
         assert_eq!(file.get_metadata().get_size(), 0);
         assert!(request.execute(parameter_packet.clone()).is_ok());
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file(&TEST_FILE_NAME.to_string()),
-                                  "File not found");
+                           "File not found");
         let file_size = file.get_metadata().get_size();
         assert!(file_size > 0);
         let mut file_helper = FileHelper::new(parameter_packet.client.clone());
@@ -263,8 +262,8 @@ mod test {
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file(&TEST_FILE_NAME.to_string())
-                                      .cloned(),
-                                  "File not found");
+                               .cloned(),
+                           "File not found");
         assert_eq!(file.get_datamap().len(), file_size);
     }
 }

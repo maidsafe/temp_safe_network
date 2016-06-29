@@ -100,9 +100,9 @@ mod test {
     use rand;
     use super::*;
     use rand::Rng;
-    use core::id::{MpidTypeTags, MaidTypeTags, Random};
+    use core::id::{MaidTypeTags, MpidTypeTags, Random};
     use sodiumoxide::crypto::sign;
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
 
 
     impl Random for RevocationIdType {

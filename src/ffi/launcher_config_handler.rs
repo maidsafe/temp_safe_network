@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use core::client::Client;
 use ffi::config::{LAUNCHER_GLOBAL_CONFIG_FILE_NAME, LAUNCHER_GLOBAL_DIRECTORY_NAME};
 use ffi::errors::FfiError;
-use maidsafe_utilities::serialisation::{serialise, deserialise};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::directory_listing::DirectoryListing;
 use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
 use nfs::helper::directory_helper::DirectoryHelper;
@@ -124,13 +124,12 @@ impl ConfigHandler {
             global_configs.push(config);
         }
 
-        let file =
-            unwrap!(dir_listing.get_files()
+        let file = unwrap!(dir_listing.get_files()
                                .iter()
                                .find(|file| file.get_name() == LAUNCHER_GLOBAL_CONFIG_FILE_NAME),
                            "Logic Error - Launcher start-up should ensure the file must be \
                             present at this stage - Report bug.")
-                .clone();
+            .clone();
 
         let mut file_helper = FileHelper::new(self.client.clone());
         let mut writer = try!(file_helper.update_content(file, Overwrite, dir_listing));
@@ -162,11 +161,9 @@ impl ConfigHandler {
                                 .close())
                             .0;
                     unwrap!(dir_listing.get_files()
-                                       .iter()
-                                       .find(|file| {
-                                           file.get_name() == LAUNCHER_GLOBAL_CONFIG_FILE_NAME
-                                       })
-                                       .cloned())
+                            .iter()
+                            .find(|file| file.get_name() == LAUNCHER_GLOBAL_CONFIG_FILE_NAME)
+                            .cloned())
                         .clone()
                 }
             };

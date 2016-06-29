@@ -18,7 +18,7 @@
 pub mod test_utils;
 
 use core::errors::CoreError;
-use maidsafe_utilities::serialisation::{serialise, deserialise};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::Rng;
 use sodiumoxide::crypto::{box_, secretbox};
 

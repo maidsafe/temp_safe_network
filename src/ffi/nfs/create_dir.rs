@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG, VERSIONED_DIRECTORY_LISTING_TAG};
 use nfs::helper::directory_helper::DirectoryHelper;
@@ -113,13 +113,13 @@ mod test {
 
         let dir_helper = DirectoryHelper::new(parameter_packet.clone().client);
         let app_dir = unwrap!(dir_helper.get(&unwrap!(parameter_packet.clone()
-                                                                        .app_root_dir_key)));
+            .app_root_dir_key)));
         assert!(app_dir.find_sub_directory(&"test_dir".to_string()).is_some());
         assert!(app_dir.find_sub_directory(&"test_dir2".to_string()).is_some());
         assert_eq!(app_dir.get_sub_directories().len(), 2);
 
         let test_dir_key = unwrap!(app_dir.find_sub_directory(&"test_dir".to_string()),
-                                          "Directory not found")
+                                   "Directory not found")
             .get_key();
         let test_dir = unwrap!(dir_helper.get(test_dir_key));
         assert!(test_dir.find_sub_directory(&"secondlevel".to_string()).is_some());

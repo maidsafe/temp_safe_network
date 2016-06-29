@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use nfs::helper::file_helper::FileHelper;
 
@@ -78,8 +78,7 @@ mod test {
         assert!(request.execute(parameter_packet.clone()).is_ok());
 
         let dir_helper = DirectoryHelper::new(parameter_packet.client);
-        let app_dir =
-            unwrap!(dir_helper.get(&unwrap!(parameter_packet.app_root_dir_key)));
+        let app_dir = unwrap!(dir_helper.get(&unwrap!(parameter_packet.app_root_dir_key)));
         assert!(app_dir.find_file(&"test.txt".to_string()).is_some());
     }
 }

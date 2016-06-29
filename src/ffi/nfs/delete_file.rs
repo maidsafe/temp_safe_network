@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{helper, ParameterPacket, ResponseType, Action};
+use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use nfs::helper::file_helper::FileHelper;
 
@@ -64,9 +64,8 @@ mod test {
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
         let app_root_dir_key = unwrap!(parameter_packet.clone().app_root_dir_key);
         let mut app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        let writer = unwrap!(file_helper.create("test_file.txt".to_string(),
-                                                       Vec::new(),
-                                                       app_root_dir));
+        let writer =
+            unwrap!(file_helper.create("test_file.txt".to_string(), Vec::new(), app_root_dir));
         let _ = unwrap!(writer.close());
 
         let mut request = DeleteFile {

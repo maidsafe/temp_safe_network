@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use core::SelfEncryptionStorage;
-use maidsafe_utilities::serialisation::{serialise, deserialise};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::AccessLevel;
 use nfs::errors::NfsError;
 use nfs::file::File;
@@ -223,7 +223,7 @@ mod test {
     use std::sync::{Arc, Mutex};
     use super::DirectoryListing;
     use nfs::file::File;
-    use maidsafe_utilities::serialisation::{serialise, deserialise};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::metadata::file_metadata::FileMetadata;
     use core::utility::test_utils;
     use self_encryption::DataMap;
@@ -232,13 +232,13 @@ mod test {
     #[test]
     fn serialise_and_deserialise_directory_listing() {
         let obj_before = unwrap!(DirectoryListing::new("Home".to_string(),
-                                                              10,
-                                                              "some metadata about the directory"
-                                                                  .to_string()
-                                                                  .into_bytes(),
-                                                              true,
-                                                              AccessLevel::Private,
-                                                              None));
+                                                       10,
+                                                       "some metadata about the directory"
+                                                           .to_string()
+                                                           .into_bytes(),
+                                                       true,
+                                                       AccessLevel::Private,
+                                                       None));
 
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after = unwrap!(deserialise(&serialised_data));
@@ -250,30 +250,29 @@ mod test {
         let test_client = unwrap!(test_utils::get_client());
         let client = Arc::new(Mutex::new(test_client));
         let directory_listing = unwrap!(DirectoryListing::new("Home".to_string(),
-                                                                     10,
-                                                                     Vec::new(),
-                                                                     true,
-                                                                     AccessLevel::Private,
-                                                                     None));
+                                                              10,
+                                                              Vec::new(),
+                                                              true,
+                                                              AccessLevel::Private,
+                                                              None));
         let encrypted_data = unwrap!(directory_listing.encrypt(client.clone()));
         let decrypted_listing = unwrap!(DirectoryListing::decrypt(client.clone(),
-                                                                         directory_listing.get_key()
-                                                                             .get_id(),
-                                                                         encrypted_data));
+                                                                  directory_listing.get_key()
+                                                                      .get_id(),
+                                                                  encrypted_data));
         assert_eq!(directory_listing, decrypted_listing);
     }
 
     #[test]
     fn find_upsert_remove_file() {
         let mut directory_listing = unwrap!(DirectoryListing::new("Home".to_string(),
-                                                                         10,
-                                                                         Vec::new(),
-                                                                         true,
-                                                                         AccessLevel::Private,
-                                                                         None));
-        let mut file = unwrap!(File::new(FileMetadata::new("index.html".to_string(),
-                                                                  Vec::new()),
-                                                DataMap::None));
+                                                                  10,
+                                                                  Vec::new(),
+                                                                  true,
+                                                                  AccessLevel::Private,
+                                                                  None));
+        let mut file = unwrap!(File::new(FileMetadata::new("index.html".to_string(), Vec::new()),
+                                         DataMap::None));
         assert!(directory_listing.find_file(file.get_name()).is_none());
         directory_listing.upsert_file(file.clone());
         assert!(directory_listing.find_file(file.get_name()).is_some());
@@ -281,16 +280,15 @@ mod test {
         file.get_mut_metadata().set_name("home.html".to_string());
         directory_listing.upsert_file(file.clone());
         assert_eq!(directory_listing.get_files().len(), 1);
-        let file2 = unwrap!(File::new(FileMetadata::new("demo.html".to_string(),
-                                                               Vec::new()),
-                                             DataMap::None));
+        let file2 = unwrap!(File::new(FileMetadata::new("demo.html".to_string(), Vec::new()),
+                                      DataMap::None));
         directory_listing.upsert_file(file2.clone());
         assert_eq!(directory_listing.get_files().len(), 2);
 
         let _ = unwrap!(directory_listing.find_file(file.get_name()),
-                               "File not found");
+                        "File not found");
         let _ = unwrap!(directory_listing.find_file(file2.get_name()),
-                               "File not found");
+                        "File not found");
 
         unwrap!(directory_listing.remove_file(file.get_metadata().get_name()));
         assert!(directory_listing.find_file(file.get_name()).is_none());
@@ -304,17 +302,17 @@ mod test {
     #[test]
     fn find_upsert_remove_directory() {
         let mut directory_listing = unwrap!(DirectoryListing::new("Home".to_string(),
-                                                                         10,
-                                                                         Vec::new(),
-                                                                         true,
-                                                                         AccessLevel::Private,
-                                                                         None));
+                                                                  10,
+                                                                  Vec::new(),
+                                                                  true,
+                                                                  AccessLevel::Private,
+                                                                  None));
         let mut sub_directory = unwrap!(DirectoryListing::new("Child one".to_string(),
-                                                                     10,
-                                                                     Vec::new(),
-                                                                     true,
-                                                                     AccessLevel::Private,
-                                                                     None));
+                                                              10,
+                                                              Vec::new(),
+                                                              true,
+                                                              AccessLevel::Private,
+                                                              None));
         assert!(directory_listing.find_sub_directory(sub_directory.get_metadata().get_name())
             .is_none());
         directory_listing.upsert_sub_directory(sub_directory.get_metadata().clone());
@@ -325,20 +323,20 @@ mod test {
         directory_listing.upsert_sub_directory(sub_directory.get_metadata().clone());
         assert_eq!(directory_listing.get_sub_directories().len(), 1);
         let sub_directory_two = unwrap!(DirectoryListing::new("Child Two".to_string(),
-                                                                     10,
-                                                                     Vec::new(),
-                                                                     true,
-                                                                     AccessLevel::Private,
-                                                                     None));
+                                                              10,
+                                                              Vec::new(),
+                                                              true,
+                                                              AccessLevel::Private,
+                                                              None));
         directory_listing.upsert_sub_directory(sub_directory_two.get_metadata().clone());
         assert_eq!(directory_listing.get_sub_directories().len(), 2);
 
         let _ = unwrap!(directory_listing.find_sub_directory(sub_directory.get_metadata()
-                                   .get_name()),
-                               "Directory not found");
+                            .get_name()),
+                        "Directory not found");
         let _ = unwrap!(directory_listing.find_sub_directory(sub_directory_two.get_metadata()
-                                       .get_name()),
-                               "Directory not found");
+                            .get_name()),
+                        "Directory not found");
 
         unwrap!(directory_listing.remove_sub_directory(sub_directory.get_metadata()
             .get_name()));
