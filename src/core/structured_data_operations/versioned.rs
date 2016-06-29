@@ -133,7 +133,7 @@ mod test {
         let id: XorName = rand::random();
         let owners = utility::test_utils::generate_public_keys(1);
         let prev_owners = Vec::new();
-        let ref secret_key = utility::test_utils::generate_secret_keys(1)[0];
+        let secret_key = &utility::test_utils::generate_secret_keys(1)[0];
 
         let version_0: XorName = rand::random();
 

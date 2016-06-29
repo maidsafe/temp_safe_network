@@ -498,7 +498,7 @@ mod test {
     fn generate_random_cstring(len: usize) -> Result<::std::ffi::CString, FfiError> {
         let mut cstring_vec = try!(::core::utility::generate_random_vector::<u8>(len));
         // Avoid internal nulls and ensure valid ASCII (thus valid utf8)
-        for it in cstring_vec.iter_mut() {
+        for it in &mut cstring_vec {
             *it %= 128;
             if *it == 0 {
                 *it += 1;
@@ -520,10 +520,10 @@ mod test {
             {
                 let ptr_to_client_handle = &mut client_handle;
 
-                let _ = assert_eq!(create_account(cstring_keyword.as_ptr(),
-                                                  cstring_pin.as_ptr(),
-                                                  cstring_password.as_ptr(),
-                                                  ptr_to_client_handle),
+                assert_eq!(create_account(cstring_keyword.as_ptr(),
+                                          cstring_pin.as_ptr(),
+                                          cstring_password.as_ptr(),
+                                          ptr_to_client_handle),
                                    0);
             }
 
@@ -537,10 +537,10 @@ mod test {
             {
                 let ptr_to_client_handle = &mut client_handle;
 
-                let _ = assert_eq!(log_in(cstring_keyword.as_ptr(),
-                                          cstring_pin.as_ptr(),
-                                          cstring_password.as_ptr(),
-                                          ptr_to_client_handle),
+                assert_eq!(log_in(cstring_keyword.as_ptr(),
+                                  cstring_pin.as_ptr(),
+                                  cstring_password.as_ptr(),
+                                  ptr_to_client_handle),
                                    0);
             }
 

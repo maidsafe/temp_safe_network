@@ -75,7 +75,7 @@ mod test {
         let parameter_packet = unwrap!(test_utils::get_parameter_packet(false));
 
         let dir_helper = DirectoryHelper::new(parameter_packet.client.clone());
-        let ref app_root_dir_key = unwrap!(parameter_packet.clone().app_root_dir_key);
+        let app_root_dir_key = &unwrap!(parameter_packet.clone().app_root_dir_key);
         let mut app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let _ = unwrap!(dir_helper.create(TEST_DIR_NAME.to_string(),
                                                  UNVERSIONED_DIRECTORY_LISTING_TAG,

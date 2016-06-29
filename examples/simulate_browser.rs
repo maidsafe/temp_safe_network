@@ -34,7 +34,7 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
-#![cfg_attr(feature="clippy", allow(print_stdout))]
+#![cfg_attr(feature="clippy", allow(use_debug, print_stdout))]
 
 #![allow(unused_extern_crates)]#[macro_use]
 extern crate maidsafe_utilities;
@@ -123,7 +123,7 @@ fn create_dns_record(client: Arc<Mutex<Client>>,
     dns_operations.register_dns(long_name,
                                 &public_messaging_encryption_key,
                                 &secret_messaging_encryption_key,
-                                &vec![],
+                                &[],
                                 owners,
                                 &secret_signing_key,
                                 None)
@@ -172,7 +172,8 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
 
     println!("Creating Home Directory for the Service...");
 
-    let service_home_dir_name = service_name.clone() + "_home_dir";
+    let mut service_home_dir_name = service_name.clone();
+    service_home_dir_name.push_str("_home_dir");
 
     let dir_helper = DirectoryHelper::new(client.clone());
     let (dir_listing, _) = try!(dir_helper.create(service_home_dir_name,

@@ -34,7 +34,7 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
-#![cfg_attr(feature="clippy", allow(use_debug))]
+#![cfg_attr(feature="clippy", allow(use_debug, print_stdout))]
 
 extern crate docopt;
 extern crate rand;
@@ -124,7 +124,7 @@ fn main() {
         unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()))
     };
     println!("Logged in successfully !!");
-    let public_key = unwrap!(client.get_public_signing_key()).clone();
+    let public_key = *unwrap!(client.get_public_signing_key());
     let secret_key = unwrap!(client.get_secret_signing_key()).clone();
 
     if !args.flag_get_only {

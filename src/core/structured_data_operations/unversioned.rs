@@ -211,7 +211,7 @@ mod test {
             let data = Vec::new();
             let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -232,7 +232,7 @@ mod test {
             let data = Vec::new();
             let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -255,7 +255,7 @@ mod test {
             let data = vec![99u8; 1024 * 75];
             let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -276,7 +276,7 @@ mod test {
             let data = vec![99u8; 1024 * 75];
             let owners = utility::test_utils::get_max_sized_public_keys(200);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -297,7 +297,7 @@ mod test {
             let data = vec![99u8; 1024 * 75];
             let owners = utility::test_utils::get_max_sized_public_keys(903);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -318,7 +318,7 @@ mod test {
             let data = vec![99u8; 1024 * 75];
             let owners = utility::test_utils::get_max_sized_public_keys(900);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -341,7 +341,7 @@ mod test {
             let data = vec![99u8; 1024 * 80];
             let owners = utility::test_utils::get_max_sized_public_keys(905);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -359,7 +359,7 @@ mod test {
             let data = vec![99u8; 102400];
             let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
@@ -380,7 +380,7 @@ mod test {
             let data = vec![99u8; 204801];
             let owners = utility::test_utils::get_max_sized_public_keys(1);
             let prev_owners = Vec::new();
-            let ref secret_key = utility::test_utils::get_max_sized_secret_keys(1)[0];
+            let secret_key = &utility::test_utils::get_max_sized_secret_keys(1)[0];
             let result = create(client.clone(),
                                 TAG_ID,
                                 id,
