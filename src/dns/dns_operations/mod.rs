@@ -603,9 +603,12 @@ mod test {
         let messaging_keypair = box_::gen_keypair();
         let owners = vec![unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone()];
         let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+
         // Limit of `Some(2)` would prevent the mutation to happen. We want one
         // `Mutation` exactly at this point
         unwrap!(client.lock()).set_network_limits(Some(3));
+
+        // Fail to register the name.
         match dns_operations.register_dns(dns_name.clone(),
                                           &messaging_keypair.0,
                                           &messaging_keypair.1,
@@ -619,7 +622,22 @@ mod test {
             Ok(()) => panic!("Operation unexpectedly had succeed"),
             Err(e) => panic!("Unexpected error {:?}", e),
         }
+
+        // Remove artificial network failure
         unwrap!(client.lock()).set_network_limits(None);
+
+        // Now try and delete. It should fail because the registration failed.
+        match dns_operations.delete_dns(&dns_name, &secret_signing_key) {
+            Err(DnsError::DnsRecordNotFound) => (),
+            Ok(()) => panic!("Operation unexpectedly had succeed"),
+            Err(e) => panic!("Unexpected error {:?}", e),
+        }
+
+        // List of registered names should be empty
+        let names = unwrap!(dns_operations.get_all_registered_names());
+        assert!(names.is_empty());
+
+        // Register for real this time.
         unwrap!(dns_operations.register_dns(dns_name.clone(),
                                             &messaging_keypair.0,
                                             &messaging_keypair.1,
@@ -627,5 +645,6 @@ mod test {
                                             owners.clone(),
                                             &secret_signing_key,
                                             None));
+
     }
 }
