@@ -231,7 +231,7 @@ impl RoutingMock {
         Ok(())
     }
 
-    pub fn send_put_request(&mut self,
+    pub fn send_put_request(&self,
                             _dst: Authority,
                             data: Data,
                             msg_id: MessageId)
@@ -315,7 +315,7 @@ impl RoutingMock {
         Ok(())
     }
 
-    pub fn send_post_request(&mut self,
+    pub fn send_post_request(&self,
                              _dst: Authority,
                              data: Data,
                              msg_id: MessageId)
@@ -391,7 +391,7 @@ impl RoutingMock {
         Ok(())
     }
 
-    pub fn send_delete_request(&mut self,
+    pub fn send_delete_request(&self,
                                _dst: Authority,
                                data: Data,
                                msg_id: MessageId)

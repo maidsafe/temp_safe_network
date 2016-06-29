@@ -605,7 +605,7 @@ mod test {
         let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
         // Limit of `Some(2)` would prevent the mutation to happen. We want one
         // `Mutation` exactly at this point
-        client.lock().unwrap().set_network_limits(Some(3));
+        unwrap!(client.lock()).set_network_limits(Some(3));
         match dns_operations.register_dns(dns_name.clone(),
                                           &messaging_keypair.0,
                                           &messaging_keypair.1,
@@ -619,7 +619,7 @@ mod test {
             Ok(()) => panic!("Operation unexpectedly had succeed"),
             Err(e) => panic!("Unexpected error {:?}", e),
         }
-        client.lock().unwrap().set_network_limits(None);
+        unwrap!(client.lock()).set_network_limits(None);
         unwrap!(dns_operations.register_dns(dns_name.clone(),
                                             &messaging_keypair.0,
                                             &messaging_keypair.1,
