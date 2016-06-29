@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use std;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::mem;
@@ -96,7 +97,7 @@ fn sync_disk_storage(memory_storage: &HashMap<XorName, Vec<u8>>) {
 pub struct RoutingMock {
     sender: mpsc::Sender<Event>,
     client_auth: Authority,
-    max_ops_countdown: Option<u64>,
+    max_ops_countdown: Option<Cell<u64>>,
 }
 
 impl RoutingMock {
@@ -135,15 +136,15 @@ impl RoutingMock {
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
-        let err = if self.max_ops_countdown == Some(0) {
+        let err = if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
             Some(GetError::NetworkOther("Max operations exhausted".to_string()))
         } else {
             None
         };
 
         if err == None {
-            if let Some(ref mut count) = self.max_ops_countdown {
-                *count -= 1;
+            if let Some(ref count) = self.max_ops_countdown {
+                count.set(count.get() - 1);
             }
         }
 
@@ -246,7 +247,7 @@ impl RoutingMock {
         let request = Request::Put(data.clone(), msg_id.clone());
 
         let mut data_store_mutex_guard = unwrap!(data_store.lock());
-        let err = if self.max_ops_countdown == Some(0) {
+        let err = if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
             Some(MutationError::NetworkOther("Max operations exhausted"
                                              .to_string()))
         } else if data_store_mutex_guard.contains_key(&data_name) {
@@ -277,8 +278,8 @@ impl RoutingMock {
         };
 
         if err == None {
-            if let Some(ref mut count) = self.max_ops_countdown {
-                *count -= 1;
+            if let Some(ref count) = self.max_ops_countdown {
+                count.set(count.get() - 1);
             }
         }
 
@@ -329,7 +330,7 @@ impl RoutingMock {
 
         let mut data_store_mutex_guard = unwrap!(data_store.lock());
         let err = if data_store_mutex_guard.contains_key(&data_name) {
-            if self.max_ops_countdown == Some(0) {
+            if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
                 Some(MutationError::NetworkOther("Max operations exhausted"
                                                  .to_string()))
             } else if let Data::Structured(ref sd_new) = data {
@@ -354,8 +355,8 @@ impl RoutingMock {
         };
 
         if err == None {
-            if let Some(ref mut count) = self.max_ops_countdown {
-                *count -= 1;
+            if let Some(ref count) = self.max_ops_countdown {
+                count.set(count.get() - 1);
             }
         }
 
@@ -405,7 +406,7 @@ impl RoutingMock {
         let request = Request::Delete(data.clone(), msg_id.clone());
 
         let mut data_store_mutex_guard = unwrap!(data_store.lock());
-        let err = if self.max_ops_countdown == Some(0) {
+        let err = if self.max_ops_countdown.as_ref().map(|count| count.get() == 0).unwrap_or(false) {
             Some(MutationError::NetworkOther("Max operations exhausted"
                                              .to_string()))
         } else if data_store_mutex_guard.contains_key(&data_name) {
@@ -431,8 +432,8 @@ impl RoutingMock {
         };
 
         if err == None {
-            if let Some(ref mut count) = self.max_ops_countdown {
-                *count -= 1;
+            if let Some(ref count) = self.max_ops_countdown {
+                count.set(count.get() - 1);
             }
         }
 
@@ -516,7 +517,7 @@ impl RoutingMock {
 
     #[cfg(test)]
     pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
-        self.max_ops_countdown = max_ops_count;
+        self.max_ops_countdown = max_ops_count.map(Cell::new)
     }
 }
 
