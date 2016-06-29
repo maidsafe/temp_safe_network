@@ -53,7 +53,7 @@ use safe_core::core::client::Client;
 
 use safe_core::nfs::helper::file_helper::FileHelper;
 use safe_core::nfs::helper::directory_helper::DirectoryHelper;
-use safe_core::nfs::{UNVERSIONED_DIRECTORY_LISTING_TAG, AccessLevel};
+use safe_core::nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
 
 use safe_core::dns::errors::DnsError;
 use safe_core::dns::dns_operations::DnsOperations;
@@ -88,8 +88,7 @@ fn handle_login() -> Arc<Mutex<Client>> {
     // Account Creation
     {
         println!("\nTrying to create an account ...");
-        let _ =
-            unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let _ = unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
         println!("Account Creation Successful !!");
     }
 
@@ -313,8 +312,7 @@ fn parse_url_and_get_home_page(client: Arc<Mutex<Client>>,
 
 fn main() {
     let client = handle_login();
-    let unregistered_client =
-        Arc::new(Mutex::new(unwrap!(Client::create_unregistered_client())));
+    let unregistered_client = Arc::new(Mutex::new(unwrap!(Client::create_unregistered_client())));
     println!("Account Login Successful !!");
 
     println!("Initialising Dns...");

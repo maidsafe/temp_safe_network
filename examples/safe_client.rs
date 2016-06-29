@@ -96,9 +96,7 @@ fn main() {
         {
             println!("\nTrying to create an account ...");
 
-            let _ = unwrap!(Client::create_account(keyword.clone(),
-                                                          pin.clone(),
-                                                          password.clone()));
+            let _ = unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
             println!("Account Created Successfully !!");
         }
 

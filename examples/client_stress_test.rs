@@ -86,12 +86,12 @@ fn random_structured_data<R: Rng>(type_tag: u64,
                                   rng: &mut R)
                                   -> StructuredData {
     unwrap!(StructuredData::new(type_tag,
-                                       rng.gen(),
-                                       0,
-                                       rng.gen_iter().take(10).collect(),
-                                       vec![public_key.clone()],
-                                       vec![],
-                                       Some(secret_key)))
+                                rng.gen(),
+                                0,
+                                rng.gen_iter().take(10).collect(),
+                                vec![public_key.clone()],
+                                vec![],
+                                Some(secret_key)))
 }
 
 
@@ -189,12 +189,12 @@ fn main() {
         // Construct data
         let structured_data = if let Data::Structured(sd) = data.clone() {
             unwrap!(StructuredData::new(sd.get_type_tag(),
-                                               *sd.get_identifier(),
-                                               sd.get_version() + 1,
-                                               rng.gen_iter().take(10).collect(),
-                                               sd.get_owner_keys().clone(),
-                                               vec![],
-                                               Some(&secret_key)))
+                                        *sd.get_identifier(),
+                                        sd.get_version() + 1,
+                                        rng.gen_iter().take(10).collect(),
+                                        sd.get_owner_keys().clone(),
+                                        vec![],
+                                        Some(&secret_key)))
         } else {
             continue; // Skip non-structured data.
         };

@@ -320,8 +320,7 @@ fn file_operation(option: u32,
                     println!("\t{} Modified at {:?}",
                              i + 1,
                              unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
-                                            &version.get_metadata().get_modified_time()))
-                                 )
+                                                    &version.get_metadata().get_modified_time())))
                 }
                 match get_user_string("Number corresponding to the version")
                     .trim()
@@ -329,12 +328,11 @@ fn file_operation(option: u32,
                     Ok(index) => {
                         if let Some(version) = versions.get(index - 1) {
                             file_version = version;
-                        }
-                        else {
+                        } else {
                             println!("Invalid version : Fetching latest version");
                             file_version = unwrap!(versions.get(0));
                         }
-                    },
+                    }
                     Err(e) => {
                         println!("Invalid input ({}): Fetching latest version", e);
                         file_version = unwrap!(versions.get(0));
@@ -429,13 +427,15 @@ fn main() {
                     match selection {
                         1...4 => {
                             if let Err(msg) = directory_operation(selection,
-                                                      client.clone(),
-                                                      &mut root_directory) {
+                                                                  client.clone(),
+                                                                  &mut root_directory) {
                                 println!("Failed: {:?}", msg);
                             }
                         }
                         5...11 => {
-                            if let Err(msg) = file_operation(selection, client.clone(), &mut root_directory) {
+                            if let Err(msg) = file_operation(selection,
+                                                             client.clone(),
+                                                             &mut root_directory) {
                                 println!("Failed: {:?}", msg);
                             }
                         }
