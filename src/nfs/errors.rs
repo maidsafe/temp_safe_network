@@ -93,7 +93,21 @@ impl Into<i32> for NfsError {
             NfsError::ParameterIsNotValid => NFS_ERROR_START_RANGE - 8,
             NfsError::Unexpected(_) => NFS_ERROR_START_RANGE - 9,
             NfsError::UnsuccessfulEncodeDecode(_) => NFS_ERROR_START_RANGE - 10,
-            NfsError::SelfEncryption(_) => NFS_ERROR_START_RANGE - 11,
+            NfsError::SelfEncryption(SelfEncryptionError
+                                      ::Compression::<SelfEncryptionStorageError>) => {
+                NFS_ERROR_START_RANGE - 11
+            }
+            NfsError::SelfEncryption(SelfEncryptionError
+                                      ::Decryption::<SelfEncryptionStorageError>) => {
+                NFS_ERROR_START_RANGE - 12
+            }
+            NfsError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
+                NFS_ERROR_START_RANGE - 13
+            }
+            NfsError::SelfEncryption(SelfEncryptionError
+                                      ::Storage
+                                      ::<SelfEncryptionStorageError>(
+                                          SelfEncryptionStorageError(err))) => (*err).into(),
         }
     }
 }
