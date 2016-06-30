@@ -1,5 +1,12 @@
 # Safe Core - Change Log
 
+## [0.16.1]
+- Update Routing to 0.23.1
+- Add logging to network events.
+- Delete existing log file due to issue in v3 of log4rs which instead of truncating/appending overwrites the existing log file garbling it.
+- Rustfmt and clippy errors addressed.
+- Error recovery test case.
+
 ## [0.16.0]
 - Update dependencies
 - Refactor FFI as `Box::into_raw()` is stable
