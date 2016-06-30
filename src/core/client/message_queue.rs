@@ -168,6 +168,8 @@ impl MessageQueue {
                     Event::Terminate => {
                         let mut dead_sender_positions = Vec::<usize>::new();
                         let mut queue_guard = unwrap!(message_queue_cloned.lock());
+                        info!("Received a Terminate event. Informing {} observers.",
+                              queue_guard.network_event_observers.len());
                         for it in queue_guard.network_event_observers.iter().enumerate() {
                             if it.1.send(NetworkEvent::Disconnected).is_err() {
                                 dead_sender_positions.push(it.0);

@@ -208,6 +208,9 @@ pub extern "C" fn register_network_event_observer(ffi_handle: *mut FfiHandle,
                     break;
                 }
                 let cbs = &*unwrap!(callbacks.lock());
+                info!("Informing {:?} to {} FFI network event observers.",
+                      event,
+                      cbs.len());
                 let event_ffi_val = event.into();
                 for cb in cbs {
                     cb(event_ffi_val);
