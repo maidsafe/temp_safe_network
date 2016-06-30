@@ -45,7 +45,7 @@ mod launcher_config_handler;
 /// Errors thrown by the FFI operations
 pub mod errors;
 
-use std::{mem, ptr};
+use std::{fs, mem, ptr};
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
@@ -126,6 +126,7 @@ impl Drop for FfiHandle {
 /// This function should be called to enable logging to a file
 #[no_mangle]
 pub extern "C" fn init_logging() -> int32_t {
+    let _ = fs::remove_file("Client.log");
     ffi_try!(safe_log::init(false).map_err(CoreError::Unexpected));
 
     0
@@ -208,6 +209,9 @@ pub extern "C" fn register_network_event_observer(ffi_handle: *mut FfiHandle,
                     break;
                 }
                 let cbs = &*unwrap!(callbacks.lock());
+                info!("Informing {:?} to {} FFI network event observers.",
+                      event,
+                      cbs.len());
                 let event_ffi_val = event.into();
                 for cb in cbs {
                     cb(event_ffi_val);

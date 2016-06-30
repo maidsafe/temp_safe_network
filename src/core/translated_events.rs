@@ -23,6 +23,7 @@ use routing::Data;
 pub const NETWORK_EVENT_START_RANGE: i32 = 0;
 
 /// These events are received as a response to a GET/PUT/POST/DELETE requests made by clients
+#[derive(Debug)]
 pub enum ResponseEvent {
     /// Response to a previous GET request
     GetResp(Result<Data, CoreError>),
@@ -33,6 +34,7 @@ pub enum ResponseEvent {
 }
 
 /// Netowork Events that Client Modules need to deal with
+#[derive(Debug)]
 pub enum NetworkEvent {
     /// The client engine is connected to atleast one peer
     Connected,
