@@ -1,11 +1,12 @@
 # Safe Core - Change Log
 
 ## [0.16.1]
-- Update Routing to 0.23.1
+- Update Routing to 0.23.2
 - Add logging to network events.
 - Delete existing log file due to issue in v3 of log4rs which instead of truncating/appending overwrites the existing log file garbling it.
 - Rustfmt and clippy errors addressed.
 - Error recovery test case.
+- Extract sub-errors out of Self Encryption errors and convert them to C error codes for FFI.
 
 ## [0.16.0]
 - Update dependencies
