@@ -65,7 +65,7 @@ impl<'a> Writer<'a> {
 
     /// Data of a file/blob can be written in smaller chunks
     pub fn write(&mut self, data: &[u8], position: u64) -> Result<(), NfsError> {
-        debug!("Writing file data at position {:?} ...", position);
+        debug!("Writing file data at position {:?} ...", position);        
         Ok(try!(self.self_encryptor.write(data, position)))
     }
 

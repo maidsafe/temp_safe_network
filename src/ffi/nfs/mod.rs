@@ -31,8 +31,10 @@ mod move_dir;
 mod move_file;
 mod modify_dir;
 mod modify_file;
+
 pub mod directory_response;
 pub mod file_response;
+pub mod get_file_writer;
 
 pub fn action_dispatcher<D>(action: String,
                             params: ParameterPacket,

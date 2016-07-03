@@ -53,14 +53,15 @@ use core::client::Client;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
 use ffi::errors::FfiError;
-use libc::{c_char, int32_t};
+use ffi::nfs::get_file_writer::{GetFileWriter, WriterWrapper};
+use libc::{c_char, c_void, int32_t};
 use maidsafe_utilities::log as safe_log;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
 use nfs::metadata::directory_key::DirectoryKey;
+use nfs::helper::writer::Writer;
 use rustc_serialize::base64::FromBase64;
 use rustc_serialize::{Decodable, Decoder, json};
-
 
 /// ParameterPacket acts as a holder for the standard parameters that would be needed for performing
 /// operations across the modules like nfs and dns
@@ -395,6 +396,57 @@ pub extern "C" fn client_issued_deletes(ffi_handle: *mut FfiHandle) -> u64 {
     let guard = unwrap!(client.lock());
     guard.issued_deletes()
 }
+
+
+/// Obtain NFS writter handle for writing data to a file in streaming mode
+#[no_mangle]
+#[allow(unsafe_code)]
+pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
+                                 ffi_handle: *mut FfiHandle,
+                                 writer_handle: *mut *const c_void)
+                                 -> int32_t {
+    let payload: String = ffi_try!(helper::c_char_ptr_to_string(c_payload));
+    let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload), "JSON parse error"));
+    let mut json_decoder = json::Decoder::new(json_request);
+    let client = cast_from_ffi_handle(ffi_handle);
+    let (_, _, parameter_packet) = ffi_try!(get_parameter_packet(client, &mut json_decoder));
+    let mut get_file_writer = ffi_try!(parse_result!(json_decoder.read_struct_field("data",
+                                                                                    0,
+                                                                                    |d| {
+                                            GetFileWriter::decode(d)
+                                        }),
+                                        ""));
+    let writer_wrapper = ffi_try!(get_file_writer.execute(parameter_packet));
+    unsafe {
+        *writer_handle = Box::into_raw(Box::new(writer_wrapper)) as *mut c_void;
+    }
+
+    0
+}
+
+/// Write data to the Network using the NFS Writer handle
+#[no_mangle]
+#[allow(unsafe_code)]
+pub fn nfs_stream_write(handle: *mut c_void, offset: u64, data: Vec<u8>) -> int32_t {
+    let mut wrapper = unsafe { Box::from_raw(handle as *mut WriterWrapper) };
+    let mut writer = unsafe { Box::from_raw(wrapper.get_writer_ptr() as *mut Writer) };
+    ffi_try!(writer.write(&data[..], offset));
+    mem::forget(writer);
+    mem::forget(wrapper);
+
+    0
+}
+
+/// Closes the NFS Writter handle
+#[no_mangle]
+#[allow(unsafe_code)]
+pub fn nfs_stream_close(handle: *mut WriterWrapper) -> int32_t {
+    let mut wrapper = unsafe { Box::from_raw(handle) };
+    let writer = unsafe { Box::from_raw(wrapper.get_writer_ptr() as *mut Writer) };
+    let _ = ffi_try!(writer.close());
+    0
+}
+
 
 fn get_parameter_packet<D>(client: Arc<Mutex<Client>>,
                            json_decoder: &mut D)
