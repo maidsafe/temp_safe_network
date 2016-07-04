@@ -1,4 +1,4 @@
-// Copyright 2015 MaidSafe.net limited.
+// Copyright 2016 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -14,11 +14,13 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-use libc::c_void;
 
-use ffi::errors::FfiError;
+use std::mem;
+
 use core::SelfEncryptionStorage;
-use ffi::{helper, ParameterPacket};
+use ffi::errors::FfiError;
+use ffi::{ParameterPacket, helper};
+use nfs::directory_listing::DirectoryListing;
 use nfs::helper::writer::{Mode, Writer};
 
 #[derive(RustcDecodable, Debug)]
@@ -27,38 +29,41 @@ pub struct GetFileWriter {
     is_path_shared: bool,
 }
 
-#[allow(unused)]
-pub struct WriterWrapper {
-    storage: Box<SelfEncryptionStorage>,
-    p_writer: *mut c_void,
+pub struct FfiWriterHandle {
+    writer: Box<Writer<'static>>,
+    _storage: Box<SelfEncryptionStorage>,
 }
 
-impl WriterWrapper {
-    pub fn new(storage: SelfEncryptionStorage, p_writer: *mut c_void) -> WriterWrapper {
-        WriterWrapper {
-            storage: Box::new(storage),
-            p_writer: p_writer,
+impl FfiWriterHandle {
+    fn new(storage: Box<SelfEncryptionStorage>, writer: Box<Writer<'static>>) -> FfiWriterHandle {
+        FfiWriterHandle {
+            writer: writer,
+            _storage: storage,
         }
     }
 
-    pub fn get_writer_ptr(&mut self) -> *mut c_void {
-        self.p_writer
+    pub fn writer(&mut self) -> &mut Writer<'static> {
+        &mut *self.writer
+    }
+
+    pub fn close(self: Box<Self>) -> Result<(DirectoryListing, Option<DirectoryListing>), FfiError> {
+        Ok(try!(self.writer.close()))
     }
 }
 
 impl GetFileWriter {
-    pub fn execute(&mut self, params: ParameterPacket) -> Result<WriterWrapper, FfiError> {
-
+    #[allow(unsafe_code)]
+    pub fn new(&mut self, params: ParameterPacket) -> Result<FfiWriterHandle, FfiError> {
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }
 
         let start_dir_key = if self.is_path_shared {
             try!(params.safe_drive_dir_key
-                       .ok_or(FfiError::from("Safe Drive directory key is not present")))
+                .ok_or(FfiError::from("Safe Drive directory key is not present")))
         } else {
             try!(params.app_root_dir_key
-                       .ok_or(FfiError::from("Application directory key is not present")))
+                .ok_or(FfiError::from("Application directory key is not present")))
         };
         let mut tokens = helper::tokenise_path(&self.file_path, false);
         let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
@@ -67,18 +72,17 @@ impl GetFileWriter {
                                                               Some(&start_dir_key)));
 
         let file = try!(dir_of_file.find_file(&file_name)
-                                   .map(|file| file.clone())
-                                   .ok_or(FfiError::InvalidPath));
-        let mut storage = SelfEncryptionStorage::new(params.client.clone());
-        let p_writer = {
-            let writer = Box::new(try!(Writer::new(params.client,
-                                                   &mut storage,
-                                                   Mode::Modify,
-                                                   dir_of_file,
-                                                   file)));
-            Box::into_raw(writer) as *mut c_void
+            .map(|file| file.clone())
+            .ok_or(FfiError::InvalidPath));
+        let mut storage = Box::new(SelfEncryptionStorage::new(params.client.clone()));
+        let writer: Writer<'static> = unsafe {
+            mem::transmute(try!(Writer::new(params.client,
+                                            &mut *storage,
+                                            Mode::Modify,
+                                            dir_of_file,
+                                            file)))
         };
 
-        Ok(WriterWrapper::new(storage, p_writer))
+        Ok(FfiWriterHandle::new(storage, Box::new(writer)))
     }
 }

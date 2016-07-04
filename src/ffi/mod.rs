@@ -53,13 +53,12 @@ use core::client::Client;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
 use ffi::errors::FfiError;
-use ffi::nfs::get_file_writer::{GetFileWriter, WriterWrapper};
-use libc::{c_char, c_void, int32_t};
+use ffi::nfs::get_file_writer::{FfiWriterHandle, GetFileWriter};
+use libc::{c_char, int32_t};
 use maidsafe_utilities::log as safe_log;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
 use nfs::metadata::directory_key::DirectoryKey;
-use nfs::helper::writer::Writer;
 use rustc_serialize::base64::FromBase64;
 use rustc_serialize::{Decodable, Decoder, json};
 
@@ -97,7 +96,7 @@ impl Clone for ParameterPacket {
     }
 }
 
-/// ResponseType tspecifies the standard Response that is to be expected from the ::Action trait
+/// ResponseType specifies the standard Response that is to be expected from the Action trait
 pub type ResponseType = Result<Option<String>, FfiError>;
 
 /// ICommand trait
@@ -305,8 +304,7 @@ pub extern "C" fn execute(c_payload: *const c_char, ffi_handle: *mut FfiHandle) 
     let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload), "JSON parse error"));
     let mut json_decoder = json::Decoder::new(json_request);
     let client = cast_from_ffi_handle(ffi_handle);
-    let (module, action, parameter_packet) = ffi_try!(get_parameter_packet(client,
-                                                                           &mut json_decoder));
+    let (module, action, parameter_packet) = ffi_try!(get_context(client, &mut json_decoder));
     let result = module_parser(module, action, parameter_packet, &mut json_decoder);
     let _ = ffi_try!(result);
 
@@ -331,9 +329,9 @@ pub extern "C" fn execute_for_content(c_payload: *const c_char,
                                     c_result);
     let mut json_decoder = json::Decoder::new(json_request.clone());
     let client = cast_from_ffi_handle(ffi_handle);
-    let (module, action, parameter_packet) =
-        ffi_ptr_try!(get_parameter_packet(client, &mut json_decoder), c_result);
-    // TODO Krishna: Avoid parsing it twice (line 292). for get_parameter_packet pass the json
+    let (module, action, parameter_packet) = ffi_ptr_try!(get_context(client, &mut json_decoder),
+                                                          c_result);
+    // TODO Krishna: Avoid parsing it twice (line 292). for get_context pass the json
     // object and iterate. parse based on keys
     json_decoder = json::Decoder::new(json_request.clone());
     let result = ffi_ptr_try!(module_parser(module, action, parameter_packet, &mut json_decoder),
@@ -398,27 +396,25 @@ pub extern "C" fn client_issued_deletes(ffi_handle: *mut FfiHandle) -> u64 {
 }
 
 
-/// Obtain NFS writter handle for writing data to a file in streaming mode
+/// Obtain NFS writer handle for writing data to a file in streaming mode
 #[no_mangle]
 #[allow(unsafe_code)]
 pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
                                  ffi_handle: *mut FfiHandle,
-                                 writer_handle: *mut *const c_void)
+                                 p_writer_handle: *mut *mut FfiWriterHandle)
                                  -> int32_t {
     let payload: String = ffi_try!(helper::c_char_ptr_to_string(c_payload));
     let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload), "JSON parse error"));
     let mut json_decoder = json::Decoder::new(json_request);
     let client = cast_from_ffi_handle(ffi_handle);
-    let (_, _, parameter_packet) = ffi_try!(get_parameter_packet(client, &mut json_decoder));
-    let mut get_file_writer = ffi_try!(parse_result!(json_decoder.read_struct_field("data",
-                                                                                    0,
-                                                                                    |d| {
-                                            GetFileWriter::decode(d)
-                                        }),
-                                        ""));
-    let writer_wrapper = ffi_try!(get_file_writer.execute(parameter_packet));
+    let parameter_packet = ffi_try!(get_parameter_packet(client, &mut json_decoder));
+    let mut get_file_writer = ffi_try!(parse_result!(json_decoder.read_struct_field("data", 0, |d| {
+                                                             GetFileWriter::decode(d)
+                                                         }),
+                                                     ""));
+    let writer_handle = ffi_try!(get_file_writer.new(parameter_packet));
     unsafe {
-        *writer_handle = Box::into_raw(Box::new(writer_wrapper)) as *mut c_void;
+        *p_writer_handle = Box::into_raw(Box::new(writer_handle));
     }
 
     0
@@ -427,40 +423,49 @@ pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
 /// Write data to the Network using the NFS Writer handle
 #[no_mangle]
 #[allow(unsafe_code)]
-pub fn nfs_stream_write(handle: *mut c_void, offset: u64, data: Vec<u8>) -> int32_t {
-    let mut wrapper = unsafe { Box::from_raw(handle as *mut WriterWrapper) };
-    let mut writer = unsafe { Box::from_raw(wrapper.get_writer_ptr() as *mut Writer) };
-    ffi_try!(writer.write(&data[..], offset));
-    mem::forget(writer);
-    mem::forget(wrapper);
+pub fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
+                        offset: u64,
+                        data: Vec<u8>)
+                        -> int32_t {
+    ffi_try!(unsafe { (*writer_handle).writer().write(&data[..], offset) });
 
     0
 }
 
-/// Closes the NFS Writter handle
+/// Closes the NFS Writer handle
 #[no_mangle]
 #[allow(unsafe_code)]
-pub fn nfs_stream_close(handle: *mut WriterWrapper) -> int32_t {
-    let mut wrapper = unsafe { Box::from_raw(handle) };
-    let writer = unsafe { Box::from_raw(wrapper.get_writer_ptr() as *mut Writer) };
-    let _ = ffi_try!(writer.close());
+pub fn nfs_stream_close(writer_handle: *mut FfiWriterHandle) -> int32_t {
+    let handle = unsafe { Box::from_raw(writer_handle) };
+    let _ = ffi_try!(handle.close());
+
     0
 }
 
 
-fn get_parameter_packet<D>(client: Arc<Mutex<Client>>,
-                           json_decoder: &mut D)
-                           -> Result<(String, String, ParameterPacket), FfiError>
+fn get_context<D>(client: Arc<Mutex<Client>>,
+                  json_decoder: &mut D)
+                  -> Result<(String, String, ParameterPacket), FfiError>
     where D: Decoder,
           D::Error: ::std::fmt::Debug
 {
-
     let module: String =
         try!(parse_result!(json_decoder.read_struct_field("module", 0, Decodable::decode),
                            ""));
     let action: String =
         try!(parse_result!(json_decoder.read_struct_field("action", 1, Decodable::decode),
                            ""));
+    let param_packet = try!(get_parameter_packet(client, json_decoder));
+
+    Ok((module, action, param_packet))
+}
+
+fn get_parameter_packet<D>(client: Arc<Mutex<Client>>,
+                           json_decoder: &mut D)
+                           -> Result<ParameterPacket, FfiError>
+    where D: Decoder,
+          D::Error: ::std::fmt::Debug
+{
     let base64_safe_drive_dir_key: Option<String> =
         json_decoder.read_struct_field("safe_drive_dir_key", 2, Decodable::decode)
             .ok();
@@ -493,14 +498,12 @@ fn get_parameter_packet<D>(client: Arc<Mutex<Client>>,
         None
     };
 
-    Ok((module,
-        action,
-        ParameterPacket {
+    Ok(ParameterPacket {
         client: client,
         app_root_dir_key: app_root_dir_key,
         safe_drive_access: safe_drive_access,
         safe_drive_dir_key: safe_drive_dir_key,
-    }))
+    })
 }
 
 fn module_parser<D>(module: String,
