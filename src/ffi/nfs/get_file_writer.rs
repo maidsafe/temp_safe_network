@@ -35,13 +35,6 @@ pub struct FfiWriterHandle {
 }
 
 impl FfiWriterHandle {
-    fn new(storage: Box<SelfEncryptionStorage>, writer: Box<Writer<'static>>) -> FfiWriterHandle {
-        FfiWriterHandle {
-            writer: writer,
-            _storage: storage,
-        }
-    }
-
     pub fn writer(&mut self) -> &mut Writer<'static> {
         &mut *self.writer
     }
@@ -83,6 +76,9 @@ impl GetFileWriter {
                                             file)))
         };
 
-        Ok(FfiWriterHandle::new(storage, Box::new(writer)))
+        Ok(FfiWriterHandle {
+            writer: Box::new(writer),
+            _storage: storage,
+        })
     }
 }
