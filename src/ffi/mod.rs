@@ -407,7 +407,7 @@ pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
     let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload), "JSON parse error"));
     let mut json_decoder = json::Decoder::new(json_request);
     let client = cast_from_ffi_handle(ffi_handle);
-    let parameter_packet = ffi_try!(get_parameter_packet(client, &mut json_decoder));
+    let parameter_packet = ffi_try!(get_parameter_packet(client, 0, &mut json_decoder));
     let mut get_file_writer = ffi_try!(parse_result!(json_decoder.read_struct_field("data", 0, |d| {
                                                              GetFileWriter::decode(d)
                                                          }),
@@ -454,30 +454,37 @@ fn get_context<D>(client: Arc<Mutex<Client>>,
     let action: String =
         try!(parse_result!(json_decoder.read_struct_field("action", 1, Decodable::decode),
                            ""));
-    let param_packet = try!(get_parameter_packet(client, json_decoder));
+    let param_packet = try!(get_parameter_packet(client, 2, json_decoder));
 
     Ok((module, action, param_packet))
 }
 
 fn get_parameter_packet<D>(client: Arc<Mutex<Client>>,
+                           mut idx: usize,
                            json_decoder: &mut D)
                            -> Result<ParameterPacket, FfiError>
     where D: Decoder,
           D::Error: ::std::fmt::Debug
 {
     let base64_safe_drive_dir_key: Option<String> =
-        json_decoder.read_struct_field("safe_drive_dir_key", 2, Decodable::decode)
+        json_decoder.read_struct_field("safe_drive_dir_key", idx, Decodable::decode)
             .ok();
 
+    idx += 1;
     let base64_app_dir_key: Option<String> =
-        json_decoder.read_struct_field("app_dir_key", 3, Decodable::decode)
+        json_decoder.read_struct_field("app_dir_key", idx, Decodable::decode)
             .ok();
+
     let safe_drive_access: bool = if base64_safe_drive_dir_key.is_none() {
         false
     } else {
-        try!(parse_result!(
-                json_decoder.read_struct_field("safe_drive_access", 4, Decodable::decode), ""))
+        idx += 1;
+        try!(parse_result!(json_decoder.read_struct_field("safe_drive_access",
+                                                          idx,
+                                                          Decodable::decode),
+                           ""))
     };
+
     let app_root_dir_key: Option<DirectoryKey> = if let Some(app_dir_key) = base64_app_dir_key {
         let serialised_app_dir_key: Vec<u8> = try!(parse_result!(app_dir_key[..].from_base64(),
                                                                  ""));
