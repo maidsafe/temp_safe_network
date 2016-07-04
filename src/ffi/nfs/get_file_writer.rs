@@ -46,14 +46,14 @@ impl FfiWriterHandle {
         &mut *self.writer
     }
 
-    pub fn close(self: Box<Self>) -> Result<(DirectoryListing, Option<DirectoryListing>), FfiError> {
+    pub fn close(self: Self) -> Result<(DirectoryListing, Option<DirectoryListing>), FfiError> {
         Ok(try!(self.writer.close()))
     }
 }
 
 impl GetFileWriter {
     #[allow(unsafe_code)]
-    pub fn new(&mut self, params: ParameterPacket) -> Result<FfiWriterHandle, FfiError> {
+    pub fn get(&mut self, params: ParameterPacket) -> Result<FfiWriterHandle, FfiError> {
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }
@@ -72,7 +72,7 @@ impl GetFileWriter {
                                                               Some(&start_dir_key)));
 
         let file = try!(dir_of_file.find_file(&file_name)
-            .map(|file| file.clone())
+            .cloned()
             .ok_or(FfiError::InvalidPath));
         let mut storage = Box::new(SelfEncryptionStorage::new(params.client.clone()));
         let writer: Writer<'static> = unsafe {

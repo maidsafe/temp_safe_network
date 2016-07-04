@@ -412,7 +412,7 @@ pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
                                                              GetFileWriter::decode(d)
                                                          }),
                                                      ""));
-    let writer_handle = ffi_try!(get_file_writer.new(parameter_packet));
+    let writer_handle = ffi_try!(get_file_writer.get(parameter_packet));
     unsafe {
         *p_writer_handle = Box::into_raw(Box::new(writer_handle));
     }
@@ -441,7 +441,6 @@ pub fn nfs_stream_close(writer_handle: *mut FfiWriterHandle) -> int32_t {
 
     0
 }
-
 
 fn get_context<D>(client: Arc<Mutex<Client>>,
                   json_decoder: &mut D)

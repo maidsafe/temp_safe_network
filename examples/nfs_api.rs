@@ -204,10 +204,10 @@ fn directory_operation(option: u32,
         }
         3 => {
             // List versions
-            let directory = try!(get_child_directory(client.clone(), directory));
+            let child = try!(get_child_directory(client.clone(), directory));
             let directory_helper = DirectoryHelper::new(client.clone());
-            let versions = try!(directory_helper.get_versions(directory.get_key().get_id(),
-                                                              directory.get_key().get_type_tag()));
+            let versions = try!(directory_helper.get_versions(child.get_key().get_id(),
+                                                              child.get_key().get_type_tag()));
             if versions.is_empty() {
                 println!("No directory versions found");
             } else {
@@ -238,11 +238,11 @@ fn file_operation(option: u32,
     match option {
         5 => {
             // List files
-            let directory = try!(get_child_directory(client, directory));
-            let files = directory.get_files();
+            let child = try!(get_child_directory(client, directory));
+            let files = child.get_files();
             if files.is_empty() {
                 println!("No Files found in Directory - {}",
-                         directory.get_metadata().get_name());
+                         child.get_metadata().get_name());
             } else {
                 println!("List of Files");
                 println!("\t        Modified On                Name ");
@@ -257,11 +257,10 @@ fn file_operation(option: u32,
         }
         6 => {
             // Create file
-            let directory = try!(get_child_directory(client.clone(), directory));
+            let child = try!(get_child_directory(client.clone(), directory));
             let data = get_user_string("text to be saved as a file").into_bytes();
             let mut file_helper = FileHelper::new(client);
-            let mut writer =
-                try!(file_helper.create(get_user_string("File name"), vec![], directory));
+            let mut writer = try!(file_helper.create(get_user_string("File name"), vec![], child));
 
             try!(writer.write(&data[..], 0));
             let _ = try!(writer.close());
@@ -269,8 +268,8 @@ fn file_operation(option: u32,
         }
         7 => {
             // Update file
-            let directory = try!(get_child_directory(client.clone(), directory));
-            let file = if let Some(file) = directory.find_file(&get_user_string("File name")) {
+            let child = try!(get_child_directory(client.clone(), directory));
+            let file = if let Some(file) = child.find_file(&get_user_string("File name")) {
                 file
             } else {
                 return Err(NfsError::FileNotFound);
@@ -278,15 +277,15 @@ fn file_operation(option: u32,
             let data = get_user_string("text to be saved as a file").into_bytes();
             let mut file_helper = FileHelper::new(client);
             let mut writer =
-                try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory.clone()));
+                try!(file_helper.update_content(file.clone(), Mode::Overwrite, child.clone()));
             try!(writer.write(&data[..], 0));
             let _ = try!(writer.close());
             println!("File Updated");
         }
         8 => {
             // Read file
-            let directory = try!(get_child_directory(client.clone(), directory));
-            let file = if let Some(file) = directory.find_file(&get_user_string("File name")) {
+            let child = try!(get_child_directory(client.clone(), directory));
+            let file = if let Some(file) = child.find_file(&get_user_string("File name")) {
                 file
             } else {
                 return Err(NfsError::FileNotFound);
@@ -305,11 +304,11 @@ fn file_operation(option: u32,
         }
         9 => {
             // Read file by version
-            let directory = try!(get_child_directory(client.clone(), directory));
+            let child = try!(get_child_directory(client.clone(), directory));
             let file_name = get_user_string("File name");
-            let file = try!(directory.find_file(&file_name).ok_or(NfsError::FileNotFound));
+            let file = try!(child.find_file(&file_name).ok_or(NfsError::FileNotFound));
             let mut file_helper = FileHelper::new(client);
-            let versions = try!(file_helper.get_versions(&file, &directory));
+            let versions = try!(file_helper.get_versions(&file, &child));
             let ref file_version;
             if versions.len() == 1 {
                 file_version = unwrap!(versions.get(0));
@@ -352,9 +351,9 @@ fn file_operation(option: u32,
         }
         10 => {
             // Delete file
-            let mut directory = try!(get_child_directory(client.clone(), directory));
+            let mut child = try!(get_child_directory(client.clone(), directory));
             let file_helper = FileHelper::new(client);
-            let _ = try!(file_helper.delete(get_user_string("File name"), &mut directory));
+            let _ = try!(file_helper.delete(get_user_string("File name"), &mut child));
             println!("File deleted");
         }
         11 => {
