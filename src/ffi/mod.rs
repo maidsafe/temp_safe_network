@@ -36,16 +36,17 @@
 
 #[macro_use]mod macros;
 
-mod dns;
-mod nfs;
-mod config;
-mod helper;
-mod test_utils;
-mod launcher_config_handler;
 /// Errors thrown by the FFI operations
 pub mod errors;
 
-use std::{fs, mem, ptr};
+mod config;
+mod dns;
+mod helper;
+mod launcher_config_handler;
+mod nfs;
+mod test_utils;
+
+use std::{fs, mem, ptr, slice};
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
@@ -425,8 +426,10 @@ pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
 #[allow(unsafe_code)]
 pub fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
                         offset: u64,
-                        data: Vec<u8>)
+                        c_data: *const u8,
+                        len: usize)
                         -> int32_t {
+    let data = unsafe { slice::from_raw_parts(c_data, len) };
     ffi_try!(unsafe { (*writer_handle).writer().write(&data[..], offset) });
 
     0
