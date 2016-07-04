@@ -14,11 +14,16 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
+
 use std::fmt;
 
-use ffi::{Action, ParameterPacket, ResponseType};
 use ffi::errors::FfiError;
+use ffi::{Action, ParameterPacket, ResponseType};
 use rustc_serialize::{Decodable, Decoder};
+
+pub mod directory_response;
+pub mod file_response;
+pub mod get_file_writer;
 
 mod create_dir;
 mod create_file;
@@ -27,12 +32,10 @@ mod delete_file;
 mod get_dir;
 mod get_file;
 mod get_file_metadata;
-mod move_dir;
-mod move_file;
 mod modify_dir;
 mod modify_file;
-pub mod directory_response;
-pub mod file_response;
+mod move_dir;
+mod move_file;
 
 pub fn action_dispatcher<D>(action: String,
                             params: ParameterPacket,
