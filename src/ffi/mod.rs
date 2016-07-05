@@ -375,7 +375,7 @@ pub extern "C" fn execute_for_content(c_payload: *const c_char,
 #[no_mangle]
 #[allow(unsafe_code)]
 /// Drop the vector returned as a result of the execute_for_content fn
-pub fn drop_vector(ptr: *mut u8, size: int32_t, capacity: int32_t) {
+pub extern "C" fn drop_vector(ptr: *mut u8, size: int32_t, capacity: int32_t) {
     let _ = unsafe { Vec::from_raw_parts(ptr, size as usize, capacity as usize) };
 }
 
@@ -453,7 +453,7 @@ pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
 /// Write data to the Network using the NFS Writer handle
 #[no_mangle]
 #[allow(unsafe_code)]
-pub fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
+pub extern "C" fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
                         offset: u64,
                         c_data: *const u8,
                         len: usize)
@@ -469,7 +469,7 @@ pub fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
 /// Closes the NFS Writer handle
 #[no_mangle]
 #[allow(unsafe_code)]
-pub fn nfs_stream_close(writer_handle: *mut FfiWriterHandle) -> int32_t {
+pub extern "C" fn nfs_stream_close(writer_handle: *mut FfiWriterHandle) -> int32_t {
     catch_unwind_i32(|| {
         let handle = unsafe { Box::from_raw(writer_handle) };
         let _ = ffi_try!(handle.close());
