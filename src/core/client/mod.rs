@@ -78,9 +78,9 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = try!(Routing::new(routing_sender, None));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                              vec![network_event_sender]);
+        let routing = try!(Routing::new(routing_sender, None));
 
         match try!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -117,9 +117,9 @@ impl Client {
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-        let routing = try!(Routing::new(routing_sender, Some(id_packet)));
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                              vec![network_event_sender]);
+        let routing = try!(Routing::new(routing_sender, Some(id_packet)));
 
         match try!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -199,9 +199,9 @@ impl Client {
             let (routing_sender, routing_receiver) = mpsc::channel();
             let (network_event_sender, network_event_receiver) = mpsc::channel();
 
-            let routing = try!(Routing::new(routing_sender, Some(id_packet)));
             let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                                  vec![network_event_sender]);
+            let routing = try!(Routing::new(routing_sender, Some(id_packet)));
 
             match try!(network_event_receiver.recv()) {
                 NetworkEvent::Connected => (),
