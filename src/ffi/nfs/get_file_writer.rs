@@ -30,8 +30,8 @@ pub struct GetFileWriter {
 }
 
 pub struct FfiWriterHandle {
-    writer: Box<Writer<'static>>,
-    _storage: Box<SelfEncryptionStorage>,
+    pub writer: Box<Writer<'static>>,
+    pub _storage: Box<SelfEncryptionStorage>,
 }
 
 impl FfiWriterHandle {

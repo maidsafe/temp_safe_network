@@ -15,9 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::{Action, ParameterPacket, ResponseType, helper};
+use std::mem;
+
+use core::SelfEncryptionStorage;
+use ffi::{ParameterPacket, helper};
 use ffi::errors::FfiError;
-use nfs::helper::file_helper::FileHelper;
+use ffi::nfs::get_file_writer::FfiWriterHandle;
+use nfs::errors::NfsError;
+use nfs::file::File;
+use nfs::helper::writer::{Mode, Writer};
+use nfs::metadata::file_metadata::FileMetadata;
+use self_encryption::DataMap;
 
 #[derive(RustcDecodable, Debug)]
 pub struct CreateFile {
@@ -26,8 +34,9 @@ pub struct CreateFile {
     is_path_shared: bool,
 }
 
-impl Action for CreateFile {
-    fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+impl CreateFile {
+    #[allow(unsafe_code)]
+    pub fn create(&mut self, params: ParameterPacket) -> Result<FfiWriterHandle, FfiError> {
         use rustc_serialize::base64::FromBase64;
 
         if self.is_path_shared && !params.safe_drive_access {
@@ -49,21 +58,37 @@ impl Action for CreateFile {
                                                                  &tokens,
                                                                  Some(&start_dir_key)));
 
-        let mut file_helper = FileHelper::new(params.client);
         let bin_metadata = try!(parse_result!(self.user_metadata.from_base64(),
                                               "Failed Converting from Base64."));
 
-        let writer = try!(file_helper.create(file_name, bin_metadata, file_directory));
-        let _ = try!(writer.close());
+        let mut storage = Box::new(SelfEncryptionStorage::new(params.client.clone()));
+        let writer: Writer<'static> = {
+            let writer = match file_directory.find_file(&file_name) {
+                Some(_) => try!(Err(NfsError::FileAlreadyExistsWithSameName)),
+                None => {
+                    let file = try!(File::new(FileMetadata::new(file_name, bin_metadata),
+                                              DataMap::None));
+                    try!(Writer::new(params.client,
+                                     &mut *storage,
+                                     Mode::Overwrite,
+                                     file_directory,
+                                     file))
+                }
+            };
+            unsafe { mem::transmute(writer) }
+        };
 
-        Ok(None)
+        Ok(FfiWriterHandle {
+            writer: Box::new(writer),
+            _storage: storage,
+        })
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffi::{Action, test_utils};
+    use ffi::test_utils;
     use nfs::helper::directory_helper::DirectoryHelper;
 
     #[test]
@@ -75,10 +100,11 @@ mod test {
             user_metadata: "InNhbXBsZSBtZXRhZGF0YSI=".to_string(),
             is_path_shared: false,
         };
-        assert!(request.execute(parameter_packet.clone()).is_ok());
+        let writer = unwrap!(request.create(parameter_packet.clone()));
+        let _ = unwrap!(writer.close());
 
         let dir_helper = DirectoryHelper::new(parameter_packet.client);
         let app_dir = unwrap!(dir_helper.get(&unwrap!(parameter_packet.app_root_dir_key)));
-        assert!(app_dir.find_file(&"test.txt".to_string()).is_some());
+        let _ = unwrap!(app_dir.find_file(&"test.txt".to_string()));
     }
 }

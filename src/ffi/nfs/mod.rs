@@ -21,12 +21,12 @@ use ffi::errors::FfiError;
 use ffi::{Action, ParameterPacket, ResponseType};
 use rustc_serialize::{Decodable, Decoder};
 
+pub mod create_file;
 pub mod directory_response;
 pub mod file_response;
 pub mod get_file_writer;
 
 mod create_dir;
-mod create_file;
 mod delete_dir;
 mod delete_file;
 mod get_dir;
@@ -56,12 +56,6 @@ fn get_action<D>(action: String, decoder: &mut D) -> Result<Box<Action>, FfiErro
         "create-dir" => {
             Box::new(try!(parse_result!(decoder.read_struct_field("data", 0, |d| {
                                             create_dir::CreateDir::decode(d)
-                                        }),
-                                        "")))
-        }
-        "create-file" => {
-            Box::new(try!(parse_result!(decoder.read_struct_field("data", 0, |d| {
-                                            create_file::CreateFile::decode(d)
                                         }),
                                         "")))
         }
