@@ -19,29 +19,14 @@ use std::mem;
 
 use core::SelfEncryptionStorage;
 use ffi::errors::FfiError;
+use ffi::nfs::FfiWriterHandle;
 use ffi::{ParameterPacket, helper};
-use nfs::directory_listing::DirectoryListing;
 use nfs::helper::writer::{Mode, Writer};
 
 #[derive(RustcDecodable, Debug)]
 pub struct GetFileWriter {
     file_path: String,
     is_path_shared: bool,
-}
-
-pub struct FfiWriterHandle {
-    pub writer: Box<Writer<'static>>,
-    pub _storage: Box<SelfEncryptionStorage>,
-}
-
-impl FfiWriterHandle {
-    pub fn writer(&mut self) -> &mut Writer<'static> {
-        &mut *self.writer
-    }
-
-    pub fn close(self: Self) -> Result<(DirectoryListing, Option<DirectoryListing>), FfiError> {
-        Ok(try!(self.writer.close()))
-    }
 }
 
 impl GetFileWriter {
@@ -77,7 +62,7 @@ impl GetFileWriter {
         };
 
         Ok(FfiWriterHandle {
-            writer: Box::new(writer),
+            writer: writer,
             _storage: storage,
         })
     }

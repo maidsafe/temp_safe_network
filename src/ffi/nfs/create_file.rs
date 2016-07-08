@@ -20,7 +20,7 @@ use std::mem;
 use core::SelfEncryptionStorage;
 use ffi::{ParameterPacket, helper};
 use ffi::errors::FfiError;
-use ffi::nfs::get_file_writer::FfiWriterHandle;
+use ffi::nfs::FfiWriterHandle;
 use nfs::errors::NfsError;
 use nfs::file::File;
 use nfs::helper::writer::{Mode, Writer};
@@ -79,7 +79,7 @@ impl CreateFile {
         };
 
         Ok(FfiWriterHandle {
-            writer: Box::new(writer),
+            writer: writer,
             _storage: storage,
         })
     }

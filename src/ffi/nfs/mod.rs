@@ -17,8 +17,11 @@
 
 use std::fmt;
 
+use core::SelfEncryptionStorage;
 use ffi::errors::FfiError;
 use ffi::{Action, ParameterPacket, ResponseType};
+use nfs::directory_listing::DirectoryListing;
+use nfs::helper::writer::Writer;
 use rustc_serialize::{Decodable, Decoder};
 
 pub mod create_file;
@@ -36,6 +39,21 @@ mod modify_dir;
 mod modify_file;
 mod move_dir;
 mod move_file;
+
+pub struct FfiWriterHandle {
+    pub writer: Writer<'static>,
+    pub _storage: Box<SelfEncryptionStorage>,
+}
+
+impl FfiWriterHandle {
+    pub fn writer(&mut self) -> &mut Writer<'static> {
+        &mut self.writer
+    }
+
+    pub fn close(self) -> Result<(DirectoryListing, Option<DirectoryListing>), FfiError> {
+        Ok(try!(self.writer.close()))
+    }
+}
 
 pub fn action_dispatcher<D>(action: String,
                             params: ParameterPacket,
