@@ -17,16 +17,19 @@
 
 use std::fmt;
 
+use core::SelfEncryptionStorage;
 use ffi::errors::FfiError;
 use ffi::{Action, ParameterPacket, ResponseType};
+use nfs::directory_listing::DirectoryListing;
+use nfs::helper::writer::Writer;
 use rustc_serialize::{Decodable, Decoder};
 
+pub mod create_file;
 pub mod directory_response;
 pub mod file_response;
 pub mod get_file_writer;
 
 mod create_dir;
-mod create_file;
 mod delete_dir;
 mod delete_file;
 mod get_dir;
@@ -36,6 +39,21 @@ mod modify_dir;
 mod modify_file;
 mod move_dir;
 mod move_file;
+
+pub struct FfiWriterHandle {
+    pub writer: Writer<'static>,
+    pub _storage: Box<SelfEncryptionStorage>,
+}
+
+impl FfiWriterHandle {
+    pub fn writer(&mut self) -> &mut Writer<'static> {
+        &mut self.writer
+    }
+
+    pub fn close(self) -> Result<(DirectoryListing, Option<DirectoryListing>), FfiError> {
+        Ok(try!(self.writer.close()))
+    }
+}
 
 pub fn action_dispatcher<D>(action: String,
                             params: ParameterPacket,
@@ -56,12 +74,6 @@ fn get_action<D>(action: String, decoder: &mut D) -> Result<Box<Action>, FfiErro
         "create-dir" => {
             Box::new(try!(parse_result!(decoder.read_struct_field("data", 0, |d| {
                                             create_dir::CreateDir::decode(d)
-                                        }),
-                                        "")))
-        }
-        "create-file" => {
-            Box::new(try!(parse_result!(decoder.read_struct_field("data", 0, |d| {
-                                            create_file::CreateFile::decode(d)
                                         }),
                                         "")))
         }

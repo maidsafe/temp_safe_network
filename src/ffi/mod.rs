@@ -54,7 +54,9 @@ use core::client::Client;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
 use ffi::errors::FfiError;
-use ffi::nfs::get_file_writer::{FfiWriterHandle, GetFileWriter};
+use ffi::nfs::FfiWriterHandle;
+use ffi::nfs::get_file_writer::GetFileWriter;
+use ffi::nfs::create_file::CreateFile;
 use libc::{c_char, int32_t, int64_t};
 use maidsafe_utilities::log as safe_log;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -161,7 +163,8 @@ pub extern "C" fn create_account(c_keyword: *const c_char,
                                  ffi_handle: *mut *mut FfiHandle)
                                  -> int32_t {
     catch_unwind_i32(|| {
-        let client = ffi_try!(Client::create_account(ffi_try!(helper::c_char_ptr_to_string(c_keyword)),
+        let client =
+            ffi_try!(Client::create_account(ffi_try!(helper::c_char_ptr_to_string(c_keyword)),
                                             ffi_try!(helper::c_char_ptr_to_string(c_pin)),
                                             ffi_try!(helper::c_char_ptr_to_string(c_password))));
         unsafe {
@@ -200,7 +203,8 @@ pub extern "C" fn log_in(c_keyword: *const c_char,
 #[no_mangle]
 #[allow(unsafe_code)]
 pub extern "C" fn register_network_event_observer(ffi_handle: *mut FfiHandle,
-                                                  callback: extern "C" fn(i32)) -> int32_t {
+                                                  callback: extern "C" fn(i32))
+                                                  -> int32_t {
     catch_unwind_i32(|| {
         let mut ffi_handle = unsafe { Box::from_raw(ffi_handle) };
 
@@ -256,7 +260,8 @@ pub extern "C" fn get_app_dir_key(c_app_name: *const c_char,
         let vendor: String = ffi_ptr_try!(helper::c_char_ptr_to_string(c_vendor), c_result);
         let handler = launcher_config_handler::ConfigHandler::new(client);
         let dir_key = ffi_ptr_try!(handler.get_app_dir_key(app_name, app_id, vendor), c_result);
-        let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from), c_result);
+        let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from),
+                                               c_result);
         serialised_data.shrink_to_fit();
         unsafe {
             ptr::write(c_size, serialised_data.len() as i32);
@@ -282,7 +287,8 @@ pub extern "C" fn get_safe_drive_key(c_size: *mut int32_t,
     catch_unwind_ptr(|| {
         let client = cast_from_ffi_handle(ffi_handle);
         let dir_key = ffi_ptr_try!(helper::get_safe_drive_key(client), c_result);
-        let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from), c_result);
+        let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from),
+                                               c_result);
         serialised_data.shrink_to_fit();
         unsafe {
             ptr::write(c_size, serialised_data.len() as i32);
@@ -318,7 +324,8 @@ pub extern "C" fn drop_client(client_handle: *mut FfiHandle) {
 pub extern "C" fn execute(c_payload: *const c_char, ffi_handle: *mut FfiHandle) -> int32_t {
     catch_unwind_i32(|| {
         let payload: String = ffi_try!(helper::c_char_ptr_to_string(c_payload));
-        let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload), "JSON parse error"));
+        let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload),
+                                                  "JSON parse error"));
         let mut json_decoder = json::Decoder::new(json_request);
         let client = cast_from_ffi_handle(ffi_handle);
         let (module, action, parameter_packet) = ffi_try!(get_context(client, &mut json_decoder));
@@ -348,13 +355,14 @@ pub extern "C" fn execute_for_content(c_payload: *const c_char,
                                         c_result);
         let mut json_decoder = json::Decoder::new(json_request.clone());
         let client = cast_from_ffi_handle(ffi_handle);
-        let (module, action, parameter_packet) = ffi_ptr_try!(get_context(client, &mut json_decoder),
-                                                              c_result);
+        let (module, action, parameter_packet) =
+            ffi_ptr_try!(get_context(client, &mut json_decoder), c_result);
         // TODO Krishna: Avoid parsing it twice (line 292). for get_context pass the json
         // object and iterate. parse based on keys
         json_decoder = json::Decoder::new(json_request.clone());
-        let result = ffi_ptr_try!(module_parser(module, action, parameter_packet, &mut json_decoder),
-                                  c_result);
+        let result =
+            ffi_ptr_try!(module_parser(module, action, parameter_packet, &mut json_decoder),
+                         c_result);
         let data = match result {
             Some(response) => response.into_bytes(),
             None => Vec::with_capacity(0),
@@ -433,15 +441,44 @@ pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
                                  -> int32_t {
     catch_unwind_i32(|| {
         let payload: String = ffi_try!(helper::c_char_ptr_to_string(c_payload));
-        let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload), "JSON parse error"));
+        let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload),
+                                                  "JSON parse error"));
         let mut json_decoder = json::Decoder::new(json_request);
         let client = cast_from_ffi_handle(ffi_handle);
         let parameter_packet = ffi_try!(get_parameter_packet(client, 0, &mut json_decoder));
-        let mut get_file_writer = ffi_try!(parse_result!(json_decoder.read_struct_field("data", 0, |d| {
-                                                                 GetFileWriter::decode(d)
-                                                             }),
-                                                         ""));
+        let mut get_file_writer =
+            ffi_try!(parse_result!(json_decoder.read_struct_field("data",
+                                                                  0,
+                                                                  |d| GetFileWriter::decode(d)),
+                                   ""));
         let writer_handle = ffi_try!(get_file_writer.get(parameter_packet));
+        unsafe {
+            *p_writer_handle = Box::into_raw(Box::new(writer_handle));
+        }
+
+        0
+    })
+}
+
+/// Create a file and return a writer for it.
+#[no_mangle]
+#[allow(unsafe_code)]
+pub extern "C" fn nfs_create_file(c_payload: *const c_char,
+                                  ffi_handle: *mut FfiHandle,
+                                  p_writer_handle: *mut *mut FfiWriterHandle)
+                                  -> int32_t {
+    catch_unwind_i32(|| {
+        let payload: String = ffi_try!(helper::c_char_ptr_to_string(c_payload));
+        let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload),
+                                                  "JSON parse error"));
+        let mut json_decoder = json::Decoder::new(json_request);
+        let client = cast_from_ffi_handle(ffi_handle);
+        let parameter_packet = ffi_try!(get_parameter_packet(client, 0, &mut json_decoder));
+        let mut create_file = ffi_try!(parse_result!(json_decoder.read_struct_field("data", 0, |d| {
+                                                             CreateFile::decode(d)
+                                                         }),
+                                                     ""));
+        let writer_handle = ffi_try!(create_file.create(parameter_packet));
         unsafe {
             *p_writer_handle = Box::into_raw(Box::new(writer_handle));
         }
@@ -454,10 +491,10 @@ pub extern "C" fn get_nfs_writer(c_payload: *const c_char,
 #[no_mangle]
 #[allow(unsafe_code)]
 pub extern "C" fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
-                        offset: u64,
-                        c_data: *const u8,
-                        len: usize)
-                        -> int32_t {
+                                   offset: u64,
+                                   c_data: *const u8,
+                                   len: usize)
+                                   -> int32_t {
     catch_unwind_i32(|| {
         let data = unsafe { slice::from_raw_parts(c_data, len) };
         ffi_try!(unsafe { (*writer_handle).writer().write(&data[..], offset) });
