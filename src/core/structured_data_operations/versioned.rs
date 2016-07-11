@@ -27,7 +27,7 @@ use sodiumoxide::crypto::sign;
 pub fn create(client: &mut Client,
               version_name_to_store: XorName,
               tag_type: u64,
-              identifier: XorName,
+              name: XorName,
               version: u64,
               owner_keys: Vec<sign::PublicKey>,
               prev_owner_keys: Vec<sign::PublicKey>,
@@ -36,7 +36,7 @@ pub fn create(client: &mut Client,
     create_impl(client,
                 &[version_name_to_store],
                 tag_type,
-                identifier,
+                name,
                 version,
                 owner_keys,
                 prev_owner_keys,
@@ -64,7 +64,7 @@ pub fn append_version(client: &mut Client,
     create_impl(client,
                 &versions,
                 struct_data.get_type_tag(),
-                *struct_data.get_identifier(),
+                *struct_data.name(),
                 struct_data.get_version() + 1,
                 struct_data.get_owner_keys().clone(),
                 struct_data.get_previous_owner_keys().clone(),
@@ -75,14 +75,14 @@ pub fn append_version(client: &mut Client,
 fn create_impl(client: &mut Client,
                version_names_to_store: &[XorName],
                tag_type: u64,
-               identifier: XorName,
+               name: XorName,
                version: u64,
                owner_keys: Vec<sign::PublicKey>,
                prev_owner_keys: Vec<sign::PublicKey>,
                private_signing_key: &sign::SecretKey)
                -> Result<StructuredData, CoreError> {
     let immutable_data = ImmutableData::new(try!(serialise(&version_names_to_store)));
-    let name_of_immutable_data = immutable_data.name();
+    let name_of_immutable_data = *immutable_data.name();
 
     let encoded_name = try!(serialise(&name_of_immutable_data));
 
@@ -94,7 +94,7 @@ fn create_impl(client: &mut Client,
             try!(client.put_recover(data, None));
 
             Ok(try!(StructuredData::new(tag_type,
-                                        identifier,
+                                        name,
                                         version,
                                         encoded_name,
                                         owner_keys,
