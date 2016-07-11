@@ -96,7 +96,8 @@ impl GetAccountInfoResponseGetter {
     }
 
     /// Get result from the network as informed by MessageQueue. This is blocking. Tuple fields of
-    /// result are `(data_stored, space_available)`.
+    /// result are `(data_stored, space_available)`. `data_stored` means number of chunks Put.
+    /// `space_available` means number of chunks which can still be Put.
     pub fn get(&self) -> Result<(u64, u64), CoreError> {
         let (_, ref data_receiver) = self.data_channel;
         let res = data_receiver.recv();

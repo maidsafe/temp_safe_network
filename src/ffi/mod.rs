@@ -515,6 +515,26 @@ pub extern "C" fn nfs_stream_close(writer_handle: *mut FfiWriterHandle) -> int32
     })
 }
 
+/// Get data from the network. This is non-blocking. `data_stored` means number
+/// of chunks Put. `space_available` means number of chunks which can still be
+/// Put.
+#[no_mangle]
+#[allow(unsafe_code)]
+pub extern "C" fn get_account_info(ffi_handle: *mut FfiHandle,
+                                   data_stored: *mut u64,
+                                   space_available: *mut u64) -> i32 {
+    catch_unwind_i32(|| {
+        let client = cast_from_ffi_handle(ffi_handle);
+        let getter = ffi_try!(unwrap!(client.lock()).get_account_info(None));
+        let res = ffi_try!(getter.get());
+        unsafe {
+            ptr::write(data_stored, res.0);
+            ptr::write(space_available, res.1);
+        }
+        0
+    })
+}
+
 fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
     let errno: i32 = FfiError::Unexpected(String::new()).into();
     panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(errno)
