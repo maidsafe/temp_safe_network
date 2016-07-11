@@ -1,5 +1,10 @@
 # Safe Core - Change Log
 
+## [0.16.2]
+- Expose get-account-info functionality in FFI for launcher to consume.
+- Fix sodiumoxide to v0.0.10 as the new released v0.0.12 does not support rustc-serializable types anymore and breaks builds.
+- Update dependencies
+
 ## [0.16.1]
 - Update Routing to 0.23.2
 - Add logging to network events.
