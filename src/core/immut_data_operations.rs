@@ -134,7 +134,7 @@ mod test {
             let client = Arc::new(Mutex::new(unwrap!(test_utils::get_client())));
 
             let immut_data_before = unwrap!(create(client.clone(), data_to_put.clone(), None));
-            let data_name = immut_data_before.name();
+            let data_name = *immut_data_before.name();
             let resp_getter = unwrap!(unwrap!(client.lock())
                 .put(Data::Immutable(immut_data_before), None));
             unwrap!(resp_getter.get());
@@ -153,7 +153,7 @@ mod test {
             let immut_data_before = unwrap!(create(client.clone(),
                                                    data_to_put.clone(),
                                                    Some((&pk, &sk, &nonce))));
-            let data_name = immut_data_before.name();
+            let data_name = *immut_data_before.name();
             let resp_getter = unwrap!(unwrap!(client.lock())
                 .put(Data::Immutable(immut_data_before), None));
             unwrap!(resp_getter.get());
@@ -170,7 +170,7 @@ mod test {
             let nonce = box_::gen_nonce();
 
             let immut_data_before = unwrap!(create(client.clone(), data_to_put.clone(), None));
-            let data_name = immut_data_before.name();
+            let data_name = *immut_data_before.name();
             let resp_getter = unwrap!(unwrap!(client.lock())
                 .put(Data::Immutable(immut_data_before), None));
             unwrap!(resp_getter.get());
@@ -187,7 +187,7 @@ mod test {
             let immut_data_before = unwrap!(create(client.clone(),
                                                    data_to_put.clone(),
                                                    Some((&pk, &sk, &nonce))));
-            let data_name = immut_data_before.name();
+            let data_name = *immut_data_before.name();
             let resp_getter = unwrap!(unwrap!(client.lock())
                 .put(Data::Immutable(immut_data_before), None));
             unwrap!(resp_getter.get());

@@ -341,14 +341,14 @@ impl Client {
 
         if let DataIdentifier::Immutable(..) = request_for {
             let mut msg_queue = unwrap!(self.message_queue.lock());
-            if msg_queue.local_cache_check(&request_for.name()) {
+            if msg_queue.local_cache_check(request_for.name()) {
                 return Ok(GetResponseGetter::new(None, self.message_queue.clone(), request_for));
             }
         }
 
         let dst = match opt_dst {
             Some(auth) => auth,
-            None => Authority::NaeManager(request_for.name()),
+            None => Authority::NaeManager(*request_for.name()),
         };
 
         let (tx, rx) = mpsc::channel();
@@ -444,7 +444,7 @@ impl Client {
 
         let dst = match opt_dst {
             Some(auth) => auth,
-            None => Authority::NaeManager(data.name()),
+            None => Authority::NaeManager(*data.name()),
         };
 
         let (tx, rx) = mpsc::channel();
@@ -465,7 +465,7 @@ impl Client {
 
         let dst = match opt_dst {
             Some(auth) => auth,
-            None => Authority::NaeManager(data.name()),
+            None => Authority::NaeManager(*data.name()),
         };
 
         let (tx, rx) = mpsc::channel();
@@ -825,7 +825,7 @@ mod test {
 
         // Unregistered Client should be able to retrieve the data
         let mut unregistered_client = unwrap!(Client::create_unregistered_client());
-        let request = DataIdentifier::Immutable(orig_data.name());
+        let request = DataIdentifier::Immutable(*orig_data.name());
         let rxd_data = unwrap!(unwrap!(unregistered_client.get(request, None)).get());
 
         assert_eq!(rxd_data, orig_data);
@@ -965,7 +965,7 @@ mod test {
 
             unwrap!(unwrap!(client.put(data.clone(), None)).get());
 
-            let data_request = DataIdentifier::Immutable(data.name());
+            let data_request = DataIdentifier::Immutable(*data.name());
 
             // Should not initially be in version cache
             {

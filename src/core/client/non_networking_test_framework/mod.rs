@@ -180,7 +180,7 @@ impl RoutingMock {
 
         let _ = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_GETS_POSTS_MS));
-            let data_name = data_id.name();
+            let data_name = *data_id.name();
             let nae_auth = Authority::NaeManager(data_name);
             let request = Request::Get(data_id, msg_id);
 
@@ -269,7 +269,7 @@ impl RoutingMock {
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
-        let data_name = data.name();
+        let data_name = *data.name();
         let data_id = data.identifier();
         // NaeManager is used as the destination authority here because in the Mock we assume that
         // MaidManagers always pass the PUT. Errors if any can come only from NaeManagers
@@ -362,7 +362,7 @@ impl RoutingMock {
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
-        let data_name = data.name();
+        let data_name = *data.name();
         let data_id = data.identifier();
         let nae_auth = Authority::NaeManager(data_name);
         let request = Request::Post(data.clone(), msg_id);
@@ -441,7 +441,7 @@ impl RoutingMock {
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
-        let data_name = data.name();
+        let data_name = *data.name();
         let data_id = data.identifier();
         let nae_auth = Authority::NaeManager(data_name);
         let request = Request::Delete(data.clone(), msg_id);
@@ -716,12 +716,12 @@ mod test {
         let orig_immutable_data = ImmutableData::new(orig_raw_data.clone());
         let orig_data = Data::Immutable(orig_immutable_data);
 
-        let location_nae_mgr = Authority::NaeManager(orig_data.name());
-        let location_client_mgr = Authority::ClientManager(orig_data.name());
+        let location_nae_mgr = Authority::NaeManager(*orig_data.name());
+        let location_client_mgr = Authority::ClientManager(*orig_data.name());
 
         // GET ImmutableData should fail
         {
-            let data_id = DataIdentifier::Immutable(orig_data.name());
+            let data_id = DataIdentifier::Immutable(*orig_data.name());
 
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
@@ -756,7 +756,7 @@ mod test {
 
         // GET ImmutableData should pass
         {
-            let data_id = DataIdentifier::Immutable(orig_data.name());
+            let data_id = DataIdentifier::Immutable(*orig_data.name());
 
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
@@ -843,7 +843,7 @@ mod test {
 
         // GET ImmutableData should pass
         {
-            let data_id = DataIdentifier::Immutable(orig_data.name());
+            let data_id = DataIdentifier::Immutable(*orig_data.name());
 
             let (tx, rx) = mpsc::channel();
             let msg_id = MessageId::new();
@@ -919,11 +919,11 @@ mod test {
         let mut data_account_version = Data::Structured(account_version);
 
 
-        let location_nae_mgr_immut = Authority::NaeManager(orig_data_immutable.name());
-        let location_nae_mgr_struct = Authority::NaeManager(data_account_version.name());
+        let location_nae_mgr_immut = Authority::NaeManager(*orig_data_immutable.name());
+        let location_nae_mgr_struct = Authority::NaeManager(*data_account_version.name());
 
-        let location_client_mgr_immut = Authority::ClientManager(orig_data_immutable.name());
-        let location_client_mgr_struct = Authority::ClientManager(data_account_version.name());
+        let location_client_mgr_immut = Authority::ClientManager(*orig_data_immutable.name());
+        let location_client_mgr_struct = Authority::ClientManager(*data_account_version.name());
 
         // First PUT of StructuredData should succeed
         {
@@ -1038,7 +1038,7 @@ mod test {
 
         // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Versioning
         let invalid_version_account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                               user_id.clone(),
+                                               user_id,
                                                0,
                                                Vec::new(),
                                                vec![account_packet.get_public_maid()
@@ -1054,7 +1054,7 @@ mod test {
 
         // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Signature
         let invalid_signature_account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                               user_id.clone(),
+                                               user_id,
                                                1,
                                                Vec::new(),
                                                vec![account_packet.get_public_maid()
@@ -1070,7 +1070,7 @@ mod test {
                                                          new_data_immutable.name()]));
         // Construct StructuredData, 2nd version, for this ImmutableData - Valid
         account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id.clone(),
+                                                      user_id,
                                                       1,
                                                       data_for_version_2,
                                                       vec![account_packet.get_public_maid()
@@ -1260,7 +1260,7 @@ mod test {
 
         // Construct StructuredData, 3rd version, for DELETE - Valid
         account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id.clone(),
+                                                      user_id,
                                                       2,
                                                       Vec::new(),
                                                       vec![account_packet.get_public_maid()

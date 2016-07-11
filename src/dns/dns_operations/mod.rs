@@ -128,7 +128,7 @@ impl DnsOperations {
             Ok(prev_struct_data) => {
                 let struct_data = try!(unversioned::create(self.client.clone(),
                                              TYPE_TAG_DNS_PACKET,
-                                             prev_struct_data.get_identifier().clone(),
+                                             *prev_struct_data.name(),
                                              prev_struct_data.get_version() + 1,
                                              vec![],
                                              prev_struct_data.get_owner_keys().clone(),
@@ -290,7 +290,7 @@ impl DnsOperations {
 
             let struct_data = try!(unversioned::create(self.client.clone(),
                                                        TYPE_TAG_DNS_PACKET,
-                                                       prev_struct_data.get_identifier().clone(),
+                                                       *prev_struct_data.name(),
                                                        prev_struct_data.get_version() + 1,
                                                        try!(serialise(&dns_record)),
                                                        prev_struct_data.get_owner_keys().clone(),

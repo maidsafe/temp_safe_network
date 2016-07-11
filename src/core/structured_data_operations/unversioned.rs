@@ -89,7 +89,7 @@ pub fn create(client: Arc<Mutex<Client>>,
                 }
                 DataFitResult::DataDoesNotFit => {
                     let immutable_data = ImmutableData::new(data_to_store);
-                    let name = immutable_data.name();
+                    let name = *immutable_data.name();
                     let data = Data::Immutable(immutable_data);
                     try!(unwrap!(client.lock()).put_recover(data, None));
 

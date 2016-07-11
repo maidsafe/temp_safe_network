@@ -189,7 +189,7 @@ fn main() {
         // Construct data
         let structured_data = if let Data::Structured(sd) = data.clone() {
             unwrap!(StructuredData::new(sd.get_type_tag(),
-                                        *sd.get_identifier(),
+                                        *sd.name(),
                                         sd.get_version() + 1,
                                         rng.gen_iter().take(10).collect(),
                                         sd.get_owner_keys().clone(),

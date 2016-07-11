@@ -45,7 +45,7 @@ impl GetResponseGetter {
         GetResponseGetter {
             data_channel: data_channel,
             message_queue: message_queue,
-            requested_name: requested_id.name(),
+            requested_name: *requested_id.name(),
             requested_id: requested_id,
         }
     }

@@ -351,7 +351,7 @@ impl DirectoryHelper {
     /// Saves the data as ImmutableData in the network and returns the name
     fn save_as_immutable_data(&self, data: Vec<u8>) -> Result<XorName, NfsError> {
         let immutable_data = ImmutableData::new(data);
-        let name = immutable_data.name();
+        let name = *immutable_data.name();
         debug!("Posting PUT request to save immutable data to the network ...");
         try!(unwrap!(self.client.lock()).put_recover(Data::Immutable(immutable_data), None));
         Ok(name)
