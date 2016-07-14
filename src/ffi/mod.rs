@@ -153,16 +153,12 @@ pub unsafe extern "C" fn create_unregistered_client(ffi_handle: *mut *mut FfiHan
 /// a pointer to a pointer and must point to a valid pointer not junk, else the consequences are
 /// undefined.
 #[no_mangle]
-pub unsafe extern "C" fn create_account(c_keyword: *const c_char,
-                                        c_pin: *const c_char,
-                                        c_password: *const c_char,
+pub unsafe extern "C" fn create_account(c_pass_phrase: *const c_char,
                                         ffi_handle: *mut *mut FfiHandle)
                                         -> int32_t {
     catch_unwind_i32(|| {
-        let client =
-            ffi_try!(Client::create_account(ffi_try!(helper::c_char_ptr_to_string(c_keyword)),
-                                            ffi_try!(helper::c_char_ptr_to_string(c_pin)),
-                                            ffi_try!(helper::c_char_ptr_to_string(c_password))));
+        let pass_phrase = ffi_try!(helper::c_char_ptr_to_string(c_pass_phrase));
+        let client = ffi_try!(Client::create_account(&pass_phrase));
         *ffi_handle = cast_to_ffi_handle(client);
         0
     })
@@ -173,15 +169,12 @@ pub unsafe extern "C" fn create_account(c_keyword: *const c_char,
 /// a pointer to a pointer and must point to a valid pointer not junk, else the consequences are
 /// undefined.
 #[no_mangle]
-pub unsafe extern "C" fn log_in(c_keyword: *const c_char,
-                                c_pin: *const c_char,
-                                c_password: *const c_char,
+pub unsafe extern "C" fn log_in(c_pass_phrase: *const c_char,
                                 ffi_handle: *mut *mut FfiHandle)
                                 -> int32_t {
     catch_unwind_i32(|| {
-        let client = ffi_try!(Client::log_in(ffi_try!(helper::c_char_ptr_to_string(c_keyword)),
-                                             ffi_try!(helper::c_char_ptr_to_string(c_pin)),
-                                             ffi_try!(helper::c_char_ptr_to_string(c_password))));
+        let pass_phrase = ffi_try!(helper::c_char_ptr_to_string(c_pass_phrase));
+        let client = ffi_try!(Client::log_in(&pass_phrase));
         *ffi_handle = cast_to_ffi_handle(client);
         0
     })
@@ -636,9 +629,7 @@ mod test {
 
     #[test]
     fn account_creation_and_login() {
-        let cstring_pin = unwrap!(generate_random_cstring(10));
-        let cstring_keyword = unwrap!(generate_random_cstring(10));
-        let cstring_password = unwrap!(generate_random_cstring(10));
+        let cstring_pass_phrase = unwrap!(generate_random_cstring(10));
 
         {
             let mut client_handle: *mut FfiHandle = ptr::null_mut();
@@ -646,10 +637,7 @@ mod test {
             unsafe {
                 let ptr_to_client_handle = &mut client_handle;
 
-                assert_eq!(create_account(cstring_keyword.as_ptr(),
-                                          cstring_pin.as_ptr(),
-                                          cstring_password.as_ptr(),
-                                          ptr_to_client_handle),
+                assert_eq!(create_account(cstring_pass_phrase.as_ptr(), ptr_to_client_handle),
                            0);
             }
 
@@ -663,10 +651,7 @@ mod test {
             unsafe {
                 let ptr_to_client_handle = &mut client_handle;
 
-                assert_eq!(log_in(cstring_keyword.as_ptr(),
-                                  cstring_pin.as_ptr(),
-                                  cstring_password.as_ptr(),
-                                  ptr_to_client_handle),
+                assert_eq!(log_in(cstring_pass_phrase.as_ptr(), ptr_to_client_handle),
                            0);
             }
 

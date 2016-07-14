@@ -52,7 +52,6 @@ use safe_core::core::client::Client;
 use docopt::Docopt;
 use routing::{Data, ImmutableData, StructuredData};
 use rand::{Rng, SeedableRng};
-use rand::distributions::{IndependentSample, Range};
 use sodiumoxide::crypto::sign::{PublicKey, SecretKey};
 
 
@@ -110,18 +109,15 @@ fn main() {
     });
 
     // Create account
-    let keyword: String = rng.gen_ascii_chars().take(20).collect();
-    let password: String = rng.gen_ascii_chars().take(20).collect();
-    let pin_range = Range::new(0u16, 9999);
-    let pin = pin_range.ind_sample(&mut rng).to_string();
+    let pass_phrase: String = rng.gen_ascii_chars().take(20).collect();
 
     let mut client = if args.flag_get_only {
-        unwrap!(Client::log_in(keyword.clone(), pin.clone(), password.clone()))
+        unwrap!(Client::log_in(&pass_phrase))
     } else {
         println!("\n\tAccount Creation");
         println!("\t================");
         println!("\nTrying to create an account ...");
-        unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()))
+        unwrap!(Client::create_account(&pass_phrase))
     };
     println!("Logged in successfully !!");
     let public_key = *unwrap!(client.get_public_signing_key());

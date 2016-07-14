@@ -21,6 +21,7 @@ use core::errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::Rng;
 use sodiumoxide::crypto::{box_, secretbox};
+use sodiumoxide::crypto::hash::sha512::{self, DIGESTBYTES, Digest};
 
 /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and
 /// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text produces different
@@ -98,6 +99,17 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
         CoreError::RandomDataGenerationFailure
     }));
     Ok((0..length).map(|_| os_rng.gen()).collect())
+}
+
+/// Derive Password, Keyword and PIN (in order)
+pub fn derive_secrets(seed: &str) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    let Digest(seed_hash) = sha512::hash(seed.as_bytes());
+    let division = DIGESTBYTES / 3;
+    let keyword = seed_hash[..division].to_owned();
+    let password = seed_hash[division..division * 2].to_owned();
+    let pin = seed_hash[division * 2..].to_owned();
+
+    (password, keyword, pin)
 }
 
 #[cfg(test)]
