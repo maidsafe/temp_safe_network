@@ -117,6 +117,8 @@ mod test {
     use super::*;
     use sodiumoxide::crypto::box_;
 
+    const SIZE: usize = 10;
+
     #[test]
     fn hybrid_encrypt_decrypt() {
         // Identical Plain Texts
@@ -151,7 +153,6 @@ mod test {
 
     #[test]
     fn random_string() {
-        const SIZE: usize = 10;
         let str0 = unwrap!(generate_random_string(SIZE));
         let str1 = unwrap!(generate_random_string(SIZE));
         let str2 = unwrap!(generate_random_string(SIZE));
@@ -163,7 +164,6 @@ mod test {
 
     #[test]
     fn random_vector() {
-        const SIZE: usize = 10;
         let vec0 = unwrap!(generate_random_vector::<u8>(SIZE));
         let vec1 = unwrap!(generate_random_vector::<u8>(SIZE));
         let vec2 = unwrap!(generate_random_vector::<u8>(SIZE));
@@ -171,5 +171,26 @@ mod test {
         assert!(vec0 != vec1);
         assert!(vec0 != vec2);
         assert!(vec1 != vec2);
+    }
+
+    #[test]
+    fn secrets_derivation() {
+        // Random pass-phrase
+        {
+            let pass_phrase = unwrap!(generate_random_string(SIZE));
+            let (password, keyword, pin) = derive_secrets(&pass_phrase);
+            assert!(pin != keyword);
+            assert!(password != pin);
+            assert!(password != keyword);
+        }
+
+        // Nullary pass-phrase
+        {
+            let pass_phrase = String::new();
+            let (password, keyword, pin) = derive_secrets(&pass_phrase);
+            assert!(pin != keyword);
+            assert!(password != pin);
+            assert!(password != keyword);
+        }
     }
 }
