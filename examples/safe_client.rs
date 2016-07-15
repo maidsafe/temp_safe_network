@@ -61,9 +61,7 @@ const MOCK_NETWORK: bool = false;
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));
 
-    let mut keyword = String::new();
-    let mut password = String::new();
-    let mut pin = String::new();
+    let mut pass_phrase = String::new();
 
     println!("\nDo you already have an account created (enter Y for yes) ?");
 
@@ -75,28 +73,14 @@ fn main() {
         println!("\n\tAccount Creation");
         println!("\t================");
 
-        println!("\n------------ Enter Keyword ---------------");
-        let _ = std::io::stdin().read_line(&mut keyword);
-
-        println!("\n\n------------ Enter Password --------------");
-        let _ = std::io::stdin().read_line(&mut password);
-
-        loop {
-            println!("\n\n--------- Enter PIN (4 Digits) -----------");
-            let _ = std::io::stdin().read_line(&mut pin);
-            pin = pin.trim().to_string();
-            if pin.parse::<u16>().is_ok() && pin.len() == 4 {
-                break;
-            }
-            println!("ERROR: PIN is not 4 Digits !!");
-            pin.clear();
-        }
+        println!("\n------------ Enter Pass-phrase ---------------");
+        let _ = std::io::stdin().read_line(&mut pass_phrase);
 
         // Account Creation
         {
             println!("\nTrying to create an account ...");
 
-            let _ = unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+            let _ = unwrap!(Client::create_account(&pass_phrase));
             println!("Account Created Successfully !!");
         }
 
@@ -107,7 +91,7 @@ fn main() {
         {
             println!("\nTrying to log into the created account using supplied credentials ...");
 
-            let _ = unwrap!(Client::log_in(keyword, pin, password));
+            let _ = unwrap!(Client::log_in(&pass_phrase));
             println!("Account Login Successful !!");
         }
     }
@@ -116,30 +100,15 @@ fn main() {
     println!("\t====================");
 
     loop {
-        keyword = String::new();
-        password = String::new();
+        pass_phrase = String::new();
 
-        println!("\n------------ Enter Keyword ---------------");
-        let _ = std::io::stdin().read_line(&mut keyword);
-
-        println!("\n\n------------ Enter Password --------------");
-        let _ = std::io::stdin().read_line(&mut password);
-
-        loop {
-            pin = String::new();
-            println!("\n\n--------- Enter PIN (4 Digits) -----------");
-            let _ = std::io::stdin().read_line(&mut pin);
-            pin = pin.trim().to_string();
-            if pin.parse::<u16>().is_ok() && pin.len() == 4 {
-                break;
-            }
-            println!("ERROR: PIN is not 4 Digits !!");
-        }
+        println!("\n------------ Enter Pass-phrase ---------------");
+        let _ = std::io::stdin().read_line(&mut pass_phrase);
 
         // Log into the created account
         {
             println!("\nTrying to log in ...");
-            match Client::log_in(keyword, pin, password) {
+            match Client::log_in(&pass_phrase) {
                 Ok(mut client) => {
                     println!("Account Login Successful !!");
                     if MOCK_NETWORK {

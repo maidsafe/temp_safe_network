@@ -105,10 +105,9 @@ impl Client {
 
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
-    pub fn create_account(keyword: String,
-                          pin: String,
-                          password: String)
-                          -> Result<Client, CoreError> {
+    pub fn create_account(pass_phrase: &str) -> Result<Client, CoreError> {
+        let (password, keyword, pin) = utility::derive_secrets(pass_phrase);
+
         let account_packet = Account::new(None, None);
         let id_packet = FullId::with_keys((account_packet.get_maid().public_keys().1,
                                            account_packet.get_maid().secret_keys().1.clone()),
@@ -135,8 +134,7 @@ impl Client {
             routing: routing,
             _raii_joiner: raii_joiner,
             message_queue: message_queue,
-            session_packet_id: Some(try!(Account::generate_network_id(keyword.as_bytes(),
-                                                                      pin.as_bytes()))),
+            session_packet_id: Some(try!(Account::generate_network_id(&keyword, &pin))),
             session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
             client_manager_addr: Some(client_manager_addr),
             issued_gets: 0,
@@ -170,18 +168,19 @@ impl Client {
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// create_account. This will help log into an already created account for the user in the
     /// SAFE-network.
-    pub fn log_in(keyword: String, pin: String, password: String) -> Result<Client, CoreError> {
+    pub fn log_in(pass_phrase: &str) -> Result<Client, CoreError> {
+        let (password, keyword, pin) = utility::derive_secrets(pass_phrase);
+
         let mut unregistered_client = try!(Client::create_unregistered_client());
-        let user_id = try!(Account::generate_network_id(keyword.as_bytes(), pin.as_bytes()));
+        let user_id = try!(Account::generate_network_id(&keyword, &pin));
 
         let session_packet_request = DataIdentifier::Structured(user_id, TYPE_TAG_SESSION_PACKET);
 
         let resp_getter = try!(unregistered_client.get(session_packet_request, None));
 
         if let Data::Structured(session_packet) = try!(resp_getter.get()) {
-            let decrypted_session_packet = try!(Account::decrypt(session_packet.get_data(),
-                                                                 password.as_bytes(),
-                                                                 pin.as_bytes()));
+            let decrypted_session_packet =
+                try!(Account::decrypt(session_packet.get_data(), &password, &pin));
             let id_packet = FullId::with_keys((decrypted_session_packet.get_maid()
                                                   .public_keys()
                                                   .1,
@@ -220,8 +219,7 @@ impl Client {
                 routing: routing,
                 _raii_joiner: raii_joiner,
                 message_queue: message_queue,
-                session_packet_id: Some(try!(Account::generate_network_id(keyword.as_bytes(),
-                                                                          pin.as_bytes()))),
+                session_packet_id: Some(try!(Account::generate_network_id(&keyword, &pin))),
                 session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
                 client_manager_addr: Some(client_manager_addr),
                 issued_gets: 0,
@@ -732,10 +730,10 @@ struct SessionPacketEncryptionKeys {
 }
 
 impl SessionPacketEncryptionKeys {
-    fn new(password: String, pin: String) -> SessionPacketEncryptionKeys {
+    fn new(password: Vec<u8>, pin: Vec<u8>) -> SessionPacketEncryptionKeys {
         SessionPacketEncryptionKeys {
-            pin: pin.into_bytes(),
-            password: password.into_bytes(),
+            pin: pin,
+            password: password,
         }
     }
 
@@ -763,48 +761,28 @@ mod test {
 
     #[test]
     fn account_creation() {
-        let keyword = unwrap!(utility::generate_random_string(10));
-        let password = unwrap!(utility::generate_random_string(10));
-        let pin = unwrap!(utility::generate_random_string(10));
+        let pass_phrase = unwrap!(utility::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ = unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let _ = unwrap!(Client::create_account(&pass_phrase));
 
-        // Account creation - same keyword, pin and password - should fail
-        match Client::create_account(keyword.clone(), pin.clone(), password.clone()) {
+        // Account creation - same pass_phrase - should fail
+        match Client::create_account(&pass_phrase) {
             Ok(_) => panic!("Account name hijaking should fail !"),
             Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
             Err(err) => panic!("{:?}", err),
         }
-
-        // Account creation - same keyword and pin - different password - should fail
-        let new_password = unwrap!(utility::generate_random_string(10));
-        match Client::create_account(keyword.clone(), pin.clone(), new_password) {
-            Ok(_) => panic!("Account name hijaking should fail !"),
-            Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
-            Err(err) => panic!("{:?}", err),
-        }
-
-        // Account creation - same keyword and password - different pin - should succeed
-        let new_pin = unwrap!(utility::generate_random_string(10));
-        let _ = unwrap!(Client::create_account(keyword, new_pin, password.clone()));
-
-        // Account creation - same pin and password - different keyword - should succeed
-        let new_keyword = unwrap!(utility::generate_random_string(10));
-        let _ = unwrap!(Client::create_account(new_keyword, pin, password));
     }
 
     #[test]
     fn account_login() {
-        let keyword = unwrap!(utility::generate_random_string(10));
-        let password = unwrap!(utility::generate_random_string(10));
-        let pin = unwrap!(utility::generate_random_string(10));
+        let pass_phrase = unwrap!(utility::generate_random_string(10));
 
         // Creation should pass
-        let _ = unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let _ = unwrap!(Client::create_account(&pass_phrase));
 
         // Correct Credentials - Login Should Pass
-        let _ = unwrap!(Client::log_in(keyword, pin, password));
+        let _ = unwrap!(Client::log_in(&pass_phrase));
     }
 
     #[test]
@@ -814,12 +792,10 @@ mod test {
 
         // Registered Client PUTs something onto the network
         {
-            let keyword = unwrap!(utility::generate_random_string(10));
-            let password = unwrap!(utility::generate_random_string(10));
-            let pin = unwrap!(utility::generate_random_string(10));
+            let pass_phrase = unwrap!(utility::generate_random_string(10));
 
             // Creation should pass
-            let mut client = unwrap!(Client::create_account(keyword, pin, password));
+            let mut client = unwrap!(Client::create_account(&pass_phrase));
             unwrap!(unwrap!(client.put(orig_data.clone(), None)).get());
         }
 
@@ -844,12 +820,9 @@ mod test {
     #[test]
     fn user_root_dir_id_creation() {
         // Construct Client
-        let keyword = unwrap!(utility::generate_random_string(10));
-        let password = unwrap!(utility::generate_random_string(10));
-        let pin = unwrap!(utility::generate_random_string(10));
+        let pass_phrase = unwrap!(utility::generate_random_string(10));
 
-        let mut client =
-            unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let mut client = unwrap!(Client::create_account(&pass_phrase));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -858,7 +831,7 @@ mod test {
         unwrap!(client.set_user_root_directory_id(root_dir_id.clone()));
 
         // Correct Credentials - Login Should Pass
-        let client = unwrap!(Client::log_in(keyword, pin, password));
+        let client = unwrap!(Client::log_in(&pass_phrase));
 
         assert!(client.get_user_root_directory_id().is_some());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -869,12 +842,9 @@ mod test {
     #[test]
     fn maidsafe_config_root_dir_id_creation() {
         // Construct Client
-        let keyword = unwrap!(utility::generate_random_string(10));
-        let password = unwrap!(utility::generate_random_string(10));
-        let pin = unwrap!(utility::generate_random_string(10));
+        let pass_phrase = unwrap!(utility::generate_random_string(10));
 
-        let mut client =
-            unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+        let mut client = unwrap!(Client::create_account(&pass_phrase));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -883,7 +853,7 @@ mod test {
         unwrap!(client.set_configuration_root_directory_id(root_dir_id.clone()));
 
         // Correct Credentials - Login Should Pass
-        let client = unwrap!(Client::log_in(keyword, pin, password));
+        let client = unwrap!(Client::log_in(&pass_phrase));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_some());
@@ -895,11 +865,9 @@ mod test {
     #[test]
     fn hybrid_encryption_decryption() {
         // Construct Client
-        let keyword = unwrap!(utility::generate_random_string(10));
-        let password = unwrap!(utility::generate_random_string(10));
-        let pin = unwrap!(utility::generate_random_string(10));
+        let pass_phrase = unwrap!(utility::generate_random_string(10));
 
-        let client = unwrap!(Client::create_account(keyword, pin, password));
+        let client = unwrap!(Client::create_account(&pass_phrase));
 
         // Identical Plain Texts
         let plain_text_original_0 = vec![123u8; 1000];

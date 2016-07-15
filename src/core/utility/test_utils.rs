@@ -21,11 +21,8 @@ use sodiumoxide::crypto::sign;
 
 /// Generates a random mock client for testing
 pub fn get_client() -> Result<Client, CoreError> {
-    let pin = try!(utility::generate_random_string(10));
-    let keyword = try!(utility::generate_random_string(10));
-    let password = try!(utility::generate_random_string(10));
-
-    Client::create_account(keyword, pin, password)
+    let pass_phrase = try!(utility::generate_random_string(10));
+    Client::create_account(&pass_phrase)
 }
 
 /// Generates random public keys

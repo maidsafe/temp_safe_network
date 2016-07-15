@@ -56,40 +56,24 @@ use safe_core::nfs::helper::file_helper::FileHelper;
 use safe_core::nfs::helper::writer::Mode;
 
 fn create_account() -> Result<Client, NfsError> {
-    let mut pin = String::new();
-    let mut keyword = String::new();
-    let mut password = String::new();
+    let mut pass_phrase = String::new();
 
     println!("\n\tAccount Creation");
     println!("\t================");
 
-    println!("\n------------ Enter Keyword ---------------");
-    let _ = std::io::stdin().read_line(&mut keyword);
-
-    println!("\n\n------------ Enter Password --------------");
-    let _ = std::io::stdin().read_line(&mut password);
-
-    loop {
-        println!("\n\n--------- Enter PIN (4 Digits) -----------");
-        let _ = std::io::stdin().read_line(&mut pin);
-        pin = pin.trim().to_string();
-        if pin.parse::<u16>().is_ok() && pin.len() == 4 {
-            break;
-        }
-        println!("ERROR: PIN is not 4 Digits !!");
-        pin.clear();
-    }
+    println!("\n------------ Enter Pass-phrase ---------------");
+    let _ = std::io::stdin().read_line(&mut pass_phrase);
 
     // Account Creation
     println!("\nTrying to create an account ...");
-    let _ = unwrap!(Client::create_account(keyword.clone(), pin.clone(), password.clone()));
+    let _ = unwrap!(Client::create_account(&pass_phrase));
     println!("Account Created Successfully !!");
     println!("\n\n\tAuto Account Login");
     println!("\t==================");
 
     // Log into the created account
     println!("\nTrying to log into the created account using supplied credentials ...");
-    let client = try!(Client::log_in(keyword, pin, password));
+    let client = try!(Client::log_in(&pass_phrase));
     println!("Account Login Successful !!");
     Ok(client)
 }
