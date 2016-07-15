@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.17.0]
+- Instead of requiring all 3 of PIN, Keyword and Password, have user type only one secure pass-phrase and derive the required credentials internally.
+
 ## [0.16.2]
 - Expose get-account-info functionality in FFI for launcher to consume.
 - Fix sodiumoxide to v0.0.10 as the new released v0.0.12 does not support rustc-serializable types anymore and breaks builds.
