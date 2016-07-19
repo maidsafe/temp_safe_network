@@ -50,7 +50,8 @@ use safe_network_common::client_errors::MutationError;
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));
 
-    let mut pass_phrase = String::new();
+    let mut secret_0 = String::new();
+    let mut secret_1 = String::new();
 
     println!("\nDo you already have an account created (enter Y for yes) ?");
 
@@ -62,14 +63,16 @@ fn main() {
         println!("\n\tAccount Creation");
         println!("\t================");
 
-        println!("\n------------ Enter Pass-phrase ---------------");
-        let _ = std::io::stdin().read_line(&mut pass_phrase);
+        println!("\n------------ Enter account-locator ---------------");
+        let _ = std::io::stdin().read_line(&mut secret_0);
+        println!("\n------------ Enter password ---------------");
+        let _ = std::io::stdin().read_line(&mut secret_1);
 
         // Account Creation
         {
             println!("\nTrying to create an account ...");
 
-            match Client::create_account(&pass_phrase) {
+            match Client::create_account(&secret_0, &secret_1) {
                 Ok(_) => (),
                 Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => {
                     println!("ERROR: This domain is already taken. Please retry with different \
@@ -88,7 +91,7 @@ fn main() {
         {
             println!("\nTrying to log into the created account using supplied credentials ...");
 
-            let _ = unwrap!(Client::log_in(&pass_phrase));
+            let _ = unwrap!(Client::log_in(&secret_0, &secret_1));
             println!("Account Login Successful !!");
         }
     }
@@ -97,15 +100,18 @@ fn main() {
     println!("\t====================");
 
     loop {
-        pass_phrase = String::new();
+        secret_0 = String::new();
+        secret_1 = String::new();
 
-        println!("\n------------ Enter Pass-phrase ---------------");
-        let _ = std::io::stdin().read_line(&mut pass_phrase);
+        println!("\n------------ Enter account-locator ---------------");
+        let _ = std::io::stdin().read_line(&mut secret_0);
+        println!("\n------------ Enter password ---------------");
+        let _ = std::io::stdin().read_line(&mut secret_1);
 
         // Log into the created account
         {
             println!("\nTrying to log in ...");
-            match Client::log_in(&pass_phrase) {
+            match Client::log_in(&secret_0, &secret_1) {
                 Ok(_) => {
                     println!("Account Login Successful !!");
                     break;
