@@ -594,7 +594,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "use-mock-routing")]
-    fn register_dns_internal_error_recovery() {
+    fn register_and_delete_dns_internal_error_recovery() {
         use core::errors::CoreError;
         use nfs::errors::NfsError;
         use safe_network_common::client_errors::GetError;
