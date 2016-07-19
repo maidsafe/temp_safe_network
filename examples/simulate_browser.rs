@@ -62,18 +62,21 @@ const DEFAULT_SERVICE: &'static str = "www";
 const HOME_PAGE_FILE_NAME: &'static str = "index.html";
 
 fn handle_login() -> Arc<Mutex<Client>> {
-    let mut pass_phrase = String::new();
+    let mut secret_0 = String::new();
+    let mut secret_1 = String::new();
 
     println!("\n\tAccount Creation");
     println!("\t================");
 
-    println!("\n------------ Enter Pass-phrase ---------------");
-    let _ = std::io::stdin().read_line(&mut pass_phrase);
+    println!("\n------------ Enter account-locator ---------------");
+    let _ = std::io::stdin().read_line(&mut secret_0);
+    println!("\n------------ Enter password ---------------");
+    let _ = std::io::stdin().read_line(&mut secret_1);
 
     // Account Creation
     {
         println!("\nTrying to create an account ...");
-        let _ = unwrap!(Client::create_account(&pass_phrase));
+        let _ = unwrap!(Client::create_account(&secret_0, &secret_1));
         println!("Account Creation Successful !!");
     }
 
@@ -82,7 +85,7 @@ fn handle_login() -> Arc<Mutex<Client>> {
 
     // Log into the created account
     println!("\nTrying to log into the created account using supplied credentials ...");
-    Arc::new(Mutex::new(unwrap!(Client::log_in(&pass_phrase))))
+    Arc::new(Mutex::new(unwrap!(Client::log_in(&secret_0, &secret_1))))
 }
 
 fn create_dns_record(client: Arc<Mutex<Client>>,

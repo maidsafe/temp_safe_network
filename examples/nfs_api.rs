@@ -56,24 +56,27 @@ use safe_core::nfs::helper::file_helper::FileHelper;
 use safe_core::nfs::helper::writer::Mode;
 
 fn create_account() -> Result<Client, NfsError> {
-    let mut pass_phrase = String::new();
+    let mut secret_0 = String::new();
+    let mut secret_1 = String::new();
 
     println!("\n\tAccount Creation");
     println!("\t================");
 
-    println!("\n------------ Enter Pass-phrase ---------------");
-    let _ = std::io::stdin().read_line(&mut pass_phrase);
+    println!("\n------------ Enter account-locator ---------------");
+    let _ = std::io::stdin().read_line(&mut secret_0);
+    println!("\n------------ Enter password ---------------");
+    let _ = std::io::stdin().read_line(&mut secret_1);
 
     // Account Creation
     println!("\nTrying to create an account ...");
-    let _ = unwrap!(Client::create_account(&pass_phrase));
+    let _ = unwrap!(Client::create_account(&secret_0, &secret_1));
     println!("Account Created Successfully !!");
     println!("\n\n\tAuto Account Login");
     println!("\t==================");
 
     // Log into the created account
     println!("\nTrying to log into the created account using supplied credentials ...");
-    let client = try!(Client::log_in(&pass_phrase));
+    let client = try!(Client::log_in(&secret_0, &secret_1));
     println!("Account Login Successful !!");
     Ok(client)
 }

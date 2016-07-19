@@ -109,15 +109,16 @@ fn main() {
     });
 
     // Create account
-    let pass_phrase: String = rng.gen_ascii_chars().take(20).collect();
+    let secret_0: String = rng.gen_ascii_chars().take(20).collect();
+    let secret_1: String = rng.gen_ascii_chars().take(20).collect();
 
     let mut client = if args.flag_get_only {
-        unwrap!(Client::log_in(&pass_phrase))
+        unwrap!(Client::log_in(&secret_0, &secret_1))
     } else {
         println!("\n\tAccount Creation");
         println!("\t================");
         println!("\nTrying to create an account ...");
-        unwrap!(Client::create_account(&pass_phrase))
+        unwrap!(Client::create_account(&secret_0, &secret_1))
     };
     println!("Logged in successfully !!");
     let public_key = *unwrap!(client.get_public_signing_key());
