@@ -173,6 +173,13 @@ impl MessageQueue {
                     Event::Response { response, .. } => {
                         handle_response(response, unwrap!(message_queue_cloned.lock()));
                     }
+                    Event::RequestTimeout(id) => {
+                        if let Some(response_observer) = unwrap!(message_queue_cloned.lock())
+                            .response_observers
+                            .remove(&id) {
+                            let _ = response_observer.send(ResponseEvent::RequestTimeout);
+                        }
+                    }
                     Event::Connected => {
                         let mut dead_sender_positions = Vec::<usize>::new();
                         let mut queue_guard = unwrap!(message_queue_cloned.lock());

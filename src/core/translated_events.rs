@@ -31,6 +31,8 @@ pub enum ResponseEvent {
     GetAccountInfoResp(Result<(u64, u64), CoreError>),
     /// Response to a previous Mutating (PUT/POST/DELETE) request
     MutationResp(Result<(), CoreError>),
+    /// Request timed out
+    RequestTimeout,
     /// Graceful Exit Condition
     Terminated,
 }

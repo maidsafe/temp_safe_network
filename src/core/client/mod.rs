@@ -43,7 +43,6 @@ use safe_network_common::messaging::{MpidMessage, MpidMessageWrapper};
 use safe_network_common::TYPE_TAG_SESSION_PACKET;
 use routing::{Authority, Data, DataIdentifier, FullId, MessageId, PlainData, StructuredData,
               XorName};
-
 use sodiumoxide::crypto::{box_, sign};
 use sodiumoxide::crypto::hash::sha256;
 

@@ -103,6 +103,7 @@ impl GetAccountInfoResponseGetter {
         let res = data_receiver.recv();
         match try!(res) {
             ResponseEvent::GetAccountInfoResp(result) => result,
+            ResponseEvent::RequestTimeout => Err(CoreError::RequestTimeout),
             ResponseEvent::Terminated => Err(CoreError::OperationAborted),
             _ => Err(CoreError::ReceivedUnexpectedData),
         }
@@ -135,6 +136,7 @@ impl MutationResponseGetter {
         let (_, ref data_receiver) = self.data_channel;
         match try!(data_receiver.recv()) {
             ResponseEvent::MutationResp(result) => result,
+            ResponseEvent::RequestTimeout => Err(CoreError::RequestTimeout),
             ResponseEvent::Terminated => Err(CoreError::OperationAborted),
             _ => Err(CoreError::ReceivedUnexpectedData),
         }
