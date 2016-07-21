@@ -133,7 +133,7 @@ impl ConfigHandler {
 
         let mut file_helper = FileHelper::new(self.client.clone());
         let mut writer = try!(file_helper.update_content(file, Overwrite, dir_listing));
-        try!(writer.write(&try!(serialise(&global_configs)), 0));
+        try!(writer.write(&try!(serialise(&global_configs))));
         let _ = try!(writer.close());
 
         Ok(())

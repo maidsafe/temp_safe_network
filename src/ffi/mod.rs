@@ -449,13 +449,12 @@ pub unsafe extern "C" fn nfs_create_file(c_payload: *const c_char,
 /// Write data to the Network using the NFS Writer handle
 #[no_mangle]
 pub unsafe extern "C" fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
-                                          offset: u64,
                                           c_data: *const u8,
                                           len: usize)
                                           -> int32_t {
     catch_unwind_i32(|| {
         let data = slice::from_raw_parts(c_data, len);
-        ffi_try!((*writer_handle).writer().write(&data[..], offset));
+        ffi_try!((*writer_handle).writer().write(&data[..]));
 
         0
     })

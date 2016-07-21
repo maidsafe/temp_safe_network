@@ -89,7 +89,7 @@ mod test {
 
         let key = file_directory.get_key().clone();
         let mut writer = try!(file_helper.create(file_name, bin_metadata, file_directory));
-        try!(writer.write(&file_content[..], 0));
+        try!(writer.write(&file_content[..]));
         let _ = try!(writer.close());
 
         Ok(key)

@@ -180,7 +180,7 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
 
     println!("Creating Home Page for the Service...");
 
-    try!(writer.write(text.as_bytes(), 0));
+    try!(writer.write(text.as_bytes()));
     let (updated_parent_dir_listing, _) = try!(writer.close());
     let dir_key = updated_parent_dir_listing.get_key();
 

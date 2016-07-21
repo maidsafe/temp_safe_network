@@ -249,7 +249,7 @@ fn file_operation(option: u32,
             let mut file_helper = FileHelper::new(client);
             let mut writer = try!(file_helper.create(get_user_string("File name"), vec![], child));
 
-            try!(writer.write(&data[..], 0));
+            try!(writer.write(&data[..]));
             let _ = try!(writer.close());
             println!("File created");
         }
@@ -265,7 +265,7 @@ fn file_operation(option: u32,
             let mut file_helper = FileHelper::new(client);
             let mut writer =
                 try!(file_helper.update_content(file.clone(), Mode::Overwrite, child.clone()));
-            try!(writer.write(&data[..], 0));
+            try!(writer.write(&data[..]));
             let _ = try!(writer.close());
             println!("File Updated");
         }

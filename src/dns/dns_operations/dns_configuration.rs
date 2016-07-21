@@ -92,7 +92,7 @@ pub fn write_dns_configuration_data(client: Arc<Mutex<Client>>,
     let mut file_helper = FileHelper::new(client.clone());
     let mut writer = try!(file_helper.update_content(file, Mode::Overwrite, dir_listing));
     debug!("Writing dns configuration data ...");
-    try!(writer.write(&try!(serialise(&config)), 0));
+    try!(writer.write(&try!(serialise(&config))));
     let _ = try!(writer.close());
     Ok(())
 }
