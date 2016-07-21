@@ -34,7 +34,6 @@ impl Action for GetServiceDirectory {
         let directory_key = try!(dns_operations.get_service_home_directory_key(&self.long_name,
                                                                                &self.service_name,
                                                                                None));
-        println!("Key {:?}", directory_key);
         let response = try!(directory_response::get_response(params.client, directory_key));
         Ok(Some(try!(::rustc_serialize::json::encode(&response))))
     }
