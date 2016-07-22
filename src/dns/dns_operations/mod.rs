@@ -92,7 +92,7 @@ impl DnsOperations {
                                                        vec![],
                                                        private_signing_key,
                                                        data_encryption_keys));
-            match unwrap!(self.client.lock()).put_recover(Data::Structured(struct_data), None) {
+            match Client::put_recover(self.client.clone(), Data::Structured(struct_data), None) {
                 Ok(()) => (),
                 Err(CoreError::MutationFailure { reason: MutationError::DataExists, .. }) => {
                     return Err(DnsError::DnsNameAlreadyRegistered)
@@ -136,8 +136,9 @@ impl DnsOperations {
                                                  .clone(),
                                              private_signing_key,
                                              None));
-                try!(unwrap!(self.client.lock())
-                    .delete_recover(Data::Structured(struct_data), None));
+                try!(Client::delete_recover(self.client.clone(),
+                                            Data::Structured(struct_data),
+                                            None));
             }
             Err(DnsError::CoreError(CoreError::GetFailure {
                 reason: GetError::NoSuchData,
@@ -298,7 +299,9 @@ impl DnsOperations {
                                                            .clone(),
                                                        private_signing_key,
                                                        data_encryption_decryption_keys));
-            try!(try!(unwrap!(self.client.lock()).post(Data::Structured(struct_data), None)).get());
+            let resp_getter = try!(unwrap!(self.client.lock())
+                .post(Data::Structured(struct_data), None));
+            try!(resp_getter.get());
 
             Ok(())
         }

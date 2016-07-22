@@ -158,7 +158,7 @@ impl Client {
                                          Some(&account.get_maid().secret_keys().0)))
             };
 
-            try!(client.put_recover(Data::Structured(account_version), None));
+            try!(try!(client.put(Data::Structured(account_version), None)).get());
         }
 
         Ok(client)
@@ -380,17 +380,21 @@ impl Client {
 
     /// Put data to the network. Unlike `put` this method is blocking and will return success if
     /// the data has already been put to the network.
-    pub fn put_recover(&mut self, data: Data, opt_dst: Option<Authority>) -> Result<(), CoreError> {
+    pub fn put_recover(client: Arc<Mutex<Self>>,
+                       data: Data,
+                       opt_dst: Option<Authority>)
+                       -> Result<(), CoreError> {
         let data_owners = match data {
             Data::Structured(ref sd) => sd.get_owner_keys().clone(),
             _ => {
                 // Don't do recovery for non-structured-data.
-                return try!(self.put(data, opt_dst)).get();
+                let getter = try!(unwrap!(client.lock()).put(data, opt_dst));
+                return getter.get();
             }
         };
 
         let data_id = data.identifier();
-        let put_err = match self.put(data, opt_dst.clone()) {
+        let put_err = match unwrap!(client.lock()).put(data, opt_dst.clone()) {
             Ok(getter) => {
                 match getter.get() {
                     // Success! We're done.
@@ -407,7 +411,7 @@ impl Client {
 
         debug!("Put failed: {:?}. Trying to recover...", put_err);
 
-        match self.get(data_id, opt_dst) {
+        match unwrap!(client.lock()).get(data_id, opt_dst) {
             Err(_) => Err(put_err),
             Ok(getter) => {
                 match getter.get() {
@@ -476,11 +480,12 @@ impl Client {
 
     /// A blocking version of `delete` that returns success if the data was already not present on
     /// the network.
-    pub fn delete_recover(&mut self,
+    pub fn delete_recover(client: Arc<Mutex<Self>>,
                           data: Data,
                           opt_dst: Option<Authority>)
                           -> Result<(), CoreError> {
-        match self.delete(data, opt_dst).and_then(|g| g.get()) {
+        let resp_getter = try!(unwrap!(client.lock()).delete(data, opt_dst));
+        match resp_getter.get() {
             Ok(()) |
             Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => Ok(()),
             Err(e) => Err(e),

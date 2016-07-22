@@ -72,7 +72,7 @@ impl DirectoryHelper {
 
         let structured_data = try!(self.save_directory_listing(&directory));
         debug!("Posting PUT request to network to save structured data for directory ...");
-        try!(unwrap!(self.client.lock()).put_recover(Data::Structured(structured_data), None));
+        try!(Client::put_recover(self.client.clone(), Data::Structured(structured_data), None));
         if let Some(mut parent_directory) = parent_directory {
             parent_directory.upsert_sub_directory(directory.get_metadata().clone());
             Ok((directory, try!(self.update(parent_directory))))
@@ -116,7 +116,7 @@ impl DirectoryHelper {
                         type_tag: u64)
                         -> Result<Vec<XorName>, NfsError> {
         let structured_data = try!(self.get_structured_data(directory_id, type_tag));
-        Ok(try!(versioned::get_all_versions(&mut *unwrap!(self.client.lock()), &structured_data)))
+        Ok(try!(versioned::get_all_versions(self.client.clone(), &structured_data)))
     }
 
     /// Return the DirectoryListing for the specified version
@@ -272,7 +272,7 @@ impl DirectoryHelper {
                 AccessLevel::Public => try!(serialise(&directory)),
             };
             let version = try!(self.save_as_immutable_data(serialised_data));
-            Ok(try!(versioned::create(&mut *unwrap!(self.client.lock()),
+            Ok(try!(versioned::create(self.client.clone(),
                                       version,
                                       directory.get_key().get_type_tag(),
                                       directory.get_key().get_id().clone(),
@@ -317,7 +317,7 @@ impl DirectoryHelper {
                 AccessLevel::Public => try!(serialise(&directory)),
             };
             let version = try!(self.save_as_immutable_data(serialised_data));
-            try!(versioned::append_version(&mut *unwrap!(self.client.lock()),
+            try!(versioned::append_version(self.client.clone(),
                                            structured_data,
                                            version,
                                            &signing_key))
@@ -353,7 +353,7 @@ impl DirectoryHelper {
         let immutable_data = ImmutableData::new(data);
         let name = *immutable_data.name();
         debug!("Posting PUT request to save immutable data to the network ...");
-        try!(unwrap!(self.client.lock()).put_recover(Data::Immutable(immutable_data), None));
+        try!(Client::put_recover(self.client.clone(), Data::Immutable(immutable_data), None));
         Ok(name)
     }
 
