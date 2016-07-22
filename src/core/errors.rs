@@ -187,12 +187,12 @@ impl Into<i32> for CoreError {
             CoreError::MutationFailure { reason: MutationError::NetworkFull, .. } => {
                 CLIENT_ERROR_START_RANGE - 27
             }
-            CoreError::SelfEncryption(SelfEncryptionError
-                                      ::Compression::<SelfEncryptionStorageError>) => {
+            CoreError::SelfEncryption(
+                SelfEncryptionError::Compression::<SelfEncryptionStorageError>) => {
                 CLIENT_ERROR_START_RANGE - 28
             }
-            CoreError::SelfEncryption(SelfEncryptionError
-                                      ::Decryption::<SelfEncryptionStorageError>) => {
+            CoreError::SelfEncryption(
+                SelfEncryptionError::Decryption::<SelfEncryptionStorageError>) => {
                 CLIENT_ERROR_START_RANGE - 29
             }
             CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
@@ -261,18 +261,18 @@ impl Debug for CoreError {
             }
             CoreError::GetFailure { ref data_id, ref reason } => {
                 write!(formatter,
-                       "CoreError::GetFailure::{{ reason: {:?}, data_id: {:?} }}",
+                       "CoreError::GetFailure::{{ reason: {:?}, data_id: {:?}}}",
                        reason,
                        data_id)
             }
             CoreError::GetAccountInfoFailure { ref reason } => {
                 write!(formatter,
-                       "CoreError::GetAccountInfoFailure::{{ reason: {:?} }}",
+                       "CoreError::GetAccountInfoFailure::{{ reason: {:?}}}",
                        reason)
             }
             CoreError::MutationFailure { ref data_id, ref reason } => {
                 write!(formatter,
-                       "CoreError::MutationFailure::{{ reason: {:?}, data_id: {:?} }}",
+                       "CoreError::MutationFailure::{{ reason: {:?}, data_id: {:?}}}",
                        reason,
                        data_id)
             }
@@ -384,7 +384,7 @@ impl Error for CoreError {
             CoreError::GetAccountInfoFailure { ref reason } => reason.description(),
             CoreError::MutationFailure { ref reason, .. } => reason.description(),
             CoreError::SelfEncryption(ref error) => error.description(),
-            CoreError::RequestTimeout => "None of the attempted routing paths has responded",
+            CoreError::RequestTimeout => "Request has timed out",
         }
     }
 
