@@ -174,6 +174,7 @@ fn wait_canceller(tx: Sender<ResponseEvent>, rx: Receiver<()>) {
                 }
                 thread::sleep(Duration::from_secs(SLEEP_PER_ITER));
             }
+            debug!("Response has timed out - firing wait canceller.");
             let _ = tx.send(ResponseEvent::Terminated);
         })
         .detach();

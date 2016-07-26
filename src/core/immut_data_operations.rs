@@ -41,6 +41,8 @@ pub fn create(client: Arc<Mutex<Client>>,
               data: Vec<u8>,
               encryption_keys: Option<(&PublicKey, &SecretKey, &Nonce)>)
               -> Result<ImmutableData, CoreError> {
+    trace!("Creating conformant ImmutableData.");
+
     let mut storage = SelfEncryptionStorage::new(client.clone());
     let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, DataMap::None));
     try!(self_encryptor.write(&data, 0));
@@ -77,6 +79,8 @@ pub fn get_data(client: Arc<Mutex<Client>>,
                 immut_data_name: XorName,
                 decryption_keys: Option<(&PublicKey, &SecretKey, &Nonce)>)
                 -> Result<Vec<u8>, CoreError> {
+    trace!("Getting data after fetching a conformant ImmutableData.");
+
     let data_identifier = DataIdentifier::Immutable(immut_data_name);
     let response_getter = try!(unwrap!(client.lock(), "Couldn't lock").get(data_identifier, None));
 

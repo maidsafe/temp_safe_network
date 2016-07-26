@@ -35,6 +35,8 @@ pub fn create(client: Arc<Mutex<Client>>,
               prev_owner_keys: Vec<sign::PublicKey>,
               private_signing_key: &sign::SecretKey)
               -> Result<StructuredData, CoreError> {
+    trace!("Creating versioned StructuredData.");
+
     create_impl(client,
                 &[version_name_to_store],
                 tag_type,
@@ -49,6 +51,8 @@ pub fn create(client: Arc<Mutex<Client>>,
 pub fn get_all_versions(client: Arc<Mutex<Client>>,
                         struct_data: &StructuredData)
                         -> Result<Vec<XorName>, CoreError> {
+    trace!("Getting all versions of versioned StructuredData.");
+
     let immut_data = try!(get_immutable_data(client, struct_data));
     Ok(try!(deserialise(&immut_data.value())))
 }
@@ -59,6 +63,8 @@ pub fn append_version(client: Arc<Mutex<Client>>,
                       version_to_append: XorName,
                       private_signing_key: &sign::SecretKey)
                       -> Result<StructuredData, CoreError> {
+    trace!("Appending version to versioned StructuredData.");
+
     // let immut_data = try!(get_immutable_data(mut client, struct_data));
     // client.delete(immut_data);
     let mut versions = try!(get_all_versions(client.clone(), &struct_data));
@@ -92,6 +98,8 @@ fn create_impl(client: Arc<Mutex<Client>>,
                                                         owner_keys.clone(),
                                                         prev_owner_keys.clone())) {
         DataFitResult::DataFits => {
+            trace!("Name of ImmutableData containing versions fits in StructuredData.");
+
             let data = Data::Immutable(immutable_data);
             try!(Client::put_recover(client, data, None));
 
@@ -103,7 +111,10 @@ fn create_impl(client: Arc<Mutex<Client>>,
                                         prev_owner_keys,
                                         Some(private_signing_key))))
         }
-        _ => Err(CoreError::StructuredDataHeaderSizeProhibitive),
+        _ => {
+            trace!("Name of ImmutableData containing versions does not fit in StructuredData.");
+            Err(CoreError::StructuredDataHeaderSizeProhibitive)
+        }
     }
 }
 

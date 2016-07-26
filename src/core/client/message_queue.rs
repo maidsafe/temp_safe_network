@@ -169,6 +169,8 @@ impl MessageQueue {
         let message_queue_cloned = message_queue.clone();
         let receiver_joiner = thread::named(EVENT_RECEIVER_THREAD_NAME, move || {
             for it in routing_event_receiver.iter() {
+                trace!("{} received: {:?}", EVENT_RECEIVER_THREAD_NAME, it);
+
                 match it {
                     Event::Response { response, .. } => {
                         handle_response(response, unwrap!(message_queue_cloned.lock()));
@@ -206,10 +208,7 @@ impl MessageQueue {
                         MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
                                                          dead_sender_positions);
                     }
-                    _ => {
-                        debug!("Received Routing Event: {:?} ;; This is currently not supported.",
-                               it)
-                    }
+                    _ => debug!("Received unsupported routing event: {:?}.", it),
                 }
             }
         });

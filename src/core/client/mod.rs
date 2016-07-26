@@ -75,6 +75,8 @@ impl Client {
     /// unregistered random clinet, which can do very limited set of operations - eg., a
     /// Network-Get
     pub fn create_unregistered_client() -> Result<Client, CoreError> {
+        trace!("Creating unregistered client.");
+
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
 
@@ -82,10 +84,15 @@ impl Client {
                                                              vec![network_event_sender]);
         let routing = try!(Routing::new(routing_sender, None));
 
+        trace!("Waiting to get connected to the Network...");
         match try!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
-            _ => return Err(CoreError::OperationAborted),
+            x => {
+                warn!("Could not connect to the Network. Unexpected: {:?}", x);
+                return Err(CoreError::OperationAborted);
+            }
         }
+        trace!("Connected to the Network.");
 
         Ok(Client {
             account: None,
@@ -105,6 +112,8 @@ impl Client {
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
     pub fn create_account(acc_locator: &str, acc_password: &str) -> Result<Client, CoreError> {
+        trace!("Creating an account.");
+
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
         let account_packet = Account::new(None, None);
@@ -120,10 +129,15 @@ impl Client {
                                                              vec![network_event_sender]);
         let routing = try!(Routing::new(routing_sender, Some(id_packet)));
 
+        trace!("Waiting to get connected to the Network...");
         match try!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
-            _ => return Err(CoreError::OperationAborted),
+            x => {
+                warn!("Could not connect to the Network. Unexpected: {:?}", x);
+                return Err(CoreError::OperationAborted);
+            }
         }
+        trace!("Connected to the Network.");
 
         let hash_sign_key = sha256::hash(&(account_packet.get_maid().public_keys().0).0);
         let client_manager_addr = XorName(hash_sign_key.0);
@@ -202,15 +216,18 @@ impl Client {
                                                                  vec![network_event_sender]);
             let routing = try!(Routing::new(routing_sender, Some(id_packet)));
 
+            trace!("Waiting to get connected to the Network...");
             match try!(network_event_receiver.recv()) {
                 NetworkEvent::Connected => (),
-                _ => return Err(CoreError::OperationAborted),
+                x => {
+                    warn!("Could not connect to the Network. Unexpected: {:?}", x);
+                    return Err(CoreError::OperationAborted);
+                }
             }
+            trace!("Connected to the Network.");
 
-            let hash_sign_key = sha256::hash(&(decrypted_session_packet.get_maid()
-                    .public_keys()
-                    .0)
-                .0);
+            let hash_sign_key =
+                sha256::hash(&(decrypted_session_packet.get_maid().public_keys().0).0);
             let client_manager_addr = XorName(hash_sign_key.0);
 
             let client = Client {
@@ -238,6 +255,8 @@ impl Client {
     /// necessary to fetch all of the user's data as all further data is encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
     pub fn set_user_root_directory_id(&mut self, root_dir_id: XorName) -> Result<(), CoreError> {
+        trace!("Setting user root Dir ID.");
+
         if try!(self.account.as_mut().ok_or(CoreError::OperationForbiddenForClient))
             .set_user_root_dir_id(root_dir_id) {
             self.update_session_packet()
@@ -259,6 +278,8 @@ impl Client {
     pub fn set_configuration_root_directory_id(&mut self,
                                                root_dir_id: XorName)
                                                -> Result<(), CoreError> {
+        trace!("Setting configuration root Dir ID.");
+
         if try!(self.account.as_mut().ok_or(CoreError::OperationForbiddenForClient))
             .set_maidsafe_config_root_dir_id(root_dir_id) {
             self.update_session_packet()
@@ -334,11 +355,14 @@ impl Client {
                request_for: DataIdentifier,
                opt_dst: Option<Authority>)
                -> Result<GetResponseGetter, CoreError> {
+        trace!("GET for {:?}", request_for);
+
         self.issued_gets += 1;
 
         if let DataIdentifier::Immutable(..) = request_for {
             let mut msg_queue = unwrap!(self.message_queue.lock());
             if msg_queue.local_cache_check(request_for.name()) {
+                trace!("ImmutableData found in cache.");
                 return Ok(GetResponseGetter::new(None, self.message_queue.clone(), request_for));
             }
         }
@@ -362,6 +386,8 @@ impl Client {
                data: Data,
                opt_dst: Option<Authority>)
                -> Result<MutationResponseGetter, CoreError> {
+        trace!("PUT for {:?}", data);
+
         self.issued_puts += 1;
 
         let dst = match opt_dst {
@@ -384,6 +410,8 @@ impl Client {
                        data: Data,
                        opt_dst: Option<Authority>)
                        -> Result<(), CoreError> {
+        trace!("PUT with recovery for {:?}", data);
+
         let data_owners = match data {
             Data::Structured(ref sd) => sd.get_owner_keys().clone(),
             _ => {
@@ -405,30 +433,34 @@ impl Client {
             Err(e) => e,
         };
 
+        debug!("PUT of StructuredData failed with {:?}. Attempting recovery.",
+               put_err);
+
         if let CoreError::MutationFailure { reason: MutationError::LowBalance, .. } = put_err {
+            debug!("Low balance error cannot be recovered from.");
             return Err(put_err);
         }
-
-        debug!("Put failed: {:?}. Trying to recover...", put_err);
 
         match unwrap!(client.lock()).get(data_id, opt_dst) {
             Err(_) => Err(put_err),
             Ok(getter) => {
                 match getter.get() {
-                    Err(_) => {
-                        debug!("Address space is vacant but unable to PUT one");
+                    Err(e) => {
+                        debug!("Address space is vacant but still unable to PUT due to {:?}.",
+                               e);
                         Err(put_err)
                     }
                     Ok(Data::Structured(ref sd)) => {
                         if *sd.get_owner_keys() == data_owners {
+                            debug!("PUT recovery successful !");
                             Ok(())
                         } else {
-                            debug!("Data exists but we are not the owner");
+                            debug!("StructuredData exists but we are not the owner.");
                             Err(put_err)
                         }
                     }
                     Ok(data) => {
-                        debug!("Address space already occupied by: {:?}", data);
+                        debug!("Address space already occupied by: {:?}.", data);
                         Err(put_err)
                     }
                 }
@@ -441,6 +473,8 @@ impl Client {
                 data: Data,
                 opt_dst: Option<Authority>)
                 -> Result<MutationResponseGetter, CoreError> {
+        trace!("POST for {:?}", data);
+
         self.issued_posts += 1;
 
         let dst = match opt_dst {
@@ -462,6 +496,8 @@ impl Client {
                   data: Data,
                   opt_dst: Option<Authority>)
                   -> Result<MutationResponseGetter, CoreError> {
+        trace!("DELETE for {:?}", data);
+
         self.issued_deletes += 1;
 
         let dst = match opt_dst {
@@ -484,11 +520,19 @@ impl Client {
                           data: Data,
                           opt_dst: Option<Authority>)
                           -> Result<(), CoreError> {
+        trace!("DELETE with recovery for {:?}", data);
+
         let resp_getter = try!(unwrap!(client.lock()).delete(data, opt_dst));
         match resp_getter.get() {
             Ok(()) |
-            Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => Ok(()),
-            Err(e) => Err(e),
+            Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => {
+                debug!("DELETE recovery successful !");
+                Ok(())
+            }
+            Err(e) => {
+                debug!("Recovery failed: {:?}", e);
+                Err(e)
+            }
         }
     }
 
@@ -496,6 +540,8 @@ impl Client {
     pub fn get_account_info(&mut self,
                             opt_dst: Option<Authority>)
                             -> Result<GetAccountInfoResponseGetter, CoreError> {
+        trace!("Account info GET issued.");
+
         let dst = match opt_dst {
             Some(auth) => auth,
             None => Authority::ClientManager(*try!(self.get_default_client_manager_address())),
@@ -659,6 +705,8 @@ impl Client {
     }
 
     fn update_session_packet(&mut self) -> Result<(), CoreError> {
+        trace!("Updating session packet.");
+
         let session_packet_id = *try!(self.session_packet_id
             .as_ref()
             .ok_or(CoreError::OperationForbiddenForClient));
