@@ -27,6 +27,8 @@ pub struct DeleteDir {
 
 impl Action for DeleteDir {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON delete dir, given the path.");
+
         let mut tokens = helper::tokenise_path(&self.dir_path, false);
         let dir_helper = DirectoryHelper::new(params.client.clone());
         let dir_to_delete = try!(tokens.pop().ok_or(FfiError::InvalidPath));

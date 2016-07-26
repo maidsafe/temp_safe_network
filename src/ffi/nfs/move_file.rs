@@ -36,6 +36,8 @@ impl MoveFile {
                               shared: bool,
                               path: &str)
                               -> Result<(DirectoryListing, String), FfiError> {
+        trace!("Get source file.");
+
         let start_dir_key = if shared {
             try!(params.clone()
                 .safe_drive_dir_key
@@ -59,6 +61,8 @@ impl MoveFile {
                      shared: bool,
                      path: &str)
                      -> Result<DirectoryListing, FfiError> {
+        trace!("Get destination directory.");
+
         let start_dir_key = if shared {
             try!(params.clone()
                 .safe_drive_dir_key
@@ -76,6 +80,10 @@ impl MoveFile {
 
 impl Action for MoveFile {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON move file, from {:?} to {:?}.",
+               self.src_path,
+               self.dest_path);
+
         if (self.is_src_path_shared || self.is_dest_path_shared) && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }

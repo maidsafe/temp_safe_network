@@ -33,6 +33,10 @@ pub struct GetFile {
 
 impl Action for GetFile {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON get file located at given path starting from home directory of \"//{}.{}\".",
+               self.service_name,
+               self.long_name);
+
         let dns_operations = match params.app_root_dir_key {
             Some(_) => try!(DnsOperations::new(params.client.clone())),
             None => DnsOperations::new_unregistered(params.client.clone()),

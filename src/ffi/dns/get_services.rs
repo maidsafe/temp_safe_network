@@ -26,6 +26,9 @@ pub struct GetServices {
 
 impl Action for GetServices {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON Get all services for dns with name: {}",
+               self.long_name);
+
         let dns_ops = try!(DnsOperations::new(params.client));
         let list = try!(dns_ops.get_all_services(&self.long_name, None));
 

@@ -32,6 +32,8 @@ pub struct GetFileWriter {
 impl GetFileWriter {
     #[allow(unsafe_code)]
     pub fn get(&mut self, params: ParameterPacket) -> Result<FfiWriterHandle, FfiError> {
+        trace!("JSON get file writer, given the path.");
+
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }

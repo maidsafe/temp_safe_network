@@ -27,6 +27,7 @@ pub struct GetFileMetadata {
 
 impl Action for GetFileMetadata {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON get file metadata, given the path.");
 
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);

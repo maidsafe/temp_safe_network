@@ -21,8 +21,11 @@ macro_rules! ffi_try {
             Ok(value)  => value,
             Err(error) => {
                 let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-                error!("\n\n {}\n| {:?}\n {}\n\n", decorator, error, decorator);
-                return error.into()
+                let err_str = format!("{:?}", error);
+                let err_code = error.into();
+                info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
+                      decorator, err_code, err_str, decorator);
+                return err_code
             },
         }
     }
@@ -34,8 +37,11 @@ macro_rules! ffi_ptr_try {
             Ok(value)  => value,
             Err(error) => {
                 let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-                error!("\n\n {}\n| {:?}\n {}\n\n", decorator, error, decorator);
-                ::std::ptr::write($out, error.into());
+                let err_str = format!("{:?}", error);
+                let err_code = error.into();
+                info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
+                      decorator, err_code, err_str, decorator);
+                ::std::ptr::write($out, err_code);
                 return ::std::ptr::null();
             },
         }

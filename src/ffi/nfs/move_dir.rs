@@ -53,6 +53,10 @@ impl MoveDirectory {
 
 impl Action for MoveDirectory {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON move directory, from {:?} to {:?}.",
+               self.src_path,
+               self.dest_path);
+
         if (self.is_src_path_shared || self.is_dest_path_shared) && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }

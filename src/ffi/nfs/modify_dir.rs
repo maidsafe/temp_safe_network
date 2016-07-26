@@ -30,6 +30,8 @@ impl Action for ModifyDir {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
         use rustc_serialize::base64::FromBase64;
 
+        trace!("JSON modify directory, given the path.");
+
         if !(self.new_values.name.is_some() || self.new_values.user_metadata.is_some()) {
             return Err(FfiError::from("Optional parameters could not be parsed"));
         }

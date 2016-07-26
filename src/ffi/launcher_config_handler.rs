@@ -58,6 +58,9 @@ impl ConfigHandler {
             .map(|config| config) {
             Some(config) => config.app_root_dir_key.clone(),
             None => {
+                trace!("App's exclusive directory is not mapped inside Launcher's config. This \
+                        must imply it's not present inside user-root-dir also - creating one.");
+
                 let dir_helper = DirectoryHelper::new(self.client.clone());
                 let mut root_dir_listing = try!(dir_helper.get_user_root_directory_listing());
                 let app_dir_name = self.get_app_dir_name(&app_name, &root_dir_listing);
@@ -90,11 +93,11 @@ impl ConfigHandler {
     }
 
     fn get_app_dir_name(&self, app_name: &str, directory_listing: &DirectoryListing) -> String {
-        let mut dir_name = format!("{}-Root-Dir", &app_name);
+        let mut dir_name = format!("{}-Root-Dir", app_name);
         if directory_listing.find_sub_directory(&dir_name).is_some() {
             let mut index = 1u8;
             loop {
-                dir_name = format!("{}-{}-Root-Dir", &app_name, index);
+                dir_name = format!("{}-{}-Root-Dir", app_name, index);
                 if directory_listing.find_sub_directory(&dir_name).is_some() {
                     index += 1;
                 } else {
@@ -109,6 +112,8 @@ impl ConfigHandler {
     fn upsert_to_launcher_global_config(&self,
                                         config: LauncherConfiguration)
                                         -> Result<(), FfiError> {
+        trace!("Update (by overwriting) Launcher's config file by appending a new config.");
+
         let (mut global_configs, dir_listing) = try!(self.get_launcher_global_config_and_dir());
 
         // (Spandan)
@@ -142,6 +147,8 @@ impl ConfigHandler {
     fn get_launcher_global_config_and_dir
         (&self)
          -> Result<(Vec<LauncherConfiguration>, DirectoryListing), FfiError> {
+        trace!("Get Launcher's config directory.");
+
         let dir_helper = DirectoryHelper::new(self.client.clone());
         let mut dir_listing = try!(dir_helper.get_configuration_directory_listing(
             LAUNCHER_GLOBAL_DIRECTORY_NAME.to_string()));
@@ -154,6 +161,9 @@ impl ConfigHandler {
                 .cloned() {
                 Some(file) => file,
                 None => {
+                    trace!("Launcher's config file does not exist inside it's config dir - \
+                            creating one.");
+
                     dir_listing =
                         try!(try!(file_helper.create(LAUNCHER_GLOBAL_CONFIG_FILE_NAME.to_string(),
                                             Vec::new(),

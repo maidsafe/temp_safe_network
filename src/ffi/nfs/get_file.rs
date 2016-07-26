@@ -33,6 +33,8 @@ impl Action for GetFile {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
         use rustc_serialize::json::ToJson;
 
+        trace!("JSON get file, given the path.");
+
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }

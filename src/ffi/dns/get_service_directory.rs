@@ -27,6 +27,10 @@ pub struct GetServiceDirectory {
 
 impl Action for GetServiceDirectory {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON Get service home directory for \"//{}.{}\".",
+               self.service_name,
+               self.long_name);
+
         let dns_operations = match params.app_root_dir_key {
             Some(_) => try!(DnsOperations::new(params.client.clone())),
             None => DnsOperations::new_unregistered(params.client.clone()),

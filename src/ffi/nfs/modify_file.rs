@@ -31,6 +31,8 @@ impl Action for ModifyFile {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
         use rustc_serialize::base64::FromBase64;
 
+        trace!("JSON modify file, given the path.");
+
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }
