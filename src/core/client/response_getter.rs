@@ -73,7 +73,7 @@ impl GetResponseGetter {
 
                     Ok(data)
                 }
-                ResponseEvent::Terminated => Err(CoreError::OperationAborted),
+                ResponseEvent::Terminated => Err(CoreError::RequestTimeout),
                 _ => Err(CoreError::ReceivedUnexpectedData),
             }
         } else {
