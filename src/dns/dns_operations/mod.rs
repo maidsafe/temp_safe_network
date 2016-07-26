@@ -68,7 +68,8 @@ impl DnsOperations {
                                                       &box_::SecretKey,
                                                       &box_::Nonce)>)
                         -> Result<(), DnsError> {
-        debug!("Registering {:?} dns ...", long_name);
+        trace!("Registering dns with name: {}", long_name);
+
         let mut saved_configs = try!(dns_configuration::get_dns_configuration_data(self.client
             .clone()));
         if saved_configs.iter().any(|config| config.long_name == long_name) {
@@ -99,7 +100,7 @@ impl DnsOperations {
                 Err(err) => return Err(From::from(err)),
             }
 
-            debug!("Adding encryption key pair to saved dns configuration ...");
+            trace!("Adding encryption key pair to the retrieved saved dns configuration.");
             saved_configs.push(dns_configuration::DnsConfiguration {
                 long_name: long_name,
                 encryption_keypair: (*public_messaging_encryption_key,
@@ -117,6 +118,8 @@ impl DnsOperations {
                       long_name: &str,
                       private_signing_key: &sign::SecretKey)
                       -> Result<(), DnsError> {
+        trace!("Deleting dns with name: {}", long_name);
+
         let mut saved_configs = try!(dns_configuration::get_dns_configuration_data(self.client
             .clone()));
         let pos = try!(saved_configs.iter()
@@ -146,7 +149,7 @@ impl DnsOperations {
             Err(e) => return Err(e),
         };
 
-        debug!("Removing dns saved configs at {:?} position ...", pos);
+        trace!("Removing dns entry from the retrieved saved config.");
         let _ = saved_configs.remove(pos);
         try!(dns_configuration::write_dns_configuration_data(self.client.clone(), &saved_configs));
 
@@ -155,6 +158,8 @@ impl DnsOperations {
 
     /// Get all the Dns-names registered by the user so far in the network.
     pub fn get_all_registered_names(&self) -> Result<Vec<String>, DnsError> {
+        trace!("Get all dns long names that we own.");
+
         dns_configuration::get_dns_configuration_data(self.client.clone())
             .map(|v| v.iter().map(|a| a.long_name.clone()).collect())
     }
@@ -165,6 +170,9 @@ impl DnsOperations {
         (&self,
          long_name: &str)
          -> Result<(box_::PublicKey, box_::SecretKey), DnsError> {
+        trace!("Get messaging encryption keys for owned dns with name: {}",
+               long_name);
+
         let dns_config_record = try!(self.find_dns_record(long_name));
         Ok(dns_config_record.encryption_keypair.clone())
     }
@@ -177,6 +185,8 @@ impl DnsOperations {
                                                           &box_::SecretKey,
                                                           &box_::Nonce)>)
                             -> Result<Vec<String>, DnsError> {
+        trace!("Get all services for the dns with name: {}", long_name);
+
         let (_, dns_record) =
             try!(self.get_housing_structured_data_and_dns_record(long_name, data_decryption_keys));
         Ok(dns_record.services.keys().cloned().collect())
@@ -191,6 +201,11 @@ impl DnsOperations {
                                                                         &box_::SecretKey,
                                                                         &box_::Nonce)>)
                                           -> Result<DirectoryKey, DnsError> {
+        trace!("Get service home directory key (to locate the home directory on SAFE Network) \
+                for \"//{}.{}\".",
+               service_name,
+               long_name);
+
         let (_, dns_record) =
             try!(self.get_housing_structured_data_and_dns_record(long_name, data_decryption_keys));
         dns_record.services
@@ -208,6 +223,10 @@ impl DnsOperations {
                                                                 &box_::SecretKey,
                                                                 &box_::Nonce)>)
                        -> Result<(), DnsError> {
+        trace!("Add service {:?} to dns with name: {}",
+               new_service,
+               long_name);
+
         self.add_remove_service_impl(long_name,
                                      (new_service.0, Some(new_service.1)),
                                      private_signing_key,
@@ -223,6 +242,10 @@ impl DnsOperations {
                                                                    &box_::SecretKey,
                                                                    &box_::Nonce)>)
                           -> Result<(), DnsError> {
+        trace!("Remove service {:?} from dns with name: {}",
+               service_to_remove,
+               long_name);
+
         self.add_remove_service_impl(long_name,
                                      (service_to_remove, None),
                                      private_signing_key,
@@ -302,10 +325,11 @@ impl DnsOperations {
     }
 
     fn get_housing_structured_data(&self, long_name: &str) -> Result<StructuredData, DnsError> {
+        trace!("Fetch capsule from network for dns with name: {}",
+               long_name);
+
         let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
         let request = DataIdentifier::Structured(identifier, TYPE_TAG_DNS_PACKET);
-        debug!("Retrieving structured data from network for {:?} dns ...",
-               long_name);
         let response_getter = try!(unwrap!(self.client.lock()).get(request, None));
         if let Data::Structured(struct_data) = try!(response_getter.get()) {
             Ok(struct_data)
