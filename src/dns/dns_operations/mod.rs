@@ -23,7 +23,6 @@ use core::errors::CoreError;
 use core::structured_data_operations::unversioned;
 use dns::errors::DnsError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::errors::NfsError;
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::{Data, DataIdentifier, StructuredData, XorName};
 use safe_network_common::client_errors::{GetError, MutationError};
@@ -178,15 +177,6 @@ impl DnsOperations {
                                                           &box_::SecretKey,
                                                           &box_::Nonce)>)
                             -> Result<Vec<String>, DnsError> {
-        // Allow unregistered clients to access this function
-        match self.find_dns_record(long_name) {
-            Ok(_) |
-            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) |
-            Err(DnsError::NfsError(NfsError::CoreError(
-                CoreError::OperationForbiddenForClient))) => (),
-            Err(error) => return Err(error),
-        };
-
         let (_, dns_record) =
             try!(self.get_housing_structured_data_and_dns_record(long_name, data_decryption_keys));
         Ok(dns_record.services.keys().cloned().collect())
@@ -201,15 +191,6 @@ impl DnsOperations {
                                                                         &box_::SecretKey,
                                                                         &box_::Nonce)>)
                                           -> Result<DirectoryKey, DnsError> {
-        // Allow unregistered clients to access this function
-        match self.find_dns_record(long_name) {
-            Ok(_) |
-            Err(DnsError::CoreError(CoreError::OperationForbiddenForClient)) |
-            Err(DnsError::NfsError(NfsError::CoreError(
-                CoreError::OperationForbiddenForClient))) |
-            Err(DnsError::DnsRecordNotFound) => (),
-            Err(error) => return Err(error),
-        };
         let (_, dns_record) =
             try!(self.get_housing_structured_data_and_dns_record(long_name, data_decryption_keys));
         dns_record.services
