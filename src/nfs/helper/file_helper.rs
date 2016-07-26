@@ -53,6 +53,8 @@ impl FileHelper {
                   user_metatdata: Vec<u8>,
                   parent_directory: DirectoryListing)
                   -> Result<Writer, NfsError> {
+        trace!("Creating file with name: {}", name);
+
         match parent_directory.find_file(&name) {
             Some(_) => Err(NfsError::FileAlreadyExistsWithSameName),
             None => {
@@ -72,7 +74,8 @@ impl FileHelper {
                   file_name: String,
                   parent_directory: &mut DirectoryListing)
                   -> Result<Option<DirectoryListing>, NfsError> {
-        debug!("Deleting {:?} file from directory listing ...", file_name);
+        trace!("Deleting file with name {}.", file_name);
+
         try!(parent_directory.remove_file(&file_name));
         let directory_helper = DirectoryHelper::new(self.client.clone());
         directory_helper.update(parent_directory)
@@ -84,6 +87,8 @@ impl FileHelper {
                            file: File,
                            parent_directory: &mut DirectoryListing)
                            -> Result<Option<DirectoryListing>, NfsError> {
+        trace!("Updating metadata for file.");
+
         {
             let existing_file = try!(parent_directory.find_file_by_id(file.get_id())
                 .ok_or(NfsError::FileNotFound));
@@ -107,6 +112,8 @@ impl FileHelper {
                           mode: Mode,
                           parent_directory: DirectoryListing)
                           -> Result<Writer, NfsError> {
+        trace!("Updating content in file with name {}", file.get_name());
+
         {
             let existing_file = try!(parent_directory.find_file(file.get_name())
                 .ok_or(NfsError::FileNotFound));
@@ -127,6 +134,8 @@ impl FileHelper {
                         file: &File,
                         parent_directory: &DirectoryListing)
                         -> Result<Vec<File>, NfsError> {
+        trace!("Getting versions of a file with name {}", file.get_name());
+
         let mut versions = Vec::<File>::new();
         let directory_helper = DirectoryHelper::new(self.client.clone());
 
@@ -156,6 +165,7 @@ impl FileHelper {
 
     /// Returns a reader for reading the file contents
     pub fn read<'a>(&'a mut self, file: &'a File) -> Result<Reader<'a>, NfsError> {
+        trace!("Reading file with name: {}", file.get_name());
         Reader::new(self.client.clone(), &mut self.storage, file)
     }
 }

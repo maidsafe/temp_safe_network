@@ -47,12 +47,15 @@ impl<'a> Reader<'a> {
 
     /// Returns the total size of the file/blob
     pub fn size(&self) -> u64 {
-        debug!("Retrieving file length ...");
         self.self_encryptor.len()
     }
 
     /// Read data from file/blob
     pub fn read(&mut self, position: u64, length: u64) -> Result<Vec<u8>, NfsError> {
+        trace!("Reader reading from pos: {} and size: {}.",
+               position,
+               length);
+
         if (position + length) > self.size() {
             Err(NfsError::InvalidRangeSpecified)
         } else {

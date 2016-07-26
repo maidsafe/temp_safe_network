@@ -65,7 +65,8 @@ impl<'a> Writer<'a> {
 
     /// Data of a file/blob can be written in smaller chunks
     pub fn write(&mut self, data: &[u8]) -> Result<(), NfsError> {
-        debug!("Writing file data...");
+        trace!("Writer writing file data of size {} into self-encryptor.",
+               data.len());
         Ok(try!(self.self_encryptor.write(data)))
     }
 
@@ -80,6 +81,7 @@ impl<'a> Writer<'a> {
         let size = self.self_encryptor.len();
 
         file.set_datamap(try!(self.self_encryptor.close()));
+        trace!("Writer induced self-encryptor close.");
 
         file.get_mut_metadata().set_modified_time(::time::now_utc());
         file.get_mut_metadata().set_size(size);
