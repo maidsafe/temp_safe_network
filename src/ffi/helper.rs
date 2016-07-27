@@ -44,12 +44,16 @@ pub fn tokenise_path(path: &str, keep_empty_splits: bool) -> Vec<String> {
 }
 
 pub fn get_safe_drive_key(client: Arc<Mutex<Client>>) -> Result<DirectoryKey, FfiError> {
+    trace!("Obtain directory key for SAFEDrive - This can be cached for efficiency. So if this \
+            is seen many times, check for missed optimisation opportunity.");
+
     let safe_drive_dir_name = SAFE_DRIVE_DIR_NAME.to_string();
     let dir_helper = DirectoryHelper::new(client);
     let mut root_dir = try!(dir_helper.get_user_root_directory_listing());
     let dir_metadata = match root_dir.find_sub_directory(&safe_drive_dir_name).cloned() {
         Some(metadata) => metadata,
         None => {
+            trace!("SAFEDrive does not exist - creating one.");
             let (created_dir, _) = try!(dir_helper.create(safe_drive_dir_name,
                                                           UNVERSIONED_DIRECTORY_LISTING_TAG,
                                                           Vec::new(),
@@ -68,14 +72,24 @@ pub fn get_final_subdirectory(client: Arc<Mutex<Client>>,
                               tokens: &[String],
                               starting_directory: Option<&DirectoryKey>)
                               -> Result<DirectoryListing, FfiError> {
+    trace!("Traverse directory tree to get the final subdirectory.");
+
     let dir_helper = DirectoryHelper::new(client);
 
     let mut current_dir_listing = match starting_directory {
-        Some(directory_key) => try!(dir_helper.get(directory_key)),
-        None => try!(dir_helper.get_user_root_directory_listing()),
+        Some(directory_key) => {
+            trace!("Traversal begins at given starting directory.");
+            try!(dir_helper.get(directory_key))
+        }
+        None => {
+            trace!("Traversal begins at user-root-directory.");
+            try!(dir_helper.get_user_root_directory_listing())
+        }
     };
 
     for it in tokens.iter() {
+        trace!("Traversing to dir with name: {}", *it);
+
         current_dir_listing = {
             let current_dir_metadata = try!(current_dir_listing.get_sub_directories()
                 .iter()

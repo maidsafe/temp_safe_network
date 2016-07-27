@@ -53,6 +53,8 @@ impl FileHelper {
                   user_metatdata: Vec<u8>,
                   parent_directory: DirectoryListing)
                   -> Result<Writer, NfsError> {
+        trace!("Creating file with name: {}", name);
+
         match parent_directory.find_file(&name) {
             Some(_) => Err(NfsError::FileAlreadyExistsWithSameName),
             None => {
@@ -72,8 +74,9 @@ impl FileHelper {
                   file_name: String,
                   parent_directory: &mut DirectoryListing)
                   -> Result<Option<DirectoryListing>, NfsError> {
-        debug!("Deleting {:?} file from directory listing ...", file_name);
-        try!(parent_directory.remove_file(&file_name));
+        trace!("Deleting file with name {}.", file_name);
+
+        let _ = try!(parent_directory.remove_file(&file_name));
         let directory_helper = DirectoryHelper::new(self.client.clone());
         directory_helper.update(parent_directory)
     }
@@ -84,6 +87,8 @@ impl FileHelper {
                            file: File,
                            parent_directory: &mut DirectoryListing)
                            -> Result<Option<DirectoryListing>, NfsError> {
+        trace!("Updating metadata for file.");
+
         {
             let existing_file = try!(parent_directory.find_file_by_id(file.get_id())
                 .ok_or(NfsError::FileNotFound));
@@ -107,6 +112,8 @@ impl FileHelper {
                           mode: Mode,
                           parent_directory: DirectoryListing)
                           -> Result<Writer, NfsError> {
+        trace!("Updating content in file with name {}", file.get_name());
+
         {
             let existing_file = try!(parent_directory.find_file(file.get_name())
                 .ok_or(NfsError::FileNotFound));
@@ -127,6 +134,8 @@ impl FileHelper {
                         file: &File,
                         parent_directory: &DirectoryListing)
                         -> Result<Vec<File>, NfsError> {
+        trace!("Getting versions of a file with name {}", file.get_name());
+
         let mut versions = Vec::<File>::new();
         let directory_helper = DirectoryHelper::new(self.client.clone());
 
@@ -156,6 +165,7 @@ impl FileHelper {
 
     /// Returns a reader for reading the file contents
     pub fn read<'a>(&'a mut self, file: &'a File) -> Result<Reader<'a>, NfsError> {
+        trace!("Reading file with name: {}", file.get_name());
         Reader::new(self.client.clone(), &mut self.storage, file)
     }
 }
@@ -187,10 +197,12 @@ mod test {
                     None));
         let mut file_helper = FileHelper::new(client.clone());
         let file_name = "hello.txt".to_string();
+
+        const ORIG_SIZE: usize = 100;
         {
             // create
             let mut writer = unwrap!(file_helper.create(file_name.clone(), Vec::new(), directory));
-            unwrap!(writer.write(&[0u8; 100], 0), "");
+            unwrap!(writer.write(&[0u8; ORIG_SIZE]), "");
             let (updated_directory, _) = unwrap!(writer.close());
             directory = updated_directory;
             assert!(directory.find_file(&file_name).is_some());
@@ -202,13 +214,15 @@ mod test {
             let size = reader.size();
             assert_eq!(unwrap!(reader.read(0, size)), vec![0u8; 100]);
         }
+
+        const NEW_SIZE: usize = 50;
         {
             // update - full rewrite
             let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
             {
                 let mut writer =
                     unwrap!(file_helper.update_content(file, Mode::Overwrite, directory));
-                unwrap!(writer.write(&[1u8; 50], 0), "");
+                unwrap!(writer.write(&[1u8; NEW_SIZE]));
                 let (updated_directory, _) = unwrap!(writer.close());
                 directory = updated_directory;
             }
@@ -217,12 +231,14 @@ mod test {
             let size = reader.size();
             assert_eq!(unwrap!(reader.read(0, size)), vec![1u8; 50]);
         }
+
+        const APPEND_SIZE: usize = 10;
         {
-            // update - partial rewrite
+            // update - should append (after S.E behaviour changed)
             let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
             {
                 let mut writer = unwrap!(file_helper.update_content(file, Mode::Modify, directory));
-                unwrap!(writer.write(&[2u8; 10], 0), "");
+                unwrap!(writer.write(&[2u8; APPEND_SIZE]));
                 let (updated_directory, _) = unwrap!(writer.close());
                 directory = updated_directory;
             }
@@ -230,8 +246,10 @@ mod test {
             let mut reader = unwrap!(file_helper.read(file), "");
             let size = reader.size();
             let data = unwrap!(reader.read(0, size));
-            assert_eq!(&data[0..10], [2u8; 10]);
-            assert_eq!(&data[10..20], [1u8; 10]);
+
+            assert_eq!(size, (NEW_SIZE + APPEND_SIZE) as u64);
+            assert_eq!(data[0..NEW_SIZE].to_owned(), vec![1u8; NEW_SIZE]);
+            assert_eq!(&data[NEW_SIZE..], [2u8; APPEND_SIZE]);
         }
         {
             // versions

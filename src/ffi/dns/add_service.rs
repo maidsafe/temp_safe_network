@@ -29,6 +29,8 @@ pub struct AddService {
 
 impl Action for AddService {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON add service.");
+
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }

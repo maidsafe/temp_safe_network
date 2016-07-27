@@ -27,6 +27,10 @@ pub struct GetServiceDirectory {
 
 impl Action for GetServiceDirectory {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON Get service home directory for \"//{}.{}\".",
+               self.service_name,
+               self.long_name);
+
         let dns_operations = match params.app_root_dir_key {
             Some(_) => try!(DnsOperations::new(params.client.clone())),
             None => DnsOperations::new_unregistered(params.client.clone()),
@@ -34,7 +38,6 @@ impl Action for GetServiceDirectory {
         let directory_key = try!(dns_operations.get_service_home_directory_key(&self.long_name,
                                                                                &self.service_name,
                                                                                None));
-        println!("Key {:?}", directory_key);
         let response = try!(directory_response::get_response(params.client, directory_key));
         Ok(Some(try!(::rustc_serialize::json::encode(&response))))
     }

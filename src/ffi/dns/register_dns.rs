@@ -30,6 +30,11 @@ pub struct RegisterDns {
 
 impl Action for RegisterDns {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON register dns with given service name as \"//{}.{}\" and associate the home \
+                directory path",
+               self.service_name,
+               self.long_name);
+
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }

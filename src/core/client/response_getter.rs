@@ -16,12 +16,17 @@
 // relating to use of the SAFE Network Software.
 
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
+use std::time::Duration;
 
 use core::client::message_queue::MessageQueue;
 use core::errors::CoreError;
 use core::translated_events::ResponseEvent;
+use maidsafe_utilities;
 use routing::{Data, DataIdentifier, XorName};
+
+const REQ_TIMEOUT_SECS: u64 = 120;
 
 // TODO - consider using template specialisation (if it becomes available) for these three structs
 //        which all do similar things.
@@ -53,7 +58,11 @@ impl GetResponseGetter {
     /// Get either from local cache or (if not available there) get it when it comes from the
     /// network as informed by MessageQueue. This is blocking.
     pub fn get(&self) -> Result<Data, CoreError> {
-        if let Some((_, ref data_receiver)) = self.data_channel {
+        if let Some((ref sender, ref data_receiver)) = self.data_channel {
+            let sender = sender.clone();
+            let (tx, rx) = mpsc::channel();
+            let _thread_canceller = ThreadCanceller(tx);
+            wait_canceller(sender, rx);
             match try!(data_receiver.recv()) {
                 ResponseEvent::GetResp(result) => {
                     let data = try!(result);
@@ -64,7 +73,7 @@ impl GetResponseGetter {
 
                     Ok(data)
                 }
-                ResponseEvent::Terminated => Err(CoreError::OperationAborted),
+                ResponseEvent::Terminated => Err(CoreError::RequestTimeout),
                 _ => Err(CoreError::ReceivedUnexpectedData),
             }
         } else {
@@ -99,11 +108,15 @@ impl GetAccountInfoResponseGetter {
     /// result are `(data_stored, space_available)`. `data_stored` means number of chunks Put.
     /// `space_available` means number of chunks which can still be Put.
     pub fn get(&self) -> Result<(u64, u64), CoreError> {
-        let (_, ref data_receiver) = self.data_channel;
+        let (ref sender, ref data_receiver) = self.data_channel;
+        let sender = sender.clone();
+        let (tx, rx) = mpsc::channel();
+        let _thread_canceller = ThreadCanceller(tx);
+        wait_canceller(sender, rx);
         let res = data_receiver.recv();
         match try!(res) {
             ResponseEvent::GetAccountInfoResp(result) => result,
-            ResponseEvent::Terminated => Err(CoreError::OperationAborted),
+            ResponseEvent::Terminated => Err(CoreError::RequestTimeout),
             _ => Err(CoreError::ReceivedUnexpectedData),
         }
     }
@@ -132,10 +145,14 @@ impl MutationResponseGetter {
 
     /// Get response when it comes from the network as informed by MessageQueue. This is blocking
     pub fn get(&self) -> Result<(), CoreError> {
-        let (_, ref data_receiver) = self.data_channel;
+        let (ref sender, ref data_receiver) = self.data_channel;
+        let sender = sender.clone();
+        let (tx, rx) = mpsc::channel();
+        let _thread_canceller = ThreadCanceller(tx);
+        wait_canceller(sender, rx);
         match try!(data_receiver.recv()) {
             ResponseEvent::MutationResp(result) => result,
-            ResponseEvent::Terminated => Err(CoreError::OperationAborted),
+            ResponseEvent::Terminated => Err(CoreError::RequestTimeout),
             _ => Err(CoreError::ReceivedUnexpectedData),
         }
     }
@@ -145,5 +162,27 @@ impl MutationResponseGetter {
     /// on `get()` fire `sender.send(ResponseEvent::Terminated)` to gracefully exit the receiver.
     pub fn get_sender(&self) -> &Sender<ResponseEvent> {
         &self.data_channel.0
+    }
+}
+
+fn wait_canceller(tx: Sender<ResponseEvent>, rx: Receiver<()>) {
+    maidsafe_utilities::thread::named("DetachedCanceller", move || {
+            const SLEEP_PER_ITER: u64 = 1;
+            for _ in 0..REQ_TIMEOUT_SECS {
+                if let Ok(()) = rx.try_recv() {
+                    return;
+                }
+                thread::sleep(Duration::from_secs(SLEEP_PER_ITER));
+            }
+            debug!("Response has timed out - firing wait canceller.");
+            let _ = tx.send(ResponseEvent::Terminated);
+        })
+        .detach();
+}
+
+struct ThreadCanceller(Sender<()>);
+impl Drop for ThreadCanceller {
+    fn drop(&mut self) {
+        let _ = self.0.send(());
     }
 }

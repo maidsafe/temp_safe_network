@@ -27,6 +27,8 @@ pub struct GetDir {
 
 impl Action for GetDir {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON get dir, given the path.");
+
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }

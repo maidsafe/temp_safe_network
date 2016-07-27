@@ -86,6 +86,8 @@ pub enum CoreError {
     },
     /// Error while self-encrypting data
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
+    /// The request has timed out
+    RequestTimeout,
 }
 
 impl<'a> From<&'a str> for CoreError {
@@ -185,12 +187,12 @@ impl Into<i32> for CoreError {
             CoreError::MutationFailure { reason: MutationError::NetworkFull, .. } => {
                 CLIENT_ERROR_START_RANGE - 27
             }
-            CoreError::SelfEncryption(SelfEncryptionError
-                                      ::Compression::<SelfEncryptionStorageError>) => {
+            CoreError::SelfEncryption(
+                SelfEncryptionError::Compression::<SelfEncryptionStorageError>) => {
                 CLIENT_ERROR_START_RANGE - 28
             }
-            CoreError::SelfEncryption(SelfEncryptionError
-                                      ::Decryption::<SelfEncryptionStorageError>) => {
+            CoreError::SelfEncryption(
+                SelfEncryptionError::Decryption::<SelfEncryptionStorageError>) => {
                 CLIENT_ERROR_START_RANGE - 29
             }
             CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
@@ -200,6 +202,7 @@ impl Into<i32> for CoreError {
                 CLIENT_ERROR_START_RANGE - 31
             }
             CoreError::GetAccountInfoFailure { .. } => CLIENT_ERROR_START_RANGE - 32,
+            CoreError::RequestTimeout => CLIENT_ERROR_START_RANGE - 33,
             CoreError::SelfEncryption(SelfEncryptionError
                                       ::Storage
                                       ::<SelfEncryptionStorageError>(
@@ -258,24 +261,25 @@ impl Debug for CoreError {
             }
             CoreError::GetFailure { ref data_id, ref reason } => {
                 write!(formatter,
-                       "CoreError::GetFailure::{{ reason: {:?}, data_id: {:?} }}",
+                       "CoreError::GetFailure::{{ reason: {:?}, data_id: {:?}}}",
                        reason,
                        data_id)
             }
             CoreError::GetAccountInfoFailure { ref reason } => {
                 write!(formatter,
-                       "CoreError::GetAccountInfoFailure::{{ reason: {:?} }}",
+                       "CoreError::GetAccountInfoFailure::{{ reason: {:?}}}",
                        reason)
             }
             CoreError::MutationFailure { ref data_id, ref reason } => {
                 write!(formatter,
-                       "CoreError::MutationFailure::{{ reason: {:?}, data_id: {:?} }}",
+                       "CoreError::MutationFailure::{{ reason: {:?}, data_id: {:?}}}",
                        reason,
                        data_id)
             }
             CoreError::SelfEncryption(ref error) => {
                 write!(formatter, "CoreError::SelfEncryption -> {:?}", error)
             }
+            CoreError::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
         }
     }
 }
@@ -350,6 +354,7 @@ impl Display for CoreError {
             CoreError::SelfEncryption(ref error) => {
                 write!(formatter, "Self-encryption error: {}", error)
             }
+            CoreError::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
         }
     }
 }
@@ -379,6 +384,7 @@ impl Error for CoreError {
             CoreError::GetAccountInfoFailure { ref reason } => reason.description(),
             CoreError::MutationFailure { ref reason, .. } => reason.description(),
             CoreError::SelfEncryption(ref error) => error.description(),
+            CoreError::RequestTimeout => "Request has timed out",
         }
     }
 

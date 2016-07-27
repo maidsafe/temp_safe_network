@@ -33,6 +33,8 @@ impl Action for GetFile {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
         use rustc_serialize::json::ToJson;
 
+        trace!("JSON get file, given the path.");
+
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }
@@ -81,7 +83,7 @@ mod test {
         let mut writer =
             unwrap!(file_helper.create(TEST_FILE_NAME.to_string(), Vec::new(), app_root_dir));
         let data = vec![10u8; 20];
-        unwrap!(writer.write(&data[..], 0));
+        unwrap!(writer.write(&data[..]));
         let _ = unwrap!(writer.close());
     }
 

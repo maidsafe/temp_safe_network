@@ -33,6 +33,8 @@ impl Action for CreateDir {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
         use rustc_serialize::base64::FromBase64;
 
+        trace!("JSON create directory, given the path.");
+
         if self.is_path_shared && !params.safe_drive_access {
             return Err(FfiError::PermissionDenied);
         }

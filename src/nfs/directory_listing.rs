@@ -101,19 +101,22 @@ impl DirectoryListing {
                    directory_id: &XorName,
                    data: Vec<u8>)
                    -> Result<DirectoryListing, NfsError> {
+        trace!("Self-decrypting directory listing.");
+
         let decrypted_data_map = try!(unwrap!(client.lock())
             .hybrid_decrypt(&data, Some(&DirectoryListing::generate_nonce(directory_id))));
         let data_map: DataMap = try!(deserialise(&decrypted_data_map));
         let mut storage = SelfEncryptionStorage::new(client.clone());
         let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
         let length = self_encryptor.len();
-        debug!("Reading encrypted storage of length {:?} ...", length);
         let serialised_directory_listing = try!(self_encryptor.read(0, length));
         Ok(try!(deserialise(&serialised_directory_listing)))
     }
 
     /// Encrypts the directory listing
     pub fn encrypt(&self, client: Arc<Mutex<Client>>) -> Result<Vec<u8>, NfsError> {
+        trace!("Self-encrypting directory listing.");
+
         let serialised_data = try!(serialise(&self));
         let mut storage = SelfEncryptionStorage::new(client.clone());
         let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, DataMap::None));
@@ -160,11 +163,9 @@ impl DirectoryListing {
         //             |entry| *entry.get_name() == *file.get_name()) {
         //         *existing_file = file;
         if let Some(index) = self.files.iter().position(|entry| *entry.get_id() == *file.get_id()) {
-            debug!("Replacing file in directory listing ...");
             let mut existing = unwrap!(self.files.get_mut(index));
             *existing = file;
         } else {
-            debug!("Adding file to directory listing ...");
             self.files.push(file);
         }
         self.get_mut_metadata().set_modified_time(modified_time)
@@ -177,36 +178,33 @@ impl DirectoryListing {
         if let Some(index) = self.sub_directories
             .iter()
             .position(|entry| *entry.get_key().get_id() == *directory_metadata.get_key().get_id()) {
-            debug!("Replacing directory listing metadata ...");
             let mut existing = unwrap!(self.sub_directories.get_mut(index));
             *existing = directory_metadata;
         } else {
-            debug!("Adding metadata to directory listing ...");
             self.sub_directories.push(directory_metadata);
         }
         self.get_mut_metadata().set_modified_time(modified_time);
     }
 
     /// Remove a sub_directory
-    pub fn remove_sub_directory(&mut self, directory_name: &str) -> Result<(), NfsError> {
+    pub fn remove_sub_directory(&mut self,
+                                directory_name: &str)
+                                -> Result<DirectoryMetadata, NfsError> {
         let index = try!(self.get_sub_directories()
             .iter()
             .position(|dir_info| *dir_info.get_name() == *directory_name)
             .ok_or(NfsError::DirectoryNotFound));
-        debug!("Removing sub directory at index {:?} ...", index);
-        let _ = self.get_mut_sub_directories().remove(index);
-        Ok(())
+        Ok(self.get_mut_sub_directories().remove(index))
+
     }
 
     /// Remove a file
-    pub fn remove_file(&mut self, file_name: &str) -> Result<(), NfsError> {
+    pub fn remove_file(&mut self, file_name: &str) -> Result<File, NfsError> {
         let index = try!(self.get_files()
             .iter()
             .position(|file| *file.get_name() == *file_name)
             .ok_or(NfsError::FileNotFound));
-        debug!("Removing file at index {:?} ...", index);
-        let _ = self.get_mut_files().remove(index);
-        Ok(())
+        Ok(self.get_mut_files().remove(index))
     }
 
     /// Generates a nonce based on the directory_id
@@ -290,12 +288,12 @@ mod test {
         let _ = unwrap!(directory_listing.find_file(file2.get_name()),
                         "File not found");
 
-        unwrap!(directory_listing.remove_file(file.get_metadata().get_name()));
+        let _ = unwrap!(directory_listing.remove_file(file.get_metadata().get_name()));
         assert!(directory_listing.find_file(file.get_name()).is_none());
         assert!(directory_listing.find_file(file2.get_name()).is_some());
         assert_eq!(directory_listing.get_files().len(), 1);
 
-        unwrap!(directory_listing.remove_file(file2.get_metadata().get_name()));
+        let _ = unwrap!(directory_listing.remove_file(file2.get_metadata().get_name()));
         assert_eq!(directory_listing.get_files().len(), 0);
     }
 
@@ -338,7 +336,7 @@ mod test {
                             .get_name()),
                         "Directory not found");
 
-        unwrap!(directory_listing.remove_sub_directory(sub_directory.get_metadata()
+        let _ = unwrap!(directory_listing.remove_sub_directory(sub_directory.get_metadata()
             .get_name()));
         assert!(directory_listing.find_sub_directory(sub_directory.get_metadata().get_name())
             .is_none());
@@ -346,7 +344,9 @@ mod test {
             .is_some());
         assert_eq!(directory_listing.get_sub_directories().len(), 1);
 
-        unwrap!(directory_listing.remove_sub_directory(
+        // TODO (Spandan) - Fetch and issue a DELETE on the removed directory, check elsewhere in
+        // code/test. Also check what can be done for file removals.
+        let _ = unwrap!(directory_listing.remove_sub_directory(
             sub_directory_two.get_metadata().get_name()));
         assert_eq!(directory_listing.get_sub_directories().len(), 0);
     }

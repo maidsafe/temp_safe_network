@@ -26,6 +26,10 @@ pub struct RegisterPublicId {
 
 impl Action for RegisterPublicId {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON register public-id with name: {}. This means to register dns without a \
+                given service.",
+               self.long_name);
+
         let (msg_public_key, msg_secret_key) = box_::gen_keypair();
         let services = vec![];
         let public_signing_key = *try!(unwrap!(params.client.lock()).get_public_signing_key());

@@ -23,6 +23,8 @@ pub struct GetLongNames;
 
 impl Action for GetLongNames {
     fn execute(&mut self, params: ParameterPacket) -> ResponseType {
+        trace!("JSON Get all dns long names.");
+
         let dns_ops = try!(DnsOperations::new(params.client));
         let list = try!(dns_ops.get_all_registered_names());
 

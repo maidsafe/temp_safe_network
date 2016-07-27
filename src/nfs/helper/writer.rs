@@ -23,7 +23,7 @@ use nfs::directory_listing::DirectoryListing;
 use nfs::errors::NfsError;
 use nfs::file::File;
 use nfs::helper::directory_helper::DirectoryHelper;
-use self_encryption::{DataMap, SelfEncryptor};
+use self_encryption::SequentialEncryptor;
 
 /// Mode of the writer
 pub enum Mode {
@@ -39,7 +39,7 @@ pub struct Writer<'a> {
     client: Arc<Mutex<Client>>,
     file: File,
     parent_directory: DirectoryListing,
-    self_encryptor: SelfEncryptor<'a, SelfEncryptionStorageError, SelfEncryptionStorage>,
+    self_encryptor: SequentialEncryptor<'a, SelfEncryptionStorageError, SelfEncryptionStorage>,
 }
 
 impl<'a> Writer<'a> {
@@ -51,22 +51,23 @@ impl<'a> Writer<'a> {
                file: File)
                -> Result<Writer<'a>, NfsError> {
         let data_map = match mode {
-            Mode::Modify => file.get_datamap().clone(),
-            Mode::Overwrite => DataMap::None,
+            Mode::Modify => Some(file.get_datamap().clone()),
+            Mode::Overwrite => None,
         };
 
         Ok(Writer {
             client: client.clone(),
             file: file,
             parent_directory: parent_directory,
-            self_encryptor: try!(SelfEncryptor::new(storage, data_map)),
+            self_encryptor: try!(SequentialEncryptor::new(storage, data_map)),
         })
     }
 
     /// Data of a file/blob can be written in smaller chunks
-    pub fn write(&mut self, data: &[u8], position: u64) -> Result<(), NfsError> {
-        debug!("Writing file data at position {:?} ...", position);
-        Ok(try!(self.self_encryptor.write(data, position)))
+    pub fn write(&mut self, data: &[u8]) -> Result<(), NfsError> {
+        trace!("Writer writing file data of size {} into self-encryptor.",
+               data.len());
+        Ok(try!(self.self_encryptor.write(data)))
     }
 
     /// close is invoked only after all the data is completely written
@@ -74,12 +75,13 @@ impl<'a> Writer<'a> {
     /// Returns the update DirectoryListing which owns the file and also the updated
     /// DirectoryListing of the file's parent
     /// Returns (files's parent_directory, Option<file's parent_directory's parent>)
-    pub fn close(self) -> Result<(DirectoryListing, Option<DirectoryListing>), NfsError> {
+    pub fn close(mut self) -> Result<(DirectoryListing, Option<DirectoryListing>), NfsError> {
         let mut file = self.file;
         let mut directory = self.parent_directory;
         let size = self.self_encryptor.len();
 
         file.set_datamap(try!(self.self_encryptor.close()));
+        trace!("Writer induced self-encryptor close.");
 
         file.get_mut_metadata().set_modified_time(::time::now_utc());
         file.get_mut_metadata().set_size(size);

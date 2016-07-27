@@ -121,6 +121,8 @@ pub struct FfiHandle {
 
 impl Drop for FfiHandle {
     fn drop(&mut self) {
+        debug!("FfiHandle is now being dropped.");
+
         if let Some(ref network_thread_terminator) = self.network_thread_terminator {
             let _ = network_thread_terminator.send(NetworkEvent::Terminated);
         }
@@ -143,6 +145,7 @@ pub extern "C" fn init_logging() -> int32_t {
 #[no_mangle]
 pub unsafe extern "C" fn create_unregistered_client(ffi_handle: *mut *mut FfiHandle) -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI create unregistered client.");
         *ffi_handle = cast_to_ffi_handle(ffi_try!(Client::create_unregistered_client()));
         0
     })
@@ -158,6 +161,8 @@ pub unsafe extern "C" fn create_account(c_account_locator: *const c_char,
                                         ffi_handle: *mut *mut FfiHandle)
                                         -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI create a client account.");
+
         let acc_locator = ffi_try!(helper::c_char_ptr_to_string(c_account_locator));
         let acc_password = ffi_try!(helper::c_char_ptr_to_string(c_account_password));
         let client = ffi_try!(Client::create_account(&acc_locator, &acc_password));
@@ -176,6 +181,8 @@ pub unsafe extern "C" fn log_in(c_account_locator: *const c_char,
                                 ffi_handle: *mut *mut FfiHandle)
                                 -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI login a registered client.");
+
         let acc_locator = ffi_try!(helper::c_char_ptr_to_string(c_account_locator));
         let acc_password = ffi_try!(helper::c_char_ptr_to_string(c_account_password));
         let client = ffi_try!(Client::log_in(&acc_locator, &acc_password));
@@ -191,6 +198,8 @@ pub unsafe extern "C" fn register_network_event_observer(ffi_handle: *mut FfiHan
                                                          callback: extern "C" fn(i32))
                                                          -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI register a network event observer.");
+
         let mut ffi_handle = Box::from_raw(ffi_handle);
 
         unwrap!(ffi_handle.network_event_observers.lock()).push(callback);
@@ -205,6 +214,7 @@ pub unsafe extern "C" fn register_network_event_observer(ffi_handle: *mut FfiHan
             let raii_joiner = thread::named("FfiNetworkEventObserver", move || {
                 while let Ok(event) = rx.recv() {
                     if let NetworkEvent::Terminated = event {
+                        trace!("FFI exiting the network event notifier thread.");
                         break;
                     }
                     let cbs = &*unwrap!(callbacks.lock());
@@ -238,8 +248,14 @@ pub unsafe extern "C" fn get_app_dir_key(c_app_name: *const c_char,
                                          ffi_handle: *mut FfiHandle)
                                          -> *const u8 {
     catch_unwind_ptr(|| {
+        trace!("FFI Get app dir key to locate app's exclusive dir on the SAFE Network.");
+
         let client = cast_from_ffi_handle(ffi_handle);
         let app_name: String = ffi_ptr_try!(helper::c_char_ptr_to_string(c_app_name), c_result);
+
+        trace!("FFI app dir key is being fetched for app with name: {}.",
+               app_name);
+
         let app_id: String = ffi_ptr_try!(helper::c_char_ptr_to_string(c_app_id), c_result);
         let vendor: String = ffi_ptr_try!(helper::c_char_ptr_to_string(c_vendor), c_result);
         let handler = launcher_config_handler::ConfigHandler::new(client);
@@ -266,6 +282,8 @@ pub unsafe extern "C" fn get_safe_drive_key(c_size: *mut int32_t,
                                             ffi_handle: *mut FfiHandle)
                                             -> *const u8 {
     catch_unwind_ptr(|| {
+        trace!("FFI Get safe-drive key to locate SAFEDrive on the SAFE Network.");
+
         let client = cast_from_ffi_handle(ffi_handle);
         let dir_key = ffi_ptr_try!(helper::get_safe_drive_key(client), c_result);
         let mut serialised_data = ffi_ptr_try!(serialise(&dir_key).map_err(FfiError::from),
@@ -287,6 +305,7 @@ pub unsafe extern "C" fn get_safe_drive_key(c_size: *mut int32_t,
 /// undefined behaviour.
 #[no_mangle]
 pub unsafe extern "C" fn drop_client(client_handle: *mut FfiHandle) {
+    trace!("FFI Dropping client.");
     let _ = Box::from_raw(client_handle);
 }
 
@@ -299,6 +318,8 @@ pub unsafe extern "C" fn drop_client(client_handle: *mut FfiHandle) {
 #[no_mangle]
 pub unsafe extern "C" fn execute(c_payload: *const c_char, ffi_handle: *mut FfiHandle) -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI execute a specific operation that does not return any data.");
+
         let payload: String = ffi_try!(helper::c_char_ptr_to_string(c_payload));
         let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload),
                                                   "JSON parse error"));
@@ -324,6 +345,8 @@ pub unsafe extern "C" fn execute_for_content(c_payload: *const c_char,
                                              ffi_handle: *mut FfiHandle)
                                              -> *const u8 {
     catch_unwind_ptr(|| {
+        trace!("FFI execute for content - i.e. operation that returns data.");
+
         let payload: String = ffi_ptr_try!(helper::c_char_ptr_to_string(c_payload), c_result);
         let json_request = ffi_ptr_try!(parse_result!(json::Json::from_str(&payload),
                                                       "JSON parse error"),
@@ -356,6 +379,7 @@ pub unsafe extern "C" fn execute_for_content(c_payload: *const c_char,
 #[no_mangle]
 /// Drop the vector returned as a result of the execute_for_content fn
 pub unsafe extern "C" fn drop_vector(ptr: *mut u8, size: int32_t, capacity: int32_t) {
+    trace!("FFI Dropping vector.");
     let _ = Vec::from_raw_parts(ptr, size as usize, capacity as usize);
 }
 
@@ -363,6 +387,8 @@ pub unsafe extern "C" fn drop_vector(ptr: *mut u8, size: int32_t, capacity: int3
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_gets(ffi_handle: *mut FfiHandle) -> int64_t {
     catch_unwind_i64(|| {
+        trace!("FFI retrieve client issued GETs.");
+
         let client = cast_from_ffi_handle(ffi_handle);
         let guard = unwrap!(client.lock());
         guard.issued_gets() as int64_t
@@ -373,6 +399,8 @@ pub unsafe extern "C" fn client_issued_gets(ffi_handle: *mut FfiHandle) -> int64
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_puts(ffi_handle: *mut FfiHandle) -> int64_t {
     catch_unwind_i64(|| {
+        trace!("FFI retrieve client issued PUTs.");
+
         let client = cast_from_ffi_handle(ffi_handle);
         let guard = unwrap!(client.lock());
         guard.issued_puts() as int64_t
@@ -383,6 +411,8 @@ pub unsafe extern "C" fn client_issued_puts(ffi_handle: *mut FfiHandle) -> int64
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_posts(ffi_handle: *mut FfiHandle) -> int64_t {
     catch_unwind_i64(|| {
+        trace!("FFI retrieve client issued POSTs.");
+
         let client = cast_from_ffi_handle(ffi_handle);
         let guard = unwrap!(client.lock());
         guard.issued_posts() as int64_t
@@ -393,6 +423,8 @@ pub unsafe extern "C" fn client_issued_posts(ffi_handle: *mut FfiHandle) -> int6
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_deletes(ffi_handle: *mut FfiHandle) -> int64_t {
     catch_unwind_i64(|| {
+        trace!("FFI retrieve client issued DELETEs.");
+
         let client = cast_from_ffi_handle(ffi_handle);
         let guard = unwrap!(client.lock());
         guard.issued_deletes() as int64_t
@@ -407,6 +439,8 @@ pub unsafe extern "C" fn get_nfs_writer(c_payload: *const c_char,
                                         p_writer_handle: *mut *mut FfiWriterHandle)
                                         -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI get nfs writer for modification of existing file.");
+
         let payload: String = ffi_try!(helper::c_char_ptr_to_string(c_payload));
         let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload),
                                                   "JSON parse error"));
@@ -430,6 +464,8 @@ pub unsafe extern "C" fn nfs_create_file(c_payload: *const c_char,
                                          p_writer_handle: *mut *mut FfiWriterHandle)
                                          -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI get nfs writer for creating a new file.");
+
         let payload: String = ffi_try!(helper::c_char_ptr_to_string(c_payload));
         let json_request = ffi_try!(parse_result!(json::Json::from_str(&payload),
                                                   "JSON parse error"));
@@ -449,13 +485,14 @@ pub unsafe extern "C" fn nfs_create_file(c_payload: *const c_char,
 /// Write data to the Network using the NFS Writer handle
 #[no_mangle]
 pub unsafe extern "C" fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
-                                          offset: u64,
                                           c_data: *const u8,
                                           len: usize)
                                           -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI Write data using nfs writer.");
+
         let data = slice::from_raw_parts(c_data, len);
-        ffi_try!((*writer_handle).writer().write(&data[..], offset));
+        ffi_try!((*writer_handle).writer().write(&data[..]));
 
         0
     })
@@ -465,6 +502,8 @@ pub unsafe extern "C" fn nfs_stream_write(writer_handle: *mut FfiWriterHandle,
 #[no_mangle]
 pub unsafe extern "C" fn nfs_stream_close(writer_handle: *mut FfiWriterHandle) -> int32_t {
     catch_unwind_i32(|| {
+        trace!("FFI Close and consume nfs writer.");
+
         let handle = Box::from_raw(writer_handle);
         let _ = ffi_try!(handle.close());
 
@@ -481,6 +520,8 @@ pub unsafe extern "C" fn get_account_info(ffi_handle: *mut FfiHandle,
                                           space_available: *mut u64)
                                           -> i32 {
     catch_unwind_i32(|| {
+        trace!("FFI get account information.");
+
         let client = cast_from_ffi_handle(ffi_handle);
         let getter = ffi_try!(unwrap!(client.lock()).get_account_info(None));
         let res = ffi_try!(getter.get());
