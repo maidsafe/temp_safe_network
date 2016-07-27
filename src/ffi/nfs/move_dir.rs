@@ -112,7 +112,8 @@ impl Action for MoveDirectory {
         if !self.retain_source {
             let _ = try!(directory_helper.update(&src_dir));
             let mut parent_of_src_dir = try!(directory_helper.get(&org_parent_of_src_dir));
-            try!(parent_of_src_dir.remove_sub_directory(src_dir.get_metadata()
+            // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
+            let _dir_meta = try!(parent_of_src_dir.remove_sub_directory(src_dir.get_metadata()
                 .get_name()));
             let _ = try!(directory_helper.update(&parent_of_src_dir));
         }

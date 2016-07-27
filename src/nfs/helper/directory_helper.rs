@@ -92,7 +92,8 @@ impl DirectoryHelper {
                   -> Result<Option<DirectoryListing>, NfsError> {
         trace!("Deleting directory with name: {}", directory_to_delete);
 
-        try!(parent_directory.remove_sub_directory(directory_to_delete));
+        // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
+        let _dir_meta = try!(parent_directory.remove_sub_directory(directory_to_delete));
         parent_directory.get_mut_metadata().set_modified_time(::time::now_utc());
         self.update(parent_directory)
     }

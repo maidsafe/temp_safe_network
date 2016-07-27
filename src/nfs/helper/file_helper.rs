@@ -76,7 +76,7 @@ impl FileHelper {
                   -> Result<Option<DirectoryListing>, NfsError> {
         trace!("Deleting file with name {}.", file_name);
 
-        try!(parent_directory.remove_file(&file_name));
+        let _ = try!(parent_directory.remove_file(&file_name));
         let directory_helper = DirectoryHelper::new(self.client.clone());
         directory_helper.update(parent_directory)
     }

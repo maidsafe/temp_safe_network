@@ -102,7 +102,7 @@ impl Action for MoveFile {
         dest_dir.upsert_file(file);
         let _ = try!(directory_helper.update(&dest_dir));
         if !self.retain_source {
-            try!(src_dir.remove_file(&src_file_name));
+            let _ = try!(src_dir.remove_file(&src_file_name));
             let _ = try!(directory_helper.update(&src_dir));
         }
         Ok(None)
