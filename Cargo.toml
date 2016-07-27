@@ -21,7 +21,7 @@ routing = "~0.25.0"
 rustc-serialize = "~0.3.19"
 safe_network_common = "~0.6.0"
 self_encryption = "~0.6.0"
-sodiumoxide = "~0.0.12"
+sodiumoxide = "=0.0.10"
 time = "~0.1.35"
 unwrap = "~1.1.0"
 
