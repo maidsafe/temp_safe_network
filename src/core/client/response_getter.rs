@@ -26,7 +26,7 @@ use core::translated_events::ResponseEvent;
 use maidsafe_utilities;
 use routing::{Data, DataIdentifier, XorName};
 
-const REQ_TIMEOUT_SECS: u64 = 60;
+const REQ_TIMEOUT_SECS: u64 = 120;
 
 // TODO - consider using template specialisation (if it becomes available) for these three structs
 //        which all do similar things.
