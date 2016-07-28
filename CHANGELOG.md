@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.18.1]
+- Dependency update - routing reduced to 0.23.3 and safe_network_common increased to 0.7.0.
+
 ## [0.18.0]
 - Requests made to safe_core will now timeout after 2 min if there is no response from routing.
 - Self-encrypt write used by safe_core via sequential encryptor will now try to put data onto the Network immediately if possible leading to better progress indication across FFI.
