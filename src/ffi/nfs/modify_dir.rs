@@ -18,6 +18,7 @@
 use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use nfs::helper::directory_helper::DirectoryHelper;
+use time;
 
 #[derive(RustcDecodable, Debug)]
 pub struct ModifyDir {
@@ -64,6 +65,7 @@ impl Action for ModifyDir {
             dir_to_modify.get_mut_metadata().set_user_metadata(metadata);
         }
 
+        dir_to_modify.get_mut_metadata().set_modified_time(time::now_utc());
         let _ = try!(directory_helper.update(&dir_to_modify));
 
         Ok(None)

@@ -19,6 +19,7 @@ use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
 use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode;
+use time;
 
 #[derive(RustcDecodable, Debug)]
 pub struct ModifyFile {
@@ -75,6 +76,7 @@ impl Action for ModifyFile {
         }
 
         if metadata_updated {
+            file.get_mut_metadata().set_modified_time(time::now_utc());
             let _ = try!(file_helper.update_metadata(file.clone(), &mut dir_of_file));
         }
 
