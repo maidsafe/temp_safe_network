@@ -51,6 +51,7 @@ use std::{fs, mem, panic, ptr, slice};
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
+use config_file_handler::FileHandler;
 use core::client::Client;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
@@ -137,6 +138,40 @@ pub extern "C" fn init_logging() -> int32_t {
         ffi_try!(safe_log::init(false).map_err(CoreError::Unexpected));
 
         0
+    })
+}
+
+/// This function should be called to find where log file will be created. It will additionally
+/// create an empty log file in the path in the deduced location and will return the file name
+/// along with complete path to it.
+#[no_mangle]
+pub unsafe extern "C" fn output_log_path(c_output_flie_name: *const c_char,
+                                         c_size: *mut int32_t,
+                                         c_capacity: *mut int32_t,
+                                         c_result: *mut int32_t)
+                                         -> *const u8 {
+    catch_unwind_ptr(|| {
+        let op_file = ffi_ptr_try!(helper::c_char_ptr_to_string(c_output_flie_name), c_result);
+        let fh = ffi_ptr_try!(FileHandler::<()>::new(&op_file, true)
+                                  .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
+                              c_result);
+        let op_file_path =
+            ffi_ptr_try!(fh.path()
+                             .to_path_buf()
+                             .into_os_string()
+                             .into_string()
+                             .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
+                         c_result)
+                .into_bytes();
+
+        ptr::write(c_size, op_file_path.len() as i32);
+        ptr::write(c_capacity, op_file_path.capacity() as i32);
+        ptr::write(c_result, 0);
+
+        let ptr = op_file_path.as_ptr();
+        mem::forget(op_file_path);
+
+        ptr
     })
 }
 
