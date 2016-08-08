@@ -152,7 +152,7 @@ pub unsafe extern "C" fn output_log_path(c_output_flie_name: *const c_char,
                                          -> *const u8 {
     catch_unwind_ptr(|| {
         let op_file = ffi_ptr_try!(helper::c_char_ptr_to_string(c_output_flie_name), c_result);
-        let fh = ffi_ptr_try!(FileHandler::<()>::new(&op_file, true)
+        let fh = ffi_ptr_try!(FileHandler::<()>::open(&op_file, true)
                                   .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
                               c_result);
         let op_file_path =
