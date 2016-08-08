@@ -20,8 +20,8 @@ pub mod test_utils;
 use core::errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::Rng;
-use sodiumoxide::crypto::{box_, secretbox};
-use sodiumoxide::crypto::hash::sha512::{self, DIGESTBYTES, Digest};
+use rust_sodium::crypto::{box_, secretbox};
+use rust_sodium::crypto::hash::sha512::{self, DIGESTBYTES, Digest};
 
 /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and
 /// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text produces different
@@ -115,7 +115,7 @@ pub fn derive_secrets(acc_locator: &str, acc_password: &str) -> (Vec<u8>, Vec<u8
 #[cfg(test)]
 mod test {
     use super::*;
-    use sodiumoxide::crypto::box_;
+    use rust_sodium::crypto::box_;
 
     const SIZE: usize = 10;
 

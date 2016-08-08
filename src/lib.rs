@@ -55,9 +55,8 @@ extern crate maidsafe_utilities;
 extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
-extern crate safe_network_common;
 extern crate self_encryption;
-extern crate sodiumoxide;
+extern crate rust_sodium;
 extern crate time;
 #[macro_use]
 extern crate unwrap;

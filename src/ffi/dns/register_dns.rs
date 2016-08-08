@@ -18,7 +18,7 @@
 use dns::dns_operations::DnsOperations;
 use ffi::{Action, ParameterPacket, ResponseType, helper};
 use ffi::errors::FfiError;
-use sodiumoxide::crypto::box_;
+use rust_sodium::crypto::box_;
 
 #[derive(RustcDecodable, Debug)]
 pub struct RegisterDns {

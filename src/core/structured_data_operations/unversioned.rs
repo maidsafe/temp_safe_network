@@ -25,7 +25,7 @@ use core::utility;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 use self_encryption::{DataMap, SelfEncryptor};
-use sodiumoxide::crypto::{box_, sign};
+use rust_sodium::crypto::{box_, sign};
 
 #[allow(variant_size_differences)]
 #[derive(Clone, RustcEncodable, RustcDecodable, PartialEq)]
@@ -214,7 +214,7 @@ mod test {
     use rand;
     use routing::XorName;
     use std::sync::{Arc, Mutex};
-    use sodiumoxide::crypto::box_;
+    use rust_sodium::crypto::box_;
     use core::utility;
 
     const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1000;

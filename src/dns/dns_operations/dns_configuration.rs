@@ -26,7 +26,7 @@ use nfs::errors::NfsError;
 use nfs::helper::writer::Mode;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::helper::file_helper::FileHelper;
-use sodiumoxide::crypto::box_;
+use rust_sodium::crypto::box_;
 
 const DNS_CONFIG_DIR_NAME: &'static str = "DnsReservedDirectory";
 const DNS_CONFIG_FILE_NAME: &'static str = "DnsConfigurationFile";
@@ -109,7 +109,7 @@ pub fn write_dns_configuration_data(client: Arc<Mutex<Client>>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use sodiumoxide::crypto::box_;
+    use rust_sodium::crypto::box_;
     use std::sync::{Arc, Mutex};
     use core::utility;
     use core::utility::test_utils;

@@ -18,8 +18,8 @@
 use core::errors::CoreError;
 use core::id::revocation_id_type::RevocationIdType;
 use routing::XorName;
-use sodiumoxide::crypto::{box_, sign};
-use sodiumoxide::crypto::hash::sha256;
+use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::hash::sha256;
 
 /// IdType
 ///
@@ -106,7 +106,7 @@ mod test {
 
     use core::id::Random;
     use self::rand::Rng;
-    use sodiumoxide::crypto::{box_, sign};
+    use rust_sodium::crypto::{box_, sign};
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use core::id::{IdType, MaidTypeTags, RevocationIdType};
 
