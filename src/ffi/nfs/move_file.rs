@@ -18,7 +18,8 @@
 use ffi::{Action, ParameterPacket, ResponseType, helper};
 use nfs::directory_listing::DirectoryListing;
 use ffi::errors::FfiError;
-use nfs::errors::NfsError::DirectoryAlreadyExistsWithSameName;
+use nfs::errors::NfsError::FileAlreadyExistsWithSameName;
+use nfs::file::File;
 use nfs::helper::directory_helper::DirectoryHelper;
 
 #[derive(RustcDecodable, Debug)]
@@ -40,12 +41,12 @@ impl MoveFile {
 
         let start_dir_key = if shared {
             try!(params.clone()
-                .safe_drive_dir_key
-                .ok_or(FfiError::from("Safe Drive directory key is not present")))
+                       .safe_drive_dir_key
+                       .ok_or(FfiError::from("Safe Drive directory key is not present")))
         } else {
             try!(params.clone()
-                .app_root_dir_key
-                .ok_or(FfiError::from("Application directory key is not present")))
+                       .app_root_dir_key
+                       .ok_or(FfiError::from("Application directory key is not present")))
         };
 
         let mut tokens = helper::tokenise_path(path, false);
@@ -65,12 +66,12 @@ impl MoveFile {
 
         let start_dir_key = if shared {
             try!(params.clone()
-                .safe_drive_dir_key
-                .ok_or(FfiError::from("Safe Drive directory key is not present")))
+                       .safe_drive_dir_key
+                       .ok_or(FfiError::from("Safe Drive directory key is not present")))
         } else {
             try!(params.clone()
-                .app_root_dir_key
-                .ok_or(FfiError::from("Application directory key is not present")))
+                       .app_root_dir_key
+                       .ok_or(FfiError::from("Application directory key is not present")))
         };
 
         let tokens = helper::tokenise_path(path, false);
@@ -90,15 +91,19 @@ impl Action for MoveFile {
         let directory_helper = DirectoryHelper::new(params.client.clone());
         let (mut src_dir, src_file_name) =
             try!(self.get_directory_and_file(&params, self.is_src_path_shared, &self.src_path));
-        let mut dest_dir =
-            try!(self.get_directory(&params, self.is_dest_path_shared, &self.dest_path));
+        let mut dest_dir = try!(self.get_directory(&params,
+                                                   self.is_dest_path_shared,
+                                                   &self.dest_path));
         if dest_dir.find_file(&src_file_name).is_some() {
-            return Err(FfiError::from(DirectoryAlreadyExistsWithSameName));
+            return Err(FfiError::from(FileAlreadyExistsWithSameName));
         }
-        let file = match src_dir.find_file(&src_file_name).cloned() {
+        let mut file = match src_dir.find_file(&src_file_name).cloned() {
             Some(file) => file,
             None => return Err(FfiError::PathNotFound),
         };
+        if self.retain_source {
+            file = try!(File::new(file.get_metadata().clone(), file.get_datamap().clone()));
+        }
         dest_dir.upsert_file(file);
         let _ = try!(directory_helper.update(&dest_dir));
         if !self.retain_source {
