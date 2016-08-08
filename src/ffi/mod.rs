@@ -47,7 +47,7 @@ mod launcher_config_handler;
 mod nfs;
 mod test_utils;
 
-use std::{fs, mem, panic, ptr, slice};
+use std::{mem, panic, ptr, slice};
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
