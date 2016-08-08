@@ -21,7 +21,7 @@ rand = "~0.3.14"
 routing = "~0.23.4"
 rust_sodium = "~0.1.1"
 rustc-serialize = "~0.3.19"
-self_encryption = "~0.6.0"
+self_encryption = "~0.7.0"
 time = "~0.1.35"
 unwrap = "~1.1.0"
 
