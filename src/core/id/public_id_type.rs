@@ -17,8 +17,8 @@
 
 use core::id::{IdType, RevocationIdType};
 use routing::XorName;
-use sodiumoxide::crypto::{box_, sign};
-use sodiumoxide::crypto::hash::sha256;
+use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::hash::sha256;
 
 /// PublicIdType
 ///
@@ -117,7 +117,7 @@ impl PublicIdType {
 #[cfg(test)]
 mod test {
     use super::*;
-    use sodiumoxide::crypto::sign;
+    use rust_sodium::crypto::sign;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use core::id::{IdType, MaidTypeTags, MpidTypeTags, Random, RevocationIdType};
 

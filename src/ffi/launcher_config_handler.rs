@@ -28,7 +28,7 @@ use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode::Overwrite;
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::XorName;
-use sodiumoxide::crypto::hash::sha256;
+use rust_sodium::crypto::hash::sha256;
 
 #[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct LauncherConfiguration {

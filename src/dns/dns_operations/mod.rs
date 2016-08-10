@@ -25,10 +25,10 @@ use dns::errors::DnsError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::{Data, DataIdentifier, StructuredData, XorName};
-use safe_network_common::client_errors::{GetError, MutationError};
-use safe_network_common::TYPE_TAG_DNS_PACKET;
-use sodiumoxide::crypto::{box_, sign};
-use sodiumoxide::crypto::hash::sha256;
+use routing::client_errors::{GetError, MutationError};
+use routing::TYPE_TAG_DNS_PACKET;
+use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::hash::sha256;
 
 pub mod dns_configuration;
 
@@ -355,7 +355,7 @@ mod test {
     use nfs::AccessLevel;
     use nfs::metadata::directory_key::DirectoryKey;
     use routing::{XOR_NAME_LEN, XorName};
-    use sodiumoxide::crypto::box_;
+    use rust_sodium::crypto::box_;
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -605,7 +605,7 @@ mod test {
     fn register_and_delete_dns_internal_error_recovery() {
         use core::errors::CoreError;
         use nfs::errors::NfsError;
-        use safe_network_common::client_errors::GetError;
+        use routing::client_errors::GetError;
         use maidsafe_utilities;
 
         unwrap!(maidsafe_utilities::log::init(true));

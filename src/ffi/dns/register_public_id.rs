@@ -17,7 +17,7 @@
 
 use dns::dns_operations::DnsOperations;
 use ffi::{Action, ParameterPacket, ResponseType};
-use sodiumoxide::crypto::box_;
+use rust_sodium::crypto::box_;
 
 #[derive(RustcDecodable, Debug)]
 pub struct RegisterPublicId {

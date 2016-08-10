@@ -19,8 +19,8 @@ use core::errors::CoreError;
 use core::id::{IdType, MaidTypeTags, MpidTypeTags, PublicIdType, RevocationIdType};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{XOR_NAME_LEN, XorName};
-use sodiumoxide::crypto::hash::sha256;
-use sodiumoxide::crypto::{pwhash, secretbox};
+use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::{pwhash, secretbox};
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also their Root

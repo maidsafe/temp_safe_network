@@ -41,7 +41,7 @@ extern crate maidsafe_utilities;
 extern crate regex;
 extern crate routing;
 extern crate safe_core;
-extern crate sodiumoxide;
+extern crate rust_sodium;
 #[macro_use]
 extern crate unwrap;
 
@@ -101,7 +101,7 @@ fn create_dns_record(client: Arc<Mutex<Client>>,
 
     println!("\nGenerating messaging ecryption keys for you...");
     let (public_messaging_encryption_key, secret_messaging_encryption_key) =
-        sodiumoxide::crypto::box_::gen_keypair();
+        rust_sodium::crypto::box_::gen_keypair();
 
     println!("Registering Dns...");
 

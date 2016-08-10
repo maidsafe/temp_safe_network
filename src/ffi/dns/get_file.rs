@@ -65,7 +65,7 @@ impl Action for GetFile {
 mod test {
     use super::*;
     use core::utility;
-    use sodiumoxide::crypto::box_;
+    use rust_sodium::crypto::box_;
     use dns::dns_operations::DnsOperations;
     use ffi::{Action, ParameterPacket, errors, test_utils};
     use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};

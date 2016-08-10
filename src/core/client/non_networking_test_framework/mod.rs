@@ -34,10 +34,10 @@ use maidsafe_utilities::serialisation::{deserialise, deserialise_with_limit, ser
 use rand;
 use routing::{Authority, Data, DataIdentifier, Event, FullId, InterfaceError, MessageId, Request,
               Response, RoutingError, XorName};
-use safe_network_common::TYPE_TAG_SESSION_PACKET;
-use safe_network_common::client_errors::{GetError, MutationError};
-use sodiumoxide::crypto::sign;
-use sodiumoxide::crypto::hash::sha256;
+use routing::TYPE_TAG_SESSION_PACKET;
+use routing::client_errors::{GetError, MutationError};
+use rust_sodium::crypto::sign;
+use rust_sodium::crypto::hash::sha256;
 
 const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
 const NETWORK_CONNECT_DELAY_SIMULATION_THREAD: &'static str = "NetworkConnectDelaySimulation";
@@ -131,7 +131,7 @@ impl RoutingMock {
     pub fn new(sender: mpsc::Sender<Event>,
                _id: Option<FullId>)
                -> Result<RoutingMock, RoutingError> {
-        ::sodiumoxide::init();
+        ::rust_sodium::init();
 
         let cloned_sender = sender.clone();
         let _ = thread::named(NETWORK_CONNECT_DELAY_SIMULATION_THREAD, move || {
@@ -675,7 +675,7 @@ mod test {
                                         MutationResponseGetter};
 
     use maidsafe_utilities::serialisation::{deserialise, serialise};
-    use safe_network_common::client_errors::{GetError, MutationError};
+    use routing::client_errors::{GetError, MutationError};
     use routing::{Authority, Data, DataIdentifier, FullId, ImmutableData, MessageId,
                   StructuredData, XOR_NAME_LEN, XorName};
 
