@@ -23,8 +23,8 @@ use core::SelfEncryptionStorageError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use routing::DataIdentifier;
 use self_encryption::SelfEncryptionError;
-use safe_network_common::client_errors::{GetError, MutationError};
-use safe_network_common::messaging;
+use routing::client_errors::{GetError, MutationError};
+use routing::messaging;
 
 /// Intended for converting Client Errors into numeric codes for propagating some error information
 /// across FFI boundaries and specially to C.
@@ -409,7 +409,7 @@ mod test {
     use rand;
     use routing::DataIdentifier;
     use self_encryption::SelfEncryptionError;
-    use safe_network_common::client_errors::MutationError;
+    use routing::client_errors::MutationError;
 
     #[test]
     fn self_encryption_error() {

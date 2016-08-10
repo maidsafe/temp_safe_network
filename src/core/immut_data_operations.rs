@@ -23,7 +23,7 @@ use core::{SelfEncryptionStorage, utility};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, XorName};
 use self_encryption::{DataMap, SelfEncryptor};
-use sodiumoxide::crypto::box_::{Nonce, PublicKey, SecretKey};
+use rust_sodium::crypto::box_::{Nonce, PublicKey, SecretKey};
 
 // TODO(Spandan) Ask Routing to define this constant and use it from there
 const MAX_IMMUT_DATA_SIZE_IN_BYTES: usize = 1024 * 1024;
@@ -125,7 +125,7 @@ mod test {
     use routing::Data;
     use core::utility;
     use core::utility::test_utils;
-    use sodiumoxide::crypto::box_;
+    use rust_sodium::crypto::box_;
 
     // TODO It takes a very long time in debug mode - it is due to S.E crate.
     #[test]

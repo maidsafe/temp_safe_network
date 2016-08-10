@@ -36,10 +36,9 @@
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
 #![cfg_attr(feature="clippy", allow(use_debug, print_stdout))]
 
-extern crate safe_network_common;
 extern crate routing;
 extern crate safe_core;
-extern crate sodiumoxide;
+extern crate rust_sodium;
 #[macro_use]
 extern crate maidsafe_utilities;
 #[macro_use]
@@ -49,8 +48,8 @@ use safe_core::core::client::Client;
 use safe_core::core::client::response_getter::GetResponseGetter;
 
 use routing::{Data, XorName};
-use sodiumoxide::crypto::hash::sha256;
-use safe_network_common::messaging::MpidMessageWrapper;
+use rust_sodium::crypto::hash::sha256;
+use routing::messaging::MpidMessageWrapper;
 use maidsafe_utilities::serialisation::deserialise;
 
 #[cfg(feature = "use-mock-routing")]

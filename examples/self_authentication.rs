@@ -39,13 +39,13 @@
 extern crate safe_core;
 #[macro_use]
 extern crate maidsafe_utilities;
-extern crate safe_network_common;
+extern crate routing;
 #[macro_use]
 extern crate unwrap;
 
 use safe_core::core::client::Client;
 use safe_core::core::errors::CoreError;
-use safe_network_common::client_errors::MutationError;
+use routing::client_errors::MutationError;
 
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));

@@ -17,7 +17,7 @@
 use core::client::Client;
 use core::errors::CoreError;
 use core::utility;
-use sodiumoxide::crypto::sign;
+use rust_sodium::crypto::sign;
 
 /// Generates a random mock client for testing
 pub fn get_client() -> Result<Client, CoreError> {

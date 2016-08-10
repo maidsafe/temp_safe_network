@@ -22,7 +22,7 @@ use core::errors::CoreError;
 use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_structured_data};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
-use sodiumoxide::crypto::sign;
+use rust_sodium::crypto::sign;
 
 /// Create the StructuredData to manage versioned data.
 #[cfg_attr(feature="clippy", allow(too_many_arguments))]

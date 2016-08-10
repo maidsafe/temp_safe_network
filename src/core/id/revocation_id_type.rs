@@ -17,15 +17,15 @@
 
 use core::id::IdTypeTags;
 use routing::XorName;
-use sodiumoxide::crypto::sign;
-use sodiumoxide::crypto::hash::sha256;
+use rust_sodium::crypto::sign;
+use rust_sodium::crypto::hash::sha256;
 
 /// RevocationIdType
 ///
 /// #Examples
 ///
 /// ```
-/// // Generating public and secret keys using sodiumoxide
+/// // Generating public and secret keys using rust_sodium
 /// // Create RevocationIdType
 /// use safe_core::core::id;
 /// let _an_maid = id::RevocationIdType::new::<id::MaidTypeTags>();
@@ -101,7 +101,7 @@ mod test {
     use super::*;
     use rand::Rng;
     use core::id::{MaidTypeTags, MpidTypeTags, Random};
-    use sodiumoxide::crypto::sign;
+    use rust_sodium::crypto::sign;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
 
 

@@ -28,7 +28,7 @@ use nfs::metadata::directory_key::DirectoryKey;
 use nfs::metadata::directory_metadata::DirectoryMetadata;
 use routing::XorName;
 use self_encryption::{DataMap, SelfEncryptor};
-use sodiumoxide::crypto::box_;
+use rust_sodium::crypto::box_;
 
 /// DirectoryListing is the representation of a deserialised Directory in the network
 #[derive(Debug, RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]

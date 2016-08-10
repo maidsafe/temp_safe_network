@@ -38,13 +38,13 @@ use core::utility;
 
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use safe_network_common::client_errors::MutationError;
-use safe_network_common::messaging::{MpidMessage, MpidMessageWrapper};
-use safe_network_common::TYPE_TAG_SESSION_PACKET;
+use routing::client_errors::MutationError;
+use routing::messaging::{MpidMessage, MpidMessageWrapper};
+use routing::TYPE_TAG_SESSION_PACKET;
 use routing::{Authority, Data, DataIdentifier, FullId, MessageId, PlainData, StructuredData,
               XorName};
-use sodiumoxide::crypto::{box_, sign};
-use sodiumoxide::crypto::hash::sha256;
+use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::hash::sha256;
 
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
@@ -809,7 +809,7 @@ mod test {
 
     use rand;
     use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XOR_NAME_LEN, XorName};
-    use safe_network_common::client_errors::MutationError;
+    use routing::client_errors::MutationError;
 
     #[test]
     fn account_creation() {
@@ -932,7 +932,7 @@ mod test {
         let plain_text_original_1 = plain_text_original_0.clone();
 
         // Encrypt passing Nonce
-        let nonce = ::sodiumoxide::crypto::box_::gen_nonce();
+        let nonce = ::rust_sodium::crypto::box_::gen_nonce();
         let cipher_text_0 =
             unwrap!(client.hybrid_encrypt(&plain_text_original_0[..], Some(&nonce)));
         let cipher_text_1 =

@@ -41,7 +41,7 @@ extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate safe_core;
-extern crate sodiumoxide;
+extern crate rust_sodium;
 #[macro_use]
 extern crate maidsafe_utilities;
 #[macro_use]
@@ -52,7 +52,7 @@ use safe_core::core::client::Client;
 use docopt::Docopt;
 use routing::{Data, ImmutableData, StructuredData};
 use rand::{Rng, SeedableRng};
-use sodiumoxide::crypto::sign::{PublicKey, SecretKey};
+use rust_sodium::crypto::sign::{PublicKey, SecretKey};
 
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
