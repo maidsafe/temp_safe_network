@@ -1,5 +1,10 @@
 # Safe Core - Change Log
 
+## [0.19.0]
+- Dependency update - routing updated to 0.23.4.
+- Log path exposed to FFI so that frontend is intimated where it is expected to create its log files.
+- Dependency on rust_sodium instead of sodiumoxide and removal of libsodium instruction from CI builds.
+
 ## [0.18.1]
 - Dependency update - routing reduced to 0.23.3 and safe_network_common increased to 0.7.0.
 
