@@ -1,4 +1,4 @@
-// Copyright 2015 MaidSafe.net limited.
+// Copyright 2016 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -15,19 +15,12 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use dns::dns_operations::DnsOperations;
-use ffi::{Action, ParameterPacket, ResponseType};
-use rustc_serialize::json;
+use nfs::metadata::file_metadata::FileMetadata;
 
-pub struct GetLongNames;
-
-impl Action for GetLongNames {
-    fn execute(&mut self, params: ParameterPacket) -> ResponseType {
-        trace!("JSON Get all dns long names.");
-
-        let dns_ops = try!(DnsOperations::new(params.client));
-        let list = try!(dns_ops.get_all_registered_names());
-
-        Ok(Some(try!(json::encode(&list))))
-    }
+/// Dispose of file metadata handle.
+#[no_mangle]
+pub unsafe extern "C" fn drop_file_metadata(metadata_handle: *mut FileMetadata) {
+    let _ = Box::from_raw(metadata_handle);
 }
+
+// TODO: add ffi functions to query the metadata structure.

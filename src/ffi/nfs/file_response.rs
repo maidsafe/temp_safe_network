@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Response to get_file operation.
+
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -27,6 +29,7 @@ use nfs::metadata::file_metadata::FileMetadata;
 use rustc_serialize::base64::ToBase64;
 use rustc_serialize::json;
 
+/// Information about a file and its content.
 #[derive(RustcEncodable, Debug)]
 pub struct GetFileResponse {
     content: String,
@@ -44,6 +47,7 @@ struct Metadata {
     modification_time_nsec: i64,
 }
 
+/// Obtain `GetFileResponse` for the given file.
 pub fn get_response(file: &File,
                     client: Arc<Mutex<Client>>,
                     offset: i64,

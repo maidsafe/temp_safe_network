@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Response to get_dir operation.
+
 use std::sync::{Arc, Mutex};
 
 use core::client::Client;
@@ -26,11 +28,18 @@ use nfs::metadata::directory_key::DirectoryKey;
 use nfs::metadata::directory_metadata::DirectoryMetadata;
 use nfs::metadata::file_metadata::FileMetadata;
 
+/// Information about a directory and its content.
 #[derive(RustcEncodable, Debug)]
 pub struct GetDirResponse {
     info: DirectoryInfo,
     files: Vec<FileInfo>,
     sub_directories: Vec<DirectoryInfo>,
+}
+
+/// Dispose of the GetDirectoryResponse handle.
+#[no_mangle]
+pub unsafe extern "C" fn nfs_drop_get_dir_response(response_handle: *mut GetDirResponse) {
+    let _ = Box::from_raw(response_handle);
 }
 
 #[derive(RustcEncodable, Debug)]
@@ -56,6 +65,7 @@ struct FileInfo {
     modification_time_nsec: i64,
 }
 
+/// Obtain `GetDirResponse` for the directory with the given key.
 pub fn get_response(client: Arc<Mutex<Client>>,
                     directory_key: DirectoryKey)
                     -> Result<GetDirResponse, FfiError> {
@@ -64,6 +74,7 @@ pub fn get_response(client: Arc<Mutex<Client>>,
     Ok(convert_to_response(dir_listing))
 }
 
+/// Convert directory listing to `GetDirResponse`.
 pub fn convert_to_response(directory_listing: DirectoryListing) -> GetDirResponse {
     let dir_info = get_directory_info(directory_listing.get_metadata());
     let mut sub_dirs: Vec<DirectoryInfo> =
