@@ -24,6 +24,7 @@ use ffi::app::App;
 use ffi::errors::FfiError;
 use ffi::helper;
 use ffi::nfs::directory_response::{self, GetDirResponse};
+use ffi::string_list::{self, StringList};
 
 /// Add service.
 #[no_mangle]
@@ -86,12 +87,10 @@ pub unsafe extern "C" fn dns_get_service_dir(app_handle: *const App,
     })
 }
 
-// TODO: add ffi for Handle<Vec<String>>
-
 /// Get all registered long names.
 pub unsafe extern "C" fn dns_get_services(app_handle: *const App,
                                           long_name: *const c_char,
-                                          list_handle: *mut *mut Vec<String>)
+                                          list_handle: *mut *mut StringList)
                                           -> int32_t {
     helper::catch_unwind_i32(|| {
         let long_name = ffi_try!(helper::c_char_ptr_to_string(long_name));
@@ -100,7 +99,7 @@ pub unsafe extern "C" fn dns_get_services(app_handle: *const App,
                long_name);
 
         let list = ffi_try!(get_services(&*app_handle, &long_name));
-        *list_handle = Box::into_raw(Box::new(list));
+        *list_handle = ffi_try!(string_list::into_ptr(list));
         0
     })
 }

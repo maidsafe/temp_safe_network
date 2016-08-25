@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use std::ffi::NulError;
 use std::fmt;
 
 use core::errors::CoreError;
@@ -58,6 +59,9 @@ pub enum FfiError {
     Unexpected(String),
     /// Could not serialise or deserialise data
     UnsuccessfulEncodeDecode(SerialisationError),
+    /// Could not convert String to nul-terminated string because it contains
+    /// internal nuls.
+    NulError(NulError),
 }
 
 impl From<SerialisationError> for FfiError {
@@ -113,6 +117,12 @@ impl From<json::DecoderError> for FfiError {
     }
 }
 
+impl From<NulError> for FfiError {
+    fn from(error: NulError) -> Self {
+        FfiError::NulError(error)
+    }
+}
+
 impl Into<i32> for FfiError {
     fn into(self) -> i32 {
         match self {
@@ -129,6 +139,7 @@ impl Into<i32> for FfiError {
             FfiError::LocalConfigAccessFailed(_) => FFI_ERROR_START_RANGE - 8,
             FfiError::Unexpected(_) => FFI_ERROR_START_RANGE - 9,
             FfiError::UnsuccessfulEncodeDecode(_) => FFI_ERROR_START_RANGE - 10,
+            FfiError::NulError(_) => FFI_ERROR_START_RANGE - 11,
         }
     }
 }
@@ -158,8 +169,11 @@ impl fmt::Debug for FfiError {
                 write!(f, "FfiError::LocalConfigAccessFailed -> {:?}", error)
             }
             FfiError::Unexpected(ref error) => write!(f, "FfiError::Unexpected{{{:?}}}", error),
-            FfiError::UnsuccessfulEncodeDecode(ref err) => {
-                write!(f, "FfiError::UnsuccessfulEncodeDecode -> {:?}", err)
+            FfiError::UnsuccessfulEncodeDecode(ref error) => {
+                write!(f, "FfiError::UnsuccessfulEncodeDecode -> {:?}", error)
+            }
+            FfiError::NulError(ref error) => {
+                write!(f, "FfiError::NulError -> {:?}", error)
             }
         }
     }

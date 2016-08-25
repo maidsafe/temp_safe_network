@@ -24,6 +24,7 @@ use dns::dns_operations::DnsOperations;
 use ffi::app::App;
 use ffi::errors::FfiError;
 use ffi::helper;
+use ffi::string_list::{self, StringList};
 
 /// Register DNS long name (for calling via FFI).
 pub unsafe extern "C" fn dns_register_long_name(app_handle: *const App,
@@ -73,17 +74,15 @@ pub unsafe extern "C" fn dns_delete_long_name(app_handle: *const App,
     })
 }
 
-// TODO: add ffi for Handle<Vec<String>>
-
 /// Get all registered long names.
 pub unsafe extern "C" fn dns_get_long_names(app_handle: *const App,
-                                            list_handle: *mut *mut Vec<String>)
+                                            list_handle: *mut *mut StringList)
                                             -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI Get all dns long names.");
 
         let list = ffi_try!(get_long_names(&*app_handle));
-        *list_handle = Box::into_raw(Box::new(list));
+        *list_handle = ffi_try!(string_list::into_ptr(list));
         0
     })
 }

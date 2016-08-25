@@ -50,8 +50,8 @@ pub mod file_metadata;
 pub mod logging;
 /// Network filesystem operations
 pub mod nfs;
-/// Session management
 pub mod session;
+pub mod string_list;
 
 mod config;
 mod helper;
