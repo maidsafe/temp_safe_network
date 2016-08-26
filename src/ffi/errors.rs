@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Errors thrown by the FFI operations
+
 use std::ffi::NulError;
 use std::fmt;
 

@@ -27,6 +27,7 @@ use ffi::helper;
 use ffi::string_list::{self, StringList};
 
 /// Register DNS long name (for calling via FFI).
+#[no_mangle]
 pub unsafe extern "C" fn dns_register_long_name(app_handle: *const App,
                                                 long_name: *const c_char)
                                                 -> int32_t {
@@ -43,6 +44,7 @@ pub unsafe extern "C" fn dns_register_long_name(app_handle: *const App,
 }
 
 /// Register DNS long name (for calling from rust).
+#[no_mangle]
 pub fn register_long_name(app: &App, long_name: String) -> Result<(), FfiError> {
     let (msg_public_key, msg_secret_key) = box_::gen_keypair();
     let services = vec![];
@@ -63,6 +65,7 @@ pub fn register_long_name(app: &App, long_name: String) -> Result<(), FfiError> 
 }
 
 /// Delete DNS.
+#[no_mangle]
 pub unsafe extern "C" fn dns_delete_long_name(app_handle: *const App,
                                               long_name: *const c_char)
                                               -> int32_t {
@@ -75,6 +78,7 @@ pub unsafe extern "C" fn dns_delete_long_name(app_handle: *const App,
 }
 
 /// Get all registered long names.
+#[no_mangle]
 pub unsafe extern "C" fn dns_get_long_names(app_handle: *const App,
                                             list_handle: *mut *mut StringList)
                                             -> int32_t {

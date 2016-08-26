@@ -15,9 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Network filesystem operations
+
 pub mod dir;
 pub mod file;
 pub mod file_writing;
-
-pub mod directory_response;
-pub mod file_response;

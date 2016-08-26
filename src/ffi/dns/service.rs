@@ -21,9 +21,9 @@ use libc::{c_char, int32_t};
 
 use dns::dns_operations::DnsOperations;
 use ffi::app::App;
+use ffi::directory_details::DirectoryDetails;
 use ffi::errors::FfiError;
 use ffi::helper;
-use ffi::nfs::directory_response::{self, GetDirResponse};
 use ffi::string_list::{self, StringList};
 
 /// Add service.
@@ -51,6 +51,7 @@ pub unsafe extern "C" fn dns_add_service(app_handle: *const App,
 }
 
 /// Delete DNS service.
+#[no_mangle]
 pub unsafe extern "C" fn dns_delete_service(app_handle: *const App,
                                             long_name: *const c_char,
                                             service_name: *const c_char)
@@ -71,7 +72,7 @@ pub unsafe extern "C" fn dns_delete_service(app_handle: *const App,
 pub unsafe extern "C" fn dns_get_service_dir(app_handle: *const App,
                                              long_name: *const c_char,
                                              service_name: *const c_char,
-                                             response_handle: *mut *mut GetDirResponse)
+                                             details_handle: *mut *mut DirectoryDetails)
                                              -> int32_t {
     helper::catch_unwind_i32(|| {
         let long_name = ffi_try!(helper::c_char_ptr_to_string(long_name));
@@ -82,12 +83,13 @@ pub unsafe extern "C" fn dns_get_service_dir(app_handle: *const App,
                long_name);
 
         let response = ffi_try!(get_service_dir(&*app_handle, &long_name, &service_name));
-        *response_handle = Box::into_raw(Box::new(response));
+        *details_handle = Box::into_raw(Box::new(response));
         0
     })
 }
 
 /// Get all registered long names.
+#[no_mangle]
 pub unsafe extern "C" fn dns_get_services(app_handle: *const App,
                                           long_name: *const c_char,
                                           list_handle: *mut *mut StringList)
@@ -138,7 +140,7 @@ fn delete_service(app: &App, long_name: String, service_name: String) -> Result<
     Ok(())
 }
 
-fn get_service_dir(app: &App, long_name: &str, service_name: &str) -> Result<GetDirResponse, FfiError> {
+fn get_service_dir(app: &App, long_name: &str, service_name: &str) -> Result<DirectoryDetails, FfiError> {
     let dns_operations = match app.get_app_dir_key() {
         Some(_) => try!(DnsOperations::new(app.get_client())),
         None => DnsOperations::new_unregistered(app.get_client()),
@@ -147,7 +149,7 @@ fn get_service_dir(app: &App, long_name: &str, service_name: &str) -> Result<Get
     let directory_key = try!(dns_operations.get_service_home_directory_key(long_name,
                                                                            service_name,
                                                                            None));
-    directory_response::get_response(app.get_client(), directory_key)
+    DirectoryDetails::from_directory_key(app.get_client(), directory_key)
 }
 
 fn get_services(app: &App, long_name: &str) -> Result<Vec<String>, FfiError> {

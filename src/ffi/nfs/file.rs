@@ -24,13 +24,12 @@ use time;
 use ffi::app::App;
 use ffi::helper;
 use ffi::errors::FfiError;
-use ffi::nfs::file_response::{self, GetFileResponse};
+use ffi::file_details::{FileMetadata, FileDetails};
 use nfs::errors::NfsError;
 use nfs::file::File;
 use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode;
 use nfs::helper::directory_helper::DirectoryHelper;
-use nfs::metadata::file_metadata::FileMetadata;
 
 
 /// Delete a file.
@@ -47,7 +46,8 @@ pub unsafe extern "C" fn nfs_delete_file(app_handle: *const App,
     })
 }
 
-/// Get file.
+/// Get file. The returned FileDetails pointer must be disposed of by calling
+/// `file_details_drop` when no longer needed.
 #[no_mangle]
 pub unsafe extern "C" fn nfs_get_file(app_handle: *const App,
                                       offset: i64,
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn nfs_get_file(app_handle: *const App,
                                       file_path: *const c_char,
                                       is_path_shared: bool,
                                       include_metadata: bool,
-                                      response_handle: *mut *mut GetFileResponse)
+                                      details_handle: *mut *mut FileDetails)
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI get file, given the path.");
@@ -69,7 +69,7 @@ pub unsafe extern "C" fn nfs_get_file(app_handle: *const App,
                                          length,
                                          include_metadata));
 
-        *response_handle = Box::into_raw(Box::new(response));
+        *details_handle = Box::into_raw(Box::new(response));
         0
     })
 }
@@ -126,7 +126,8 @@ pub unsafe extern "C" fn nfs_move_file(app_handle: *const App,
     })
 }
 
-/// Get file metadata.
+/// Get file metadata. The returned pointer must be disposed of by calling
+/// `file_metadata_drop` when no longer needed.
 #[no_mangle]
 pub unsafe extern "C" fn nfs_get_file_metadata(app_handle: *const App,
                                                file_path: *const c_char,
@@ -158,16 +159,16 @@ fn get_file(app: &App,
             offset: i64,
             length: i64,
             include_metadata: bool)
-            -> Result<GetFileResponse, FfiError> {
+            -> Result<FileDetails, FfiError> {
     let (directory, file_name)
         = try!(helper::get_directory_and_file(app, file_path, is_path_shared));
     let file = try!(directory.find_file(&file_name).ok_or(FfiError::InvalidPath));
 
-    file_response::get_response(file,
-                                app.get_client(),
-                                offset,
-                                length,
-                                include_metadata)
+    FileDetails::new(file,
+                     app.get_client(),
+                     offset,
+                     length,
+                     include_metadata)
 }
 
 fn modify_file(app: &App,
@@ -261,12 +262,13 @@ fn get_file_metadata(app: &App, file_path: &str, is_path_shared: bool)
         = try!(helper::get_directory_and_file(app, file_path, is_path_shared));
     let file = try!(directory.find_file(&file_name).ok_or(FfiError::InvalidPath));
 
-    Ok(file.get_metadata().clone())
+    FileMetadata::new(file.get_metadata())
 }
 
 #[cfg(test)]
 mod test {
     use rustc_serialize::base64::ToBase64;
+    use std::ffi::CStr;
     use std::str;
 
     use ffi::app::App;
@@ -315,11 +317,16 @@ mod test {
 
         create_test_file(&app, "test_file.txt");
 
-        assert!(super::get_file(&app,
-                                "/test_file.txt",
-                                false,
-                                0, 0,
-                                true).is_ok());
+        let details = unwrap!(super::get_file(&app,
+                                              "/test_file.txt",
+                                              false,
+                                              0, 0,
+                                              true));
+        unsafe {
+            let metadata = unwrap!(details.metadata.as_ref());
+            let name = unwrap!(CStr::from_ptr(metadata.name).to_str());
+            assert_eq!(name, "test_file.txt");
+        }
 
         assert!(super::get_file(&app,
                                 "/does_not_exist",

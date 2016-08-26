@@ -22,9 +22,9 @@ use rustc_serialize::base64::FromBase64;
 use time;
 
 use ffi::app::App;
+use ffi::directory_details::DirectoryDetails;
 use ffi::errors::FfiError;
 use ffi::helper;
-use ffi::nfs::directory_response::{self, GetDirResponse};
 use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG, VERSIONED_DIRECTORY_LISTING_TAG};
 use nfs::errors::NfsError;
 use nfs::helper::directory_helper::DirectoryHelper;
@@ -73,13 +73,13 @@ pub unsafe extern "C" fn nfs_delete_dir(app_handle: *const App,
 pub unsafe extern "C" fn nfs_get_dir(app_handle: *const App,
                                      dir_path: *const c_char,
                                      is_shared: bool,
-                                     response_handle: *mut *mut GetDirResponse)
+                                     details_handle: *mut *mut DirectoryDetails)
                                      -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI get dir, given the path.");
         let dir_path = ffi_try!(helper::c_char_ptr_to_str(dir_path));
-        let response = ffi_try!(get_dir(&*app_handle, dir_path, is_shared));
-        *response_handle = Box::into_raw(Box::new(response));
+        let details = ffi_try!(get_dir(&*app_handle, dir_path, is_shared));
+        *details_handle = Box::into_raw(Box::new(details));
         0
     })
 }
@@ -200,9 +200,9 @@ fn delete_dir(app: &App, dir_path: &str, is_shared: bool) -> Result<(), FfiError
 fn get_dir(app: &App,
            dir_path: &str,
            is_shared: bool)
-           -> Result<GetDirResponse, FfiError> {
+           -> Result<DirectoryDetails, FfiError> {
     let directory = try!(helper::get_directory(app, dir_path, is_shared));
-    Ok(directory_response::convert_to_response(directory))
+    DirectoryDetails::from_directory_listing(directory)
 }
 
 fn modify_dir(app: &App,
@@ -302,6 +302,7 @@ fn move_dir(app: &App,
 #[cfg(test)]
 mod test {
     use rustc_serialize::base64::ToBase64;
+    use std::ffi::CStr;
 
     use ffi::app::App;
     use ffi::{config, test_utils};
@@ -400,7 +401,16 @@ mod test {
 
         create_test_dir(&app, "test_dir");
 
-        assert!(super::get_dir(&app, "/test_dir", false).is_ok());
+        let details = unwrap!(super::get_dir(&app, "/test_dir", false));
+
+        unsafe {
+            let name = unwrap!(CStr::from_ptr(details.metadata.name).to_str());
+            assert_eq!(name, "test_dir");
+        }
+
+        assert_eq!(details.files.len(), 0);
+        assert_eq!(details.sub_directories.len(), 0);
+
         assert!(super::get_dir(&app, "/does_not_exist", false).is_err());
     }
 

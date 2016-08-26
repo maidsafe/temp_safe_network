@@ -22,8 +22,8 @@ use libc::{c_char, int32_t};
 use dns::dns_operations::DnsOperations;
 use ffi::app::App;
 use ffi::errors::FfiError;
+use ffi::file_details::FileDetails;
 use ffi::helper;
-use ffi::nfs::file_response::{self, GetFileResponse};
 use nfs::metadata::file_metadata::FileMetadata;
 
 /// Get file.
@@ -35,7 +35,7 @@ pub unsafe extern "C" fn dns_get_file(app_handle: *const App,
                                       offset: i64,
                                       length: i64,
                                       include_metadata: bool,
-                                      response_handle: *mut *mut GetFileResponse)
+                                      details_handle: *mut *mut FileDetails)
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let long_name = ffi_try!(helper::c_char_ptr_to_string(long_name));
@@ -54,12 +54,13 @@ pub unsafe extern "C" fn dns_get_file(app_handle: *const App,
                                          length,
                                          include_metadata));
 
-        *response_handle = Box::into_raw(Box::new(response));
+        *details_handle = Box::into_raw(Box::new(response));
         0
     })
 }
 
 /// Get file metadata.
+#[no_mangle]
 pub unsafe extern "C" fn dns_get_file_metadata(app_handle: *const App,
                                                long_name: *const c_char,
                                                service_name: *const c_char,
@@ -95,7 +96,7 @@ fn get_file(app: &App,
             offset: i64,
             length: i64,
             include_metadata: bool)
-            -> Result<GetFileResponse, FfiError> {
+            -> Result<FileDetails, FfiError> {
     let dns_operations = match app.get_app_dir_key() {
         Some(_) => try!(DnsOperations::new(app.get_client())),
         None => DnsOperations::new_unregistered(app.get_client()),
@@ -110,11 +111,11 @@ fn get_file(app: &App,
                                                        Some(&directory_key)));
     let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
 
-    file_response::get_response(file,
-                                app.get_client(),
-                                offset,
-                                length,
-                                include_metadata)
+    FileDetails::new(file,
+                     app.get_client(),
+                     offset,
+                     length,
+                     include_metadata)
 }
 
 fn get_file_metadata(app: &App,

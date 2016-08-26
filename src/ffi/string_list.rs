@@ -40,11 +40,13 @@ pub fn into_ptr(strings: Vec<String>) -> Result<*mut StringList, FfiError> {
 }
 
 /// Get number of elements in the string list.
+#[no_mangle]
 pub unsafe extern "C" fn string_list_len(list: *const StringList) -> u64 {
     (*list).len() as u64
 }
 
 /// Get the string at the given index, or NULL if the index is out of range.
+#[no_mangle]
 pub unsafe extern "C" fn string_list_at(list: *const StringList,
                                         index: u64)
                                         -> *const c_char {
@@ -59,6 +61,7 @@ pub unsafe extern "C" fn string_list_at(list: *const StringList,
 }
 
 /// Dispose of the string list.
+#[no_mangle]
 pub unsafe extern "C" fn string_list_drop(list: *mut StringList) {
     let _ = Box::from_raw(list);
 }

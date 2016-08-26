@@ -15,6 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Structure representing application registered with the launcher + set of
+//! FFI operations on it.
+
 use libc::{c_char, int32_t};
 use std::cell::RefCell;
 use std::rc::Rc;

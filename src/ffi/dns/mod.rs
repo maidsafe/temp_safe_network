@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! DNS operations.
+
 pub mod file;
 pub mod long_name;
 pub mod service;

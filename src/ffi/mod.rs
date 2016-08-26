@@ -38,17 +38,12 @@
 #[macro_use]
 mod macros;
 
-/// Handle to call application scoped ffi functions.
 pub mod app;
-/// DNS operations.
+pub mod directory_details;
 pub mod dns;
-/// Errors thrown by the FFI operations
 pub mod errors;
-/// File metadata operations.
-pub mod file_metadata;
-/// Logging
+pub mod file_details;
 pub mod logging;
-/// Network filesystem operations
 pub mod nfs;
 pub mod session;
 pub mod string_list;
