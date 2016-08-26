@@ -18,11 +18,11 @@
 //! StringList is a FFI-enabled wrapper over vector of strings with a corresponding
 //! FFI-enabled API.
 
+
+use ffi::errors::FfiError;
 use libc::c_char;
 use std::ffi::CString;
 use std::ptr;
-
-use ffi::errors::FfiError;
 
 /// List of strings.
 pub type StringList = Vec<CString>;
@@ -47,9 +47,7 @@ pub unsafe extern "C" fn string_list_len(list: *const StringList) -> u64 {
 
 /// Get the string at the given index, or NULL if the index is out of range.
 #[no_mangle]
-pub unsafe extern "C" fn string_list_at(list: *const StringList,
-                                        index: u64)
-                                        -> *const c_char {
+pub unsafe extern "C" fn string_list_at(list: *const StringList, index: u64) -> *const c_char {
     let list = &*list;
     let index = index as usize;
 

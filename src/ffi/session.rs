@@ -17,17 +17,17 @@
 
 //! Session management
 
+
+use core::client::Client;
+use core::translated_events::NetworkEvent;
 use libc::{c_char, int32_t, int64_t};
 use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
+use nfs::metadata::directory_key::DirectoryKey;
 use std::cell::RefCell;
 use std::ptr;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Sender};
-
-use core::client::Client;
-use core::translated_events::NetworkEvent;
-use nfs::metadata::directory_key::DirectoryKey;
 use super::errors::FfiError;
 use super::helper;
 
@@ -150,7 +150,8 @@ pub type SessionHandle = Rc<RefCell<Session>>;
 /// Create a session as an unregistered client. This or any one of the other companion functions to get a
 /// session must be called before initiating any operation allowed by this crate.
 #[no_mangle]
-pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut SessionHandle) -> int32_t {
+pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut SessionHandle)
+                                                    -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI create unregistered client.");
 
@@ -211,8 +212,9 @@ pub unsafe extern "C" fn register_network_event_observer(session_handle: *mut Se
                                                          -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI register a network event observer.");
-        (*session_handle).borrow_mut()
-                         .register_network_event_observer(callback);
+        (*session_handle)
+            .borrow_mut()
+            .register_network_event_observer(callback);
         0
     })
 }
@@ -297,9 +299,9 @@ unsafe fn allocate_handle(session: Session) -> *mut SessionHandle {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use std::ptr;
     use ffi::test_utils;
+    use std::ptr;
+    use super::*;
 
     #[test]
     fn create_account_and_log_in() {

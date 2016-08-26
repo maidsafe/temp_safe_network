@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::cell::RefCell;
-use std::ffi::CString;
-use std::rc::Rc;
 
 use core::utility;
 use ffi::app::App;
 use ffi::session::Session;
+use std::cell::RefCell;
+use std::ffi::CString;
+use std::rc::Rc;
 
 pub fn generate_random_cstring(len: usize) -> CString {
     let mut cstring_vec = unwrap!(utility::generate_random_vector::<u8>(len));

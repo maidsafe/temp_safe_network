@@ -17,14 +17,14 @@
 
 //! DNS Long name operations
 
-use libc::{c_char, int32_t};
-use rust_sodium::crypto::box_;
 
 use dns::dns_operations::DnsOperations;
 use ffi::app::App;
 use ffi::errors::FfiError;
 use ffi::helper;
 use ffi::string_list::{self, StringList};
+use libc::{c_char, int32_t};
+use rust_sodium::crypto::box_;
 
 /// Register DNS long name (for calling via FFI).
 #[no_mangle]
@@ -108,8 +108,8 @@ fn get_long_names(app: &App) -> Result<Vec<String>, FfiError> {
 
 #[cfg(test)]
 mod test {
-    use ffi::test_utils;
     use core::utility;
+    use ffi::test_utils;
 
     #[test]
     fn register_long_name() {

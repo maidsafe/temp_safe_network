@@ -24,13 +24,6 @@ mod message_queue;
 #[cfg(feature = "use-mock-routing")]
 mod non_networking_test_framework;
 
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex, mpsc};
-
-use self::message_queue::MessageQueue;
-use self::response_getter::{GetAccountInfoResponseGetter, GetResponseGetter,
-                            MutationResponseGetter};
-use self::user_account::Account;
 
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
@@ -38,18 +31,25 @@ use core::utility;
 
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use routing::client_errors::MutationError;
-use routing::messaging::{MpidMessage, MpidMessageWrapper};
-use routing::TYPE_TAG_SESSION_PACKET;
 use routing::{Authority, Data, DataIdentifier, FullId, MessageId, PlainData, StructuredData,
               XorName};
+#[cfg(not(feature = "use-mock-routing"))]
+use routing::Client as Routing;
+use routing::TYPE_TAG_SESSION_PACKET;
+use routing::client_errors::MutationError;
+use routing::messaging::{MpidMessage, MpidMessageWrapper};
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256;
 
+use self::message_queue::MessageQueue;
+
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
-#[cfg(not(feature = "use-mock-routing"))]
-use routing::Client as Routing;
+use self::response_getter::{GetAccountInfoResponseGetter, GetResponseGetter,
+                            MutationResponseGetter};
+use self::user_account::Account;
+use std::sync::{Arc, Mutex, mpsc};
+use std::sync::mpsc::Sender;
 
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
@@ -801,7 +801,6 @@ impl SessionPacketEncryptionKeys {
 /// //////////////////////////////////////////////////////////////
 #[cfg(test)]
 mod test {
-    use super::*;
 
     use core::client::response_getter::GetResponseGetter;
     use core::errors::CoreError;
@@ -810,6 +809,7 @@ mod test {
     use rand;
     use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XOR_NAME_LEN, XorName};
     use routing::client_errors::MutationError;
+    use super::*;
 
     #[test]
     fn account_creation() {

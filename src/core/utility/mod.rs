@@ -114,8 +114,8 @@ pub fn derive_secrets(acc_locator: &str, acc_password: &str) -> (Vec<u8>, Vec<u8
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use rust_sodium::crypto::box_;
+    use super::*;
 
     const SIZE: usize = 10;
 

@@ -15,11 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::cmp;
-use std::sync::{Arc, Mutex};
+use core::SelfEncryptionStorage;
 
 use core::client::Client;
-use core::SelfEncryptionStorage;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::AccessLevel;
 use nfs::errors::NfsError;
@@ -27,8 +25,10 @@ use nfs::file::File;
 use nfs::metadata::directory_key::DirectoryKey;
 use nfs::metadata::directory_metadata::DirectoryMetadata;
 use routing::XorName;
-use self_encryption::{DataMap, SelfEncryptor};
 use rust_sodium::crypto::box_;
+use self_encryption::{DataMap, SelfEncryptor};
+use std::cmp;
+use std::sync::{Arc, Mutex};
 
 /// DirectoryListing is the representation of a deserialised Directory in the network
 #[derive(Debug, RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -218,14 +218,14 @@ impl DirectoryListing {
 
 #[cfg(test)]
 mod test {
+    use core::utility::test_utils;
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use nfs::AccessLevel;
+    use nfs::file::File;
+    use nfs::metadata::file_metadata::FileMetadata;
+    use self_encryption::DataMap;
     use std::sync::{Arc, Mutex};
     use super::DirectoryListing;
-    use nfs::file::File;
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
-    use nfs::metadata::file_metadata::FileMetadata;
-    use core::utility::test_utils;
-    use self_encryption::DataMap;
-    use nfs::AccessLevel;
 
     #[test]
     fn serialise_and_deserialise_directory_listing() {

@@ -63,11 +63,11 @@ impl DirectoryKey {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use rand;
-    use routing::XorName;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::AccessLevel;
+    use rand;
+    use routing::XorName;
+    use super::*;
 
     /// Should be able to serialise & deserialise the DirectoryKey
     #[test]

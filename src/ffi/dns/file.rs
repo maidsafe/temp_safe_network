@@ -17,13 +17,13 @@
 
 //! File operations
 
-use libc::{c_char, int32_t};
 
 use dns::dns_operations::DnsOperations;
 use ffi::app::App;
 use ffi::errors::FfiError;
 use ffi::file_details::FileDetails;
 use ffi::helper;
+use libc::{c_char, int32_t};
 use nfs::metadata::file_metadata::FileMetadata;
 
 /// Get file.
@@ -77,10 +77,8 @@ pub unsafe extern "C" fn dns_get_file_metadata(app_handle: *const App,
                service_name,
                long_name);
 
-        let metadata = ffi_try!(get_file_metadata(&*app_handle,
-                                                  &long_name,
-                                                  &service_name,
-                                                  &file_path));
+        let metadata =
+            ffi_try!(get_file_metadata(&*app_handle, &long_name, &service_name, &file_path));
 
         *metadata_handle = Box::into_raw(Box::new(metadata));
         0
@@ -101,21 +99,15 @@ fn get_file(app: &App,
         Some(_) => try!(DnsOperations::new(app.get_client())),
         None => DnsOperations::new_unregistered(app.get_client()),
     };
-    let directory_key = try!(dns_operations.get_service_home_directory_key(long_name,
-                                                                           service_name,
-                                                                           None));
+    let directory_key =
+        try!(dns_operations.get_service_home_directory_key(long_name, service_name, None));
     let mut tokens = helper::tokenise_path(file_path, false);
     let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
-    let file_dir = try!(helper::get_final_subdirectory(app.get_client(),
-                                                       &tokens,
-                                                       Some(&directory_key)));
+    let file_dir =
+        try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key)));
     let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
 
-    FileDetails::new(file,
-                     app.get_client(),
-                     offset,
-                     length,
-                     include_metadata)
+    FileDetails::new(file, app.get_client(), offset, length, include_metadata)
 }
 
 fn get_file_metadata(app: &App,
@@ -128,14 +120,12 @@ fn get_file_metadata(app: &App,
         None => DnsOperations::new_unregistered(app.get_client()),
     };
 
-    let directory_key = try!(dns_operations.get_service_home_directory_key(long_name,
-                                                                           service_name,
-                                                                           None));
+    let directory_key =
+        try!(dns_operations.get_service_home_directory_key(long_name, service_name, None));
     let mut tokens = helper::tokenise_path(file_path, false);
     let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
-    let file_dir = try!(helper::get_final_subdirectory(app.get_client(),
-                                                       &tokens,
-                                                       Some(&directory_key)));
+    let file_dir =
+        try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key)));
     let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
 
     Ok(file.get_metadata().clone())
@@ -143,7 +133,6 @@ fn get_file_metadata(app: &App,
 
 #[cfg(test)]
 mod test {
-    use rust_sodium::crypto::box_;
 
     use core::utility;
     use dns::dns_operations::DnsOperations;
@@ -153,11 +142,9 @@ mod test {
     use nfs::helper::directory_helper::DirectoryHelper;
     use nfs::helper::file_helper::FileHelper;
     use nfs::metadata::directory_key::DirectoryKey;
+    use rust_sodium::crypto::box_;
 
-    fn create_public_file(app: &App,
-                          file_name: String,
-                          file_content: Vec<u8>)
-                          -> DirectoryKey {
+    fn create_public_file(app: &App, file_name: String, file_content: Vec<u8>) -> DirectoryKey {
         let dir_helper = DirectoryHelper::new(app.get_client());
         let mut file_helper = FileHelper::new(app.get_client());
 
@@ -219,34 +206,16 @@ mod test {
                          public_name.clone(),
                          public_directory_key);
 
-        let _ = unwrap!(super::get_file(&app,
-                                        &public_name,
-                                        service_name,
-                                        file_name,
-                                        0,
-                                        0,
-                                        false));
+        let _ = unwrap!(super::get_file(&app, &public_name, service_name, file_name, 0, 0, false));
 
         // Fetch the file using a new client
         let app2 = test_utils::create_app(false);
 
-        let _ = unwrap!(super::get_file(&app2,
-                                        &public_name,
-                                        service_name,
-                                        file_name,
-                                        0,
-                                        0,
-                                        false));
+        let _ = unwrap!(super::get_file(&app2, &public_name, service_name, file_name, 0, 0, false));
 
         // Fetch the file using an unregisterd client
         let app3 = test_utils::create_unregistered_app();
 
-        let _ = unwrap!(super::get_file(&app3,
-                                        &public_name,
-                                        service_name,
-                                        file_name,
-                                        0,
-                                        0,
-                                        false));
+        let _ = unwrap!(super::get_file(&app3, &public_name, service_name, file_name, 0, 0, false));
     }
 }

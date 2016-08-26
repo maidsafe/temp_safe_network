@@ -19,8 +19,8 @@ use core::errors::CoreError;
 use core::id::{IdType, MaidTypeTags, MpidTypeTags, PublicIdType, RevocationIdType};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{XOR_NAME_LEN, XorName};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::{pwhash, secretbox};
+use rust_sodium::crypto::hash::sha256;
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also their Root
@@ -211,8 +211,8 @@ impl Account {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use super::*;
 
     #[test]
     fn generating_new_account() {

@@ -17,18 +17,18 @@
 
 //! FFI-enabled types containing details (content and metadata) about a file.
 
-use libc::c_char;
-use std::ffi::CString;
-use std::ptr;
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use ffi::config;
 use ffi::errors::FfiError;
+use libc::c_char;
 use nfs::file::File;
 use nfs::helper::file_helper::FileHelper;
 use nfs::metadata::file_metadata::FileMetadata as NfsFileMetadata;
 use rustc_serialize::base64::ToBase64;
+use std::ffi::CString;
+use std::ptr;
+use std::sync::{Arc, Mutex};
 
 /// Details of a file and its content.
 #[derive(Debug)]
@@ -109,7 +109,7 @@ impl FileMetadata {
 
         let name = try!(CString::new(file_metadata.get_name().to_string()));
         let user_metadata = file_metadata.get_user_metadata()
-                                         .to_base64(config::get_base64_config());
+            .to_base64(config::get_base64_config());
         let user_metadata = try!(CString::new(user_metadata));
 
         Ok(FileMetadata {

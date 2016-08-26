@@ -15,16 +15,16 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::thread;
-use std::time::Duration;
 
 use core::client::message_queue::MessageQueue;
 use core::errors::CoreError;
 use core::translated_events::ResponseEvent;
 use maidsafe_utilities;
 use routing::{Data, DataIdentifier, XorName};
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
+use std::time::Duration;
 
 const REQ_TIMEOUT_SECS: u64 = 120;
 

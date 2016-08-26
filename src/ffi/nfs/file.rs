@@ -17,19 +17,19 @@
 
 //! File operations
 
-use libc::{c_char, int32_t};
-use rustc_serialize::base64::FromBase64;
-use time;
 
 use ffi::app::App;
-use ffi::helper;
 use ffi::errors::FfiError;
-use ffi::file_details::{FileMetadata, FileDetails};
+use ffi::file_details::{FileDetails, FileMetadata};
+use ffi::helper;
+use libc::{c_char, int32_t};
 use nfs::errors::NfsError;
 use nfs::file::File;
+use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode;
-use nfs::helper::directory_helper::DirectoryHelper;
+use rustc_serialize::base64::FromBase64;
+use time;
 
 
 /// Delete a file.
@@ -160,15 +160,11 @@ fn get_file(app: &App,
             length: i64,
             include_metadata: bool)
             -> Result<FileDetails, FfiError> {
-    let (directory, file_name)
-        = try!(helper::get_directory_and_file(app, file_path, is_path_shared));
+    let (directory, file_name) =
+        try!(helper::get_directory_and_file(app, file_path, is_path_shared));
     let file = try!(directory.find_file(&file_name).ok_or(FfiError::InvalidPath));
 
-    FileDetails::new(file,
-                     app.get_client(),
-                     offset,
-                     length,
-                     include_metadata)
+    FileDetails::new(file, app.get_client(), offset, length, include_metadata)
 }
 
 fn modify_file(app: &App,
@@ -182,8 +178,8 @@ fn modify_file(app: &App,
         return Err(FfiError::from("Optional parameters could not be parsed"));
     }
 
-    let (mut directory, file_name)
-        = try!(helper::get_directory_and_file(app, file_path, is_shared));
+    let (mut directory, file_name) =
+        try!(helper::get_directory_and_file(app, file_path, is_shared));
     let mut file = try!(directory.find_file(&file_name)
         .cloned()
         .ok_or(FfiError::InvalidPath));
@@ -197,8 +193,7 @@ fn modify_file(app: &App,
     }
 
     if let Some(metadata) = new_metadata {
-        let metadata = try!(parse_result!(metadata.from_base64(),
-                                          "Failed to convert from base64"));
+        let metadata = try!(parse_result!(metadata.from_base64(), "Failed to convert from base64"));
         file.get_mut_metadata().set_user_metadata(metadata);
         metadata_updated = true;
     }
@@ -209,10 +204,8 @@ fn modify_file(app: &App,
     }
 
     if let Some(content) = new_content {
-        let mut writer =
-            try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory));
-        let bytes = try!(parse_result!(content.from_base64(),
-                                       "Failed to convert from base64"));
+        let mut writer = try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory));
+        let bytes = try!(parse_result!(content.from_base64(), "Failed to convert from base64"));
         try!(writer.write(&bytes[..]));
         let _ = try!(writer.close());
     }
@@ -228,7 +221,8 @@ fn move_file(app: &App,
              retain_src: bool)
              -> Result<(), FfiError> {
     let directory_helper = DirectoryHelper::new(app.get_client());
-    let (mut src_dir, src_file_name) = try!(helper::get_directory_and_file(app, src_path, is_src_path_shared));
+    let (mut src_dir, src_file_name) =
+        try!(helper::get_directory_and_file(app, src_path, is_src_path_shared));
     let mut dst_dir = try!(helper::get_directory(app, dst_path, is_dst_path_shared));
 
     if dst_dir.find_file(&src_file_name).is_some() {
@@ -256,10 +250,12 @@ fn move_file(app: &App,
     Ok(())
 }
 
-fn get_file_metadata(app: &App, file_path: &str, is_path_shared: bool)
+fn get_file_metadata(app: &App,
+                     file_path: &str,
+                     is_path_shared: bool)
                      -> Result<FileMetadata, FfiError> {
-    let (directory, file_name)
-        = try!(helper::get_directory_and_file(app, file_path, is_path_shared));
+    let (directory, file_name) =
+        try!(helper::get_directory_and_file(app, file_path, is_path_shared));
     let file = try!(directory.find_file(&file_name).ok_or(FfiError::InvalidPath));
 
     FileMetadata::new(file.get_metadata())
@@ -267,14 +263,14 @@ fn get_file_metadata(app: &App, file_path: &str, is_path_shared: bool)
 
 #[cfg(test)]
 mod test {
+    use ffi::{config, test_utils};
+
+    use ffi::app::App;
+    use nfs::helper::directory_helper::DirectoryHelper;
+    use nfs::helper::file_helper::FileHelper;
     use rustc_serialize::base64::ToBase64;
     use std::ffi::CStr;
     use std::str;
-
-    use ffi::app::App;
-    use ffi::{config, test_utils};
-    use nfs::helper::directory_helper::DirectoryHelper;
-    use nfs::helper::file_helper::FileHelper;
 
     fn create_test_file(app: &App, name: &str) {
         let mut file_helper = FileHelper::new(app.get_client());
@@ -283,9 +279,7 @@ mod test {
         let app_root_dir_key = unwrap!(app.get_app_dir_key());
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
 
-        let mut writer = unwrap!(file_helper.create(name.to_string(),
-                                 Vec::new(),
-                                 app_root_dir));
+        let mut writer = unwrap!(file_helper.create(name.to_string(), Vec::new(), app_root_dir));
         let data = vec![10u8; 20];
         unwrap!(writer.write(&data[..]));
         let _ = unwrap!(writer.close());
@@ -317,22 +311,14 @@ mod test {
 
         create_test_file(&app, "test_file.txt");
 
-        let details = unwrap!(super::get_file(&app,
-                                              "/test_file.txt",
-                                              false,
-                                              0, 0,
-                                              true));
+        let details = unwrap!(super::get_file(&app, "/test_file.txt", false, 0, 0, true));
         unsafe {
             let metadata = unwrap!(details.metadata.as_ref());
             let name = unwrap!(CStr::from_ptr(metadata.name).to_str());
             assert_eq!(name, "test_file.txt");
         }
 
-        assert!(super::get_file(&app,
-                                "/does_not_exist",
-                                false,
-                                0, 0,
-                                true).is_err());
+        assert!(super::get_file(&app, "/does_not_exist", false, 0, 0, true).is_err());
     }
 
     #[test]
@@ -352,7 +338,8 @@ mod test {
                                    false,
                                    Some("new_test_file.txt".to_string()),
                                    None,
-                                   None).is_ok());
+                                   None)
+            .is_ok());
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         assert_eq!(app_root_dir.get_files().len(), 1);
@@ -379,7 +366,8 @@ mod test {
                                    false,
                                    None,
                                    Some(METADATA_BASE64.to_string()),
-                                   None).is_ok());
+                                   None)
+            .is_ok());
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file("test_file.txt"));
@@ -400,12 +388,7 @@ mod test {
         create_test_file(&app, "test_file.txt");
 
         let content = "first".as_bytes().to_base64(config::get_base64_config());
-        unwrap!(super::modify_file(&app,
-                                   "/test_file.txt",
-                                   false,
-                                   None,
-                                   None,
-                                   Some(content)));
+        unwrap!(super::modify_file(&app, "/test_file.txt", false, None, None, Some(content)));
 
 
         {
@@ -420,12 +403,7 @@ mod test {
         }
 
         let content = "second".as_bytes().to_base64(config::get_base64_config());
-        unwrap!(super::modify_file(&app,
-                                   "/test_file.txt",
-                                   false,
-                                   None,
-                                   None,
-                                   Some(content)));
+        unwrap!(super::modify_file(&app, "/test_file.txt", false, None, None, Some(content)));
 
         {
             let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));

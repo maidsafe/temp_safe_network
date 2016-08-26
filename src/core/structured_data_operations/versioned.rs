@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use core::errors::CoreError;
@@ -23,6 +22,7 @@ use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_s
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 use rust_sodium::crypto::sign;
+use std::sync::{Arc, Mutex};
 
 /// Create the StructuredData to manage versioned data.
 #[cfg_attr(feature="clippy", allow(too_many_arguments))]
@@ -132,13 +132,13 @@ fn get_immutable_data(client: Arc<Mutex<Client>>,
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
-    use std::sync::{Arc, Mutex};
 
     use core::utility;
     use rand;
     use routing::XorName;
+
+    use std::sync::{Arc, Mutex};
+    use super::*;
 
     const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1001;
 

@@ -18,12 +18,12 @@
 //! Logging.
 
 use config_file_handler::FileHandler;
+
+use core::errors::CoreError;
 use libc::{c_char, int32_t};
 use maidsafe_utilities::log as safe_log;
 use std::mem;
 use std::ptr;
-
-use core::errors::CoreError;
 use super::helper;
 
 /// This function should be called to enable logging to a file
@@ -71,13 +71,13 @@ pub unsafe extern "C" fn output_log_path(c_output_flie_name: *const c_char,
 
 #[cfg(test)]
 mod test {
-    use super::*;
 
     use std::env;
-    use std::thread;
     use std::fs::File;
     use std::io::Read;
+    use std::thread;
     use std::time::Duration;
+    use super::*;
 
     // Enable this test when doing explicit file-logging
     #[test]

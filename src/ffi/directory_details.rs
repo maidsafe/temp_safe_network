@@ -17,19 +17,19 @@
 
 //! Details about directory and its content.
 
-use libc::c_char;
-use std::ffi::CString;
-use std::ptr;
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use ffi::config;
 use ffi::errors::FfiError;
 use ffi::file_details::FileMetadata;
+use libc::c_char;
 use nfs::directory_listing::DirectoryListing;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::metadata::directory_key::DirectoryKey;
 use nfs::metadata::directory_metadata::DirectoryMetadata as NfsDirectoryMetadata;
+use std::ffi::CString;
+use std::ptr;
+use std::sync::{Arc, Mutex};
 
 /// Details about a directory and its content.
 #[derive(Debug)]
@@ -54,8 +54,7 @@ impl DirectoryDetails {
     }
 
     /// Obtain `DirectoryDetails` from the given directory listing.
-    pub fn from_directory_listing(listing: DirectoryListing)
-                                  -> Result<Self, FfiError> {
+    pub fn from_directory_listing(listing: DirectoryListing) -> Result<Self, FfiError> {
         let mut details = DirectoryDetails {
             metadata: try!(DirectoryMetadata::new(listing.get_metadata())),
             files: Vec::with_capacity(listing.get_files().len()),
@@ -140,22 +139,22 @@ impl DirectoryMetadata {
 
 /// Get non-owning pointer to the directory metadata.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_metadata(
-    details: *const DirectoryDetails) -> *const DirectoryMetadata {
+pub unsafe extern "C" fn directory_details_get_metadata(details: *const DirectoryDetails)
+                                                        -> *const DirectoryMetadata {
     &(*details).metadata
 }
 
 /// Get the number of files in the directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_files_len(
-    details: *const DirectoryDetails) -> u64 {
+pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirectoryDetails) -> u64 {
     (*details).files.len() as u64
 }
 
 /// Get a non-owning pointer to the metadata of the i-th file in the directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_file_at(
-    details: *const DirectoryDetails, index: u64) -> *const FileMetadata {
+pub unsafe extern "C" fn directory_details_get_file_at(details: *const DirectoryDetails,
+                                                       index: u64)
+                                                       -> *const FileMetadata {
     let details = &*details;
     let index = index as usize;
 
@@ -176,8 +175,9 @@ pub unsafe extern "C" fn directory_details_get_sub_directories_len(
 /// Get a non-owning pointer to the metadata of the i-th sub-directory of the
 /// directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_sub_directory_at(
-    details: *const DirectoryDetails, index: u64) -> *const DirectoryMetadata {
+pub unsafe extern "C" fn directory_details_get_sub_directory_at(details: *const DirectoryDetails,
+                                                                index: u64)
+                                                                -> *const DirectoryMetadata {
     let details = &*details;
     let index = index as usize;
 

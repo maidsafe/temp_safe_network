@@ -15,17 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use core::errors::CoreError;
 use core::structured_data_operations::{unversioned, versioned};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::AccessLevel;
-use nfs::errors::NfsError;
 use nfs::directory_listing::DirectoryListing;
+use nfs::errors::NfsError;
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
+use std::sync::{Arc, Mutex};
 
 /// DirectoryHelper provides helper functions to perform Operations on Directory
 pub struct DirectoryHelper {
@@ -412,10 +412,10 @@ impl DirectoryHelper {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use std::sync::{Arc, Mutex};
     use core::utility::test_utils;
     use nfs::AccessLevel;
+    use std::sync::{Arc, Mutex};
+    use super::*;
 
     #[test]
     fn create_dir_listing() {

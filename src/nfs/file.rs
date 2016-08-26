@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::fmt;
 
 use nfs::errors::NfsError;
 use nfs::metadata::file_metadata::FileMetadata;
 use rand::{OsRng, Rand};
 use routing::XorName;
 use self_encryption::DataMap;
+use std::fmt;
 
 /// Representation of a File to be put into the network. Could be text, music, video etc any kind
 /// of file
@@ -82,10 +82,10 @@ impl fmt::Debug for File {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::metadata::file_metadata::FileMetadata;
     use self_encryption::DataMap;
+    use super::*;
 
     #[test]
     fn serialise_deserialise() {

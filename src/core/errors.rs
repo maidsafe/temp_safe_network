@@ -15,16 +15,16 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::error::Error;
-use std::fmt::{self, Debug, Display, Formatter};
-use std::sync::mpsc;
 
 use core::SelfEncryptionStorageError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use routing::DataIdentifier;
-use self_encryption::SelfEncryptionError;
 use routing::client_errors::{GetError, MutationError};
 use routing::messaging;
+use self_encryption::SelfEncryptionError;
+use std::error::Error;
+use std::fmt::{self, Debug, Display, Formatter};
+use std::sync::mpsc;
 
 /// Intended for converting Client Errors into numeric codes for propagating some error information
 /// across FFI boundaries and specially to C.
@@ -403,13 +403,13 @@ impl Error for CoreError {
 
 #[cfg(test)]
 mod test {
-    use super::*;
 
     use core::SelfEncryptionStorageError;
     use rand;
     use routing::DataIdentifier;
-    use self_encryption::SelfEncryptionError;
     use routing::client_errors::MutationError;
+    use self_encryption::SelfEncryptionError;
+    use super::*;
 
     #[test]
     fn self_encryption_error() {

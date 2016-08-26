@@ -15,11 +15,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
 
 use core::errors::CoreError;
 use self_encryption::StorageError;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 
 /// Errors arising from storage object being used by self-encryptors.
 #[derive(Debug)]

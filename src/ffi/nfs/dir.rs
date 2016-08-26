@@ -17,17 +17,17 @@
 
 //! Directory operations.
 
-use libc::{c_char, int32_t};
-use rustc_serialize::base64::FromBase64;
-use time;
 
 use ffi::app::App;
 use ffi::directory_details::DirectoryDetails;
 use ffi::errors::FfiError;
 use ffi::helper;
+use libc::{c_char, int32_t};
 use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG, VERSIONED_DIRECTORY_LISTING_TAG};
 use nfs::errors::NfsError;
 use nfs::helper::directory_helper::DirectoryHelper;
+use rustc_serialize::base64::FromBase64;
+use time;
 
 /// Create a new directory.
 #[no_mangle]
@@ -117,9 +117,7 @@ pub unsafe extern "C" fn nfs_move_dir(app_handle: *const App,
                                       retain_src: bool)
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
-        trace!("FFI move directory, from {:?} to {:?}.",
-               src_path,
-               dst_path);
+        trace!("FFI move directory, from {:?} to {:?}.", src_path, dst_path);
 
         let src_path = ffi_try!(helper::c_char_ptr_to_string(src_path));
         let dst_path = ffi_try!(helper::c_char_ptr_to_string(dst_path));
@@ -147,9 +145,8 @@ fn create_dir(app: &App,
     let dir_to_create = try!(tokens.pop().ok_or(FfiError::InvalidPath));
 
     let start_dir_key = try!(app.get_root_dir_key(is_shared));
-    let mut parent_sub_dir = try!(helper::get_final_subdirectory(app.get_client(),
-                                                                 &tokens,
-                                                                 Some(&start_dir_key)));
+    let mut parent_sub_dir =
+        try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key)));
 
     let dir_helper = DirectoryHelper::new(app.get_client());
 
@@ -197,10 +194,7 @@ fn delete_dir(app: &App, dir_path: &str, is_shared: bool) -> Result<(), FfiError
     Ok(())
 }
 
-fn get_dir(app: &App,
-           dir_path: &str,
-           is_shared: bool)
-           -> Result<DirectoryDetails, FfiError> {
+fn get_dir(app: &App, dir_path: &str, is_shared: bool) -> Result<DirectoryDetails, FfiError> {
     let directory = try!(helper::get_directory(app, dir_path, is_shared));
     DirectoryDetails::from_directory_listing(directory)
 }
@@ -222,8 +216,7 @@ fn modify_dir(app: &App,
     }
 
     if let Some(metadata) = new_metadata {
-        let metadata = try!(parse_result!(metadata.from_base64(),
-                                          "Failed to convert from base64"));
+        let metadata = try!(parse_result!(metadata.from_base64(), "Failed to convert from base64"));
         dir_to_modify.get_mut_metadata().set_user_metadata(metadata);
     }
 
@@ -249,10 +242,9 @@ fn move_dir(app: &App,
     }
 
     let org_parent_of_src_dir = try!(src_dir.get_metadata()
-                                            .get_parent_dir_key()
-                                            .cloned()
-                                            .ok_or(FfiError::from("Parent directory not \
-                                                                   found")));
+        .get_parent_dir_key()
+        .cloned()
+        .ok_or(FfiError::from("Parent directory not found")));
 
     if retain_src {
         let name = src_dir.get_metadata().get_name().to_owned();
@@ -262,12 +254,12 @@ fn move_dir(app: &App,
         let modified_time = *src_dir.get_metadata().get_modified_time();
         let (mut dir, _) = try!(directory_helper.create(name,
                                                         src_dir.get_metadata()
-                                                               .get_key()
-                                                               .get_type_tag(),
+                                                            .get_key()
+                                                            .get_type_tag(),
                                                         user_metadata,
                                                         src_dir.get_metadata()
-                                                               .get_key()
-                                                               .is_versioned(),
+                                                            .get_key()
+                                                            .is_versioned(),
                                                         access_level,
                                                         Some(&mut dst_dir)));
         src_dir.get_files().iter().all(|file| {
@@ -275,24 +267,24 @@ fn move_dir(app: &App,
             true
         });
         src_dir.get_sub_directories()
-               .iter()
-               .all(|sub_dir| {
-                   dir.get_mut_sub_directories().push(sub_dir.clone());
-                   true
-               });
+            .iter()
+            .all(|sub_dir| {
+                dir.get_mut_sub_directories().push(sub_dir.clone());
+                true
+            });
         dir.get_mut_metadata().set_created_time(created_time);
         dir.get_mut_metadata().set_modified_time(modified_time);
         let _ = try!(directory_helper.update(&dir));
     } else {
         src_dir.get_mut_metadata()
-               .set_parent_dir_key(Some(dst_dir.get_metadata().get_key().clone()));
+            .set_parent_dir_key(Some(dst_dir.get_metadata().get_key().clone()));
         dst_dir.upsert_sub_directory(src_dir.get_metadata().clone());
         let _ = try!(directory_helper.update(&dst_dir));
         let _ = try!(directory_helper.update(&src_dir));
         let mut parent_of_src_dir = try!(directory_helper.get(&org_parent_of_src_dir));
         // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
         let _dir_meta = try!(parent_of_src_dir.remove_sub_directory(src_dir.get_metadata()
-                                                                           .get_name()));
+            .get_name()));
         let _ = try!(directory_helper.update(&parent_of_src_dir));
     }
 
@@ -301,13 +293,13 @@ fn move_dir(app: &App,
 
 #[cfg(test)]
 mod test {
-    use rustc_serialize::base64::ToBase64;
-    use std::ffi::CStr;
+    use ffi::{config, test_utils};
 
     use ffi::app::App;
-    use ffi::{config, test_utils};
-    use nfs::helper::directory_helper::DirectoryHelper;
     use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
+    use nfs::helper::directory_helper::DirectoryHelper;
+    use rustc_serialize::base64::ToBase64;
+    use std::ffi::CStr;
 
     fn create_test_dir(app: &App, name: &str) {
         let app_dir_key = unwrap!(app.get_app_dir_key());
@@ -326,40 +318,27 @@ mod test {
         let app = test_utils::create_app(false);
         let user_metadata = "InNhbXBsZSBtZXRhZGF0YSI=".to_string();
 
-        assert!(super::create_dir(&app,
-                                  "/",
-                                  &user_metadata,
-                                  true,
-                                  false,
-                                  false).is_err());
+        assert!(super::create_dir(&app, "/", &user_metadata, true, false, false).is_err());
 
         assert!(super::create_dir(&app,
                                   "/test_dir/secondlevel",
                                   &user_metadata,
                                   true,
                                   false,
-                                  false).is_err());
+                                  false)
+            .is_err());
 
-        assert!(super::create_dir(&app,
-                                  "/test_dir",
-                                  &user_metadata,
-                                  true,
-                                  false,
-                                  false).is_ok());
+        assert!(super::create_dir(&app, "/test_dir", &user_metadata, true, false, false).is_ok());
 
-        assert!(super::create_dir(&app,
-                                  "/test_dir2",
-                                  &user_metadata,
-                                  true,
-                                  false,
-                                  false).is_ok());
+        assert!(super::create_dir(&app, "/test_dir2", &user_metadata, true, false, false).is_ok());
 
         assert!(super::create_dir(&app,
                                   "/test_dir/secondlevel",
                                   &user_metadata,
                                   true,
                                   false,
-                                  false).is_ok());
+                                  false)
+            .is_ok());
 
         let dir_helper = DirectoryHelper::new(app.get_client());
         let app_dir = unwrap!(dir_helper.get(&unwrap!(app.get_app_dir_key())));
@@ -430,7 +409,8 @@ mod test {
                                   "/test_dir",
                                   false,
                                   Some("new_test_dir".to_string()),
-                                  None).is_ok());
+                                  None)
+            .is_ok());
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         assert_eq!(app_root_dir.get_sub_directories().len(), 1);
@@ -457,13 +437,14 @@ mod test {
                                   "/test_dir",
                                   false,
                                   None,
-                                  Some(METADATA_BASE64.to_string())).is_ok());
+                                  Some(METADATA_BASE64.to_string()))
+            .is_ok());
 
         let dir_to_modify = unwrap!(dir_helper.get(dir_key));
         assert!(dir_to_modify.get_metadata().get_user_metadata().len() > 0);
         assert_eq!(dir_to_modify.get_metadata()
-                                .get_user_metadata()
-                                .to_base64(config::get_base64_config()),
+                       .get_user_metadata()
+                       .to_base64(config::get_base64_config()),
                    METADATA_BASE64.to_string());
     }
 
@@ -483,10 +464,7 @@ mod test {
         let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
         assert_eq!(dst_dir.get_sub_directories().len(), 0);
 
-        assert!(super::move_dir(&app,
-                                "/test_dir_a", false,
-                                "/test_dir_b", false,
-                                false).is_ok());
+        assert!(super::move_dir(&app, "/test_dir_a", false, "/test_dir_b", false, false).is_ok());
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         assert_eq!(app_root_dir.get_sub_directories().len(), 1);
@@ -511,10 +489,7 @@ mod test {
         let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
         assert_eq!(dst_dir.get_sub_directories().len(), 0);
 
-        assert!(super::move_dir(&app,
-                                "/test_dir_a", false,
-                                "/test_dir_b", false,
-                                true).is_ok());
+        assert!(super::move_dir(&app, "/test_dir_a", false, "/test_dir_b", false, true).is_ok());
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         assert_eq!(app_root_dir.get_sub_directories().len(), 2);

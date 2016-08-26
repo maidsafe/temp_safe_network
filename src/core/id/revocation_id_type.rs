@@ -17,8 +17,8 @@
 
 use core::id::IdTypeTags;
 use routing::XorName;
-use rust_sodium::crypto::sign;
 use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign;
 
 /// RevocationIdType
 ///
@@ -97,12 +97,12 @@ impl RevocationIdType {
 
 #[cfg(test)]
 mod test {
-    use rand;
-    use super::*;
-    use rand::Rng;
     use core::id::{MaidTypeTags, MpidTypeTags, Random};
-    use rust_sodium::crypto::sign;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use rand;
+    use rand::Rng;
+    use rust_sodium::crypto::sign;
+    use super::*;
 
 
     impl Random for RevocationIdType {

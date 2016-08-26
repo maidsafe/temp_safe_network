@@ -18,13 +18,13 @@
 //! Structure representing application registered with the launcher + set of
 //! FFI operations on it.
 
+
+use core::client::Client;
 use libc::{c_char, int32_t};
+use nfs::metadata::directory_key::DirectoryKey;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-
-use core::client::Client;
-use nfs::metadata::directory_key::DirectoryKey;
 use super::errors::FfiError;
 use super::helper;
 use super::launcher_config_handler;
@@ -82,7 +82,7 @@ impl App {
 
     /// Has this app access to the SAFEdrive?
     pub fn has_safe_drive_access(&self) -> bool {
-      self.safe_drive_access
+        self.safe_drive_access
     }
 
     /// Get root directory key: for shared paths, this is the SAFEdrive directory,
@@ -114,16 +114,12 @@ pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let app_name = ffi_try!(helper::c_char_ptr_to_string(app_name));
-        let app_id   = ffi_try!(helper::c_char_ptr_to_string(app_id));
-        let vendor   = ffi_try!(helper::c_char_ptr_to_string(vendor));
+        let app_id = ffi_try!(helper::c_char_ptr_to_string(app_id));
+        let vendor = ffi_try!(helper::c_char_ptr_to_string(vendor));
 
         let session = (*session_handle).clone();
 
-        let app = ffi_try!(App::registered(session,
-                                           app_name,
-                                           app_id,
-                                           vendor,
-                                           safe_drive_access));
+        let app = ffi_try!(App::registered(session, app_name, app_id, vendor, safe_drive_access));
 
         *app_handle = Box::into_raw(Box::new(app));
         0

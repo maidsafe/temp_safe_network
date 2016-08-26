@@ -17,21 +17,21 @@
 
 //! Operations on file writer
 
-use libc::{c_char, int32_t};
-use rustc_serialize::base64::FromBase64;
-use self_encryption::DataMap;
-use std::mem;
-use std::slice;
 
 use core::SelfEncryptionStorage;
 use ffi::app::App;
 use ffi::errors::FfiError;
 use ffi::helper;
+use libc::{c_char, int32_t};
 use nfs::errors::NfsError;
 use nfs::file::File;
-use nfs::helper::writer::Writer as InnerWriter;
 use nfs::helper::writer::Mode;
+use nfs::helper::writer::Writer as InnerWriter;
 use nfs::metadata::file_metadata::FileMetadata;
+use rustc_serialize::base64::FromBase64;
+use self_encryption::DataMap;
+use std::mem;
+use std::slice;
 
 /// File writer.
 pub struct Writer {
@@ -60,10 +60,7 @@ pub unsafe extern "C" fn nfs_create_file(app_handle: *const App,
         let file_path = ffi_try!(helper::c_char_ptr_to_str(file_path));
         let user_metadata = ffi_try!(helper::c_char_ptr_to_str(user_metadata));
 
-        let writer = ffi_try!(create_file(&*app_handle,
-                                          file_path,
-                                          user_metadata,
-                                          is_path_shared));
+        let writer = ffi_try!(create_file(&*app_handle, file_path, user_metadata, is_path_shared));
 
         *writer_handle = Box::into_raw(Box::new(writer));
         0
@@ -149,10 +146,7 @@ fn create_file(app: &App,
     })
 }
 
-fn writer_open(app: &App,
-               file_path: &str,
-               is_path_shared: bool)
-               -> Result<Writer, FfiError> {
+fn writer_open(app: &App, file_path: &str, is_path_shared: bool) -> Result<Writer, FfiError> {
     let (directory, file_name) =
         try!(helper::get_directory_and_file(app, file_path, is_path_shared));
 
@@ -177,11 +171,11 @@ fn writer_open(app: &App,
 
 #[cfg(test)]
 mod test {
-    use std::str;
 
     use ffi::test_utils;
     use nfs::helper::directory_helper::DirectoryHelper;
     use nfs::helper::file_helper::FileHelper;
+    use std::str;
 
     #[test]
     fn create_file() {
@@ -191,10 +185,8 @@ mod test {
         let dir_helper = DirectoryHelper::new(app.get_client());
         let mut file_helper = FileHelper::new(app.get_client());
 
-        let mut writer = unwrap!(super::create_file(&app,
-                                                    "/test_file.txt",
-                                                    METADATA_BASE64,
-                                                    false));
+        let mut writer =
+            unwrap!(super::create_file(&app, "/test_file.txt", METADATA_BASE64, false));
         unwrap!(writer.inner.write("hello world".as_bytes()));
         let _ = unwrap!(writer.close());
 

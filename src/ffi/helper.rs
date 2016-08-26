@@ -15,22 +15,22 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use libc::{c_char, int32_t, int64_t};
-use std::error::Error;
-use std::ffi::CStr;
-use std::panic;
-use std::ptr;
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use ffi::app::App;
 use ffi::config::SAFE_DRIVE_DIR_NAME;
 use ffi::errors::FfiError;
+use libc::{c_char, int32_t, int64_t};
 use nfs::AccessLevel;
+use nfs::UNVERSIONED_DIRECTORY_LISTING_TAG;
 use nfs::directory_listing::DirectoryListing;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::metadata::directory_key::DirectoryKey;
-use nfs::UNVERSIONED_DIRECTORY_LISTING_TAG;
+use std::error::Error;
+use std::ffi::CStr;
+use std::panic;
+use std::ptr;
+use std::sync::{Arc, Mutex};
 
 #[allow(unsafe_code)]
 pub fn c_char_ptr_to_string(c_char_ptr: *const c_char) -> Result<String, FfiError> {
@@ -50,8 +50,8 @@ pub fn c_char_ptr_to_opt_string(c_char_ptr: *const c_char) -> Result<Option<Stri
 #[allow(unsafe_code)]
 pub unsafe fn c_char_ptr_to_str(c_char_ptr: *const c_char) -> Result<&'static str, FfiError> {
     CStr::from_ptr(c_char_ptr)
-         .to_str()
-         .map_err(|error| FfiError::from(error.description()))
+        .to_str()
+        .map_err(|error| FfiError::from(error.description()))
 }
 
 // TODO: add c_char_ptr_to_str and c_char_ptr_to_opt_str (return &str instead of String)
@@ -143,13 +143,14 @@ pub fn get_directory(app: &App, path: &str, is_shared: bool) -> Result<Directory
     get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key))
 }
 
-pub fn get_directory_and_file(app: &App, path: &str, is_shared: bool)
+pub fn get_directory_and_file(app: &App,
+                              path: &str,
+                              is_shared: bool)
                               -> Result<(DirectoryListing, String), FfiError> {
     let start_dir_key = try!(app.get_root_dir_key(is_shared));
     let mut tokens = tokenise_path(path, false);
     let file_name = try!(tokens.pop().ok_or(FfiError::PathNotFound));
-    let directory_listing = try!(get_final_subdirectory(app.get_client(),
-                                                        &tokens,
-                                                        Some(&start_dir_key)));
+    let directory_listing =
+        try!(get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key)));
     Ok((directory_listing, file_name))
 }

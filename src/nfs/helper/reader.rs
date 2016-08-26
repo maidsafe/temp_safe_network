@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
+use core::{SelfEncryptionStorage, SelfEncryptionStorageError};
 
 use core::client::Client;
-use core::{SelfEncryptionStorage, SelfEncryptionStorageError};
 use nfs::errors::NfsError;
 use nfs::file::File;
 use self_encryption::SelfEncryptor;
+use std::sync::{Arc, Mutex};
 
 /// Reader is used to read contents of a File. It can read in chunks if the file happens to be very
 /// large

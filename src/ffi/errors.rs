@@ -17,14 +17,14 @@
 
 //! Errors thrown by the FFI operations
 
-use std::ffi::NulError;
-use std::fmt;
 
 use core::errors::CoreError;
 use dns::errors::{DNS_ERROR_START_RANGE, DnsError};
 use maidsafe_utilities::serialisation::SerialisationError;
 use nfs::errors::NfsError;
 use rustc_serialize::{base64, json};
+use std::ffi::NulError;
+use std::fmt;
 
 /// Intended for converting Launcher Errors into numeric codes for propagating some error
 /// information across FFI boundaries and specially to C.
@@ -174,9 +174,7 @@ impl fmt::Debug for FfiError {
             FfiError::UnsuccessfulEncodeDecode(ref error) => {
                 write!(f, "FfiError::UnsuccessfulEncodeDecode -> {:?}", error)
             }
-            FfiError::NulError(ref error) => {
-                write!(f, "FfiError::NulError -> {:?}", error)
-            }
+            FfiError::NulError(ref error) => write!(f, "FfiError::NulError -> {:?}", error),
         }
     }
 }

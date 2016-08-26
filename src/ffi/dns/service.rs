@@ -17,7 +17,6 @@
 
 //! DNS service operations
 
-use libc::{c_char, int32_t};
 
 use dns::dns_operations::DnsOperations;
 use ffi::app::App;
@@ -25,6 +24,7 @@ use ffi::directory_details::DirectoryDetails;
 use ffi::errors::FfiError;
 use ffi::helper;
 use ffi::string_list::{self, StringList};
+use libc::{c_char, int32_t};
 
 /// Add service.
 #[no_mangle]
@@ -97,8 +97,7 @@ pub unsafe extern "C" fn dns_get_services(app_handle: *const App,
     helper::catch_unwind_i32(|| {
         let long_name = ffi_try!(helper::c_char_ptr_to_string(long_name));
 
-        trace!("FFI Get all services for dns with name: {}",
-               long_name);
+        trace!("FFI Get all services for dns with name: {}", long_name);
 
         let list = ffi_try!(get_services(&*app_handle, &long_name));
         *list_handle = ffi_try!(string_list::into_ptr(list));
@@ -132,23 +131,22 @@ fn delete_service(app: &App, long_name: String, service_name: String) -> Result<
     let signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
     let dns_ops = try!(DnsOperations::new(client));
 
-    try!(dns_ops.remove_service(&long_name,
-                                service_name,
-                                &signing_key,
-                                None));
+    try!(dns_ops.remove_service(&long_name, service_name, &signing_key, None));
 
     Ok(())
 }
 
-fn get_service_dir(app: &App, long_name: &str, service_name: &str) -> Result<DirectoryDetails, FfiError> {
+fn get_service_dir(app: &App,
+                   long_name: &str,
+                   service_name: &str)
+                   -> Result<DirectoryDetails, FfiError> {
     let dns_operations = match app.get_app_dir_key() {
         Some(_) => try!(DnsOperations::new(app.get_client())),
         None => DnsOperations::new_unregistered(app.get_client()),
     };
 
-    let directory_key = try!(dns_operations.get_service_home_directory_key(long_name,
-                                                                           service_name,
-                                                                           None));
+    let directory_key =
+        try!(dns_operations.get_service_home_directory_key(long_name, service_name, None));
     DirectoryDetails::from_directory_key(app.get_client(), directory_key)
 }
 
@@ -184,11 +182,8 @@ mod test {
                                           Some(&mut app_root_dir)));
 
         unwrap!(long_name::register_long_name(&app, public_name.clone()));
-        assert!(super::add_service(&app,
-                                   public_name,
-                                   "www".to_string(),
-                                   "/test_dir",
-                                   false).is_ok());
+        assert!(super::add_service(&app, public_name, "www".to_string(), "/test_dir", false)
+            .is_ok());
     }
 
     #[test]
