@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use core::errors::CoreError;
 use core::self_encryption_storage_error::SelfEncryptionStorageError;
 use routing::{Data, DataIdentifier, ImmutableData, XOR_NAME_LEN, XorName};
 use self_encryption::Storage;
+use std::sync::{Arc, Mutex};
 
 /// Network storage is the concrete type which self-encryption crate will use to put or get data
 /// from the network

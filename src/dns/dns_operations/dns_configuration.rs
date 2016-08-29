@@ -17,16 +17,16 @@
 
 //! Dns operations. Implementation for some of the `dns` module
 
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use dns::errors::DnsError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::errors::NfsError;
-use nfs::helper::writer::Mode;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::helper::file_helper::FileHelper;
+use nfs::helper::writer::Mode;
 use rust_sodium::crypto::box_;
+use std::sync::{Arc, Mutex};
 
 const DNS_CONFIG_DIR_NAME: &'static str = "DnsReservedDirectory";
 const DNS_CONFIG_FILE_NAME: &'static str = "DnsConfigurationFile";
@@ -108,11 +108,11 @@ pub fn write_dns_configuration_data(client: Arc<Mutex<Client>>,
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use rust_sodium::crypto::box_;
-    use std::sync::{Arc, Mutex};
     use core::utility;
     use core::utility::test_utils;
+    use rust_sodium::crypto::box_;
+    use std::sync::{Arc, Mutex};
+    use super::*;
 
     #[test]
     fn read_write_dns_configuration_file() {

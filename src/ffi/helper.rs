@@ -15,25 +15,59 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::error::Error;
-use std::ffi::CStr;
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
+use ffi::app::App;
 use ffi::config::SAFE_DRIVE_DIR_NAME;
 use ffi::errors::FfiError;
-use libc::c_char;
+use libc::{c_char, int32_t, int64_t};
 use nfs::AccessLevel;
+use nfs::UNVERSIONED_DIRECTORY_LISTING_TAG;
 use nfs::directory_listing::DirectoryListing;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::metadata::directory_key::DirectoryKey;
-use nfs::UNVERSIONED_DIRECTORY_LISTING_TAG;
+use std::error::Error;
+use std::ffi::CStr;
+use std::panic;
+use std::ptr;
+use std::sync::{Arc, Mutex};
 
 #[allow(unsafe_code)]
 pub fn c_char_ptr_to_string(c_char_ptr: *const c_char) -> Result<String, FfiError> {
     let cstr = unsafe { CStr::from_ptr(c_char_ptr) };
-    Ok(try!(String::from_utf8(cstr.to_bytes().iter().cloned().collect())
+    Ok(try!(String::from_utf8(cstr.to_bytes().to_vec())
         .map_err(|error| FfiError::from(error.description()))))
+}
+
+pub fn c_char_ptr_to_opt_string(c_char_ptr: *const c_char) -> Result<Option<String>, FfiError> {
+    if c_char_ptr.is_null() {
+        Ok(None)
+    } else {
+        Ok(Some(try!(c_char_ptr_to_string(c_char_ptr))))
+    }
+}
+
+#[allow(unsafe_code)]
+pub unsafe fn c_char_ptr_to_str(c_char_ptr: *const c_char) -> Result<&'static str, FfiError> {
+    CStr::from_ptr(c_char_ptr)
+        .to_str()
+        .map_err(|error| FfiError::from(error.description()))
+}
+
+// TODO: add c_char_ptr_to_str and c_char_ptr_to_opt_str (return &str instead of String)
+
+pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
+    let errno: i32 = FfiError::Unexpected(String::new()).into();
+    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(errno)
+}
+
+pub fn catch_unwind_i64<F: FnOnce() -> int64_t>(f: F) -> int64_t {
+    let errno: i32 = FfiError::Unexpected(String::new()).into();
+    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(errno as i64)
+}
+
+pub fn catch_unwind_ptr<T, F: FnOnce() -> *const T>(f: F) -> *const T {
+    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(ptr::null())
 }
 
 pub fn tokenise_path(path: &str, keep_empty_splits: bool) -> Vec<String> {
@@ -100,4 +134,23 @@ pub fn get_final_subdirectory(client: Arc<Mutex<Client>>,
     }
 
     Ok(current_dir_listing)
+}
+
+// Return a DirectoryListing corresponding to the path.
+pub fn get_directory(app: &App, path: &str, is_shared: bool) -> Result<DirectoryListing, FfiError> {
+    let start_dir_key = try!(app.get_root_dir_key(is_shared));
+    let tokens = tokenise_path(path, false);
+    get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key))
+}
+
+pub fn get_directory_and_file(app: &App,
+                              path: &str,
+                              is_shared: bool)
+                              -> Result<(DirectoryListing, String), FfiError> {
+    let start_dir_key = try!(app.get_root_dir_key(is_shared));
+    let mut tokens = tokenise_path(path, false);
+    let file_name = try!(tokens.pop().ok_or(FfiError::PathNotFound));
+    let directory_listing =
+        try!(get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key)));
+    Ok((directory_listing, file_name))
 }

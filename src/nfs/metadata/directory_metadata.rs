@@ -174,12 +174,12 @@ impl Decodable for DirectoryMetadata {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use rand;
-    use routing::XorName;
-    use nfs::metadata::directory_key::DirectoryKey;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::AccessLevel;
+    use nfs::metadata::directory_key::DirectoryKey;
+    use rand;
+    use routing::XorName;
+    use super::*;
 
     #[test]
     fn serialise_directory_metadata_without_parent_directory() {

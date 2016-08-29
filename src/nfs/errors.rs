@@ -15,12 +15,12 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::fmt;
+use core::SelfEncryptionStorageError;
 
 use core::errors::{CLIENT_ERROR_START_RANGE, CoreError};
-use core::SelfEncryptionStorageError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use self_encryption::SelfEncryptionError;
+use std::fmt;
 
 /// Intended for converting NFS Errors into numeric codes for propagating some error information
 /// across FFI boundaries and specially to C.

@@ -15,17 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
+use core::SelfEncryptionStorage;
 
 use core::client::Client;
 use core::errors::CoreError;
-use core::SelfEncryptionStorage;
 use core::structured_data_operations::{self, DataFitResult};
 use core::utility;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
-use self_encryption::{DataMap, SelfEncryptor};
 use rust_sodium::crypto::{box_, sign};
+use self_encryption::{DataMap, SelfEncryptor};
+use std::sync::{Arc, Mutex};
 
 #[allow(variant_size_differences)]
 #[derive(Clone, RustcEncodable, RustcDecodable, PartialEq)]
@@ -210,12 +210,12 @@ fn get_decoded_stored_data(raw_data: &[u8],
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use core::utility;
     use rand;
     use routing::XorName;
-    use std::sync::{Arc, Mutex};
     use rust_sodium::crypto::box_;
-    use core::utility;
+    use std::sync::{Arc, Mutex};
+    use super::*;
 
     const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1000;
 

@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::convert::From;
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use core::errors::CoreError;
@@ -25,10 +23,12 @@ use dns::errors::DnsError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::{Data, DataIdentifier, StructuredData, XorName};
-use routing::client_errors::{GetError, MutationError};
 use routing::TYPE_TAG_DNS_PACKET;
+use routing::client_errors::{GetError, MutationError};
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256;
+use std::convert::From;
+use std::sync::{Arc, Mutex};
 
 pub mod dns_configuration;
 
@@ -348,7 +348,6 @@ struct Dns {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use core::client::Client;
     use core::utility::{generate_random_string, test_utils};
     use dns::errors::DnsError;
@@ -357,6 +356,7 @@ mod test {
     use routing::{XOR_NAME_LEN, XorName};
     use rust_sodium::crypto::box_;
     use std::sync::{Arc, Mutex};
+    use super::*;
 
     #[test]
     fn register_and_delete_dns() {

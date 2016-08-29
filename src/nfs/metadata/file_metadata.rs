@@ -145,8 +145,8 @@ impl Decodable for FileMetadata {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use super::*;
 
     #[test]
     fn serialise_and_deserialise_file_metadata() {

@@ -15,15 +15,15 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
+use core::{SelfEncryptionStorage, utility};
 
 use core::client::Client;
 use core::errors::CoreError;
-use core::{SelfEncryptionStorage, utility};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, XorName};
-use self_encryption::{DataMap, SelfEncryptor};
 use rust_sodium::crypto::box_::{Nonce, PublicKey, SecretKey};
+use self_encryption::{DataMap, SelfEncryptor};
+use std::sync::{Arc, Mutex};
 
 // TODO(Spandan) Ask Routing to define this constant and use it from there
 const MAX_IMMUT_DATA_SIZE_IN_BYTES: usize = 1024 * 1024;
@@ -118,14 +118,14 @@ pub fn get_data(client: Arc<Mutex<Client>>,
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
-    use std::sync::{Arc, Mutex};
-
-    use routing::Data;
     use core::utility;
     use core::utility::test_utils;
+
+    use routing::Data;
     use rust_sodium::crypto::box_;
+
+    use std::sync::{Arc, Mutex};
+    use super::*;
 
     // TODO It takes a very long time in debug mode - it is due to S.E crate.
     #[test]

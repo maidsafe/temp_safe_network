@@ -15,20 +15,20 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
 
 use core::client::Client;
 use ffi::config::{LAUNCHER_GLOBAL_CONFIG_FILE_NAME, LAUNCHER_GLOBAL_DIRECTORY_NAME};
 use ffi::errors::FfiError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::directory_listing::DirectoryListing;
 use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
+use nfs::directory_listing::DirectoryListing;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode::Overwrite;
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::XorName;
 use rust_sodium::crypto::hash::sha256;
+use std::sync::{Arc, Mutex};
 
 #[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct LauncherConfiguration {

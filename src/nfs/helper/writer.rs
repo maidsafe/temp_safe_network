@@ -15,15 +15,15 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
+use core::{SelfEncryptionStorage, SelfEncryptionStorageError};
 
 use core::client::Client;
-use core::{SelfEncryptionStorage, SelfEncryptionStorageError};
 use nfs::directory_listing::DirectoryListing;
 use nfs::errors::NfsError;
 use nfs::file::File;
 use nfs::helper::directory_helper::DirectoryHelper;
 use self_encryption::SequentialEncryptor;
+use std::sync::{Arc, Mutex};
 
 /// Mode of the writer
 pub enum Mode {

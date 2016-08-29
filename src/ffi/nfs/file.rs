@@ -1,0 +1,419 @@
+// Copyright 2016 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// licence you accepted on initial access to the Software (the "Licences").
+//
+// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
+// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+//
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.
+//
+// Please review the Licences for the specific language governing permissions and limitations
+// relating to use of the SAFE Network Software.
+
+//! File operations
+
+
+use ffi::app::App;
+use ffi::errors::FfiError;
+use ffi::file_details::{FileDetails, FileMetadata};
+use ffi::helper;
+use libc::{c_char, int32_t};
+use nfs::errors::NfsError;
+use nfs::file::File;
+use nfs::helper::directory_helper::DirectoryHelper;
+use nfs::helper::file_helper::FileHelper;
+use nfs::helper::writer::Mode;
+use rustc_serialize::base64::FromBase64;
+use time;
+
+
+/// Delete a file.
+#[no_mangle]
+pub unsafe extern "C" fn nfs_delete_file(app_handle: *const App,
+                                         file_path: *const c_char,
+                                         is_shared: bool)
+                                         -> int32_t {
+    helper::catch_unwind_i32(|| {
+        trace!("FFI delete file, given the path.");
+        let file_path = ffi_try!(helper::c_char_ptr_to_str(file_path));
+        ffi_try!(delete_file(&*app_handle, file_path, is_shared));
+        0
+    })
+}
+
+/// Get file. The returned FileDetails pointer must be disposed of by calling
+/// `file_details_drop` when no longer needed.
+#[no_mangle]
+pub unsafe extern "C" fn nfs_get_file(app_handle: *const App,
+                                      offset: i64,
+                                      length: i64,
+                                      file_path: *const c_char,
+                                      is_path_shared: bool,
+                                      include_metadata: bool,
+                                      details_handle: *mut *mut FileDetails)
+                                      -> int32_t {
+    helper::catch_unwind_i32(|| {
+        trace!("FFI get file, given the path.");
+
+        let file_path = ffi_try!(helper::c_char_ptr_to_str(file_path));
+
+        let response = ffi_try!(get_file(&*app_handle,
+                                         file_path,
+                                         is_path_shared,
+                                         offset,
+                                         length,
+                                         include_metadata));
+
+        *details_handle = Box::into_raw(Box::new(response));
+        0
+    })
+}
+
+/// Modify name, metadata or content of the file.
+#[no_mangle]
+pub unsafe extern "C" fn nfs_modify_file(app_handle: *const App,
+                                         file_path: *const c_char,
+                                         is_shared: bool,
+                                         new_name: *const c_char,
+                                         new_metadata: *const c_char,
+                                         new_content: *const c_char)
+                                         -> int32_t {
+    helper::catch_unwind_i32(|| {
+        trace!("FFI modify file, given the path.");
+
+        let file_path = ffi_try!(helper::c_char_ptr_to_str(file_path));
+        let new_name = ffi_try!(helper::c_char_ptr_to_opt_string(new_name));
+        let new_metadata = ffi_try!(helper::c_char_ptr_to_opt_string(new_metadata));
+        let new_content = ffi_try!(helper::c_char_ptr_to_opt_string(new_content));
+
+        ffi_try!(modify_file(&*app_handle,
+                             file_path,
+                             is_shared,
+                             new_name,
+                             new_metadata,
+                             new_content));
+        0
+    })
+}
+
+/// Move or copy a file.
+#[no_mangle]
+pub unsafe extern "C" fn nfs_move_file(app_handle: *const App,
+                                       src_path: *const c_char,
+                                       is_src_path_shared: bool,
+                                       dst_path: *const c_char,
+                                       is_dst_path_shared: bool,
+                                       retain_src: bool)
+                                       -> int32_t {
+    helper::catch_unwind_i32(|| {
+        trace!("FFI move file, from {:?} to {:?}.", src_path, dst_path);
+
+        let src_path = ffi_try!(helper::c_char_ptr_to_str(src_path));
+        let dst_path = ffi_try!(helper::c_char_ptr_to_str(dst_path));
+
+        ffi_try!(move_file(&*app_handle,
+                           src_path,
+                           is_src_path_shared,
+                           dst_path,
+                           is_dst_path_shared,
+                           retain_src));
+        0
+    })
+}
+
+/// Get file metadata. The returned pointer must be disposed of by calling
+/// `file_metadata_drop` when no longer needed.
+#[no_mangle]
+pub unsafe extern "C" fn nfs_get_file_metadata(app_handle: *const App,
+                                               file_path: *const c_char,
+                                               is_path_shared: bool,
+                                               metadata_handle: *mut *mut FileMetadata)
+                                               -> int32_t {
+    helper::catch_unwind_i32(|| {
+        trace!("FFI get file metadata, given the path.");
+        let file_path = ffi_try!(helper::c_char_ptr_to_str(file_path));
+        let metadata = ffi_try!(get_file_metadata(&*app_handle, file_path, is_path_shared));
+        *metadata_handle = Box::into_raw(Box::new(metadata));
+        0
+    })
+}
+
+fn delete_file(app: &App, file_path: &str, is_shared: bool) -> Result<(), FfiError> {
+    let (mut directory, file_name) =
+        try!(helper::get_directory_and_file(app, file_path, is_shared));
+
+    let file_helper = FileHelper::new(app.get_client());
+    let _ = try!(file_helper.delete(file_name, &mut directory));
+
+    Ok(())
+}
+
+fn get_file(app: &App,
+            file_path: &str,
+            is_path_shared: bool,
+            offset: i64,
+            length: i64,
+            include_metadata: bool)
+            -> Result<FileDetails, FfiError> {
+    let (directory, file_name) =
+        try!(helper::get_directory_and_file(app, file_path, is_path_shared));
+    let file = try!(directory.find_file(&file_name).ok_or(FfiError::InvalidPath));
+
+    FileDetails::new(file, app.get_client(), offset, length, include_metadata)
+}
+
+fn modify_file(app: &App,
+               file_path: &str,
+               is_shared: bool,
+               new_name: Option<String>,
+               new_metadata: Option<String>,
+               new_content: Option<String>)
+               -> Result<(), FfiError> {
+    if new_name.is_none() && new_metadata.is_none() && new_content.is_none() {
+        return Err(FfiError::from("Optional parameters could not be parsed"));
+    }
+
+    let (mut directory, file_name) =
+        try!(helper::get_directory_and_file(app, file_path, is_shared));
+    let mut file = try!(directory.find_file(&file_name)
+        .cloned()
+        .ok_or(FfiError::InvalidPath));
+
+    let mut file_helper = FileHelper::new(app.get_client());
+
+    let mut metadata_updated = false;
+    if let Some(name) = new_name {
+        file.get_mut_metadata().set_name(name);
+        metadata_updated = true;
+    }
+
+    if let Some(metadata) = new_metadata {
+        let metadata = try!(parse_result!(metadata.from_base64(), "Failed to convert from base64"));
+        file.get_mut_metadata().set_user_metadata(metadata);
+        metadata_updated = true;
+    }
+
+    if metadata_updated {
+        file.get_mut_metadata().set_modified_time(time::now_utc());
+        let _ = try!(file_helper.update_metadata(file.clone(), &mut directory));
+    }
+
+    if let Some(content) = new_content {
+        let mut writer = try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory));
+        let bytes = try!(parse_result!(content.from_base64(), "Failed to convert from base64"));
+        try!(writer.write(&bytes[..]));
+        let _ = try!(writer.close());
+    }
+
+    Ok(())
+}
+
+fn move_file(app: &App,
+             src_path: &str,
+             is_src_path_shared: bool,
+             dst_path: &str,
+             is_dst_path_shared: bool,
+             retain_src: bool)
+             -> Result<(), FfiError> {
+    let directory_helper = DirectoryHelper::new(app.get_client());
+    let (mut src_dir, src_file_name) =
+        try!(helper::get_directory_and_file(app, src_path, is_src_path_shared));
+    let mut dst_dir = try!(helper::get_directory(app, dst_path, is_dst_path_shared));
+
+    if dst_dir.find_file(&src_file_name).is_some() {
+        return Err(FfiError::from(NfsError::FileAlreadyExistsWithSameName));
+    }
+
+    let mut file = match src_dir.find_file(&src_file_name).cloned() {
+        Some(file) => file,
+        None => return Err(FfiError::PathNotFound),
+    };
+
+    if retain_src {
+        file = try!(File::new(file.get_metadata().clone(), file.get_datamap().clone()));
+    }
+
+    dst_dir.upsert_file(file);
+
+    let _ = try!(directory_helper.update(&dst_dir));
+
+    if !retain_src {
+        let _ = try!(src_dir.remove_file(&src_file_name));
+        let _ = try!(directory_helper.update(&src_dir));
+    }
+
+    Ok(())
+}
+
+fn get_file_metadata(app: &App,
+                     file_path: &str,
+                     is_path_shared: bool)
+                     -> Result<FileMetadata, FfiError> {
+    let (directory, file_name) =
+        try!(helper::get_directory_and_file(app, file_path, is_path_shared));
+    let file = try!(directory.find_file(&file_name).ok_or(FfiError::InvalidPath));
+
+    FileMetadata::new(file.get_metadata())
+}
+
+#[cfg(test)]
+mod test {
+    use ffi::{config, test_utils};
+
+    use ffi::app::App;
+    use nfs::helper::directory_helper::DirectoryHelper;
+    use nfs::helper::file_helper::FileHelper;
+    use rustc_serialize::base64::ToBase64;
+    use std::ffi::CStr;
+    use std::str;
+
+    fn create_test_file(app: &App, name: &str) {
+        let mut file_helper = FileHelper::new(app.get_client());
+        let dir_helper = DirectoryHelper::new(app.get_client());
+
+        let app_root_dir_key = unwrap!(app.get_app_dir_key());
+        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+
+        let mut writer = unwrap!(file_helper.create(name.to_string(), Vec::new(), app_root_dir));
+        let data = vec![10u8; 20];
+        unwrap!(writer.write(&data[..]));
+        let _ = unwrap!(writer.close());
+    }
+
+    #[test]
+    fn delete_file() {
+        let app = test_utils::create_app(false);
+        let dir_helper = DirectoryHelper::new(app.get_client());
+        let app_root_dir_key = unwrap!(app.get_app_dir_key());
+
+        create_test_file(&app, "test_file.txt");
+
+        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+        assert_eq!(app_root_dir.get_files().len(), 1);
+        assert!(app_root_dir.find_file("test_file.txt").is_some());
+
+        assert!(super::delete_file(&app, "/test_file.txt", false).is_ok());
+
+        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+        assert_eq!(app_root_dir.get_files().len(), 0);
+
+        assert!(super::delete_file(&app, "/test_file.txt", false).is_err());
+    }
+
+    #[test]
+    fn get_file() {
+        let app = test_utils::create_app(false);
+
+        create_test_file(&app, "test_file.txt");
+
+        let details = unwrap!(super::get_file(&app, "/test_file.txt", false, 0, 0, true));
+        unsafe {
+            let metadata = unwrap!(details.metadata.as_ref());
+            let name = unwrap!(CStr::from_ptr(metadata.name).to_str());
+            assert_eq!(name, "test_file.txt");
+        }
+
+        assert!(super::get_file(&app, "/does_not_exist", false, 0, 0, true).is_err());
+    }
+
+    #[test]
+    fn file_rename() {
+        let app = test_utils::create_app(false);
+        let dir_helper = DirectoryHelper::new(app.get_client());
+        let app_root_dir_key = unwrap!(app.get_app_dir_key());
+
+        create_test_file(&app, "test_file.txt");
+
+        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+        assert_eq!(app_root_dir.get_files().len(), 1);
+        assert!(app_root_dir.find_file("test_file.txt").is_some());
+
+        assert!(super::modify_file(&app,
+                                   "/test_file.txt",
+                                   false,
+                                   Some("new_test_file.txt".to_string()),
+                                   None,
+                                   None)
+            .is_ok());
+
+        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+        assert_eq!(app_root_dir.get_files().len(), 1);
+        assert!(app_root_dir.find_file("test_file.txt").is_none());
+        assert!(app_root_dir.find_file("new_test_file.txt").is_some());
+    }
+
+    #[test]
+    fn file_update_user_metadata() {
+        const METADATA_BASE64: &'static str = "c2FtcGxlIHRleHQ=";
+
+        let app = test_utils::create_app(false);
+        let dir_helper = DirectoryHelper::new(app.get_client());
+        let app_root_dir_key = unwrap!(app.get_app_dir_key());
+
+        create_test_file(&app, "test_file.txt");
+
+        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+        let file = unwrap!(app_root_dir.find_file("test_file.txt"));
+        assert_eq!(file.get_metadata().get_user_metadata().len(), 0);
+
+        assert!(super::modify_file(&app,
+                                   "/test_file.txt",
+                                   false,
+                                   None,
+                                   Some(METADATA_BASE64.to_string()),
+                                   None)
+            .is_ok());
+
+        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+        let file = unwrap!(app_root_dir.find_file("test_file.txt"));
+        assert!(file.get_metadata().get_user_metadata().len() > 0);
+        assert_eq!(file.get_metadata()
+                       .get_user_metadata()
+                       .to_base64(config::get_base64_config()),
+                   METADATA_BASE64.to_string());
+    }
+
+    #[test]
+    fn file_update_content() {
+        let app = test_utils::create_app(false);
+        let mut file_helper = FileHelper::new(app.get_client());
+        let dir_helper = DirectoryHelper::new(app.get_client());
+        let app_root_dir_key = unwrap!(app.get_app_dir_key());
+
+        create_test_file(&app, "test_file.txt");
+
+        let content = "first".as_bytes().to_base64(config::get_base64_config());
+        unwrap!(super::modify_file(&app, "/test_file.txt", false, None, None, Some(content)));
+
+
+        {
+            let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+            let file = unwrap!(app_root_dir.find_file("test_file.txt"));
+            let mut reader = unwrap!(file_helper.read(file));
+            let size = reader.size();
+
+            let content = unwrap!(reader.read(0, size));
+            let content = unwrap!(str::from_utf8(&content));
+            assert_eq!(content, "first");
+        }
+
+        let content = "second".as_bytes().to_base64(config::get_base64_config());
+        unwrap!(super::modify_file(&app, "/test_file.txt", false, None, None, Some(content)));
+
+        {
+            let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+            let file = unwrap!(app_root_dir.find_file("test_file.txt"));
+            let mut reader = unwrap!(file_helper.read(file));
+            let size = reader.size();
+
+            let content = unwrap!(reader.read(0, size));
+            let content = unwrap!(str::from_utf8(&content));
+            assert_eq!(content, "second");
+        }
+    }
+}

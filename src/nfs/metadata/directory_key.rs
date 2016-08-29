@@ -20,7 +20,7 @@ use routing::XorName;
 
 /// DirectoryKey represnts the meta information about a directory
 /// A directory can be feteched with the DirectoryKey
-#[derive(Debug, RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct DirectoryKey {
     id: XorName,
     type_tag: u64,
@@ -63,11 +63,11 @@ impl DirectoryKey {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use rand;
-    use routing::XorName;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::AccessLevel;
+    use rand;
+    use routing::XorName;
+    use super::*;
 
     /// Should be able to serialise & deserialise the DirectoryKey
     #[test]

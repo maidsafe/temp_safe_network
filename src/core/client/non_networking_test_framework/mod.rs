@@ -17,6 +17,18 @@
 
 #![cfg_attr(feature="clippy", allow(map_entry))]  // TODO: Look to enable this lint check.
 
+
+use bincode::SizeLimit;
+use maidsafe_utilities::serialisation::{deserialise, deserialise_with_limit, serialise,
+                                        serialise_with_limit};
+use maidsafe_utilities::thread;
+use rand;
+use routing::{Authority, Data, DataIdentifier, Event, FullId, InterfaceError, MessageId, Request,
+              Response, RoutingError, XorName};
+use routing::TYPE_TAG_SESSION_PACKET;
+use routing::client_errors::{GetError, MutationError};
+use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign;
 use std;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -26,18 +38,6 @@ use std::io::{Read, Write};
 use std::mem;
 use std::sync::{Arc, Mutex, ONCE_INIT, Once, mpsc};
 use std::time::Duration;
-
-use bincode::SizeLimit;
-use maidsafe_utilities::thread;
-use maidsafe_utilities::serialisation::{deserialise, deserialise_with_limit, serialise,
-                                        serialise_with_limit};
-use rand;
-use routing::{Authority, Data, DataIdentifier, Event, FullId, InterfaceError, MessageId, Request,
-              Response, RoutingError, XorName};
-use routing::TYPE_TAG_SESSION_PACKET;
-use routing::client_errors::{GetError, MutationError};
-use rust_sodium::crypto::sign;
-use rust_sodium::crypto::hash::sha256;
 
 const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
 const NETWORK_CONNECT_DELAY_SIMULATION_THREAD: &'static str = "NetworkConnectDelaySimulation";
@@ -661,23 +661,23 @@ impl RoutingMock {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use super::DEFAULT_CLIENT_ACCOUNT_SIZE;
-    use std::sync::mpsc;
-    use std::collections::HashMap;
-
-    use core::utility;
-    use core::errors::CoreError;
-    use core::client::user_account::Account;
-    use core::translated_events::NetworkEvent;
     use core::client::message_queue::MessageQueue;
     use core::client::response_getter::{GetAccountInfoResponseGetter, GetResponseGetter,
                                         MutationResponseGetter};
+    use core::client::user_account::Account;
+    use core::errors::CoreError;
+    use core::translated_events::NetworkEvent;
+
+    use core::utility;
 
     use maidsafe_utilities::serialisation::{deserialise, serialise};
-    use routing::client_errors::{GetError, MutationError};
     use routing::{Authority, Data, DataIdentifier, FullId, ImmutableData, MessageId,
                   StructuredData, XOR_NAME_LEN, XorName};
+    use routing::client_errors::{GetError, MutationError};
+    use std::collections::HashMap;
+    use std::sync::mpsc;
+    use super::*;
+    use super::DEFAULT_CLIENT_ACCOUNT_SIZE;
 
     #[test]
     fn map_serialisation() {

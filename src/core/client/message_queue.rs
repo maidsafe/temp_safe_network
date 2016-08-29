@@ -15,18 +15,18 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::sync::mpsc::{Receiver, Sender};
 
 use core::errors::CoreError;
 use core::translated_events::{NetworkEvent, ResponseEvent};
 
 use lru_time_cache::LruCache;
-use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
 use maidsafe_utilities::serialisation::deserialise;
+use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
 use routing::{Data, Event, MessageId, Response, XorName};
 use routing::client_errors::{GetError, MutationError};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::mpsc::{Receiver, Sender};
 
 const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 

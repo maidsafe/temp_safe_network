@@ -15,10 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
+use core::SelfEncryptionStorage;
 
 use core::client::Client;
-use core::SelfEncryptionStorage;
 use nfs::directory_listing::DirectoryListing;
 use nfs::errors::NfsError;
 use nfs::file::File;
@@ -27,6 +26,7 @@ use nfs::helper::reader::Reader;
 use nfs::helper::writer::{Mode, Writer};
 use nfs::metadata::file_metadata::FileMetadata;
 use self_encryption::DataMap;
+use std::sync::{Arc, Mutex};
 
 /// File provides helper functions to perform Operations on Files
 pub struct FileHelper {
@@ -172,13 +172,13 @@ impl FileHelper {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{Arc, Mutex};
-    use nfs::helper::directory_helper::DirectoryHelper;
-    use nfs::helper::file_helper::FileHelper;
-    use nfs::helper::writer::Mode;
     use core::client::Client;
     use core::utility::test_utils;
     use nfs::AccessLevel;
+    use nfs::helper::directory_helper::DirectoryHelper;
+    use nfs::helper::file_helper::FileHelper;
+    use nfs::helper::writer::Mode;
+    use std::sync::{Arc, Mutex};
 
     fn get_client() -> Arc<Mutex<Client>> {
         let test_client = unwrap!(test_utils::get_client());

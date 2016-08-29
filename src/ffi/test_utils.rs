@@ -15,49 +15,46 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use std::sync::{Arc, Mutex};
 
-use core::client::Client;
-use core::utility::test_utils;
-use ffi::config::SAFE_DRIVE_DIR_NAME;
-use ffi::errors::FfiError;
-use ffi::ParameterPacket;
-use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
-use nfs::helper::directory_helper::DirectoryHelper;
+use core::utility;
+use ffi::app::App;
+use ffi::session::Session;
+use std::cell::RefCell;
+use std::ffi::CString;
+use std::rc::Rc;
 
-#[allow(unused)]
-pub fn get_parameter_packet(has_safe_drive_access: bool) -> Result<ParameterPacket, FfiError> {
-    let client = Arc::new(Mutex::new(try!(test_utils::get_client())));
-    let directory_helper = DirectoryHelper::new(client.clone());
-    let mut user_root_dir = try!(directory_helper.get_user_root_directory_listing());
-    let (safe_drive, _) = try!(directory_helper.create(SAFE_DRIVE_DIR_NAME.to_string(),
-                                                       UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                       Vec::new(),
-                                                       false,
-                                                       AccessLevel::Private,
-                                                       Some(&mut user_root_dir)));
-    let (test_app, _) = try!(directory_helper.create("Test_Application".to_string(),
-                                                     UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                     Vec::new(),
-                                                     false,
-                                                     AccessLevel::Private,
-                                                     Some(&mut user_root_dir)));
-    Ok(ParameterPacket {
-        client: client,
-        app_root_dir_key: Some(test_app.get_key().clone()),
-        safe_drive_access: has_safe_drive_access,
-        safe_drive_dir_key: Some(safe_drive.get_key().clone()),
-    })
+pub fn generate_random_cstring(len: usize) -> CString {
+    let mut cstring_vec = unwrap!(utility::generate_random_vector::<u8>(len));
+
+    // Avoid internal nulls and ensure valid ASCII (thus valid utf8)
+    for it in &mut cstring_vec {
+        *it %= 128;
+        if *it == 0 {
+            *it += 1;
+        }
+    }
+
+    // Ok to unwrap, as we took care of removing all NULs above.
+    unwrap!(CString::new(cstring_vec))
 }
 
+pub fn create_app(has_safe_drive_access: bool) -> App {
+    let acc_locator = unwrap!(utility::generate_random_string(10));
+    let acc_password = unwrap!(utility::generate_random_string(10));
 
-#[allow(unused)]
-pub fn get_unregistered_parameter_packet() -> Result<ParameterPacket, FfiError> {
-    let client = Arc::new(Mutex::new(try!(Client::create_unregistered_client())));
-    Ok(ParameterPacket {
-        client: client,
-        app_root_dir_key: None,
-        safe_drive_access: false,
-        safe_drive_dir_key: None,
-    })
+    let session = unwrap!(Session::create_account(&acc_locator, &acc_password));
+    let app_name = "Test App".to_string();
+    let app_id = unwrap!(utility::generate_random_string(10));
+    let vendor = "Test Vendor".to_string();
+
+    unwrap!(App::registered(Rc::new(RefCell::new(session)),
+                            app_name,
+                            app_id,
+                            vendor,
+                            has_safe_drive_access))
+}
+
+pub fn create_unregistered_app() -> App {
+    let session = unwrap!(Session::create_unregistered_client());
+    App::unregistered(Rc::new(RefCell::new(session)))
 }
