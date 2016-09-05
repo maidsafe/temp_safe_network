@@ -65,10 +65,20 @@ pub enum FfiError {
     /// Could not convert String to nul-terminated string because it contains
     /// internal nuls.
     NulError(NulError),
-    /// Invalid encrypt (box_) key handle
-    InvalidEncryptKeyHandle,
+    /// Invalid StructuredData handle
+    InvalidStructDataHandle,
+    /// Invalid DataIdentifier handle
+    InvalidDataIdHandle,
+    /// Invalid Pub/PrivAppendableData handle
+    InvalidAppendableDataHandle,
+    /// Invalid Self Encryptor handle
+    InvalidSelfEncryptorHandle,
     /// Invalid CipherOpt handle
     InvalidCipherOptHandle,
+    /// Invalid encrypt (box_) key handle
+    InvalidEncryptKeyHandle,
+    /// Invalid sign key handle
+    InvalidSignKeyHandle,
     /// The requested operation is forbidded for the given app.
     OperationForbiddenForApp,
 }
@@ -149,9 +159,14 @@ impl Into<i32> for FfiError {
             FfiError::Unexpected(_) => FFI_ERROR_START_RANGE - 9,
             FfiError::UnsuccessfulEncodeDecode(_) => FFI_ERROR_START_RANGE - 10,
             FfiError::NulError(_) => FFI_ERROR_START_RANGE - 11,
-            FfiError::InvalidEncryptKeyHandle => FFI_ERROR_START_RANGE - 12,
-            FfiError::InvalidCipherOptHandle => FFI_ERROR_START_RANGE - 13,
-            FfiError::OperationForbiddenForApp => FFI_ERROR_START_RANGE - 14,
+            FfiError::InvalidStructDataHandle => FFI_ERROR_START_RANGE - 12,
+            FfiError::InvalidDataIdHandle => FFI_ERROR_START_RANGE - 13,
+            FfiError::InvalidAppendableDataHandle => FFI_ERROR_START_RANGE - 14,
+            FfiError::InvalidSelfEncryptorHandle => FFI_ERROR_START_RANGE - 15,
+            FfiError::InvalidCipherOptHandle => FFI_ERROR_START_RANGE - 16,
+            FfiError::InvalidEncryptKeyHandle => FFI_ERROR_START_RANGE - 17,
+            FfiError::InvalidSignKeyHandle => FFI_ERROR_START_RANGE - 18,
+            FfiError::OperationForbiddenForApp => FFI_ERROR_START_RANGE - 19,
         }
     }
 }
@@ -185,8 +200,17 @@ impl fmt::Debug for FfiError {
                 write!(f, "FfiError::UnsuccessfulEncodeDecode -> {:?}", error)
             }
             FfiError::NulError(ref error) => write!(f, "FfiError::NulError -> {:?}", error),
-            FfiError::InvalidEncryptKeyHandle => write!(f, "FfiError::InvalidEncryptKeyHandle"),
+            FfiError::InvalidStructDataHandle => write!(f, "FfiError::InvalidStructDataHandle"),
+            FfiError::InvalidDataIdHandle => write!(f, "FfiError::InvalidDataIdHandle"),
+            FfiError::InvalidAppendableDataHandle => {
+                write!(f, "FfiError::InvalidAppendableDataHandle")
+            }
+            FfiError::InvalidSelfEncryptorHandle => {
+                write!(f, "FfiError::InvalidSelfEncryptorHandle")
+            }
             FfiError::InvalidCipherOptHandle => write!(f, "FfiError::InvalidCipherOptHandle"),
+            FfiError::InvalidEncryptKeyHandle => write!(f, "FfiError::InvalidEncryptKeyHandle"),
+            FfiError::InvalidSignKeyHandle => write!(f, "FfiError::InvalidSignKeyHandle"),
             FfiError::OperationForbiddenForApp => write!(f, "FfiError::OperationForbiddenForApp"),
         }
     }

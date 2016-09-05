@@ -101,9 +101,9 @@ impl CipherOpt {
     }
 }
 
-/// Get CipherOpt::PlainText handle
+/// Construct CipherOpt::PlainText handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_plaintext(o_handle: *mut CipherOptHandle) -> i32 {
+pub unsafe extern "C" fn cipher_opt_new_plaintext(o_handle: *mut CipherOptHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache().lock());
         let obj_handle = obj_cache.new_handle();
@@ -114,9 +114,9 @@ pub unsafe extern "C" fn cipher_opt_plaintext(o_handle: *mut CipherOptHandle) ->
     })
 }
 
-/// Get CipherOpt::Symmetric handle
+/// Construct CipherOpt::Symmetric handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_symmetric(o_handle: *mut CipherOptHandle) -> i32 {
+pub unsafe extern "C" fn cipher_opt_new_symmetric(o_handle: *mut CipherOptHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache().lock());
         let obj_handle = obj_cache.new_handle();
@@ -127,11 +127,11 @@ pub unsafe extern "C" fn cipher_opt_symmetric(o_handle: *mut CipherOptHandle) ->
     })
 }
 
-/// Get CipherOpt::Asymmetric handle
+/// Construct CipherOpt::Asymmetric handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_asymmetric(peer_encrypt_key: EncryptKeyHandle,
-                                               o_handle: *mut CipherOptHandle)
-                                               -> i32 {
+pub unsafe extern "C" fn cipher_opt_new_asymmetric(peer_encrypt_key: EncryptKeyHandle,
+                                                   o_handle: *mut CipherOptHandle)
+                                                   -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache().lock());
         let pk = *ffi_try!(obj_cache.encrypt_key
@@ -163,9 +163,11 @@ pub extern "C" fn cipher_opt_free(handle: CipherOptHandle) -> i32 {
 mod tests {
     use core::utility;
     use ffi::app::App;
+    use ffi::errors::FfiError;
     use ffi::low_level_api::CipherOptHandle;
     use ffi::low_level_api::object_cache::object_cache;
     use ffi::test_utils;
+    use rust_sodium::crypto::box_;
     use super::*;
 
     fn decrypt_and_check(app: &App, raw_data: &[u8], orig_plain_text: &[u8]) -> bool {
@@ -182,7 +184,7 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let mut cipher_opt_handle: CipherOptHandle = 0;
         unsafe {
-            assert_eq!(cipher_opt_plaintext(&mut cipher_opt_handle), 0);
+            assert_eq!(cipher_opt_new_plaintext(&mut cipher_opt_handle), 0);
         }
         let raw_data = {
             let mut obj_cache = unwrap!(object_cache().lock());
@@ -202,7 +204,7 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let mut cipher_opt_handle: CipherOptHandle = 0;
         unsafe {
-            assert_eq!(cipher_opt_symmetric(&mut cipher_opt_handle), 0);
+            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_handle), 0);
         }
         let raw_data = {
             let mut obj_cache = unwrap!(object_cache().lock());
@@ -236,7 +238,7 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let mut cipher_opt_handle: CipherOptHandle = 0;
         unsafe {
-            assert_eq!(cipher_opt_asymmetric(app_1_encrypt_key_handle, &mut cipher_opt_handle),
+            assert_eq!(cipher_opt_new_asymmetric(app_1_encrypt_key_handle, &mut cipher_opt_handle),
                        0);
         }
 
@@ -251,5 +253,56 @@ mod tests {
 
         assert!(!decrypt_and_check(&app_0, &raw_data, &plain_text));
         assert!(decrypt_and_check(&app_1, &raw_data, &plain_text));
+    }
+
+    #[test]
+    fn create_and_free() {
+        let peer_encrypt_key_handle = {
+            let (pk, _) = box_::gen_keypair();
+
+            let mut obj_cache = unwrap!(object_cache().lock());
+            let handle = obj_cache.new_handle();
+            assert!(obj_cache.encrypt_key.insert(handle, pk).is_none());
+            handle
+        };
+
+        let mut cipher_opt_handle_pt = 0;
+        let mut cipher_opt_handle_sym = 0;
+        let mut cipher_opt_handle_asym = 0;
+
+        unsafe {
+            assert_eq!(cipher_opt_new_plaintext(&mut cipher_opt_handle_pt), 0);
+            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_handle_sym), 0);
+
+            let err_code = FfiError::InvalidEncryptKeyHandle.into();
+            assert_eq!(cipher_opt_new_asymmetric(29293290, &mut cipher_opt_handle_asym),
+                       err_code);
+            assert_eq!(cipher_opt_new_asymmetric(peer_encrypt_key_handle,
+                                                 &mut cipher_opt_handle_asym),
+                       0);
+        }
+
+        {
+            let mut obj_cache = unwrap!(object_cache().lock());
+            assert!(obj_cache.cipher_opt.contains_key(&cipher_opt_handle_pt));
+            assert!(obj_cache.cipher_opt.contains_key(&cipher_opt_handle_sym));
+            assert!(obj_cache.cipher_opt.contains_key(&cipher_opt_handle_asym));
+        }
+
+        assert_eq!(cipher_opt_free(cipher_opt_handle_pt), 0);
+        assert_eq!(cipher_opt_free(cipher_opt_handle_sym), 0);
+        assert_eq!(cipher_opt_free(cipher_opt_handle_asym), 0);
+
+        let err_code = FfiError::InvalidCipherOptHandle.into();
+        assert_eq!(cipher_opt_free(cipher_opt_handle_pt), err_code);
+        assert_eq!(cipher_opt_free(cipher_opt_handle_sym), err_code);
+        assert_eq!(cipher_opt_free(cipher_opt_handle_asym), err_code);
+
+        {
+            let mut obj_cache = unwrap!(object_cache().lock());
+            assert!(!obj_cache.cipher_opt.contains_key(&cipher_opt_handle_pt));
+            assert!(!obj_cache.cipher_opt.contains_key(&cipher_opt_handle_sym));
+            assert!(!obj_cache.cipher_opt.contains_key(&cipher_opt_handle_asym));
+        }
     }
 }

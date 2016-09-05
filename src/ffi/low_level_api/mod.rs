@@ -20,7 +20,8 @@
 // pub mod appendable_data;
 /// Cipher Options
 pub mod cipher_opt;
-// pub mod data_id;
+/// DataIdentifier constructions and freeing
+pub mod data_id;
 // pub mod immut_data;
 /// Low level manipulation of StructuredData
 // pub mod struct_data;
