@@ -49,7 +49,7 @@ extern crate config_file_handler;
 extern crate libc;
 #[macro_use]
 extern crate log;
-extern crate lru_time_cache;
+extern crate lru_cache;
 #[macro_use]
 extern crate maidsafe_utilities;
 extern crate rand;

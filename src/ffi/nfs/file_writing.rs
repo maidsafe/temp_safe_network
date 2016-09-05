@@ -59,13 +59,10 @@ pub unsafe extern "C" fn nfs_create_file(app_handle: *const App,
     helper::catch_unwind_i32(|| {
         trace!("FFI get nfs writer for creating a new file.");
 
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path,
-                                                       file_path_len));
-        let user_metadata = ffi_try!(helper::c_utf8_to_str(user_metadata,
-                                                           user_metadata_len));
+        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
+        let user_metadata = ffi_try!(helper::c_utf8_to_str(user_metadata, user_metadata_len));
 
-        let writer = ffi_try!(create_file(&*app_handle, file_path,
-                                          user_metadata, is_path_shared));
+        let writer = ffi_try!(create_file(&*app_handle, file_path, user_metadata, is_path_shared));
 
         *writer_handle = Box::into_raw(Box::new(writer));
         0
@@ -82,10 +79,8 @@ pub unsafe extern "C" fn nfs_writer_open(app_handle: *const App,
                                          -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI get nfs writer for modification of existing file.");
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path,
-                                                       file_path_len));
-        let writer = ffi_try!(writer_open(&*app_handle, file_path,
-                                          is_path_shared));
+        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
+        let writer = ffi_try!(writer_open(&*app_handle, file_path, is_path_shared));
         *writer_handle = Box::into_raw(Box::new(writer));
         0
     })

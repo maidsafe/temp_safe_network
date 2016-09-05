@@ -18,7 +18,6 @@
 //! Details about directory and its content.
 
 
-use super::helper;
 use core::client::Client;
 use ffi::config;
 use ffi::errors::FfiError;
@@ -29,6 +28,7 @@ use nfs::metadata::directory_key::DirectoryKey;
 use nfs::metadata::directory_metadata::DirectoryMetadata as NfsDirectoryMetadata;
 use std::ptr;
 use std::sync::{Arc, Mutex};
+use super::helper;
 
 /// Details about a directory and its content.
 #[derive(Debug)]
@@ -113,10 +113,9 @@ impl DirectoryMetadata {
         let modified_time = dir_metadata.get_modified_time().to_timespec();
 
         let (name, name_len) = helper::string_to_c_utf8(dir_metadata.get_name()
-                                                        .to_string());
+            .to_string());
         let user_metadata = dir_metadata.get_user_metadata().to_base64(config::get_base64_config());
-        let (user_metadata, user_metadata_len)
-            = helper::string_to_c_utf8(user_metadata);
+        let (user_metadata, user_metadata_len) = helper::string_to_c_utf8(user_metadata);
 
         Ok(DirectoryMetadata {
             name: name,
@@ -136,8 +135,7 @@ impl DirectoryMetadata {
     // a proper impl Drop.
     fn deallocate(&mut self) {
         unsafe {
-            let _ = helper::dealloc_c_utf8_alloced_from_rust(self.name,
-                                                             self.name_len);
+            let _ = helper::dealloc_c_utf8_alloced_from_rust(self.name, self.name_len);
             let _ = helper::dealloc_c_utf8_alloced_from_rust(self.user_metadata,
                                                              self.user_metadata_len);
         }

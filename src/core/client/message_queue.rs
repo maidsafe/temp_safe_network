@@ -19,9 +19,9 @@
 use core::errors::CoreError;
 use core::translated_events::{NetworkEvent, ResponseEvent};
 
-use lru_time_cache::LruCache;
+use lru_cache::LruCache;
 use maidsafe_utilities::serialisation::deserialise;
-use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
+use maidsafe_utilities::thread::{self, Joiner};
 use routing::{Data, Event, MessageId, Response, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::HashMap;
@@ -159,9 +159,9 @@ impl MessageQueue {
     /// chance to add an observer before requesting data.
     pub fn new(routing_event_receiver: Receiver<Event>,
                network_event_observers: Vec<Sender<NetworkEvent>>)
-               -> (Arc<Mutex<MessageQueue>>, RaiiThreadJoiner) {
+               -> (Arc<Mutex<MessageQueue>>, Joiner) {
         let message_queue = Arc::new(Mutex::new(MessageQueue {
-            local_cache: LruCache::with_capacity(1000),
+            local_cache: LruCache::new(1000),
             network_event_observers: network_event_observers,
             response_observers: HashMap::new(),
         }));
@@ -224,7 +224,7 @@ impl MessageQueue {
     }
 
     pub fn local_cache_get(&mut self, key: &XorName) -> Result<Data, CoreError> {
-        self.local_cache.get(key).ok_or(CoreError::VersionCacheMiss).map(|elt| elt.clone())
+        self.local_cache.get_mut(key).ok_or(CoreError::VersionCacheMiss).map(|elt| elt.clone())
     }
 
     pub fn local_cache_insert(&mut self, key: XorName, value: Data) {

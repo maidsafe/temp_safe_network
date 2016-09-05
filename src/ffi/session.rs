@@ -17,11 +17,10 @@
 
 //! Session management
 
-
 use core::client::Client;
 use core::translated_events::NetworkEvent;
 use libc::{int32_t, int64_t};
-use maidsafe_utilities::thread::{self, RaiiThreadJoiner};
+use maidsafe_utilities::thread::{self, Joiner};
 use nfs::metadata::directory_key::DirectoryKey;
 use std::cell::RefCell;
 use std::ptr;
@@ -37,7 +36,7 @@ pub struct Session {
     safe_drive_dir_key: Option<DirectoryKey>,
 
     network_event_observers: Arc<Mutex<Vec<extern "C" fn(i32)>>>,
-    network_thread: Option<(Sender<NetworkEvent>, RaiiThreadJoiner)>,
+    network_thread: Option<(Sender<NetworkEvent>, Joiner)>,
 }
 
 impl Session {
@@ -147,8 +146,8 @@ impl Drop for Session {
 /// Clonable handle to Session.
 pub type SessionHandle = Rc<RefCell<Session>>;
 
-/// Create a session as an unregistered client. This or any one of the other companion functions to get a
-/// session must be called before initiating any operation allowed by this crate.
+/// Create a session as an unregistered client. This or any one of the other companion functions to
+/// get a session must be called before initiating any operation allowed by this crate.
 #[no_mangle]
 pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut SessionHandle)
                                                     -> int32_t {
@@ -162,8 +161,8 @@ pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut Se
 }
 
 /// Create a registered client. This or any one of the other companion functions to get a
-/// session must be called before initiating any operation allowed by this crate. `session_handle` is
-/// a pointer to a pointer and must point to a valid pointer not junk, else the consequences are
+/// session must be called before initiating any operation allowed by this crate. `session_handle`
+/// is a pointer to a pointer and must point to a valid pointer not junk, else the consequences are
 /// undefined.
 #[no_mangle]
 pub unsafe extern "C" fn create_account(account_locator: *const u8,
@@ -176,8 +175,7 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
         trace!("FFI create a client account.");
 
         // TODO: convert the locator/password to &str, not String
-        let acc_locator = ffi_try!(helper::c_utf8_to_string(account_locator,
-                                                            account_locator_len));
+        let acc_locator = ffi_try!(helper::c_utf8_to_string(account_locator, account_locator_len));
         let acc_password = ffi_try!(helper::c_utf8_to_string(account_password,
                                                              account_password_len));
         let session = ffi_try!(Session::create_account(&acc_locator, &acc_password));
@@ -188,8 +186,8 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
 }
 
 /// Log into a registered client. This or any one of the other companion functions to get a
-/// session must be called before initiating any operation allowed by this crate. `session_handle` is
-/// a pointer to a pointer and must point to a valid pointer not junk, else the consequences are
+/// session must be called before initiating any operation allowed by this crate. `session_handle`
+/// is a pointer to a pointer and must point to a valid pointer not junk, else the consequences are
 /// undefined.
 #[no_mangle]
 pub unsafe extern "C" fn log_in(account_locator: *const u8,
@@ -201,12 +199,9 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
     helper::catch_unwind_i32(|| {
         trace!("FFI login a registered client.");
 
-        let acc_locator
-            = ffi_try!(helper::c_utf8_to_string(account_locator,
-                                                account_locator_len));
-        let acc_password
-            = ffi_try!(helper::c_utf8_to_string(account_password,
-                                                account_password_len));
+        let acc_locator = ffi_try!(helper::c_utf8_to_string(account_locator, account_locator_len));
+        let acc_password = ffi_try!(helper::c_utf8_to_string(account_password,
+                                                             account_password_len));
         let session = ffi_try!(Session::log_in(&acc_locator, &acc_password));
 
         *session_handle = allocate_handle(session);

@@ -17,6 +17,7 @@
 
 //! Errors thrown by the FFI operations
 
+// TODO - Purge unneeded errors (like JsonParseError etc.)
 
 use core::errors::CoreError;
 use dns::errors::{DNS_ERROR_START_RANGE, DnsError};
@@ -64,6 +65,12 @@ pub enum FfiError {
     /// Could not convert String to nul-terminated string because it contains
     /// internal nuls.
     NulError(NulError),
+    /// Invalid encrypt (box_) key handle
+    InvalidEncryptKeyHandle,
+    /// Invalid CipherOpt handle
+    InvalidCipherOptHandle,
+    /// The requested operation is forbidded for the given app.
+    OperationForbiddenForApp,
 }
 
 impl From<SerialisationError> for FfiError {
@@ -142,6 +149,9 @@ impl Into<i32> for FfiError {
             FfiError::Unexpected(_) => FFI_ERROR_START_RANGE - 9,
             FfiError::UnsuccessfulEncodeDecode(_) => FFI_ERROR_START_RANGE - 10,
             FfiError::NulError(_) => FFI_ERROR_START_RANGE - 11,
+            FfiError::InvalidEncryptKeyHandle => FFI_ERROR_START_RANGE - 12,
+            FfiError::InvalidCipherOptHandle => FFI_ERROR_START_RANGE - 13,
+            FfiError::OperationForbiddenForApp => FFI_ERROR_START_RANGE - 14,
         }
     }
 }
@@ -175,6 +185,9 @@ impl fmt::Debug for FfiError {
                 write!(f, "FfiError::UnsuccessfulEncodeDecode -> {:?}", error)
             }
             FfiError::NulError(ref error) => write!(f, "FfiError::NulError -> {:?}", error),
+            FfiError::InvalidEncryptKeyHandle => write!(f, "FfiError::InvalidEncryptKeyHandle"),
+            FfiError::InvalidCipherOptHandle => write!(f, "FfiError::InvalidCipherOptHandle"),
+            FfiError::OperationForbiddenForApp => write!(f, "FfiError::OperationForbiddenForApp"),
         }
     }
 }
