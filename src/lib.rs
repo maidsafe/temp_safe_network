@@ -69,3 +69,8 @@ pub mod nfs;
 pub mod dns;
 /// Ffi module;
 pub mod ffi;
+
+/// Unversioned StructuredData
+pub const UNVERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 500;
+/// Versioned StructuredData
+pub const VERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 501;

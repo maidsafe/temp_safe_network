@@ -17,6 +17,7 @@
 
 //! Low Level APIs
 
+/// Low level manipulation of Pub/PrivAppendableData
 // pub mod appendable_data;
 /// Cipher Options
 pub mod cipher_opt;
@@ -24,7 +25,8 @@ pub mod cipher_opt;
 pub mod data_id;
 // pub mod immut_data;
 /// Low level manipulation of StructuredData
-// pub mod struct_data;
+pub mod struct_data;
+
 /// Object handle associated with objects. In normal C API one would expect rust code to pass
 /// pointers to opaque object to C. C code would then need to pass these pointers back each time
 /// they needed rust code to execute something on those objects. However our code base deals with

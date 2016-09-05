@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+// TODO Remove
 #![allow(unused)]
 
 use lru_cache::LruCache;
@@ -40,6 +41,8 @@ pub fn object_cache() -> &'static Mutex<ObjectCache> {
     }
 }
 
+// TODO Instead of this make each field a Mutex - that way operation on one handle does not block
+// operations on others.
 pub struct ObjectCache {
     new_handle: ObjectHandle,
     pub struct_data: LruCache<StructDataHandle, StructuredData>,

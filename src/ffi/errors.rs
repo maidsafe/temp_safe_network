@@ -81,6 +81,8 @@ pub enum FfiError {
     InvalidSignKeyHandle,
     /// The requested operation is forbidded for the given app.
     OperationForbiddenForApp,
+    /// Invalid type tag for StructuredData
+    InvalidStructuredDataTypeTag,
 }
 
 impl From<SerialisationError> for FfiError {
@@ -167,6 +169,7 @@ impl Into<i32> for FfiError {
             FfiError::InvalidEncryptKeyHandle => FFI_ERROR_START_RANGE - 17,
             FfiError::InvalidSignKeyHandle => FFI_ERROR_START_RANGE - 18,
             FfiError::OperationForbiddenForApp => FFI_ERROR_START_RANGE - 19,
+            FfiError::InvalidStructuredDataTypeTag => FFI_ERROR_START_RANGE - 20,
         }
     }
 }
@@ -212,6 +215,9 @@ impl fmt::Debug for FfiError {
             FfiError::InvalidEncryptKeyHandle => write!(f, "FfiError::InvalidEncryptKeyHandle"),
             FfiError::InvalidSignKeyHandle => write!(f, "FfiError::InvalidSignKeyHandle"),
             FfiError::OperationForbiddenForApp => write!(f, "FfiError::OperationForbiddenForApp"),
+            FfiError::InvalidStructuredDataTypeTag => {
+                write!(f, "FfiError::InvalidStructuredDataTypeTag")
+            }
         }
     }
 }

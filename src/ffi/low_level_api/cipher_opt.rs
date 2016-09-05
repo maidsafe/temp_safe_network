@@ -129,13 +129,13 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(o_handle: *mut CipherOptHandle
 
 /// Construct CipherOpt::Asymmetric handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_new_asymmetric(peer_encrypt_key: EncryptKeyHandle,
+pub unsafe extern "C" fn cipher_opt_new_asymmetric(peer_encrypt_key_h: EncryptKeyHandle,
                                                    o_handle: *mut CipherOptHandle)
                                                    -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache().lock());
         let pk = *ffi_try!(obj_cache.encrypt_key
-            .get_mut(&peer_encrypt_key)
+            .get_mut(&peer_encrypt_key_h)
             .ok_or(FfiError::InvalidEncryptKeyHandle));
         let obj_handle = obj_cache.new_handle();
         let _ = obj_cache.cipher_opt
