@@ -163,8 +163,8 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
         let ser_final_immut_data = ffi_try!(CipherOpt::decrypt(&app, raw_immut_data.value()));
         let final_immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_final_immut_data)
             .map_err(FfiError::from));
-        let ser_data_map = ffi_try!(immut_data_operations::get_data(client.clone(),
-                                                                    *final_immut_data.name(),
+        let ser_data_map = ffi_try!(immut_data_operations::get_data_from_immut_data(client.clone(),
+                                                                    final_immut_data,
                                                                     None));
 
         let data_map = ffi_try!(deserialise::<DataMap>(&ser_data_map).map_err(FfiError::from));
@@ -258,4 +258,110 @@ pub extern "C" fn immut_data_self_encryptor_reader_free(handle: SelfEncryptorRea
 
         0
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use core::utility;
+    use ffi::errors::FfiError;
+    use ffi::low_level_api::cipher_opt::*;
+    use ffi::low_level_api::data_id::data_id_free;
+    use ffi::low_level_api::object_cache::object_cache;
+    use ffi::test_utils;
+    use std::ptr;
+    use super::*;
+
+    #[test]
+    fn immut_data_operations() {
+        let app_0 = test_utils::create_app(false);
+        let app_1 = test_utils::create_app(false);
+
+        let mut cipher_opt_h = 0;
+        let mut se_writer_h = 0;
+        let mut se_reader_h = 0;
+        let mut data_id_h = 0;
+
+        let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
+
+        let app_1_encrypt_key_handle = {
+            let mut obj_cache = unwrap!(object_cache().lock());
+            let app_1_encrypt_key_handle = obj_cache.new_handle();
+            let app_1_pub_encrypt_key = unwrap!(app_1.asym_keys()).0;
+            let _ = obj_cache.encrypt_key
+                .insert(app_1_encrypt_key_handle, app_1_pub_encrypt_key);
+            app_1_encrypt_key_handle
+        };
+
+        unsafe {
+            // App-0
+            assert_eq!(cipher_opt_new_asymmetric(app_1_encrypt_key_handle, &mut cipher_opt_h),
+                       0);
+
+            assert_eq!(immut_data_write_to_self_encryptor(se_writer_h,
+                                                          plain_text.as_ptr(),
+                                                          plain_text.len() as u64),
+                       FfiError::InvalidSelfEncryptorHandle.into());
+
+            assert_eq!(immut_data_new_self_encryptor(&app_0, &mut se_writer_h), 0);
+            assert_eq!(immut_data_write_to_self_encryptor(se_writer_h,
+                                                          plain_text.as_ptr(),
+                                                          plain_text.len() as u64),
+                       0);
+            assert_eq!(immut_data_close_self_encryptor(&app_0,
+                                                       se_writer_h,
+                                                       cipher_opt_h,
+                                                       &mut data_id_h),
+                       0);
+
+            assert_eq!(immut_data_self_encryptor_reader_free(se_writer_h),
+                       FfiError::InvalidSelfEncryptorHandle.into());
+            assert_eq!(immut_data_self_encryptor_writer_free(se_writer_h), 0);
+            assert_eq!(immut_data_self_encryptor_writer_free(se_writer_h),
+                       FfiError::InvalidSelfEncryptorHandle.into());
+
+            // App-1
+            let mut size = 0;
+            assert_eq!(immut_data_size(se_reader_h, &mut size),
+                       FfiError::InvalidSelfEncryptorHandle.into());
+            assert_eq!(immut_data_size(se_writer_h, &mut size),
+                       FfiError::InvalidSelfEncryptorHandle.into());
+
+            assert!(immut_data_fetch_self_encryptor(&app_0, data_id_h, &mut se_reader_h) != 0);
+            assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h),
+                       FfiError::InvalidSelfEncryptorHandle.into());
+
+            assert_eq!(immut_data_fetch_self_encryptor(&app_1, data_id_h, &mut se_reader_h),
+                       0);
+            assert_eq!(immut_data_size(se_reader_h, &mut size), 0);
+            assert_eq!(size, plain_text.len() as u64);
+
+            let mut data_ptr: *mut u8 = ptr::null_mut();
+            let mut data_size = 0;
+            let mut capacity = 0;
+            assert_eq!(immut_data_read_from_self_encryptor(se_reader_h,
+                                                           1,
+                                                           size,
+                                                           &mut data_ptr,
+                                                           &mut data_size,
+                                                           &mut capacity),
+                       FfiError::InvalidSelfEncryptorReadOffsets.into());
+            assert_eq!(immut_data_read_from_self_encryptor(se_reader_h,
+                                                           0,
+                                                           size,
+                                                           &mut data_ptr,
+                                                           &mut data_size,
+                                                           &mut capacity),
+                       0);
+            let plain_text_rx =
+                Vec::from_raw_parts(data_ptr, data_size as usize, capacity as usize);
+            assert_eq!(plain_text, plain_text_rx);
+
+            assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h), 0);
+            assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h),
+                       FfiError::InvalidSelfEncryptorHandle.into());
+
+            assert_eq!(cipher_opt_free(cipher_opt_h), 0);
+            assert_eq!(data_id_free(data_id_h), 0);
+        }
+    }
 }
