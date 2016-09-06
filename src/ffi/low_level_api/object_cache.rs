@@ -18,16 +18,17 @@
 // TODO Remove
 #![allow(unused)]
 
+use ffi::low_level_api::{AppendableDataHandle, CipherOptHandle, DataIdHandle, EncryptKeyHandle,
+                         ObjectHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle,
+                         SignKeyHandle, StructDataHandle};
+// use ffi::low_level_api::appendable_data::AppendableData;
+use ffi::low_level_api::cipher_opt::CipherOpt;
+use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWriterWrapper};
 use lru_cache::LruCache;
 use routing::{DataIdentifier, StructuredData};
 use rust_sodium::crypto::{box_, sign};
-// use self_encryption::SequentialEncryptor;
 use std::sync::{Mutex, ONCE_INIT, Once};
 use std::u64;
-use super::{AppendableDataHandle, CipherOptHandle, DataIdHandle, EncryptKeyHandle, ObjectHandle,
-            SelfEncryptorHandle, SignKeyHandle, StructDataHandle};
-// use super::appendable_data::AppendableData;
-use super::cipher_opt::CipherOpt;
 
 const DEFAULT_CAPACITY: usize = 100;
 
@@ -48,7 +49,8 @@ pub struct ObjectCache {
     pub struct_data: LruCache<StructDataHandle, StructuredData>,
     pub data_id: LruCache<DataIdHandle, DataIdentifier>,
     // pub appendable_data: LruCache<AppendableDataHandle, AppendableData>,
-    // pub se: LruCache<SelfEncryptorHandle, SequentialEncryptor>,
+    pub se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
+    pub se_writer: LruCache<SelfEncryptorWriterHandle, SelfEncryptorWriterWrapper>,
     pub cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
     pub encrypt_key: LruCache<EncryptKeyHandle, box_::PublicKey>,
     pub sign_key: LruCache<SignKeyHandle, sign::PublicKey>,
@@ -66,7 +68,8 @@ impl ObjectCache {
         self.struct_data.clear();
         self.data_id.clear();
         // self.appendable_data.clear();
-        // self.se.clear();
+        self.se_reader.clear();
+        self.se_writer.clear();
         self.cipher_opt.clear();
         self.encrypt_key.clear();
         self.sign_key.clear();
@@ -80,7 +83,8 @@ impl Default for ObjectCache {
             struct_data: LruCache::new(DEFAULT_CAPACITY),
             data_id: LruCache::new(DEFAULT_CAPACITY),
             //  appendable_data: LruCache::new(DEFAULT_CAPACITY),
-            // se: LruCache::new(DEFAULT_CAPACITY),
+            se_reader: LruCache::new(DEFAULT_CAPACITY),
+            se_writer: LruCache::new(DEFAULT_CAPACITY),
             cipher_opt: LruCache::new(DEFAULT_CAPACITY),
             encrypt_key: LruCache::new(DEFAULT_CAPACITY),
             sign_key: LruCache::new(DEFAULT_CAPACITY),

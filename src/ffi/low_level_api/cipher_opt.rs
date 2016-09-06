@@ -54,6 +54,7 @@ enum WireFormat {
 
 impl CipherOpt {
     /// Encrypt plain text
+    // TODO Take a serialisable type directly to prevent double serialisation
     pub fn encrypt(&self, app: &App, plain_text: &[u8]) -> Result<Vec<u8>, FfiError> {
         match *self {
             CipherOpt::PlainText => Ok(try!(serialise(&WireFormat::Plain(plain_text.to_owned())))),

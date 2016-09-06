@@ -85,6 +85,9 @@ pub enum FfiError {
     InvalidStructuredDataTypeTag,
     /// Invalid version number requested for a versioned StructuredData
     InvalidVersionNumber,
+    /// Invalid offsets (from-position and lenght combination) provided for reading form Self
+    /// Encryptor. Would have probably caused an overflow.
+    InvalidSelfEncryptorReadOffsets,
 }
 
 impl From<SerialisationError> for FfiError {
@@ -173,6 +176,7 @@ impl Into<i32> for FfiError {
             FfiError::OperationForbiddenForApp => FFI_ERROR_START_RANGE - 19,
             FfiError::InvalidStructuredDataTypeTag => FFI_ERROR_START_RANGE - 20,
             FfiError::InvalidVersionNumber => FFI_ERROR_START_RANGE - 21,
+            FfiError::InvalidSelfEncryptorReadOffsets => FFI_ERROR_START_RANGE - 22,
         }
     }
 }
@@ -222,6 +226,9 @@ impl fmt::Debug for FfiError {
                 write!(f, "FfiError::InvalidStructuredDataTypeTag")
             }
             FfiError::InvalidVersionNumber => write!(f, "FfiError::InvalidVersionNumber"),
+            FfiError::InvalidSelfEncryptorReadOffsets => {
+                write!(f, "FfiError::InvalidSelfEncryptorReadOffsets")
+            }
         }
     }
 }

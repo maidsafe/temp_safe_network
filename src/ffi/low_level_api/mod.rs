@@ -23,7 +23,8 @@
 pub mod cipher_opt;
 /// DataIdentifier constructions and freeing
 pub mod data_id;
-// pub mod immut_data;
+/// Low level manipulation of ImmutableData
+pub mod immut_data;
 /// Low level manipulation of StructuredData
 pub mod struct_data;
 
@@ -45,7 +46,9 @@ pub type DataIdHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
 pub type AppendableDataHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
-pub type SelfEncryptorHandle = ObjectHandle;
+pub type SelfEncryptorReaderHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
+pub type SelfEncryptorWriterHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
 pub type CipherOptHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
