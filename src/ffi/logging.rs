@@ -46,10 +46,9 @@ pub unsafe extern "C" fn output_log_path(c_output_file_name: *const u8,
                                          c_result: *mut int32_t)
                                          -> *const u8 {
     helper::catch_unwind_ptr(|| {
-        let op_file
-            = ffi_ptr_try!(helper::c_utf8_to_string(c_output_file_name,
-                                                    c_output_file_name_len),
-                           c_result);
+        let op_file = ffi_ptr_try!(helper::c_utf8_to_string(c_output_file_name,
+                                                            c_output_file_name_len),
+                                   c_result);
         let fh = ffi_ptr_try!(FileHandler::<()>::new(&op_file, true)
                                   .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
                               c_result);

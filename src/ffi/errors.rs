@@ -17,6 +17,7 @@
 
 //! Errors thrown by the FFI operations
 
+// TODO - Purge unneeded errors (like JsonParseError etc.)
 
 use core::errors::CoreError;
 use dns::errors::{DNS_ERROR_START_RANGE, DnsError};
@@ -64,6 +65,29 @@ pub enum FfiError {
     /// Could not convert String to nul-terminated string because it contains
     /// internal nuls.
     NulError(NulError),
+    /// Invalid StructuredData handle
+    InvalidStructDataHandle,
+    /// Invalid DataIdentifier handle
+    InvalidDataIdHandle,
+    /// Invalid Pub/PrivAppendableData handle
+    InvalidAppendableDataHandle,
+    /// Invalid Self Encryptor handle
+    InvalidSelfEncryptorHandle,
+    /// Invalid CipherOpt handle
+    InvalidCipherOptHandle,
+    /// Invalid encrypt (box_) key handle
+    InvalidEncryptKeyHandle,
+    /// Invalid sign key handle
+    InvalidSignKeyHandle,
+    /// The requested operation is forbidded for the given app.
+    OperationForbiddenForApp,
+    /// Invalid type tag for StructuredData
+    InvalidStructuredDataTypeTag,
+    /// Invalid version number requested for a versioned StructuredData
+    InvalidVersionNumber,
+    /// Invalid offsets (from-position and lenght combination) provided for reading form Self
+    /// Encryptor. Would have probably caused an overflow.
+    InvalidSelfEncryptorReadOffsets,
 }
 
 impl From<SerialisationError> for FfiError {
@@ -142,6 +166,17 @@ impl Into<i32> for FfiError {
             FfiError::Unexpected(_) => FFI_ERROR_START_RANGE - 9,
             FfiError::UnsuccessfulEncodeDecode(_) => FFI_ERROR_START_RANGE - 10,
             FfiError::NulError(_) => FFI_ERROR_START_RANGE - 11,
+            FfiError::InvalidStructDataHandle => FFI_ERROR_START_RANGE - 12,
+            FfiError::InvalidDataIdHandle => FFI_ERROR_START_RANGE - 13,
+            FfiError::InvalidAppendableDataHandle => FFI_ERROR_START_RANGE - 14,
+            FfiError::InvalidSelfEncryptorHandle => FFI_ERROR_START_RANGE - 15,
+            FfiError::InvalidCipherOptHandle => FFI_ERROR_START_RANGE - 16,
+            FfiError::InvalidEncryptKeyHandle => FFI_ERROR_START_RANGE - 17,
+            FfiError::InvalidSignKeyHandle => FFI_ERROR_START_RANGE - 18,
+            FfiError::OperationForbiddenForApp => FFI_ERROR_START_RANGE - 19,
+            FfiError::InvalidStructuredDataTypeTag => FFI_ERROR_START_RANGE - 20,
+            FfiError::InvalidVersionNumber => FFI_ERROR_START_RANGE - 21,
+            FfiError::InvalidSelfEncryptorReadOffsets => FFI_ERROR_START_RANGE - 22,
         }
     }
 }
@@ -175,6 +210,25 @@ impl fmt::Debug for FfiError {
                 write!(f, "FfiError::UnsuccessfulEncodeDecode -> {:?}", error)
             }
             FfiError::NulError(ref error) => write!(f, "FfiError::NulError -> {:?}", error),
+            FfiError::InvalidStructDataHandle => write!(f, "FfiError::InvalidStructDataHandle"),
+            FfiError::InvalidDataIdHandle => write!(f, "FfiError::InvalidDataIdHandle"),
+            FfiError::InvalidAppendableDataHandle => {
+                write!(f, "FfiError::InvalidAppendableDataHandle")
+            }
+            FfiError::InvalidSelfEncryptorHandle => {
+                write!(f, "FfiError::InvalidSelfEncryptorHandle")
+            }
+            FfiError::InvalidCipherOptHandle => write!(f, "FfiError::InvalidCipherOptHandle"),
+            FfiError::InvalidEncryptKeyHandle => write!(f, "FfiError::InvalidEncryptKeyHandle"),
+            FfiError::InvalidSignKeyHandle => write!(f, "FfiError::InvalidSignKeyHandle"),
+            FfiError::OperationForbiddenForApp => write!(f, "FfiError::OperationForbiddenForApp"),
+            FfiError::InvalidStructuredDataTypeTag => {
+                write!(f, "FfiError::InvalidStructuredDataTypeTag")
+            }
+            FfiError::InvalidVersionNumber => write!(f, "FfiError::InvalidVersionNumber"),
+            FfiError::InvalidSelfEncryptorReadOffsets => {
+                write!(f, "FfiError::InvalidSelfEncryptorReadOffsets")
+            }
         }
     }
 }

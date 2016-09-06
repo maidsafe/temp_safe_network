@@ -18,16 +18,19 @@
 //! Structure representing application registered with the launcher + set of
 //! FFI operations on it.
 
+// TODO(Spandan) - Run through this and make interfaces efficient (return references instead of
+// copies etc.) and uniform (i.e. not use get_ prefix for mem functions.
 
 use core::client::Client;
 use libc::int32_t;
 use nfs::metadata::directory_key::DirectoryKey;
+use rust_sodium::crypto::{box_, secretbox};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use super::errors::FfiError;
 use super::helper;
-use super::launcher_config_handler;
+use super::launcher_config_handler::ConfigHandler;
 use super::session::{Session, SessionHandle};
 
 /// Represents an application connected to the launcher.
@@ -35,24 +38,28 @@ pub struct App {
     session: Rc<RefCell<Session>>,
     app_dir_key: Option<DirectoryKey>,
     safe_drive_access: bool,
+    asym_keys: Option<(box_::PublicKey, box_::SecretKey)>,
+    sym_key: Option<secretbox::Key>,
 }
 
 impl App {
     /// Create new app for registered client.
     pub fn registered(session: Rc<RefCell<Session>>,
                       app_name: String,
-                      app_id: String,
+                      unique_token: String,
                       vendor: String,
                       safe_drive_access: bool)
                       -> Result<Self, FfiError> {
         let client = session.borrow().get_client();
-        let handler = launcher_config_handler::ConfigHandler::new(client);
-        let app_dir_key = try!(handler.get_app_dir_key(app_name, app_id, vendor));
+        let handler = ConfigHandler::new(client);
+        let app_info = try!(handler.get_app_info(app_name, unique_token, vendor));
 
         Ok(App {
             session: session,
-            app_dir_key: Some(app_dir_key),
+            app_dir_key: Some(app_info.app_root_dir_key),
             safe_drive_access: safe_drive_access,
+            asym_keys: Some(app_info.asym_keys),
+            sym_key: Some(app_info.sym_key),
         })
     }
 
@@ -62,6 +69,8 @@ impl App {
             session: session,
             app_dir_key: None,
             safe_drive_access: false,
+            asym_keys: None,
+            sym_key: None,
         }
     }
 
@@ -73,6 +82,16 @@ impl App {
     /// Get app root directory key
     pub fn get_app_dir_key(&self) -> Option<DirectoryKey> {
         self.app_dir_key
+    }
+
+    /// Get app asym_keys
+    pub fn asym_keys(&self) -> Option<&(box_::PublicKey, box_::SecretKey)> {
+        self.asym_keys.as_ref()
+    }
+
+    /// Get app root directory key
+    pub fn sym_key(&self) -> Option<&secretbox::Key> {
+        self.sym_key.as_ref()
     }
 
     /// Get SAFEdrive directory key.
@@ -108,7 +127,7 @@ impl App {
 pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
                                       app_name: *const u8,
                                       app_name_len: usize,
-                                      app_id: *const u8,
+                                      unique_token: *const u8,
                                       app_id_len: usize,
                                       vendor: *const u8,
                                       vendor_len: usize,
@@ -116,14 +135,14 @@ pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
                                       app_handle: *mut *mut App)
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
-        let app_name = ffi_try!(helper::c_utf8_to_string(app_name,
-                                                         app_name_len));
-        let app_id = ffi_try!(helper::c_utf8_to_string(app_id, app_id_len));
+        let app_name = ffi_try!(helper::c_utf8_to_string(app_name, app_name_len));
+        let unique_token = ffi_try!(helper::c_utf8_to_string(unique_token, app_id_len));
         let vendor = ffi_try!(helper::c_utf8_to_string(vendor, vendor_len));
 
         let session = (*session_handle).clone();
 
-        let app = ffi_try!(App::registered(session, app_name, app_id, vendor, safe_drive_access));
+        let app =
+            ffi_try!(App::registered(session, app_name, unique_token, vendor, safe_drive_access));
 
         *app_handle = Box::into_raw(Box::new(app));
         0

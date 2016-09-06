@@ -27,13 +27,21 @@ use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode::Overwrite;
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::XorName;
+use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::hash::sha256;
 use std::sync::{Arc, Mutex};
 
 #[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct LauncherConfiguration {
     pub app_id: XorName,
+    pub app_info: AppInfo,
+}
+
+#[derive(RustcEncodable, RustcDecodable, Debug, Clone)]
+pub struct AppInfo {
     pub app_root_dir_key: DirectoryKey,
+    pub asym_keys: (box_::PublicKey, box_::SecretKey),
+    pub sym_key: secretbox::Key,
 }
 
 pub struct ConfigHandler {
@@ -45,18 +53,18 @@ impl ConfigHandler {
         ConfigHandler { client: client }
     }
 
-    pub fn get_app_dir_key(&self,
-                           app_name: String,
-                           app_key: String,
-                           vendor: String)
-                           -> Result<DirectoryKey, FfiError> {
+    pub fn get_app_info(&self,
+                        app_name: String,
+                        app_key: String,
+                        vendor: String)
+                        -> Result<AppInfo, FfiError> {
         let app_id = self.get_app_id(&app_key, &vendor);
 
         let (configs, _) = try!(self.get_launcher_global_config_and_dir());
-        let app_dir_key = match configs.into_iter()
+        let app_info = match configs.into_iter()
             .find(|config| config.app_id == app_id)
             .map(|config| config) {
-            Some(config) => config.app_root_dir_key.clone(),
+            Some(config) => config.app_info,
             None => {
                 trace!("App's exclusive directory is not mapped inside Launcher's config. This \
                         must imply it's not present inside user-root-dir also - creating one.");
@@ -64,25 +72,31 @@ impl ConfigHandler {
                 let dir_helper = DirectoryHelper::new(self.client.clone());
                 let mut root_dir_listing = try!(dir_helper.get_user_root_directory_listing());
                 let app_dir_name = self.get_app_dir_name(&app_name, &root_dir_listing);
-                let dir_key = try!(dir_helper.create(app_dir_name,
-                                                     UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                     Vec::new(),
-                                                     false,
-                                                     AccessLevel::Private,
-                                                     Some(&mut root_dir_listing)))
+                let dir_key = *try!(dir_helper.create(app_dir_name,
+                                                      UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                                      Vec::new(),
+                                                      false,
+                                                      AccessLevel::Private,
+                                                      Some(&mut root_dir_listing)))
                     .0
-                    .get_key()
-                    .clone();
+                    .get_key();
+
+                let app_info = AppInfo {
+                    app_root_dir_key: dir_key,
+                    asym_keys: box_::gen_keypair(),
+                    sym_key: secretbox::gen_key(),
+                };
                 let app_config = LauncherConfiguration {
                     app_id: app_id,
-                    app_root_dir_key: dir_key.clone(),
+                    app_info: app_info.clone(),
                 };
                 try!(self.upsert_to_launcher_global_config(app_config));
-                dir_key
+
+                app_info
             }
         };
 
-        Ok(app_dir_key)
+        Ok(app_info)
     }
 
     fn get_app_id(&self, app_key: &str, vendor: &str) -> XorName {

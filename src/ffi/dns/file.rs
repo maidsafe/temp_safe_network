@@ -41,12 +41,9 @@ pub unsafe extern "C" fn dns_get_file(app_handle: *const App,
                                       details_handle: *mut *mut FileDetails)
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name,
-                                                          long_name_len));
-        let service_name = ffi_try!(helper::c_utf8_to_string(service_name,
-                                                             service_name_len));
-        let file_path = ffi_try!(helper::c_utf8_to_string(file_path,
-                                                          file_path_len));
+        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let service_name = ffi_try!(helper::c_utf8_to_string(service_name, service_name_len));
+        let file_path = ffi_try!(helper::c_utf8_to_string(file_path, file_path_len));
 
         trace!("FFI get file located at given path starting from home directory of \"//{}.{}\".",
                service_name,
@@ -77,12 +74,9 @@ pub unsafe extern "C" fn dns_get_file_metadata(app_handle: *const App,
                                                metadata_handle: *mut *mut FileMetadata)
                                                -> int32_t {
     helper::catch_unwind_i32(|| {
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name,
-                                                          long_name_len));
-        let service_name = ffi_try!(helper::c_utf8_to_string(service_name,
-                                                             service_name_len));
-        let file_path = ffi_try!(helper::c_utf8_to_string(file_path,
-                                                          file_path_len));
+        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let service_name = ffi_try!(helper::c_utf8_to_string(service_name, service_name_len));
+        let file_path = ffi_try!(helper::c_utf8_to_string(file_path, file_path_len));
 
         trace!("FFI get file metadata for file located at given path starting from home \
                 directory of \"//{}.{}\".",

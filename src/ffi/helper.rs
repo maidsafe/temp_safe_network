@@ -34,19 +34,16 @@ use std::ptr;
 use std::slice;
 use std::sync::{Arc, Mutex};
 
-pub unsafe fn c_utf8_to_string(ptr: *const u8, len: usize)
-                               -> Result<String, FfiError> {
+pub unsafe fn c_utf8_to_string(ptr: *const u8, len: usize) -> Result<String, FfiError> {
     c_utf8_to_str(ptr, len).map(|v| v.to_owned())
 }
 
-pub unsafe fn c_utf8_to_str(ptr: *const u8, len: usize)
-                            -> Result<&'static str, FfiError> {
+pub unsafe fn c_utf8_to_str(ptr: *const u8, len: usize) -> Result<&'static str, FfiError> {
     std::str::from_utf8(slice::from_raw_parts(ptr, len))
         .map_err(|error| FfiError::from(error.description()))
 }
 
-pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize)
-                                   -> Result<Option<String>, FfiError> {
+pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize) -> Result<Option<String>, FfiError> {
     if ptr.is_null() {
         Ok(None)
     } else {

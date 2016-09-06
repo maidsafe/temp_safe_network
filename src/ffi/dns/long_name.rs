@@ -33,8 +33,7 @@ pub unsafe extern "C" fn dns_register_long_name(app_handle: *const App,
                                                 long_name_len: usize)
                                                 -> int32_t {
     helper::catch_unwind_i32(|| {
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name,
-                                                          long_name_len));
+        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
 
         trace!("FFI register public-id with name: {}. This means to register dns without a \
                 given service.",
@@ -74,8 +73,7 @@ pub unsafe extern "C" fn dns_delete_long_name(app_handle: *const App,
                                               -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI delete DNS.");
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name,
-                                                          long_name_len));
+        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
         ffi_try!(delete_long_name(&*app_handle, &long_name));
         0
     })

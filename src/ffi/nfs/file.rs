@@ -41,8 +41,7 @@ pub unsafe extern "C" fn nfs_delete_file(app_handle: *const App,
                                          -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI delete file, given the path.");
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path,
-                                                       file_path_len));
+        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
         ffi_try!(delete_file(&*app_handle, file_path, is_shared));
         0
     })
@@ -63,8 +62,7 @@ pub unsafe extern "C" fn nfs_get_file(app_handle: *const App,
     helper::catch_unwind_i32(|| {
         trace!("FFI get file, given the path.");
 
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path,
-                                                       file_path_len));
+        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
 
         let response = ffi_try!(get_file(&*app_handle,
                                          file_path,
@@ -94,14 +92,10 @@ pub unsafe extern "C" fn nfs_modify_file(app_handle: *const App,
     helper::catch_unwind_i32(|| {
         trace!("FFI modify file, given the path.");
 
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path,
-                                                       file_path_len));
-        let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name,
-                                                             new_name_len));
-        let new_metadata = ffi_try!(helper::c_utf8_to_opt_string(new_metadata,
-                                                                 new_metadata_len));
-        let new_content = ffi_try!(helper::c_utf8_to_opt_string(new_content,
-                                                                new_content_len));
+        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
+        let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
+        let new_metadata = ffi_try!(helper::c_utf8_to_opt_string(new_metadata, new_metadata_len));
+        let new_content = ffi_try!(helper::c_utf8_to_opt_string(new_content, new_content_len));
 
         ffi_try!(modify_file(&*app_handle,
                              file_path,
@@ -151,10 +145,8 @@ pub unsafe extern "C" fn nfs_get_file_metadata(app_handle: *const App,
                                                -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI get file metadata, given the path.");
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path,
-                                                       file_path_len));
-        let metadata = ffi_try!(get_file_metadata(&*app_handle, file_path,
-                                                  is_path_shared));
+        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
+        let metadata = ffi_try!(get_file_metadata(&*app_handle, file_path, is_path_shared));
         *metadata_handle = Box::into_raw(Box::new(metadata));
         0
     })

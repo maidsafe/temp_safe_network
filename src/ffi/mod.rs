@@ -44,6 +44,7 @@ pub mod dns;
 pub mod errors;
 pub mod file_details;
 pub mod logging;
+pub mod low_level_api;
 pub mod nfs;
 pub mod session;
 pub mod string_list;

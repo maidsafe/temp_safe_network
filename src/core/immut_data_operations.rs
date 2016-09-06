@@ -85,32 +85,41 @@ pub fn get_data(client: Arc<Mutex<Client>>,
     let response_getter = try!(unwrap!(client.lock(), "Couldn't lock").get(data_identifier, None));
 
     match try!(response_getter.get()) {
-        Data::Immutable(mut immut_data) => {
-            let mut storage = SelfEncryptionStorage::new(client.clone());
-            while let Ok(DataTypeEncoding::DataMap(data_map)) = deserialise(immut_data.value()) {
-                let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
-                let length = self_encryptor.len();
-                immut_data = try!(deserialise(&try!(self_encryptor.read(0, length))));
-            }
+        Data::Immutable(immut_data) => {
+            get_data_from_immut_data(client, immut_data, decryption_keys)
+        }
+        _ => Err(CoreError::ReceivedUnexpectedData),
+    }
+}
 
-            match try!(deserialise(&immut_data.value())) {
-                DataTypeEncoding::Serialised(serialised_data_map) => {
-                    let data_map = if let Some((public_key, secret_key, nonce)) = decryption_keys {
-                        let plain_text = try!(utility::hybrid_decrypt(&serialised_data_map,
-                                                                      nonce,
-                                                                      public_key,
-                                                                      secret_key));
-                        try!(deserialise(&plain_text))
-                    } else {
-                        try!(deserialise(&serialised_data_map))
-                    };
+/// Get actual data from ImmutableData created via create() function in this module.
+/// Call this if you already have the ImmutableData with you.
+pub fn get_data_from_immut_data(client: Arc<Mutex<Client>>,
+                                mut immut_data: ImmutableData,
+                                decryption_keys: Option<(&PublicKey, &SecretKey, &Nonce)>)
+                                -> Result<Vec<u8>, CoreError> {
+    let mut storage = SelfEncryptionStorage::new(client.clone());
+    while let Ok(DataTypeEncoding::DataMap(data_map)) = deserialise(immut_data.value()) {
+        let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
+        let length = self_encryptor.len();
+        immut_data = try!(deserialise(&try!(self_encryptor.read(0, length))));
+    }
 
-                    let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
-                    let length = self_encryptor.len();
-                    Ok(try!(self_encryptor.read(0, length)))
-                }
-                _ => Err(CoreError::ReceivedUnexpectedData),
-            }
+    match try!(deserialise(&immut_data.value())) {
+        DataTypeEncoding::Serialised(serialised_data_map) => {
+            let data_map = if let Some((public_key, secret_key, nonce)) = decryption_keys {
+                let plain_text = try!(utility::hybrid_decrypt(&serialised_data_map,
+                                                              nonce,
+                                                              public_key,
+                                                              secret_key));
+                try!(deserialise(&plain_text))
+            } else {
+                try!(deserialise(&serialised_data_map))
+            };
+
+            let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
+            let length = self_encryptor.len();
+            Ok(try!(self_encryptor.read(0, length)))
         }
         _ => Err(CoreError::ReceivedUnexpectedData),
     }

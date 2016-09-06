@@ -49,7 +49,7 @@ extern crate config_file_handler;
 extern crate libc;
 #[macro_use]
 extern crate log;
-extern crate lru_time_cache;
+extern crate lru_cache;
 #[macro_use]
 extern crate maidsafe_utilities;
 extern crate rand;
@@ -69,3 +69,8 @@ pub mod nfs;
 pub mod dns;
 /// Ffi module;
 pub mod ffi;
+
+/// Unversioned StructuredData
+pub const UNVERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 500;
+/// Versioned StructuredData
+pub const VERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 501;

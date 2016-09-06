@@ -15,11 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+// TODO Remove type_tag parameter from api's of unversioned and versioned SD's as they are now
+// consolidated to 500 and 501
+
 /// Unversioned-Structured Data
 pub mod unversioned;
 /// Versioned-Structured Data
 pub mod versioned;
-
 
 use core::errors::CoreError;
 use maidsafe_utilities::serialisation::serialise;

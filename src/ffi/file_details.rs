@@ -18,7 +18,6 @@
 //! FFI-enabled types containing details (content and metadata) about a file.
 
 
-use super::helper;
 use core::client::Client;
 use ffi::config;
 use ffi::errors::FfiError;
@@ -28,6 +27,7 @@ use nfs::metadata::file_metadata::FileMetadata as NfsFileMetadata;
 use rustc_serialize::base64::ToBase64;
 use std::ptr;
 use std::sync::{Arc, Mutex};
+use super::helper;
 
 /// Details of a file and its content.
 #[derive(Debug)]
@@ -78,8 +78,7 @@ impl FileDetails {
     // a proper impl Drop.
     fn deallocate(self) {
         unsafe {
-            helper::dealloc_c_utf8_alloced_from_rust(self.content,
-                                                     self.content_len);
+            helper::dealloc_c_utf8_alloced_from_rust(self.content, self.content_len);
         }
 
         if !self.metadata.is_null() {
@@ -112,13 +111,11 @@ impl FileMetadata {
         let created_time = file_metadata.get_created_time().to_timespec();
         let modified_time = file_metadata.get_modified_time().to_timespec();
 
-        let (name, name_len)
-            = helper::string_to_c_utf8(file_metadata.get_name().to_string());
+        let (name, name_len) = helper::string_to_c_utf8(file_metadata.get_name().to_string());
 
         let user_metadata = file_metadata.get_user_metadata()
             .to_base64(config::get_base64_config());
-        let (user_metadata, user_metadata_len)
-            = helper::string_to_c_utf8(user_metadata);
+        let (user_metadata, user_metadata_len) = helper::string_to_c_utf8(user_metadata);
 
         Ok(FileMetadata {
             name: name,
@@ -139,8 +136,7 @@ impl FileMetadata {
     pub fn deallocate(&mut self) {
         unsafe {
             helper::dealloc_c_utf8_alloced_from_rust(self.name, self.name_len);
-            helper::dealloc_c_utf8_alloced_from_rust(self.user_metadata,
-                                                     self.user_metadata_len);
+            helper::dealloc_c_utf8_alloced_from_rust(self.user_metadata, self.user_metadata_len);
         }
     }
 }

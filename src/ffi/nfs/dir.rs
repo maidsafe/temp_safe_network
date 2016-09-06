@@ -17,7 +17,6 @@
 
 //! Directory operations.
 
-
 use ffi::app::App;
 use ffi::directory_details::DirectoryDetails;
 use ffi::errors::FfiError;
@@ -44,8 +43,7 @@ pub unsafe extern "C" fn nfs_create_dir(app_handle: *const App,
         trace!("FFI create directory, given the path.");
 
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
-        let user_metadata = ffi_try!(helper::c_utf8_to_str(user_metadata,
-                                                           user_metadata_len));
+        let user_metadata = ffi_try!(helper::c_utf8_to_str(user_metadata, user_metadata_len));
 
         ffi_try!(create_dir(&*app_handle,
                             dir_path,
@@ -103,11 +101,9 @@ pub unsafe extern "C" fn nfs_modify_dir(app_handle: *const App,
     helper::catch_unwind_i32(|| {
         trace!("JSON modify directory, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
-        let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name,
-                                                             new_name_len));
-        let new_user_metadata
-            = ffi_try!(helper::c_utf8_to_opt_string(new_user_metadata,
-                                                    new_user_metadata_len));
+        let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
+        let new_user_metadata = ffi_try!(helper::c_utf8_to_opt_string(new_user_metadata,
+                                                                      new_user_metadata_len));
 
         ffi_try!(modify_dir(&*app_handle,
                             dir_path,
@@ -306,7 +302,6 @@ fn move_dir(app: &App,
 
 #[cfg(test)]
 mod test {
-    use std::slice;
 
     use ffi::{config, test_utils};
 
@@ -314,6 +309,7 @@ mod test {
     use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
     use nfs::helper::directory_helper::DirectoryHelper;
     use rustc_serialize::base64::ToBase64;
+    use std::slice;
 
     fn create_test_dir(app: &App, name: &str) {
         let app_dir_key = unwrap!(app.get_app_dir_key());
@@ -397,8 +393,7 @@ mod test {
         let details = unwrap!(super::get_dir(&app, "/test_dir", false));
 
         unsafe {
-            let name = slice::from_raw_parts(details.metadata.name,
-                                             details.metadata.name_len);
+            let name = slice::from_raw_parts(details.metadata.name, details.metadata.name_len);
             let name = String::from_utf8(name.to_owned()).unwrap();
             assert_eq!(name, "test_dir");
         }
