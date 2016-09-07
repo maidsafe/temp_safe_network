@@ -213,8 +213,7 @@ pub unsafe extern "C" fn appendable_data_post(app: *const App,
 
 /// Switch the filter of the appendable data.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_toggle_filter(appendable_data_h: AppendableDataHandle)
-                                                       -> i32 {
+pub extern "C" fn appendable_data_toggle_filter(appendable_data_h: AppendableDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache().lock());
         let ad = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
