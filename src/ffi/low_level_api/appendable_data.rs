@@ -15,14 +15,12 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::client::Client;
 use core::errors::CoreError;
 use ffi::app::App;
 use ffi::helper;
 use ffi::low_level_api::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle};
 use ffi::low_level_api::object_cache::object_cache;
 use routing::{Data, Filter, PrivAppendableData, PubAppendableData, XOR_NAME_LEN, XorName};
-use rust_sodium::crypto::sign::PublicKey;
 use std::iter;
 use std::ptr;
 
@@ -36,79 +34,10 @@ pub enum AppendableData {
 }
 
 impl AppendableData {
-    fn switch_to_whitelist(&mut self) {
-        let filter = self.filter_mut();
-
-        if let Filter::BlackList(_) = *filter {
-            *filter = Filter::white_list(iter::empty())
-        };
-    }
-
-    fn switch_to_blacklist(&mut self) {
-        let filter = self.filter_mut();
-
-        if let Filter::WhiteList(_) = *filter {
-            *filter = Filter::black_list(iter::empty());
-        }
-    }
-
-    fn insert_to_filter(&mut self, key: PublicKey) {
-        let list = match *self.filter_mut() {
-            Filter::WhiteList(ref mut list) => list,
-            Filter::BlackList(ref mut list) => list,
-        };
-
-        let _ = list.insert(key);
-    }
-
-    fn remove_from_filter(&mut self, key: &PublicKey) {
-        let list = match *self.filter_mut() {
-            Filter::WhiteList(ref mut list) => list,
-            Filter::BlackList(ref mut list) => list,
-        };
-
-        let _ = list.remove(&key);
-    }
-
     fn filter_mut(&mut self) -> &mut Filter {
         match *self {
             AppendableData::Pub(ref mut data) => &mut data.filter,
             AppendableData::Priv(ref mut data) => &mut data.filter,
-        }
-    }
-
-    // Return a clone of this data with the version bumped and the signature
-    // updated.
-    fn bump_version(&self, client: &Client) -> Result<Self, CoreError> {
-        let signing_key = try!(client.get_secret_signing_key());
-
-        Ok(match *self {
-            AppendableData::Pub(ref old_data) => {
-                let new_data = try!(PubAppendableData::new(old_data.name,
-                                                           old_data.version + 1,
-                                                           old_data.current_owner_keys.clone(),
-                                                           old_data.previous_owner_keys.clone(),
-                                                           old_data.filter.clone(),
-                                                           Some(signing_key)));
-                AppendableData::Pub(new_data)
-            }
-            AppendableData::Priv(ref old_data) => {
-                let new_data = try!(PrivAppendableData::new(old_data.name,
-                                                            old_data.version + 1,
-                                                            old_data.current_owner_keys.clone(),
-                                                            old_data.previous_owner_keys.clone(),
-                                                            old_data.filter.clone(),
-                                                            old_data.encrypt_key.clone(),
-                                                            Some(signing_key)));
-                AppendableData::Priv(new_data)
-            }
-        })
-    }
-
-    fn num_of_items(&self) -> usize {
-        match *self {
-            AppendableData::Pub(ref data) => data.data.len(),
-            AppendableData::Priv(ref data) => data.data.len(),
         }
     }
 }
@@ -129,16 +58,14 @@ pub unsafe extern "C" fn appendable_data_new_pub(app: *const App,
                                                  o_handle: *mut AppendableDataHandle)
                                                  -> i32 {
     helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache().lock());
-
         let client = (*app).get_client();
         let name = XorName(*name);
 
-        let (owner_key, signing_key) = {
+        let (owner_key, sign_key) = {
             let client = unwrap!(client.lock());
             let owner_key = *ffi_try!(client.get_public_signing_key());
-            let signing_key = ffi_try!(client.get_secret_signing_key()).clone();
-            (owner_key, signing_key)
+            let sign_key = ffi_try!(client.get_secret_signing_key()).clone();
+            (owner_key, sign_key)
         };
 
         let data = PubAppendableData::new(name,
@@ -146,9 +73,10 @@ pub unsafe extern "C" fn appendable_data_new_pub(app: *const App,
                                           vec![owner_key],
                                           vec![],
                                           Filter::black_list(iter::empty()),
-                                          Some(&signing_key));
+                                          Some(&sign_key));
         let data = AppendableData::Pub(ffi_try!(data.map_err(CoreError::from)));
-        let handle = object_cache.insert_appendable_data(data);
+        let handle = unwrap!(object_cache().lock()).insert_appendable_data(data);
+
         ptr::write(o_handle, handle);
         0
     })
@@ -167,11 +95,11 @@ pub unsafe extern "C" fn appendable_data_new_priv(app: *const App,
         let client = (*app).get_client();
         let name = XorName(*name);
 
-        let (owner_key, signing_key) = {
+        let (owner_key, sign_key) = {
             let client = unwrap!(client.lock());
             let owner_key = *ffi_try!(client.get_public_signing_key());
-            let signing_key = ffi_try!(client.get_secret_signing_key()).clone();
-            (owner_key, signing_key)
+            let sign_key = ffi_try!(client.get_secret_signing_key()).clone();
+            (owner_key, sign_key)
         };
         let encrypt_key = *ffi_try!(object_cache.get_encrypt_key(encrypt_key_h));
 
@@ -181,9 +109,10 @@ pub unsafe extern "C" fn appendable_data_new_priv(app: *const App,
                                            vec![],
                                            Filter::black_list(iter::empty()),
                                            encrypt_key,
-                                           Some(&signing_key));
+                                           Some(&sign_key));
         let data = AppendableData::Priv(ffi_try!(data.map_err(CoreError::from)));
         let handle = object_cache.insert_appendable_data(data);
+
         ptr::write(o_handle, handle);
         0
     })
@@ -196,10 +125,7 @@ pub unsafe extern "C" fn appendable_data_get(app: *const App,
                                              o_handle: *mut AppendableDataHandle)
                                              -> i32 {
     helper::catch_unwind_i32(|| {
-        let data_id = {
-            let mut object_cache = unwrap!(object_cache().lock());
-            *ffi_try!(object_cache.get_data_id(data_id_h))
-        };
+        let data_id = *ffi_try!(unwrap!(object_cache().lock()).get_data_id(data_id_h));
 
         let client = (*app).get_client();
         let resp_getter = ffi_try!(unwrap!(client.lock()).get(data_id, None));
@@ -209,8 +135,8 @@ pub unsafe extern "C" fn appendable_data_get(app: *const App,
             _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
         };
 
-        let mut object_cache = unwrap!(object_cache().lock());
-        let handle = object_cache.insert_appendable_data(data);
+        let handle = unwrap!(object_cache().lock()).insert_appendable_data(data);
+
         ptr::write(o_handle, handle);
         0
     })
@@ -230,10 +156,12 @@ pub unsafe extern "C" fn appendable_data_put(app: *const App,
         let client = (*app).get_client();
         let resp_getter = ffi_try!(unwrap!(client.lock()).put(data.into(), None));
         ffi_try!(resp_getter.get());
+
         0
     })
 }
 
+// TODO Need to clone delete_data too - ask routing to provide that
 /// POST appendable data (bumps the version).
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_post(app: *const App,
@@ -242,51 +170,61 @@ pub unsafe extern "C" fn appendable_data_post(app: *const App,
     helper::catch_unwind_i32(|| {
         let client = (*app).get_client();
 
-        let (data, resp_getter) = {
-            let mut client = unwrap!(client.lock());
-
+        let new_ad = {
+            let sign_key = ffi_try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
             let mut object_cache = unwrap!(object_cache().lock());
-            let data = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
-            let data = ffi_try!(data.bump_version(&*client));
-            let resp_getter = ffi_try!(client.post(data.clone().into(), None));
+            let ad = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
 
-            (data, resp_getter)
+            match *ad {
+                AppendableData::Pub(ref old_data) => {
+                    let new_data =
+                        ffi_try!(PubAppendableData::new(old_data.name,
+                                                        old_data.version + 1,
+                                                        old_data.current_owner_keys.clone(),
+                                                        old_data.previous_owner_keys.clone(),
+                                                        old_data.filter.clone(),
+                                                        Some(&sign_key))
+                            .map_err(CoreError::from));
+                    AppendableData::Pub(new_data)
+                }
+                AppendableData::Priv(ref old_data) => {
+                    let new_data =
+                        ffi_try!(PrivAppendableData::new(old_data.name,
+                                                         old_data.version + 1,
+                                                         old_data.current_owner_keys.clone(),
+                                                         old_data.previous_owner_keys.clone(),
+                                                         old_data.filter.clone(),
+                                                         old_data.encrypt_key.clone(),
+                                                         Some(&sign_key))
+                            .map_err(CoreError::from));
+                    AppendableData::Priv(new_data)
+                }
+            }
         };
-
+        let resp_getter = ffi_try!(unwrap!(client.lock()).post(new_ad.clone().into(), None));
         ffi_try!(resp_getter.get());
+        let _ = unwrap!(object_cache().lock()).appendable_data.insert(appendable_data_h, new_ad);
 
-        let mut object_cache = unwrap!(object_cache().lock());
-        let _ = object_cache.appendable_data.insert(appendable_data_h, data);
         0
     })
 }
 
 // TODO: DELETE (disabled for now)
 
-/// Switch the filter of the appendable data to a whitelist.
+/// Switch the filter of the appendable data.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_switch_filter_to_whitelist(
-    appendable_data_h: AppendableDataHandle)
-    -> i32 {
+pub unsafe extern "C" fn appendable_data_toggle_filter(appendable_data_h: AppendableDataHandle)
+                                                       -> i32 {
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache().lock());
-        let data = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
+        let ad = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
 
-        data.switch_to_whitelist();
-        0
-    })
-}
+        let filter = ad.filter_mut();
+        match *filter {
+            Filter::BlackList(_) => *filter = Filter::white_list(iter::empty()),
+            Filter::WhiteList(_) => *filter = Filter::black_list(iter::empty()),
+        }
 
-/// Switch the filter of the appendable data to a blacklist.
-#[no_mangle]
-pub unsafe extern "C" fn appendable_data_switch_filter_to_blacklist(
-    appendable_data_h: AppendableDataHandle)
-    -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache().lock());
-        let data = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
-
-        data.switch_to_blacklist();
         0
     })
 }
@@ -294,15 +232,19 @@ pub unsafe extern "C" fn appendable_data_switch_filter_to_blacklist(
 /// Insert a new entry to the (whitelist or blacklist) filter. If the key was
 /// already present in the filter, this is a no-op.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_insert_to_filter(appendable_data_h: AppendableDataHandle,
-                                                          sign_key_h: SignKeyHandle)
-                                                          -> i32 {
+pub extern "C" fn appendable_data_insert_to_filter(appendable_data_h: AppendableDataHandle,
+                                                   sign_key_h: SignKeyHandle)
+                                                   -> i32 {
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache().lock());
         let sign_key = *ffi_try!(object_cache.get_sign_key(sign_key_h));
-        let data = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
+        let ad = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
 
-        data.insert_to_filter(sign_key);
+        let _ = match *ad.filter_mut() {
+            Filter::WhiteList(ref mut list) |
+            Filter::BlackList(ref mut list) => list.insert(sign_key),
+        };
+
         0
     })
 }
@@ -310,31 +252,37 @@ pub unsafe extern "C" fn appendable_data_insert_to_filter(appendable_data_h: App
 /// Remove the given key from the (whitelist or blacklist) filter. If the key
 /// isn't present in the filter, this is a no-op.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_remove_from_filter(
-    appendable_data_h: AppendableDataHandle,
-    sign_key_h: SignKeyHandle)
-    -> i32 {
+pub extern "C" fn appendable_data_remove_from_filter(appendable_data_h: AppendableDataHandle,
+                                                     sign_key_h: SignKeyHandle)
+                                                     -> i32 {
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache().lock());
         let sign_key = *ffi_try!(object_cache.get_sign_key(sign_key_h));
-        let data = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
+        let ad = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
 
-        data.remove_from_filter(&sign_key);
+        let _ = match *ad.filter_mut() {
+            Filter::WhiteList(ref mut list) |
+            Filter::BlackList(ref mut list) => list.remove(&sign_key),
+        };
+
         0
     })
 }
 
 /// Get number of appended data items.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_num_of_items(
-    appendable_data_h: AppendableDataHandle,
-    o_num: *mut u64)
-    -> i32 {
+pub unsafe extern "C" fn appendable_data_num_of_data(appendable_data_h: AppendableDataHandle,
+                                                     o_num: *mut u64)
+                                                     -> i32 {
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache().lock());
-        let data = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
-        ptr::write(o_num, data.num_of_items() as u64);
+        let ad = ffi_try!(object_cache.get_appendable_data(appendable_data_h));
+        let num = match *ad {
+            AppendableData::Pub(ref data) => data.data.len(),
+            AppendableData::Priv(ref data) => data.data.len(),
+        };
+
+        ptr::write(o_num, num as u64);
         0
     })
 }
-

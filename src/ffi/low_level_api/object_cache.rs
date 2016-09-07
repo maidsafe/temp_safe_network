@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// TODO Remove
-
 use ffi::errors::FfiError;
 use ffi::low_level_api::{AppendableDataHandle, CipherOptHandle, DataIdHandle, EncryptKeyHandle,
                          ObjectHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle,
@@ -62,6 +60,7 @@ impl ObjectCache {
         self.new_handle
     }
 
+    // TODO Remove
     #[allow(unused)]
     pub fn reset(&mut self) {
         self.new_handle = u64::MAX;
@@ -91,15 +90,13 @@ impl ObjectCache {
             .ok_or(FfiError::InvalidAppendableDataHandle)
     }
 
-    pub fn get_data_id(&mut self, handle: DataIdHandle)
-                       -> Result<&mut DataIdentifier, FfiError> {
-
+    pub fn get_data_id(&mut self, handle: DataIdHandle) -> Result<&mut DataIdentifier, FfiError> {
         self.data_id.get_mut(&handle).ok_or(FfiError::InvalidDataIdHandle)
     }
 
     pub fn get_encrypt_key(&mut self,
                            handle: EncryptKeyHandle)
-                        -> Result<&mut box_::PublicKey, FfiError> {
+                           -> Result<&mut box_::PublicKey, FfiError> {
         self.encrypt_key.get_mut(&handle).ok_or(FfiError::InvalidEncryptKeyHandle)
     }
 
