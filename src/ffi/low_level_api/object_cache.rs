@@ -75,6 +75,7 @@ impl ObjectCache {
         self.sign_key.clear();
     }
 
+    // TODO This is a nice way of doing things - use it for others types too
     pub fn insert_appendable_data(&mut self, data: AppendableData) -> AppendableDataHandle {
         let handle = self.new_handle();
         let _ = self.appendable_data.insert(handle, data);
@@ -82,6 +83,8 @@ impl ObjectCache {
         handle
     }
 
+    // TODO change handle to &AppendableDataHandle to keep interface uniform (no surprises,
+    // maintain consistency with standard interfaces).
     pub fn get_appendable_data(&mut self,
                                handle: AppendableDataHandle)
                                -> Result<&mut AppendableData, FfiError> {

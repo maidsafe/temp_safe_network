@@ -67,33 +67,33 @@ pub unsafe extern "C" fn data_id_new_immut_data(id: *const [u8; XOR_NAME_LEN],
     })
 }
 
-// /// Construct DataIdentifier for AppendableData.
-// #[no_mangle]
-// pub unsafe extern "C" fn data_id_new_appendable_data( id: *const [u8; XOR_NAME_LEN],
-//                                                       is_private: bool,
-//                                                  o_handle: *mut DataIdHandle)
-//                                                  -> i32 {
-//     helper::catch_unwind_i32(|| {
-//         let xor_id = XorName(*id);
-//         let data_id = if is_private {
-//             DataIdentifier::PrivAppendable(xor_id)
-//         } else {
-//             DataIdentifier::PubAppendable(xor_id)
-//         };
-//
-//         let handle = {
-//             let mut obj_cache = unwrap!(object_cache().lock());
-//             let handle = obj_cache.new_handle();
-//             if let Some(prev) = obj_cache.data_id.insert(handle, data_id) {
-//                 debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
-//             }
-//             handle
-//         };
-//
-//         ptr::write(o_handle, handle);
-//         0
-//     })
-// }
+/// Construct DataIdentifier for AppendableData.
+#[no_mangle]
+pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LEN],
+                                                     is_private: bool,
+                                                     o_handle: *mut DataIdHandle)
+                                                     -> i32 {
+    helper::catch_unwind_i32(|| {
+        let xor_id = XorName(*id);
+        let data_id = if is_private {
+            DataIdentifier::PrivAppendable(xor_id)
+        } else {
+            DataIdentifier::PubAppendable(xor_id)
+        };
+
+        let handle = {
+            let mut obj_cache = unwrap!(object_cache().lock());
+            let handle = obj_cache.new_handle();
+            if let Some(prev) = obj_cache.data_id.insert(handle, data_id) {
+                debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
+            }
+            handle
+        };
+
+        ptr::write(o_handle, handle);
+        0
+    })
+}
 
 /// Free DataIdentifier handle
 #[no_mangle]
@@ -123,13 +123,13 @@ mod tests {
 
         let immut_id_arr: [u8; XOR_NAME_LEN] = rand::random();
 
-        // let priv_app_id_arr: [u8; XOR_NAME_LEN] = rand::random();
-        // let pub_app_id_arr: [u8; XOR_NAME_LEN] = rand::random();
+        let priv_app_id_arr: [u8; XOR_NAME_LEN] = rand::random();
+        let pub_app_id_arr: [u8; XOR_NAME_LEN] = rand::random();
 
         let mut data_id_handle_immut = 0;
         let mut data_id_handle_struct = 0;
-        // let mut data_id_handle_priv_appendable = 0;
-        // let mut data_id_handle_pub_appendable = 0;
+        let mut data_id_handle_priv_appendable = 0;
+        let mut data_id_handle_pub_appendable = 0;
 
         unsafe {
             assert_eq!(data_id_new_struct_data(type_tag,
@@ -138,41 +138,41 @@ mod tests {
                        0);
             assert_eq!(data_id_new_immut_data(&immut_id_arr, &mut data_id_handle_immut),
                        0);
-            //     assert_eq!(data_id_new_appendable_data(&priv_app_id_arr,
-            //                                            true,
-            //                                            &mut data_id_handle_priv_appendable),
-            //                0);
-            //     assert_eq!(data_id_new_appendable_data(&pub_app_id_arr,
-            //                                            false,
-            //                                            &mut data_id_handle_pub_appendable),
-            //                0);
+            assert_eq!(data_id_new_appendable_data(&priv_app_id_arr,
+                                                   true,
+                                                   &mut data_id_handle_priv_appendable),
+                       0);
+            assert_eq!(data_id_new_appendable_data(&pub_app_id_arr,
+                                                   false,
+                                                   &mut data_id_handle_pub_appendable),
+                       0);
         }
 
         {
             let mut obj_cache = unwrap!(object_cache().lock());
             assert!(obj_cache.data_id.contains_key(&data_id_handle_struct));
             assert!(obj_cache.data_id.contains_key(&data_id_handle_immut));
-            // assert!(obj_cache.data_id.contains_key(&data_id_handle_priv_appendable));
-            // assert!(obj_cache.data_id.contains_key(&data_id_handle_pub_appendable));
+            assert!(obj_cache.data_id.contains_key(&data_id_handle_priv_appendable));
+            assert!(obj_cache.data_id.contains_key(&data_id_handle_pub_appendable));
         }
 
         assert_eq!(data_id_free(data_id_handle_struct), 0);
         assert_eq!(data_id_free(data_id_handle_immut), 0);
-        // assert_eq!(data_id_free(data_id_handle_priv_appendable), 0);
-        // assert_eq!(data_id_free(data_id_handle_pub_appendable), 0);
+        assert_eq!(data_id_free(data_id_handle_priv_appendable), 0);
+        assert_eq!(data_id_free(data_id_handle_pub_appendable), 0);
 
         let err_code = FfiError::InvalidDataIdHandle.into();
         assert_eq!(data_id_free(data_id_handle_struct), err_code);
         assert_eq!(data_id_free(data_id_handle_immut), err_code);
-        // assert_eq!(data_id_free(data_id_handle_priv_appendable), err_code);
-        // assert_eq!(data_id_free(data_id_handle_pub_appendable), err_code);
+        assert_eq!(data_id_free(data_id_handle_priv_appendable), err_code);
+        assert_eq!(data_id_free(data_id_handle_pub_appendable), err_code);
 
         {
             let mut obj_cache = unwrap!(object_cache().lock());
             assert!(!obj_cache.data_id.contains_key(&data_id_handle_struct));
             assert!(!obj_cache.data_id.contains_key(&data_id_handle_immut));
-            // assert!(!obj_cache.data_id.contains_key(&data_id_handle_priv_appendable));
-            // assert!(!obj_cache.data_id.contains_key(&data_id_handle_pub_appendable));
+            assert!(!obj_cache.data_id.contains_key(&data_id_handle_priv_appendable));
+            assert!(!obj_cache.data_id.contains_key(&data_id_handle_pub_appendable));
         }
     }
 }

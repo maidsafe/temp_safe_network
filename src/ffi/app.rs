@@ -79,19 +79,20 @@ impl App {
         self.session.borrow().get_client()
     }
 
+    // TODO Maybe change all of these to operation forbidden for app
     /// Get app root directory key
     pub fn get_app_dir_key(&self) -> Option<DirectoryKey> {
         self.app_dir_key
     }
 
     /// Get app asym_keys
-    pub fn asym_keys(&self) -> Option<&(box_::PublicKey, box_::SecretKey)> {
-        self.asym_keys.as_ref()
+    pub fn asym_keys(&self) -> Result<&(box_::PublicKey, box_::SecretKey), FfiError> {
+        self.asym_keys.as_ref().ok_or(FfiError::OperationForbiddenForApp)
     }
 
     /// Get app root directory key
-    pub fn sym_key(&self) -> Option<&secretbox::Key> {
-        self.sym_key.as_ref()
+    pub fn sym_key(&self) -> Result<&secretbox::Key, FfiError> {
+        self.sym_key.as_ref().ok_or(FfiError::OperationForbiddenForApp)
     }
 
     /// Get SAFEdrive directory key.

@@ -23,8 +23,8 @@ use maidsafe_utilities::serialisation::{deserialise, deserialise_with_limit, ser
                                         serialise_with_limit};
 use maidsafe_utilities::thread;
 use rand;
-use routing::{Authority, Data, DataIdentifier, Event, FullId, InterfaceError, MessageId, Request,
-              Response, RoutingError, XorName};
+use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, InterfaceError,
+              MessageId, Request, Response, RoutingError, XorName};
 use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::{GetError, MutationError};
 use rust_sodium::crypto::hash::sha256;
@@ -591,6 +591,14 @@ impl RoutingMock {
         });
 
         Ok(())
+    }
+
+    // TODO Write this
+    pub fn send_append_request(&self,
+                               _dst: Authority,
+                               _wrapper: AppendWrapper,
+                               _msg_id: MessageId)
+                               -> Result<(), InterfaceError> {
     }
 
     fn construct_failure_resp(src: Authority,

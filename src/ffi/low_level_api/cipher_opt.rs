@@ -54,7 +54,7 @@ impl CipherOpt {
         match *self {
             CipherOpt::PlainText => Ok(try!(serialise(&WireFormat::Plain(plain_text.to_owned())))),
             CipherOpt::Symmetric => {
-                let sym_key = try!(app.sym_key().ok_or(FfiError::OperationForbiddenForApp));
+                let sym_key = try!(app.sym_key());
                 let nonce = secretbox::gen_nonce();
                 let cipher_text = secretbox::seal(plain_text, &nonce, sym_key);
                 let wire_format = WireFormat::Symmetric {
@@ -76,13 +76,12 @@ impl CipherOpt {
         match try!(deserialise::<WireFormat>(raw_data)) {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {
-                let sym_key = try!(app.sym_key().ok_or(FfiError::OperationForbiddenForApp));
+                let sym_key = try!(app.sym_key());
                 Ok(try!(secretbox::open(&cipher_text, &nonce, sym_key)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)))
             }
             WireFormat::Asymmetric(cipher_text) => {
-                let &(ref pk, ref sk) = try!(app.asym_keys()
-                    .ok_or(FfiError::OperationForbiddenForApp));
+                let &(ref pk, ref sk) = try!(app.asym_keys());
                 Ok(try!(sealedbox::open(&cipher_text, pk, sk)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)))
             }

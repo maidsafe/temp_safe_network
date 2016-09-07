@@ -31,8 +31,8 @@ use core::utility;
 
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::RaiiThreadJoiner;
-use routing::{Authority, Data, DataIdentifier, FullId, MessageId, PlainData, StructuredData,
-              XorName};
+use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, PlainData,
+              StructuredData, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
 use routing::TYPE_TAG_SESSION_PACKET;
@@ -68,6 +68,7 @@ pub struct Client {
     issued_puts: u64,
     issued_posts: u64,
     issued_deletes: u64,
+    issued_appends: u64,
 }
 
 impl Client {
@@ -106,6 +107,7 @@ impl Client {
             issued_puts: 0,
             issued_posts: 0,
             issued_deletes: 0,
+            issued_appends: 0,
         })
     }
 
@@ -154,6 +156,7 @@ impl Client {
             issued_puts: 0,
             issued_posts: 0,
             issued_deletes: 0,
+            issued_appends: 0,
         };
 
         {
@@ -242,6 +245,7 @@ impl Client {
                 issued_puts: 0,
                 issued_posts: 0,
                 issued_deletes: 0,
+                issued_appends: 0,
             };
 
             Ok(client)
@@ -536,6 +540,35 @@ impl Client {
         }
     }
 
+    /// Append request
+    pub fn append(&mut self,
+                  appender: AppendWrapper,
+                  opt_dst: Option<Authority>)
+                  -> Result<MutationResponseGetter, CoreError> {
+        trace!("APPEND for {:?}", appender);
+
+        self.issued_appends += 1;
+
+        let dst = match opt_dst {
+            Some(auth) => auth,
+            None => {
+                let append_to = match appender {
+                    AppendWrapper::Pub { ref append_to, .. } |
+                    AppendWrapper::Priv { ref append_to, .. } => *append_to,
+                };
+                Authority::NaeManager(append_to)
+            }
+        };
+
+        let (tx, rx) = mpsc::channel();
+        let msg_id = MessageId::new();
+        unwrap!(self.message_queue.lock()).register_response_observer(msg_id, tx.clone());
+
+        try!(self.routing.send_append_request(dst, appender, msg_id));
+
+        Ok(MutationResponseGetter::new((tx, rx)))
+    }
+
     /// Get data from the network. This is non-blocking.
     pub fn get_account_info(&mut self,
                             opt_dst: Option<Authority>)
@@ -764,6 +797,11 @@ impl Client {
     /// Return the amount of calls that were done to `delete`
     pub fn issued_deletes(&self) -> u64 {
         self.issued_deletes
+    }
+
+    /// Return the amount of calls that were done to `append`
+    pub fn issued_appends(&self) -> u64 {
+        self.issued_appends
     }
 
     #[cfg(all(test, feature = "use-mock-routing"))]
