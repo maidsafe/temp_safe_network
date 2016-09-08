@@ -52,8 +52,8 @@ pub extern "C" fn misc_sign_key_free(handle: SignKeyHandle) -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn misc_serailise_data_id(data_id_h: DataIdHandle,
                                                 o_data: *mut *mut u8,
-                                                o_size: *mut u64,
-                                                o_capacity: *mut u64)
+                                                o_size: *mut usize,
+                                                o_capacity: *mut usize)
                                                 -> i32 {
     helper::catch_unwind_i32(|| {
         let mut ser_data_id = ffi_try!(serialise(ffi_try!(unwrap!(object_cache().lock())
@@ -63,8 +63,8 @@ pub unsafe extern "C" fn misc_serailise_data_id(data_id_h: DataIdHandle,
             .map_err(FfiError::from));
 
         *o_data = ser_data_id.as_mut_ptr();
-        ptr::write(o_size, ser_data_id.len() as u64);
-        ptr::write(o_capacity, ser_data_id.capacity() as u64);
+        ptr::write(o_size, ser_data_id.len());
+        ptr::write(o_capacity, ser_data_id.capacity());
         mem::forget(ser_data_id);
 
         0
@@ -74,11 +74,11 @@ pub unsafe extern "C" fn misc_serailise_data_id(data_id_h: DataIdHandle,
 /// Deserialise DataIdentifier
 #[no_mangle]
 pub unsafe extern "C" fn misc_deserailise_data_id(data: *const u8,
-                                                  size: u64,
+                                                  size: usize,
                                                   o_handle: *mut DataIdHandle)
                                                   -> i32 {
     helper::catch_unwind_i32(|| {
-        let ser_data_id = slice::from_raw_parts(data, size as usize);
+        let ser_data_id = slice::from_raw_parts(data, size);
         let data_id = ffi_try!(deserialise(ser_data_id).map_err(FfiError::from));
 
         let mut object_cache = unwrap!(object_cache().lock());
@@ -94,8 +94,8 @@ pub unsafe extern "C" fn misc_deserailise_data_id(data: *const u8,
 
 /// Deallocate pointer obtained via FFI and allocated by safe_core
 #[no_mangle]
-pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: u64, capacity: u64) {
-    let _ = Vec::from_raw_parts(ptr, size as usize, capacity as usize);
+pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: usize, capacity: usize) {
+    let _ = Vec::from_raw_parts(ptr, size, capacity);
 }
 
 #[cfg(test)]
