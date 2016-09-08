@@ -83,7 +83,8 @@ pub unsafe extern "C" fn appendable_data_new_pub(app: *const App,
         let data = PubAppendableData::new(name,
                                           0,
                                           vec![owner_key],
-                                          vec![],
+                                          Default::default(),
+                                          Default::default(),
                                           Filter::black_list(iter::empty()),
                                           Some(&sign_key));
         let data = AppendableData::Pub(ffi_try!(data.map_err(CoreError::from)));
@@ -118,7 +119,8 @@ pub unsafe extern "C" fn appendable_data_new_priv(app: *const App,
         let data = PrivAppendableData::new(name,
                                            0,
                                            vec![owner_key],
-                                           vec![],
+                                           Default::default(),
+                                           Default::default(),
                                            Filter::black_list(iter::empty()),
                                            encrypt_key,
                                            Some(&sign_key));
@@ -160,13 +162,13 @@ pub unsafe extern "C" fn appendable_data_extract_data_id(ad_h: AppendableDataHan
                                                          o_handle: *mut DataIdHandle)
                                                          -> i32 {
     helper::catch_unwind_i32(|| {
-        let mut obj_cache = unwrap!(object_cache().lock());
-        let data_id = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+        let mut object_cache = unwrap!(object_cache().lock());
+        let data_id = match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
             AppendableData::Pub(ref elt) => elt.identifier(),
             AppendableData::Priv(ref elt) => elt.identifier(),
         };
-        let handle = obj_cache.new_handle();
-        if let Some(prev) = obj_cache.data_id.insert(handle, data_id) {
+        let handle = object_cache.new_handle();
+        if let Some(prev) = object_cache.data_id.insert(handle, data_id) {
             debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
         }
 
@@ -180,8 +182,8 @@ pub unsafe extern "C" fn appendable_data_extract_data_id(ad_h: AppendableDataHan
 pub unsafe extern "C" fn appendable_data_put(app: *const App, ad_h: AppendableDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let data = {
-            let mut obj_cache = unwrap!(object_cache().lock());
-            ffi_try!(obj_cache.get_appendable_data(ad_h)).clone()
+            let mut object_cache = unwrap!(object_cache().lock());
+            ffi_try!(object_cache.get_appendable_data(ad_h)).clone()
         };
 
         let client = (*app).get_client();
@@ -192,7 +194,6 @@ pub unsafe extern "C" fn appendable_data_put(app: *const App, ad_h: AppendableDa
     })
 }
 
-// TODO Need to clone delete_data too - ask routing to provide that
 /// POST appendable data (bumps the version).
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_post(app: *const App, ad_h: AppendableDataHandle) -> i32 {
@@ -211,6 +212,7 @@ pub unsafe extern "C" fn appendable_data_post(app: *const App, ad_h: AppendableD
                                                         old_data.version + 1,
                                                         old_data.current_owner_keys.clone(),
                                                         old_data.previous_owner_keys.clone(),
+                                                        old_data.deleted_data.clone(),
                                                         old_data.filter.clone(),
                                                         Some(&sign_key))
                             .map_err(CoreError::from));
@@ -222,6 +224,7 @@ pub unsafe extern "C" fn appendable_data_post(app: *const App, ad_h: AppendableD
                                                          old_data.version + 1,
                                                          old_data.current_owner_keys.clone(),
                                                          old_data.previous_owner_keys.clone(),
+                                                         old_data.deleted_data.clone(),
                                                          old_data.filter.clone(),
                                                          old_data.encrypt_key.clone(),
                                                          Some(&sign_key))
@@ -322,13 +325,13 @@ pub unsafe extern "C" fn appendable_data_encrypt_key(ad_h: AppendableDataHandle,
                                                      o_handle: *mut EncryptKeyHandle)
                                                      -> i32 {
     helper::catch_unwind_i32(|| {
-        let mut obj_cache = unwrap!(object_cache().lock());
-        let pk = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+        let mut object_cache = unwrap!(object_cache().lock());
+        let pk = match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
             AppendableData::Priv(ref elt) => elt.encrypt_key.clone(),
             _ => ffi_try!(Err(FfiError::UnsupportedOperation)),
         };
-        let handle = obj_cache.new_handle();
-        if let Some(prev) = obj_cache.encrypt_key.insert(handle, pk) {
+        let handle = object_cache.new_handle();
+        if let Some(prev) = object_cache.encrypt_key.insert(handle, pk) {
             debug!("Displaced Public Encrypt Key from ObjectCache: {:?}", prev);
         }
 
@@ -365,9 +368,9 @@ pub unsafe extern "C" fn appendable_data_nth_data_id(app: *const App,
     helper::catch_unwind_i32(|| {
         let app = &*app;
 
-        let mut obj_cache = unwrap!(object_cache().lock());
+        let mut object_cache = unwrap!(object_cache().lock());
 
-        let data_id = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+        let data_id = match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
             AppendableData::Priv(ref elt) => {
                 let priv_data = ffi_try!(nth(&elt.data, n));
                 let &(ref pk, ref sk) = ffi_try!(app.asym_keys());
@@ -377,8 +380,8 @@ pub unsafe extern "C" fn appendable_data_nth_data_id(app: *const App,
             AppendableData::Pub(ref elt) => ffi_try!(nth(&elt.data, n)).pointer,
         };
 
-        let handle = obj_cache.new_handle();
-        if let Some(prev) = obj_cache.data_id.insert(handle, data_id) {
+        let handle = object_cache.new_handle();
+        if let Some(prev) = object_cache.data_id.insert(handle, data_id) {
             debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
         }
 
@@ -397,9 +400,9 @@ pub unsafe extern "C" fn appendable_data_nth_sign_key(app: *const App,
     helper::catch_unwind_i32(|| {
         let app = &*app;
 
-        let mut obj_cache = unwrap!(object_cache().lock());
+        let mut object_cache = unwrap!(object_cache().lock());
 
-        let sign_key = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+        let sign_key = match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
             AppendableData::Priv(ref elt) => {
                 let priv_data = ffi_try!(nth(&elt.data, n));
                 let &(ref pk, ref sk) = ffi_try!(app.asym_keys());
@@ -409,8 +412,8 @@ pub unsafe extern "C" fn appendable_data_nth_sign_key(app: *const App,
             AppendableData::Pub(ref elt) => ffi_try!(nth(&elt.data, n)).sign_key,
         };
 
-        let handle = obj_cache.new_handle();
-        if let Some(prev) = obj_cache.sign_key.insert(handle, sign_key) {
+        let handle = object_cache.new_handle();
+        if let Some(prev) = object_cache.sign_key.insert(handle, sign_key) {
             debug!("Displaced Public Sign Key from ObjectCache: {:?}", prev);
         }
 
@@ -430,8 +433,8 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
         let client = (*app).get_client();
 
         let append_wrapper = {
-            let mut obj_cache = unwrap!(object_cache().lock());
-            let data_id = *ffi_try!(obj_cache.get_data_id(data_id_h));
+            let mut object_cache = unwrap!(object_cache().lock());
+            let data_id = *ffi_try!(object_cache.get_data_id(data_id_h));
 
             let client = unwrap!(client.lock());
             let sign_pk = ffi_try!(client.get_public_signing_key());
@@ -440,7 +443,7 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
             let appended_data = ffi_try!(AppendedData::new(data_id, *sign_pk, sign_sk)
                 .map_err(CoreError::from));
 
-            match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+            match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
                 AppendableData::Priv(ref elt) => {
                     let priv_appended_data = ffi_try!(PrivAppendedData::new(&appended_data,
                                                                             &elt.encrypt_key)
@@ -470,8 +473,8 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
 #[no_mangle]
 pub extern "C" fn appendable_data_remove_nth(ad_h: AppendableDataHandle, n: u64) -> i32 {
     helper::catch_unwind_i32(|| {
-        let mut obj_cache = unwrap!(object_cache().lock());
-        match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+        let mut object_cache = unwrap!(object_cache().lock());
+        match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
             AppendableData::Pub(ref mut data) => {
                 let item = ffi_try!(nth(&data.data, n)).clone();
                 data.delete(item);

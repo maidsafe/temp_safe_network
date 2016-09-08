@@ -599,6 +599,7 @@ impl RoutingMock {
                                _wrapper: AppendWrapper,
                                _msg_id: MessageId)
                                -> Result<(), InterfaceError> {
+        unimplemented!()
     }
 
     fn construct_failure_resp(src: Authority,
