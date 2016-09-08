@@ -92,8 +92,15 @@ pub unsafe extern "C" fn misc_deserailise_data_id(data: *const u8,
     })
 }
 
+/// Deallocate pointer obtained via FFI and allocated by safe_core
+#[no_mangle]
+pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: u64, capacity: u64) {
+    let _ = Vec::from_raw_parts(ptr, size as usize, capacity as usize);
+}
+
 #[cfg(test)]
 mod tests {
+    use ffi::low_level_api::data_id::*;
     use ffi::low_level_api::object_cache::object_cache;
     use rand;
     use routing::DataIdentifier;
@@ -142,8 +149,12 @@ mod tests {
             let mut object_cache = unwrap!(object_cache().lock());
             let before_id = *unwrap!(object_cache.data_id.get_mut(&sd_data_id_h));
             let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+
             assert_eq!(before_id, *after_id);
             assert_eq!(data_id_sd, *after_id);
+
+            assert_eq!(data_id_free(data_id_h), 0);
+            misc_u8_ptr_free(data_ptr, data_size, capacity);
         }
 
         unsafe {
@@ -164,8 +175,12 @@ mod tests {
             let mut object_cache = unwrap!(object_cache().lock());
             let before_id = *unwrap!(object_cache.data_id.get_mut(&id_data_id_h));
             let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+
             assert_eq!(before_id, *after_id);
             assert_eq!(data_id_id, *after_id);
+
+            assert_eq!(data_id_free(data_id_h), 0);
+            misc_u8_ptr_free(data_ptr, data_size, capacity);
         }
 
         unsafe {
@@ -186,8 +201,16 @@ mod tests {
             let mut object_cache = unwrap!(object_cache().lock());
             let before_id = *unwrap!(object_cache.data_id.get_mut(&ad_data_id_h));
             let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+
             assert_eq!(before_id, *after_id);
             assert_eq!(data_id_ad, *after_id);
+
+            assert_eq!(data_id_free(data_id_h), 0);
+            misc_u8_ptr_free(data_ptr, data_size, capacity);
         }
+
+        assert_eq!(data_id_free(sd_data_id_h), 0);
+        assert_eq!(data_id_free(id_data_id_h), 0);
+        assert_eq!(data_id_free(ad_data_id_h), 0);
     }
 }
