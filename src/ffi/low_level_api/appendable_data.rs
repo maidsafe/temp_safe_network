@@ -23,6 +23,7 @@ use ffi::low_level_api::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, S
 use ffi::low_level_api::object_cache::object_cache;
 use routing::{AppendWrapper, AppendedData, Data, Filter, PrivAppendableData, PrivAppendedData,
               PubAppendableData, XOR_NAME_LEN, XorName};
+use std::collections::BTreeSet;
 use std::iter;
 use std::ptr;
 
@@ -258,27 +259,6 @@ pub unsafe extern "C" fn appendable_data_filter_type(ad_h: AppendableDataHandle,
     })
 }
 
-/// Get the owner's encrypt key
-#[no_mangle]
-pub unsafe extern "C" fn appendable_data_filter_encrypt_key(ad_h: AppendableDataHandle,
-                                                            o_handle: *mut EncryptKeyHandle)
-                                                            -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut obj_cache = unwrap!(object_cache().lock());
-        let pk = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
-            AppendableData::Priv(ref elt) => elt.encrypt_key.clone(),
-            _ => ffi_try!(Err(FfiError::UnsupportedOperation)),
-        };
-        let handle = obj_cache.new_handle();
-        if let Some(prev) = obj_cache.encrypt_key.insert(handle, pk) {
-            debug!("Displaced Public Encrypt Key from ObjectCache: {:?}", prev);
-        }
-
-        ptr::write(o_handle, handle);
-        0
-    })
-}
-
 /// Switch the filter of the appendable data.
 #[no_mangle]
 pub extern "C" fn appendable_data_toggle_filter(ad_h: AppendableDataHandle) -> i32 {
@@ -336,6 +316,27 @@ pub extern "C" fn appendable_data_remove_from_filter(ad_h: AppendableDataHandle,
     })
 }
 
+/// Get the owner's encrypt key
+#[no_mangle]
+pub unsafe extern "C" fn appendable_data_encrypt_key(ad_h: AppendableDataHandle,
+                                                     o_handle: *mut EncryptKeyHandle)
+                                                     -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut obj_cache = unwrap!(object_cache().lock());
+        let pk = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+            AppendableData::Priv(ref elt) => elt.encrypt_key.clone(),
+            _ => ffi_try!(Err(FfiError::UnsupportedOperation)),
+        };
+        let handle = obj_cache.new_handle();
+        if let Some(prev) = obj_cache.encrypt_key.insert(handle, pk) {
+            debug!("Displaced Public Encrypt Key from ObjectCache: {:?}", prev);
+        }
+
+        ptr::write(o_handle, handle);
+        0
+    })
+}
+
 /// Get number of appended data items.
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_num_of_data(ad_h: AppendableDataHandle,
@@ -368,15 +369,12 @@ pub unsafe extern "C" fn appendable_data_nth_data_id(app: *const App,
 
         let data_id = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
             AppendableData::Priv(ref elt) => {
-                let priv_data =
-                    ffi_try!(elt.data.iter().nth(n as usize).ok_or(FfiError::InvalidIndex));
+                let priv_data = ffi_try!(nth(&elt.data, n));
                 let &(ref pk, ref sk) = ffi_try!(app.asym_keys());
                 ffi_try!(priv_data.open(pk, sk).map_err(CoreError::from)).pointer
 
             }
-            AppendableData::Pub(ref elt) => {
-                ffi_try!(elt.data.iter().nth(n as usize).ok_or(FfiError::InvalidIndex)).pointer
-            }
+            AppendableData::Pub(ref elt) => ffi_try!(nth(&elt.data, n)).pointer,
         };
 
         let handle = obj_cache.new_handle();
@@ -403,15 +401,12 @@ pub unsafe extern "C" fn appendable_data_nth_sign_key(app: *const App,
 
         let sign_key = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
             AppendableData::Priv(ref elt) => {
-                let priv_data =
-                    ffi_try!(elt.data.iter().nth(n as usize).ok_or(FfiError::InvalidIndex));
+                let priv_data = ffi_try!(nth(&elt.data, n));
                 let &(ref pk, ref sk) = ffi_try!(app.asym_keys());
                 ffi_try!(priv_data.open(pk, sk).map_err(CoreError::from)).sign_key
 
             }
-            AppendableData::Pub(ref elt) => {
-                ffi_try!(elt.data.iter().nth(n as usize).ok_or(FfiError::InvalidIndex)).sign_key
-            }
+            AppendableData::Pub(ref elt) => ffi_try!(nth(&elt.data, n)).sign_key,
         };
 
         let handle = obj_cache.new_handle();
@@ -434,11 +429,9 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
     helper::catch_unwind_i32(|| {
         let client = (*app).get_client();
 
-        let resp_getter = {
+        let append_wrapper = {
             let mut obj_cache = unwrap!(object_cache().lock());
-            let data_id = *ffi_try!(obj_cache.data_id
-                .get_mut(&data_id_h)
-                .ok_or(FfiError::InvalidDataIdHandle));
+            let data_id = *ffi_try!(obj_cache.get_data_id(data_id_h));
 
             let client = unwrap!(client.lock());
             let sign_pk = ffi_try!(client.get_public_signing_key());
@@ -447,10 +440,7 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
             let appended_data = ffi_try!(AppendedData::new(data_id, *sign_pk, sign_sk)
                 .map_err(CoreError::from));
 
-            // TODO Check how to get this version number. Maybe iterate through the data set and
-            // get the highest version and then increment it ??
-            let version = 0;
-            let append_wrapper = match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+            match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
                 AppendableData::Priv(ref elt) => {
                     let priv_appended_data = ffi_try!(PrivAppendedData::new(&appended_data,
                                                                             &elt.encrypt_key)
@@ -458,18 +448,39 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
                     ffi_try!(AppendWrapper::new_priv(elt.name,
                                                      priv_appended_data,
                                                      (sign_pk, sign_sk),
-                                                     version)
+                                                     elt.version)
                         .map_err(CoreError::from))
                 }
                 AppendableData::Pub(ref elt) => {
-                    AppendWrapper::new_pub(elt.name, appended_data, version)
+                    AppendWrapper::new_pub(elt.name, appended_data, elt.version)
                 }
-            };
-
-            ffi_try!(client.append(append_wrapper, None))
+            }
         };
 
+        let mut client = unwrap!(client.lock());
+        let resp_getter = ffi_try!(client.append(append_wrapper, None));
         ffi_try!(resp_getter.get());
+
+        0
+    })
+}
+
+/// Remove the n-th data item from the appendable data. The data has to be
+/// POST'd afterwards for the change to be registered by the network.
+#[no_mangle]
+pub extern "C" fn appendable_data_remove_nth(ad_h: AppendableDataHandle, n: u64) -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut obj_cache = unwrap!(object_cache().lock());
+        match *ffi_try!(obj_cache.get_appendable_data(ad_h)) {
+            AppendableData::Pub(ref mut data) => {
+                let item = ffi_try!(nth(&data.data, n)).clone();
+                data.delete(item);
+            }
+            AppendableData::Priv(ref mut data) => {
+                let item = ffi_try!(nth(&data.data, n)).clone();
+                data.delete(item);
+            }
+        }
 
         0
     })
@@ -486,4 +497,10 @@ pub extern "C" fn appendable_data_free(handle: AppendableDataHandle) -> i32 {
 
         0
     })
+}
+
+// Convenience function to access n-th item from the given set, returning FfiError::InvalidIndex
+// if not found.
+fn nth<T>(items: &BTreeSet<T>, n: u64) -> Result<&T, FfiError> {
+    items.iter().nth(n as usize).ok_or(FfiError::InvalidIndex)
 }
