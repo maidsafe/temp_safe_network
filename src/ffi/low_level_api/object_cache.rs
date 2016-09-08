@@ -93,6 +93,13 @@ impl ObjectCache {
             .ok_or(FfiError::InvalidAppendableDataHandle)
     }
 
+    pub fn insert_data_id(&mut self, data_id: DataIdentifier) -> DataIdHandle {
+        let handle = self.new_handle();
+        let _ = self.data_id.insert(handle, data_id);
+
+        handle
+    }
+
     pub fn get_data_id(&mut self, handle: DataIdHandle) -> Result<&mut DataIdentifier, FfiError> {
         self.data_id.get_mut(&handle).ok_or(FfiError::InvalidDataIdHandle)
     }

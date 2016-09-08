@@ -56,6 +56,7 @@ impl Into<Data> for AppendableData {
 
 /// Filter Type
 #[repr(C)]
+#[derive(Debug, PartialEq)]
 pub enum FilterType {
     /// BlackList
     BlackList,
@@ -539,4 +540,58 @@ pub extern "C" fn appendable_data_free(handle: AppendableDataHandle) -> i32 {
 // if not found.
 fn nth<T>(items: &BTreeSet<T>, n: u64) -> Result<&T, FfiError> {
     items.iter().nth(n as usize).ok_or(FfiError::InvalidIndex)
+}
+
+#[cfg(test)]
+mod tests {
+    use core::utility;
+    use ffi::app::App;
+    use ffi::low_level_api::{AppendableDataHandle, DataIdHandle};
+    use ffi::low_level_api::object_cache::object_cache;
+    use ffi::test_utils;
+    use rand;
+    use routing::{Data, ImmutableData};
+    use super::*;
+
+    #[test]
+    fn smoke() {
+        let app = test_utils::create_app(false);
+        let ad_name = rand::random();
+        let mut ad_h: AppendableDataHandle = 0;
+
+        // Data to append
+        let (_, immutable_data_0_h) = generate_random_immutable_data(&app);
+        let (_, immutable_data_1_h) = generate_random_immutable_data(&app);
+
+        unsafe {
+            // Create
+            assert_eq!(appendable_data_new_pub(&app,
+                                               &ad_name,
+                                               &mut ad_h),
+                       0);
+
+            // Put to the network
+            assert_eq!(appendable_data_put(&app, ad_h), 0);
+
+            // Append
+            assert_eq!(appendable_data_append(&app, ad_h, immutable_data_0_h), 0);
+            assert_eq!(appendable_data_append(&app, ad_h, immutable_data_1_h), 0);
+        }
+    }
+
+    // Helper function to generate random immutable data and put it into the network.
+    // Returns the data itself and the object cache handle to its DataIdentifier.
+    fn generate_random_immutable_data(app: &App) -> (ImmutableData, DataIdHandle) {
+        let immutable_data = ImmutableData::new(unwrap!(utility::generate_random_vector(10)));
+        let data = Data::Immutable(immutable_data.clone());
+
+        let client = app.get_client();
+        let mut client = unwrap!(client.lock());
+        unwrap!(unwrap!(client.put(data, None)).get());
+
+        let mut obj_cache = unwrap!(object_cache().lock());
+        let data_id_h = obj_cache.insert_data_id(immutable_data.identifier());
+
+        (immutable_data, data_id_h)
+    }
 }

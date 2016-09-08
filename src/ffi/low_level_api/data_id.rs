@@ -33,11 +33,7 @@ pub unsafe extern "C" fn data_id_new_struct_data(type_tag: u64,
         let data_id = DataIdentifier::Structured(xor_id, type_tag);
         let handle = {
             let mut obj_cache = unwrap!(object_cache().lock());
-            let handle = obj_cache.new_handle();
-            if let Some(prev) = obj_cache.data_id.insert(handle, data_id) {
-                debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
-            }
-            handle
+            obj_cache.insert_data_id(data_id)
         };
 
         ptr::write(o_handle, handle);
@@ -55,11 +51,7 @@ pub unsafe extern "C" fn data_id_new_immut_data(id: *const [u8; XOR_NAME_LEN],
         let data_id = DataIdentifier::Immutable(xor_id);
         let handle = {
             let mut obj_cache = unwrap!(object_cache().lock());
-            let handle = obj_cache.new_handle();
-            if let Some(prev) = obj_cache.data_id.insert(handle, data_id) {
-                debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
-            }
-            handle
+            obj_cache.insert_data_id(data_id)
         };
 
         ptr::write(o_handle, handle);
@@ -83,11 +75,7 @@ pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LE
 
         let handle = {
             let mut obj_cache = unwrap!(object_cache().lock());
-            let handle = obj_cache.new_handle();
-            if let Some(prev) = obj_cache.data_id.insert(handle, data_id) {
-                debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
-            }
-            handle
+            obj_cache.insert_data_id(data_id)
         };
 
         ptr::write(o_handle, handle);
