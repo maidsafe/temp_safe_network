@@ -146,12 +146,14 @@ mod tests {
                        0);
             assert!(data_id_h != sd_data_id_h);
 
-            let mut object_cache = unwrap!(object_cache().lock());
-            let before_id = *unwrap!(object_cache.data_id.get_mut(&sd_data_id_h));
-            let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+            {
+                let mut object_cache = unwrap!(object_cache().lock());
+                let before_id = *unwrap!(object_cache.data_id.get_mut(&sd_data_id_h));
+                let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
 
-            assert_eq!(before_id, *after_id);
-            assert_eq!(data_id_sd, *after_id);
+                assert_eq!(before_id, *after_id);
+                assert_eq!(data_id_sd, *after_id);
+            }
 
             assert_eq!(data_id_free(data_id_h), 0);
             misc_u8_ptr_free(data_ptr, data_size, capacity);
@@ -172,12 +174,14 @@ mod tests {
                        0);
             assert!(data_id_h != id_data_id_h);
 
-            let mut object_cache = unwrap!(object_cache().lock());
-            let before_id = *unwrap!(object_cache.data_id.get_mut(&id_data_id_h));
-            let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+            {
+                let mut object_cache = unwrap!(object_cache().lock());
+                let before_id = *unwrap!(object_cache.data_id.get_mut(&id_data_id_h));
+                let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
 
-            assert_eq!(before_id, *after_id);
-            assert_eq!(data_id_id, *after_id);
+                assert_eq!(before_id, *after_id);
+                assert_eq!(data_id_id, *after_id);
+            }
 
             assert_eq!(data_id_free(data_id_h), 0);
             misc_u8_ptr_free(data_ptr, data_size, capacity);
@@ -198,12 +202,14 @@ mod tests {
                        0);
             assert!(data_id_h != ad_data_id_h);
 
-            let mut object_cache = unwrap!(object_cache().lock());
-            let before_id = *unwrap!(object_cache.data_id.get_mut(&ad_data_id_h));
-            let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+            {
+                let mut object_cache = unwrap!(object_cache().lock());
+                let before_id = *unwrap!(object_cache.data_id.get_mut(&ad_data_id_h));
+                let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
 
-            assert_eq!(before_id, *after_id);
-            assert_eq!(data_id_ad, *after_id);
+                assert_eq!(before_id, *after_id);
+                assert_eq!(data_id_ad, *after_id);
+            }
 
             assert_eq!(data_id_free(data_id_h), 0);
             misc_u8_ptr_free(data_ptr, data_size, capacity);

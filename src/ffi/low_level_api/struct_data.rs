@@ -279,6 +279,8 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
         let app = &*app;
         let client = app.get_client();
 
+        // Note: Order of locking is object_cache followed by client - ensure this order
+        // everywhere.
         let mut obj_cache = unwrap!(object_cache().lock());
         let sd =
             ffi_try!(obj_cache.struct_data.get_mut(&sd_h).ok_or(FfiError::InvalidStructDataHandle));
