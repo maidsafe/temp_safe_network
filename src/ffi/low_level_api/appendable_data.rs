@@ -422,7 +422,6 @@ pub unsafe extern "C" fn appendable_data_nth_sign_key(app: *const App,
     })
 }
 
-// TODO Discuss if this should free the appendabledatahandle as after success it would be useless
 /// Append data.
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_append(app: *const App,
