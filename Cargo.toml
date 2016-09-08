@@ -53,6 +53,10 @@ name = "nfs_api"
 bench = false
 name = "simulate_browser"
 
+[[example]]
+bench = false
+name = "email"
+
 [features]
 use-mock-routing = []
 
