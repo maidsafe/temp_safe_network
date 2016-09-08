@@ -66,14 +66,6 @@ pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
     (p, len, cap)
 }
 
-/// Dealloc a string allocated with `string_to_c_utf8`.
-pub unsafe fn dealloc_c_utf8_alloced_from_rust(p: *mut u8, len: usize,
-                                               cap: usize) {
-    // TODO: refactor implementation to remove the need for `cap`. Related issue:
-    // <https://github.com/rust-lang/rust/issues/36284>.
-    let _ = Vec::from_raw_parts(p, len, cap);
-}
-
 // TODO: add c_char_ptr_to_str and c_char_ptr_to_opt_str (return &str instead of String)
 
 pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {

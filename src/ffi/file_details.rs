@@ -21,6 +21,7 @@
 use core::client::Client;
 use ffi::config;
 use ffi::errors::FfiError;
+use ffi::low_level_api::misc::misc_u8_ptr_free;
 use nfs::file::File;
 use nfs::helper::file_helper::FileHelper;
 use nfs::metadata::file_metadata::FileMetadata as NfsFileMetadata;
@@ -81,9 +82,7 @@ impl FileDetails {
     // a proper impl Drop.
     fn deallocate(self) {
         unsafe {
-            helper::dealloc_c_utf8_alloced_from_rust(self.content,
-                                                     self.content_len,
-                                                     self.content_cap);
+            misc_u8_ptr_free(self.content, self.content_len, self.content_cap);
         }
 
         if !self.metadata.is_null() {
@@ -146,10 +145,10 @@ impl FileMetadata {
     // a proper impl Drop.
     pub fn deallocate(&mut self) {
         unsafe {
-            helper::dealloc_c_utf8_alloced_from_rust(self.name, self.name_len, self.name_cap);
-            helper::dealloc_c_utf8_alloced_from_rust(self.user_metadata,
-                                                     self.user_metadata_len,
-                                                     self.user_metadata_cap);
+            misc_u8_ptr_free(self.name, self.name_len, self.name_cap);
+            misc_u8_ptr_free(self.user_metadata,
+                             self.user_metadata_len,
+                             self.user_metadata_cap);
         }
     }
 }

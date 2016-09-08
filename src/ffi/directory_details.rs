@@ -29,6 +29,7 @@ use nfs::metadata::directory_metadata::DirectoryMetadata as NfsDirectoryMetadata
 use std::ptr;
 use std::sync::{Arc, Mutex};
 use super::helper;
+use ffi::low_level_api::misc::misc_u8_ptr_free;
 
 /// Details about a directory and its content.
 #[derive(Debug)]
@@ -140,11 +141,10 @@ impl DirectoryMetadata {
     // a proper impl Drop.
     fn deallocate(&mut self) {
         unsafe {
-            let _ =
-                helper::dealloc_c_utf8_alloced_from_rust(self.name, self.name_len, self.name_cap);
-            let _ = helper::dealloc_c_utf8_alloced_from_rust(self.user_metadata,
-                                                             self.user_metadata_len,
-                                                             self.user_metadata_cap);
+            let _ = misc_u8_ptr_free(self.name, self.name_len, self.name_cap);
+            let _ = misc_u8_ptr_free(self.user_metadata,
+                                     self.user_metadata_len,
+                                     self.user_metadata_cap);
         }
     }
 }

@@ -95,6 +95,8 @@ pub unsafe extern "C" fn misc_deserailise_data_id(data: *const u8,
 /// Deallocate pointer obtained via FFI and allocated by safe_core
 #[no_mangle]
 pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: usize, capacity: usize) {
+    // TODO: refactor implementation to remove the need for `cap`. Related issue:
+    // <https://github.com/rust-lang/rust/issues/36284>.
     let _ = Vec::from_raw_parts(ptr, size, capacity);
 }
 
