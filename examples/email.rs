@@ -159,7 +159,8 @@ unsafe fn read_email(app_h: *mut App) {
     let mut num_of_emails = 0;
     assert_eq!(appendable_data_num_of_data(ad_h, &mut num_of_emails), 0);
 
-    println!("You have a total of {} emails.", num_of_emails);
+    println!("\n================ You have a total of {} email(s). ================",
+             num_of_emails);
 
     for n in 0..num_of_emails {
         assert_eq!(appendable_data_nth_data_id(app_h, ad_h, n, &mut data_id_h),
@@ -196,7 +197,7 @@ unsafe fn read_email(app_h: *mut App) {
 
     assert_eq!(appendable_data_free(ad_h), 0);
 
-    println!("All Emails read successfully !");
+    println!("\n================ All Emails read successfully ! ================");
 }
 
 fn main() {
