@@ -37,14 +37,14 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
                                          id: *const [u8; XOR_NAME_LEN],
                                          cipher_opt_h: CipherOptHandle,
                                          data: *const u8,
-                                         size: u64,
+                                         size: usize,
                                          o_handle: *mut StructDataHandle)
                                          -> i32 {
     helper::catch_unwind_i32(|| {
         let app = &*app;
         let client = app.get_client();
         let xor_id = XorName(*id);
-        let plain_text = slice::from_raw_parts(data, size as usize).to_owned();
+        let plain_text = slice::from_raw_parts(data, size).to_owned();
 
         let (owner_keys, sign_key) = {
             let client_guard = unwrap!(client.lock());
@@ -188,7 +188,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                               sd_h: StructDataHandle,
                                               cipher_opt_h: CipherOptHandle,
                                               data: *const u8,
-                                              size: u64)
+                                              size: usize)
                                               -> i32 {
     helper::catch_unwind_i32(|| {
         let mut sd = ffi_try!(unwrap!(object_cache().lock())
@@ -198,7 +198,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
 
         let app = &*app;
         let client = app.get_client();
-        let plain_text = slice::from_raw_parts(data, size as usize).to_owned();
+        let plain_text = slice::from_raw_parts(data, size).to_owned();
 
         let sign_key = ffi_try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
 
@@ -272,8 +272,8 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
 pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
                                                   sd_h: StructDataHandle,
                                                   o_data: *mut *mut u8,
-                                                  o_size: *mut u64,
-                                                  o_capacity: *mut u64)
+                                                  o_size: *mut usize,
+                                                  o_capacity: *mut usize)
                                                   -> i32 {
     helper::catch_unwind_i32(|| {
         let app = &*app;
@@ -316,8 +316,8 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
         };
 
         *o_data = plain_text.as_mut_ptr();
-        ptr::write(o_size, plain_text.len() as u64);
-        ptr::write(o_capacity, plain_text.capacity() as u64);
+        ptr::write(o_size, plain_text.len());
+        ptr::write(o_capacity, plain_text.capacity());
         mem::forget(plain_text);
 
         0
@@ -328,7 +328,7 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_num_of_versions(app: *const App,
                                                      sd_h: StructDataHandle,
-                                                     o_num: *mut u64)
+                                                     o_num: *mut usize)
                                                      -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache().lock());
@@ -342,7 +342,7 @@ pub unsafe extern "C" fn struct_data_num_of_versions(app: *const App,
 
         let num = ffi_try!(versioned::get_all_versions((*app).get_client(), sd)).len();
 
-        ptr::write(o_num, num as u64);
+        ptr::write(o_num, num);
 
         0
     })
@@ -352,10 +352,10 @@ pub unsafe extern "C" fn struct_data_num_of_versions(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
                                                  sd_h: StructDataHandle,
-                                                 n: u64,
+                                                 n: usize,
                                                  o_data: *mut *mut u8,
-                                                 o_size: *mut u64,
-                                                 o_capacity: *mut u64)
+                                                 o_size: *mut usize,
+                                                 o_capacity: *mut usize)
                                                  -> i32 {
     helper::catch_unwind_i32(|| {
         let app = &*app;
@@ -374,12 +374,12 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
             ffi_try!(versioned::get_all_versions(client.clone(), sd))
         };
 
-        if n as usize >= versions.len() {
+        if n >= versions.len() {
             ffi_try!(Err(FfiError::InvalidVersionNumber));
         }
 
         // TODO Try to combine this code with above (extract_data) if it makes it smaller
-        let immut_data_final_name = versions.remove(n as usize);
+        let immut_data_final_name = versions.remove(n);
         let resp_getter = ffi_try!(unwrap!(client.lock())
             .get(DataIdentifier::Immutable(immut_data_final_name), None));
         let immut_data_final = match ffi_try!(resp_getter.get()) {
@@ -394,8 +394,8 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
             ffi_try!(immut_data_operations::get_data(client, *immut_data.name(), None));
 
         *o_data = plain_text.as_mut_ptr();
-        ptr::write(o_size, plain_text.len() as u64);
-        ptr::write(o_capacity, plain_text.capacity() as u64);
+        ptr::write(o_size, plain_text.len());
+        ptr::write(o_capacity, plain_text.capacity());
         mem::forget(plain_text);
 
         0
@@ -547,7 +547,7 @@ mod tests {
                                        &id,
                                        cipher_opt_h,
                                        plain_text.as_ptr(),
-                                       plain_text.len() as u64,
+                                       plain_text.len(),
                                        &mut sd_h),
                        0);
             assert_eq!(struct_data_extract_data_id(sd_h, &mut data_id_h), 0);
@@ -573,7 +573,7 @@ mod tests {
                                                     &mut data_size,
                                                     &mut capacity),
                            0);
-                Vec::from_raw_parts(data_ptr, data_size as usize, capacity as usize)
+                Vec::from_raw_parts(data_ptr, data_size, capacity)
             };
             assert_eq!(rx_plain_text_0, plain_text);
 
@@ -583,7 +583,7 @@ mod tests {
                                             sd_h,
                                             cipher_opt_h,
                                             plain_text.as_ptr(),
-                                            plain_text.len() as u64),
+                                            plain_text.len()),
                        0);
 
             // Post
@@ -607,7 +607,7 @@ mod tests {
                                                     &mut data_size,
                                                     &mut capacity),
                            0);
-                Vec::from_raw_parts(data_ptr, data_size as usize, capacity as usize)
+                Vec::from_raw_parts(data_ptr, data_size, capacity)
             };
             assert_eq!(rx_plain_text_1, plain_text);
             assert!(rx_plain_text_1 != rx_plain_text_0);

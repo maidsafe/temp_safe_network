@@ -74,10 +74,10 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_write_to_self_encryptor(se_h: SelfEncryptorWriterHandle,
                                                             data: *const u8,
-                                                            size: u64)
+                                                            size: usize)
                                                             -> i32 {
     helper::catch_unwind_i32(|| {
-        let data_slice = slice::from_raw_parts(data, size as usize);
+        let data_slice = slice::from_raw_parts(data, size);
         ffi_try!(ffi_try!(unwrap!(object_cache().lock())
                 .se_writer
                 .get_mut(&se_h)
@@ -213,8 +213,8 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(se_h: SelfEncryptor
                                                              from_pos: u64,
                                                              len: u64,
                                                              o_data: *mut *mut u8,
-                                                             o_size: *mut u64,
-                                                             o_capacity: *mut u64)
+                                                             o_size: *mut usize,
+                                                             o_capacity: *mut usize)
                                                              -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache().lock());
@@ -230,8 +230,8 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(se_h: SelfEncryptor
         let mut data = ffi_try!(se.read(from_pos, len).map_err(CoreError::from));
 
         *o_data = data.as_mut_ptr();
-        ptr::write(o_size, data.len() as u64);
-        ptr::write(o_capacity, data.capacity() as u64);
+        ptr::write(o_size, data.len());
+        ptr::write(o_capacity, data.capacity());
         mem::forget(data);
 
         0
@@ -303,13 +303,13 @@ mod tests {
 
             assert_eq!(immut_data_write_to_self_encryptor(se_writer_h,
                                                           plain_text.as_ptr(),
-                                                          plain_text.len() as u64),
+                                                          plain_text.len()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
             assert_eq!(immut_data_new_self_encryptor(&app_0, &mut se_writer_h), 0);
             assert_eq!(immut_data_write_to_self_encryptor(se_writer_h,
                                                           plain_text.as_ptr(),
-                                                          plain_text.len() as u64),
+                                                          plain_text.len()),
                        0);
             assert_eq!(immut_data_close_self_encryptor(&app_0,
                                                        se_writer_h,
@@ -357,7 +357,7 @@ mod tests {
                                                            &mut capacity),
                        0);
             let plain_text_rx =
-                Vec::from_raw_parts(data_ptr, data_size as usize, capacity as usize);
+                Vec::from_raw_parts(data_ptr, data_size, capacity);
             assert_eq!(plain_text, plain_text_rx);
 
             assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h), 0);

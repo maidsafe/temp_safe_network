@@ -158,17 +158,16 @@ pub unsafe extern "C" fn directory_details_get_metadata(details: *const Director
 
 /// Get the number of files in the directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirectoryDetails) -> u64 {
-    (*details).files.len() as u64
+pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirectoryDetails) -> usize {
+    (*details).files.len()
 }
 
 /// Get a non-owning pointer to the metadata of the i-th file in the directory.
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_get_file_at(details: *const DirectoryDetails,
-                                                       index: u64)
+                                                       index: usize)
                                                        -> *const FileMetadata {
     let details = &*details;
-    let index = index as usize;
 
     if index < details.files.len() {
         &details.files[index]
@@ -180,18 +179,17 @@ pub unsafe extern "C" fn directory_details_get_file_at(details: *const Directory
 /// Get the number of sub-directories in the directory.
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_get_sub_directories_len(
-    details: *const DirectoryDetails) -> u64 {
-    (*details).sub_directories.len() as u64
+    details: *const DirectoryDetails) -> usize {
+    (*details).sub_directories.len()
 }
 
 /// Get a non-owning pointer to the metadata of the i-th sub-directory of the
 /// directory.
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_get_sub_directory_at(details: *const DirectoryDetails,
-                                                                index: u64)
+                                                                index: usize)
                                                                 -> *const DirectoryMetadata {
     let details = &*details;
-    let index = index as usize;
 
     if index < details.sub_directories.len() {
         &details.sub_directories[index]

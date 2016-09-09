@@ -337,7 +337,7 @@ pub unsafe extern "C" fn appendable_data_encrypt_key(ad_h: AppendableDataHandle,
 /// Get number of appended data items.
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_num_of_data(ad_h: AppendableDataHandle,
-                                                     o_num: *mut u64)
+                                                     o_num: *mut usize)
                                                      -> i32 {
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache().lock());
@@ -347,7 +347,7 @@ pub unsafe extern "C" fn appendable_data_num_of_data(ad_h: AppendableDataHandle,
             AppendableData::Priv(ref elt) => elt.data.len(),
         };
 
-        ptr::write(o_num, num as u64);
+        ptr::write(o_num, num);
         0
     })
 }
@@ -356,7 +356,7 @@ pub unsafe extern "C" fn appendable_data_num_of_data(ad_h: AppendableDataHandle,
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_nth_data_id(app: *const App,
                                                      ad_h: AppendableDataHandle,
-                                                     n: u64,
+                                                     n: usize,
                                                      o_handle: *mut DataIdHandle)
                                                      -> i32 {
     helper::catch_unwind_i32(|| {
@@ -388,7 +388,7 @@ pub unsafe extern "C" fn appendable_data_nth_data_id(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_nth_sign_key(app: *const App,
                                                       ad_h: AppendableDataHandle,
-                                                      n: u64,
+                                                      n: usize,
                                                       o_handle: *mut SignKeyHandle)
                                                       -> i32 {
     helper::catch_unwind_i32(|| {
@@ -419,7 +419,7 @@ pub unsafe extern "C" fn appendable_data_nth_sign_key(app: *const App,
 /// Remove the n-th data item from the appendable data. The data has to be
 /// POST'd afterwards for the change to be registered by the network.
 #[no_mangle]
-pub extern "C" fn appendable_data_remove_nth_data(ad_h: AppendableDataHandle, n: u64) -> i32 {
+pub extern "C" fn appendable_data_remove_nth_data(ad_h: AppendableDataHandle, n: usize) -> i32 {
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache().lock());
         match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
@@ -534,8 +534,8 @@ pub extern "C" fn appendable_data_free(handle: AppendableDataHandle) -> i32 {
 
 // Convenience function to access n-th item from the given set, returning FfiError::InvalidIndex
 // if not found.
-fn nth<T>(items: &BTreeSet<T>, n: u64) -> Result<&T, FfiError> {
-    items.iter().nth(n as usize).ok_or(FfiError::InvalidIndex)
+fn nth<T>(items: &BTreeSet<T>, n: usize) -> Result<&T, FfiError> {
+    items.iter().nth(n).ok_or(FfiError::InvalidIndex)
 }
 
 #[cfg(test)]
@@ -586,7 +586,7 @@ mod tests {
             // GET back
             assert_eq!(appendable_data_get(&app, ad_id_h, &mut got_ad_h), 0);
 
-            let mut num: u64 = 0;
+            let mut num: usize = 0;
             assert_eq!(appendable_data_num_of_data(got_ad_h, &mut num), 0);
             assert_eq!(num, 2);
 
@@ -709,7 +709,7 @@ mod tests {
             // GET it back.
             assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
 
-            let mut num: u64 = 0;
+            let mut num: usize = 0;
             assert_eq!(appendable_data_num_of_data(ad_h, &mut num), 0);
             assert_eq!(num, 0);
         }
