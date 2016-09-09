@@ -91,6 +91,7 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(se_h: SelfEncryptorW
 }
 
 /// Close Self Encryptor
+#[no_mangle]
 pub unsafe extern "C" fn immut_data_close_self_encryptor(app: *const App,
                                                          se_h: SelfEncryptorWriterHandle,
                                                          cipher_opt_h: CipherOptHandle,
@@ -140,6 +141,7 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(app: *const App,
 }
 
 /// Fetch Self Encryptor
+#[no_mangle]
 pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
                                                          data_id_h: DataIdHandle,
                                                          o_handle: *mut SelfEncryptorReaderHandle)
@@ -190,6 +192,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
 }
 
 /// Get data size from Self Encryptor
+#[no_mangle]
 pub unsafe extern "C" fn immut_data_size(se_h: SelfEncryptorReaderHandle, o_size: *mut u64) -> i32 {
     helper::catch_unwind_i32(|| {
         let size = ffi_try!(unwrap!(object_cache().lock())
@@ -205,6 +208,7 @@ pub unsafe extern "C" fn immut_data_size(se_h: SelfEncryptorReaderHandle, o_size
 }
 
 /// Read from Self Encryptor
+#[no_mangle]
 pub unsafe extern "C" fn immut_data_read_from_self_encryptor(se_h: SelfEncryptorReaderHandle,
                                                              from_pos: u64,
                                                              len: u64,

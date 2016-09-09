@@ -79,19 +79,20 @@ impl App {
         self.session.borrow().get_client()
     }
 
+    // TODO Maybe change all of these to operation forbidden for app
     /// Get app root directory key
     pub fn get_app_dir_key(&self) -> Option<DirectoryKey> {
         self.app_dir_key
     }
 
     /// Get app asym_keys
-    pub fn asym_keys(&self) -> Option<&(box_::PublicKey, box_::SecretKey)> {
-        self.asym_keys.as_ref()
+    pub fn asym_keys(&self) -> Result<&(box_::PublicKey, box_::SecretKey), FfiError> {
+        self.asym_keys.as_ref().ok_or(FfiError::OperationForbiddenForApp)
     }
 
     /// Get app root directory key
-    pub fn sym_key(&self) -> Option<&secretbox::Key> {
-        self.sym_key.as_ref()
+    pub fn sym_key(&self) -> Result<&secretbox::Key, FfiError> {
+        self.sym_key.as_ref().ok_or(FfiError::OperationForbiddenForApp)
     }
 
     /// Get SAFEdrive directory key.
@@ -128,7 +129,7 @@ pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
                                       app_name: *const u8,
                                       app_name_len: usize,
                                       unique_token: *const u8,
-                                      app_id_len: usize,
+                                      token_len: usize,
                                       vendor: *const u8,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
@@ -136,7 +137,7 @@ pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let app_name = ffi_try!(helper::c_utf8_to_string(app_name, app_name_len));
-        let unique_token = ffi_try!(helper::c_utf8_to_string(unique_token, app_id_len));
+        let unique_token = ffi_try!(helper::c_utf8_to_string(unique_token, token_len));
         let vendor = ffi_try!(helper::c_utf8_to_string(vendor, vendor_len));
 
         let session = (*session_handle).clone();

@@ -88,6 +88,10 @@ pub enum FfiError {
     /// Invalid offsets (from-position and lenght combination) provided for reading form Self
     /// Encryptor. Would have probably caused an overflow.
     InvalidSelfEncryptorReadOffsets,
+    /// Invalid indexing
+    InvalidIndex,
+    /// Unsupported Operation (e.g. mixing Pub/PrivAppendableData operations
+    UnsupportedOperation,
 }
 
 impl From<SerialisationError> for FfiError {
@@ -177,6 +181,8 @@ impl Into<i32> for FfiError {
             FfiError::InvalidStructuredDataTypeTag => FFI_ERROR_START_RANGE - 20,
             FfiError::InvalidVersionNumber => FFI_ERROR_START_RANGE - 21,
             FfiError::InvalidSelfEncryptorReadOffsets => FFI_ERROR_START_RANGE - 22,
+            FfiError::InvalidIndex => FFI_ERROR_START_RANGE - 23,
+            FfiError::UnsupportedOperation => FFI_ERROR_START_RANGE - 24,
         }
     }
 }
@@ -229,6 +235,8 @@ impl fmt::Debug for FfiError {
             FfiError::InvalidSelfEncryptorReadOffsets => {
                 write!(f, "FfiError::InvalidSelfEncryptorReadOffsets")
             }
+            FfiError::InvalidIndex => write!(f, "FfiError::InvalidIndex"),
+            FfiError::UnsupportedOperation => write!(f, "FfiError::UnsupportedOperation"),
         }
     }
 }

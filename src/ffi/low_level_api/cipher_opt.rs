@@ -20,7 +20,7 @@ use ffi::app::App;
 use ffi::errors::FfiError;
 use ffi::helper;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use rust_sodium::crypto::{box_, secretbox};
+use rust_sodium::crypto::{box_, sealedbox, secretbox};
 use std::ptr;
 use super::{CipherOptHandle, EncryptKeyHandle};
 use super::object_cache::object_cache;
@@ -45,21 +45,16 @@ enum WireFormat {
         nonce: secretbox::Nonce,
         cipher_text: Vec<u8>,
     },
-    Asymmetric {
-        nonce: box_::Nonce,
-        peer_pk: box_::PublicKey,
-        cipher_text: Vec<u8>,
-    },
+    Asymmetric(Vec<u8>),
 }
 
 impl CipherOpt {
     /// Encrypt plain text
-    // TODO Take a serialisable type directly to prevent double serialisation
     pub fn encrypt(&self, app: &App, plain_text: &[u8]) -> Result<Vec<u8>, FfiError> {
         match *self {
             CipherOpt::PlainText => Ok(try!(serialise(&WireFormat::Plain(plain_text.to_owned())))),
             CipherOpt::Symmetric => {
-                let sym_key = try!(app.sym_key().ok_or(FfiError::OperationForbiddenForApp));
+                let sym_key = try!(app.sym_key());
                 let nonce = secretbox::gen_nonce();
                 let cipher_text = secretbox::seal(plain_text, &nonce, sym_key);
                 let wire_format = WireFormat::Symmetric {
@@ -70,16 +65,8 @@ impl CipherOpt {
                 Ok(try!(serialise(&wire_format)))
             }
             CipherOpt::Asymmetric { ref peer_encrypt_key } => {
-                let (pk, sk) = box_::gen_keypair();
-                let nonce = box_::gen_nonce();
-                let cipher_text = box_::seal(plain_text, &nonce, peer_encrypt_key, &sk);
-                let wire_format = WireFormat::Asymmetric {
-                    nonce: nonce,
-                    peer_pk: pk,
-                    cipher_text: cipher_text,
-                };
-
-                Ok(try!(serialise(&wire_format)))
+                let cipher_text = sealedbox::seal(plain_text, peer_encrypt_key);
+                Ok(try!(serialise(&WireFormat::Asymmetric(cipher_text))))
             }
         }
     }
@@ -89,13 +76,13 @@ impl CipherOpt {
         match try!(deserialise::<WireFormat>(raw_data)) {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {
-                let sym_key = try!(app.sym_key().ok_or(FfiError::OperationForbiddenForApp));
+                let sym_key = try!(app.sym_key());
                 Ok(try!(secretbox::open(&cipher_text, &nonce, sym_key)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)))
             }
-            WireFormat::Asymmetric { nonce, peer_pk, cipher_text } => {
-                let asym_sk = &try!(app.asym_keys().ok_or(FfiError::OperationForbiddenForApp)).1;
-                Ok(try!(box_::open(&cipher_text, &nonce, &peer_pk, asym_sk)
+            WireFormat::Asymmetric(cipher_text) => {
+                let &(ref pk, ref sk) = try!(app.asym_keys());
+                Ok(try!(sealedbox::open(&cipher_text, pk, sk)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)))
             }
         }
