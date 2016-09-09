@@ -23,9 +23,9 @@ use ffi::low_level_api::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, S
 use ffi::low_level_api::object_cache::object_cache;
 use routing::{AppendWrapper, AppendedData, Data, Filter, PrivAppendableData, PrivAppendedData,
               PubAppendableData, XOR_NAME_LEN, XorName};
+use std::{mem, ptr};
 use std::collections::BTreeSet;
 use std::iter;
-use std::ptr;
 
 /// Wrapper for PrivAppendableData and PubAppendableData.
 #[derive(Clone)]
@@ -419,6 +419,65 @@ pub unsafe extern "C" fn appendable_data_nth_sign_key(app: *const App,
     })
 }
 
+/// Remove the n-th data item from the appendable data. The data has to be
+/// POST'd afterwards for the change to be registered by the network.
+#[no_mangle]
+pub extern "C" fn appendable_data_remove_nth_data(ad_h: AppendableDataHandle, n: u64) -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut object_cache = unwrap!(object_cache().lock());
+        match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
+            AppendableData::Pub(ref mut elt) => {
+                let item = ffi_try!(nth(&elt.data, n)).clone();
+                if elt.data.remove(&item) {
+                    let _ = elt.deleted_data.insert(item);
+                }
+            }
+            AppendableData::Priv(ref mut elt) => {
+                let item = ffi_try!(nth(&elt.data, n)).clone();
+                if elt.data.remove(&item) {
+                    let _ = elt.deleted_data.insert(item);
+                }
+            }
+        }
+
+        0
+    })
+}
+
+/// Clear all data - moves it to delted data.
+#[no_mangle]
+pub extern "C" fn appendable_data_clear_data(ad_h: AppendableDataHandle) -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut object_cache = unwrap!(object_cache().lock());
+        match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
+            AppendableData::Pub(ref mut elt) => {
+                let tmp = mem::replace(&mut elt.data, Default::default());
+                elt.deleted_data.extend(tmp);
+            }
+            AppendableData::Priv(ref mut elt) => {
+                let tmp = mem::replace(&mut elt.data, Default::default());
+                elt.deleted_data.extend(tmp);
+            }
+        };
+
+        0
+    })
+}
+
+/// Clear all deleted data - data will be actually be removed.
+#[no_mangle]
+pub extern "C" fn appendable_data_clear_deleted_data(ad_h: AppendableDataHandle) -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut object_cache = unwrap!(object_cache().lock());
+        match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
+            AppendableData::Pub(ref mut elt) => elt.deleted_data.clear(),
+            AppendableData::Priv(ref mut elt) => elt.deleted_data.clear(),
+        };
+
+        0
+    })
+}
+
 /// Append data.
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_append(app: *const App,
@@ -458,27 +517,6 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
 
         let resp_getter = ffi_try!(unwrap!(client.lock()).append(append_wrapper, None));
         ffi_try!(resp_getter.get());
-
-        0
-    })
-}
-
-/// Remove the n-th data item from the appendable data. The data has to be
-/// POST'd afterwards for the change to be registered by the network.
-#[no_mangle]
-pub extern "C" fn appendable_data_remove_nth(ad_h: AppendableDataHandle, n: u64) -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache().lock());
-        match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
-            AppendableData::Pub(ref mut data) => {
-                let item = ffi_try!(nth(&data.data, n)).clone();
-                data.delete(item);
-            }
-            AppendableData::Priv(ref mut data) => {
-                let item = ffi_try!(nth(&data.data, n)).clone();
-                data.delete(item);
-            }
-        }
 
         0
     })
