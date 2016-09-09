@@ -205,6 +205,8 @@ impl RoutingMock {
                     if let Ok(data) = deserialise::<Data>(raw_data) {
                         if match (&data, &data_id) {
                             (&Data::Immutable(_), &DataIdentifier::Immutable(_)) => true,
+                            (&Data::PrivAppendable(_), &DataIdentifier::PrivAppendable(_)) => true,
+                            (&Data::PubAppendable(_), &DataIdentifier::PubAppendable(_)) => true,
                             (&Data::Structured(ref struct_data),
                              &DataIdentifier::Structured(_, ref tag)) => {
                                 struct_data.get_type_tag() == *tag
@@ -372,22 +374,68 @@ impl RoutingMock {
             if self.max_ops_countdown.as_ref().map_or(false, |count| count.get() == 0) {
                 info!("Mock POST: {:?} {:?} [0]", data_id, msg_id);
                 Some(MutationError::NetworkOther("Max operations exhausted".to_string()))
-            } else if let Data::Structured(ref sd_new) = data {
-                match (serialise(&data),
-                       deserialise(unwrap!(storage_mutex_guard.data_store.get(&data_name)))) {
-                    (Ok(raw_data), Ok(Data::Structured(sd_stored))) => {
-                        if let Ok(_) = sd_stored.validate_self_against_successor(sd_new) {
-                            let _ = storage_mutex_guard.data_store.insert(data_name, raw_data);
-                            sync_disk_storage(&*storage_mutex_guard);
-                            None
-                        } else {
-                            Some(MutationError::InvalidSuccessor)
+            } else {
+                match data {
+                    Data::Structured(ref sd_new) => {
+                        match (serialise(&data),
+                               deserialise(unwrap!(storage_mutex_guard.data_store.get(&data_name)))) {
+                            (Ok(raw_data), Ok(Data::Structured(sd_stored))) => {
+                                if let Ok(_) = sd_stored.validate_self_against_successor(sd_new) {
+                                    let _ = storage_mutex_guard.data_store
+                                        .insert(data_name, raw_data);
+                                    sync_disk_storage(&*storage_mutex_guard);
+                                    None
+                                } else {
+                                    Some(MutationError::InvalidSuccessor)
+                                }
+                            }
+                            _ => {
+                                Some(MutationError::NetworkOther("Serialisation error".to_owned()))
+                            }
                         }
                     }
-                    _ => Some(MutationError::NetworkOther("Serialisation error".to_owned())),
+                    Data::PrivAppendable(ref ad_new) => {
+                        match (serialise(&data),
+                               deserialise(unwrap!(storage_mutex_guard.data_store.get(&data_name)))) {
+                            (Ok(_raw_data), Ok(Data::PrivAppendable(mut ad_stored))) => {
+                                if let Ok(()) = ad_stored.update_with_other(ad_new.clone()) {
+                                    let ad_new_raw =
+                                        unwrap!(serialise(&Data::PrivAppendable(ad_stored)));
+                                    let _ = storage_mutex_guard.data_store
+                                        .insert(data_name, ad_new_raw);
+                                    sync_disk_storage(&*storage_mutex_guard);
+                                    None
+                                } else {
+                                    Some(MutationError::InvalidSuccessor)
+                                }
+                            }
+                            _ => {
+                                Some(MutationError::NetworkOther("Serialisation error".to_owned()))
+                            }
+                        }
+                    }
+                    Data::PubAppendable(ref ad_new) => {
+                        match (serialise(&data),
+                               deserialise(unwrap!(storage_mutex_guard.data_store.get(&data_name)))) {
+                            (Ok(_raw_data), Ok(Data::PubAppendable(mut ad_stored))) => {
+                                if let Ok(()) = ad_stored.update_with_other(ad_new.clone()) {
+                                    let ad_new_raw =
+                                        unwrap!(serialise(&Data::PubAppendable(ad_stored)));
+                                    let _ = storage_mutex_guard.data_store
+                                        .insert(data_name, ad_new_raw);
+                                    sync_disk_storage(&*storage_mutex_guard);
+                                    None
+                                } else {
+                                    Some(MutationError::InvalidSuccessor)
+                                }
+                            }
+                            _ => {
+                                Some(MutationError::NetworkOther("Serialisation error".to_owned()))
+                            }
+                        }
+                    }
+                    _ => Some(MutationError::InvalidOperation),
                 }
-            } else {
-                Some(MutationError::InvalidOperation)
             }
         } else {
             Some(MutationError::NoSuchData)
@@ -593,13 +641,111 @@ impl RoutingMock {
         Ok(())
     }
 
-    // TODO Write this
+    // TODO Write this properly
     pub fn send_append_request(&self,
                                _dst: Authority,
-                               _wrapper: AppendWrapper,
-                               _msg_id: MessageId)
+                               wrapper: AppendWrapper,
+                               msg_id: MessageId)
                                -> Result<(), InterfaceError> {
-        unimplemented!()
+        let storage = get_storage();
+        let cloned_sender = self.sender.clone();
+        let client_auth = self.client_auth.clone();
+
+        let data_id = wrapper.identifier();
+        let data_name = *data_id.name();
+        let nae_auth = Authority::NaeManager(data_name);
+        let request = Request::Append(wrapper.clone(), msg_id);
+
+        let mut storage_mutex_guard = unwrap!(storage.lock());
+        let err = if storage_mutex_guard.data_store.contains_key(&data_name) {
+            if self.max_ops_countdown.as_ref().map_or(false, |count| count.get() == 0) {
+                info!("Mock POST: {:?} {:?} [0]", data_id, msg_id);
+                Some(MutationError::NetworkOther("Max operations exhausted".to_string()))
+            } else {
+                match wrapper {
+                    AppendWrapper::Priv { data, version, .. } => {
+                        match deserialise(unwrap!(storage_mutex_guard.data_store.get(&data_name))) {
+                            Ok(Data::PrivAppendable(mut ad_stored)) => {
+                                if version == ad_stored.version {
+                                    let _ = ad_stored.data.insert(data);
+                                    let ad_new_raw =
+                                        unwrap!(serialise(&Data::PrivAppendable(ad_stored)));
+                                    let _ = storage_mutex_guard.data_store
+                                        .insert(data_name, ad_new_raw);
+                                    sync_disk_storage(&*storage_mutex_guard);
+                                    None
+                                } else {
+                                    Some(MutationError::InvalidSuccessor)
+                                }
+                            }
+                            _ => {
+                                Some(MutationError::NetworkOther("Serialisation error".to_owned()))
+                            }
+                        }
+                    }
+                    AppendWrapper::Pub { data, version, .. } => {
+                        match deserialise(unwrap!(storage_mutex_guard.data_store.get(&data_name))) {
+                            Ok(Data::PubAppendable(mut ad_stored)) => {
+                                if version == ad_stored.version {
+                                    let _ = ad_stored.data.insert(data);
+                                    let ad_new_raw =
+                                        unwrap!(serialise(&Data::PubAppendable(ad_stored)));
+                                    let _ = storage_mutex_guard.data_store
+                                        .insert(data_name, ad_new_raw);
+                                    sync_disk_storage(&*storage_mutex_guard);
+                                    None
+                                } else {
+                                    Some(MutationError::InvalidSuccessor)
+                                }
+                            }
+                            _ => {
+                                Some(MutationError::NetworkOther("Serialisation error".to_owned()))
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Some(MutationError::NoSuchData)
+        };
+
+        if err == None {
+            if let Some(ref count) = self.max_ops_countdown {
+                let ops = count.get();
+                info!("Mock POST: {:?} {:?} [{}]", data_id, msg_id, ops);
+                count.set(ops - 1);
+            }
+        }
+
+        let _ = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(SIMULATED_NETWORK_DELAY_PUTS_DELETS_MS));
+            if let Some(reason) = err {
+                let ext_err = match serialise(&reason) {
+                    Ok(serialised_err) => serialised_err,
+                    Err(err) => {
+                        warn!("Could not serialise client-vault error - {:?}", err);
+                        Vec::new()
+                    }
+                };
+                let event =
+                    RoutingMock::construct_failure_resp(nae_auth, client_auth, request, ext_err);
+                if let Err(error) = cloned_sender.send(event) {
+                    error!("Append-Response mpsc-send failure: {:?}", error);
+                }
+            } else {
+                let event = Event::Response {
+                    src: nae_auth,
+                    dst: client_auth,
+                    response: Response::AppendSuccess(data_id, msg_id),
+                };
+
+                if let Err(error) = cloned_sender.send(event) {
+                    error!("Append-Response mpsc-send failure: {:?}", error);
+                }
+            }
+        });
+
+        Ok(())
     }
 
     fn construct_failure_resp(src: Authority,
@@ -639,6 +785,13 @@ impl RoutingMock {
             Request::GetAccountInfo(msg_id) => {
                 Response::GetAccountInfoFailure {
                     id: msg_id,
+                    external_error_indicator: ext_err,
+                }
+            }
+            Request::Append(wrapper, msg_id) => {
+                Response::AppendFailure {
+                    id: msg_id,
+                    data_id: wrapper.identifier(),
                     external_error_indicator: ext_err,
                 }
             }

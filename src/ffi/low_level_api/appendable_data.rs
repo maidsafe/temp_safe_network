@@ -99,11 +99,11 @@ pub unsafe extern "C" fn appendable_data_new_pub(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_new_priv(app: *const App,
                                                   name: *const [u8; XOR_NAME_LEN],
-                                                  encrypt_key_h: EncryptKeyHandle,
                                                   o_handle: *mut AppendableDataHandle)
                                                   -> i32 {
     helper::catch_unwind_i32(|| {
-        let client = (*app).get_client();
+        let app = &*app;
+        let client = app.get_client();
         let name = XorName(*name);
 
         let (owner_key, sign_key) = {
@@ -113,19 +113,16 @@ pub unsafe extern "C" fn appendable_data_new_priv(app: *const App,
             (owner_key, sign_key)
         };
 
-        let mut object_cache = unwrap!(object_cache().lock());
-        let encrypt_key = *ffi_try!(object_cache.get_encrypt_key(encrypt_key_h));
-
         let data = PrivAppendableData::new(name,
                                            0,
                                            vec![owner_key],
                                            Default::default(),
                                            Default::default(),
                                            Filter::black_list(iter::empty()),
-                                           encrypt_key,
+                                           ffi_try!(app.asym_keys()).0,
                                            Some(&sign_key));
         let data = AppendableData::Priv(ffi_try!(data.map_err(CoreError::from)));
-        let handle = object_cache.insert_appendable_data(data);
+        let handle = unwrap!(object_cache().lock()).insert_appendable_data(data);
 
         ptr::write(o_handle, handle);
         0

@@ -129,7 +129,7 @@ pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
                                       app_name: *const u8,
                                       app_name_len: usize,
                                       unique_token: *const u8,
-                                      app_id_len: usize,
+                                      token_len: usize,
                                       vendor: *const u8,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let app_name = ffi_try!(helper::c_utf8_to_string(app_name, app_name_len));
-        let unique_token = ffi_try!(helper::c_utf8_to_string(unique_token, app_id_len));
+        let unique_token = ffi_try!(helper::c_utf8_to_string(unique_token, token_len));
         let vendor = ffi_try!(helper::c_utf8_to_string(vendor, vendor_len));
 
         let session = (*session_handle).clone();
