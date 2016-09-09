@@ -81,6 +81,8 @@ unsafe fn create_email(app_h: *mut App) {
     let mut email = String::new();
     println!("\nEnter email name of choice:");
     let _ = std::io::stdin().read_line(&mut email);
+    email = email.trim().to_string();
+
     let Digest(digest) = sha256::hash(email.as_bytes());
 
     let mut ad_h = 0;
@@ -94,10 +96,12 @@ unsafe fn send_email(app_h: *mut App) {
     let mut email = String::new();
     println!("\nEnter peer email address:");
     let _ = std::io::stdin().read_line(&mut email);
+    email = email.trim().to_string();
 
     let mut msg = String::new();
     println!("\nEnter message:");
     let _ = std::io::stdin().read_line(&mut msg);
+    msg = msg.trim().to_string();
 
     let Digest(digest) = sha256::hash(email.as_bytes());
 
@@ -140,6 +144,8 @@ unsafe fn read_email(app_h: *mut App) {
     let mut email = String::new();
     println!("\nEnter your email address:");
     let _ = std::io::stdin().read_line(&mut email);
+    email = email.trim().to_string();
+
     let Digest(digest) = sha256::hash(email.as_bytes());
 
     let mut data_id_h = 0;
@@ -219,9 +225,11 @@ fn main() {
 
     loop {
         let mut opt = String::new();
-        println!("\n0) Create Email\n1) Send Email\n2) Read Email\n(Anything else to \
-                  exit)\nEnter Option:");
+        println!("\n0) Create Email\n1) Send Email\n2) Read Email\nx) Anything else to \
+                  exit\nEnter Option:");
         let _ = std::io::stdin().read_line(&mut opt);
+        opt = opt.trim().to_string();
+
         match &opt[..] {
             "0" => unsafe { create_email(app_h) },
             "1" => unsafe { send_email(app_h) },
