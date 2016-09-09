@@ -23,9 +23,9 @@ use ffi::low_level_api::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, S
 use ffi::low_level_api::object_cache::object_cache;
 use routing::{AppendWrapper, AppendedData, Data, Filter, PrivAppendableData, PrivAppendedData,
               PubAppendableData, XOR_NAME_LEN, XorName};
+use std::{mem, ptr};
 use std::collections::BTreeSet;
 use std::iter;
-use std::ptr;
 
 /// Wrapper for PrivAppendableData and PubAppendableData.
 #[derive(Clone)]
@@ -450,8 +450,14 @@ pub extern "C" fn appendable_data_clear_data(ad_h: AppendableDataHandle) -> i32 
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache().lock());
         match *ffi_try!(object_cache.get_appendable_data(ad_h)) {
-            AppendableData::Pub(ref mut elt) => elt.deleted_data.extend(elt.data.clone()),
-            AppendableData::Priv(ref mut elt) => elt.deleted_data.extend(elt.data.clone()),
+            AppendableData::Pub(ref mut elt) => {
+                let tmp = mem::replace(&mut elt.data, Default::default());
+                elt.deleted_data.extend(tmp);
+            }
+            AppendableData::Priv(ref mut elt) => {
+                let tmp = mem::replace(&mut elt.data, Default::default());
+                elt.deleted_data.extend(tmp);
+            }
         };
 
         0
