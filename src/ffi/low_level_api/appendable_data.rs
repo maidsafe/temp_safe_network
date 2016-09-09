@@ -165,11 +165,7 @@ pub unsafe extern "C" fn appendable_data_extract_data_id(ad_h: AppendableDataHan
             AppendableData::Pub(ref elt) => elt.identifier(),
             AppendableData::Priv(ref elt) => elt.identifier(),
         };
-        let handle = object_cache.new_handle();
-        if let Some(prev) = object_cache.data_id.insert(handle, data_id) {
-            debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
-        }
-
+        let handle = object_cache.insert_data_id(data_id);
         ptr::write(o_handle, handle);
         0
     })
@@ -445,7 +441,7 @@ pub extern "C" fn appendable_data_remove_nth_data(ad_h: AppendableDataHandle, n:
     })
 }
 
-/// Clear all data - moves it to delted data.
+/// Clear all data - moves it to deleted data.
 #[no_mangle]
 pub extern "C" fn appendable_data_clear_data(ad_h: AppendableDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
@@ -544,24 +540,32 @@ fn nth<T>(items: &BTreeSet<T>, n: u64) -> Result<&T, FfiError> {
 
 #[cfg(test)]
 mod tests {
-    use core::utility;
     use ffi::app::App;
     use ffi::low_level_api::{AppendableDataHandle, DataIdHandle};
     use ffi::low_level_api::object_cache::object_cache;
     use ffi::test_utils;
     use rand;
-    use routing::{Data, ImmutableData};
+    use routing::DataIdentifier;
+    use rust_sodium::crypto::sign;
+    use std::collections::HashSet;
     use super::*;
 
     #[test]
-    fn smoke() {
+    fn put_append_and_get() {
         let app = test_utils::create_app(false);
+
         let ad_name = rand::random();
         let mut ad_h: AppendableDataHandle = 0;
+        let mut ad_id_h: DataIdHandle = 0;
+
+        let mut got_ad_h: AppendableDataHandle = 0;
 
         // Data to append
-        let (_, immutable_data_0_h) = generate_random_immutable_data(&app);
-        let (_, immutable_data_1_h) = generate_random_immutable_data(&app);
+        let (_, immut_id_0_h) = generate_random_immutable_data_id();
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+
+        let mut got_immut_id_0_h: DataIdHandle = 0;
+        let mut got_immut_id_1_h: DataIdHandle = 0;
 
         unsafe {
             // Create
@@ -570,28 +574,160 @@ mod tests {
                                                &mut ad_h),
                        0);
 
-            // Put to the network
+            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
+
+            // PUT to the network
             assert_eq!(appendable_data_put(&app, ad_h), 0);
 
-            // Append
-            assert_eq!(appendable_data_append(&app, ad_h, immutable_data_0_h), 0);
-            assert_eq!(appendable_data_append(&app, ad_h, immutable_data_1_h), 0);
+            // APPEND
+            assert_eq!(appendable_data_append(&app, ad_h, immut_id_0_h), 0);
+            assert_eq!(appendable_data_append(&app, ad_h, immut_id_1_h), 0);
+
+            // GET back
+            assert_eq!(appendable_data_get(&app, ad_id_h, &mut got_ad_h), 0);
+
+            let mut num: u64 = 0;
+            assert_eq!(appendable_data_num_of_data(got_ad_h, &mut num), 0);
+            assert_eq!(num, 2);
+
+            assert_eq!(appendable_data_nth_data_id(&app, got_ad_h, 0, &mut got_immut_id_0_h), 0);
+            assert_eq!(appendable_data_nth_data_id(&app, got_ad_h, 1, &mut got_immut_id_1_h), 0);
+        }
+
+        // Verify the data items we got back are the same we put in.
+        {
+            let mut object_cache = unwrap!(object_cache().lock());
+
+            let mut orig = HashSet::with_capacity(2);
+            let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_0_h)));
+            let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_1_h)));
+
+            let mut got = HashSet::with_capacity(2);
+            let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_0_h)));
+            let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_1_h)));
+
+            assert_eq!(orig, got);
+        }
+
+        assert_eq!(appendable_data_free(ad_h), 0);
+        assert_eq!(appendable_data_free(got_ad_h), 0);
+    }
+
+    #[test]
+    fn filter() {
+        let app0 = test_utils::create_app(false);
+        let app1 = test_utils::create_app(false);
+        let app2 = test_utils::create_app(false);
+
+        let (sk1_h, _sk2_h) = {
+            let mut object_cache = unwrap!(object_cache().lock());
+            (object_cache.insert_sign_key(get_sign_pk(&app1)),
+             object_cache.insert_sign_key(get_sign_pk(&app2)))
+        };
+
+        let ad_name = rand::random();
+        let mut ad_h: AppendableDataHandle = 0;
+        let mut ad_id_h: DataIdHandle = 0;
+        let mut filter_type = FilterType::BlackList;
+
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+        let (_, immut_id_2_h) = generate_random_immutable_data_id();
+
+        unsafe {
+            assert_eq!(appendable_data_new_pub(&app0, &ad_name, &mut ad_h), 0);
+            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
+            assert_eq!(appendable_data_put(&app0, ad_h), 0);
+
+            // Anyone can append by default
+            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
+            assert_eq!(appendable_data_append(&app2, ad_h, immut_id_2_h), 0);
+        }
+
+        // Set blacklist
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+        let (_, immut_id_2_h) = generate_random_immutable_data_id();
+
+
+        unsafe {
+            assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
+            assert_eq!(filter_type, FilterType::BlackList);
+
+            assert_eq!(appendable_data_insert_to_filter(ad_h, sk1_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h), 0);
+
+            assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
+            assert_eq!(appendable_data_append(&app2, ad_h, immut_id_2_h), 0);
+        }
+
+        // Set whitelist
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+        let (_, immut_id_2_h) = generate_random_immutable_data_id();
+
+        unsafe {
+            assert_eq!(appendable_data_toggle_filter(ad_h), 0);
+            assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
+
+            assert_eq!(filter_type, FilterType::WhiteList);
+            assert_eq!(appendable_data_insert_to_filter(ad_h, sk1_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h), 0);
+
+            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
+            assert!(appendable_data_append(&app2, ad_h, immut_id_2_h) != 0);
         }
     }
 
-    // Helper function to generate random immutable data and put it into the network.
-    // Returns the data itself and the object cache handle to its DataIdentifier.
-    fn generate_random_immutable_data(app: &App) -> (ImmutableData, DataIdHandle) {
-        let immutable_data = ImmutableData::new(unwrap!(utility::generate_random_vector(10)));
-        let data = Data::Immutable(immutable_data.clone());
+    #[test]
+    fn delete_data() {
+        let app = test_utils::create_app(false);
 
-        let client = app.get_client();
-        let mut client = unwrap!(client.lock());
-        unwrap!(unwrap!(client.put(data, None)).get());
+        let ad_name = rand::random();
+        let mut ad_h: AppendableDataHandle = 0;
+        let mut ad_id_h: DataIdHandle = 0;
+
+        let (_, immut_id_0_h) = generate_random_immutable_data_id();
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+
+        unsafe {
+            // Create AD and PUT it to the network.
+            assert_eq!(appendable_data_new_pub(&app, &ad_name, &mut ad_h), 0);
+            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
+            assert_eq!(appendable_data_put(&app, ad_h), 0);
+
+            // Append stuff to it.
+            assert_eq!(appendable_data_append(&app, ad_h, immut_id_0_h), 0);
+            assert_eq!(appendable_data_append(&app, ad_h, immut_id_1_h), 0);
+            assert_eq!(appendable_data_free(ad_h), 0);
+
+            // GET it back.
+            assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
+
+            // clear the data and POST it.
+            assert_eq!(appendable_data_clear_data(ad_h), 0);
+            assert_eq!(appendable_data_post(&app, ad_h), 0);
+            assert_eq!(appendable_data_free(ad_h), 0);
+
+            // GET it back.
+            assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
+
+            let mut num: u64 = 0;
+            assert_eq!(appendable_data_num_of_data(ad_h, &mut num), 0);
+            assert_eq!(num, 0);
+        }
+    }
+
+    fn generate_random_immutable_data_id() -> (DataIdentifier, DataIdHandle) {
+        let name = rand::random();
+        let id = DataIdentifier::Immutable(name);
 
         let mut obj_cache = unwrap!(object_cache().lock());
-        let data_id_h = obj_cache.insert_data_id(immutable_data.identifier());
+        let id_h = obj_cache.insert_data_id(id);
 
-        (immutable_data, data_id_h)
+        (id, id_h)
+    }
+
+    fn get_sign_pk(app: &App) -> sign::PublicKey {
+        let client = app.get_client();
+        let client = unwrap!(client.lock());
+        unwrap!(client.get_public_signing_key()).clone()
     }
 }

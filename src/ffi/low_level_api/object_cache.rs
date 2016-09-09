@@ -112,6 +112,14 @@ impl ObjectCache {
         self.encrypt_key.get_mut(&handle).ok_or(FfiError::InvalidEncryptKeyHandle)
     }
 
+    #[allow(unused)]
+    pub fn insert_sign_key(&mut self, key: sign::PublicKey) -> SignKeyHandle {
+        let handle = self.new_handle();
+        let _ = self.sign_key.insert(handle, key);
+
+        handle
+    }
+
     pub fn get_sign_key(&mut self,
                         handle: SignKeyHandle)
                         -> Result<&mut sign::PublicKey, FfiError> {
