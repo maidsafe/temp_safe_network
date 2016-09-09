@@ -97,7 +97,7 @@ impl ObjectCache {
         self.data_id.get_mut(&handle).ok_or(FfiError::InvalidDataIdHandle)
     }
 
-    // TODO remove
+    // TODO Remove
     #[allow(unused)]
     pub fn get_encrypt_key(&mut self,
                            handle: EncryptKeyHandle)
