@@ -20,8 +20,7 @@ maidsafe_utilities = "~0.9.0"
 rand = "~0.3.14"
 
 # routing = "~0.23.4"
-# routing = { git = "https://github.com/afck/routing.git", branch = "0.23" }
-routing = { git = "git://github.com/maqi/routing.git", branch = "0.23" }
+routing = { git = "https://github.com/maidsafe/routing.git", branch = "0.23" }
 
 rust_sodium = "~0.1.1"
 rustc-serialize = "~0.3.19"

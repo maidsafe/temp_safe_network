@@ -93,6 +93,13 @@ impl ObjectCache {
             .ok_or(FfiError::InvalidAppendableDataHandle)
     }
 
+    pub fn insert_data_id(&mut self, data_id: DataIdentifier) -> DataIdHandle {
+        let handle = self.new_handle();
+        let _ = self.data_id.insert(handle, data_id);
+
+        handle
+    }
+
     pub fn get_data_id(&mut self, handle: DataIdHandle) -> Result<&mut DataIdentifier, FfiError> {
         self.data_id.get_mut(&handle).ok_or(FfiError::InvalidDataIdHandle)
     }
@@ -103,6 +110,14 @@ impl ObjectCache {
                            handle: EncryptKeyHandle)
                            -> Result<&mut box_::PublicKey, FfiError> {
         self.encrypt_key.get_mut(&handle).ok_or(FfiError::InvalidEncryptKeyHandle)
+    }
+
+    #[allow(unused)]
+    pub fn insert_sign_key(&mut self, key: sign::PublicKey) -> SignKeyHandle {
+        let handle = self.new_handle();
+        let _ = self.sign_key.insert(handle, key);
+
+        handle
     }
 
     pub fn get_sign_key(&mut self,
