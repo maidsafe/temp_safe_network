@@ -41,15 +41,14 @@ pub fn into_ptr(strings: Vec<String>) -> Result<*mut StringList, FfiError> {
 
 /// Get number of elements in the string list.
 #[no_mangle]
-pub unsafe extern "C" fn string_list_len(list: *const StringList) -> u64 {
-    (*list).len() as u64
+pub unsafe extern "C" fn string_list_len(list: *const StringList) -> usize {
+    (*list).len()
 }
 
 /// Get the string at the given index, or NULL if the index is out of range.
 #[no_mangle]
-pub unsafe extern "C" fn string_list_at(list: *const StringList, index: u64) -> *const c_char {
+pub unsafe extern "C" fn string_list_at(list: *const StringList, index: usize) -> *const c_char {
     let list = &*list;
-    let index = index as usize;
 
     if index < list.len() {
         list[index].as_ptr()
@@ -75,7 +74,7 @@ mod test {
 
         unsafe {
             let list = unwrap!(super::into_ptr(strings));
-            assert_eq!(super::string_list_len(list), 2u64);
+            assert_eq!(super::string_list_len(list), 2);
 
             let item = unwrap!(CStr::from_ptr(super::string_list_at(list, 0)).to_str());
             assert_eq!(item, "one");
