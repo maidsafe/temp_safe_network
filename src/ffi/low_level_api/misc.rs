@@ -50,7 +50,7 @@ pub extern "C" fn misc_sign_key_free(handle: SignKeyHandle) -> i32 {
 
 /// Serialise DataIdentifier
 #[no_mangle]
-pub unsafe extern "C" fn misc_serailise_data_id(data_id_h: DataIdHandle,
+pub unsafe extern "C" fn misc_serialise_data_id(data_id_h: DataIdHandle,
                                                 o_data: *mut *mut u8,
                                                 o_size: *mut usize,
                                                 o_capacity: *mut usize)
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn misc_serailise_data_id(data_id_h: DataIdHandle,
 
 /// Deserialise DataIdentifier
 #[no_mangle]
-pub unsafe extern "C" fn misc_deserailise_data_id(data: *const u8,
+pub unsafe extern "C" fn misc_deserialise_data_id(data: *const u8,
                                                   size: usize,
                                                   o_handle: *mut DataIdHandle)
                                                   -> i32 {
@@ -137,14 +137,14 @@ mod tests {
             let mut data_ptr: *mut u8 = ptr::null_mut();
             let mut data_size = 0;
             let mut capacity = 0;
-            assert_eq!(misc_serailise_data_id(sd_data_id_h,
+            assert_eq!(misc_serialise_data_id(sd_data_id_h,
                                               &mut data_ptr,
                                               &mut data_size,
                                               &mut capacity),
                        0);
 
             let mut data_id_h = 0;
-            assert_eq!(misc_deserailise_data_id(data_ptr, data_size, &mut data_id_h),
+            assert_eq!(misc_deserialise_data_id(data_ptr, data_size, &mut data_id_h),
                        0);
             assert!(data_id_h != sd_data_id_h);
 
@@ -165,14 +165,14 @@ mod tests {
             let mut data_ptr: *mut u8 = ptr::null_mut();
             let mut data_size = 0;
             let mut capacity = 0;
-            assert_eq!(misc_serailise_data_id(id_data_id_h,
+            assert_eq!(misc_serialise_data_id(id_data_id_h,
                                               &mut data_ptr,
                                               &mut data_size,
                                               &mut capacity),
                        0);
 
             let mut data_id_h = 0;
-            assert_eq!(misc_deserailise_data_id(data_ptr, data_size, &mut data_id_h),
+            assert_eq!(misc_deserialise_data_id(data_ptr, data_size, &mut data_id_h),
                        0);
             assert!(data_id_h != id_data_id_h);
 
@@ -193,14 +193,14 @@ mod tests {
             let mut data_ptr: *mut u8 = ptr::null_mut();
             let mut data_size = 0;
             let mut capacity = 0;
-            assert_eq!(misc_serailise_data_id(ad_data_id_h,
+            assert_eq!(misc_serialise_data_id(ad_data_id_h,
                                               &mut data_ptr,
                                               &mut data_size,
                                               &mut capacity),
                        0);
 
             let mut data_id_h = 0;
-            assert_eq!(misc_deserailise_data_id(data_ptr, data_size, &mut data_id_h),
+            assert_eq!(misc_deserialise_data_id(data_ptr, data_size, &mut data_id_h),
                        0);
             assert!(data_id_h != ad_data_id_h);
 

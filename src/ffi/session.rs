@@ -174,11 +174,9 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
     helper::catch_unwind_i32(|| {
         trace!("FFI create a client account.");
 
-        // TODO: convert the locator/password to &str, not String
-        let acc_locator = ffi_try!(helper::c_utf8_to_string(account_locator, account_locator_len));
-        let acc_password = ffi_try!(helper::c_utf8_to_string(account_password,
-                                                             account_password_len));
-        let session = ffi_try!(Session::create_account(&acc_locator, &acc_password));
+        let acc_locator = ffi_try!(helper::c_utf8_to_str(account_locator, account_locator_len));
+        let acc_password = ffi_try!(helper::c_utf8_to_str(account_password, account_password_len));
+        let session = ffi_try!(Session::create_account(acc_locator, acc_password));
 
         *session_handle = allocate_handle(session);
         0
@@ -199,10 +197,9 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
     helper::catch_unwind_i32(|| {
         trace!("FFI login a registered client.");
 
-        let acc_locator = ffi_try!(helper::c_utf8_to_string(account_locator, account_locator_len));
-        let acc_password = ffi_try!(helper::c_utf8_to_string(account_password,
-                                                             account_password_len));
-        let session = ffi_try!(Session::log_in(&acc_locator, &acc_password));
+        let acc_locator = ffi_try!(helper::c_utf8_to_str(account_locator, account_locator_len));
+        let acc_password = ffi_try!(helper::c_utf8_to_str(account_password, account_password_len));
+        let session = ffi_try!(Session::log_in(acc_locator, acc_password));
 
         *session_handle = allocate_handle(session);
         0
