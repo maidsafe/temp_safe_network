@@ -53,9 +53,11 @@ pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize) -> Result<Option<
     }
 }
 
+// TODO: add c_utf8_to_opt_str (return Option<&str> instead of Option<String>)
+
 /// Returns a heap-allocated raw string, usable by C/FFI-boundary.
 /// The tuple means (pointer, length_in_bytes, capacity).
-/// Use `dealloc_c_utf8_alloced_from_rust` to free the memory.
+/// Use `misc_u8_ptr_free` to free the memory.
 pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
     let mut v = s.into_bytes();
     v.shrink_to_fit();
@@ -65,8 +67,6 @@ pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
     mem::forget(v);
     (p, len, cap)
 }
-
-// TODO: add c_char_ptr_to_str and c_char_ptr_to_opt_str (return &str instead of String)
 
 pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
     let errno: i32 = FfiError::Unexpected(String::new()).into();
@@ -165,4 +165,22 @@ pub fn get_directory_and_file(app: &App,
     let directory_listing =
         try!(get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key)));
     Ok((directory_listing, file_name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn string_conversion() {
+        let (ptr, size, cap) = string_to_c_utf8(String::new());
+        assert_eq!(size, 0);
+        unsafe { let _ = Vec::from_raw_parts(ptr, size, cap); }
+
+        let (ptr, size, cap) = string_to_c_utf8("hello world".to_owned());
+        assert!(ptr != 0 as *mut u8);
+        assert_eq!(size, 11);
+        assert!(cap >= 11);
+        unsafe { let _ = Vec::from_raw_parts(ptr, size, cap); }
+    }
 }

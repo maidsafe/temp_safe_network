@@ -347,7 +347,8 @@ impl DirectoryHelper {
             try!(versioned::append_version(self.client.clone(),
                                            structured_data,
                                            version,
-                                           &signing_key))
+                                           &signing_key,
+                                           true))
         } else {
             trace!("Updating directory listing with a new one (will convert DL to an unversioned \
                     StructuredData).");
