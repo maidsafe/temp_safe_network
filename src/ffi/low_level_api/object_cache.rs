@@ -25,19 +25,17 @@ use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWr
 use lru_cache::LruCache;
 use routing::{DataIdentifier, StructuredData};
 use rust_sodium::crypto::{box_, sign};
-use std::sync::{Mutex, ONCE_INIT, Once};
+use std::sync::{LockResult, Mutex, MutexGuard};
 use std::u64;
 
 const DEFAULT_CAPACITY: usize = 100;
 
-pub fn object_cache() -> &'static Mutex<ObjectCache> {
-    static mut OBJECT_CACHE: *const Mutex<ObjectCache> = 0 as *const Mutex<ObjectCache>;
-    static ONCE: Once = ONCE_INIT;
+lazy_static! {
+    static ref OBJECT_CACHE: Mutex<ObjectCache> = Mutex::new(ObjectCache::default());
+}
 
-    unsafe {
-        ONCE.call_once(|| OBJECT_CACHE = Box::into_raw(Box::new(Default::default())));
-        &*OBJECT_CACHE
-    }
+pub fn object_cache() -> LockResult<MutexGuard<'static, ObjectCache>> {
+    OBJECT_CACHE.lock()
 }
 
 // TODO Instead of this make each field a Mutex - that way operation on one handle does not block
@@ -60,8 +58,6 @@ impl ObjectCache {
         self.new_handle
     }
 
-    // TODO Remove
-    #[allow(unused)]
     pub fn reset(&mut self) {
         self.new_handle = u64::MAX;
 
@@ -93,6 +89,13 @@ impl ObjectCache {
             .ok_or(FfiError::InvalidAppendableDataHandle)
     }
 
+    pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) -> CipherOptHandle {
+        let handle = self.new_handle();
+        let _ = self.cipher_opt.insert(handle, cipher_opt);
+
+        handle
+    }
+
     pub fn insert_data_id(&mut self, data_id: DataIdentifier) -> DataIdHandle {
         let handle = self.new_handle();
         let _ = self.data_id.insert(handle, data_id);
@@ -104,15 +107,28 @@ impl ObjectCache {
         self.data_id.get_mut(&handle).ok_or(FfiError::InvalidDataIdHandle)
     }
 
-    // TODO Remove
-    #[allow(unused)]
     pub fn get_encrypt_key(&mut self,
                            handle: EncryptKeyHandle)
                            -> Result<&mut box_::PublicKey, FfiError> {
         self.encrypt_key.get_mut(&handle).ok_or(FfiError::InvalidEncryptKeyHandle)
     }
 
-    #[allow(unused)]
+    pub fn insert_se_reader(&mut self, se_reader: SelfEncryptorReaderWrapper) -> SelfEncryptorReaderHandle {
+        let handle = self.new_handle();
+        let _ = self.se_reader.insert(handle, se_reader);
+        handle
+    }
+
+    pub fn insert_se_writer(&mut self, se_reader: SelfEncryptorWriterWrapper) -> SelfEncryptorWriterHandle {
+        let handle = self.new_handle();
+        let _ = self.se_writer.insert(handle, se_reader);
+        handle
+    }
+
+    pub fn get_se_writer(&mut self, handle: SelfEncryptorWriterHandle) -> Result<&mut SelfEncryptorWriterWrapper, FfiError> {
+        self.se_writer.get_mut(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    }
+
     pub fn insert_sign_key(&mut self, key: sign::PublicKey) -> SignKeyHandle {
         let handle = self.new_handle();
         let _ = self.sign_key.insert(handle, key);
@@ -124,6 +140,13 @@ impl ObjectCache {
                         handle: SignKeyHandle)
                         -> Result<&mut sign::PublicKey, FfiError> {
         self.sign_key.get_mut(&handle).ok_or(FfiError::InvalidSignKeyHandle)
+    }
+
+    pub fn insert_struct_data(&mut self, data: StructuredData) -> StructDataHandle {
+        let handle = self.new_handle();
+        let _ = self.struct_data.insert(handle, data);
+
+        handle
     }
 
     pub fn get_struct_data(&mut self,
