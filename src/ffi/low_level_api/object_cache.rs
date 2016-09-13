@@ -125,6 +125,12 @@ impl ObjectCache {
                         -> Result<&mut sign::PublicKey, FfiError> {
         self.sign_key.get_mut(&handle).ok_or(FfiError::InvalidSignKeyHandle)
     }
+
+    pub fn get_struct_data(&mut self,
+                           handle: StructDataHandle)
+                           -> Result<&mut StructuredData, FfiError> {
+        self.struct_data.get_mut(&handle).ok_or(FfiError::InvalidStructDataHandle)
+    }
 }
 
 impl Default for ObjectCache {

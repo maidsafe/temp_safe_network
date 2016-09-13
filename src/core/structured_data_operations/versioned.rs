@@ -61,7 +61,8 @@ pub fn get_all_versions(client: Arc<Mutex<Client>>,
 pub fn append_version(client: Arc<Mutex<Client>>,
                       struct_data: StructuredData,
                       version_to_append: XorName,
-                      private_signing_key: &sign::SecretKey)
+                      private_signing_key: &sign::SecretKey,
+                      increment_version_number: bool)
                       -> Result<StructuredData, CoreError> {
     trace!("Appending version to versioned StructuredData.");
 
@@ -69,11 +70,15 @@ pub fn append_version(client: Arc<Mutex<Client>>,
     // client.delete(immut_data);
     let mut versions = try!(get_all_versions(client.clone(), &struct_data));
     versions.push(version_to_append);
+
+    let new_version_number = struct_data.get_version() +
+                             if increment_version_number { 1 } else { 0 };
+
     create_impl(client,
                 &versions,
                 struct_data.get_type_tag(),
                 *struct_data.name(),
-                struct_data.get_version() + 1,
+                new_version_number,
                 struct_data.get_owner_keys().clone(),
                 struct_data.get_previous_owner_keys().clone(),
                 private_signing_key)
@@ -171,7 +176,7 @@ mod test {
         let version_1: XorName = rand::random();
 
         structured_data_result =
-            append_version(client.clone(), structured_data, version_1, secret_key);
+            append_version(client.clone(), structured_data, version_1, secret_key, true);
         structured_data = unwrap!(structured_data_result);
         versions_res = get_all_versions(client, &structured_data);
         versions = unwrap!(versions_res);

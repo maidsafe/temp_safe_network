@@ -138,10 +138,7 @@ pub unsafe extern "C" fn struct_data_fetch(app: *const App,
                                            -> i32 {
     helper::catch_unwind_i32(|| {
         let client = (*app).get_client();
-        let data_id = *ffi_try!(unwrap!(object_cache().lock())
-            .data_id
-            .get_mut(&data_id_h)
-            .ok_or(FfiError::InvalidDataIdHandle));
+        let data_id = *ffi_try!(unwrap!(object_cache().lock()).get_data_id(data_id_h));
         let resp_getter = ffi_try!(unwrap!(client.lock()).get(data_id, None));
         let sd = match ffi_try!(resp_getter.get()) {
             Data::Structured(sd) => sd,
@@ -168,9 +165,7 @@ pub unsafe extern "C" fn struct_data_extract_data_id(sd_h: StructDataHandle,
                                                      -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache().lock());
-        let data_id =
-            ffi_try!(obj_cache.struct_data.get_mut(&sd_h).ok_or(FfiError::InvalidStructDataHandle))
-                .identifier();
+        let data_id = ffi_try!(obj_cache.get_struct_data(sd_h)).identifier();
         let handle = obj_cache.new_handle();
         if let Some(prev) = obj_cache.data_id.insert(handle, data_id) {
             debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
@@ -238,7 +233,11 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                 let resp_getter = ffi_try!(unwrap!(client.lock()).put(immut_data_final, None));
                 ffi_try!(resp_getter.get());
 
-                ffi_try!(versioned::append_version(client, sd, immut_data_final_name, &sign_key))
+                ffi_try!(versioned::append_version(client,
+                                                   sd,
+                                                   immut_data_final_name,
+                                                   &sign_key,
+                                                   false))
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache().lock())
@@ -304,7 +303,7 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
                                                                      immut_data_final.value()));
                     let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
                         .map_err(FfiError::from));
-                    ffi_try!(immut_data_operations::get_data(client, *immut_data.name(), None))
+                    ffi_try!(immut_data_operations::get_data_from_immut_data(client, immut_data, None))
                 } else {
                     Vec::new()
                 }
@@ -363,9 +362,7 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
 
         let mut versions = {
             let mut obj_cache = unwrap!(object_cache().lock());
-            let sd = ffi_try!(obj_cache.struct_data
-                .get_mut(&sd_h)
-                .ok_or(FfiError::InvalidStructDataHandle));
+            let sd = ffi_try!(obj_cache.get_struct_data(sd_h));
 
             if sd.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
                 ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag));
@@ -391,7 +388,7 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
         let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
             .map_err(FfiError::from));
         let mut plain_text =
-            ffi_try!(immut_data_operations::get_data(client, *immut_data.name(), None));
+            ffi_try!(immut_data_operations::get_data_from_immut_data(client, immut_data, None));
 
         *o_data = plain_text.as_mut_ptr();
         ptr::write(o_size, plain_text.len());
@@ -520,6 +517,7 @@ pub extern "C" fn struct_data_free(handle: StructDataHandle) -> i32 {
 #[cfg(test)]
 mod tests {
     use core::utility;
+    use ffi::app::App;
     use ffi::errors::FfiError;
     use ffi::low_level_api::{CipherOptHandle, DataIdHandle, StructDataHandle};
     use ffi::low_level_api::cipher_opt::*;
@@ -563,18 +561,7 @@ mod tests {
             assert!(unwrap!(object_cache().lock()).struct_data.contains_key(&sd_h));
 
             // Extract Data
-            let rx_plain_text_0 = {
-                let mut data_ptr: *mut u8 = ptr::null_mut();
-                let mut data_size = 0;
-                let mut capacity = 0;
-                assert_eq!(struct_data_extract_data(&app,
-                                                    sd_h,
-                                                    &mut data_ptr,
-                                                    &mut data_size,
-                                                    &mut capacity),
-                           0);
-                Vec::from_raw_parts(data_ptr, data_size, capacity)
-            };
+            let rx_plain_text_0 = extract_data(&app, sd_h);
             assert_eq!(rx_plain_text_0, plain_text);
 
             // New Data
@@ -597,18 +584,7 @@ mod tests {
             assert!(unwrap!(object_cache().lock()).struct_data.contains_key(&sd_h));
 
             // Extract Data
-            let rx_plain_text_1 = {
-                let mut data_ptr: *mut u8 = ptr::null_mut();
-                let mut data_size = 0;
-                let mut capacity = 0;
-                assert_eq!(struct_data_extract_data(&app,
-                                                    sd_h,
-                                                    &mut data_ptr,
-                                                    &mut data_size,
-                                                    &mut capacity),
-                           0);
-                Vec::from_raw_parts(data_ptr, data_size, capacity)
-            };
+            let rx_plain_text_1 = extract_data(&app, sd_h);
             assert_eq!(rx_plain_text_1, plain_text);
             assert!(rx_plain_text_1 != rx_plain_text_0);
 
@@ -640,6 +616,103 @@ mod tests {
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), -18);
             assert_eq!(struct_data_free(sd_h),
                        FfiError::InvalidStructDataHandle.into());
+        }
+    }
+
+    #[test]
+    fn versioned_struct_data_crud() {
+        let app = test_utils::create_app(false);
+
+        let mut cipher_opt_h: CipherOptHandle = 0;
+        let mut sd_h: StructDataHandle = 0;
+        let mut data_id_h: DataIdHandle = 0;
+
+        let name = rand::random();
+        let data0 = unwrap!(utility::generate_random_vector(10));
+        let data1 = unwrap!(utility::generate_random_vector(10));
+
+        unsafe {
+            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_h), 0);
+
+            // Create
+            assert_eq!(struct_data_new(&app,
+                                       ::VERSIONED_STRUCT_DATA_TYPE_TAG,
+                                       &name,
+                                       cipher_opt_h,
+                                       data0.as_ptr(),
+                                       data0.len(),
+                                       &mut sd_h),
+                       0);
+            assert_eq!(struct_data_extract_data_id(sd_h, &mut data_id_h), 0);
+
+            // Put and re-fetch
+            assert_eq!(struct_data_put(&app, sd_h), 0);
+            assert_eq!(struct_data_free(sd_h), 0);
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
+
+            // Check content
+            let mut num_versions = 0usize;
+            assert_eq!(struct_data_num_of_versions(&app, sd_h, &mut num_versions),
+                       0);
+            assert_eq!(num_versions, 1);
+            assert_eq!(nth_version(&app, sd_h, 0), data0);
+
+            assert_eq!(extract_data(&app, sd_h), data0);
+
+            // Update the content
+            assert_eq!(struct_data_new_data(&app, sd_h, cipher_opt_h, data1.as_ptr(), data1.len()),
+                       0);
+
+            // Post and re-fetch
+            assert_eq!(struct_data_post(&app, sd_h), 0);
+            assert_eq!(struct_data_free(sd_h), 0);
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
+
+            // Check content
+            assert_eq!(struct_data_num_of_versions(&app, sd_h, &mut num_versions),
+                       0);
+            assert_eq!(num_versions, 2);
+            assert_eq!(nth_version(&app, sd_h, 0), data0);
+            assert_eq!(nth_version(&app, sd_h, 1), data1);
+
+            assert_eq!(extract_data(&app, sd_h), data1);
+        }
+    }
+
+    // Helper function to fetch the current data from the structured data using FFI.
+    fn extract_data(app: &App, sd_h: StructDataHandle) -> Vec<u8> {
+        let mut data_ptr = ptr::null_mut();
+        let mut data_size = 0usize;
+        let mut data_cap = 0usize;
+
+        unsafe {
+            assert_eq!(struct_data_extract_data(app,
+                                                sd_h,
+                                                &mut data_ptr,
+                                                &mut data_size,
+                                                &mut data_cap),
+                       0);
+
+            Vec::from_raw_parts(data_ptr, data_size, data_cap)
+        }
+    }
+
+    // Helper function to fetch the nth version from the structured data using FFI.
+    fn nth_version(app: &App, sd_h: StructDataHandle, n: usize) -> Vec<u8> {
+        let mut data_ptr = ptr::null_mut();
+        let mut data_size = 0usize;
+        let mut data_cap = 0usize;
+
+        unsafe {
+            assert_eq!(struct_data_nth_version(app,
+                                               sd_h,
+                                               n,
+                                               &mut data_ptr,
+                                               &mut data_size,
+                                               &mut data_cap),
+                       0);
+
+            Vec::from_raw_parts(data_ptr, data_size, data_cap)
         }
     }
 }
