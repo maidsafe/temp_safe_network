@@ -88,6 +88,7 @@ unsafe fn create_email(app_h: *mut App) {
     let mut ad_h = 0;
     assert_eq!(appendable_data_new_priv(app_h, &digest, &mut ad_h), 0);
     assert_eq!(appendable_data_put(app_h, ad_h), 0);
+    assert_eq!(appendable_data_free(ad_h), 0);
 
     println!("Email created successfully !");
 }
