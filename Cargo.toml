@@ -36,6 +36,10 @@ regex = "~0.1.73"
 
 [[example]]
 bench = false
+name = "email_stress_test"
+
+[[example]]
+bench = false
 name = "client_stress_test"
 
 [[example]]

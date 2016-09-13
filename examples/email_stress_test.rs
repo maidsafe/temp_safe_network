@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Email Stress Test
+
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 #![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
@@ -41,11 +43,15 @@ extern crate log;
 extern crate unwrap;
 
 extern crate crossbeam;
+extern crate docopt;
+extern crate rand;
 extern crate rust_sodium;
+extern crate rustc_serialize;
 extern crate safe_core;
 
+use docopt::Docopt;
+use rand::{Rng, SeedableRng, XorShiftRng};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
-use safe_core::core::utility;
 use safe_core::ffi::app::*;
 use safe_core::ffi::logging::*;
 use safe_core::ffi::low_level_api::{AppendableDataHandle, CipherOptHandle};
@@ -59,6 +65,23 @@ use std::{ptr, slice};
 use std::sync::Mutex;
 use std::time::Instant;
 
+static USAGE: &'static str = "
+Usage:
+  email_stress_test [options]
+
+Options:
+  --seed <seed>                     Seed for a pseudo-random number generator.
+  --get-only                        Only Get the data, don't Put it.
+  -h, --help                        Display this help message and exit.
+";
+
+#[derive(Debug, RustcDecodable)]
+struct Args {
+    flag_seed: Option<u32>,
+    flag_get_only: bool,
+    flag_help: bool,
+}
+
 const BOTS: usize = 5;
 const MSGS_SENT_BY_EACH_BOT: usize = 10;
 
@@ -70,20 +93,34 @@ struct Bot {
 }
 
 impl Bot {
-    fn new(n: usize) -> Self {
+    fn new(n: usize, rng: &mut XorShiftRng, account_exists: bool) -> Self {
         let mut app_h: *mut App = ptr::null_mut();
         let mut session_h: *mut SessionHandle = ptr::null_mut();
 
-        let sec_0 = unwrap!(utility::generate_random_string(10));
-        let sec_1 = unwrap!(utility::generate_random_string(10));
+        let mut sec_0: String = rng.gen_iter::<char>().take(10).collect();
+        let mut sec_1: String = rng.gen_iter::<char>().take(10).collect();
 
-        unsafe {
-            assert_eq!(create_account(sec_0.as_bytes().as_ptr(),
-                                      sec_0.as_bytes().len(),
-                                      sec_1.as_bytes().as_ptr(),
-                                      sec_1.as_bytes().len(),
-                                      &mut session_h),
-                       0);
+        sec_0.push_str(&n.to_string());
+        sec_1.push_str(&n.to_string());
+
+        if account_exists {
+            unsafe {
+                assert_eq!(log_in(sec_0.as_bytes().as_ptr(),
+                                  sec_0.as_bytes().len(),
+                                  sec_1.as_bytes().as_ptr(),
+                                  sec_1.as_bytes().len(),
+                                  &mut session_h),
+                           0);
+            }
+        } else {
+            unsafe {
+                assert_eq!(create_account(sec_0.as_bytes().as_ptr(),
+                                          sec_0.as_bytes().len(),
+                                          sec_1.as_bytes().as_ptr(),
+                                          sec_1.as_bytes().len(),
+                                          &mut session_h),
+                           0);
+            }
         }
 
         let app_name = format!("Bot-{}", n);
@@ -103,17 +140,22 @@ impl Bot {
                        0);
         }
 
-        // Without this the test will fail the next time it is run.
-        let prefix = unwrap!(utility::generate_random_string(10));
+        let prefix: String = rng.gen_iter::<char>().take(10).collect();
         let email = format!("{}-Bot-{}-mail", prefix, n);
+
+        let tx_msgs = (0..MSGS_SENT_BY_EACH_BOT)
+            .map(|x| {
+                let mut msg: Vec<_> = rng.gen_iter::<u8>().take(10).collect();
+                msg.extend(format!("Bot-{}-msg-{}", n, x).into_bytes());
+                msg
+            })
+            .collect();
 
         Bot {
             app_h: app_h,
             session_h: session_h,
             email: email,
-            tx_msgs: (0..MSGS_SENT_BY_EACH_BOT)
-                .map(|_| unwrap!(utility::generate_random_vector::<u8>(10)))
-                .collect(),
+            tx_msgs: tx_msgs,
         }
     }
 
@@ -258,91 +300,100 @@ impl Drop for Bot {
 unsafe impl Send for Bot {}
 unsafe impl Sync for Bot {}
 
-#[test]
-fn email_stress() {
+fn main() {
     // Sample timmings in release run with mock-routing and cleared VaultStorageSimulation:
     // ------------------------------------------------------------------------------------
     // Create accounts for 5 bots: 3 secs, 0 millis
     // Create emails for 5 bots: 0 secs, 218 millis
-    // Send total of 40 emails by 5 bots: 23 secs, 71 millis
-    // Read total of 40 emails by 5 bots: 0 secs, 30 millis
+    // Send total of 200 emails by 5 bots: 23 secs, 71 millis
+    // Read total of 200 emails by 5 bots: 0 secs, 30 millis
     //
     // Sample timmings in release run with actual-routing:
     // ------------------------------------------------------------------------------------
     // Create accounts for 5 bots: 27 secs, 0 millis
     // Create emails for 5 bots: 0 secs, 411 millis
-    // Send total of 40 emails by 5 bots: 26 secs, 415 millis
-    // Read total of 40 emails by 5 bots: 6 secs, 273 millis
+    // Send total of 200 emails by 5 bots: 26 secs, 415 millis
+    // Read total of 200 emails by 5 bots: 6 secs, 273 millis
     // ------------------------------------------------------------------------------------
 
     assert_eq!(init_logging(), 0);
 
+    let args: Args =
+        Docopt::new(USAGE).and_then(|docopt| docopt.decode()).unwrap_or_else(|error| error.exit());
+
+    let mut rng = XorShiftRng::from_seed(match args.flag_seed {
+        Some(seed) => [0, 0, 0, seed],
+        None => [rand::random(), rand::random(), rand::random(), rand::random()],
+    });
+
     // ------------------------------------------------------------------------
     // Create bots
     let mut now = Instant::now();
-    let bots: Vec<_> = (0..BOTS).map(|n| Bot::new(n)).collect();
+    let bots: Vec<_> = (0..BOTS).map(|n| Bot::new(n, &mut rng, args.flag_get_only)).collect();
     let mut duration = now.elapsed();
     info!("Create accounts for {} bots: {} secs, {} millis\n",
           BOTS,
           duration.as_secs(),
           duration.subsec_nanos() / 1000000 / 1000000);
 
-    // ------------------------------------------------------------------------
-    // Create email in parallel
-    now = Instant::now();
-    crossbeam::scope(|scope| {
-        for bot in &bots {
-            let _ = scope.spawn(move || bot.create_email());
-        }
-    });
-    duration = now.elapsed();
-    info!("Create emails for {} bots: {} secs, {} millis\n",
-          BOTS,
-          duration.as_secs(),
-          duration.subsec_nanos() / 1000000);
-
-    // ------------------------------------------------------------------------
-    // Send emails
-    now = Instant::now();
-    for (i, bot) in bots.iter().enumerate() {
-        let peer_handles = Mutex::new(Vec::with_capacity(BOTS - 1));
-        let peer_handles_ref = &peer_handles;
-
-        // Get peer emails in parallel
+    if !args.flag_get_only {
+        // ------------------------------------------------------------------------
+        // Create email in parallel
+        now = Instant::now();
         crossbeam::scope(|scope| {
-            for (j, peer_bot) in bots.iter().enumerate() {
-                if i == j {
-                    continue;
-                }
-                let _ = scope.spawn(move || {
-                    unwrap!(peer_handles_ref.lock())
-                        .push(bot.get_peer_email_handles(&peer_bot.email))
-                });
+            for bot in &bots {
+                let _ = scope.spawn(move || bot.create_email());
             }
         });
+        duration = now.elapsed();
+        info!("Create emails for {} bots: {} secs, {} millis\n",
+              BOTS,
+              duration.as_secs(),
+              duration.subsec_nanos() / 1000000);
 
-        // Send each email-msg from a bot in parallel to all others
-        for msg in &bot.tx_msgs {
-            let guard = unwrap!(peer_handles.lock());
+        // ------------------------------------------------------------------------
+        // Send emails
+        now = Instant::now();
+        for (i, bot) in bots.iter().enumerate() {
+            let peer_handles = Mutex::new(Vec::with_capacity(BOTS - 1));
+            let peer_handles_ref = &peer_handles;
+
+            // Get peer emails in parallel
             crossbeam::scope(|scope| {
-                for &(ad_h, cipher_opt_h) in &*guard {
-                    let _ = scope.spawn(move || bot.send_email(ad_h, cipher_opt_h, msg));
+                for (j, peer_bot) in bots.iter().enumerate() {
+                    if i == j {
+                        continue;
+                    }
+                    let _ = scope.spawn(move || {
+                        unwrap!(peer_handles_ref.lock())
+                            .push(bot.get_peer_email_handles(&peer_bot.email))
+                    });
                 }
-            })
-        }
+            });
 
-        let guard = unwrap!(peer_handles.lock());
-        for &(ad_h, cipher_opt_h) in &*guard {
-            assert_eq!(appendable_data_free(ad_h), 0);
-            assert_eq!(cipher_opt_free(cipher_opt_h), 0);
+            // Send each email-msg from a bot in parallel to all others
+            for msg in &bot.tx_msgs {
+                let guard = unwrap!(peer_handles.lock());
+                crossbeam::scope(|scope| {
+                    for &(ad_h, cipher_opt_h) in &*guard {
+                        let _ = scope.spawn(move || bot.send_email(ad_h, cipher_opt_h, msg));
+                    }
+                })
+            }
+
+            let guard = unwrap!(peer_handles.lock());
+            for &(ad_h, cipher_opt_h) in &*guard {
+                assert_eq!(appendable_data_free(ad_h), 0);
+                assert_eq!(cipher_opt_free(cipher_opt_h), 0);
+            }
         }
+        duration = now.elapsed();
+        info!("Sent total of {} emails by {} bots: {} secs, {} millis\n",
+              MSGS_SENT_BY_EACH_BOT * (BOTS - 1) * BOTS,
+              BOTS,
+              duration.as_secs(),
+              duration.subsec_nanos() / 1000000);
     }
-    duration = now.elapsed();
-    info!("Send total of {} emails by {} bots: {} secs, {} millis\n",
-          MSGS_SENT_BY_EACH_BOT * (BOTS - 1),
-          BOTS,
-          duration.as_secs(),
-          duration.subsec_nanos() / 1000000);
 
     // ------------------------------------------------------------------------
     // Read and verify all emails by all bots in parallel
@@ -370,7 +421,7 @@ fn email_stress() {
     });
     duration = now.elapsed();
     info!("Read total of {} emails by {} bots: {} secs, {} millis\n",
-          MSGS_SENT_BY_EACH_BOT * (BOTS - 1),
+          MSGS_SENT_BY_EACH_BOT * (BOTS - 1) * BOTS,
           BOTS,
           duration.as_secs(),
           duration.subsec_nanos() / 1000000);
