@@ -266,6 +266,13 @@ fn email_stress() {
     // Create emails for 5 bots: 0 secs, 218 millis
     // Send total of 40 emails by 5 bots: 23 secs, 71 millis
     // Read total of 40 emails by 5 bots: 0 secs, 30 millis
+    //
+    // Sample timmings in release run with actual-routing:
+    // ------------------------------------------------------------------------------------
+    // Create accounts for 5 bots: 27 secs, 0 millis
+    // Create emails for 5 bots: 0 secs, 411 millis
+    // Send total of 40 emails by 5 bots: 26 secs, 415 millis
+    // Read total of 40 emails by 5 bots: 6 secs, 273 millis
     // ------------------------------------------------------------------------------------
 
     assert_eq!(init_logging(), 0);
