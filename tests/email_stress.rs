@@ -15,8 +15,28 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+// For explanation of lint checks, run `rustc -W help` or see
+// https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
+#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
+          unknown_crate_types, warnings)]
+#![deny(bad_style, deprecated, drop_with_repr_extern, improper_ctypes, missing_docs,
+        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
+        private_no_mangle_fns, private_no_mangle_statics, stable_features, unconditional_recursion,
+        unknown_lints, unused, unused_allocation, unused_attributes,
+        unused_comparisons, unused_features, unused_parens, while_true)]
+#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+        unused_qualifications, unused_results)]
+#![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
+         missing_debug_implementations, variant_size_differences)]
+
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
+                                   option_unwrap_used))]
+#![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))] // TODO: Fix doc_markdown errors.
+
 #[macro_use]
-extern crate maidsafe_utilities;
+extern crate log;
 #[macro_use]
 extern crate unwrap;
 
@@ -37,6 +57,7 @@ use safe_core::ffi::low_level_api::misc::*;
 use safe_core::ffi::session::*;
 use std::{ptr, slice};
 use std::sync::Mutex;
+use std::time::Instant;
 
 const BOTS: usize = 5;
 const MSGS_SENT_BY_EACH_BOT: usize = 10;
@@ -215,7 +236,7 @@ impl Bot {
             assert_eq!(data_id_free(data_id_h), 0);
             assert_eq!(immut_data_self_encryptor_reader_free(se_h), 0);
             unsafe {
-                misc_u8_ptr_free(data_ptr, read_size, capacity as usize);
+                misc_u8_ptr_free(data_ptr, read_size, capacity);
             }
         }
 
@@ -239,19 +260,43 @@ unsafe impl Sync for Bot {}
 
 #[test]
 fn email_stress() {
+    // Sample timmings in release run with mock-routing and cleared VaultStorageSimulation:
+    // ------------------------------------------------------------------------------------
+    // Create accounts for 5 bots: 3 secs, 0 millis
+    // Create emails for 5 bots: 0 secs, 218 millis
+    // Send total of 40 emails by 5 bots: 23 secs, 71 millis
+    // Read total of 40 emails by 5 bots: 0 secs, 30 millis
+    // ------------------------------------------------------------------------------------
+
     assert_eq!(init_logging(), 0);
 
+    // ------------------------------------------------------------------------
+    // Create bots
+    let mut now = Instant::now();
     let bots: Vec<_> = (0..BOTS).map(|n| Bot::new(n)).collect();
+    let mut duration = now.elapsed();
+    info!("Create accounts for {} bots: {} secs, {} millis\n",
+          BOTS,
+          duration.as_secs(),
+          duration.subsec_nanos() / 1000000 / 1000000);
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    // ------------------------------------------------------------------------
     // Create email in parallel
+    now = Instant::now();
     crossbeam::scope(|scope| {
         for bot in &bots {
             let _ = scope.spawn(move || bot.create_email());
         }
     });
+    duration = now.elapsed();
+    info!("Create emails for {} bots: {} secs, {} millis\n",
+          BOTS,
+          duration.as_secs(),
+          duration.subsec_nanos() / 1000000);
 
+    // ------------------------------------------------------------------------
     // Send emails
+    now = Instant::now();
     for (i, bot) in bots.iter().enumerate() {
         let peer_handles = Mutex::new(Vec::with_capacity(BOTS - 1));
         let peer_handles_ref = &peer_handles;
@@ -285,8 +330,16 @@ fn email_stress() {
             assert_eq!(cipher_opt_free(cipher_opt_h), 0);
         }
     }
+    duration = now.elapsed();
+    info!("Send total of {} emails by {} bots: {} secs, {} millis\n",
+          MSGS_SENT_BY_EACH_BOT * (BOTS - 1),
+          BOTS,
+          duration.as_secs(),
+          duration.subsec_nanos() / 1000000);
 
+    // ------------------------------------------------------------------------
     // Read and verify all emails by all bots in parallel
+    now = Instant::now();
     crossbeam::scope(|scope| {
         let bots_ref = &bots;
 
@@ -307,5 +360,12 @@ fn email_stress() {
                 }
             });
         }
-    })
+    });
+    duration = now.elapsed();
+    info!("Read total of {} emails by {} bots: {} secs, {} millis\n",
+          MSGS_SENT_BY_EACH_BOT * (BOTS - 1),
+          BOTS,
+          duration.as_secs(),
+          duration.subsec_nanos() / 1000000);
+
 }
