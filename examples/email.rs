@@ -126,7 +126,7 @@ unsafe fn send_email(app_h: *mut App) {
     assert_eq!(immut_data_new_self_encryptor(app_h, &mut se_h), 0);
     assert_eq!(immut_data_write_to_self_encryptor(se_h,
                                                   msg.as_bytes().as_ptr(),
-                                                  msg.as_bytes().len() as u64),
+                                                  msg.as_bytes().len()),
                0);
     assert_eq!(immut_data_close_self_encryptor(app_h, se_h, cipher_opt_h, &mut data_id_h),
                0);
@@ -170,29 +170,30 @@ unsafe fn read_email(app_h: *mut App) {
         assert_eq!(immut_data_fetch_self_encryptor(app_h, data_id_h, &mut se_h),
                    0);
 
-        let mut size = 0;
-        assert_eq!(immut_data_size(se_h, &mut size), 0);
+        let mut total_size = 0;
+        assert_eq!(immut_data_size(se_h, &mut total_size), 0);
 
         let mut data_ptr: *mut u8 = ptr::null_mut();
+        let mut read_size = 0;
         let mut capacity = 0;
         assert_eq!(immut_data_read_from_self_encryptor(se_h,
                                                        0,
-                                                       size,
+                                                       total_size,
                                                        &mut data_ptr,
-                                                       &mut size,
+                                                       &mut read_size,
                                                        &mut capacity),
                    0);
 
         // TODO Confirm that cloning is done - else this is UB as we are freeing the vector
         // separately.
-        let data = unwrap!(std::str::from_utf8(slice::from_raw_parts(data_ptr, size as usize)))
+        let data = unwrap!(std::str::from_utf8(slice::from_raw_parts(data_ptr, read_size)))
             .to_owned();
 
         println!("\nEmail {}:\n{}", n, data);
 
         assert_eq!(data_id_free(data_id_h), 0);
         assert_eq!(immut_data_self_encryptor_reader_free(se_h), 0);
-        misc_u8_ptr_free(data_ptr, size as usize, capacity as usize);
+        misc_u8_ptr_free(data_ptr, read_size, capacity as usize);
     }
 
     assert_eq!(appendable_data_free(ad_h), 0);
