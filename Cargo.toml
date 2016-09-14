@@ -30,8 +30,13 @@ time = "~0.1.35"
 unwrap = "~1.1.0"
 
 [dev-dependencies]
+crossbeam = "~0.2.10"
 docopt = "~0.6.81"
 regex = "~0.1.73"
+
+[[example]]
+bench = false
+name = "email_stress_test"
 
 [[example]]
 bench = false
@@ -52,6 +57,10 @@ name = "nfs_api"
 [[example]]
 bench = false
 name = "simulate_browser"
+
+[[example]]
+bench = false
+name = "email"
 
 [features]
 use-mock-routing = []

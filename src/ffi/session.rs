@@ -22,9 +22,7 @@ use core::translated_events::NetworkEvent;
 use libc::{int32_t, int64_t};
 use maidsafe_utilities::thread::{self, Joiner};
 use nfs::metadata::directory_key::DirectoryKey;
-use std::cell::RefCell;
 use std::ptr;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Sender};
 use super::errors::FfiError;
@@ -144,7 +142,7 @@ impl Drop for Session {
 }
 
 /// Clonable handle to Session.
-pub type SessionHandle = Rc<RefCell<Session>>;
+pub type SessionHandle = Arc<Mutex<Session>>;
 
 /// Create a session as an unregistered client. This or any one of the other companion functions to
 /// get a session must be called before initiating any operation allowed by this crate.
@@ -214,9 +212,7 @@ pub unsafe extern "C" fn register_network_event_observer(session_handle: *mut Se
                                                          -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI register a network event observer.");
-        (*session_handle)
-            .borrow_mut()
-            .register_network_event_observer(callback);
+        unwrap!((*session_handle).lock()).register_network_event_observer(callback);
         0
     })
 }
@@ -227,7 +223,7 @@ pub unsafe extern "C" fn register_network_event_observer(session_handle: *mut Se
 pub unsafe extern "C" fn client_issued_gets(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
         trace!("FFI retrieve client issued GETs.");
-        let session = (*session_handle).borrow();
+        let session = unwrap!((*session_handle).lock());
         let client = unwrap!(session.client.lock());
         client.issued_gets() as int64_t
     })
@@ -238,7 +234,7 @@ pub unsafe extern "C" fn client_issued_gets(session_handle: *const SessionHandle
 pub unsafe extern "C" fn client_issued_puts(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
         trace!("FFI retrieve client issued PUTs.");
-        let session = (*session_handle).borrow();
+        let session = unwrap!((*session_handle).lock());
         let client = unwrap!(session.client.lock());
         client.issued_puts() as int64_t
     })
@@ -249,7 +245,7 @@ pub unsafe extern "C" fn client_issued_puts(session_handle: *const SessionHandle
 pub unsafe extern "C" fn client_issued_posts(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
         trace!("FFI retrieve client issued POSTs.");
-        let session = (*session_handle).borrow();
+        let session = unwrap!((*session_handle).lock());
         let client = unwrap!(session.client.lock());
         client.issued_posts() as int64_t
     })
@@ -260,9 +256,20 @@ pub unsafe extern "C" fn client_issued_posts(session_handle: *const SessionHandl
 pub unsafe extern "C" fn client_issued_deletes(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
         trace!("FFI retrieve client issued DELETEs.");
-        let session = (*session_handle).borrow();
+        let session = unwrap!((*session_handle).lock());
         let client = unwrap!(session.client.lock());
         client.issued_deletes() as int64_t
+    })
+}
+
+/// Return the amount of calls that were done to `append`
+#[no_mangle]
+pub unsafe extern "C" fn client_issued_appends(session_handle: *const SessionHandle) -> int64_t {
+    helper::catch_unwind_i64(|| {
+        trace!("FFI retrieve client issued APPENDs.");
+        let session = unwrap!((*session_handle).lock());
+        let client = unwrap!(session.client.lock());
+        client.issued_appends() as int64_t
     })
 }
 
@@ -277,7 +284,7 @@ pub unsafe extern "C" fn get_account_info(session_handle: *const SessionHandle,
     helper::catch_unwind_i32(|| {
         trace!("FFI get account information.");
 
-        let res = ffi_try!((*session_handle).borrow().get_account_info());
+        let res = ffi_try!(unwrap!((*session_handle).lock()).get_account_info());
         ptr::write(data_stored, res.0);
         ptr::write(space_available, res.1);
 
@@ -296,7 +303,7 @@ pub unsafe extern "C" fn drop_session(session: *mut SessionHandle) {
 
 
 unsafe fn allocate_handle(session: Session) -> *mut SessionHandle {
-    Box::into_raw(Box::new(Rc::new(RefCell::new(session))))
+    Box::into_raw(Box::new(Arc::new(Mutex::new(session))))
 }
 
 #[cfg(test)]

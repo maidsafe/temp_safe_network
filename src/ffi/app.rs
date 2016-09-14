@@ -25,8 +25,6 @@ use core::client::Client;
 use libc::int32_t;
 use nfs::metadata::directory_key::DirectoryKey;
 use rust_sodium::crypto::{box_, secretbox};
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use super::errors::FfiError;
 use super::helper;
@@ -35,7 +33,7 @@ use super::session::{Session, SessionHandle};
 
 /// Represents an application connected to the launcher.
 pub struct App {
-    session: Rc<RefCell<Session>>,
+    session: Arc<Mutex<Session>>,
     app_dir_key: Option<DirectoryKey>,
     safe_drive_access: bool,
     asym_keys: Option<(box_::PublicKey, box_::SecretKey)>,
@@ -44,13 +42,13 @@ pub struct App {
 
 impl App {
     /// Create new app for registered client.
-    pub fn registered(session: Rc<RefCell<Session>>,
+    pub fn registered(session: Arc<Mutex<Session>>,
                       app_name: String,
                       unique_token: String,
                       vendor: String,
                       safe_drive_access: bool)
                       -> Result<Self, FfiError> {
-        let client = session.borrow().get_client();
+        let client = unwrap!(session.lock()).get_client();
         let handler = ConfigHandler::new(client);
         let app_info = try!(handler.get_app_info(app_name, unique_token, vendor));
 
@@ -64,7 +62,7 @@ impl App {
     }
 
     /// Create new app for unregistered client.
-    pub fn unregistered(session: Rc<RefCell<Session>>) -> Self {
+    pub fn unregistered(session: Arc<Mutex<Session>>) -> Self {
         App {
             session: session,
             app_dir_key: None,
@@ -76,7 +74,7 @@ impl App {
 
     /// Get the client.
     pub fn get_client(&self) -> Arc<Mutex<Client>> {
-        self.session.borrow().get_client()
+        unwrap!(self.session.lock()).get_client()
     }
 
     // TODO Maybe change all of these to operation forbidden for app
@@ -97,7 +95,7 @@ impl App {
 
     /// Get SAFEdrive directory key.
     pub fn get_safe_drive_dir_key(&self) -> Option<DirectoryKey> {
-        *self.session.borrow().get_safe_drive_dir_key()
+        *unwrap!(self.session.lock()).get_safe_drive_dir_key()
     }
 
     /// Has this app access to the SAFEdrive?
