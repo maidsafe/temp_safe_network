@@ -18,9 +18,8 @@
 use core::utility;
 use ffi::app::App;
 use ffi::session::Session;
-use std::cell::RefCell;
 use std::ffi::CString;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub fn generate_random_cstring(len: usize) -> CString {
     let mut cstring_vec = unwrap!(utility::generate_random_vector::<u8>(len));
@@ -46,7 +45,7 @@ pub fn create_app(has_safe_drive_access: bool) -> App {
     let app_id = unwrap!(utility::generate_random_string(10));
     let vendor = "Test Vendor".to_string();
 
-    unwrap!(App::registered(Rc::new(RefCell::new(session)),
+    unwrap!(App::registered(Arc::new(Mutex::new(session)),
                             app_name,
                             app_id,
                             vendor,
@@ -55,5 +54,5 @@ pub fn create_app(has_safe_drive_access: bool) -> App {
 
 pub fn create_unregistered_app() -> App {
     let session = unwrap!(Session::create_unregistered_client());
-    App::unregistered(Rc::new(RefCell::new(session)))
+    App::unregistered(Arc::new(Mutex::new(session)))
 }
