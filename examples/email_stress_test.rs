@@ -315,7 +315,6 @@ fn main() {
     // Send total of 200 emails by 5 bots: 26 secs, 415 millis
     // Read total of 200 emails by 5 bots: 6 secs, 273 millis
     // ------------------------------------------------------------------------------------
-
     assert_eq!(init_logging(), 0);
 
     let args: Args =
