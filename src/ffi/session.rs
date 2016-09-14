@@ -262,6 +262,17 @@ pub unsafe extern "C" fn client_issued_deletes(session_handle: *const SessionHan
     })
 }
 
+/// Return the amount of calls that were done to `append`
+#[no_mangle]
+pub unsafe extern "C" fn client_issued_appends(session_handle: *const SessionHandle) -> int64_t {
+    helper::catch_unwind_i64(|| {
+        trace!("FFI retrieve client issued APPENDs.");
+        let session = unwrap!((*session_handle).lock());
+        let client = unwrap!(session.client.lock());
+        client.issued_appends() as int64_t
+    })
+}
+
 /// Get data from the network. This is non-blocking. `data_stored` means number
 /// of chunks Put. `space_available` means number of chunks which can still be
 /// Put.
