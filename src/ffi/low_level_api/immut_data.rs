@@ -103,10 +103,7 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(app: *const App,
             ffi_try!(immut_data_operations::create(client.clone(), ser_data_map, None));
         let ser_final_immut_data = ffi_try!(serialise(&final_immut_data).map_err(FfiError::from));
 
-        let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                .cipher_opt
-                .get_mut(&cipher_opt_h)
-                .ok_or(FfiError::InvalidCipherOptHandle))
+        let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache()).get_cipher_opt(cipher_opt_h))
             .encrypt(app, &ser_final_immut_data));
 
         let raw_immut_data = ImmutableData::new(raw_data);
@@ -134,11 +131,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
         let app = &*app;
         let client = app.get_client();
 
-        let data_id = ffi_try!(unwrap!(object_cache())
-                .data_id
-                .get_mut(&data_id_h)
-                .ok_or(FfiError::InvalidDataIdHandle))
-            .clone();
+        let data_id = *ffi_try!(unwrap!(object_cache()).get_data_id(data_id_h));
 
         let resp_getter = ffi_try!(unwrap!(client.lock()).get(data_id, None));
         let raw_immut_data = match ffi_try!(resp_getter.get()) {
@@ -165,6 +158,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
         };
 
         let handle = unwrap!(object_cache()).insert_se_reader(se_wrapper);
+
         ptr::write(o_handle, handle);
         0
     })
@@ -174,12 +168,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_size(se_h: SelfEncryptorReaderHandle, o_size: *mut u64) -> i32 {
     helper::catch_unwind_i32(|| {
-        let size = ffi_try!(unwrap!(object_cache())
-                .se_reader
-                .get_mut(&se_h)
-                .ok_or(FfiError::InvalidSelfEncryptorHandle))
-            .se
-            .len();
+        let size = ffi_try!(unwrap!(object_cache()).get_se_reader(se_h)).se.len();
 
         ptr::write(o_size, size);
         0
@@ -197,9 +186,7 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(se_h: SelfEncryptor
                                                              -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache());
-        let se_wrapper = ffi_try!(obj_cache.se_reader
-            .get_mut(&se_h)
-            .ok_or(FfiError::InvalidSelfEncryptorHandle));
+        let se_wrapper = ffi_try!(obj_cache.get_se_reader(se_h));
         let se = &mut se_wrapper.se;
 
         if from_pos + len > se.len() {
@@ -221,11 +208,7 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(se_h: SelfEncryptor
 #[no_mangle]
 pub extern "C" fn immut_data_self_encryptor_writer_free(handle: SelfEncryptorWriterHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache())
-            .se_writer
-            .remove(&handle)
-            .ok_or(FfiError::InvalidSelfEncryptorHandle));
-
+        let _ = ffi_try!(unwrap!(object_cache()).remove_se_writer(handle));
         0
     })
 }
@@ -234,11 +217,7 @@ pub extern "C" fn immut_data_self_encryptor_writer_free(handle: SelfEncryptorWri
 #[no_mangle]
 pub extern "C" fn immut_data_self_encryptor_reader_free(handle: SelfEncryptorReaderHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache())
-            .se_reader
-            .remove(&handle)
-            .ok_or(FfiError::InvalidSelfEncryptorHandle));
-
+        let _ = ffi_try!(unwrap!(object_cache()).remove_se_reader(handle));
         0
     })
 }
@@ -267,12 +246,8 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
 
         let app_1_encrypt_key_handle = {
-            let mut obj_cache = unwrap!(object_cache());
-            let app_1_encrypt_key_handle = obj_cache.new_handle();
             let app_1_pub_encrypt_key = unwrap!(app_1.asym_keys()).0;
-            let _ = obj_cache.encrypt_key
-                .insert(app_1_encrypt_key_handle, app_1_pub_encrypt_key);
-            app_1_encrypt_key_handle
+            unwrap!(object_cache()).insert_encrypt_key(app_1_pub_encrypt_key)
         };
 
         unsafe {
@@ -335,8 +310,7 @@ mod tests {
                                                            &mut data_size,
                                                            &mut capacity),
                        0);
-            let plain_text_rx =
-                Vec::from_raw_parts(data_ptr, data_size, capacity);
+            let plain_text_rx = Vec::from_raw_parts(data_ptr, data_size, capacity);
             assert_eq!(plain_text, plain_text_rx);
 
             assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h), 0);

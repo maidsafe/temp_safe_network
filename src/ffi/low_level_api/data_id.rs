@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::errors::FfiError;
 use ffi::helper;
 use ffi::low_level_api::DataIdHandle;
 use ffi::low_level_api::object_cache::object_cache;
@@ -31,10 +30,7 @@ pub unsafe extern "C" fn data_id_new_struct_data(type_tag: u64,
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Structured(xor_id, type_tag);
-        let handle = {
-            let mut obj_cache = unwrap!(object_cache());
-            obj_cache.insert_data_id(data_id)
-        };
+        let handle = unwrap!(object_cache()).insert_data_id(data_id);
 
         ptr::write(o_handle, handle);
         0
@@ -49,10 +45,7 @@ pub unsafe extern "C" fn data_id_new_immut_data(id: *const [u8; XOR_NAME_LEN],
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Immutable(xor_id);
-        let handle = {
-            let mut obj_cache = unwrap!(object_cache());
-            obj_cache.insert_data_id(data_id)
-        };
+        let handle = unwrap!(object_cache()).insert_data_id(data_id);
 
         ptr::write(o_handle, handle);
         0
@@ -73,10 +66,7 @@ pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LE
             DataIdentifier::PubAppendable(xor_id)
         };
 
-        let handle = {
-            let mut obj_cache = unwrap!(object_cache());
-            obj_cache.insert_data_id(data_id)
-        };
+        let handle = unwrap!(object_cache()).insert_data_id(data_id);
 
         ptr::write(o_handle, handle);
         0
@@ -87,11 +77,7 @@ pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LE
 #[no_mangle]
 pub extern "C" fn data_id_free(handle: DataIdHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache())
-            .data_id
-            .remove(&handle)
-            .ok_or(FfiError::InvalidDataIdHandle));
-
+        let _ = ffi_try!(unwrap!(object_cache()).remove_data_id(handle));
         0
     })
 }
@@ -138,10 +124,10 @@ mod tests {
 
         {
             let mut obj_cache = unwrap!(object_cache());
-            assert!(obj_cache.data_id.contains_key(&data_id_handle_struct));
-            assert!(obj_cache.data_id.contains_key(&data_id_handle_immut));
-            assert!(obj_cache.data_id.contains_key(&data_id_handle_priv_appendable));
-            assert!(obj_cache.data_id.contains_key(&data_id_handle_pub_appendable));
+            let _ = unwrap!(obj_cache.get_data_id(data_id_handle_struct));
+            let _ = unwrap!(obj_cache.get_data_id(data_id_handle_immut));
+            let _ = unwrap!(obj_cache.get_data_id(data_id_handle_priv_appendable));
+            let _ = unwrap!(obj_cache.get_data_id(data_id_handle_pub_appendable));
         }
 
         assert_eq!(data_id_free(data_id_handle_struct), 0);
@@ -157,10 +143,10 @@ mod tests {
 
         {
             let mut obj_cache = unwrap!(object_cache());
-            assert!(!obj_cache.data_id.contains_key(&data_id_handle_struct));
-            assert!(!obj_cache.data_id.contains_key(&data_id_handle_immut));
-            assert!(!obj_cache.data_id.contains_key(&data_id_handle_priv_appendable));
-            assert!(!obj_cache.data_id.contains_key(&data_id_handle_pub_appendable));
+            assert!(obj_cache.get_data_id(data_id_handle_struct).is_err());
+            assert!(obj_cache.get_data_id(data_id_handle_immut).is_err());
+            assert!(obj_cache.get_data_id(data_id_handle_priv_appendable).is_err());
+            assert!(obj_cache.get_data_id(data_id_handle_pub_appendable).is_err());
         }
     }
 }

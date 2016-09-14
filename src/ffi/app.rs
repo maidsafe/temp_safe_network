@@ -148,6 +148,20 @@ pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
     })
 }
 
+/// Register an annonymous app with the launcher. Can access only public data
+#[no_mangle]
+pub unsafe extern "C" fn create_unauthorised_app(session_handle: *mut SessionHandle,
+                                                 app_handle: *mut *mut App)
+                                                 -> int32_t {
+    helper::catch_unwind_i32(|| {
+        let session = (*session_handle).clone();
+        let app = App::unregistered(session);
+
+        *app_handle = Box::into_raw(Box::new(app));
+        0
+    })
+}
+
 /// Discard and clean up the previously allocated app.
 #[no_mangle]
 pub unsafe extern "C" fn drop_app(app_handle: *mut App) {
