@@ -21,10 +21,9 @@
 use dns::dns_operations::DnsOperations;
 use ffi::app::App;
 use ffi::errors::FfiError;
-use ffi::file_details::FileDetails;
+use ffi::file_details::{FileDetails, FileMetadata};
 use ffi::helper;
 use libc::int32_t;
-use nfs::metadata::file_metadata::FileMetadata;
 
 /// Get file.
 #[no_mangle]
@@ -134,7 +133,7 @@ fn get_file_metadata(app: &App,
         try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key)));
     let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
 
-    Ok(file.get_metadata().clone())
+    FileMetadata::new(&file.get_metadata().clone())
 }
 
 #[cfg(test)]
