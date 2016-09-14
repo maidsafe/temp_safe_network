@@ -17,7 +17,9 @@
 
 use ffi::errors::FfiError;
 use ffi::helper;
-use ffi::low_level_api::{DataIdHandle, EncryptKeyHandle, SignKeyHandle};
+use ffi::low_level_api::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle,
+                         StructDataHandle};
+use ffi::low_level_api::appendable_data::AppendableData;
 use ffi::low_level_api::object_cache::object_cache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use std::{mem, ptr, slice};
@@ -26,11 +28,7 @@ use std::{mem, ptr, slice};
 #[no_mangle]
 pub extern "C" fn misc_encrypt_key_free(handle: EncryptKeyHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache())
-            .encrypt_key
-            .remove(&handle)
-            .ok_or(FfiError::InvalidEncryptKeyHandle));
-
+        let _ = ffi_try!(unwrap!(object_cache()).remove_encrypt_key(handle));
         0
     })
 }
@@ -39,11 +37,7 @@ pub extern "C" fn misc_encrypt_key_free(handle: EncryptKeyHandle) -> i32 {
 #[no_mangle]
 pub extern "C" fn misc_sign_key_free(handle: SignKeyHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache())
-            .sign_key
-            .remove(&handle)
-            .ok_or(FfiError::InvalidSignKeyHandle));
-
+        let _ = ffi_try!(unwrap!(object_cache()).remove_sign_key(handle));
         0
     })
 }
@@ -57,9 +51,7 @@ pub unsafe extern "C" fn misc_serialise_data_id(data_id_h: DataIdHandle,
                                                 -> i32 {
     helper::catch_unwind_i32(|| {
         let mut ser_data_id = ffi_try!(serialise(ffi_try!(unwrap!(object_cache())
-                .data_id
-                .get_mut(&data_id_h)
-                .ok_or(FfiError::InvalidDataIdHandle)))
+                .get_data_id(data_id_h)))
             .map_err(FfiError::from));
 
         *o_data = ser_data_id.as_mut_ptr();
@@ -81,9 +73,92 @@ pub unsafe extern "C" fn misc_deserialise_data_id(data: *const u8,
         let ser_data_id = slice::from_raw_parts(data, size);
         let data_id = ffi_try!(deserialise(ser_data_id).map_err(FfiError::from));
 
-        let mut object_cache = unwrap!(object_cache());
-        let handle = object_cache.insert_data_id(data_id);
+        let handle = unwrap!(object_cache()).insert_data_id(data_id);
         ptr::write(o_handle, handle);
+
+        0
+    })
+}
+
+/// Serialise AppendableData
+#[no_mangle]
+pub unsafe extern "C" fn misc_serialise_appendable_data(ad_h: AppendableDataHandle,
+                                                        o_data: *mut *mut u8,
+                                                        o_size: *mut usize,
+                                                        o_capacity: *mut usize)
+                                                        -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut object_cache = unwrap!(object_cache());
+        let mut ser_ad = match *ffi_try!(object_cache.get_ad(ad_h)) {
+            AppendableData::Pub(ref ad) => ffi_try!(serialise(ad).map_err(FfiError::from)),
+            AppendableData::Priv(ref ad) => ffi_try!(serialise(ad).map_err(FfiError::from)),
+        };
+
+        *o_data = ser_ad.as_mut_ptr();
+        ptr::write(o_size, ser_ad.len());
+        ptr::write(o_capacity, ser_ad.capacity());
+        mem::forget(ser_ad);
+
+        0
+    })
+}
+
+/// Deserialise AppendableData
+#[no_mangle]
+pub unsafe extern "C" fn misc_deserialise_appendable_data(data: *const u8,
+                                                          size: usize,
+                                                          o_handle: *mut AppendableDataHandle)
+                                                          -> i32 {
+    helper::catch_unwind_i32(|| {
+        let ser_ad = slice::from_raw_parts(data, size);
+        let ad = {
+            if let Ok(elt) = deserialise(ser_ad) {
+                AppendableData::Priv(elt)
+            } else {
+                AppendableData::Pub(ffi_try!(deserialise(ser_ad).map_err(FfiError::from)))
+            }
+        };
+
+        let handle = unwrap!(object_cache()).insert_ad(ad);
+        ptr::write(o_handle, handle);
+
+        0
+    })
+}
+
+/// Serialise StructuredData
+#[no_mangle]
+pub unsafe extern "C" fn misc_serialise_struct_data(sd_h: StructDataHandle,
+                                                    o_data: *mut *mut u8,
+                                                    o_size: *mut usize,
+                                                    o_capacity: *mut usize)
+                                                    -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut ser_ad = ffi_try!(serialise(ffi_try!(unwrap!(object_cache()).get_sd(sd_h)))
+            .map_err(FfiError::from));
+
+        *o_data = ser_ad.as_mut_ptr();
+        ptr::write(o_size, ser_ad.len());
+        ptr::write(o_capacity, ser_ad.capacity());
+        mem::forget(ser_ad);
+
+        0
+    })
+}
+
+/// Deserialise StructuredData
+#[no_mangle]
+pub unsafe extern "C" fn misc_deserialise_struct_data(data: *const u8,
+                                                      size: usize,
+                                                      o_handle: *mut StructDataHandle)
+                                                      -> i32 {
+    helper::catch_unwind_i32(|| {
+        let ser_sd = slice::from_raw_parts(data, size);
+        let sd = ffi_try!(deserialise(ser_sd).map_err(FfiError::from));
+
+        let handle = unwrap!(object_cache()).insert_sd(sd);
+        ptr::write(o_handle, handle);
+
         0
     })
 }
@@ -145,8 +220,8 @@ mod tests {
 
             {
                 let mut object_cache = unwrap!(object_cache());
-                let before_id = *unwrap!(object_cache.data_id.get_mut(&sd_data_id_h));
-                let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+                let before_id = *unwrap!(object_cache.get_data_id(sd_data_id_h));
+                let after_id = unwrap!(object_cache.get_data_id(data_id_h));
 
                 assert_eq!(before_id, *after_id);
                 assert_eq!(data_id_sd, *after_id);
@@ -173,8 +248,8 @@ mod tests {
 
             {
                 let mut object_cache = unwrap!(object_cache());
-                let before_id = *unwrap!(object_cache.data_id.get_mut(&id_data_id_h));
-                let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+                let before_id = *unwrap!(object_cache.get_data_id(id_data_id_h));
+                let after_id = unwrap!(object_cache.get_data_id(data_id_h));
 
                 assert_eq!(before_id, *after_id);
                 assert_eq!(data_id_id, *after_id);
@@ -201,8 +276,8 @@ mod tests {
 
             {
                 let mut object_cache = unwrap!(object_cache());
-                let before_id = *unwrap!(object_cache.data_id.get_mut(&ad_data_id_h));
-                let after_id = unwrap!(object_cache.data_id.get_mut(&data_id_h));
+                let before_id = *unwrap!(object_cache.get_data_id(ad_data_id_h));
+                let after_id = unwrap!(object_cache.get_data_id(data_id_h));
 
                 assert_eq!(before_id, *after_id);
                 assert_eq!(data_id_ad, *after_id);

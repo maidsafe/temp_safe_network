@@ -56,9 +56,7 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
         let sd = match type_tag {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .cipher_opt
-                        .get_mut(&cipher_opt_h)
-                        .ok_or(FfiError::InvalidCipherOptHandle))
+                        .get_cipher_opt(cipher_opt_h))
                     .encrypt(app, &plain_text));
 
                 ffi_try!(unversioned::create(client,
@@ -79,9 +77,7 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
                 // that we need to live with this.
                 let ser_immut_data = ffi_try!(serialise(&immut_data).map_err(FfiError::from));
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .cipher_opt
-                        .get_mut(&cipher_opt_h)
-                        .ok_or(FfiError::InvalidCipherOptHandle))
+                        .get_cipher_opt(cipher_opt_h))
                     .encrypt(app, &ser_immut_data));
 
                 let immut_data_final = Data::Immutable(ImmutableData::new(raw_data));
@@ -101,9 +97,7 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .cipher_opt
-                        .get_mut(&cipher_opt_h)
-                        .ok_or(FfiError::InvalidCipherOptHandle))
+                        .get_cipher_opt(cipher_opt_h))
                     .encrypt(app, &plain_text));
 
                 ffi_try!(StructuredData::new(type_tag,
@@ -119,7 +113,7 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
         };
 
 
-        let handle = unwrap!(object_cache()).insert_struct_data(sd);
+        let handle = unwrap!(object_cache()).insert_sd(sd);
         ptr::write(o_handle, handle);
 
         0
@@ -141,7 +135,7 @@ pub unsafe extern "C" fn struct_data_fetch(app: *const App,
             _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
         };
 
-        let handle = unwrap!(object_cache()).insert_struct_data(sd);
+        let handle = unwrap!(object_cache()).insert_sd(sd);
         ptr::write(o_handle, handle);
 
         0
@@ -156,7 +150,7 @@ pub unsafe extern "C" fn struct_data_extract_data_id(sd_h: StructDataHandle,
                                                      -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache());
-        let data_id = ffi_try!(obj_cache.get_struct_data(sd_h)).identifier();
+        let data_id = ffi_try!(obj_cache.get_sd(sd_h)).identifier();
         let handle = obj_cache.insert_data_id(data_id);
         ptr::write(o_handle, handle);
 
@@ -174,10 +168,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                               size: usize)
                                               -> i32 {
     helper::catch_unwind_i32(|| {
-        let mut sd = ffi_try!(unwrap!(object_cache())
-            .struct_data
-            .remove(&sd_h)
-            .ok_or(FfiError::InvalidStructDataHandle));
+        let mut object_cache = unwrap!(object_cache());
 
         let app = &*app;
         let client = app.get_client();
@@ -185,23 +176,20 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
 
         let sign_key = ffi_try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
 
-        sd = match sd.get_type_tag() {
+        let new_sd = match ffi_try!(object_cache.get_sd(sd_h)).get_type_tag() {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
-                let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .cipher_opt
-                        .get_mut(&cipher_opt_h)
-                        .ok_or(FfiError::InvalidCipherOptHandle))
+                let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
                     .encrypt(app, &plain_text));
 
+                let sd = ffi_try!(object_cache.get_sd(sd_h));
                 ffi_try!(unversioned::create(client,
                                              sd.get_type_tag(),
                                              *sd.name(),
                                              sd.get_version(),
                                              raw_data,
-                                             // TODO I am discarding this SD. Why does routing make
-                                             // me clone unnecessarily ? - check.
                                              sd.get_owner_keys().clone(),
                                              sd.get_previous_owner_keys().clone(),
+                                             // TODO avoid cloning this above
                                              &sign_key,
                                              None))
             }
@@ -209,10 +197,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                 let immut_data =
                     ffi_try!(immut_data_operations::create(client.clone(), plain_text, None));
                 let ser_immut_data = ffi_try!(serialise(&immut_data).map_err(FfiError::from));
-                let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .cipher_opt
-                        .get_mut(&cipher_opt_h)
-                        .ok_or(FfiError::InvalidCipherOptHandle))
+                let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
                     .encrypt(app, &ser_immut_data));
 
                 let immut_data_final = Data::Immutable(ImmutableData::new(raw_data));
@@ -222,18 +207,16 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                 ffi_try!(resp_getter.get());
 
                 ffi_try!(versioned::append_version(client,
-                                                   sd,
+                                                   ffi_try!(object_cache.get_sd(sd_h)).clone(),
                                                    immut_data_final_name,
                                                    &sign_key,
                                                    false))
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
-                let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .cipher_opt
-                        .get_mut(&cipher_opt_h)
-                        .ok_or(FfiError::InvalidCipherOptHandle))
+                let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
                     .encrypt(app, &plain_text));
 
+                let sd = ffi_try!(object_cache.get_sd(sd_h));
                 ffi_try!(StructuredData::new(sd.get_type_tag(),
                                              *sd.name(),
                                              sd.get_version(),
@@ -246,10 +229,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
 
-        if let Some(prev) = unwrap!(object_cache()).struct_data.insert(sd_h, sd) {
-            debug!("Displaced StructuredData from ObjectCache: {:?}", prev);
-        }
-
+        *ffi_try!(object_cache.get_sd(sd_h)) = new_sd;
         0
     })
 }
@@ -269,16 +249,16 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
         // Note: Order of locking is object_cache followed by client - ensure this order
         // everywhere.
         let mut obj_cache = unwrap!(object_cache());
-        let sd =
-            ffi_try!(obj_cache.struct_data.get_mut(&sd_h).ok_or(FfiError::InvalidStructDataHandle));
 
-        let mut plain_text = match sd.get_type_tag() {
+        let mut plain_text = match ffi_try!(obj_cache.get_sd(sd_h)).get_type_tag() {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
-                let raw_data = ffi_try!(unversioned::get_data(client, sd, None));
+                let raw_data =
+                    ffi_try!(unversioned::get_data(client, ffi_try!(obj_cache.get_sd(sd_h)), None));
                 ffi_try!(CipherOpt::decrypt(&app, &raw_data))
             }
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
-                let mut versions = ffi_try!(versioned::get_all_versions(client.clone(), sd));
+                let mut versions = ffi_try!(versioned::get_all_versions(client.clone(),
+                                                         ffi_try!(obj_cache.get_sd(sd_h))));
                 if let Some(immut_data_final_name) = versions.pop() {
                     let resp_getter = ffi_try!(unwrap!(client.lock())
                         .get(DataIdentifier::Immutable(immut_data_final_name), None));
@@ -291,13 +271,15 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
                                                                      immut_data_final.value()));
                     let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
                         .map_err(FfiError::from));
-                    ffi_try!(immut_data_operations::get_data_from_immut_data(client, immut_data, None))
+                    ffi_try!(immut_data_operations::get_data_from_immut_data(client,
+                                                                             immut_data,
+                                                                             None))
                 } else {
                     Vec::new()
                 }
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
-                ffi_try!(CipherOpt::decrypt(&app, sd.get_data()))
+                ffi_try!(CipherOpt::decrypt(&app, ffi_try!(obj_cache.get_sd(sd_h)).get_data()))
             }
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
@@ -319,8 +301,7 @@ pub unsafe extern "C" fn struct_data_num_of_versions(app: *const App,
                                                      -> i32 {
     helper::catch_unwind_i32(|| {
         let mut obj_cache = unwrap!(object_cache());
-        let sd =
-            ffi_try!(obj_cache.struct_data.get_mut(&sd_h).ok_or(FfiError::InvalidStructDataHandle));
+        let sd = ffi_try!(obj_cache.get_sd(sd_h));
 
         // TODO Move this check to core module itself (from all functions here using this pattern.
         if sd.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
@@ -350,7 +331,7 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
 
         let mut versions = {
             let mut obj_cache = unwrap!(object_cache());
-            let sd = ffi_try!(obj_cache.get_struct_data(sd_h));
+            let sd = ffi_try!(obj_cache.get_sd(sd_h));
 
             if sd.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
                 ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag));
@@ -391,11 +372,7 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_put(app: *const App, sd_h: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let sd = ffi_try!(unwrap!(object_cache())
-                .struct_data
-                .get_mut(&sd_h)
-                .ok_or(FfiError::InvalidStructDataHandle))
-            .clone();
+        let sd = ffi_try!(unwrap!(object_cache()).get_sd(sd_h)).clone();
         let data = Data::Structured(sd);
         let client = (*app).get_client();
         let resp_getter = ffi_try!(unwrap!(client.lock()).put(data, None));
@@ -409,102 +386,88 @@ pub unsafe extern "C" fn struct_data_put(app: *const App, sd_h: StructDataHandle
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_post(app: *const App, sd_h: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let sd = ffi_try!(unwrap!(object_cache())
-            .struct_data
-            .remove(&sd_h)
-            .ok_or(FfiError::InvalidStructDataHandle));
-        match struct_data_post_impl((*app).get_client(), sd.clone()) {
+        let mut object_cache = unwrap!(object_cache());
+        let sd = ffi_try!(object_cache.get_sd(sd_h));
+        match struct_data_post_impl((*app).get_client(), sd) {
             Ok(new_sd) => {
-                let _ = unwrap!(object_cache()).struct_data.insert(sd_h, new_sd);
+                *sd = new_sd;
                 0
             }
-            Err(e) => {
-                let _ = unwrap!(object_cache()).struct_data.insert(sd_h, sd);
-                ffi_try!(Err(e))
-            }
+            Err(e) => ffi_try!(Err(e)),
         }
     })
 }
 
 fn struct_data_post_impl(client: Arc<Mutex<Client>>,
-                         mut sd: StructuredData)
+                         sd: &StructuredData)
                          -> Result<StructuredData, FfiError> {
     let sign_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
     // TODO Ask routing to remove this inefficiency of requiring to clone data and all
-    sd = try!(StructuredData::new(sd.get_type_tag(),
-                                  *sd.name(),
-                                  sd.get_version() + 1,
-                                  sd.get_data().clone(),
-                                  sd.get_owner_keys().clone(),
-                                  sd.get_previous_owner_keys().clone(),
-                                  Some(&sign_key))
+    let new_sd = try!(StructuredData::new(sd.get_type_tag(),
+                                          *sd.name(),
+                                          sd.get_version() + 1,
+                                          sd.get_data().clone(),
+                                          sd.get_owner_keys().clone(),
+                                          sd.get_previous_owner_keys().clone(),
+                                          Some(&sign_key))
         .map_err(CoreError::from));
 
-    let data = Data::Structured(sd.clone());
+    let data = Data::Structured(new_sd.clone());
     let resp_getter = try!(unwrap!(client.lock()).post(data, None));
     try!(resp_getter.get());
 
-    Ok(sd)
+    Ok(new_sd)
 }
 
 /// DELETE StructuredData. Version will be bumped.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_delete(app: *const App, sd_h: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let sd = ffi_try!(unwrap!(object_cache())
-            .struct_data
-            .remove(&sd_h)
-            .ok_or(FfiError::InvalidStructDataHandle));
-        match struct_data_delete_impl((*app).get_client(), sd.clone()) {
+        let mut object_cache = unwrap!(object_cache());
+        let sd = ffi_try!(object_cache.get_sd(sd_h));
+        match struct_data_delete_impl((*app).get_client(), sd) {
             Ok(new_sd) => {
-                let _ = unwrap!(object_cache()).struct_data.insert(sd_h, new_sd);
+                *sd = new_sd;
                 0
             }
-            Err(e) => {
-                let _ = unwrap!(object_cache()).struct_data.insert(sd_h, sd);
-                ffi_try!(Err(e))
-            }
+            Err(e) => ffi_try!(Err(e)),
         }
     })
 }
 
 fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
-                           mut sd: StructuredData)
+                           sd: &StructuredData)
                            -> Result<StructuredData, FfiError> {
     let sign_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
     // TODO Ask routing to remove this inefficiency of requiring to clone data and all
-    sd = try!(StructuredData::new(sd.get_type_tag(),
-                                  *sd.name(),
-                                  sd.get_version() + 1,
-                                  Vec::new(),
-                                  sd.get_owner_keys().clone(),
-                                  sd.get_previous_owner_keys().clone(),
-                                  Some(&sign_key))
+    let new_sd = try!(StructuredData::new(sd.get_type_tag(),
+                                          *sd.name(),
+                                          sd.get_version() + 1,
+                                          Vec::new(),
+                                          sd.get_owner_keys().clone(),
+                                          sd.get_previous_owner_keys().clone(),
+                                          Some(&sign_key))
         .map_err(CoreError::from));
 
-    let data = Data::Structured(sd.clone());
+    let data = Data::Structured(new_sd.clone());
     let resp_getter = try!(unwrap!(client.lock()).delete(data, None));
     try!(resp_getter.get());
 
-    Ok(sd)
+    Ok(new_sd)
 }
 
 /// Free StructuredData handle
 #[no_mangle]
 pub extern "C" fn struct_data_free(handle: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache())
-            .struct_data
-            .remove(&handle)
-            .ok_or(FfiError::InvalidStructDataHandle));
-
+        let _ = ffi_try!(unwrap!(object_cache()).remove_sd(handle));
         0
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use core::{utility, CLIENT_STRUCTURED_DATA_TAG};
+    use core::{CLIENT_STRUCTURED_DATA_TAG, utility};
     use ffi::app::App;
     use ffi::errors::FfiError;
     use ffi::low_level_api::{CipherOptHandle, DataIdHandle, StructDataHandle};
@@ -540,13 +503,13 @@ mod tests {
 
             // Put
             assert_eq!(struct_data_put(&app, sd_h), 0);
-            assert!(unwrap!(object_cache()).struct_data.contains_key(&sd_h));
+            let _ = unwrap!(object_cache()).get_sd(sd_h);
             assert_eq!(struct_data_free(sd_h), 0);
-            assert!(!unwrap!(object_cache()).struct_data.contains_key(&sd_h));
+            assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
 
             // Fetch
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-            assert!(unwrap!(object_cache()).struct_data.contains_key(&sd_h));
+            let _ = unwrap!(object_cache()).get_sd(sd_h);
 
             // Extract Data
             let rx_plain_text_0 = extract_data(&app, sd_h);
@@ -563,13 +526,13 @@ mod tests {
 
             // Post
             assert_eq!(struct_data_post(&app, sd_h), 0);
-            assert!(unwrap!(object_cache()).struct_data.contains_key(&sd_h));
+            let _ = unwrap!(object_cache()).get_sd(sd_h);
             assert_eq!(struct_data_free(sd_h), 0);
-            assert!(!unwrap!(object_cache()).struct_data.contains_key(&sd_h));
+            assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
 
             // Fetch
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-            assert!(unwrap!(object_cache()).struct_data.contains_key(&sd_h));
+            let _ = unwrap!(object_cache()).get_sd(sd_h);
 
             // Extract Data
             let rx_plain_text_1 = extract_data(&app, sd_h);
@@ -596,9 +559,9 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            assert!(unwrap!(object_cache()).struct_data.contains_key(&sd_h));
+            let _ = unwrap!(object_cache()).get_sd(sd_h);
             assert_eq!(struct_data_free(sd_h), 0);
-            assert!(!unwrap!(object_cache()).struct_data.contains_key(&sd_h));
+            assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
 
             // Fetch - should error out
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), -18);

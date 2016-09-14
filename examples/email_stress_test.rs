@@ -333,7 +333,7 @@ fn main() {
     info!("Create accounts for {} bots: {} secs, {} millis\n",
           BOTS,
           duration.as_secs(),
-          duration.subsec_nanos() / 1000000 / 1000000);
+          duration.subsec_nanos() / 1000000);
 
     if !args.flag_get_only {
         // ------------------------------------------------------------------------
