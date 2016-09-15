@@ -86,7 +86,9 @@ impl FileDetails {
         }
 
         if !self.metadata.is_null() {
-            let _ = unsafe { Box::from_raw(self.metadata) };
+            unsafe {
+                Box::from_raw(self.metadata).deallocate();
+            }
         }
     }
 }
