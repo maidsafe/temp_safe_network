@@ -99,7 +99,7 @@ pub unsafe extern "C" fn nfs_modify_dir(app_handle: *const App,
                                         new_user_metadata_len: usize)
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
-        trace!("JSON modify directory, given the path.");
+        trace!("FFI modify directory, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
         let new_user_metadata = helper::u8_ptr_to_opt_vec(new_user_metadata, new_user_metadata_len);
