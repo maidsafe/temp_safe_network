@@ -28,7 +28,6 @@ use nfs::file::File;
 use nfs::helper::writer::Mode;
 use nfs::helper::writer::Writer as InnerWriter;
 use nfs::metadata::file_metadata::FileMetadata;
-use rustc_serialize::base64::FromBase64;
 use self_encryption::DataMap;
 use std::mem;
 use std::slice;
@@ -60,7 +59,7 @@ pub unsafe extern "C" fn nfs_create_file(app_handle: *const App,
         trace!("FFI get nfs writer for creating a new file.");
 
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
-        let user_metadata = ffi_try!(helper::c_utf8_to_str(user_metadata, user_metadata_len));
+        let user_metadata = helper::u8_ptr_to_vec(user_metadata, user_metadata_len);
 
         let writer = ffi_try!(create_file(&*app_handle, file_path, user_metadata, is_path_shared));
 
@@ -115,14 +114,11 @@ pub unsafe extern "C" fn nfs_writer_close(writer_handle: *mut Writer) -> int32_t
 #[allow(unsafe_code)]
 fn create_file(app: &App,
                file_path: &str,
-               user_metadata: &str,
+               user_metadata: Vec<u8>,
                is_path_shared: bool)
                -> Result<Writer, FfiError> {
     let (directory, file_name) =
         try!(helper::get_directory_and_file(app, file_path, is_path_shared));
-
-    let user_metadata = try!(parse_result!(user_metadata.from_base64(),
-                                           "Failed Converting from Base64."));
 
     let mut storage = Box::new(SelfEncryptionStorage::new(app.get_client()));
 
@@ -182,14 +178,16 @@ mod test {
 
     #[test]
     fn create_file() {
-        const METADATA_BASE64: &'static str = "c2FtcGxlIHRleHQ=";
+        const METADATA: &'static str = "user metadata";
 
         let app = test_utils::create_app(false);
         let dir_helper = DirectoryHelper::new(app.get_client());
         let mut file_helper = FileHelper::new(app.get_client());
 
-        let mut writer =
-            unwrap!(super::create_file(&app, "/test_file.txt", METADATA_BASE64, false));
+        let mut writer = unwrap!(super::create_file(&app,
+                                                    "/test_file.txt",
+                                                    METADATA.as_bytes().to_vec(),
+                                                    false));
         unwrap!(writer.inner.write("hello world".as_bytes()));
         let _ = unwrap!(writer.close());
 

@@ -19,13 +19,11 @@
 
 
 use core::client::Client;
-use ffi::config;
 use ffi::errors::FfiError;
 use ffi::low_level_api::misc::misc_u8_ptr_free;
 use nfs::file::File;
 use nfs::helper::file_helper::FileHelper;
 use nfs::metadata::file_metadata::FileMetadata as NfsFileMetadata;
-use rustc_serialize::base64::ToBase64;
 use std::ptr;
 use std::sync::{Arc, Mutex};
 use super::helper;
@@ -34,7 +32,7 @@ use super::helper;
 #[derive(Debug)]
 #[repr(C)]
 pub struct FileDetails {
-    /// Content of the file, base64 encoded string.
+    /// Content of the file
     pub content: *mut u8,
     /// Size of `content`
     pub content_len: usize,
@@ -61,8 +59,7 @@ impl FileDetails {
         };
 
         let content = try!(reader.read(start_position, size));
-        let content = content.to_base64(config::get_base64_config());
-        let (content, content_len, content_cap) = helper::string_to_c_utf8(content);
+        let (content, content_len, content_cap) = helper::u8_vec_to_ptr(content);
 
         let file_metadata_ptr = if include_metadata {
             Box::into_raw(Box::new(try!(FileMetadata::new(file.get_metadata()))))
@@ -114,18 +111,15 @@ pub struct FileMetadata {
 impl FileMetadata {
     /// Create new FFI file metadata wrapper.
     pub fn new(file_metadata: &NfsFileMetadata) -> Result<Self, FfiError> {
-        use rustc_serialize::base64::ToBase64;
-
         let created_time = file_metadata.get_created_time().to_timespec();
         let modified_time = file_metadata.get_modified_time().to_timespec();
 
         let (name, name_len, name_cap) = helper::string_to_c_utf8(file_metadata.get_name()
             .to_string());
 
-        let user_metadata = file_metadata.get_user_metadata()
-            .to_base64(config::get_base64_config());
+        let user_metadata = file_metadata.get_user_metadata().to_owned();
         let (user_metadata, user_metadata_len, user_metadata_cap) =
-            helper::string_to_c_utf8(user_metadata);
+            helper::u8_vec_to_ptr(user_metadata);
 
         Ok(FileMetadata {
             name: name,

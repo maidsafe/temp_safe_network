@@ -19,7 +19,6 @@
 
 
 use core::client::Client;
-use ffi::config;
 use ffi::errors::FfiError;
 use ffi::file_details::FileMetadata;
 use nfs::directory_listing::DirectoryListing;
@@ -109,17 +108,15 @@ pub struct DirectoryMetadata {
 
 impl DirectoryMetadata {
     fn new(dir_metadata: &NfsDirectoryMetadata) -> Result<Self, FfiError> {
-        use rustc_serialize::base64::ToBase64;
-
         let dir_key = dir_metadata.get_key();
         let created_time = dir_metadata.get_created_time().to_timespec();
         let modified_time = dir_metadata.get_modified_time().to_timespec();
 
         let (name, name_len, name_cap) = helper::string_to_c_utf8(dir_metadata.get_name()
             .to_string());
-        let user_metadata = dir_metadata.get_user_metadata().to_base64(config::get_base64_config());
+        let user_metadata = dir_metadata.get_user_metadata().to_owned();
         let (user_metadata, user_metadata_len, user_metadata_cap) =
-            helper::string_to_c_utf8(user_metadata);
+            helper::u8_vec_to_ptr(user_metadata);
 
         Ok(DirectoryMetadata {
             name: name,

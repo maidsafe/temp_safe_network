@@ -19,14 +19,3 @@
 pub const SAFE_DRIVE_DIR_NAME: &'static str = "SAFEDrive";
 pub const LAUNCHER_GLOBAL_DIRECTORY_NAME: &'static str = "LauncherReservedDirectory";
 pub const LAUNCHER_GLOBAL_CONFIG_FILE_NAME: &'static str = "LauncherSpecificConfigurationFile";
-
-use rustc_serialize::base64::{CharacterSet, Config, Newline};
-
-pub fn get_base64_config() -> Config {
-    Config {
-        char_set: CharacterSet::Standard,
-        newline: Newline::LF,
-        pad: true,
-        line_length: None,
-    }
-}

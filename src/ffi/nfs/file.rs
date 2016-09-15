@@ -28,7 +28,6 @@ use nfs::file::File;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode;
-use rustc_serialize::base64::FromBase64;
 use time;
 
 
@@ -94,8 +93,8 @@ pub unsafe extern "C" fn nfs_modify_file(app_handle: *const App,
 
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
         let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
-        let new_metadata = ffi_try!(helper::c_utf8_to_opt_string(new_metadata, new_metadata_len));
-        let new_content = ffi_try!(helper::c_utf8_to_opt_string(new_content, new_content_len));
+        let new_metadata = helper::u8_ptr_to_opt_vec(new_metadata, new_metadata_len);
+        let new_content = helper::u8_ptr_to_opt_vec(new_content, new_content_len);
 
         ffi_try!(modify_file(&*app_handle,
                              file_path,
@@ -180,8 +179,8 @@ fn modify_file(app: &App,
                file_path: &str,
                is_shared: bool,
                new_name: Option<String>,
-               new_metadata: Option<String>,
-               new_content: Option<String>)
+               new_metadata: Option<Vec<u8>>,
+               new_content: Option<Vec<u8>>)
                -> Result<(), FfiError> {
     if new_name.is_none() && new_metadata.is_none() && new_content.is_none() {
         return Err(FfiError::from("Optional parameters could not be parsed"));
@@ -202,7 +201,6 @@ fn modify_file(app: &App,
     }
 
     if let Some(metadata) = new_metadata {
-        let metadata = try!(parse_result!(metadata.from_base64(), "Failed to convert from base64"));
         file.get_mut_metadata().set_user_metadata(metadata);
         metadata_updated = true;
     }
@@ -214,8 +212,7 @@ fn modify_file(app: &App,
 
     if let Some(content) = new_content {
         let mut writer = try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory));
-        let bytes = try!(parse_result!(content.from_base64(), "Failed to convert from base64"));
-        try!(writer.write(&bytes[..]));
+        try!(writer.write(&content[..]));
         let _ = try!(writer.close());
     }
 
@@ -272,12 +269,10 @@ fn get_file_metadata(app: &App,
 
 #[cfg(test)]
 mod test {
-    use ffi::{config, test_utils};
-
     use ffi::app::App;
+    use ffi::test_utils;
     use nfs::helper::directory_helper::DirectoryHelper;
     use nfs::helper::file_helper::FileHelper;
-    use rustc_serialize::base64::ToBase64;
     use std::slice;
     use std::str;
 
@@ -359,7 +354,7 @@ mod test {
 
     #[test]
     fn file_update_user_metadata() {
-        const METADATA_BASE64: &'static str = "c2FtcGxlIHRleHQ=";
+        const METADATA: &'static str = "user metadata";
 
         let app = test_utils::create_app(false);
         let dir_helper = DirectoryHelper::new(app.get_client());
@@ -375,17 +370,15 @@ mod test {
                                    "/test_file.txt",
                                    false,
                                    None,
-                                   Some(METADATA_BASE64.to_string()),
+                                   Some(METADATA.as_bytes().to_vec()),
                                    None)
             .is_ok());
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file("test_file.txt"));
         assert!(file.get_metadata().get_user_metadata().len() > 0);
-        assert_eq!(file.get_metadata()
-                       .get_user_metadata()
-                       .to_base64(config::get_base64_config()),
-                   METADATA_BASE64.to_string());
+        assert_eq!(file.get_metadata().get_user_metadata(),
+                   METADATA.as_bytes());
     }
 
     #[test]
@@ -397,7 +390,7 @@ mod test {
 
         create_test_file(&app, "test_file.txt");
 
-        let content = "first".as_bytes().to_base64(config::get_base64_config());
+        let content = "first".as_bytes().to_vec();
         unwrap!(super::modify_file(&app, "/test_file.txt", false, None, None, Some(content)));
 
 
@@ -412,7 +405,7 @@ mod test {
             assert_eq!(content, "first");
         }
 
-        let content = "second".as_bytes().to_base64(config::get_base64_config());
+        let content = "second".as_bytes().to_vec();
         unwrap!(super::modify_file(&app, "/test_file.txt", false, None, None, Some(content)));
 
         {

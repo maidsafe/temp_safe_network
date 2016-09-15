@@ -23,7 +23,7 @@ use core::errors::CoreError;
 use dns::errors::{DNS_ERROR_START_RANGE, DnsError};
 use maidsafe_utilities::serialisation::SerialisationError;
 use nfs::errors::NfsError;
-use rustc_serialize::{base64, json};
+use rustc_serialize::json;
 use std::ffi::NulError;
 use std::fmt;
 
@@ -51,9 +51,6 @@ pub enum FfiError {
     /// Could not decode valid JSON into expected Structures probably because a mandatory field was
     /// missing or a field was wrongly named etc.
     JsonDecodeError(json::DecoderError),
-    /// JSON non-conforming to the Launcher RFC and not covered by JsonDecodeError, e.g. things
-    /// like invalid base64 formatting, unreasonable/unexpected indexing, ranges etc.
-    SpecificParseError(String),
     /// Error encoding into Json String
     JsonEncodeError(json::EncoderError),
     /// Unable to Read from or Write to a Local Config file.
@@ -123,12 +120,6 @@ impl From<DnsError> for FfiError {
     }
 }
 
-impl From<base64::FromBase64Error> for FfiError {
-    fn from(_: base64::FromBase64Error) -> FfiError {
-        FfiError::SpecificParseError("Base64 decode error".to_string())
-    }
-}
-
 impl From<json::ParserError> for FfiError {
     fn from(error: json::ParserError) -> FfiError {
         FfiError::JsonParseError(error)
@@ -164,7 +155,6 @@ impl Into<i32> for FfiError {
             FfiError::PermissionDenied => FFI_ERROR_START_RANGE - 3,
             FfiError::JsonParseError(_) => FFI_ERROR_START_RANGE - 4,
             FfiError::JsonDecodeError(_) => FFI_ERROR_START_RANGE - 5,
-            FfiError::SpecificParseError(_) => FFI_ERROR_START_RANGE - 6,
             FfiError::JsonEncodeError(_) => FFI_ERROR_START_RANGE - 7,
             FfiError::LocalConfigAccessFailed(_) => FFI_ERROR_START_RANGE - 8,
             FfiError::Unexpected(_) => FFI_ERROR_START_RANGE - 9,
@@ -201,9 +191,6 @@ impl fmt::Debug for FfiError {
             }
             FfiError::JsonDecodeError(ref error) => {
                 write!(f, "FfiError::JsonDecodeError -> {:?}", error)
-            }
-            FfiError::SpecificParseError(ref error) => {
-                write!(f, "FfiError::SpecificParseError -> {:?}", error)
             }
             FfiError::JsonEncodeError(ref error) => {
                 write!(f, "FfiError::JsonEncodeError -> {:?}", error)

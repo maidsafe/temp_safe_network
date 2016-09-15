@@ -59,13 +59,28 @@ pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize) -> Result<Option<
 /// The tuple means (pointer, length_in_bytes, capacity).
 /// Use `misc_u8_ptr_free` to free the memory.
 pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
-    let mut v = s.into_bytes();
+    u8_vec_to_ptr(s.into_bytes())
+}
+
+pub unsafe fn u8_ptr_to_vec(ptr: *const u8, len: usize) -> Vec<u8> {
+    slice::from_raw_parts(ptr, len).to_owned()
+}
+
+pub unsafe fn u8_ptr_to_opt_vec(ptr: *const u8, len: usize) -> Option<Vec<u8>> {
+    if ptr.is_null() {
+        None
+    } else {
+        Some(u8_ptr_to_vec(ptr, len))
+    }
+}
+
+pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
     v.shrink_to_fit();
-    let p = v.as_mut_ptr();
+    let ptr = v.as_mut_ptr();
     let len = v.len();
     let cap = v.capacity();
     mem::forget(v);
-    (p, len, cap)
+    (ptr, len, cap)
 }
 
 pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
