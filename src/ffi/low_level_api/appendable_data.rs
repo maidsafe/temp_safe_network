@@ -801,6 +801,10 @@ mod tests {
 
             assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
             assert_eq!(appendable_data_append(&app2, ad_h, immut_id_2_h), 0);
+
+            assert_eq!(appendable_data_remove_from_filter(ad_h, sk1_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
+            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
         }
 
         // Set whitelist
@@ -817,6 +821,10 @@ mod tests {
 
             assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
             assert!(appendable_data_append(&app2, ad_h, immut_id_2_h) != 0);
+
+            assert_eq!(appendable_data_remove_from_filter(ad_h, sk1_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
+            assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
         }
     }
 
