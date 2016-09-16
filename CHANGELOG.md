@@ -1,5 +1,15 @@
 # Safe Core - Change Log
 
+## [0.20.0]
+- API changed from JSON to direct FFI calls for interfacing with other languages.
+- Provide low-level-api for finer grained control for manipulation of MaidSafe data types.
+- Provide Private & Public Appendable Data operations and manipulations.
+- Code APPEND API.
+- Update mock-routing to comply with above changes to mimic basic routing and vault functionality for purposes of independent testing.
+- Introduce Object Caching - a method in which `safe_core` keeps cache of object in LRU cache and gives only a POD (u64) handle via FFI.
+- Increase test cases performace when using mock routing by not writing data to file for test-cases.
+- Dependency update - routing updated to 0.26.0.
+
 ## [0.19.0]
 - Dependency update - routing updated to 0.23.4.
 - Log path exposed to FFI so that frontend is intimated where it is expected to create its log files.
