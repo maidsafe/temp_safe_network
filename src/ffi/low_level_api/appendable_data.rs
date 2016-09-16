@@ -825,7 +825,107 @@ mod tests {
             assert_eq!(appendable_data_remove_from_filter(ad_h, sk1_h), 0);
             assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
             assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
+
+            // Toggle filter and ensure it's blacklist again
+            assert_eq!(appendable_data_toggle_filter(ad_h), 0);
+            assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
+            assert_eq!(filter_type, FilterType::BlackList);
         }
+    }
+
+    #[test]
+    fn priv_appendable_data() {
+        let app0 = test_utils::create_app(false);
+        let app1 = test_utils::create_app(false);
+        let app2 = test_utils::create_app(false);
+
+        let ad_name = rand::random();
+        let mut ad_priv_h: AppendableDataHandle = 0;
+        let mut ad_id_h: DataIdHandle = 0;
+
+        let mut got_ad_h: AppendableDataHandle = 0;
+
+        // Data to append
+        let (_, immut_id_0_h) = generate_random_immutable_data_id();
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+
+        // Generate keys for extra test apps
+        let (sk1_h, sk2_h) = {
+            let mut object_cache = unwrap!(object_cache());
+            (object_cache.insert_sign_key(get_sign_pk(&app1)),
+             object_cache.insert_sign_key(get_sign_pk(&app2)))
+        };
+
+        let mut got_immut_id_0_h: DataIdHandle = 0;
+        let mut got_immut_id_1_h: DataIdHandle = 0;
+
+        unsafe {
+            // Create
+            assert_eq!(appendable_data_new_priv(&app0, &ad_name, &mut ad_priv_h), 0);
+            assert_eq!(appendable_data_extract_data_id(ad_priv_h, &mut ad_id_h), 0);
+
+            // Test PUT requests for private data
+            assert_eq!(appendable_data_put(&app0, ad_priv_h), 0);
+            assert_eq!(appendable_data_append(&app0, ad_priv_h, immut_id_0_h), 0);
+            assert_eq!(appendable_data_append(&app0, ad_priv_h, immut_id_1_h), 0);
+
+            assert_eq!(appendable_data_get(&app0, ad_id_h, &mut got_ad_h), 0);
+
+            let mut num: usize = 0;
+            assert_eq!(appendable_data_num_of_data(got_ad_h, &mut num), 0);
+            assert_eq!(num, 2);
+
+            assert_eq!(appendable_data_nth_data_id(&app0, got_ad_h, 0, &mut got_immut_id_0_h),
+                       0);
+            assert_eq!(appendable_data_nth_data_id(&app0, got_ad_h, 1, &mut got_immut_id_1_h),
+                       0);
+
+            // Other apps can append new data
+            assert_eq!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h), 0);
+            assert_eq!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h), 0);
+
+            // Check blacklist filter for private appendable data
+            let mut filter_type = FilterType::BlackList;
+
+            assert_eq!(appendable_data_filter_type(ad_priv_h, &mut filter_type), 0);
+            assert_eq!(filter_type, FilterType::BlackList);
+
+            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sk1_h), 0);
+            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sk2_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_priv_h, false), 0);
+
+            assert!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h) != 0);
+            assert!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h) != 0);
+
+            // Check whitelist filter for private data
+            assert_eq!(appendable_data_toggle_filter(ad_priv_h), 0);
+            assert_eq!(appendable_data_filter_type(ad_priv_h, &mut filter_type), 0);
+
+            assert_eq!(filter_type, FilterType::WhiteList);
+            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sk2_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_priv_h, false), 0);
+
+            assert_eq!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h), 0);
+            assert!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h) != 0);
+        }
+
+        // Verify the data items we got back are the same we put in.
+        {
+            let mut object_cache = unwrap!(object_cache());
+
+            let mut orig = HashSet::with_capacity(2);
+            let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_0_h)));
+            let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_1_h)));
+
+            let mut got = HashSet::with_capacity(2);
+            let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_0_h)));
+            let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_1_h)));
+
+            assert_eq!(orig, got);
+        }
+
+        assert_eq!(appendable_data_free(ad_priv_h), 0);
+        assert_eq!(appendable_data_free(got_ad_h), 0);
     }
 
     #[test]
