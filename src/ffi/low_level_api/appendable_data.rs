@@ -880,7 +880,30 @@ mod tests {
             assert_eq!(appendable_data_nth_data_id(&app0, got_ad_h, 1, &mut got_immut_id_1_h),
                        0);
 
+            // Delete and restore private appendable data
+            assert_eq!(appendable_data_remove_nth_data(got_ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app0, got_ad_h, true), 0);
+
+            assert_eq!(appendable_data_num_of_data(got_ad_h, &mut num), 0);
+            assert_eq!(num, 1);
+            assert_eq!(appendable_data_num_of_deleted_data(got_ad_h, &mut num), 0);
+            assert_eq!(num, 1);
+
+            let mut deleted_data_h = 0;
+            assert_eq!(appendable_data_nth_deleted_data_id(&app0, got_ad_h, 0, &mut deleted_data_h),
+                       0);
+
+            assert_eq!(appendable_data_restore_nth_deleted_data(got_ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app0, got_ad_h, true), 0);
+
+            assert_eq!(appendable_data_num_of_data(got_ad_h, &mut num), 0);
+            assert_eq!(num, 2);
+            assert_eq!(appendable_data_num_of_deleted_data(got_ad_h, &mut num), 0);
+            assert_eq!(num, 0);
+
             // Other apps can append new data
+            assert_eq!(appendable_data_get(&app0, ad_id_h, &mut ad_priv_h), 0);
+
             assert_eq!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h), 0);
             assert_eq!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h), 0);
 
@@ -953,6 +976,47 @@ mod tests {
             // GET it back.
             assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
 
+            let mut num: usize = 0;
+            assert_eq!(appendable_data_num_of_data(ad_h, &mut num), 0);
+            assert_eq!(num, 2);
+
+            // Try to remove one of available versions first
+            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+            assert_eq!(appendable_data_free(ad_h), 0);
+
+            assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
+
+            let mut num: usize = 0;
+            assert_eq!(appendable_data_num_of_data(ad_h, &mut num), 0);
+            assert_eq!(num, 1);
+
+            let mut num_deleted: usize = 0;
+            assert_eq!(appendable_data_num_of_deleted_data(ad_h, &mut num_deleted), 0);
+            assert_eq!(num_deleted, 1);
+
+            // Try restoring deleted data
+            assert_eq!(appendable_data_restore_nth_deleted_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+            assert_eq!(appendable_data_free(ad_h), 0);
+
+            assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
+
+            let mut num: usize = 0;
+            assert_eq!(appendable_data_num_of_data(ad_h, &mut num), 0);
+            assert_eq!(num, 2);
+
+            // Permanently delete data
+            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_remove_nth_deleted_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+
+            assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
+
+            let mut num_deleted: usize = 0;
+            assert_eq!(appendable_data_num_of_deleted_data(ad_h, &mut num_deleted), 0);
+            assert_eq!(num_deleted, 0);
+
             // clear the data and POST it.
             assert_eq!(appendable_data_clear_data(ad_h), 0);
             assert_eq!(appendable_data_post(&app, ad_h, false), 0);
@@ -964,6 +1028,19 @@ mod tests {
             let mut num: usize = 0;
             assert_eq!(appendable_data_num_of_data(ad_h, &mut num), 0);
             assert_eq!(num, 0);
+
+            // Permanently clear deleted data
+            let mut deleted_num: usize = 0;
+            assert_eq!(appendable_data_num_of_deleted_data(ad_h, &mut deleted_num), 0);
+            assert_eq!(deleted_num, 2);
+
+            assert_eq!(appendable_data_clear_deleted_data(ad_h), 0);
+            assert_eq!(appendable_data_post(&app, ad_h, false), 0);
+            assert_eq!(appendable_data_free(ad_h), 0);
+
+            assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
+            assert_eq!(appendable_data_num_of_deleted_data(ad_h, &mut deleted_num), 0);
+            assert_eq!(deleted_num, 0);
         }
     }
 
