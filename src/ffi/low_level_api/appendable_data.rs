@@ -949,6 +949,8 @@ mod tests {
 
         assert_eq!(appendable_data_free(ad_priv_h), 0);
         assert_eq!(appendable_data_free(got_ad_h), 0);
+        assert_eq!(misc_sign_key_free(sk1_h), 0);
+        assert_eq!(misc_sign_key_free(sk2_h), 0);
     }
 
     #[test]
@@ -1053,8 +1055,7 @@ mod tests {
         unsafe {
             // Initialise public appendable data
             let mut ad_h = 0;
-            let ad_name = rand::random();
-            assert_eq!(appendable_data_new_pub(&app, &ad_name, &mut ad_h), 0);
+            assert_eq!(appendable_data_new_pub(&app, &rand::random(), &mut ad_h), 0);
 
             // Public appendable data doens't have a private owner key
             assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h),
@@ -1064,13 +1065,67 @@ mod tests {
 
             // Initialise private appendable data
             let mut ad_h = 0;
-            let ad_name = rand::random();
-            assert_eq!(appendable_data_new_priv(&app, &ad_name, &mut ad_h), 0);
+            assert_eq!(appendable_data_new_priv(&app, &rand::random(), &mut ad_h), 0);
 
             assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h), 0);
 
             assert_eq!(misc_encrypt_key_free(encrypt_key_h), 0);
         }
+    }
+
+    #[test]
+    fn data_sign_key() {
+        let app0 = test_utils::create_app(false);
+        let app1 = test_utils::create_app(false);
+
+        let sk1 = get_sign_pk(&app1);
+        let sk1_h = unwrap!(object_cache()).insert_sign_key(sk1);
+
+        let mut ad_h = 0;
+        let mut ad_id_h: DataIdHandle = 0;
+
+        // Data to append
+        let (_, immut_id_0_h) = generate_random_immutable_data_id();
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+
+        unsafe {
+            // Create test data
+            assert_eq!(appendable_data_new_pub(&app0, &rand::random(), &mut ad_h), 0);
+            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
+
+            assert_eq!(appendable_data_put(&app0, ad_h), 0);
+            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_0_h), 0);
+
+            assert_eq!(appendable_data_get(&app0, ad_id_h, &mut ad_h), 0);
+
+            // Get a data key of app1
+            let mut sign_key_h = 0;
+            assert_eq!(appendable_data_nth_data_sign_key(&app0, ad_h, 0, &mut sign_key_h),
+                       0);
+            assert_eq!(*unwrap!(unwrap!(object_cache()).get_sign_key(sign_key_h)),
+                       sk1);
+
+            // Now try to get a data key from deleted data
+            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h, true), 0);
+            assert_eq!(appendable_data_free(ad_h), 0);
+            assert_eq!(appendable_data_get(&app0, ad_id_h, &mut ad_h), 0);
+
+            let mut deleted_sk_h = 0;
+            assert_eq!(appendable_data_nth_deleted_data_sign_key(&app0, ad_h, 0, &mut deleted_sk_h),
+                       0);
+            assert_eq!(*unwrap!(unwrap!(object_cache()).get_sign_key(deleted_sk_h)),
+                       sk1);
+
+            // Filter out the key that we've got for an app1
+            assert_eq!(appendable_data_insert_to_filter(ad_h, deleted_sk_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
+
+            assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
+        }
+
+        assert_eq!(misc_sign_key_free(sk1_h), 0);
+        assert_eq!(appendable_data_free(ad_h), 0);
     }
 
     fn generate_random_immutable_data_id() -> (DataIdentifier, DataIdHandle) {
