@@ -28,7 +28,7 @@ use std::collections::BTreeSet;
 use std::iter;
 
 /// Wrapper for PrivAppendableData and PubAppendableData.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum AppendableData {
     /// Public appendable data.
     Pub(PubAppendableData),
@@ -684,7 +684,9 @@ fn nth<T>(items: &BTreeSet<T>, n: usize) -> Result<&T, FfiError> {
 #[cfg(test)]
 mod tests {
     use ffi::app::App;
+    use ffi::errors::FfiError;
     use ffi::low_level_api::{AppendableDataHandle, DataIdHandle};
+    use ffi::low_level_api::misc::*;
     use ffi::low_level_api::object_cache::object_cache;
     use ffi::test_utils;
     use rand;
@@ -854,6 +856,35 @@ mod tests {
             let mut num: usize = 0;
             assert_eq!(appendable_data_num_of_data(ad_h, &mut num), 0);
             assert_eq!(num, 0);
+        }
+    }
+
+    #[test]
+    fn sign_key() {
+        let app = test_utils::create_app(false);
+
+        let mut encrypt_key_h = 0;
+
+        unsafe {
+            // Initialise public appendable data
+            let mut ad_h = 0;
+            let ad_name = rand::random();
+            assert_eq!(appendable_data_new_pub(&app, &ad_name, &mut ad_h), 0);
+
+            // Public appendable data doens't have a private owner key
+            assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h),
+                       FfiError::UnsupportedOperation.into());
+
+            assert_eq!(appendable_data_free(ad_h), 0);
+
+            // Initialise private appendable data
+            let mut ad_h = 0;
+            let ad_name = rand::random();
+            assert_eq!(appendable_data_new_priv(&app, &ad_name, &mut ad_h), 0);
+
+            assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h), 0);
+
+            assert_eq!(misc_encrypt_key_free(encrypt_key_h), 0);
         }
     }
 
