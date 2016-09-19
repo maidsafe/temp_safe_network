@@ -640,18 +640,18 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
             let sign_sk = ffi_try!(client.get_secret_signing_key());
 
             let appended_data = ffi_try!(AppendedData::new(data_id, *sign_pk, sign_sk)
-                .map_err(CoreError::from));
+                                             .map_err(CoreError::from));
 
             match *ffi_try!(object_cache.get_ad(ad_h)) {
                 AppendableData::Priv(ref elt) => {
                     let priv_appended_data = ffi_try!(PrivAppendedData::new(&appended_data,
                                                                             &elt.encrypt_key)
-                        .map_err(CoreError::from));
+                                                          .map_err(CoreError::from));
                     ffi_try!(AppendWrapper::new_priv(elt.name,
                                                      priv_appended_data,
                                                      (sign_pk, sign_sk),
                                                      elt.version)
-                        .map_err(CoreError::from))
+                                 .map_err(CoreError::from))
                 }
                 AppendableData::Pub(ref elt) => {
                     AppendWrapper::new_pub(elt.name, appended_data, elt.version)
@@ -740,15 +740,15 @@ mod tests {
             assert_eq!(appendable_data_append(&app, ad_h, immut_id_1_h), 0);
 
             // GET back
-            let got_ad_h = reload_ad(&app, ad_id_h, ad_h);
-            assert_num_of_data!(got_ad_h, 2);
+            reload_ad(&app, ad_id_h, &mut ad_h);
+            assert_num_of_data!(ad_h, 2);
 
-            assert_eq!(appendable_data_nth_data_id(&app, got_ad_h, 0, &mut got_immut_id_0_h),
+            assert_eq!(appendable_data_nth_data_id(&app, ad_h, 0, &mut got_immut_id_0_h),
                        0);
-            assert_eq!(appendable_data_nth_data_id(&app, got_ad_h, 1, &mut got_immut_id_1_h),
+            assert_eq!(appendable_data_nth_data_id(&app, ad_h, 1, &mut got_immut_id_1_h),
                        0);
 
-            assert_eq!(appendable_data_free(got_ad_h), 0);
+            assert_eq!(appendable_data_free(ad_h), 0);
         }
 
         // Verify the data items we got back are the same we put in.
@@ -877,7 +877,7 @@ mod tests {
             assert_eq!(appendable_data_append(&app0, ad_priv_h, immut_id_0_h), 0);
             assert_eq!(appendable_data_append(&app0, ad_priv_h, immut_id_1_h), 0);
 
-            let ad_priv_h = reload_ad(&app0, ad_id_h, ad_priv_h);
+            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
             assert_num_of_data!(ad_priv_h, 2);
 
             assert_eq!(appendable_data_nth_data_id(&app0, ad_priv_h, 0, &mut got_immut_id_0_h),
@@ -889,18 +889,21 @@ mod tests {
             assert_eq!(appendable_data_remove_nth_data(ad_priv_h, 0), 0);
             assert_eq!(appendable_data_post(&app0, ad_priv_h, true), 0);
 
-            let ad_priv_h = reload_ad(&app0, ad_id_h, ad_priv_h);
+            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
             assert_num_of_data!(ad_priv_h, 1);
             assert_num_of_deleted_data!(ad_priv_h, 1);
 
             let mut deleted_data_h = 0;
-            assert_eq!(appendable_data_nth_deleted_data_id(&app0, ad_priv_h, 0, &mut deleted_data_h),
+            assert_eq!(appendable_data_nth_deleted_data_id(&app0,
+                                                           ad_priv_h,
+                                                           0,
+                                                           &mut deleted_data_h),
                        0);
 
             assert_eq!(appendable_data_restore_nth_deleted_data(ad_priv_h, 0), 0);
             assert_eq!(appendable_data_post(&app0, ad_priv_h, true), 0);
 
-            let ad_priv_h = reload_ad(&app0, ad_id_h, ad_priv_h);
+            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
             assert_num_of_data!(ad_priv_h, 2);
             assert_num_of_deleted_data!(ad_priv_h, 0);
 
@@ -976,14 +979,14 @@ mod tests {
             assert_eq!(appendable_data_append(&app, ad_h, immut_id_1_h), 0);
 
             // GET it back.
-            let ad_h = reload_ad(&app, ad_id_h, ad_h);
+            reload_ad(&app, ad_id_h, &mut ad_h);
             assert_num_of_data!(ad_h, 2);
 
             // Try to remove one of available versions first
             assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
             assert_eq!(appendable_data_post(&app, ad_h, true), 0);
 
-            let ad_h = reload_ad(&app, ad_id_h, ad_h);
+            reload_ad(&app, ad_id_h, &mut ad_h);
             assert_num_of_data!(ad_h, 1);
             assert_num_of_deleted_data!(ad_h, 1);
 
@@ -991,7 +994,7 @@ mod tests {
             assert_eq!(appendable_data_restore_nth_deleted_data(ad_h, 0), 0);
             assert_eq!(appendable_data_post(&app, ad_h, true), 0);
 
-            let ad_h = reload_ad(&app, ad_id_h, ad_h);
+            reload_ad(&app, ad_id_h, &mut ad_h);
             assert_num_of_data!(ad_h, 2);
 
             // Permanently delete data
@@ -999,7 +1002,7 @@ mod tests {
             assert_eq!(appendable_data_remove_nth_deleted_data(ad_h, 0), 0);
             assert_eq!(appendable_data_post(&app, ad_h, true), 0);
 
-            let ad_h = reload_ad(&app, ad_id_h, ad_h);
+            reload_ad(&app, ad_id_h, &mut ad_h);
             assert_num_of_deleted_data!(ad_h, 0);
 
             // clear the data and POST it.
@@ -1007,7 +1010,7 @@ mod tests {
             assert_eq!(appendable_data_post(&app, ad_h, false), 0);
 
             // GET it back.
-            let ad_h = reload_ad(&app, ad_id_h, ad_h);
+            reload_ad(&app, ad_id_h, &mut ad_h);
             assert_num_of_data!(ad_h, 0);
             assert_num_of_deleted_data!(ad_h, 2);
 
@@ -1015,7 +1018,7 @@ mod tests {
             assert_eq!(appendable_data_clear_deleted_data(ad_h), 0);
             assert_eq!(appendable_data_post(&app, ad_h, false), 0);
 
-            let ad_h = reload_ad(&app, ad_id_h, ad_h);
+            reload_ad(&app, ad_id_h, &mut ad_h);
             assert_num_of_deleted_data!(ad_h, 0);
 
             assert_eq!(appendable_data_free(ad_h), 0);
@@ -1041,7 +1044,8 @@ mod tests {
 
             // Initialise private appendable data
             let mut ad_h = 0;
-            assert_eq!(appendable_data_new_priv(&app, &rand::random(), &mut ad_h), 0);
+            assert_eq!(appendable_data_new_priv(&app, &rand::random(), &mut ad_h),
+                       0);
 
             assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h), 0);
 
@@ -1066,13 +1070,14 @@ mod tests {
 
         unsafe {
             // Create test data
-            assert_eq!(appendable_data_new_pub(&app0, &rand::random(), &mut ad_h), 0);
+            assert_eq!(appendable_data_new_pub(&app0, &rand::random(), &mut ad_h),
+                       0);
             assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
 
             assert_eq!(appendable_data_put(&app0, ad_h), 0);
             assert_eq!(appendable_data_append(&app1, ad_h, immut_id_0_h), 0);
 
-            let ad_h = reload_ad(&app0, ad_id_h, ad_h);
+            reload_ad(&app0, ad_id_h, &mut ad_h);
 
             // Get a data key of app1
             let mut sign_key_h = 0;
@@ -1084,10 +1089,13 @@ mod tests {
             // Now try to get a data key from deleted data
             assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
             assert_eq!(appendable_data_post(&app0, ad_h, true), 0);
-            let ad_h = reload_ad(&app0, ad_id_h, ad_h);
+            reload_ad(&app0, ad_id_h, &mut ad_h);
 
             let mut deleted_sk_h = 0;
-            assert_eq!(appendable_data_nth_deleted_data_sign_key(&app0, ad_h, 0, &mut deleted_sk_h),
+            assert_eq!(appendable_data_nth_deleted_data_sign_key(&app0,
+                                                                 ad_h,
+                                                                 0,
+                                                                 &mut deleted_sk_h),
                        0);
             assert_eq!(*unwrap!(unwrap!(object_cache()).get_sign_key(deleted_sk_h)),
                        sign_key1);
@@ -1120,12 +1128,10 @@ mod tests {
         unwrap!(client.get_public_signing_key()).clone()
     }
 
-    fn reload_ad(app: &App, ad_id_h: DataIdHandle, ad_h: AppendableDataHandle) -> AppendableDataHandle {
-        let mut new_ad_h = 0;
+    fn reload_ad(app: &App, ad_id_h: DataIdHandle, ad_h: &mut AppendableDataHandle) {
+        assert_eq!(appendable_data_free(*ad_h), 0);
         unsafe {
-            assert_eq!(appendable_data_get(app, ad_id_h, &mut new_ad_h), 0);
+            assert_eq!(appendable_data_get(app, ad_id_h, ad_h), 0);
         }
-        assert_eq!(appendable_data_free(ad_h), 0);
-        new_ad_h
     }
 }
