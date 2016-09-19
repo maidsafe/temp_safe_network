@@ -28,7 +28,7 @@ use std::collections::BTreeSet;
 use std::iter;
 
 /// Wrapper for PrivAppendableData and PubAppendableData.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum AppendableData {
     /// Public appendable data.
     Pub(PubAppendableData),
@@ -640,18 +640,18 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
             let sign_sk = ffi_try!(client.get_secret_signing_key());
 
             let appended_data = ffi_try!(AppendedData::new(data_id, *sign_pk, sign_sk)
-                .map_err(CoreError::from));
+                                             .map_err(CoreError::from));
 
             match *ffi_try!(object_cache.get_ad(ad_h)) {
                 AppendableData::Priv(ref elt) => {
                     let priv_appended_data = ffi_try!(PrivAppendedData::new(&appended_data,
                                                                             &elt.encrypt_key)
-                        .map_err(CoreError::from));
+                                                          .map_err(CoreError::from));
                     ffi_try!(AppendWrapper::new_priv(elt.name,
                                                      priv_appended_data,
                                                      (sign_pk, sign_sk),
                                                      elt.version)
-                        .map_err(CoreError::from))
+                                 .map_err(CoreError::from))
                 }
                 AppendableData::Pub(ref elt) => {
                     AppendWrapper::new_pub(elt.name, appended_data, elt.version)
@@ -684,7 +684,9 @@ fn nth<T>(items: &BTreeSet<T>, n: usize) -> Result<&T, FfiError> {
 #[cfg(test)]
 mod tests {
     use ffi::app::App;
+    use ffi::errors::FfiError;
     use ffi::low_level_api::{AppendableDataHandle, DataIdHandle};
+    use ffi::low_level_api::misc::*;
     use ffi::low_level_api::object_cache::object_cache;
     use ffi::test_utils;
     use rand;
@@ -693,6 +695,22 @@ mod tests {
     use std::collections::HashSet;
     use super::*;
 
+    macro_rules! assert_num_of_data {
+        ($ad_h:ident, $expected:expr) => {
+            let mut num: usize = 0;
+            assert_eq!(appendable_data_num_of_data($ad_h, &mut num), 0);
+            assert_eq!(num, $expected);
+        }
+    }
+
+    macro_rules! assert_num_of_deleted_data {
+        ($ad_h:ident, $expected:expr) => {
+            let mut num: usize = 0;
+            assert_eq!(appendable_data_num_of_deleted_data($ad_h, &mut num), 0);
+            assert_eq!(num, $expected);
+        }
+    }
+
     #[test]
     fn put_append_and_get() {
         let app = test_utils::create_app(false);
@@ -700,8 +718,6 @@ mod tests {
         let ad_name = rand::random();
         let mut ad_h: AppendableDataHandle = 0;
         let mut ad_id_h: DataIdHandle = 0;
-
-        let mut got_ad_h: AppendableDataHandle = 0;
 
         // Data to append
         let (_, immut_id_0_h) = generate_random_immutable_data_id();
@@ -724,16 +740,15 @@ mod tests {
             assert_eq!(appendable_data_append(&app, ad_h, immut_id_1_h), 0);
 
             // GET back
-            assert_eq!(appendable_data_get(&app, ad_id_h, &mut got_ad_h), 0);
+            reload_ad(&app, ad_id_h, &mut ad_h);
+            assert_num_of_data!(ad_h, 2);
 
-            let mut num: usize = 0;
-            assert_eq!(appendable_data_num_of_data(got_ad_h, &mut num), 0);
-            assert_eq!(num, 2);
+            assert_eq!(appendable_data_nth_data_id(&app, ad_h, 0, &mut got_immut_id_0_h),
+                       0);
+            assert_eq!(appendable_data_nth_data_id(&app, ad_h, 1, &mut got_immut_id_1_h),
+                       0);
 
-            assert_eq!(appendable_data_nth_data_id(&app, got_ad_h, 0, &mut got_immut_id_0_h),
-                       0);
-            assert_eq!(appendable_data_nth_data_id(&app, got_ad_h, 1, &mut got_immut_id_1_h),
-                       0);
+            assert_eq!(appendable_data_free(ad_h), 0);
         }
 
         // Verify the data items we got back are the same we put in.
@@ -750,9 +765,6 @@ mod tests {
 
             assert_eq!(orig, got);
         }
-
-        assert_eq!(appendable_data_free(ad_h), 0);
-        assert_eq!(appendable_data_free(got_ad_h), 0);
     }
 
     #[test]
@@ -761,7 +773,7 @@ mod tests {
         let app1 = test_utils::create_app(false);
         let app2 = test_utils::create_app(false);
 
-        let (sk1_h, _sk2_h) = {
+        let (sign_key1_h, _sign_key2_h) = {
             let mut object_cache = unwrap!(object_cache());
             (object_cache.insert_sign_key(get_sign_pk(&app1)),
              object_cache.insert_sign_key(get_sign_pk(&app2)))
@@ -794,11 +806,15 @@ mod tests {
             assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
             assert_eq!(filter_type, FilterType::BlackList);
 
-            assert_eq!(appendable_data_insert_to_filter(ad_h, sk1_h), 0);
+            assert_eq!(appendable_data_insert_to_filter(ad_h, sign_key1_h), 0);
             assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
 
             assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
             assert_eq!(appendable_data_append(&app2, ad_h, immut_id_2_h), 0);
+
+            assert_eq!(appendable_data_remove_from_filter(ad_h, sign_key1_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
+            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
         }
 
         // Set whitelist
@@ -810,12 +826,135 @@ mod tests {
             assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
 
             assert_eq!(filter_type, FilterType::WhiteList);
-            assert_eq!(appendable_data_insert_to_filter(ad_h, sk1_h), 0);
+            assert_eq!(appendable_data_insert_to_filter(ad_h, sign_key1_h), 0);
             assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
 
             assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
             assert!(appendable_data_append(&app2, ad_h, immut_id_2_h) != 0);
+
+            assert_eq!(appendable_data_remove_from_filter(ad_h, sign_key1_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
+            assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
+
+            // Toggle filter and ensure it's blacklist again
+            assert_eq!(appendable_data_toggle_filter(ad_h), 0);
+            assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
+            assert_eq!(filter_type, FilterType::BlackList);
         }
+    }
+
+    #[test]
+    fn priv_appendable_data() {
+        let app0 = test_utils::create_app(false);
+        let app1 = test_utils::create_app(false);
+        let app2 = test_utils::create_app(false);
+
+        let ad_name = rand::random();
+        let mut ad_priv_h: AppendableDataHandle = 0;
+        let mut ad_id_h: DataIdHandle = 0;
+
+        // Data to append
+        let (_, immut_id_0_h) = generate_random_immutable_data_id();
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+
+        // Generate keys for extra test apps
+        let (sign_key1_h, sign_key2_h) = {
+            let mut object_cache = unwrap!(object_cache());
+            (object_cache.insert_sign_key(get_sign_pk(&app1)),
+             object_cache.insert_sign_key(get_sign_pk(&app2)))
+        };
+
+        let mut got_immut_id_0_h: DataIdHandle = 0;
+        let mut got_immut_id_1_h: DataIdHandle = 0;
+
+        unsafe {
+            // Create
+            assert_eq!(appendable_data_new_priv(&app0, &ad_name, &mut ad_priv_h), 0);
+            assert_eq!(appendable_data_extract_data_id(ad_priv_h, &mut ad_id_h), 0);
+
+            // Test PUT requests for private data
+            assert_eq!(appendable_data_put(&app0, ad_priv_h), 0);
+            assert_eq!(appendable_data_append(&app0, ad_priv_h, immut_id_0_h), 0);
+            assert_eq!(appendable_data_append(&app0, ad_priv_h, immut_id_1_h), 0);
+
+            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
+            assert_num_of_data!(ad_priv_h, 2);
+
+            assert_eq!(appendable_data_nth_data_id(&app0, ad_priv_h, 0, &mut got_immut_id_0_h),
+                       0);
+            assert_eq!(appendable_data_nth_data_id(&app0, ad_priv_h, 1, &mut got_immut_id_1_h),
+                       0);
+
+            // Delete and restore private appendable data
+            assert_eq!(appendable_data_remove_nth_data(ad_priv_h, 0), 0);
+            assert_eq!(appendable_data_post(&app0, ad_priv_h, true), 0);
+
+            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
+            assert_num_of_data!(ad_priv_h, 1);
+            assert_num_of_deleted_data!(ad_priv_h, 1);
+
+            let mut deleted_data_h = 0;
+            assert_eq!(appendable_data_nth_deleted_data_id(&app0,
+                                                           ad_priv_h,
+                                                           0,
+                                                           &mut deleted_data_h),
+                       0);
+
+            assert_eq!(appendable_data_restore_nth_deleted_data(ad_priv_h, 0), 0);
+            assert_eq!(appendable_data_post(&app0, ad_priv_h, true), 0);
+
+            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
+            assert_num_of_data!(ad_priv_h, 2);
+            assert_num_of_deleted_data!(ad_priv_h, 0);
+
+            // Other apps can append new data
+            assert_eq!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h), 0);
+            assert_eq!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h), 0);
+
+            // Check blacklist filter for private appendable data
+            let mut filter_type = FilterType::BlackList;
+
+            assert_eq!(appendable_data_filter_type(ad_priv_h, &mut filter_type), 0);
+            assert_eq!(filter_type, FilterType::BlackList);
+
+            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sign_key1_h), 0);
+            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sign_key2_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_priv_h, false), 0);
+
+            assert!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h) != 0);
+            assert!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h) != 0);
+
+            // Check whitelist filter for private data
+            assert_eq!(appendable_data_toggle_filter(ad_priv_h), 0);
+            assert_eq!(appendable_data_filter_type(ad_priv_h, &mut filter_type), 0);
+
+            assert_eq!(filter_type, FilterType::WhiteList);
+            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sign_key2_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_priv_h, false), 0);
+
+            assert_eq!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h), 0);
+            assert!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h) != 0);
+
+            assert_eq!(appendable_data_free(ad_priv_h), 0);
+        }
+
+        // Verify the data items we got back are the same we put in.
+        {
+            let mut object_cache = unwrap!(object_cache());
+
+            let mut orig = HashSet::with_capacity(2);
+            let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_0_h)));
+            let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_1_h)));
+
+            let mut got = HashSet::with_capacity(2);
+            let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_0_h)));
+            let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_1_h)));
+
+            assert_eq!(orig, got);
+        }
+
+        assert_eq!(misc_sign_key_free(sign_key1_h), 0);
+        assert_eq!(misc_sign_key_free(sign_key2_h), 0);
     }
 
     #[test]
@@ -838,23 +977,139 @@ mod tests {
             // Append stuff to it.
             assert_eq!(appendable_data_append(&app, ad_h, immut_id_0_h), 0);
             assert_eq!(appendable_data_append(&app, ad_h, immut_id_1_h), 0);
-            assert_eq!(appendable_data_free(ad_h), 0);
 
             // GET it back.
-            assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
+            reload_ad(&app, ad_id_h, &mut ad_h);
+            assert_num_of_data!(ad_h, 2);
+
+            // Try to remove one of available versions first
+            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+
+            reload_ad(&app, ad_id_h, &mut ad_h);
+            assert_num_of_data!(ad_h, 1);
+            assert_num_of_deleted_data!(ad_h, 1);
+
+            // Try restoring deleted data
+            assert_eq!(appendable_data_restore_nth_deleted_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+
+            reload_ad(&app, ad_id_h, &mut ad_h);
+            assert_num_of_data!(ad_h, 2);
+
+            // Permanently delete data
+            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_remove_nth_deleted_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+
+            reload_ad(&app, ad_id_h, &mut ad_h);
+            assert_num_of_deleted_data!(ad_h, 0);
 
             // clear the data and POST it.
             assert_eq!(appendable_data_clear_data(ad_h), 0);
             assert_eq!(appendable_data_post(&app, ad_h, false), 0);
-            assert_eq!(appendable_data_free(ad_h), 0);
 
             // GET it back.
-            assert_eq!(appendable_data_get(&app, ad_id_h, &mut ad_h), 0);
+            reload_ad(&app, ad_id_h, &mut ad_h);
+            assert_num_of_data!(ad_h, 0);
+            assert_num_of_deleted_data!(ad_h, 2);
 
-            let mut num: usize = 0;
-            assert_eq!(appendable_data_num_of_data(ad_h, &mut num), 0);
-            assert_eq!(num, 0);
+            // Permanently clear deleted data
+            assert_eq!(appendable_data_clear_deleted_data(ad_h), 0);
+            assert_eq!(appendable_data_post(&app, ad_h, false), 0);
+
+            reload_ad(&app, ad_id_h, &mut ad_h);
+            assert_num_of_deleted_data!(ad_h, 0);
+
+            assert_eq!(appendable_data_free(ad_h), 0);
         }
+    }
+
+    #[test]
+    fn data_encrypt_key() {
+        let app = test_utils::create_app(false);
+
+        let mut encrypt_key_h = 0;
+
+        unsafe {
+            // Initialise public appendable data
+            let mut ad_h = 0;
+            assert_eq!(appendable_data_new_pub(&app, &rand::random(), &mut ad_h), 0);
+
+            // Public appendable data doens't have a private owner key
+            assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h),
+                       FfiError::UnsupportedOperation.into());
+
+            assert_eq!(appendable_data_free(ad_h), 0);
+
+            // Initialise private appendable data
+            let mut ad_h = 0;
+            assert_eq!(appendable_data_new_priv(&app, &rand::random(), &mut ad_h),
+                       0);
+
+            assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h), 0);
+
+            assert_eq!(misc_encrypt_key_free(encrypt_key_h), 0);
+        }
+    }
+
+    #[test]
+    fn data_sign_key() {
+        let app0 = test_utils::create_app(false);
+        let app1 = test_utils::create_app(false);
+
+        let sign_key1 = get_sign_pk(&app1);
+        let sign_key1_h = unwrap!(object_cache()).insert_sign_key(sign_key1);
+
+        let mut ad_h = 0;
+        let mut ad_id_h: DataIdHandle = 0;
+
+        // Data to append
+        let (_, immut_id_0_h) = generate_random_immutable_data_id();
+        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+
+        unsafe {
+            // Create test data
+            assert_eq!(appendable_data_new_pub(&app0, &rand::random(), &mut ad_h),
+                       0);
+            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
+
+            assert_eq!(appendable_data_put(&app0, ad_h), 0);
+            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_0_h), 0);
+
+            reload_ad(&app0, ad_id_h, &mut ad_h);
+
+            // Get a data key of app1
+            let mut sign_key_h = 0;
+            assert_eq!(appendable_data_nth_data_sign_key(&app0, ad_h, 0, &mut sign_key_h),
+                       0);
+            assert_eq!(*unwrap!(unwrap!(object_cache()).get_sign_key(sign_key_h)),
+                       sign_key1);
+
+            // Now try to get a data key from deleted data
+            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h, true), 0);
+            reload_ad(&app0, ad_id_h, &mut ad_h);
+
+            let mut deleted_sk_h = 0;
+            assert_eq!(appendable_data_nth_deleted_data_sign_key(&app0,
+                                                                 ad_h,
+                                                                 0,
+                                                                 &mut deleted_sk_h),
+                       0);
+            assert_eq!(*unwrap!(unwrap!(object_cache()).get_sign_key(deleted_sk_h)),
+                       sign_key1);
+
+            // Filter out the key that we've got for an app1
+            assert_eq!(appendable_data_insert_to_filter(ad_h, deleted_sk_h), 0);
+            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
+
+            assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
+
+            assert_eq!(appendable_data_free(ad_h), 0);
+        }
+
+        assert_eq!(misc_sign_key_free(sign_key1_h), 0);
     }
 
     fn generate_random_immutable_data_id() -> (DataIdentifier, DataIdHandle) {
@@ -871,5 +1126,12 @@ mod tests {
         let client = app.get_client();
         let client = unwrap!(client.lock());
         unwrap!(client.get_public_signing_key()).clone()
+    }
+
+    fn reload_ad(app: &App, ad_id_h: DataIdHandle, ad_h: &mut AppendableDataHandle) {
+        assert_eq!(appendable_data_free(*ad_h), 0);
+        unsafe {
+            assert_eq!(appendable_data_get(app, ad_id_h, ad_h), 0);
+        }
     }
 }

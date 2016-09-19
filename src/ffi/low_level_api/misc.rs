@@ -179,12 +179,147 @@ pub extern "C" fn misc_object_cache_reset() {
 
 #[cfg(test)]
 mod tests {
+    use core::utility;
+    use ffi::low_level_api::appendable_data::*;
+    use ffi::low_level_api::cipher_opt::*;
     use ffi::low_level_api::data_id::*;
+    use ffi::low_level_api::struct_data::*;
     use ffi::low_level_api::object_cache::object_cache;
+    use ffi::test_utils;
     use rand;
     use routing::DataIdentifier;
+    use std::hash::{Hash, Hasher, SipHasher};
     use std::ptr;
     use super::*;
+
+    #[test]
+    fn appendable_data_serialisation() {
+        let app = test_utils::create_app(true);
+
+        let mut ad_pub_h = 0;
+        let mut ad_priv_h = 0;
+
+        // Initialise mock appendable data
+        unsafe {
+            let ad_name = rand::random();
+            assert_eq!(appendable_data_new_pub(&app, &ad_name, &mut ad_pub_h), 0);
+
+            let ad_name = rand::random();
+            assert_eq!(appendable_data_new_priv(&app, &ad_name, &mut ad_priv_h), 0);
+        }
+
+        // Test pub appendable data
+        unsafe {
+            let mut data_ptr: *mut u8 = ptr::null_mut();
+            let mut data_size = 0;
+            let mut capacity = 0;
+            assert_eq!(misc_serialise_appendable_data(ad_pub_h,
+                                                      &mut data_ptr,
+                                                      &mut data_size,
+                                                      &mut capacity),
+                       0);
+
+            let mut appendable_data_h = 0;
+            assert_eq!(misc_deserialise_appendable_data(data_ptr, data_size, &mut appendable_data_h),
+                       0);
+            assert!(appendable_data_h != ad_pub_h);
+
+            {
+                let mut object_cache = unwrap!(object_cache());
+                let before = hash(unwrap!(object_cache.get_ad(ad_pub_h)));
+                let after = hash(unwrap!(object_cache.get_ad(appendable_data_h)));
+
+                assert_eq!(before, after);
+            }
+
+            assert_eq!(appendable_data_free(appendable_data_h), 0);
+            misc_u8_ptr_free(data_ptr, data_size, capacity);
+        }
+
+        // Test priv appendable data
+        unsafe {
+            let mut data_ptr: *mut u8 = ptr::null_mut();
+            let mut data_size = 0;
+            let mut capacity = 0;
+            assert_eq!(misc_serialise_appendable_data(ad_priv_h,
+                                                      &mut data_ptr,
+                                                      &mut data_size,
+                                                      &mut capacity),
+                       0);
+
+            let mut appendable_data_h = 0;
+            assert_eq!(misc_deserialise_appendable_data(data_ptr, data_size, &mut appendable_data_h),
+                       0);
+            assert!(appendable_data_h != ad_priv_h);
+
+            {
+                let mut object_cache = unwrap!(object_cache());
+                let before = hash(unwrap!(object_cache.get_ad(ad_priv_h)));
+                let after = hash(unwrap!(object_cache.get_ad(appendable_data_h)));
+
+                assert_eq!(before, after);
+            }
+
+            assert_eq!(appendable_data_free(appendable_data_h), 0);
+            misc_u8_ptr_free(data_ptr, data_size, capacity);
+        }
+
+        assert_eq!(appendable_data_free(ad_priv_h), 0);
+        assert_eq!(appendable_data_free(ad_pub_h), 0);
+    }
+
+    #[test]
+    fn structured_data_serialisation() {
+        let app = test_utils::create_app(true);
+
+        let mut cipher_opt_h = 0;
+        let mut sd_h = 0;
+
+        // Initialise mock structured data
+        unsafe {
+            let sd_id = rand::random();
+            let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
+
+            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_h), 0);
+
+            assert_eq!(struct_data_new(&app,
+                                       ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
+                                       &sd_id,
+                                       cipher_opt_h,
+                                       plain_text.as_ptr(),
+                                       plain_text.len(),
+                                       &mut sd_h), 0);
+        }
+
+        unsafe {
+            let mut data_ptr: *mut u8 = ptr::null_mut();
+            let mut data_size = 0;
+            let mut capacity = 0;
+            assert_eq!(misc_serialise_struct_data(sd_h,
+                                                  &mut data_ptr,
+                                                  &mut data_size,
+                                                  &mut capacity),
+                       0);
+
+            let mut struct_data_h = 0;
+            assert_eq!(misc_deserialise_struct_data(data_ptr, data_size, &mut struct_data_h),
+                       0);
+            assert!(struct_data_h != sd_h);
+
+            {
+                let mut object_cache = unwrap!(object_cache());
+                let before = hash(unwrap!(object_cache.get_sd(sd_h)));
+                let after = hash(unwrap!(object_cache.get_sd(struct_data_h)));
+
+                assert_eq!(before, after);
+            }
+
+            assert_eq!(struct_data_free(struct_data_h), 0);
+            misc_u8_ptr_free(data_ptr, data_size, capacity);
+        }
+
+        assert_eq!(struct_data_free(sd_h), 0);
+    }
 
     #[test]
     fn data_id_serialisation() {
@@ -290,5 +425,11 @@ mod tests {
         assert_eq!(data_id_free(sd_data_id_h), 0);
         assert_eq!(data_id_free(id_data_id_h), 0);
         assert_eq!(data_id_free(ad_data_id_h), 0);
+    }
+
+    fn hash<T: Hash>(t: &T) -> u64 {
+        let mut s = SipHasher::new();
+        t.hash(&mut s);
+        s.finish()
     }
 }

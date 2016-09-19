@@ -251,3 +251,21 @@ impl Default for ObjectCache {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand;
+    use routing::DataIdentifier;
+
+    #[test]
+    fn reset() {
+        let mut object_cache = ObjectCache::default();
+
+        let handle = object_cache.insert_data_id(DataIdentifier::Immutable(rand::random()));
+        assert!(object_cache.get_data_id(handle).is_ok());
+
+        object_cache.reset();
+        assert!(object_cache.data_id.is_empty());
+    }
+}
