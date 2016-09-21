@@ -457,6 +457,23 @@ pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle,
     })
 }
 
+/// Returns true if the app is one of the owners of the provided StructuredData.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_is_owned(app: *const App,
+                                       handle: StructDataHandle,
+                                       o_is_owned: *mut bool) -> i32 {
+    helper::catch_unwind_i32(|| {
+        let client = (*app).get_client();
+        let my_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
+
+        *o_is_owned = ffi_try!(unwrap!(object_cache()).get_sd(handle))
+            .get_owner_keys()
+            .contains(&my_key);
+
+        0
+    })
+}
+
 /// Free StructuredData handle
 #[no_mangle]
 pub extern "C" fn struct_data_free(handle: StructDataHandle) -> i32 {
@@ -557,6 +574,15 @@ mod tests {
                                                    &mut capacity),
                            FfiError::InvalidStructuredDataTypeTag.into());
             }
+
+            // Check StructData owners
+            let mut is_owned = false;
+            assert_eq!(struct_data_is_owned(&app, sd_h, &mut is_owned), 0);
+            assert_eq!(is_owned, true);
+
+            let app_fake = test_utils::create_app(false);
+            assert_eq!(struct_data_is_owned(&app_fake, sd_h, &mut is_owned), 0);
+            assert_eq!(is_owned, false);
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
