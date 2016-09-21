@@ -449,11 +449,10 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
 
 /// Get the current version of StructuredData by its handle
 #[no_mangle]
-pub extern "C" fn struct_data_version(handle: StructDataHandle, o_version: *mut u64) -> i32 {
+pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle,
+                                             o_version: *mut u64) -> i32 {
     helper::catch_unwind_i32(|| {
-        unsafe {
-            *o_version = ffi_try!(unwrap!(object_cache()).get_sd(handle)).get_version();
-        }
+        *o_version = ffi_try!(unwrap!(object_cache()).get_sd(handle)).get_version();
         0
     })
 }

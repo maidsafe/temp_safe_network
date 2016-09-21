@@ -438,7 +438,7 @@ mod test {
             ::<SelfEncryptionStorageError>(SelfEncryptionStorageError(Box::new(core_err_0)));
         let core_from_se_err = CoreError::from(se_err);
 
-        assert_eq!(<CoreError as Into::<i32>>::into(core_err_1),
-                   <CoreError as Into::<i32>>::into(core_from_se_err));
+        assert_eq!(<CoreError as Into<i32>>::into(core_err_1),
+                   <CoreError as Into<i32>>::into(core_from_se_err));
     }
 }
