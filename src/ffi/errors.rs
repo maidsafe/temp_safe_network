@@ -17,13 +17,10 @@
 
 //! Errors thrown by the FFI operations
 
-// TODO - Purge unneeded errors (like JsonParseError etc.)
-
 use core::errors::CoreError;
 use dns::errors::{DNS_ERROR_START_RANGE, DnsError};
 use maidsafe_utilities::serialisation::SerialisationError;
 use nfs::errors::NfsError;
-use rustc_serialize::{base64, json};
 use std::ffi::NulError;
 use std::fmt;
 
@@ -46,16 +43,6 @@ pub enum FfiError {
     InvalidPath,
     /// Permission denied - e.g. permission to access SAFEDrive etc.
     PermissionDenied,
-    /// Could not parse payload as a valid JSON
-    JsonParseError(json::ParserError),
-    /// Could not decode valid JSON into expected Structures probably because a mandatory field was
-    /// missing or a field was wrongly named etc.
-    JsonDecodeError(json::DecoderError),
-    /// JSON non-conforming to the Launcher RFC and not covered by JsonDecodeError, e.g. things
-    /// like invalid base64 formatting, unreasonable/unexpected indexing, ranges etc.
-    SpecificParseError(String),
-    /// Error encoding into Json String
-    JsonEncodeError(json::EncoderError),
     /// Unable to Read from or Write to a Local Config file.
     LocalConfigAccessFailed(String),
     /// Unexpected - Probably a Logic error
@@ -123,30 +110,6 @@ impl From<DnsError> for FfiError {
     }
 }
 
-impl From<base64::FromBase64Error> for FfiError {
-    fn from(_: base64::FromBase64Error) -> FfiError {
-        FfiError::SpecificParseError("Base64 decode error".to_string())
-    }
-}
-
-impl From<json::ParserError> for FfiError {
-    fn from(error: json::ParserError) -> FfiError {
-        FfiError::JsonParseError(error)
-    }
-}
-
-impl From<json::EncoderError> for FfiError {
-    fn from(error: json::EncoderError) -> FfiError {
-        FfiError::JsonEncodeError(error)
-    }
-}
-
-impl From<json::DecoderError> for FfiError {
-    fn from(error: json::DecoderError) -> FfiError {
-        FfiError::JsonDecodeError(error)
-    }
-}
-
 impl From<NulError> for FfiError {
     fn from(error: NulError) -> Self {
         FfiError::NulError(error)
@@ -162,10 +125,6 @@ impl Into<i32> for FfiError {
             FfiError::PathNotFound => FFI_ERROR_START_RANGE - 1,
             FfiError::InvalidPath => FFI_ERROR_START_RANGE - 2,
             FfiError::PermissionDenied => FFI_ERROR_START_RANGE - 3,
-            FfiError::JsonParseError(_) => FFI_ERROR_START_RANGE - 4,
-            FfiError::JsonDecodeError(_) => FFI_ERROR_START_RANGE - 5,
-            FfiError::SpecificParseError(_) => FFI_ERROR_START_RANGE - 6,
-            FfiError::JsonEncodeError(_) => FFI_ERROR_START_RANGE - 7,
             FfiError::LocalConfigAccessFailed(_) => FFI_ERROR_START_RANGE - 8,
             FfiError::Unexpected(_) => FFI_ERROR_START_RANGE - 9,
             FfiError::UnsuccessfulEncodeDecode(_) => FFI_ERROR_START_RANGE - 10,
@@ -196,18 +155,6 @@ impl fmt::Debug for FfiError {
             FfiError::PathNotFound => write!(f, "FfiError::PathNotFound"),
             FfiError::InvalidPath => write!(f, "FfiError::InvalidPath"),
             FfiError::PermissionDenied => write!(f, "FfiError::PermissionDenied"),
-            FfiError::JsonParseError(ref error) => {
-                write!(f, "FfiError::JsonParseError -> {:?}", error)
-            }
-            FfiError::JsonDecodeError(ref error) => {
-                write!(f, "FfiError::JsonDecodeError -> {:?}", error)
-            }
-            FfiError::SpecificParseError(ref error) => {
-                write!(f, "FfiError::SpecificParseError -> {:?}", error)
-            }
-            FfiError::JsonEncodeError(ref error) => {
-                write!(f, "FfiError::JsonEncodeError -> {:?}", error)
-            }
             FfiError::LocalConfigAccessFailed(ref error) => {
                 write!(f, "FfiError::LocalConfigAccessFailed -> {:?}", error)
             }

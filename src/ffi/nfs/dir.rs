@@ -25,7 +25,7 @@ use libc::int32_t;
 use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG, VERSIONED_DIRECTORY_LISTING_TAG};
 use nfs::errors::NfsError;
 use nfs::helper::directory_helper::DirectoryHelper;
-use rustc_serialize::base64::FromBase64;
+use std::slice;
 use time;
 
 /// Create a new directory.
@@ -43,7 +43,7 @@ pub unsafe extern "C" fn nfs_create_dir(app_handle: *const App,
         trace!("FFI create directory, given the path.");
 
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
-        let user_metadata = ffi_try!(helper::c_utf8_to_str(user_metadata, user_metadata_len));
+        let user_metadata = slice::from_raw_parts(user_metadata, user_metadata_len);
 
         ffi_try!(create_dir(&*app_handle,
                             dir_path,
@@ -99,11 +99,10 @@ pub unsafe extern "C" fn nfs_modify_dir(app_handle: *const App,
                                         new_user_metadata_len: usize)
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
-        trace!("JSON modify directory, given the path.");
+        trace!("FFI modify directory, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
-        let new_user_metadata = ffi_try!(helper::c_utf8_to_opt_string(new_user_metadata,
-                                                                      new_user_metadata_len));
+        let new_user_metadata = helper::u8_ptr_to_opt_vec(new_user_metadata, new_user_metadata_len);
 
         ffi_try!(modify_dir(&*app_handle,
                             dir_path,
@@ -145,7 +144,7 @@ pub unsafe extern "C" fn nfs_move_dir(app_handle: *const App,
 
 fn create_dir(app: &App,
               dir_path: &str,
-              user_metadata: &str,
+              user_metadata: &[u8],
               is_private: bool,
               is_versioned: bool,
               is_shared: bool)
@@ -171,12 +170,9 @@ fn create_dir(app: &App,
         UNVERSIONED_DIRECTORY_LISTING_TAG
     };
 
-    let user_metadata = try!(parse_result!(user_metadata.from_base64(),
-                                           "Faild Converting from Base64."));
-
     let _ = try!(dir_helper.create(dir_to_create,
                                    tag,
-                                   user_metadata,
+                                   user_metadata.to_owned(),
                                    is_versioned,
                                    access_level,
                                    Some(&mut parent_sub_dir)));
@@ -212,7 +208,7 @@ fn modify_dir(app: &App,
               dir_path: &str,
               is_shared: bool,
               new_name: Option<String>,
-              new_metadata: Option<String>)
+              new_metadata: Option<Vec<u8>>)
               -> Result<(), FfiError> {
     if new_name.is_none() && new_metadata.is_none() {
         return Err(FfiError::from("Optional parameters could not be parsed"));
@@ -225,7 +221,6 @@ fn modify_dir(app: &App,
     }
 
     if let Some(metadata) = new_metadata {
-        let metadata = try!(parse_result!(metadata.from_base64(), "Failed to convert from base64"));
         dir_to_modify.get_mut_metadata().set_user_metadata(metadata);
     }
 
@@ -302,13 +297,10 @@ fn move_dir(app: &App,
 
 #[cfg(test)]
 mod test {
-
-    use ffi::{config, test_utils};
-
     use ffi::app::App;
+    use ffi::test_utils;
     use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
     use nfs::helper::directory_helper::DirectoryHelper;
-    use rustc_serialize::base64::ToBase64;
     use std::slice;
 
     fn create_test_dir(app: &App, name: &str) {
@@ -326,10 +318,9 @@ mod test {
     #[test]
     fn create_dir() {
         let app = test_utils::create_app(false);
-        let user_metadata = "InNhbXBsZSBtZXRhZGF0YSI=".to_string();
+        let user_metadata = "user metadata".as_bytes().to_vec();
 
         assert!(super::create_dir(&app, "/", &user_metadata, true, false, false).is_err());
-
         assert!(super::create_dir(&app,
                                   "/test_dir/secondlevel",
                                   &user_metadata,
@@ -337,11 +328,8 @@ mod test {
                                   false,
                                   false)
             .is_err());
-
         assert!(super::create_dir(&app, "/test_dir", &user_metadata, true, false, false).is_ok());
-
         assert!(super::create_dir(&app, "/test_dir2", &user_metadata, true, false, false).is_ok());
-
         assert!(super::create_dir(&app,
                                   "/test_dir/secondlevel",
                                   &user_metadata,
@@ -431,7 +419,7 @@ mod test {
 
     #[test]
     fn dir_update_user_metadata() {
-        const METADATA_BASE64: &'static str = "c2FtcGxlIHRleHQ=";
+        const METADATA: &'static str = "user metadata";
 
         let app = test_utils::create_app(false);
         let dir_helper = DirectoryHelper::new(app.get_client());
@@ -448,15 +436,13 @@ mod test {
                                   "/test_dir",
                                   false,
                                   None,
-                                  Some(METADATA_BASE64.to_string()))
+                                  Some(METADATA.as_bytes().to_vec()))
             .is_ok());
 
         let dir_to_modify = unwrap!(dir_helper.get(dir_key));
         assert!(dir_to_modify.get_metadata().get_user_metadata().len() > 0);
-        assert_eq!(dir_to_modify.get_metadata()
-                       .get_user_metadata()
-                       .to_base64(config::get_base64_config()),
-                   METADATA_BASE64.to_string());
+        assert_eq!(dir_to_modify.get_metadata().get_user_metadata(),
+                   METADATA.as_bytes());
     }
 
     #[test]
