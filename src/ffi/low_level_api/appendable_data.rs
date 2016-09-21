@@ -666,6 +666,23 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
     })
 }
 
+/// Get the current version of AppendableData by its handle
+#[no_mangle]
+pub extern "C" fn appendable_data_version(handle: AppendableDataHandle,
+                                          o_version: *mut u64)
+                                          -> i32 {
+    helper::catch_unwind_i32(|| {
+        unsafe {
+            *o_version = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
+                AppendableData::Pub(ref mut elt) => elt.get_version(),
+                AppendableData::Priv(ref mut elt) => elt.get_version(),
+            }
+        }
+
+        0
+    })
+}
+
 /// Free AppendableData handle
 #[no_mangle]
 pub extern "C" fn appendable_data_free(handle: AppendableDataHandle) -> i32 {

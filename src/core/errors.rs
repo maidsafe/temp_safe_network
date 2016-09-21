@@ -88,6 +88,8 @@ pub enum CoreError {
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
     /// The request has timed out
     RequestTimeout,
+    /// Invalid type tag for StructuredData
+    InvalidStructuredDataTypeTag,
 }
 
 impl<'a> From<&'a str> for CoreError {
@@ -207,6 +209,7 @@ impl Into<i32> for CoreError {
                                       ::Storage
                                       ::<SelfEncryptionStorageError>(
                                           SelfEncryptionStorageError(err))) => (*err).into(),
+            CoreError::InvalidStructuredDataTypeTag => CLIENT_ERROR_START_RANGE - 34,
         }
     }
 }
@@ -280,6 +283,9 @@ impl Debug for CoreError {
                 write!(formatter, "CoreError::SelfEncryption -> {:?}", error)
             }
             CoreError::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
+            CoreError::InvalidStructuredDataTypeTag => {
+                write!(formatter, "CoreError::InvalidStructuredDataTypeTag")
+            }
         }
     }
 }
@@ -355,6 +361,9 @@ impl Display for CoreError {
                 write!(formatter, "Self-encryption error: {}", error)
             }
             CoreError::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
+            CoreError::InvalidStructuredDataTypeTag => {
+                write!(formatter, "CoreError::InvalidStructuredDataTypeTag")
+            }
         }
     }
 }
@@ -385,6 +394,7 @@ impl Error for CoreError {
             CoreError::MutationFailure { ref reason, .. } => reason.description(),
             CoreError::SelfEncryption(ref error) => error.description(),
             CoreError::RequestTimeout => "Request has timed out",
+            CoreError::InvalidStructuredDataTypeTag => "Invalid Structured Data type tag",
         }
     }
 
@@ -428,7 +438,7 @@ mod test {
             ::<SelfEncryptionStorageError>(SelfEncryptionStorageError(Box::new(core_err_0)));
         let core_from_se_err = CoreError::from(se_err);
 
-        assert_eq!(<CoreError as Into<i32>>::into(core_err_1),
-                   <CoreError as Into<i32>>::into(core_from_se_err));
+        assert_eq!(<CoreError as Into::<i32>>::into(core_err_1),
+                   <CoreError as Into::<i32>>::into(core_from_se_err));
     }
 }
