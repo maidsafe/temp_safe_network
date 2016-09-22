@@ -46,7 +46,6 @@ impl DirectoryHelper {
     /// Returns (created_directory, Option<parent_directory's parent>)
     pub fn create(&self,
                   directory_name: String,
-                  tag_type: u64,
                   user_metadata: Vec<u8>,
                   versioned: bool,
                   access_level: AccessLevel,
@@ -65,7 +64,6 @@ impl DirectoryHelper {
 
         let directory =
             try!(DirectoryListing::new(directory_name,
-                                       tag_type,
                                        user_metadata,
                                        versioned,
                                        access_level,
@@ -197,7 +195,6 @@ impl DirectoryHelper {
         match root_directory_id {
             Some(id) => {
                 self.get(&DirectoryKey::new(id,
-                                            ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
                                             false,
                                             AccessLevel::Private))
             }
@@ -206,7 +203,6 @@ impl DirectoryHelper {
 
                 let (created_directory, _) =
                     try!(self.create(::nfs::ROOT_DIRECTORY_NAME.to_string(),
-                                     ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
                                      Vec::new(),
                                      false,
                                      AccessLevel::Private,
@@ -233,7 +229,6 @@ impl DirectoryHelper {
         let mut config_directory_listing = match config_dir_id {
             Some(id) => {
                 try!(self.get(&DirectoryKey::new(id,
-                                                 ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
                                                  false,
                                                  AccessLevel::Private)))
             }
@@ -242,7 +237,6 @@ impl DirectoryHelper {
 
                 let (created_directory, _) =
                     try!(self.create(::nfs::CONFIGURATION_DIRECTORY_NAME.to_string(),
-                                     ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
                                      Vec::new(),
                                      false,
                                      AccessLevel::Private,
@@ -266,7 +260,6 @@ impl DirectoryHelper {
                         configuration dir) - creating one.");
 
                 let (directory, _) = try!(self.create(directory_name,
-                                                      ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
                                                       Vec::new(),
                                                       false,
                                                       AccessLevel::Private,
@@ -425,7 +418,6 @@ mod test {
         let dir_helper = DirectoryHelper::new(client.clone());
         // Create a Directory
         let (mut directory, grand_parent) = unwrap!(dir_helper.create("DirName".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                     Vec::new(),
                     true,
                     AccessLevel::Private,
@@ -434,7 +426,6 @@ mod test {
         assert_eq!(directory, unwrap!(dir_helper.get(directory.get_key())));
         // Create a Child directory and update the parent_directory
         let (mut child_directory, grand_parent) = unwrap!(dir_helper.create("Child".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                     Vec::new(),
                     true,
                     AccessLevel::Private,
@@ -446,13 +437,11 @@ mod test {
 
         let (grand_child_directory, grand_parent) =
             unwrap!(dir_helper.create("Grand Child".to_string(),
-                                      ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                                       Vec::new(),
                                       true,
                                       AccessLevel::Private,
                                       Some(&mut child_directory)));
         assert!(dir_helper.create("Grand Child".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                     Vec::new(),
                     true,
                     AccessLevel::Private,
@@ -474,7 +463,6 @@ mod test {
             let client = Arc::new(Mutex::new(test_client));
             let dir_helper = DirectoryHelper::new(client.clone());
             let (directory, _) = unwrap!(dir_helper.create("PublicDirectory".to_string(),
-                        ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                         vec![2u8, 10],
                         true,
                         AccessLevel::Public,
@@ -498,7 +486,6 @@ mod test {
             let client = Arc::new(Mutex::new(test_client));
             let dir_helper = DirectoryHelper::new(client.clone());
             let (directory, _) = unwrap!(dir_helper.create("PublicDirectory".to_string(),
-                        ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
                         vec![2u8, 10],
                         false,
                         AccessLevel::Public,
@@ -522,7 +509,6 @@ mod test {
 
         let mut root_dir = unwrap!(dir_helper.get_user_root_directory_listing());
         let (created_dir, _) = unwrap!(dir_helper.create("DirName".to_string(),
-                                                         ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                                                          Vec::new(),
                                                          true,
                                                          AccessLevel::Private,
@@ -551,7 +537,6 @@ mod test {
         let dir_helper = DirectoryHelper::new(client.clone());
 
         let (mut dir_listing, _) = unwrap!(dir_helper.create("DirName2".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                     Vec::new(),
                     true,
                     AccessLevel::Private,
@@ -590,7 +575,6 @@ mod test {
         let dir_helper = DirectoryHelper::new(client.clone());
         // Create a Directory
         let (mut directory, grand_parent) = unwrap!(dir_helper.create("DirName".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                     Vec::new(),
                     true,
                     AccessLevel::Private,
@@ -599,7 +583,6 @@ mod test {
         assert_eq!(directory, unwrap!(dir_helper.get(directory.get_key())));
         // Create a Child directory and update the parent_directory
         let (mut child_directory, grand_parent) = unwrap!(dir_helper.create("Child".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                     Vec::new(),
                     true,
                     AccessLevel::Private,
@@ -611,7 +594,6 @@ mod test {
 
         let (grand_child_directory, grand_parent) =
             unwrap!(dir_helper.create("Grand Child".to_string(),
-                                      ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
                                       Vec::new(),
                                       true,
                                       AccessLevel::Private,

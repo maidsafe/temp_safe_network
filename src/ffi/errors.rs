@@ -94,7 +94,10 @@ impl<'a> From<&'a str> for FfiError {
 
 impl From<CoreError> for FfiError {
     fn from(error: CoreError) -> FfiError {
-        FfiError::CoreError(Box::new(error))
+        match error {
+            CoreError::InvalidStructuredDataTypeTag => FfiError::InvalidStructuredDataTypeTag,
+            _ => FfiError::CoreError(Box::new(error)),
+        }
     }
 }
 

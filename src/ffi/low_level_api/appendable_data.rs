@@ -666,6 +666,39 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
     })
 }
 
+/// Get the current version of AppendableData by its handle
+#[no_mangle]
+pub unsafe extern "C" fn appendable_data_version(handle: AppendableDataHandle,
+                                                 o_version: *mut u64)
+                                                 -> i32 {
+    helper::catch_unwind_i32(|| {
+        *o_version = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
+            AppendableData::Pub(ref mut elt) => elt.get_version(),
+            AppendableData::Priv(ref mut elt) => elt.get_version(),
+        };
+
+        0
+    })
+}
+
+/// Returns true if the app is one of the owners of the provided AppendableData.
+#[no_mangle]
+pub unsafe extern "C" fn appendable_data_is_owned(app: *const App,
+                                                  handle: AppendableDataHandle,
+                                                  o_is_owned: *mut bool) -> i32 {
+    helper::catch_unwind_i32(|| {
+        let client = (*app).get_client();
+        let my_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
+
+        *o_is_owned = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
+            AppendableData::Pub(ref mut elt) => elt.get_owner_keys().contains(&my_key),
+            AppendableData::Priv(ref mut elt) => elt.get_owner_keys().contains(&my_key),
+        };
+
+        0
+    })
+}
+
 /// Free AppendableData handle
 #[no_mangle]
 pub extern "C" fn appendable_data_free(handle: AppendableDataHandle) -> i32 {
@@ -747,6 +780,16 @@ mod tests {
                        0);
             assert_eq!(appendable_data_nth_data_id(&app, ad_h, 1, &mut got_immut_id_1_h),
                        0);
+
+            let mut is_owner = false;
+
+            // Check owners
+            assert_eq!(appendable_data_is_owned(&app, ad_h, &mut is_owner), 0);
+            assert_eq!(is_owner, true);
+
+            let app_fake = test_utils::create_app(false);
+            assert_eq!(appendable_data_is_owned(&app_fake, ad_h, &mut is_owner), 0);
+            assert_eq!(is_owner, false);
 
             assert_eq!(appendable_data_free(ad_h), 0);
         }
@@ -884,6 +927,15 @@ mod tests {
                        0);
             assert_eq!(appendable_data_nth_data_id(&app0, ad_priv_h, 1, &mut got_immut_id_1_h),
                        0);
+
+            // Check owners of appendable data
+            let mut is_owner = false;
+
+            assert_eq!(appendable_data_is_owned(&app0, ad_priv_h, &mut is_owner), 0);
+            assert_eq!(is_owner, true);
+
+            assert_eq!(appendable_data_is_owned(&app1, ad_priv_h, &mut is_owner), 0);
+            assert_eq!(is_owner, false);
 
             // Delete and restore private appendable data
             assert_eq!(appendable_data_remove_nth_data(ad_priv_h, 0), 0);

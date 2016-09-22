@@ -36,7 +36,6 @@ pub struct DirectoryMetadata {
 impl DirectoryMetadata {
     /// Create a new instance of Metadata
     pub fn new(name: String,
-               type_tag: u64,
                versioned: bool,
                access_level: AccessLevel,
                user_metadata: Vec<u8>,
@@ -44,7 +43,7 @@ impl DirectoryMetadata {
                -> Result<DirectoryMetadata, NfsError> {
         let id = Rand::rand(&mut unwrap!(OsRng::new(), "Failed to create OsRng."));
         Ok(DirectoryMetadata {
-            key: DirectoryKey::new(id, type_tag, versioned, access_level),
+            key: DirectoryKey::new(id, versioned, access_level),
             name: name,
             created_time: ::time::now_utc(),
             modified_time: ::time::now_utc(),
@@ -184,7 +183,6 @@ mod test {
     #[test]
     fn serialise_directory_metadata_without_parent_directory() {
         let obj_before = unwrap!(DirectoryMetadata::new("hello.txt".to_string(),
-                                                        99u64,
                                                         true,
                                                         AccessLevel::Private,
                                                         Vec::new(),
@@ -197,9 +195,8 @@ mod test {
     #[test]
     fn serialise_directory_metadata_with_parent_directory() {
         let id: XorName = rand::random();
-        let parent_directory = DirectoryKey::new(id, 100u64, false, AccessLevel::Private);
+        let parent_directory = DirectoryKey::new(id, false, AccessLevel::Private);
         let obj_before = unwrap!(DirectoryMetadata::new("hello.txt".to_string(),
-                                                        99u64,
                                                         true,
                                                         AccessLevel::Private,
                                                         "Some user metadata"
@@ -218,12 +215,10 @@ mod test {
         let id: XorName = rand::random();
         let modified_time = ::time::now_utc();
         let mut obj_before = unwrap!(DirectoryMetadata::new("hello.txt".to_string(),
-                                                  99u64,
                                                   true,
                                                   AccessLevel::Private,
                                                   Vec::new(),
                                                   Some(DirectoryKey::new(id,
-                                                                         100u64,
                                                                          false,
                                                                          AccessLevel::Private))));
         let user_metadata = "{mime: \"application/json\"}".to_string().into_bytes();
