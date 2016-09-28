@@ -1,5 +1,11 @@
 # Safe Core - Change Log
 
+## [0.21.0]
+- Removal of base64 indirection as we no longer have JSON interface to `safe_core`.
+- Many more test cases to thoroughly check low-level-api
+- Add new api's wanted by launcher - ownership assertion, version exposure, more serialisations etc.
+- Make tag-types for versioned and unversioned StructuredData MaidSafe constants and remove them from `DirectoryKey`.
+
 ## [0.20.0]
 - API changed from JSON to direct FFI calls for interfacing with other languages.
 - Provide low-level-api for finer grained control for manipulation of MaidSafe data types.
