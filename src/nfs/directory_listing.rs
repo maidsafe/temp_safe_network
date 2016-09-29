@@ -41,12 +41,14 @@ pub struct DirectoryListing {
 impl DirectoryListing {
     /// Create a new DirectoryListing
     pub fn new(name: String,
+               tag_type: u64,
                user_metadata: Vec<u8>,
                versioned: bool,
                access_level: AccessLevel,
                parent_dir_key: Option<DirectoryKey>)
                -> Result<DirectoryListing, NfsError> {
         let meta_data = try!(DirectoryMetadata::new(name,
+                                                    tag_type,
                                                     versioned,
                                                     access_level,
                                                     user_metadata,
@@ -228,6 +230,7 @@ mod test {
     #[test]
     fn serialise_and_deserialise_directory_listing() {
         let obj_before = unwrap!(DirectoryListing::new("Home".to_string(),
+                                                       10,
                                                        "some metadata about the directory"
                                                            .to_string()
                                                            .into_bytes(),
@@ -245,6 +248,7 @@ mod test {
         let test_client = unwrap!(test_utils::get_client());
         let client = Arc::new(Mutex::new(test_client));
         let directory_listing = unwrap!(DirectoryListing::new("Home".to_string(),
+                                                              10,
                                                               Vec::new(),
                                                               true,
                                                               AccessLevel::Private,
@@ -260,6 +264,7 @@ mod test {
     #[test]
     fn find_upsert_remove_file() {
         let mut directory_listing = unwrap!(DirectoryListing::new("Home".to_string(),
+                                                                  10,
                                                                   Vec::new(),
                                                                   true,
                                                                   AccessLevel::Private,
@@ -295,11 +300,13 @@ mod test {
     #[test]
     fn find_upsert_remove_directory() {
         let mut directory_listing = unwrap!(DirectoryListing::new("Home".to_string(),
+                                                                  10,
                                                                   Vec::new(),
                                                                   true,
                                                                   AccessLevel::Private,
                                                                   None));
         let mut sub_directory = unwrap!(DirectoryListing::new("Child one".to_string(),
+                                                              10,
                                                               Vec::new(),
                                                               true,
                                                               AccessLevel::Private,
@@ -314,6 +321,7 @@ mod test {
         directory_listing.upsert_sub_directory(sub_directory.get_metadata().clone());
         assert_eq!(directory_listing.get_sub_directories().len(), 1);
         let sub_directory_two = unwrap!(DirectoryListing::new("Child Two".to_string(),
+                                                              10,
                                                               Vec::new(),
                                                               true,
                                                               AccessLevel::Private,
