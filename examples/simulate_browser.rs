@@ -45,18 +45,18 @@ extern crate rust_sodium;
 #[macro_use]
 extern crate unwrap;
 
-use std::sync::{Arc, Mutex};
 
 use regex::Regex;
 
 use safe_core::core::client::Client;
-
-use safe_core::nfs::helper::file_helper::FileHelper;
-use safe_core::nfs::helper::directory_helper::DirectoryHelper;
-use safe_core::nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
+use safe_core::dns::dns_operations::DnsOperations;
 
 use safe_core::dns::errors::DnsError;
-use safe_core::dns::dns_operations::DnsOperations;
+use safe_core::nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
+use safe_core::nfs::helper::directory_helper::DirectoryHelper;
+
+use safe_core::nfs::helper::file_helper::FileHelper;
+use std::sync::{Arc, Mutex};
 
 const DEFAULT_SERVICE: &'static str = "www";
 const HOME_PAGE_FILE_NAME: &'static str = "index.html";
@@ -70,8 +70,10 @@ fn handle_login() -> Arc<Mutex<Client>> {
 
     println!("\n------------ Enter account-locator ---------------");
     let _ = std::io::stdin().read_line(&mut secret_0);
+    secret_0 = secret_0.trim().to_string();
     println!("\n------------ Enter password ---------------");
     let _ = std::io::stdin().read_line(&mut secret_1);
+    secret_1 = secret_1.trim().to_string();
 
     // Account Creation
     {

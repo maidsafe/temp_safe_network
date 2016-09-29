@@ -43,9 +43,9 @@ extern crate routing;
 #[macro_use]
 extern crate unwrap;
 
+use routing::client_errors::MutationError;
 use safe_core::core::client::Client;
 use safe_core::core::errors::CoreError;
-use routing::client_errors::MutationError;
 
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));
@@ -65,8 +65,10 @@ fn main() {
 
         println!("\n------------ Enter account-locator ---------------");
         let _ = std::io::stdin().read_line(&mut secret_0);
+        secret_0 = secret_0.trim().to_string();
         println!("\n------------ Enter password ---------------");
         let _ = std::io::stdin().read_line(&mut secret_1);
+        secret_1 = secret_1.trim().to_string();
 
         // Account Creation
         {
@@ -105,8 +107,10 @@ fn main() {
 
         println!("\n------------ Enter account-locator ---------------");
         let _ = std::io::stdin().read_line(&mut secret_0);
+        secret_0 = secret_0.trim().to_string();
         println!("\n------------ Enter password ---------------");
         let _ = std::io::stdin().read_line(&mut secret_1);
+        secret_1 = secret_1.trim().to_string();
 
         // Log into the created account
         {
