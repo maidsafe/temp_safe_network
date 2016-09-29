@@ -55,8 +55,12 @@ unsafe fn self_auth(session_h: *mut *mut SessionHandle) {
 
     println!("\n------------ Enter account-locator ---------------");
     let _ = std::io::stdin().read_line(&mut secret_0);
+    secret_0 = secret_0.trim().to_string();
+
     println!("\n------------ Enter password ---------------");
     let _ = std::io::stdin().read_line(&mut secret_1);
+    secret_1 = secret_1.trim().to_string();
+
 
     if user_option != "Y" && user_option != "y" {
         println!("\nTrying to create an account ...");

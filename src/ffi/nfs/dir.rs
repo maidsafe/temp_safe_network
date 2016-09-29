@@ -22,7 +22,7 @@ use ffi::directory_details::DirectoryDetails;
 use ffi::errors::FfiError;
 use ffi::helper;
 use libc::int32_t;
-use nfs::AccessLevel;
+use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG, VERSIONED_DIRECTORY_LISTING_TAG};
 use nfs::errors::NfsError;
 use nfs::helper::directory_helper::DirectoryHelper;
 use std::slice;
@@ -164,7 +164,14 @@ fn create_dir(app: &App,
         AccessLevel::Public
     };
 
+    let tag = if is_versioned {
+        VERSIONED_DIRECTORY_LISTING_TAG
+    } else {
+        UNVERSIONED_DIRECTORY_LISTING_TAG
+    };
+
     let _ = try!(dir_helper.create(dir_to_create,
+                                   tag,
                                    user_metadata.to_owned(),
                                    is_versioned,
                                    access_level,
@@ -250,6 +257,9 @@ fn move_dir(app: &App,
         let created_time = *src_dir.get_metadata().get_created_time();
         let modified_time = *src_dir.get_metadata().get_modified_time();
         let (mut dir, _) = try!(directory_helper.create(name,
+                                                        src_dir.get_metadata()
+                                                            .get_key()
+                                                            .get_type_tag(),
                                                         user_metadata,
                                                         src_dir.get_metadata()
                                                             .get_key()
@@ -289,7 +299,7 @@ fn move_dir(app: &App,
 mod test {
     use ffi::app::App;
     use ffi::test_utils;
-    use nfs::AccessLevel;
+    use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
     use nfs::helper::directory_helper::DirectoryHelper;
     use std::slice;
 
@@ -298,6 +308,7 @@ mod test {
         let dir_helper = DirectoryHelper::new(app.get_client());
         let mut app_root_dir = unwrap!(dir_helper.get(&app_dir_key));
         let _ = unwrap!(dir_helper.create(name.to_string(),
+                                          UNVERSIONED_DIRECTORY_LISTING_TAG,
                                           Vec::new(),
                                           false,
                                           AccessLevel::Private,

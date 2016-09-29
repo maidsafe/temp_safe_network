@@ -44,16 +44,16 @@ extern crate safe_core;
 #[macro_use]
 extern crate unwrap;
 
-use std::sync::{Arc, Mutex};
 
 use routing::XOR_NAME_LEN;
 use safe_core::core::client::Client;
-use safe_core::nfs::AccessLevel;
-use safe_core::nfs::errors::NfsError;
+use safe_core::nfs::{self, AccessLevel};
 use safe_core::nfs::directory_listing::DirectoryListing;
+use safe_core::nfs::errors::NfsError;
 use safe_core::nfs::helper::directory_helper::DirectoryHelper;
 use safe_core::nfs::helper::file_helper::FileHelper;
 use safe_core::nfs::helper::writer::Mode;
+use std::sync::{Arc, Mutex};
 
 fn create_account() -> Result<Client, NfsError> {
     let mut secret_0 = String::new();
@@ -64,8 +64,11 @@ fn create_account() -> Result<Client, NfsError> {
 
     println!("\n------------ Enter account-locator ---------------");
     let _ = std::io::stdin().read_line(&mut secret_0);
+    secret_0 = secret_0.trim().to_string();
+
     println!("\n------------ Enter password ---------------");
     let _ = std::io::stdin().read_line(&mut secret_1);
+    secret_1 = secret_1.trim().to_string();
 
     // Account Creation
     println!("\nTrying to create an account ...");
@@ -154,8 +157,15 @@ fn directory_operation(option: u32,
                         return Err(NfsError::ParameterIsNotValid);
                     }
 
+                    let tag_type = if versioned {
+                        nfs::VERSIONED_DIRECTORY_LISTING_TAG
+                    } else {
+                        nfs::UNVERSIONED_DIRECTORY_LISTING_TAG
+                    };
+
                     let directory_helper = DirectoryHelper::new(client.clone());
                     let _ = try!(directory_helper.create(name.clone(),
+                                                         tag_type,
                                                          vec![],
                                                          versioned,
                                                          access_level,

@@ -47,12 +47,12 @@ extern crate maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
 
-use safe_core::core::client::Client;
 
 use docopt::Docopt;
-use routing::{Data, ImmutableData, StructuredData};
 use rand::{Rng, SeedableRng};
+use routing::{Data, ImmutableData, StructuredData};
 use rust_sodium::crypto::sign::{PublicKey, SecretKey};
+use safe_core::core::client::Client;
 
 
 #[cfg_attr(rustfmt, rustfmt_skip)]

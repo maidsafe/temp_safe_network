@@ -295,7 +295,7 @@ impl RoutingMock {
                     Err(error) => Some(MutationError::from(error)),
                 }
             }
-            Err(error) => Some(error)
+            Err(error) => Some(error),
         };
 
         let _ = std::thread::spawn(move || {

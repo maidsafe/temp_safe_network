@@ -23,6 +23,7 @@ use routing::XorName;
 #[derive(Debug, RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct DirectoryKey {
     id: XorName,
+    type_tag: u64,
     versioned: bool,
     access_level: AccessLevel,
 }
@@ -30,11 +31,13 @@ pub struct DirectoryKey {
 impl DirectoryKey {
     /// Creates a new instance of DirectoryKey
     pub fn new(directory_id: XorName,
+               type_tag: u64,
                versioned: bool,
                access_level: AccessLevel)
                -> DirectoryKey {
         DirectoryKey {
             id: directory_id,
+            type_tag: type_tag,
             versioned: versioned,
             access_level: access_level,
         }
@@ -46,11 +49,7 @@ impl DirectoryKey {
     }
     /// Returns the type_tag
     pub fn get_type_tag(&self) -> u64 {
-        if self.versioned {
-            ::nfs::VERSIONED_DIRECTORY_LISTING_TAG
-        } else {
-            ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG
-        }
+        self.type_tag
     }
     /// Returns true if the directory represented by the key is versioned, else returns false
     pub fn is_versioned(&self) -> bool {
@@ -74,25 +73,17 @@ mod test {
     #[test]
     fn serailise_and_deserialise_directory_key() {
         let id: XorName = rand::random();
+        let tag = 10u64;
         let versioned = false;
         let access_level = AccessLevel::Private;
 
-        let directory_key = DirectoryKey::new(id,
-                                              versioned,
-                                              access_level.clone());
+        let directory_key = DirectoryKey::new(id, tag, versioned, access_level.clone());
 
         let serialised = unwrap!(serialise(&directory_key));
         let deserilaised_key: DirectoryKey = unwrap!(deserialise(&serialised));
         assert_eq!(*deserilaised_key.get_id(), id);
         assert_eq!(*deserilaised_key.get_access_level(), access_level);
         assert_eq!(deserilaised_key.is_versioned(), versioned);
-        assert_eq!(deserilaised_key.get_type_tag(),
-                   ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG);
-
-        let directory_key_versioned = DirectoryKey::new(id,
-                                                        true,
-                                                        access_level.clone());
-        assert_eq!(directory_key_versioned.get_type_tag(),
-                   ::nfs::VERSIONED_DIRECTORY_LISTING_TAG);
+        assert_eq!(deserilaised_key.get_type_tag(), tag);
     }
 }
