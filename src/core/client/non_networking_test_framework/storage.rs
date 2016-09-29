@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use maidsafe_utilities::serialisation::{deserialise, serialise, SerialisationError};
+use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
 use routing::{Data, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::HashMap;
@@ -56,7 +56,9 @@ impl Storage {
     // Save the data to the storage.
     pub fn put_data(&mut self, name: XorName, data: Data) -> Result<(), StorageError> {
         serialise(&data)
-            .map(|data| { let _ = self.data_store.insert(name, data); })
+            .map(|data| {
+                let _ = self.data_store.insert(name, data);
+            })
             .map_err(StorageError::SerialisationError)
     }
 
@@ -141,7 +143,7 @@ mod sync {
             let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata()).len() as usize);
             if let Ok(_) = file.read_to_end(&mut raw_disk_data) {
                 if !raw_disk_data.is_empty() {
-                    return deserialise_with_limit(&raw_disk_data, SizeLimit::Infinite).ok()
+                    return deserialise_with_limit(&raw_disk_data, SizeLimit::Infinite).ok();
                 }
             }
         }

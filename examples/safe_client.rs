@@ -44,13 +44,13 @@ extern crate maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
 
-use safe_core::core::client::Client;
-use safe_core::core::client::response_getter::GetResponseGetter;
+use maidsafe_utilities::serialisation::deserialise;
 
 use routing::{Data, XorName};
-use rust_sodium::crypto::hash::sha256;
 use routing::messaging::MpidMessageWrapper;
-use maidsafe_utilities::serialisation::deserialise;
+use rust_sodium::crypto::hash::sha256;
+use safe_core::core::client::Client;
+use safe_core::core::client::response_getter::GetResponseGetter;
 
 #[cfg(feature = "use-mock-routing")]
 const MOCK_NETWORK: bool = true;
@@ -75,8 +75,10 @@ fn main() {
 
         println!("\n------------ Enter account-locator ---------------");
         let _ = std::io::stdin().read_line(&mut secret_0);
+        secret_0 = secret_0.trim().to_string();
         println!("\n------------ Enter password ---------------");
         let _ = std::io::stdin().read_line(&mut secret_1);
+        secret_1 = secret_1.trim().to_string();
 
         // Account Creation
         {
@@ -107,8 +109,11 @@ fn main() {
 
         println!("\n------------ Enter account-locator ---------------");
         let _ = std::io::stdin().read_line(&mut secret_0);
+        secret_0 = secret_0.trim().to_string();
+
         println!("\n------------ Enter password ---------------");
         let _ = std::io::stdin().read_line(&mut secret_1);
+        secret_1 = secret_1.trim().to_string();
 
         // Log into the created account
         {
