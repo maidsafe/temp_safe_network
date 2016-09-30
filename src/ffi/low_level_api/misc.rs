@@ -42,6 +42,43 @@ pub extern "C" fn misc_sign_key_free(handle: SignKeyHandle) -> i32 {
     })
 }
 
+/// Serialise sign::PubKey
+#[no_mangle]
+pub unsafe extern "C" fn misc_serialise_sign_key(sign_key_h: SignKeyHandle,
+                                                 o_data: *mut *mut u8,
+                                                 o_size: *mut usize,
+                                                 o_capacity: *mut usize)
+                                                 -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut ser_sign_key = ffi_try!(serialise(ffi_try!(unwrap!(object_cache())
+                .get_sign_key(sign_key_h)))
+            .map_err(FfiError::from));
+
+        *o_data = ser_sign_key.as_mut_ptr();
+        ptr::write(o_size, ser_sign_key.len());
+        ptr::write(o_capacity, ser_sign_key.capacity());
+        mem::forget(ser_sign_key);
+
+        0
+    })
+}
+
+/// Deserialise sign::PubKey
+pub unsafe extern "C" fn misc_deserialise_sign_key(data: *mut u8,
+                                                   size: usize,
+                                                   o_handle: *mut SignKeyHandle)
+                                                   -> i32 {
+    helper::catch_unwind_i32(|| {
+        let ser_sign_key = slice::from_raw_parts(data, size);
+        let sign_key = ffi_try!(deserialise(ser_sign_key).map_err(FfiError::from));
+
+        let handle = unwrap!(object_cache()).insert_sign_key(sign_key);
+        ptr::write(o_handle, handle);
+
+        0
+    })
+}
+
 /// Serialise DataIdentifier
 #[no_mangle]
 pub unsafe extern "C" fn misc_serialise_data_id(data_id_h: DataIdHandle,
@@ -191,6 +228,45 @@ mod tests {
     use std::hash::{Hash, Hasher, SipHasher};
     use std::ptr;
     use super::*;
+
+    #[test]
+    fn sign_key_serialisation() {
+        let app = test_utils::create_app(false);
+        let client = app.get_client();
+
+        let sign_key = unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone();
+        let sign_key_h = unwrap!(object_cache()).insert_sign_key(sign_key);
+
+        unsafe {
+            let mut data_ptr: *mut u8 = ptr::null_mut();
+            let mut data_size = 0;
+            let mut capacity = 0;
+
+            assert_eq!(misc_serialise_sign_key(sign_key_h,
+                                               &mut data_ptr,
+                                               &mut data_size,
+                                               &mut capacity),
+                       0);
+
+            let mut got_sign_key_h = 0;
+            assert_eq!(misc_deserialise_sign_key(data_ptr,
+                                                 data_size,
+                                                 &mut got_sign_key_h),
+                       0);
+
+            {
+                let mut object_cache = unwrap!(object_cache());
+
+                let before = hash(unwrap!(object_cache.get_sign_key(sign_key_h)));
+                let after = hash(unwrap!(object_cache.get_sign_key(got_sign_key_h)));
+
+                assert_eq!(before, after);
+            }
+
+            assert_eq!(misc_sign_key_free(got_sign_key_h), 0);
+            assert_eq!(misc_sign_key_free(sign_key_h), 0);
+        }
+    }
 
     #[test]
     fn appendable_data_serialisation() {
