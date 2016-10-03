@@ -64,6 +64,7 @@ pub unsafe extern "C" fn misc_serialise_sign_key(sign_key_h: SignKeyHandle,
 }
 
 /// Deserialise sign::PubKey
+#[no_mangle]
 pub unsafe extern "C" fn misc_deserialise_sign_key(data: *mut u8,
                                                    size: usize,
                                                    o_handle: *mut SignKeyHandle)
@@ -220,8 +221,8 @@ mod tests {
     use ffi::low_level_api::appendable_data::*;
     use ffi::low_level_api::cipher_opt::*;
     use ffi::low_level_api::data_id::*;
-    use ffi::low_level_api::struct_data::*;
     use ffi::low_level_api::object_cache::object_cache;
+    use ffi::low_level_api::struct_data::*;
     use ffi::test_utils;
     use rand;
     use routing::DataIdentifier;
@@ -249,9 +250,7 @@ mod tests {
                        0);
 
             let mut got_sign_key_h = 0;
-            assert_eq!(misc_deserialise_sign_key(data_ptr,
-                                                 data_size,
-                                                 &mut got_sign_key_h),
+            assert_eq!(misc_deserialise_sign_key(data_ptr, data_size, &mut got_sign_key_h),
                        0);
 
             {
@@ -296,7 +295,9 @@ mod tests {
                        0);
 
             let mut appendable_data_h = 0;
-            assert_eq!(misc_deserialise_appendable_data(data_ptr, data_size, &mut appendable_data_h),
+            assert_eq!(misc_deserialise_appendable_data(data_ptr,
+                                                        data_size,
+                                                        &mut appendable_data_h),
                        0);
             assert!(appendable_data_h != ad_pub_h);
 
@@ -324,7 +325,9 @@ mod tests {
                        0);
 
             let mut appendable_data_h = 0;
-            assert_eq!(misc_deserialise_appendable_data(data_ptr, data_size, &mut appendable_data_h),
+            assert_eq!(misc_deserialise_appendable_data(data_ptr,
+                                                        data_size,
+                                                        &mut appendable_data_h),
                        0);
             assert!(appendable_data_h != ad_priv_h);
 
@@ -364,7 +367,8 @@ mod tests {
                                        cipher_opt_h,
                                        plain_text.as_ptr(),
                                        plain_text.len(),
-                                       &mut sd_h), 0);
+                                       &mut sd_h),
+                       0);
         }
 
         unsafe {
