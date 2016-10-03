@@ -52,14 +52,13 @@ pub unsafe extern "C" fn output_log_path(c_output_file_name: *const u8,
         let fh = ffi_ptr_try!(FileHandler::<()>::new(&op_file, true)
                                   .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
                               c_result);
-        let op_file_path =
-            ffi_ptr_try!(fh.path()
+        let op_file_path = ffi_ptr_try!(fh.path()
                              .to_path_buf()
                              .into_os_string()
                              .into_string()
                              .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
                          c_result)
-                .into_bytes();
+            .into_bytes();
 
         ptr::write(c_size, op_file_path.len() as i32);
         ptr::write(c_capacity, op_file_path.capacity() as i32);

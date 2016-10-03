@@ -83,11 +83,7 @@ pub fn append_version(client: Arc<Mutex<Client>>,
     versions.push(version_to_append);
 
     let new_version_number = struct_data.get_version() +
-                             if increment_version_number {
-        1
-    } else {
-        0
-    };
+                             if increment_version_number { 1 } else { 0 };
 
     create_impl(client,
                 &versions,
@@ -213,11 +209,8 @@ mod test {
 
         let version_1: XorName = rand::random();
 
-        structured_data_result = append_version(client.clone(),
-                                                structured_data,
-                                                version_1,
-                                                secret_key,
-                                                true);
+        structured_data_result =
+            append_version(client.clone(), structured_data, version_1, secret_key, true);
         structured_data = unwrap!(structured_data_result);
         versions_res = get_all_versions(client, &structured_data);
         versions = unwrap!(versions_res);

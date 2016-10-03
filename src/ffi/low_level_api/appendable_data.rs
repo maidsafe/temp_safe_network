@@ -319,6 +319,47 @@ pub extern "C" fn appendable_data_remove_from_filter(ad_h: AppendableDataHandle,
     })
 }
 
+/// Get the number of filtered keys.
+#[no_mangle]
+pub unsafe extern "C" fn appendable_data_num_of_filter_keys(ad_h: AppendableDataHandle,
+                                                            o_num: *mut usize)
+                                                            -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut object_cache = unwrap!(object_cache());
+        let ad = ffi_try!(object_cache.get_ad(ad_h));
+
+        let num = match *ad.filter_mut() {
+            Filter::WhiteList(ref mut list) |
+            Filter::BlackList(ref mut list) => list.len(),
+        };
+
+        *o_num = num;
+        0
+    })
+}
+
+/// Get the nth filter key.
+#[no_mangle]
+pub unsafe extern "C" fn appendable_data_nth_filter_key(ad_h: AppendableDataHandle,
+                                                        n: usize,
+                                                        o_handle: *mut SignKeyHandle)
+                                                        -> i32 {
+    helper::catch_unwind_i32(|| {
+        let filter_key = {
+            let mut object_cache = unwrap!(object_cache());
+            let ad = ffi_try!(object_cache.get_ad(ad_h));
+
+            match *ad.filter_mut() {
+                Filter::WhiteList(ref mut list) |
+                Filter::BlackList(ref mut list) => *ffi_try!(nth(list, n)),
+            }
+        };
+
+        *o_handle = unwrap!(object_cache()).insert_sign_key(filter_key);
+        0
+    })
+}
+
 /// Get the owner's encrypt key
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_encrypt_key(ad_h: AppendableDataHandle,
@@ -640,18 +681,18 @@ pub unsafe extern "C" fn appendable_data_append(app: *const App,
             let sign_sk = ffi_try!(client.get_secret_signing_key());
 
             let appended_data = ffi_try!(AppendedData::new(data_id, *sign_pk, sign_sk)
-                                             .map_err(CoreError::from));
+                .map_err(CoreError::from));
 
             match *ffi_try!(object_cache.get_ad(ad_h)) {
                 AppendableData::Priv(ref elt) => {
                     let priv_appended_data = ffi_try!(PrivAppendedData::new(&appended_data,
                                                                             &elt.encrypt_key)
-                                                          .map_err(CoreError::from));
+                        .map_err(CoreError::from));
                     ffi_try!(AppendWrapper::new_priv(elt.name,
                                                      priv_appended_data,
                                                      (sign_pk, sign_sk),
                                                      elt.version)
-                                 .map_err(CoreError::from))
+                        .map_err(CoreError::from))
                 }
                 AppendableData::Pub(ref elt) => {
                     AppendWrapper::new_pub(elt.name, appended_data, elt.version)
@@ -685,7 +726,8 @@ pub unsafe extern "C" fn appendable_data_version(handle: AppendableDataHandle,
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_is_owned(app: *const App,
                                                   handle: AppendableDataHandle,
-                                                  o_is_owned: *mut bool) -> i32 {
+                                                  o_is_owned: *mut bool)
+                                                  -> i32 {
     helper::catch_unwind_i32(|| {
         let client = (*app).get_client();
         let my_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());

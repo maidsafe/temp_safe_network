@@ -21,6 +21,7 @@
 use core::client::Client;
 use ffi::errors::FfiError;
 use ffi::file_details::FileMetadata;
+use ffi::low_level_api::misc::misc_u8_ptr_free;
 use nfs::directory_listing::DirectoryListing;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::metadata::directory_key::DirectoryKey;
@@ -28,7 +29,6 @@ use nfs::metadata::directory_metadata::DirectoryMetadata as NfsDirectoryMetadata
 use std::ptr;
 use std::sync::{Arc, Mutex};
 use super::helper;
-use ffi::low_level_api::misc::misc_u8_ptr_free;
 
 /// Details about a directory and its content.
 #[derive(Debug)]
@@ -155,7 +155,8 @@ pub unsafe extern "C" fn directory_details_get_metadata(details: *const Director
 
 /// Get the number of files in the directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirectoryDetails) -> usize {
+pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirectoryDetails)
+                                                         -> usize {
     (*details).files.len()
 }
 
