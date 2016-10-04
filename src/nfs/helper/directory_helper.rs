@@ -63,8 +63,7 @@ impl DirectoryHelper {
             return Err(NfsError::DirectoryAlreadyExistsWithSameName);
         }
 
-        let directory =
-            try!(DirectoryListing::new(directory_name,
+        let directory = try!(DirectoryListing::new(directory_name,
                                        tag_type,
                                        user_metadata,
                                        versioned,

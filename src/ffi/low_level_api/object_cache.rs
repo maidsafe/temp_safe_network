@@ -254,9 +254,9 @@ impl Default for ObjectCache {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rand;
     use routing::DataIdentifier;
+    use super::*;
 
     #[test]
     fn reset() {

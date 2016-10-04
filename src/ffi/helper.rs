@@ -190,12 +190,16 @@ mod tests {
     fn string_conversion() {
         let (ptr, size, cap) = string_to_c_utf8(String::new());
         assert_eq!(size, 0);
-        unsafe { let _ = Vec::from_raw_parts(ptr, size, cap); }
+        unsafe {
+            let _ = Vec::from_raw_parts(ptr, size, cap);
+        }
 
         let (ptr, size, cap) = string_to_c_utf8("hello world".to_owned());
         assert!(ptr != 0 as *mut u8);
         assert_eq!(size, 11);
         assert!(cap >= 11);
-        unsafe { let _ = Vec::from_raw_parts(ptr, size, cap); }
+        unsafe {
+            let _ = Vec::from_raw_parts(ptr, size, cap);
+        }
     }
 }

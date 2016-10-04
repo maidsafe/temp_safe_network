@@ -56,8 +56,8 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
         let sd = match type_tag {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                                                     .get_cipher_opt(cipher_opt_h))
-                                            .encrypt(app, &plain_text));
+                        .get_cipher_opt(cipher_opt_h))
+                    .encrypt(app, &plain_text));
 
                 ffi_try!(unversioned::create(client,
                                              type_tag,
@@ -70,16 +70,15 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
                                              None))
             }
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
-                let immut_data = ffi_try!(immut_data_operations::create(client.clone(),
-                                                                        plain_text,
-                                                                        None));
+                let immut_data =
+                    ffi_try!(immut_data_operations::create(client.clone(), plain_text, None));
                 // TODO The above data could be exactly 1 MiB and ideally should not be touched any
                 // more. For this however we will require CipherOpt to be in core module. Until
                 // that we need to live with this.
                 let ser_immut_data = ffi_try!(serialise(&immut_data).map_err(FfiError::from));
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                                                     .get_cipher_opt(cipher_opt_h))
-                                            .encrypt(app, &ser_immut_data));
+                        .get_cipher_opt(cipher_opt_h))
+                    .encrypt(app, &ser_immut_data));
 
                 let immut_data_final = Data::Immutable(ImmutableData::new(raw_data));
                 let immut_data_final_name = *immut_data_final.name();
@@ -98,8 +97,8 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                                                     .get_cipher_opt(cipher_opt_h))
-                                            .encrypt(app, &plain_text));
+                        .get_cipher_opt(cipher_opt_h))
+                    .encrypt(app, &plain_text));
 
                 ffi_try!(StructuredData::new(type_tag,
                                              xor_id,
@@ -108,7 +107,7 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
                                              owner_keys,
                                              Vec::new(),
                                              Some(&sign_key))
-                             .map_err(CoreError::from))
+                    .map_err(CoreError::from))
             }
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
@@ -180,7 +179,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
         let new_sd = match ffi_try!(object_cache.get_sd(sd_h)).get_type_tag() {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
-                                            .encrypt(app, &plain_text));
+                    .encrypt(app, &plain_text));
 
                 let sd = ffi_try!(object_cache.get_sd(sd_h));
                 ffi_try!(unversioned::create(client,
@@ -195,12 +194,11 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                              None))
             }
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
-                let immut_data = ffi_try!(immut_data_operations::create(client.clone(),
-                                                                        plain_text,
-                                                                        None));
+                let immut_data =
+                    ffi_try!(immut_data_operations::create(client.clone(), plain_text, None));
                 let ser_immut_data = ffi_try!(serialise(&immut_data).map_err(FfiError::from));
                 let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
-                                            .encrypt(app, &ser_immut_data));
+                    .encrypt(app, &ser_immut_data));
 
                 let immut_data_final = Data::Immutable(ImmutableData::new(raw_data));
                 let immut_data_final_name = *immut_data_final.name();
@@ -216,7 +214,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                 let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
-                                            .encrypt(app, &plain_text));
+                    .encrypt(app, &plain_text));
 
                 let sd = ffi_try!(object_cache.get_sd(sd_h));
                 ffi_try!(StructuredData::new(sd.get_type_tag(),
@@ -226,7 +224,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                              sd.get_owner_keys().clone(),
                                              sd.get_previous_owner_keys().clone(),
                                              Some(&sign_key))
-                             .map_err(CoreError::from))
+                    .map_err(CoreError::from))
             }
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
@@ -254,18 +252,16 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
 
         let mut plain_text = match ffi_try!(obj_cache.get_sd(sd_h)).get_type_tag() {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
-                let raw_data = ffi_try!(unversioned::get_data(client,
-                                                              ffi_try!(obj_cache.get_sd(sd_h)),
-                                                              None));
+                let raw_data =
+                    ffi_try!(unversioned::get_data(client, ffi_try!(obj_cache.get_sd(sd_h)), None));
                 ffi_try!(CipherOpt::decrypt(&app, &raw_data))
             }
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let immut_data_final_name =
                     ffi_try!(versioned::current_version(ffi_try!(obj_cache.get_sd(sd_h))));
 
-                let resp_getter =
-                    ffi_try!(unwrap!(client.lock())
-                                 .get(DataIdentifier::Immutable(immut_data_final_name), None));
+                let resp_getter = ffi_try!(unwrap!(client.lock())
+                    .get(DataIdentifier::Immutable(immut_data_final_name), None));
                 let immut_data_final = match ffi_try!(resp_getter.get()) {
                     Data::Immutable(immut_data) => immut_data,
                     _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
@@ -273,7 +269,7 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
 
                 let ser_immut_data = ffi_try!(CipherOpt::decrypt(&app, immut_data_final.value()));
                 let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
-                                              .map_err(FfiError::from));
+                    .map_err(FfiError::from));
                 ffi_try!(immut_data_operations::get_data_from_immut_data(client, immut_data, None))
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
@@ -336,8 +332,7 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
         // TODO Try to combine this code with above (extract_data) if it makes it smaller
         let immut_data_final_name = versions.remove(n);
         let resp_getter = ffi_try!(unwrap!(client.lock())
-                                       .get(DataIdentifier::Immutable(immut_data_final_name),
-                                            None));
+            .get(DataIdentifier::Immutable(immut_data_final_name), None));
         let immut_data_final = match ffi_try!(resp_getter.get()) {
             Data::Immutable(immut_data) => immut_data,
             _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
@@ -345,10 +340,9 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
 
         let ser_immut_data = ffi_try!(CipherOpt::decrypt(&app, immut_data_final.value()));
         let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
-                                      .map_err(FfiError::from));
-        let mut plain_text = ffi_try!(immut_data_operations::get_data_from_immut_data(client,
-                                                                                      immut_data,
-                                                                                      None));
+            .map_err(FfiError::from));
+        let mut plain_text =
+            ffi_try!(immut_data_operations::get_data_from_immut_data(client, immut_data, None));
 
         *o_data = plain_text.as_mut_ptr();
         ptr::write(o_size, plain_text.len());
@@ -401,7 +395,7 @@ fn struct_data_post_impl(client: Arc<Mutex<Client>>,
                                           sd.get_owner_keys().clone(),
                                           sd.get_previous_owner_keys().clone(),
                                           Some(&sign_key))
-                          .map_err(CoreError::from));
+        .map_err(CoreError::from));
 
     let data = Data::Structured(new_sd.clone());
     let resp_getter = try!(unwrap!(client.lock()).post(data, None));
@@ -438,7 +432,7 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
                                           sd.get_owner_keys().clone(),
                                           sd.get_previous_owner_keys().clone(),
                                           Some(&sign_key))
-                          .map_err(CoreError::from));
+        .map_err(CoreError::from));
 
     let data = Data::Structured(new_sd.clone());
     let resp_getter = try!(unwrap!(client.lock()).delete(data, None));
@@ -449,8 +443,7 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
 
 /// Get the current version of StructuredData by its handle
 #[no_mangle]
-pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle,
-                                             o_version: *mut u64) -> i32 {
+pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle, o_version: *mut u64) -> i32 {
     helper::catch_unwind_i32(|| {
         *o_version = ffi_try!(unwrap!(object_cache()).get_sd(handle)).get_version();
         0
@@ -460,8 +453,9 @@ pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle,
 /// Returns true if the app is one of the owners of the provided StructuredData.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_is_owned(app: *const App,
-                                       handle: StructDataHandle,
-                                       o_is_owned: *mut bool) -> i32 {
+                                              handle: StructDataHandle,
+                                              o_is_owned: *mut bool)
+                                              -> i32 {
     helper::catch_unwind_i32(|| {
         let client = (*app).get_client();
         let my_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());

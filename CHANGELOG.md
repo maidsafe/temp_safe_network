@@ -1,5 +1,10 @@
 # Safe Core - Change Log
 
+## [0.21.2]
+- Serialisation and deserialisation for Sign Keys.
+- API for getting Filtered keys from AppendableData.
+- Fix accidental name mangling of C function.
+
 ## [0.21.1]
 - Reverting the commit to remove dir-tag from dir-key: commit e829423 reverts commit 4fbc044.
 - Trim credentials in examples to not include a `\n`.
