@@ -12,6 +12,7 @@ version = "0.21.2"
 [dependencies]
 clippy = {version = "~0.0.91", optional = true}
 config_file_handler = "~0.4.0"
+futures = "0.1"
 lazy_static = "~0.2.1"
 libc = "~0.2.16"
 log = "~0.3.6"
@@ -24,6 +25,7 @@ rust_sodium = "~0.1.2"
 rustc-serialize = "~0.3.19"
 self_encryption = "~0.7.1"
 time = "~0.1.35"
+tokio-core = { git = "https://github.com/tokio-rs/tokio-core.git" }
 unwrap = "~1.1.0"
 
 [dev-dependencies]

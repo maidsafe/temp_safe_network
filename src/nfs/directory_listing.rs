@@ -16,7 +16,6 @@
 // relating to use of the SAFE Network Software.
 
 use core::SelfEncryptionStorage;
-
 use core::client::Client;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::AccessLevel;

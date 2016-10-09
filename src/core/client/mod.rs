@@ -20,24 +20,21 @@ pub mod response_getter;
 
 mod user_account;
 mod message_queue;
+mod routing_el;
 
 #[cfg(feature = "use-mock-routing")]
 mod non_networking_test_framework;
 
-
-use core::errors::CoreError;
+use core::{CoreError, HeadFuture, utility};
 use core::translated_events::NetworkEvent;
-use core::utility;
 
-use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::Joiner;
-use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, PlainData,
-              StructuredData, XorName};
+use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, StructuredData,
+              XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
 use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::MutationError;
-use routing::messaging::{MpidMessage, MpidMessageWrapper};
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256;
 
@@ -48,6 +45,7 @@ use self::non_networking_test_framework::RoutingMock as Routing;
 use self::response_getter::{GetAccountInfoResponseGetter, GetResponseGetter,
                             MutationResponseGetter};
 use self::user_account::Account;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
@@ -59,8 +57,8 @@ use std::sync::mpsc::Sender;
 pub struct Client {
     account: Option<Account>,
     routing: Routing,
-    _raii_joiner: Joiner,
     message_queue: Arc<Mutex<MessageQueue>>,
+    heads: HashMap<MessageId, HeadFuture>,
     session_packet_id: Option<XorName>,
     session_packet_keys: Option<SessionPacketEncryptionKeys>,
     client_manager_addr: Option<XorName>,
@@ -69,6 +67,7 @@ pub struct Client {
     issued_posts: u64,
     issued_deletes: u64,
     issued_appends: u64,
+    _joiner: Joiner,
 }
 
 impl Client {
@@ -98,8 +97,9 @@ impl Client {
         Ok(Client {
             account: None,
             routing: routing,
-            _raii_joiner: raii_joiner,
+            _joiner: raii_joiner,
             message_queue: message_queue,
+            heads: HashMap::with_capacity(10),
             session_packet_id: None,
             session_packet_keys: None,
             client_manager_addr: None,
@@ -147,8 +147,9 @@ impl Client {
         let mut client = Client {
             account: Some(account_packet),
             routing: routing,
-            _raii_joiner: raii_joiner,
+            _joiner: raii_joiner,
             message_queue: message_queue,
+            heads: HashMap::with_capacity(10),
             session_packet_id: Some(try!(Account::generate_network_id(&keyword, &pin))),
             session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
             client_manager_addr: Some(client_manager_addr),
@@ -236,8 +237,9 @@ impl Client {
             let client = Client {
                 account: Some(decrypted_session_packet),
                 routing: routing,
-                _raii_joiner: raii_joiner,
+                _joiner: raii_joiner,
                 message_queue: message_queue,
+                heads: HashMap::with_capacity(10),
                 session_packet_id: Some(try!(Account::generate_network_id(&keyword, &pin))),
                 session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
                 client_manager_addr: Some(client_manager_addr),
@@ -252,6 +254,12 @@ impl Client {
         } else {
             Err(CoreError::ReceivedUnexpectedData)
         }
+    }
+
+    /// Remove `head` of the future chain, the `tail` of which is probaly being processed in event
+    /// loop.
+    pub fn remove_head(&mut self, id: &MessageId) -> Option<HeadFuture> {
+        self.heads.remove(id)
     }
 
     /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
@@ -587,108 +595,6 @@ impl Client {
         try!(self.routing.send_get_account_info_request(dst, msg_id));
 
         Ok(GetAccountInfoResponseGetter::new((tx, rx)))
-    }
-
-    // TODO Redo this since response handling is integrated - For Qi right now
-    /// Send a message to receiver via the network. This is non-blocking.
-    pub fn send_message(&mut self,
-                        mpid_account: XorName,
-                        msg_metadata: Vec<u8>,
-                        msg_content: Vec<u8>,
-                        receiver: XorName,
-                        secret_key: &sign::SecretKey)
-                        -> Result<MutationResponseGetter, CoreError> {
-        let mpid_message = try!(MpidMessage::new(mpid_account,
-                                                 msg_metadata,
-                                                 receiver,
-                                                 msg_content,
-                                                 secret_key));
-        let name = try!(mpid_message.name());
-        let request = MpidMessageWrapper::PutMessage(mpid_message);
-
-        let serialised_request = try!(serialise(&request));
-        let data = Data::Plain(PlainData::new(name, serialised_request));
-
-        self.put(data, Some(Authority::ClientManager(mpid_account)))
-    }
-
-    /// Delete a message from own or sender's outbox. This is non-blocking.
-    pub fn delete_message(&mut self,
-                          target_account: XorName,
-                          message_name: XorName)
-                          -> Result<MutationResponseGetter, CoreError> {
-        self.messaging_delete_request(target_account,
-                                      message_name,
-                                      MpidMessageWrapper::DeleteMessage(message_name))
-    }
-
-    /// Delete a header from own inbox. This is non-blocking.
-    pub fn delete_header(&mut self,
-                         mpid_account: XorName,
-                         header_name: XorName)
-                         -> Result<MutationResponseGetter, CoreError> {
-        self.messaging_delete_request(mpid_account,
-                                      header_name,
-                                      MpidMessageWrapper::DeleteHeader(header_name))
-    }
-
-    fn messaging_delete_request(&mut self,
-                                account: XorName,
-                                name: XorName,
-                                request: MpidMessageWrapper)
-                                -> Result<MutationResponseGetter, CoreError> {
-        let serialised_request = try!(serialise(&request));
-        let data = Data::Plain(PlainData::new(name, serialised_request));
-
-        self.delete(data, Some(Authority::ClientManager(account)))
-    }
-
-    /// Register as an online mpid_messaging client to the network. This is non-blocking.
-    pub fn register_online(&mut self,
-                           mpid_account: XorName)
-                           -> Result<GetResponseGetter, CoreError> {
-        self.messaging_post_request(mpid_account, MpidMessageWrapper::Online)
-    }
-
-    /// Query the targeted messages' header that still in the outbox. This is non-blocking.
-    pub fn query_outbox_headers(&mut self,
-                                mpid_account: XorName,
-                                headers: Vec<XorName>)
-                                -> Result<GetResponseGetter, CoreError> {
-        self.messaging_post_request(mpid_account, MpidMessageWrapper::OutboxHas(headers))
-    }
-
-    /// Get the list of messages' headers that still in the outbox. This is non-blocking.
-    pub fn get_outbox_headers(&mut self,
-                              mpid_account: XorName)
-                              -> Result<GetResponseGetter, CoreError> {
-        self.messaging_post_request(mpid_account, MpidMessageWrapper::GetOutboxHeaders)
-    }
-
-    // TODO - Qi to check if this is alright - Post something should not require version caching.
-    // Should this not be a GET ? - Asked by Spandan
-    fn messaging_post_request(&mut self,
-                              mpid_account: XorName,
-                              request: MpidMessageWrapper)
-                              -> Result<GetResponseGetter, CoreError> {
-        let data_request = DataIdentifier::Plain(mpid_account);
-
-        {
-            let mut msg_queue = unwrap!(self.message_queue.lock());
-            if msg_queue.local_cache_check(&mpid_account) {
-                return Ok(GetResponseGetter::new(None, self.message_queue.clone(), data_request));
-            }
-        }
-
-        let serialised_request = try!(serialise(&request));
-        let data = Data::Plain(PlainData::new(mpid_account, serialised_request));
-        try!(try!(self.post(data, Some(Authority::ClientManager(mpid_account)))).get());
-
-        let (tx, rx) = mpsc::channel();
-        let msg_id = MessageId::new();
-        unwrap!(self.message_queue.lock()).register_response_observer(msg_id, tx.clone());
-
-        Ok(GetResponseGetter::new(Some((tx, rx)), self.message_queue.clone(), data_request))
     }
 
     /// Returns the public encryption key
