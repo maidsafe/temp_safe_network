@@ -62,8 +62,7 @@ impl DirectoryHelper {
             return Err(NfsError::DirectoryAlreadyExistsWithSameName);
         }
 
-        let directory =
-            try!(DirectoryListing::new(directory_name,
+        let directory = try!(DirectoryListing::new(directory_name,
                                        user_metadata,
                                        versioned,
                                        access_level,
@@ -193,11 +192,7 @@ impl DirectoryHelper {
             .get_user_root_directory_id()
             .cloned();
         match root_directory_id {
-            Some(id) => {
-                self.get(&DirectoryKey::new(id,
-                                            false,
-                                            AccessLevel::Private))
-            }
+            Some(id) => self.get(&DirectoryKey::new(id, false, AccessLevel::Private)),
             None => {
                 debug!("Root directory does not exist - creating one.");
 
@@ -227,11 +222,7 @@ impl DirectoryHelper {
             .get_configuration_root_directory_id()
             .cloned();
         let mut config_directory_listing = match config_dir_id {
-            Some(id) => {
-                try!(self.get(&DirectoryKey::new(id,
-                                                 false,
-                                                 AccessLevel::Private)))
-            }
+            Some(id) => try!(self.get(&DirectoryKey::new(id, false, AccessLevel::Private))),
             None => {
                 debug!("Configuartion Root directory does not exist - creating one.");
 
@@ -418,18 +409,18 @@ mod test {
         let dir_helper = DirectoryHelper::new(client.clone());
         // Create a Directory
         let (mut directory, grand_parent) = unwrap!(dir_helper.create("DirName".to_string(),
-                    Vec::new(),
-                    true,
-                    AccessLevel::Private,
-                    None));
+                                                                      Vec::new(),
+                                                                      true,
+                                                                      AccessLevel::Private,
+                                                                      None));
         assert!(grand_parent.is_none());
         assert_eq!(directory, unwrap!(dir_helper.get(directory.get_key())));
         // Create a Child directory and update the parent_directory
         let (mut child_directory, grand_parent) = unwrap!(dir_helper.create("Child".to_string(),
-                    Vec::new(),
-                    true,
-                    AccessLevel::Private,
-                    Some(&mut directory)));
+                                                                            Vec::new(),
+                                                                            true,
+                                                                            AccessLevel::Private,
+                                                                            Some(&mut directory)));
         assert!(grand_parent.is_none());
         // Assert whether parent is updated
         let parent = unwrap!(dir_helper.get(directory.get_key()));
@@ -463,10 +454,10 @@ mod test {
             let client = Arc::new(Mutex::new(test_client));
             let dir_helper = DirectoryHelper::new(client.clone());
             let (directory, _) = unwrap!(dir_helper.create("PublicDirectory".to_string(),
-                        vec![2u8, 10],
-                        true,
-                        AccessLevel::Public,
-                        None));
+                                                           vec![2u8, 10],
+                                                           true,
+                                                           AccessLevel::Public,
+                                                           None));
             public_directory = directory;
         }
         {
@@ -486,10 +477,10 @@ mod test {
             let client = Arc::new(Mutex::new(test_client));
             let dir_helper = DirectoryHelper::new(client.clone());
             let (directory, _) = unwrap!(dir_helper.create("PublicDirectory".to_string(),
-                        vec![2u8, 10],
-                        false,
-                        AccessLevel::Public,
-                        None));
+                                                           vec![2u8, 10],
+                                                           false,
+                                                           AccessLevel::Public,
+                                                           None));
             public_directory = directory;
         }
         {
@@ -537,10 +528,10 @@ mod test {
         let dir_helper = DirectoryHelper::new(client.clone());
 
         let (mut dir_listing, _) = unwrap!(dir_helper.create("DirName2".to_string(),
-                    Vec::new(),
-                    true,
-                    AccessLevel::Private,
-                    None));
+                                                             Vec::new(),
+                                                             true,
+                                                             AccessLevel::Private,
+                                                             None));
 
         let mut versions = unwrap!(dir_helper.get_versions(dir_listing.get_key().get_id(),
                                                            dir_listing.get_key()
@@ -575,18 +566,18 @@ mod test {
         let dir_helper = DirectoryHelper::new(client.clone());
         // Create a Directory
         let (mut directory, grand_parent) = unwrap!(dir_helper.create("DirName".to_string(),
-                    Vec::new(),
-                    true,
-                    AccessLevel::Private,
-                    None));
+                                                                      Vec::new(),
+                                                                      true,
+                                                                      AccessLevel::Private,
+                                                                      None));
         assert!(grand_parent.is_none());
         assert_eq!(directory, unwrap!(dir_helper.get(directory.get_key())));
         // Create a Child directory and update the parent_directory
         let (mut child_directory, grand_parent) = unwrap!(dir_helper.create("Child".to_string(),
-                    Vec::new(),
-                    true,
-                    AccessLevel::Private,
-                    Some(&mut directory)));
+                                                                            Vec::new(),
+                                                                            true,
+                                                                            AccessLevel::Private,
+                                                                            Some(&mut directory)));
         assert!(grand_parent.is_none());
         // Assert whether parent is updated
         let parent = unwrap!(dir_helper.get(directory.get_key()));
