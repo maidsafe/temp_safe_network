@@ -24,13 +24,12 @@ use core::{CoreError, CoreEvent, CoreMsgTx, HeadFuture, utility};
 use core::translated_events::NetworkEvent;
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, StructuredData,
-              XorName};
+              TYPE_TAG_SESSION_PACKET, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
-use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::MutationError;
 use rust_sodium::crypto::{box_, sign};
-use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::hash::sha256::{self, Digest};
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
 use self::user_account::Account;
@@ -40,6 +39,7 @@ use std::time::Duration;
 pub type ReturnType = Future<Item = CoreEvent, Error = CoreError>;
 
 const CONNECTION_TIMEOUT_SECS: u64 = 60;
+const ACC_PKT_PUT_TIMEOUT_SECS: u64 = 60;
 
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
@@ -49,10 +49,7 @@ const CONNECTION_TIMEOUT_SECS: u64 = 60;
 pub struct Client {
     routing: Routing,
     heads: HashMap<MessageId, HeadFuture>,
-    account: Option<Account>,
-    session_packet_id: Option<XorName>,
-    session_pkt_keys: Option<SessionPacketEncryptionKeys>,
-    client_manager_addr: Option<XorName>,
+    client_type: ClientType,
     stats: Stats,
     _joiner: Joiner,
 }
@@ -83,30 +80,27 @@ impl Client {
         Ok(Client {
             routing: routing,
             heads: HashMap::with_capacity(10),
-            account: None,
-            session_packet_id: None,
-            session_pkt_keys: None,
-            client_manager_addr: None,
+            client_type: ClientType::Unregistered,
             stats: Default::default(),
             _joiner: joiner,
         })
     }
 
     /// This is one of the two main Gateway functions to the Maidsafe network, the other being the
-    /// log_in. This will help create a fresh account for the user in the SAFE-network.
+    /// log_in. This will help create a fresh acc for the user in the SAFE-network.
     pub fn create_account(acc_locator: &str,
                           acc_password: &str,
                           core_tx: CoreMsgTx)
                           -> Result<Client, CoreError> {
-        trace!("Creating an account.");
+        trace!("Creating an acc.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
-        let account = Account::new(None, None);
-        let id_packet = FullId::with_keys((account.get_maid().public_keys().1,
-                                           account.get_maid().secret_keys().1.clone()),
-                                          (account.get_maid().public_keys().0,
-                                           account.get_maid().secret_keys().0.clone()));
+        let acc = Account::new(None, None);
+        let id_packet = FullId::with_keys((acc.get_maid().public_keys().1,
+                                           acc.get_maid().secret_keys().1.clone()),
+                                          (acc.get_maid().public_keys().0,
+                                           acc.get_maid().secret_keys().0.clone()));
 
         let (routing_tx, routing_rx) = mpsc::channel();
         let routing = try!(Routing::new(routing_tx, Some(id_packet)));
@@ -121,25 +115,23 @@ impl Client {
         }
         trace!("Connected to the Network.");
 
-        let session_pkt_id = try!(Account::generate_network_id(&keyword, &pin));
-        let session_pkt_keys = SessionPacketEncryptionKeys::new(password, pin);
-        let account_sd = try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                         *session_packet_id,
-                                         0,
-                                         try!(account.encrypt(session_pkt_keys.get_password(),
-                                                              session_pkt_keys.get_pin())),
-                                         vec![account.get_public_maid().public_keys().0.clone()],
-                                         Vec::new(),
-                                         Some(&account.get_maid().secret_keys().0)));
+        let acc_loc = try!(Account::generate_network_id(&keyword, &pin));
+        let user_cred = UserCred::new(password, pin);
+        let acc_sd = try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
+                                     *session_packet_id,
+                                     0,
+                                     try!(acc.encrypt(&user_cred.password, &user_cred.pin)),
+                                     vec![acc.get_public_maid().public_keys().0.clone()],
+                                     Vec::new(),
+                                     Some(&acc.get_maid().secret_keys().0)));
 
-        let Digest(digest) = sha256::hash(&(account.get_maid().public_keys().0).0);
-        let client_manager_addr = XorName(digest);
+        let Digest(digest) = sha256::hash(&(acc.get_maid().public_keys().0).0);
+        let cm_addr = Authority::ClientManager(XorName(digest));
 
-        let dst = Authority::ClientManager(client_manager_addr);
         let msg_id = MessageId::new();
-        try!(routing.send_put_request(dst, Data::Structured(account_sd), msg_id));
-        match routing_rx.recv_timeout(Duration::secs(CONNECTION_TIMEOUT_SECS)) {
-            Ok(Event::Response { response: Response::PutSuccess(_, id), .. }) => (),
+        try!(routing.send_put_request(cm_addr, Data::Structured(acc_sd), msg_id));
+        match routing_rx.recv_timeout(Duration::secs(ACC_PKT_PUT_TIMEOUT_SECS)) {
+            Ok(Event::Response { response: Response::PutSuccess(_, id), .. }) if id == msg_id => (),
             x => {
                 warn!("Could not put session packet to the Network. Unexpected: {:?}",
                       x);
@@ -153,10 +145,7 @@ impl Client {
         Ok(Client {
             routing: routing,
             heads: HashMap::with_capacity(10),
-            account: Some(account),
-            session_packet_id: Some(session_pkt_id),
-            session_pkt_keys: Some(session_pkt_keys),
-            client_manager_addr: Some(client_manager_addr),
+            client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
             _joiner: joiner,
         })
@@ -259,8 +248,8 @@ impl Client {
     }
 
     /// Get the default address where the PUTs will go to for this client
-    pub fn cm_addr(&self) -> Result<XorName, CoreError> {
-        self.client_manager_addr.ok_or(CoreError::OperationForbiddenForClient)
+    pub fn cm_addr(&self) -> Result<Authority, CoreError> {
+        self.client_type.cm_addr()
     }
 
     #[cfg(all(test, feature = "use-mock-routing"))]
@@ -273,25 +262,66 @@ impl Client {
 // Helper Struct
 // ------------------------------------------------------------
 
-struct SessionPacketEncryptionKeys {
+struct UserCred {
     pin: Vec<u8>,
     password: Vec<u8>,
 }
 
-impl SessionPacketEncryptionKeys {
-    fn new(password: Vec<u8>, pin: Vec<u8>) -> SessionPacketEncryptionKeys {
-        SessionPacketEncryptionKeys {
+impl UserCred {
+    fn new(password: Vec<u8>, pin: Vec<u8>) -> UserCred {
+        UserCred {
             pin: pin,
             password: password,
         }
     }
+}
 
-    fn get_password(&self) -> &[u8] {
-        &self.password[..]
+enum ClientType {
+    Unregistered,
+    Registered {
+        acc: Account,
+        acc_loc: XorName,
+        user_cred: UserCred,
+        cm_addr: Authority,
+    },
+}
+
+impl ClientType {
+    fn reg(acc: Account, acc_loc: XorName, user_cred: UserCred, cm_addr: Authority) -> Self {
+        ClientType::Registered {
+            acc: acc,
+            acc_loc: XorName,
+            user_cred: user_cred,
+            cm_addr: cm_addr,
+        }
     }
 
-    fn get_pin(&self) -> &[u8] {
-        &self.pin[..]
+    fn acc(&self) -> Result<&Account, CoreError> {
+        match *self {
+            ClientType::Registered { ref acc, .. } => Ok(acc),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn acc_loc(&self) -> Result<XorName, CoreError> {
+        match *self {
+            ClientType::Registered { acc_loc, .. } => Ok(acc_loc),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn user_cred(&self) -> Result<&UserCred, CoreError> {
+        match *self {
+            ClientType::Registered { ref user_cred, .. } => Ok(user_cred),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn cm_addr(&self) -> Result<Authority, CoreError> {
+        match *self {
+            ClientType::Registered { cm_addr, .. } => Ok(cm_addr),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
     }
 }
 
