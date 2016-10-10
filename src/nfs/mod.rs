@@ -19,21 +19,21 @@
 pub mod file;
 /// Errors
 pub mod errors;
-/// Helper for directory_listing and File for NFS Low level API
-pub mod helper;
+
+// /// Helper for directory_listing and File for NFS Low level API
+// pub mod helper;
+
 /// Directory and File Metadata
 pub mod metadata;
-/// Module for directory reltaed structs - DirectoryListin, DirectoryInfo
-pub mod directory_listing;
+/// Module for directory related structs
+pub mod dir;
 
 /// Root directory name
 pub const ROOT_DIRECTORY_NAME: &'static str = "USER_ROOT";
 /// Configuration directory Name stored in the session packet
 pub const CONFIGURATION_DIRECTORY_NAME: &'static str = "CONFIGURATION_ROOT";
-/// Tag representing the Versioned Directory Listing
-pub const VERSIONED_DIRECTORY_LISTING_TAG: u64 = ::core::CLIENT_STRUCTURED_DATA_TAG + 100;
-/// Tag representing the Versioned Directory Listing
-pub const UNVERSIONED_DIRECTORY_LISTING_TAG: u64 = VERSIONED_DIRECTORY_LISTING_TAG + 1;
+
+pub use nfs::dir::Dir;
 
 /// AccessLevel indicates whether the container is Private or Public shared
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]

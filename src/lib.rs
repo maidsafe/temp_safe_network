@@ -59,16 +59,15 @@ extern crate routing;
 extern crate rustc_serialize;
 extern crate rust_sodium;
 extern crate self_encryption;
-// extern crate time;
+extern crate time;
 extern crate tokio_core;
-#[cfg(feature = "use-mock-routing")]
 #[macro_use]
 extern crate unwrap;
 
 /// Core module
 pub mod core;
-// /// Nfs module;
-// pub mod nfs;
+/// Nfs module;
+pub mod nfs;
 // /// Dns module;
 // pub mod dns;
 // /// Ffi module;
