@@ -15,10 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+mod account;
 #[cfg(feature = "use-mock-routing")]
 mod non_networking_test_framework;
 mod routing_el;
-mod user_account;
 
 use core::{CoreError, CoreEvent, CoreMsgTx, HeadFuture, utility};
 use futures::{self, Future};
@@ -30,13 +30,14 @@ use routing::Client as Routing;
 use routing::client_errors::MutationError;
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
+use self::account::Account;
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
-use self::user_account::Account;
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::time::Duration;
 
+/// Return type of all the async functions exposed by `Client`.
 pub type ReturnType = Future<Item = CoreEvent, Error = CoreError>;
 
 const CONNECTION_TIMEOUT_SECS: u64 = 60;
