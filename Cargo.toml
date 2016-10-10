@@ -10,7 +10,7 @@ repository = "https://github.com/maidsafe/safe_core"
 version = "0.21.2"
 
 [dependencies]
-clippy = {version = "~0.0.91", optional = true}
+clippy = { version = "~0.0.91", optional = true }
 config_file_handler = "~0.4.0"
 futures = "0.1"
 lazy_static = "~0.2.1"
@@ -35,30 +35,37 @@ regex = "~0.1.77"
 
 [[example]]
 bench = false
+test = false
 name = "email_stress_test"
 
 [[example]]
 bench = false
+test = false
 name = "client_stress_test"
 
 [[example]]
 bench = false
+test = false
 name = "self_authentication"
 
 [[example]]
 bench = false
+test = false
 name = "safe_client"
 
 [[example]]
 bench = false
+test = false
 name = "nfs_api"
 
 [[example]]
 bench = false
+test = false
 name = "simulate_browser"
 
 [[example]]
 bench = false
+test = false
 name = "email"
 
 [features]
