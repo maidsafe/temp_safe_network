@@ -41,7 +41,7 @@ use std::time::Duration;
 pub type ReturnType = Future<Item = CoreEvent, Error = CoreError>;
 
 const CONNECTION_TIMEOUT_SECS: u64 = 60;
-const ACC_PKT_PUT_TIMEOUT_SECS: u64 = 60;
+const ACC_PKT_TIMEOUT_SECS: u64 = 60;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 
 /// The main self-authentication client instance that will interface all the request from high
@@ -91,8 +91,8 @@ impl Client {
         })
     }
 
-    /// This is one of the two main Gateway functions to the Maidsafe network, the other being the
-    /// log_in. This will help create a fresh acc for the user in the SAFE-network.
+    /// This is a Gateway function to the Maidsafe network. This will help create a fresh acc for
+    /// the user in the SAFE-network.
     pub fn create_account(acc_locator: &str,
                           acc_password: &str,
                           core_tx: CoreMsgTx)
@@ -135,7 +135,7 @@ impl Client {
 
         let msg_id = MessageId::new();
         try!(routing.send_put_request(cm_addr.clone(), Data::Structured(acc_sd), msg_id));
-        match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_PUT_TIMEOUT_SECS)) {
+        match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
             Ok(Event::Response { response: Response::PutSuccess(_, id), .. }) if id == msg_id => (),
             x => {
                 warn!("Could not put session packet to the Network. Unexpected: {:?}",
@@ -157,14 +157,98 @@ impl Client {
         })
     }
 
+    /// This is a Gateway function to the Maidsafe network. This will help login to an already
+    /// existing account of the user in the SAFE-network.
+    pub fn log_in(acc_locator: &str,
+                  acc_password: &str,
+                  core_tx: CoreMsgTx)
+                  -> Result<Client, CoreError> {
+        trace!("Attempting to log into an acc.");
+
+        let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
+
+        let acc_loc = try!(Account::generate_network_id(&keyword, &pin));
+        let user_cred = UserCred::new(password, pin);
+        let acc_sd_id = DataIdentifier::Structured(acc_loc, TYPE_TAG_SESSION_PACKET);
+
+        let msg_id = MessageId::new();
+        let dst = Authority::NaeManager(*acc_sd_id.name());
+
+        let acc_sd = {
+            trace!("Creating throw-away routing getter for account packet.");
+            let (routing_tx, routing_rx) = mpsc::channel();
+            let mut routing = try!(Routing::new(routing_tx, None));
+
+            trace!("Waiting to get connected to the Network...");
+            match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
+                Ok(Event::Connected) => (),
+                x => {
+                    warn!("Could not connect to the Network. Unexpected: {:?}", x);
+                    return Err(CoreError::OperationAborted);
+                }
+            }
+            trace!("Connected to the Network.");
+
+            try!(routing.send_get_request(dst, acc_sd_id, msg_id));
+            match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
+                Ok(Event::Response { response:
+                    Response::GetSuccess(Data::Structured(data), id), .. }) => {
+                    if id == msg_id {
+                        data
+                    } else {
+                        return Err(CoreError::OperationAborted);
+                    }
+                }
+                x => {
+                    warn!("Could not fetch account packet from the Network. Unexpected: {:?}",
+                          x);
+                    return Err(CoreError::OperationAborted);
+                }
+            }
+        };
+
+        let acc = try!(Account::decrypt(acc_sd.get_data(), &user_cred.password, &user_cred.pin));
+        let id_packet = FullId::with_keys((acc.get_maid().public_keys().1,
+                                           acc.get_maid().secret_keys().1.clone()),
+                                          (acc.get_maid().public_keys().0,
+                                           acc.get_maid().secret_keys().0.clone()));
+
+        let Digest(digest) = sha256::hash(&(acc.get_maid().public_keys().0).0);
+        let cm_addr = Authority::ClientManager(XorName(digest));
+
+        trace!("Creating an actual routing...");
+        let (routing_tx, routing_rx) = mpsc::channel();
+        let routing = try!(Routing::new(routing_tx, Some(id_packet)));
+
+        trace!("Waiting to get connected to the Network...");
+        match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
+            Ok(Event::Connected) => (),
+            x => {
+                warn!("Could not connect to the Network. Unexpected: {:?}", x);
+                return Err(CoreError::OperationAborted);
+            }
+        }
+        trace!("Connected to the Network.");
+
+        let joiner = thread::named("Routing Event Loop",
+                                   move || routing_el::run(routing_rx, core_tx));
+
+        Ok(Client {
+            routing: routing,
+            heads: HashMap::with_capacity(10),
+            cache: Rc::new(RefCell::new(LruCache::new(IMMUT_DATA_CACHE_SIZE))),
+            client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
+            stats: Default::default(),
+            _joiner: joiner,
+        })
+    }
+
     /// Remove `head` of the future chain, the `tail` of which is probaly being processed in event
     /// loop.
     pub fn remove_head(&mut self, id: &MessageId) -> Option<HeadFuture> {
         self.heads.remove(id)
     }
 
-    // TODO All these return the same future from all branches. So convert to impl Trait when it
-    // arrives in stable. Change from `Box<ReturnType>` -> `impl ReturnType`.
     /// Get data from the network. If the data exists locally in the cache (for ImmutableData) then
     /// it will immediately be returned without making an actual network request.
     pub fn get(&mut self, data_id: DataIdentifier, opt_dst: Option<Authority>) -> Box<ReturnType> {
@@ -210,6 +294,8 @@ impl Client {
         rx
     }
 
+    // TODO All these return the same future from all branches. So convert to impl Trait when it
+    // arrives in stable. Change from `Box<ReturnType>` -> `impl ReturnType`.
     /// Put data onto the network.
     pub fn put(&mut self, data: Data, opt_dst: Option<Authority>) -> Box<ReturnType> {
         trace!("PUT for {:?}", data);
