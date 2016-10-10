@@ -16,13 +16,12 @@
 // relating to use of the SAFE Network Software.
 
 
-use core::{CoreError, CoreEvent, CPtr};
+use core::{CoreError, CPtr};
 use futures::{self, Future};
 use routing::{Data, DataIdentifier, ImmutableData, XOR_NAME_LEN, XorName};
 use self_encryption::{Storage, StorageError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
 
 /// Network storage is the concrete type which self-encryption crate will use to put or get data
 /// from the network
@@ -58,34 +57,19 @@ impl Storage for SelfEncryptionStorage {
         };
 
         let data_id = DataIdentifier::Immutable(XorName(name));
-        Box::new(self.client.borrow_mut().get(data_id, None)
-            .map_err(From::from)
-            .and_then(|event| {
-            match event {
-                CoreEvent::Get(Ok(Data::Immutable(data))) => Ok(data.value().clone()),
-                _ => {
-                    let err = CoreError::Unexpected("Received unexpected response.".to_owned());
-                    Err(SelfEncryptionStorageError::from(err))
-                }
-            }
-        }))
+        Box::new(self.client.borrow_mut()
+            .get(data_id, None)
+            .and_then(|data| match data {
+                Data::Immutable(data) => Ok(data.value().clone()),
+                _ => Err(CoreError::ReceivedUnexpectedData),
+            })
+            .map_err(From::from))
     }
 
     fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Box<Future<Item=(), Error=Self::Error>> {
         trace!("Self encrypt invoked PUT.");
         let data = Data::Immutable(ImmutableData::new(data));
-        Box::new(self.client.borrow_mut()
-            .put(data, None)
-            .map_err(From::from)
-            .and_then(|event| {
-                match event {
-                    CoreEvent::Mutation(Ok(_)) => Ok(()),
-                    _ => {
-                        let err = CoreError::Unexpected("Received unexpected response.".to_owned());
-                        Err(SelfEncryptionStorageError::from(err))
-                    }
-                }
-        }))
+        Box::new(self.client.borrow_mut().put(data, None).map_err(From::from))
     }
 }
 

@@ -41,8 +41,10 @@ pub enum CoreError {
     AsymmetricDecipherFailure,
     /// Symmetric Key Decryption Failed
     SymmetricDecipherFailure,
-    /// ReceivedUnexpectedData
+    /// Received unexpected data
     ReceivedUnexpectedData,
+    /// Received unexpected event
+    ReceivedUnexpectedEvent,
     /// No such data found in local version cache
     VersionCacheMiss,
     /// Cannot overwrite a root directory if it already exists
@@ -214,6 +216,7 @@ impl Into<i32> for CoreError {
             //                           ::<SelfEncryptionStorageError>(
             //                               SelfEncryptionStorageError(err))) => (*err).into(),
             CoreError::InvalidStructuredDataTypeTag => CLIENT_ERROR_START_RANGE - 35,
+            CoreError::ReceivedUnexpectedEvent => CLIENT_ERROR_START_RANGE - 36,
         }
     }
 }
@@ -238,6 +241,9 @@ impl Debug for CoreError {
             }
             CoreError::ReceivedUnexpectedData => {
                 write!(formatter, "CoreError::ReceivedUnexpectedData")
+            }
+            CoreError::ReceivedUnexpectedEvent => {
+                write!(formatter, "CoreError::ReceivedUnexpectedEvent")
             }
             CoreError::VersionCacheMiss => write!(formatter, "CoreError::VersionCacheMiss"),
             CoreError::RootDirectoryAlreadyExists => {
@@ -312,6 +318,7 @@ impl Display for CoreError {
             }
             CoreError::SymmetricDecipherFailure => write!(formatter, "Symmetric decryption failed"),
             CoreError::ReceivedUnexpectedData => write!(formatter, "Received unexpected data"),
+            CoreError::ReceivedUnexpectedEvent => write!(formatter, "Received unexpected event"),
             CoreError::VersionCacheMiss => {
                 write!(formatter, "No such data found in local version cache")
             }
@@ -380,6 +387,7 @@ impl Error for CoreError {
             CoreError::AsymmetricDecipherFailure => "Asymmetric decryption failure",
             CoreError::SymmetricDecipherFailure => "Symmetric decryption failure",
             CoreError::ReceivedUnexpectedData => "Received unexpected data",
+            CoreError::ReceivedUnexpectedEvent => "Received unexpected event",
             CoreError::VersionCacheMiss => "Version cache miss",
             CoreError::RootDirectoryAlreadyExists => "Root directory already exists",
             CoreError::RandomDataGenerationFailure => "Cannot obtain RNG",

@@ -15,7 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use futures::Complete;
+// TODO: remove this
+#![allow(unused)]
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -27,8 +29,6 @@ mod macros;
 pub mod id;
 /// Safe-Core Errors
 pub mod errors;
-// /// Self-Authentication and Gateway Module
-// pub mod client;
 /// Utility functions
 pub mod utility;
 /// Implements the Self Encryption storage trait
@@ -41,11 +41,8 @@ pub mod self_encryption_storage;
 pub use self::client::Client;
 pub use self::core_el::{CoreMsg, CoreMsgTx, TailFuture, run};
 pub use self::errors::CoreError;
-pub use self::event::CoreEvent;
 pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
 
-/// `Head` of the future chain, the tail part of which is probably being processed in event loop.
-pub type HeadFuture = Complete<CoreEvent>;
 /// Handle to the main Client object.
 pub type CPtr = Rc<RefCell<Client>>;
 

@@ -15,10 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// TODO Remove this
-#![allow(unused)]
-
-use core::{CoreError, CoreEvent, CoreMsg, CoreMsgTx, TailFuture};
+use core::{CoreError, CoreMsg, CoreMsgTx};
+use core::event::CoreEvent;
 use maidsafe_utilities::serialisation::deserialise;
 use routing::{Event, MessageId, Response};
 use routing::client_errors::{GetError, MutationError};
@@ -104,7 +102,7 @@ fn parse_get_err(reason_raw: Vec<u8>) -> GetError {
 /// sending fails for some other reason, treat it as an exit condition. The return value thus
 /// signifies if the firing was successful.
 fn fire(core_tx: &CoreMsgTx, id: MessageId, event: CoreEvent) -> bool {
-    let msg = CoreMsg::new(move |cptr| -> Option<TailFuture> {
+    let msg = CoreMsg::new(move |cptr| {
         if let Some(head) = cptr.borrow_mut().remove_head(&id) {
             head.complete(event);
         }
