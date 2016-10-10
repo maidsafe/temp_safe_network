@@ -27,17 +27,17 @@ mod macros;
 pub mod id;
 /// Safe-Core Errors
 pub mod errors;
-/// Self-Authentication and Gateway Module
-pub mod client;
+// /// Self-Authentication and Gateway Module
+// pub mod client;
 /// Utility functions
 pub mod utility;
 /// Events filtered from set of Routing provided events, on which the Client Modules must
 /// specifically act
 pub mod translated_events;
-/// Implements the Self Encryption storage trait
-pub mod self_encryption_storage;
-/// Implements the Self Encryption storage error trait
-pub mod self_encryption_storage_error;
+// /// Implements the Self Encryption storage trait
+// pub mod self_encryption_storage;
+// /// Implements the Self Encryption storage error trait
+// pub mod self_encryption_storage_error;
 // /// Helper functions to handle ImmutableData related operations
 // pub mod immut_data_operations;
 // /// Helper functions to handle StructuredData related operations
@@ -47,8 +47,8 @@ pub use self::client::Client;
 pub use self::core_el::{CoreMsg, CoreMsgTx, TailFuture, run};
 pub use self::errors::CoreError;
 pub use self::event::CoreEvent;
-pub use self::self_encryption_storage::SelfEncryptionStorage;
-pub use self::self_encryption_storage_error::SelfEncryptionStorageError;
+// pub use self::self_encryption_storage::SelfEncryptionStorage;
+// pub use self::self_encryption_storage_error::SelfEncryptionStorageError;
 
 /// `Head` of the future chain, the tail part of which is probably being processed in event loop.
 pub type HeadFuture = Complete<CoreEvent>;
@@ -61,5 +61,6 @@ pub const MAIDSAFE_TAG: u64 = 5483_000;
 /// through this safe_core crate
 pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;
 
+mod client;
 mod core_el;
 mod event;

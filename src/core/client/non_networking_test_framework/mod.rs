@@ -609,790 +609,798 @@ impl RoutingMock {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use core::client::message_queue::MessageQueue;
-    use core::client::response_getter::{GetAccountInfoResponseGetter, GetResponseGetter,
-                                        MutationResponseGetter};
-    use core::client::user_account::Account;
-    use core::errors::CoreError;
-    use core::translated_events::NetworkEvent;
-
-    use core::utility;
-
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
-    use rand;
-    use routing::{AppendWrapper, AppendedData, Authority, Data, DataIdentifier, Filter, FullId,
-                  ImmutableData, InterfaceError, MessageId, PubAppendableData, StructuredData,
-                  XOR_NAME_LEN, XorName};
-    use routing::client_errors::{GetError, MutationError};
-    use rust_sodium::crypto::sign;
-    use std::collections::HashMap;
-    use std::iter;
-    use std::sync::{Arc, Mutex};
-    use std::sync::mpsc;
-    use super::*;
-    use super::storage::DEFAULT_CLIENT_ACCOUNT_SIZE;
-
-    #[test]
-    fn map_serialisation() {
-        let mut map_before = HashMap::<XorName, Vec<u8>>::new();
-        let _ = map_before.insert(XorName([1; XOR_NAME_LEN]), vec![1; 10]);
-
-        let serialised_data = unwrap!(serialise(&map_before));
-
-        let map_after: HashMap<XorName, Vec<u8>> = unwrap!(deserialise(&serialised_data));
-        assert_eq!(map_before, map_after);
-    }
-
-    #[test]
-    fn check_put_post_get_delete_for_immutable_data() {
-        let (_, id_packet) = create_account_and_full_id();
-
-        let (routing_sender, routing_receiver) = mpsc::channel();
-        let (network_event_sender, network_event_receiver) = mpsc::channel();
-
-        let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
-                                                              vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
-
-        match unwrap!(network_event_receiver.recv()) {
-            NetworkEvent::Connected => (),
-            _ => panic!("Could not Connect !!"),
-        }
-
-        // Construct ImmutableData
-        let orig_immutable_data = generate_random_immutable_data();
-        let orig_data = Data::Immutable(orig_immutable_data);
-
-        let location_nae_mgr = Authority::NaeManager(*orig_data.name());
-        let location_client_mgr = Authority::ClientManager(*orig_data.name());
-
-        // GET ImmutableData should fail
-        {
-            let result = do_get(&mut mock_routing,
-                                message_queue.clone(),
-                                location_nae_mgr.clone(),
-                                orig_data.identifier());
-
-            match result {
-                Ok(_) => panic!("Expected Get Failure!"),
-                Err(CoreError::GetFailure { reason: GetError::NoSuchData, .. }) => (),
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
-        }
-
-        // First PUT should succeed
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       location_client_mgr.clone(),
-                       orig_data.clone()));
-
-        // GET ImmutableData should pass
-        assert_eq!(unwrap!(do_get(&mut mock_routing,
-                                  message_queue.clone(),
-                                  location_nae_mgr.clone(),
-                                  orig_data.identifier())),
-                   orig_data);
-
-        // GetAccountInfo should pass and show one chunk stored
-        assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
-                                               message_queue.clone(),
-                                               location_client_mgr.clone())),
-
-                   (1, DEFAULT_CLIENT_ACCOUNT_SIZE - 1));
-
-        // Subsequent PUTs for same ImmutableData should succeed - De-duplication
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       location_client_mgr.clone(),
-                       orig_data.clone()));
-
-        // POSTs for ImmutableData should fail
-        {
-            let result = do_post(&mut mock_routing,
-                                 message_queue.clone(),
-                                 location_nae_mgr.clone(),
-                                 orig_data.clone());
-
-            match result {
-                Ok(_) => panic!("Expected Post Failure!"),
-                Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. }) => {
-                    ()
-                }
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
-        }
-
-        // DELETEs of ImmutableData should fail
-        {
-            let result = do_delete(&mut mock_routing,
-                                   message_queue.clone(),
-                                   location_client_mgr.clone(),
-                                   orig_data.clone());
-
-            match result {
-                Ok(_) => panic!("Expected Delete Failure!"),
-                Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. }) => {
-                    ()
-                }
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
-        }
-
-        // GET ImmutableData should pass
-        assert_eq!(unwrap!(do_get(&mut mock_routing,
-                                  message_queue.clone(),
-                                  location_nae_mgr.clone(),
-                                  orig_data.identifier())),
-                   orig_data);
-
-        // GetAccountInfo should pass and show two chunks stored
-        assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
-                                               message_queue.clone(),
-                                               location_client_mgr)),
-
-                   (2, DEFAULT_CLIENT_ACCOUNT_SIZE - 2));
-    }
-
-    #[test]
-    fn check_put_post_get_delete_for_structured_data() {
-        let (account_packet, id_packet) = create_account_and_full_id();
-
-        let (routing_sender, routing_receiver) = mpsc::channel();
-        let (network_event_sender, network_event_receiver) = mpsc::channel();
-
-        let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
-                                                              vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
-
-        match unwrap!(network_event_receiver.recv()) {
-            NetworkEvent::Connected => (),
-            _ => panic!("Could not Bootstrap !!"),
-        }
-
-        let owner_key = account_packet.get_public_maid().public_keys().0.clone();
-
-        // Construct ImmutableData
-        let orig_immutable_data = generate_random_immutable_data();
-        let orig_data = Data::Immutable(orig_immutable_data);
-
-        const TYPE_TAG: u64 = 999;
-
-        // Construct StructuredData, 1st version, for this ImmutableData
-        let keyword = unwrap!(utility::generate_random_string(10));
-        let pin = unwrap!(utility::generate_random_string(10));
-        let user_id = unwrap!(Account::generate_network_id(keyword.as_bytes(),
-                                                           pin.to_string().as_bytes()));
-        let account_ver_res =
-            StructuredData::new(TYPE_TAG,
-                                user_id,
-                                0,
-                                unwrap!(serialise(&vec![orig_data.name()])),
-                                vec![account_packet.get_public_maid().public_keys().0.clone()],
-                                Vec::new(),
-                                Some(&account_packet.get_maid().secret_keys().0));
-        let mut account_version = unwrap!(account_ver_res);
-        let mut data_account_version = Data::Structured(account_version);
-
-
-        let location_nae_mgr_immut = Authority::NaeManager(*orig_data.name());
-        let location_nae_mgr_struct = Authority::NaeManager(*data_account_version.name());
-
-        let location_client_mgr_immut = Authority::ClientManager(*orig_data.name());
-        let location_client_mgr_struct = Authority::ClientManager(*data_account_version.name());
-
-        // First PUT of StructuredData should succeed
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       location_client_mgr_struct.clone(),
-                       data_account_version.clone()));
-
-        // PUT for ImmutableData should succeed
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       location_client_mgr_immut.clone(),
-                       orig_data.clone()));
-
-        let mut received_structured_data: StructuredData;
-
-        // GET StructuredData should pass
-        {
-            let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
-            let data = unwrap!(do_get(&mut mock_routing,
-                                      message_queue.clone(),
-                                      location_client_mgr_struct.clone(),
-                                      struct_data_id));
-
-            assert_eq!(data, data_account_version);
-            match data {
-                Data::Structured(struct_data) => received_structured_data = struct_data,
-                _ => unreachable!("Unexpected! {:?}", data),
-            }
-        }
-
-        // GetAccountInfo should pass and show two chunks stored
-        assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
-                                               message_queue.clone(),
-                                               location_client_mgr_struct.clone())),
-
-                   (2, DEFAULT_CLIENT_ACCOUNT_SIZE - 2));
-
-        // GET ImmutableData from latest version of StructuredData should pass
-        {
-            let mut location_vec =
-                unwrap!(deserialise::<Vec<XorName>>(received_structured_data.get_data()));
-            let immut_data_id = DataIdentifier::Immutable(unwrap!(location_vec.pop(),
-                                                                  "Value must exist !"));
-
-            assert_eq!(unwrap!(do_get(&mut mock_routing,
-                                      message_queue.clone(),
-                                      location_client_mgr_immut.clone(),
-                                      immut_data_id)),
-                       orig_data);
-        }
-
-        // Construct ImmutableData
-        let new_immutable_data = generate_random_immutable_data();
-        let new_data = Data::Immutable(new_immutable_data);
-
-        // PUT for new ImmutableData should succeed
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       location_client_mgr_struct.clone(),
-                       new_data.clone()));
-
-        // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Versioning
-        let invalid_version_account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                               user_id,
-                                               0,
-                                               Vec::new(),
-                                               vec![owner_key.clone()],
-                                               Vec::new(),
-                                               Some(&account_packet.get_maid()
-                                                   .secret_keys()
-                                                   .0)));
-        let invalid_version_data_account_version =
-            Data::Structured(invalid_version_account_version);
-
-        // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Signature
-        let invalid_signature_account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                        user_id,
-                                        1,
-                                        Vec::new(),
-                                        vec![owner_key.clone()],
-                                        Vec::new(),
-                                        Some(&account_packet.get_mpid().secret_keys().0)));
-        let invalid_signature_data_account_version =
-            Data::Structured(invalid_signature_account_version);
-
-        let data_for_version_2 = unwrap!(serialise(&vec![orig_data.name(), new_data.name()]));
-        // Construct StructuredData, 2nd version, for this ImmutableData - Valid
-        account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id,
-                                                      1,
-                                                      data_for_version_2,
-                                                      vec![owner_key.clone()],
-                                                      Vec::new(),
-                                                      Some(&account_packet.get_maid()
-                                                          .secret_keys()
-                                                          .0)));
-        data_account_version = Data::Structured(account_version);
-
-        // Subsequent PUTs for same StructuredData should fail
-        {
-            let result = do_put(&mut mock_routing,
-                                message_queue.clone(),
-                                location_client_mgr_struct.clone(),
-                                data_account_version.clone());
-
-            match result {
-                Ok(_) => panic!("Expected Put Failure!"),
-                Err(CoreError::MutationFailure { reason: MutationError::DataExists, .. }) => (),
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
-        }
-
-        // Subsequent POSTSs for same StructuredData should fail if versioning is invalid
-        {
-            let result = do_post(&mut mock_routing,
-                                 message_queue.clone(),
-                                 location_nae_mgr_struct.clone(),
-                                 invalid_version_data_account_version);
-
-            match result {
-                Ok(_) => panic!("Expected Post Failure!"),
-                Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => {
-                    ()
-                }
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
-        }
-
-        // Subsequent POSTSs for same StructuredData should fail if signature is invalid
-        {
-            let result = do_post(&mut mock_routing,
-                                 message_queue.clone(),
-                                 location_client_mgr_struct.clone(),
-                                 invalid_signature_data_account_version);
-
-            match result {
-                Ok(_) => panic!("Expected Post Failure!"),
-                Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => {
-                    ()
-                }
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
-        }
-
-        // Subsequent POSTSs for existing StructuredData version should pass for valid update
-        unwrap!(do_post(&mut mock_routing,
-                        message_queue.clone(),
-                        location_nae_mgr_struct.clone(),
-                        data_account_version.clone()));
-
-        // GET for new StructuredData version should pass
-        {
-            let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
-            let data = unwrap!(do_get(&mut mock_routing,
-                                      message_queue.clone(),
-                                      location_nae_mgr_struct.clone(),
-                                      struct_data_id));
-
-            assert_eq!(data, data_account_version);
-            match data {
-                Data::Structured(struct_data) => received_structured_data = struct_data,
-                _ => unreachable!("Unexpected! {:?}", data),
-            }
-        }
-
-        let location_vec =
-            unwrap!(deserialise::<Vec<XorName>>(received_structured_data.get_data()));
-        assert_eq!(location_vec.len(), 2);
-
-        // GET new ImmutableData should pass
-        {
-            let immut_data_id = DataIdentifier::Immutable(location_vec[1]);
-            assert_eq!(unwrap!(do_get(&mut mock_routing,
-                                      message_queue.clone(),
-                                      location_nae_mgr_immut.clone(),
-                                      immut_data_id)),
-                       new_data);
-        }
-
-        // GET original ImmutableData should pass
-        {
-            let immut_data_id = DataIdentifier::Immutable(location_vec[0]);
-            assert_eq!(unwrap!(do_get(&mut mock_routing,
-                                      message_queue.clone(),
-                                      location_client_mgr_immut.clone(),
-                                      immut_data_id)),
-                       orig_data);
-        }
-
-        // DELETE of Structured Data without version bump should fail
-        {
-            let result = do_delete(&mut mock_routing,
-                                   message_queue.clone(),
-                                   location_client_mgr_struct.clone(),
-                                   data_account_version.clone());
-
-            match result {
-                Ok(_) => panic!("Expected Delete Failure!"),
-                Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => {
-                    ()
-                }
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
-        }
-
-        // GET for StructuredData version should still pass
-        {
-            let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
-            assert_eq!(unwrap!(do_get(&mut mock_routing,
-                                      message_queue.clone(),
-                                      location_client_mgr_struct.clone(),
-                                      struct_data_id)),
-                       data_account_version);
-        }
-
-        // Construct StructuredData, 3rd version, for DELETE - Valid
-        account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id,
-                                                      2,
-                                                      Vec::new(),
-                                                      vec![owner_key.clone()],
-                                                      Vec::new(),
-                                                      Some(&account_packet.get_maid()
-                                                          .secret_keys()
-                                                          .0)));
-        data_account_version = Data::Structured(account_version);
-
-        // DELETE of Structured Data with version bump should pass
-        unwrap!(do_delete(&mut mock_routing,
-                          message_queue.clone(),
-                          location_client_mgr_struct,
-                          data_account_version));
-
-        // GET for DELETED StructuredData version should fail
-        {
-            let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
-            let result = do_get(&mut mock_routing,
-                                message_queue.clone(),
-                                location_nae_mgr_struct.clone(),
-                                struct_data_id);
-
-            match result {
-                Ok(_) => panic!("Expected Get Failure!"),
-                Err(CoreError::GetFailure { reason: GetError::NoSuchData, .. }) => (),
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
-        }
-
-        // GetAccountInfo should pass and show three chunks stored
-        assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
-                                               message_queue.clone(),
-                                               location_client_mgr_immut)),
-                   (3, DEFAULT_CLIENT_ACCOUNT_SIZE - 3));
-    }
-
-    #[test]
-    fn check_put_post_get_append_delete_for_pub_appendable_data() {
-        let (account_packet, id_packet) = create_account_and_full_id();
-
-        let (routing_sender, routing_receiver) = mpsc::channel();
-        let (network_event_sender, network_event_receiver) = mpsc::channel();
-
-        let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
-                                                              vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
-
-        match unwrap!(network_event_receiver.recv()) {
-            NetworkEvent::Connected => (),
-            _ => panic!("Could not Bootstrap !!"),
-        }
-
-        let owner_key = account_packet.get_public_maid().public_keys().0.clone();
-        let signing_key = account_packet.get_maid().secret_keys().0.clone();
-
-        // Construct some immutable data to be later appended to an appendable data.
-        let immut_data_0 = Data::Immutable(generate_random_immutable_data());
-        let immut_data_0_nae_mgr = Authority::NaeManager(*immut_data_0.name());
-
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       immut_data_0_nae_mgr,
-                       immut_data_0.clone()));
-
-        let immut_data_1 = Data::Immutable(generate_random_immutable_data());
-        let immut_data_1_nae_mgr = Authority::NaeManager(*immut_data_1.name());
-
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       immut_data_1_nae_mgr,
-                       immut_data_1.clone()));
-
-        // Construct appendable data
-        let appendable_data_name = rand::random();
-        let appendable_data_nae_mgr = Authority::NaeManager(appendable_data_name);
-
-        let appendable_data = unwrap!(PubAppendableData::new(appendable_data_name,
-                                                             0,
-                                                             vec![owner_key],
-                                                             vec![],
-                                                             Default::default(),
-                                                             Filter::black_list(iter::empty()),
-                                                             Some(&signing_key)));
-
-        let appendable_data_id = appendable_data.identifier();
-
-        // PUT it to the network
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       appendable_data_nae_mgr.clone(),
-                       Data::PubAppendable(appendable_data)));
-
-        // APPEND data
-        {
-            let appended_data =
-                unwrap!(AppendedData::new(immut_data_0.identifier(), owner_key, &signing_key));
-            let append_wrapper = AppendWrapper::new_pub(appendable_data_name, appended_data, 0);
-
-            unwrap!(do_append(&mut mock_routing,
-                              message_queue.clone(),
-                              appendable_data_nae_mgr.clone(),
-                              append_wrapper));
-        }
-
-        // GET the appendable data back from the network and verify it has the
-        // previously appended data.
-        let appendable_data = unwrap!(do_get(&mut mock_routing,
-                                             message_queue.clone(),
-                                             appendable_data_nae_mgr.clone(),
-                                             appendable_data_id));
-
-        let appendable_data = match appendable_data {
-            Data::PubAppendable(data) => data,
-            _ => panic!("Unexpected data type"),
-        };
-
-        assert_eq!(appendable_data.name, appendable_data_name);
-        assert_eq!(appendable_data.data.len(), 1);
-
-        let appended_data = unwrap!(appendable_data.data.iter().next());
-        assert_eq!(appended_data.pointer, immut_data_0.identifier());
-
-        // APPEND more data
-        {
-            let appended_data =
-                unwrap!(AppendedData::new(immut_data_1.identifier(), owner_key, &signing_key));
-            let append_wrapper = AppendWrapper::new_pub(appendable_data_name,
-                                                        appended_data,
-                                                        appendable_data.version);
-
-            unwrap!(do_append(&mut mock_routing,
-                              message_queue.clone(),
-                              appendable_data_nae_mgr.clone(),
-                              append_wrapper));
-        }
-
-        // GET the appendable data back from the network and verify it has all the
-        // previously appended data.
-        let appendable_data = unwrap!(do_get(&mut mock_routing,
-                                             message_queue.clone(),
-                                             appendable_data_nae_mgr.clone(),
-                                             appendable_data_id));
-
-        let appendable_data = match appendable_data {
-            Data::PubAppendable(data) => data,
-            _ => panic!("Unexpected data type"),
-        };
-
-        assert_eq!(appendable_data.version, 0);
-        assert_eq!(appendable_data.name, appendable_data_name);
-        assert_eq!(appendable_data.data.len(), 2);
-
-        // POST without version bump should fail
-        let result = do_post(&mut mock_routing,
-                             message_queue.clone(),
-                             appendable_data_nae_mgr.clone(),
-                             Data::PubAppendable(appendable_data.clone()));
-
-        match result {
-            Ok(_) => panic!("Expected POST failure"),
-            Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => (),
-            Err(error) => panic!("Unexpected: {:?}", error),
-        }
-
-        // POST with modified filter.
-        let (blacklisted_pk, blacklisted_sk) = sign::gen_keypair();
-        let filter = Filter::black_list(iter::once(blacklisted_pk));
-        let appendable_data =
-            unwrap!(PubAppendableData::new(appendable_data.name,
-                                           appendable_data.version + 1,
-                                           appendable_data.current_owner_keys.clone(),
-                                           appendable_data.previous_owner_keys.clone(),
-                                           appendable_data.deleted_data.clone(),
-                                           filter,
-                                           Some(&signing_key)));
-
-        unwrap!(do_post(&mut mock_routing,
-                        message_queue.clone(),
-                        appendable_data_nae_mgr.clone(),
-                        Data::PubAppendable(appendable_data)));
-
-        // GET it back and verify the filter and version are modified.
-        let appendable_data = unwrap!(do_get(&mut mock_routing,
-                                             message_queue.clone(),
-                                             appendable_data_nae_mgr.clone(),
-                                             appendable_data_id));
-
-        let appendable_data = match appendable_data {
-            Data::PubAppendable(data) => data,
-            _ => panic!("Unexpected data type"),
-        };
-
-        assert_eq!(appendable_data.version, 1);
-
-        match appendable_data.filter {
-            Filter::BlackList(ref list) => {
-                assert_eq!(list.len(), 1);
-                assert!(list.contains(&blacklisted_pk));
-            }
-            _ => panic!("Unexpected filter type"),
-        }
-
-        // APPEND by a blacklisted user should fail.
-        {
-            let immut_data_name = rand::random();
-            let immut_data_id = DataIdentifier::Immutable(immut_data_name);
-
-            let appended_data =
-                unwrap!(AppendedData::new(immut_data_id, blacklisted_pk, &blacklisted_sk));
-            let append_wrapper = AppendWrapper::new_pub(appendable_data_name,
-                                                        appended_data,
-                                                        appendable_data.version);
-
-            let result = do_append(&mut mock_routing,
-                                   message_queue.clone(),
-                                   appendable_data_nae_mgr.clone(),
-                                   append_wrapper);
-
-            match result {
-                Ok(_) => panic!("Expected APPEND failure"),
-                Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => {
-                    ()
-                }
-                Err(error) => panic!("Unexpected {:?}", error),
-            }
-        }
-
-        // TODO: test also whitelist
-
-        // PUT with data already appended.
-        let appendable_data_name = rand::random();
-        let appendable_data_nae_mgr = Authority::NaeManager(appendable_data_name);
-
-        let mut appendable_data = unwrap!(PubAppendableData::new(appendable_data_name,
-                                                                 0,
-                                                                 vec![owner_key],
-                                                                 vec![],
-                                                                 Default::default(),
-                                                                 Filter::black_list(iter::empty()),
-                                                                 Some(&signing_key)));
-
-        let appendable_data_id = appendable_data.identifier();
-
-        let appended_data =
-            unwrap!(AppendedData::new(immut_data_0.identifier(), owner_key, &signing_key));
-        assert!(appendable_data.append(appended_data));
-
-        unwrap!(do_put(&mut mock_routing,
-                       message_queue.clone(),
-                       appendable_data_nae_mgr.clone(),
-                       Data::PubAppendable(appendable_data)));
-
-        // GET it back and verify the appended data is there.
-        let appendable_data = unwrap!(do_get(&mut mock_routing,
-                                             message_queue.clone(),
-                                             appendable_data_nae_mgr.clone(),
-                                             appendable_data_id));
-
-        let appendable_data = match appendable_data {
-            Data::PubAppendable(data) => data,
-            _ => panic!("Unexpected data type"),
-        };
-
-        assert_eq!(appendable_data.data.len(), 1);
-
-        let appended_data = unwrap!(appendable_data.data.iter().next());
-        assert_eq!(appended_data.pointer, immut_data_0.identifier());
-
-        // TODO: test POST with appended data too
-        // TODO: test simultaneous POSTs with different appended data - verify
-        // the appendable data contains data items from both POSTs afterwards.
-    }
-
-    fn create_account_and_full_id() -> (Account, FullId) {
-        let account = Account::new(None, None);
-        let id = FullId::with_keys((account.get_maid().public_keys().1,
-                                    account.get_maid().secret_keys().1.clone()),
-                                   (account.get_maid().public_keys().0,
-                                    account.get_maid().secret_keys().0.clone()));
-
-        (account, id)
-    }
-
-    fn generate_random_immutable_data() -> ImmutableData {
-        let data = unwrap!(utility::generate_random_vector(100));
-        ImmutableData::new(data)
-    }
-
-    // Do a GET request and wait for the response.
-    fn do_get(routing: &mut RoutingMock,
-              message_queue: Arc<Mutex<MessageQueue>>,
-              dst: Authority,
-              data_id: DataIdentifier)
-              -> Result<Data, CoreError> {
-        let (tx, rx) = mpsc::channel();
-        let message_id = MessageId::new();
-
-        unwrap!(message_queue.lock()).register_response_observer(message_id, tx.clone());
-        unwrap!(routing.send_get_request(dst, data_id, message_id));
-
-        let resp_getter = GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), data_id);
-        resp_getter.get()
-    }
-
-    // Do a PUT request and wait for the response.
-    fn do_put(routing: &mut RoutingMock,
-              message_queue: Arc<Mutex<MessageQueue>>,
-              dst: Authority,
-              data: Data)
-              -> Result<(), CoreError> {
-        do_mutation_request(message_queue,
-                            |message_id| routing.send_put_request(dst, data, message_id))
-    }
-
-    // Do a POST request and wait for the response.
-    fn do_post(routing: &mut RoutingMock,
-               message_queue: Arc<Mutex<MessageQueue>>,
-               dst: Authority,
-               data: Data)
-               -> Result<(), CoreError> {
-        do_mutation_request(message_queue,
-                            |message_id| routing.send_post_request(dst, data, message_id))
-    }
-
-    // Do a DELETE request and wait for the response.
-    fn do_delete(routing: &mut RoutingMock,
-                 message_queue: Arc<Mutex<MessageQueue>>,
-                 dst: Authority,
-                 data: Data)
-                 -> Result<(), CoreError> {
-        do_mutation_request(message_queue,
-                            |message_id| routing.send_delete_request(dst, data, message_id))
-    }
-
-    // Do an APPEND request and wait for the response.
-    fn do_append(routing: &mut RoutingMock,
-                 message_queue: Arc<Mutex<MessageQueue>>,
-                 dst: Authority,
-                 append_wrapper: AppendWrapper)
-                 -> Result<(), CoreError> {
-        do_mutation_request(message_queue, |message_id| {
-            routing.send_append_request(dst, append_wrapper, message_id)
-        })
-    }
-
-    // Do a GetAccountInfo request and wait for the response.
-    fn do_get_account_info(routing: &mut RoutingMock,
-                           message_queue: Arc<Mutex<MessageQueue>>,
-                           dst: Authority)
-                           -> Result<(u64, u64), CoreError> {
-        let (tx, rx) = mpsc::channel();
-        let message_id = MessageId::new();
-
-        unwrap!(message_queue.lock()).register_response_observer(message_id, tx.clone());
-        unwrap!(routing.send_get_account_info_request(dst, message_id));
-
-        let resp_getter = GetAccountInfoResponseGetter::new((tx, rx));
-        resp_getter.get()
-    }
-
-    // Helper for PUT, POST,  DELETE and APPEND.
-    fn do_mutation_request<F>(message_queue: Arc<Mutex<MessageQueue>>,
-                              f: F)
-                              -> Result<(), CoreError>
-        where F: FnOnce(MessageId) -> Result<(), InterfaceError>
-    {
-        let (tx, rx) = mpsc::channel();
-        let message_id = MessageId::new();
-
-        unwrap!(message_queue.lock()).register_response_observer(message_id, tx.clone());
-        unwrap!(f(message_id));
-
-        let resp_getter = MutationResponseGetter::new((tx, rx));
-        resp_getter.get()
-    }
-}
+// #[cfg(test)]
+// mod test {
+//     use core::client::message_queue::MessageQueue;
+//     use core::client::response_getter::{GetAccountInfoResponseGetter, GetResponseGetter,
+//                                         MutationResponseGetter};
+//     use core::client::user_account::Account;
+//     use core::errors::CoreError;
+//     use core::translated_events::NetworkEvent;
+//
+//     use core::utility;
+//
+//     use maidsafe_utilities::serialisation::{deserialise, serialise};
+//     use rand;
+//     use routing::{AppendWrapper, AppendedData, Authority, Data, DataIdentifier, Filter, FullId,
+//                   ImmutableData, InterfaceError, MessageId, PubAppendableData, StructuredData,
+//                   XOR_NAME_LEN, XorName};
+//     use routing::client_errors::{GetError, MutationError};
+//     use rust_sodium::crypto::sign;
+//     use std::collections::HashMap;
+//     use std::iter;
+//     use std::sync::{Arc, Mutex};
+//     use std::sync::mpsc;
+//     use super::*;
+//     use super::storage::DEFAULT_CLIENT_ACCOUNT_SIZE;
+//
+//     #[test]
+//     fn map_serialisation() {
+//         let mut map_before = HashMap::<XorName, Vec<u8>>::new();
+//         let _ = map_before.insert(XorName([1; XOR_NAME_LEN]), vec![1; 10]);
+//
+//         let serialised_data = unwrap!(serialise(&map_before));
+//
+//         let map_after: HashMap<XorName, Vec<u8>> = unwrap!(deserialise(&serialised_data));
+//         assert_eq!(map_before, map_after);
+//     }
+//
+//     #[test]
+//     fn check_put_post_get_delete_for_immutable_data() {
+//         let (_, id_packet) = create_account_and_full_id();
+//
+//         let (routing_sender, routing_receiver) = mpsc::channel();
+//         let (network_event_sender, network_event_receiver) = mpsc::channel();
+//
+//         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
+//                                                               vec![network_event_sender]);
+//         let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
+//
+//         match unwrap!(network_event_receiver.recv()) {
+//             NetworkEvent::Connected => (),
+//             _ => panic!("Could not Connect !!"),
+//         }
+//
+//         // Construct ImmutableData
+//         let orig_immutable_data = generate_random_immutable_data();
+//         let orig_data = Data::Immutable(orig_immutable_data);
+//
+//         let location_nae_mgr = Authority::NaeManager(*orig_data.name());
+//         let location_client_mgr = Authority::ClientManager(*orig_data.name());
+//
+//         // GET ImmutableData should fail
+//         {
+//             let result = do_get(&mut mock_routing,
+//                                 message_queue.clone(),
+//                                 location_nae_mgr.clone(),
+//                                 orig_data.identifier());
+//
+//             match result {
+//                 Ok(_) => panic!("Expected Get Failure!"),
+//                 Err(CoreError::GetFailure { reason: GetError::NoSuchData, .. }) => (),
+//                 Err(err) => panic!("Unexpected: {:?}", err),
+//             }
+//         }
+//
+//         // First PUT should succeed
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        location_client_mgr.clone(),
+//                        orig_data.clone()));
+//
+//         // GET ImmutableData should pass
+//         assert_eq!(unwrap!(do_get(&mut mock_routing,
+//                                   message_queue.clone(),
+//                                   location_nae_mgr.clone(),
+//                                   orig_data.identifier())),
+//                    orig_data);
+//
+//         // GetAccountInfo should pass and show one chunk stored
+//         assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
+//                                                message_queue.clone(),
+//                                                location_client_mgr.clone())),
+//
+//                    (1, DEFAULT_CLIENT_ACCOUNT_SIZE - 1));
+//
+//         // Subsequent PUTs for same ImmutableData should succeed - De-duplication
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        location_client_mgr.clone(),
+//                        orig_data.clone()));
+//
+//         // POSTs for ImmutableData should fail
+//         {
+//             let result = do_post(&mut mock_routing,
+//                                  message_queue.clone(),
+//                                  location_nae_mgr.clone(),
+//                                  orig_data.clone());
+//
+//             match result {
+//                 Ok(_) => panic!("Expected Post Failure!"),
+//                 Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. })
+//                 => {
+//                     ()
+//                 }
+//                 Err(err) => panic!("Unexpected: {:?}", err),
+//             }
+//         }
+//
+//         // DELETEs of ImmutableData should fail
+//         {
+//             let result = do_delete(&mut mock_routing,
+//                                    message_queue.clone(),
+//                                    location_client_mgr.clone(),
+//                                    orig_data.clone());
+//
+//             match result {
+//                 Ok(_) => panic!("Expected Delete Failure!"),
+//                 Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. })
+//                 => {
+//                     ()
+//                 }
+//                 Err(err) => panic!("Unexpected: {:?}", err),
+//             }
+//         }
+//
+//         // GET ImmutableData should pass
+//         assert_eq!(unwrap!(do_get(&mut mock_routing,
+//                                   message_queue.clone(),
+//                                   location_nae_mgr.clone(),
+//                                   orig_data.identifier())),
+//                    orig_data);
+//
+//         // GetAccountInfo should pass and show two chunks stored
+//         assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
+//                                                message_queue.clone(),
+//                                                location_client_mgr)),
+//
+//                    (2, DEFAULT_CLIENT_ACCOUNT_SIZE - 2));
+//     }
+//
+//     #[test]
+//     fn check_put_post_get_delete_for_structured_data() {
+//         let (account_packet, id_packet) = create_account_and_full_id();
+//
+//         let (routing_sender, routing_receiver) = mpsc::channel();
+//         let (network_event_sender, network_event_receiver) = mpsc::channel();
+//
+//         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
+//                                                               vec![network_event_sender]);
+//         let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
+//
+//         match unwrap!(network_event_receiver.recv()) {
+//             NetworkEvent::Connected => (),
+//             _ => panic!("Could not Bootstrap !!"),
+//         }
+//
+//         let owner_key = account_packet.get_public_maid().public_keys().0.clone();
+//
+//         // Construct ImmutableData
+//         let orig_immutable_data = generate_random_immutable_data();
+//         let orig_data = Data::Immutable(orig_immutable_data);
+//
+//         const TYPE_TAG: u64 = 999;
+//
+//         // Construct StructuredData, 1st version, for this ImmutableData
+//         let keyword = unwrap!(utility::generate_random_string(10));
+//         let pin = unwrap!(utility::generate_random_string(10));
+//         let user_id = unwrap!(Account::generate_network_id(keyword.as_bytes(),
+//                                                            pin.to_string().as_bytes()));
+//         let account_ver_res =
+//             StructuredData::new(TYPE_TAG,
+//                                 user_id,
+//                                 0,
+//                                 unwrap!(serialise(&vec![orig_data.name()])),
+//                                 vec![account_packet.get_public_maid().public_keys().0.clone()],
+//                                 Vec::new(),
+//                                 Some(&account_packet.get_maid().secret_keys().0));
+//         let mut account_version = unwrap!(account_ver_res);
+//         let mut data_account_version = Data::Structured(account_version);
+//
+//
+//         let location_nae_mgr_immut = Authority::NaeManager(*orig_data.name());
+//         let location_nae_mgr_struct = Authority::NaeManager(*data_account_version.name());
+//
+//         let location_client_mgr_immut = Authority::ClientManager(*orig_data.name());
+//         let location_client_mgr_struct = Authority::ClientManager(*data_account_version.name());
+//
+//         // First PUT of StructuredData should succeed
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        location_client_mgr_struct.clone(),
+//                        data_account_version.clone()));
+//
+//         // PUT for ImmutableData should succeed
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        location_client_mgr_immut.clone(),
+//                        orig_data.clone()));
+//
+//         let mut received_structured_data: StructuredData;
+//
+//         // GET StructuredData should pass
+//         {
+//             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
+//             let data = unwrap!(do_get(&mut mock_routing,
+//                                       message_queue.clone(),
+//                                       location_client_mgr_struct.clone(),
+//                                       struct_data_id));
+//
+//             assert_eq!(data, data_account_version);
+//             match data {
+//                 Data::Structured(struct_data) => received_structured_data = struct_data,
+//                 _ => unreachable!("Unexpected! {:?}", data),
+//             }
+//         }
+//
+//         // GetAccountInfo should pass and show two chunks stored
+//         assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
+//                                                message_queue.clone(),
+//                                                location_client_mgr_struct.clone())),
+//
+//                    (2, DEFAULT_CLIENT_ACCOUNT_SIZE - 2));
+//
+//         // GET ImmutableData from latest version of StructuredData should pass
+//         {
+//             let mut location_vec =
+//                 unwrap!(deserialise::<Vec<XorName>>(received_structured_data.get_data()));
+//             let immut_data_id = DataIdentifier::Immutable(unwrap!(location_vec.pop(),
+//                                                                   "Value must exist !"));
+//
+//             assert_eq!(unwrap!(do_get(&mut mock_routing,
+//                                       message_queue.clone(),
+//                                       location_client_mgr_immut.clone(),
+//                                       immut_data_id)),
+//                        orig_data);
+//         }
+//
+//         // Construct ImmutableData
+//         let new_immutable_data = generate_random_immutable_data();
+//         let new_data = Data::Immutable(new_immutable_data);
+//
+//         // PUT for new ImmutableData should succeed
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        location_client_mgr_struct.clone(),
+//                        new_data.clone()));
+//
+//         // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Versioning
+//         let invalid_version_account_version = unwrap!(StructuredData::new(TYPE_TAG,
+//                                                user_id,
+//                                                0,
+//                                                Vec::new(),
+//                                                vec![owner_key.clone()],
+//                                                Vec::new(),
+//                                                Some(&account_packet.get_maid()
+//                                                    .secret_keys()
+//                                                    .0)));
+//         let invalid_version_data_account_version =
+//             Data::Structured(invalid_version_account_version);
+//
+//         // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Signature
+//         let invalid_signature_account_version = unwrap!(StructuredData::new(TYPE_TAG,
+//                                         user_id,
+//                                         1,
+//                                         Vec::new(),
+//                                         vec![owner_key.clone()],
+//                                         Vec::new(),
+//                                         Some(&account_packet.get_mpid().secret_keys().0)));
+//         let invalid_signature_data_account_version =
+//             Data::Structured(invalid_signature_account_version);
+//
+//         let data_for_version_2 = unwrap!(serialise(&vec![orig_data.name(), new_data.name()]));
+//         // Construct StructuredData, 2nd version, for this ImmutableData - Valid
+//         account_version = unwrap!(StructuredData::new(TYPE_TAG,
+//                                                       user_id,
+//                                                       1,
+//                                                       data_for_version_2,
+//                                                       vec![owner_key.clone()],
+//                                                       Vec::new(),
+//                                                       Some(&account_packet.get_maid()
+//                                                           .secret_keys()
+//                                                           .0)));
+//         data_account_version = Data::Structured(account_version);
+//
+//         // Subsequent PUTs for same StructuredData should fail
+//         {
+//             let result = do_put(&mut mock_routing,
+//                                 message_queue.clone(),
+//                                 location_client_mgr_struct.clone(),
+//                                 data_account_version.clone());
+//
+//             match result {
+//                 Ok(_) => panic!("Expected Put Failure!"),
+//                 Err(CoreError::MutationFailure { reason: MutationError::DataExists, .. }) => (),
+//                 Err(err) => panic!("Unexpected: {:?}", err),
+//             }
+//         }
+//
+//         // Subsequent POSTSs for same StructuredData should fail if versioning is invalid
+//         {
+//             let result = do_post(&mut mock_routing,
+//                                  message_queue.clone(),
+//                                  location_nae_mgr_struct.clone(),
+//                                  invalid_version_data_account_version);
+//
+//             match result {
+//                 Ok(_) => panic!("Expected Post Failure!"),
+//                 Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. })
+//                 => {
+//                     ()
+//                 }
+//                 Err(err) => panic!("Unexpected: {:?}", err),
+//             }
+//         }
+//
+//         // Subsequent POSTSs for same StructuredData should fail if signature is invalid
+//         {
+//             let result = do_post(&mut mock_routing,
+//                                  message_queue.clone(),
+//                                  location_client_mgr_struct.clone(),
+//                                  invalid_signature_data_account_version);
+//
+//             match result {
+//                 Ok(_) => panic!("Expected Post Failure!"),
+//                 Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. })
+//                 => {
+//                     ()
+//                 }
+//                 Err(err) => panic!("Unexpected: {:?}", err),
+//             }
+//         }
+//
+//         // Subsequent POSTSs for existing StructuredData version should pass for valid update
+//         unwrap!(do_post(&mut mock_routing,
+//                         message_queue.clone(),
+//                         location_nae_mgr_struct.clone(),
+//                         data_account_version.clone()));
+//
+//         // GET for new StructuredData version should pass
+//         {
+//             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
+//             let data = unwrap!(do_get(&mut mock_routing,
+//                                       message_queue.clone(),
+//                                       location_nae_mgr_struct.clone(),
+//                                       struct_data_id));
+//
+//             assert_eq!(data, data_account_version);
+//             match data {
+//                 Data::Structured(struct_data) => received_structured_data = struct_data,
+//                 _ => unreachable!("Unexpected! {:?}", data),
+//             }
+//         }
+//
+//         let location_vec =
+//             unwrap!(deserialise::<Vec<XorName>>(received_structured_data.get_data()));
+//         assert_eq!(location_vec.len(), 2);
+//
+//         // GET new ImmutableData should pass
+//         {
+//             let immut_data_id = DataIdentifier::Immutable(location_vec[1]);
+//             assert_eq!(unwrap!(do_get(&mut mock_routing,
+//                                       message_queue.clone(),
+//                                       location_nae_mgr_immut.clone(),
+//                                       immut_data_id)),
+//                        new_data);
+//         }
+//
+//         // GET original ImmutableData should pass
+//         {
+//             let immut_data_id = DataIdentifier::Immutable(location_vec[0]);
+//             assert_eq!(unwrap!(do_get(&mut mock_routing,
+//                                       message_queue.clone(),
+//                                       location_client_mgr_immut.clone(),
+//                                       immut_data_id)),
+//                        orig_data);
+//         }
+//
+//         // DELETE of Structured Data without version bump should fail
+//         {
+//             let result = do_delete(&mut mock_routing,
+//                                    message_queue.clone(),
+//                                    location_client_mgr_struct.clone(),
+//                                    data_account_version.clone());
+//
+//             match result {
+//                 Ok(_) => panic!("Expected Delete Failure!"),
+//                 Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. })
+//                 => {
+//                     ()
+//                 }
+//                 Err(err) => panic!("Unexpected: {:?}", err),
+//             }
+//         }
+//
+//         // GET for StructuredData version should still pass
+//         {
+//             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
+//             assert_eq!(unwrap!(do_get(&mut mock_routing,
+//                                       message_queue.clone(),
+//                                       location_client_mgr_struct.clone(),
+//                                       struct_data_id)),
+//                        data_account_version);
+//         }
+//
+//         // Construct StructuredData, 3rd version, for DELETE - Valid
+//         account_version = unwrap!(StructuredData::new(TYPE_TAG,
+//                                                       user_id,
+//                                                       2,
+//                                                       Vec::new(),
+//                                                       vec![owner_key.clone()],
+//                                                       Vec::new(),
+//                                                       Some(&account_packet.get_maid()
+//                                                           .secret_keys()
+//                                                           .0)));
+//         data_account_version = Data::Structured(account_version);
+//
+//         // DELETE of Structured Data with version bump should pass
+//         unwrap!(do_delete(&mut mock_routing,
+//                           message_queue.clone(),
+//                           location_client_mgr_struct,
+//                           data_account_version));
+//
+//         // GET for DELETED StructuredData version should fail
+//         {
+//             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
+//             let result = do_get(&mut mock_routing,
+//                                 message_queue.clone(),
+//                                 location_nae_mgr_struct.clone(),
+//                                 struct_data_id);
+//
+//             match result {
+//                 Ok(_) => panic!("Expected Get Failure!"),
+//                 Err(CoreError::GetFailure { reason: GetError::NoSuchData, .. }) => (),
+//                 Err(err) => panic!("Unexpected: {:?}", err),
+//             }
+//         }
+//
+//         // GetAccountInfo should pass and show three chunks stored
+//         assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
+//                                                message_queue.clone(),
+//                                                location_client_mgr_immut)),
+//                    (3, DEFAULT_CLIENT_ACCOUNT_SIZE - 3));
+//     }
+//
+//     #[test]
+//     fn check_put_post_get_append_delete_for_pub_appendable_data() {
+//         let (account_packet, id_packet) = create_account_and_full_id();
+//
+//         let (routing_sender, routing_receiver) = mpsc::channel();
+//         let (network_event_sender, network_event_receiver) = mpsc::channel();
+//
+//         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
+//                                                               vec![network_event_sender]);
+//         let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
+//
+//         match unwrap!(network_event_receiver.recv()) {
+//             NetworkEvent::Connected => (),
+//             _ => panic!("Could not Bootstrap !!"),
+//         }
+//
+//         let owner_key = account_packet.get_public_maid().public_keys().0.clone();
+//         let signing_key = account_packet.get_maid().secret_keys().0.clone();
+//
+//         // Construct some immutable data to be later appended to an appendable data.
+//         let immut_data_0 = Data::Immutable(generate_random_immutable_data());
+//         let immut_data_0_nae_mgr = Authority::NaeManager(*immut_data_0.name());
+//
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        immut_data_0_nae_mgr,
+//                        immut_data_0.clone()));
+//
+//         let immut_data_1 = Data::Immutable(generate_random_immutable_data());
+//         let immut_data_1_nae_mgr = Authority::NaeManager(*immut_data_1.name());
+//
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        immut_data_1_nae_mgr,
+//                        immut_data_1.clone()));
+//
+//         // Construct appendable data
+//         let appendable_data_name = rand::random();
+//         let appendable_data_nae_mgr = Authority::NaeManager(appendable_data_name);
+//
+//         let appendable_data = unwrap!(PubAppendableData::new(appendable_data_name,
+//                                                              0,
+//                                                              vec![owner_key],
+//                                                              vec![],
+//                                                              Default::default(),
+//                                                              Filter::black_list(iter::empty()),
+//                                                              Some(&signing_key)));
+//
+//         let appendable_data_id = appendable_data.identifier();
+//
+//         // PUT it to the network
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        appendable_data_nae_mgr.clone(),
+//                        Data::PubAppendable(appendable_data)));
+//
+//         // APPEND data
+//         {
+//             let appended_data =
+//                 unwrap!(AppendedData::new(immut_data_0.identifier(), owner_key, &signing_key));
+//             let append_wrapper = AppendWrapper::new_pub(appendable_data_name, appended_data, 0);
+//
+//             unwrap!(do_append(&mut mock_routing,
+//                               message_queue.clone(),
+//                               appendable_data_nae_mgr.clone(),
+//                               append_wrapper));
+//         }
+//
+//         // GET the appendable data back from the network and verify it has the
+//         // previously appended data.
+//         let appendable_data = unwrap!(do_get(&mut mock_routing,
+//                                              message_queue.clone(),
+//                                              appendable_data_nae_mgr.clone(),
+//                                              appendable_data_id));
+//
+//         let appendable_data = match appendable_data {
+//             Data::PubAppendable(data) => data,
+//             _ => panic!("Unexpected data type"),
+//         };
+//
+//         assert_eq!(appendable_data.name, appendable_data_name);
+//         assert_eq!(appendable_data.data.len(), 1);
+//
+//         let appended_data = unwrap!(appendable_data.data.iter().next());
+//         assert_eq!(appended_data.pointer, immut_data_0.identifier());
+//
+//         // APPEND more data
+//         {
+//             let appended_data =
+//                 unwrap!(AppendedData::new(immut_data_1.identifier(), owner_key, &signing_key));
+//             let append_wrapper = AppendWrapper::new_pub(appendable_data_name,
+//                                                         appended_data,
+//                                                         appendable_data.version);
+//
+//             unwrap!(do_append(&mut mock_routing,
+//                               message_queue.clone(),
+//                               appendable_data_nae_mgr.clone(),
+//                               append_wrapper));
+//         }
+//
+//         // GET the appendable data back from the network and verify it has all the
+//         // previously appended data.
+//         let appendable_data = unwrap!(do_get(&mut mock_routing,
+//                                              message_queue.clone(),
+//                                              appendable_data_nae_mgr.clone(),
+//                                              appendable_data_id));
+//
+//         let appendable_data = match appendable_data {
+//             Data::PubAppendable(data) => data,
+//             _ => panic!("Unexpected data type"),
+//         };
+//
+//         assert_eq!(appendable_data.version, 0);
+//         assert_eq!(appendable_data.name, appendable_data_name);
+//         assert_eq!(appendable_data.data.len(), 2);
+//
+//         // POST without version bump should fail
+//         let result = do_post(&mut mock_routing,
+//                              message_queue.clone(),
+//                              appendable_data_nae_mgr.clone(),
+//                              Data::PubAppendable(appendable_data.clone()));
+//
+//         match result {
+//             Ok(_) => panic!("Expected POST failure"),
+//             Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. })
+//             => (),
+//             Err(error) => panic!("Unexpected: {:?}", error),
+//         }
+//
+//         // POST with modified filter.
+//         let (blacklisted_pk, blacklisted_sk) = sign::gen_keypair();
+//         let filter = Filter::black_list(iter::once(blacklisted_pk));
+//         let appendable_data =
+//             unwrap!(PubAppendableData::new(appendable_data.name,
+//                                            appendable_data.version + 1,
+//                                            appendable_data.current_owner_keys.clone(),
+//                                            appendable_data.previous_owner_keys.clone(),
+//                                            appendable_data.deleted_data.clone(),
+//                                            filter,
+//                                            Some(&signing_key)));
+//
+//         unwrap!(do_post(&mut mock_routing,
+//                         message_queue.clone(),
+//                         appendable_data_nae_mgr.clone(),
+//                         Data::PubAppendable(appendable_data)));
+//
+//         // GET it back and verify the filter and version are modified.
+//         let appendable_data = unwrap!(do_get(&mut mock_routing,
+//                                              message_queue.clone(),
+//                                              appendable_data_nae_mgr.clone(),
+//                                              appendable_data_id));
+//
+//         let appendable_data = match appendable_data {
+//             Data::PubAppendable(data) => data,
+//             _ => panic!("Unexpected data type"),
+//         };
+//
+//         assert_eq!(appendable_data.version, 1);
+//
+//         match appendable_data.filter {
+//             Filter::BlackList(ref list) => {
+//                 assert_eq!(list.len(), 1);
+//                 assert!(list.contains(&blacklisted_pk));
+//             }
+//             _ => panic!("Unexpected filter type"),
+//         }
+//
+//         // APPEND by a blacklisted user should fail.
+//         {
+//             let immut_data_name = rand::random();
+//             let immut_data_id = DataIdentifier::Immutable(immut_data_name);
+//
+//             let appended_data =
+//                 unwrap!(AppendedData::new(immut_data_id, blacklisted_pk, &blacklisted_sk));
+//             let append_wrapper = AppendWrapper::new_pub(appendable_data_name,
+//                                                         appended_data,
+//                                                         appendable_data.version);
+//
+//             let result = do_append(&mut mock_routing,
+//                                    message_queue.clone(),
+//                                    appendable_data_nae_mgr.clone(),
+//                                    append_wrapper);
+//
+//             match result {
+//                 Ok(_) => panic!("Expected APPEND failure"),
+//                 Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. })
+//                 => {
+//                     ()
+//                 }
+//                 Err(error) => panic!("Unexpected {:?}", error),
+//             }
+//         }
+//
+//         // TODO: test also whitelist
+//
+//         // PUT with data already appended.
+//         let appendable_data_name = rand::random();
+//         let appendable_data_nae_mgr = Authority::NaeManager(appendable_data_name);
+//
+//         let mut appendable_data = unwrap!(PubAppendableData::new(appendable_data_name,
+//                                                                  0,
+//                                                                  vec![owner_key],
+//                                                                  vec![],
+//                                                                  Default::default(),
+//                                                                  Filter::black_list(iter::empty()
+//                                                                  ),
+//                                                                  Some(&signing_key)));
+//
+//         let appendable_data_id = appendable_data.identifier();
+//
+//         let appended_data =
+//             unwrap!(AppendedData::new(immut_data_0.identifier(), owner_key, &signing_key));
+//         assert!(appendable_data.append(appended_data));
+//
+//         unwrap!(do_put(&mut mock_routing,
+//                        message_queue.clone(),
+//                        appendable_data_nae_mgr.clone(),
+//                        Data::PubAppendable(appendable_data)));
+//
+//         // GET it back and verify the appended data is there.
+//         let appendable_data = unwrap!(do_get(&mut mock_routing,
+//                                              message_queue.clone(),
+//                                              appendable_data_nae_mgr.clone(),
+//                                              appendable_data_id));
+//
+//         let appendable_data = match appendable_data {
+//             Data::PubAppendable(data) => data,
+//             _ => panic!("Unexpected data type"),
+//         };
+//
+//         assert_eq!(appendable_data.data.len(), 1);
+//
+//         let appended_data = unwrap!(appendable_data.data.iter().next());
+//         assert_eq!(appended_data.pointer, immut_data_0.identifier());
+//
+//         // TODO: test POST with appended data too
+//         // TODO: test simultaneous POSTs with different appended data - verify
+//         // the appendable data contains data items from both POSTs afterwards.
+//     }
+//
+//     fn create_account_and_full_id() -> (Account, FullId) {
+//         let account = Account::new(None, None);
+//         let id = FullId::with_keys((account.get_maid().public_keys().1,
+//                                     account.get_maid().secret_keys().1.clone()),
+//                                    (account.get_maid().public_keys().0,
+//                                     account.get_maid().secret_keys().0.clone()));
+//
+//         (account, id)
+//     }
+//
+//     fn generate_random_immutable_data() -> ImmutableData {
+//         let data = unwrap!(utility::generate_random_vector(100));
+//         ImmutableData::new(data)
+//     }
+//
+//     // Do a GET request and wait for the response.
+//     fn do_get(routing: &mut RoutingMock,
+//               message_queue: Arc<Mutex<MessageQueue>>,
+//               dst: Authority,
+//               data_id: DataIdentifier)
+//               -> Result<Data, CoreError> {
+//         let (tx, rx) = mpsc::channel();
+//         let message_id = MessageId::new();
+//
+//         unwrap!(message_queue.lock()).register_response_observer(message_id, tx.clone());
+//         unwrap!(routing.send_get_request(dst, data_id, message_id));
+//
+//         let resp_getter = GetResponseGetter::new(Some((tx, rx)), message_queue.clone(), data_id);
+//         resp_getter.get()
+//     }
+//
+//     // Do a PUT request and wait for the response.
+//     fn do_put(routing: &mut RoutingMock,
+//               message_queue: Arc<Mutex<MessageQueue>>,
+//               dst: Authority,
+//               data: Data)
+//               -> Result<(), CoreError> {
+//         do_mutation_request(message_queue,
+//                             |message_id| routing.send_put_request(dst, data, message_id))
+//     }
+//
+//     // Do a POST request and wait for the response.
+//     fn do_post(routing: &mut RoutingMock,
+//                message_queue: Arc<Mutex<MessageQueue>>,
+//                dst: Authority,
+//                data: Data)
+//                -> Result<(), CoreError> {
+//         do_mutation_request(message_queue,
+//                             |message_id| routing.send_post_request(dst, data, message_id))
+//     }
+//
+//     // Do a DELETE request and wait for the response.
+//     fn do_delete(routing: &mut RoutingMock,
+//                  message_queue: Arc<Mutex<MessageQueue>>,
+//                  dst: Authority,
+//                  data: Data)
+//                  -> Result<(), CoreError> {
+//         do_mutation_request(message_queue,
+//                             |message_id| routing.send_delete_request(dst, data, message_id))
+//     }
+//
+//     // Do an APPEND request and wait for the response.
+//     fn do_append(routing: &mut RoutingMock,
+//                  message_queue: Arc<Mutex<MessageQueue>>,
+//                  dst: Authority,
+//                  append_wrapper: AppendWrapper)
+//                  -> Result<(), CoreError> {
+//         do_mutation_request(message_queue, |message_id| {
+//             routing.send_append_request(dst, append_wrapper, message_id)
+//         })
+//     }
+//
+//     // Do a GetAccountInfo request and wait for the response.
+//     fn do_get_account_info(routing: &mut RoutingMock,
+//                            message_queue: Arc<Mutex<MessageQueue>>,
+//                            dst: Authority)
+//                            -> Result<(u64, u64), CoreError> {
+//         let (tx, rx) = mpsc::channel();
+//         let message_id = MessageId::new();
+//
+//         unwrap!(message_queue.lock()).register_response_observer(message_id, tx.clone());
+//         unwrap!(routing.send_get_account_info_request(dst, message_id));
+//
+//         let resp_getter = GetAccountInfoResponseGetter::new((tx, rx));
+//         resp_getter.get()
+//     }
+//
+//     // Helper for PUT, POST,  DELETE and APPEND.
+//     fn do_mutation_request<F>(message_queue: Arc<Mutex<MessageQueue>>,
+//                               f: F)
+//                               -> Result<(), CoreError>
+//         where F: FnOnce(MessageId) -> Result<(), InterfaceError>
+//     {
+//         let (tx, rx) = mpsc::channel();
+//         let message_id = MessageId::new();
+//
+//         unwrap!(message_queue.lock()).register_response_observer(message_id, tx.clone());
+//         unwrap!(f(message_id));
+//
+//         let resp_getter = MutationResponseGetter::new((tx, rx));
+//         resp_getter.get()
+//     }
+// }
