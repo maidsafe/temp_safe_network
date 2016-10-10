@@ -22,6 +22,7 @@ mod routing_el;
 
 use core::{CoreError, CoreEvent, CoreMsgTx, HeadFuture, utility};
 use futures::{self, Future};
+use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId, Response,
               StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
@@ -33,7 +34,9 @@ use rust_sodium::crypto::hash::sha256::{self, Digest};
 use self::account::Account;
 #[cfg(feature = "use-mock-routing")]
 use self::non_networking_test_framework::RoutingMock as Routing;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -42,6 +45,7 @@ pub type ReturnType = Future<Item = CoreEvent, Error = CoreError>;
 
 const CONNECTION_TIMEOUT_SECS: u64 = 60;
 const ACC_PKT_PUT_TIMEOUT_SECS: u64 = 60;
+const IMMUT_DATA_CACHE_SIZE: usize = 300;
 
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
@@ -51,6 +55,7 @@ const ACC_PKT_PUT_TIMEOUT_SECS: u64 = 60;
 pub struct Client {
     routing: Routing,
     heads: HashMap<MessageId, HeadFuture>,
+    cache: Rc<RefCell<LruCache<XorName, Data>>>,
     client_type: ClientType,
     stats: Stats,
     _joiner: Joiner,
@@ -82,6 +87,7 @@ impl Client {
         Ok(Client {
             routing: routing,
             heads: HashMap::with_capacity(10),
+            cache: Rc::new(RefCell::new(LruCache::new(IMMUT_DATA_CACHE_SIZE))),
             client_type: ClientType::Unregistered,
             stats: Default::default(),
             _joiner: joiner,
@@ -147,6 +153,7 @@ impl Client {
         Ok(Client {
             routing: routing,
             heads: HashMap::with_capacity(10),
+            cache: Rc::new(RefCell::new(LruCache::new(IMMUT_DATA_CACHE_SIZE))),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
             _joiner: joiner,
@@ -161,21 +168,35 @@ impl Client {
 
     // TODO All these return the same future from all branches. So convert to impl Trait when it
     // arrives in stable. Change from `Box<ReturnType>` -> `impl ReturnType`.
-    /// Get data from the network.
+    /// Get data from the network. If the data exists locally in the cache (for ImmutableData) then
+    /// it will immediately be returned without making an actual network request.
     pub fn get(&mut self, data_id: DataIdentifier, opt_dst: Option<Authority>) -> Box<ReturnType> {
         trace!("GET for {:?}", data_id);
         self.stats.issued_gets += 1;
 
         let (head, oneshot) = futures::oneshot();
-        let rx = Box::new(oneshot.map_err(|e| CoreError::OperationAborted));
+        let rx = oneshot.map_err(|e| CoreError::OperationAborted);
 
-        // if let DataIdentifier::Immutable(..) = data_id {
-        //     if let Some(data) = self.cache.borrow().get(data_id.name()) {
-        //         trace!("ImmutableData found in cache.");
-        //         head.complete(CoreEvent::Get(Ok(data)));
-        //         return rx;
-        //     }
-        // }
+        let rx: Box<ReturnType> = if let DataIdentifier::Immutable(..) = data_id {
+            if let Some(data) = self.cache.borrow_mut().get_mut(data_id.name()) {
+                trace!("ImmutableData found in cache.");
+                head.complete(CoreEvent::Get(Ok(data.clone())));
+                return Box::new(rx);
+            }
+
+            let cache = self.cache.clone();
+            Box::new(rx.map(move |event| {
+                match event {
+                    CoreEvent::Get(Ok(ref data @ Data::Immutable(_))) => {
+                        let _ = cache.borrow_mut().insert(*data.name(), data.clone());
+                    }
+                    _ => (),
+                }
+                event
+            }))
+        } else {
+            Box::new(rx)
+        };
 
         let dst = match opt_dst {
             Some(auth) => auth,
@@ -215,6 +236,29 @@ impl Client {
 
         let msg_id = MessageId::new();
         if let Err(e) = self.routing.send_put_request(dst, data, msg_id) {
+            head.complete(CoreEvent::Get(Err(From::from(e))));
+        } else {
+            let _ = self.heads.insert(msg_id, head);
+        }
+
+        rx
+    }
+
+    /// Post data onto the network.
+    pub fn post(&mut self, data: Data, opt_dst: Option<Authority>) -> Box<ReturnType> {
+        trace!("Post for {:?}", data);
+        self.stats.issued_posts += 1;
+
+        let (head, oneshot) = futures::oneshot();
+        let rx = Box::new(oneshot.map_err(|e| CoreError::OperationAborted));
+
+        let dst = match opt_dst {
+            Some(auth) => auth,
+            None => Authority::NaeManager(*data.name()),
+        };
+
+        let msg_id = MessageId::new();
+        if let Err(e) = self.routing.send_post_request(dst, data, msg_id) {
             head.complete(CoreEvent::Get(Err(From::from(e))));
         } else {
             let _ = self.heads.insert(msg_id, head);
