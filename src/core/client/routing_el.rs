@@ -103,7 +103,9 @@ fn parse_get_err(reason_raw: Vec<u8>) -> GetError {
 /// signifies if the firing was successful.
 fn fire(core_tx: &CoreMsgTx, id: MessageId, event: CoreEvent) -> bool {
     let msg = CoreMsg::new(move |cptr| {
-        if let Some(head) = cptr.borrow_mut().remove_head(&id) {
+        // Using in `if` keeps borrow alive. Do not try to combine the 2 lines into one.
+        let opt_head = cptr.borrow_mut().remove_head(&id);
+        if let Some(head) = opt_head {
             head.complete(event);
         }
         None

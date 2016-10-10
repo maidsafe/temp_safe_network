@@ -63,7 +63,7 @@ impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will create an
     /// unregistered random client, which can do very limited set of operations - eg., a
     /// Network-Get
-    pub fn create_unregistered_client(core_tx: CoreMsgTx) -> Result<Client, CoreError> {
+    pub fn unregistered(core_tx: CoreMsgTx) -> Result<Client, CoreError> {
         trace!("Creating unregistered client.");
 
         let (routing_tx, routing_rx) = mpsc::channel();
@@ -94,10 +94,10 @@ impl Client {
 
     /// This is a Gateway function to the Maidsafe network. This will help create a fresh acc for
     /// the user in the SAFE-network.
-    pub fn create_account(acc_locator: &str,
-                          acc_password: &str,
-                          core_tx: CoreMsgTx)
-                          -> Result<Client, CoreError> {
+    pub fn registered(acc_locator: &str,
+                      acc_password: &str,
+                      core_tx: CoreMsgTx)
+                      -> Result<Client, CoreError> {
         trace!("Creating an acc.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
@@ -161,10 +161,10 @@ impl Client {
 
     /// This is a Gateway function to the Maidsafe network. This will help login to an already
     /// existing account of the user in the SAFE-network.
-    pub fn log_in(acc_locator: &str,
-                  acc_password: &str,
-                  core_tx: CoreMsgTx)
-                  -> Result<Client, CoreError> {
+    pub fn login(acc_locator: &str,
+                 acc_password: &str,
+                 core_tx: CoreMsgTx)
+                 -> Result<Client, CoreError> {
         trace!("Attempting to log into an acc.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
@@ -252,17 +252,19 @@ impl Client {
 
     /// Get data from the network. If the data exists locally in the cache (for ImmutableData) then
     /// it will immediately be returned without making an actual network request.
-    pub fn get(&mut self, data_id: DataIdentifier, opt_dst: Option<Authority>) -> Box<ReturnType<Data>> {
+    pub fn get(&mut self,
+               data_id: DataIdentifier,
+               opt_dst: Option<Authority>)
+               -> Box<ReturnType<Data>> {
         trace!("GET for {:?}", data_id);
         self.stats.issued_gets += 1;
 
         let (head, oneshot) = futures::oneshot();
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
-                        .and_then(|event| match event {
-                            CoreEvent::Get(Ok(data)) => Ok(data),
-                            CoreEvent::Get(Err(err)) => Err(err),
-                            _ => Err(CoreError::ReceivedUnexpectedEvent),
-                        });
+            .and_then(|event| match event {
+                CoreEvent::Get(res) => ok!(fry!(res)),
+                _ => err!(CoreError::ReceivedUnexpectedEvent),
+            });
 
         let rx: Box<ReturnType<Data>> = if let DataIdentifier::Immutable(..) = data_id {
             if let Some(data) = self.cache.borrow_mut().get_mut(data_id.name()) {
@@ -482,11 +484,47 @@ impl Default for Stats {
 }
 
 fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<ReturnType<()>> {
-    Box::new(oneshot
-        .map_err(|_| CoreError::OperationAborted)
+    Box::new(oneshot.map_err(|_| CoreError::OperationAborted)
         .and_then(|event| match event {
-            CoreEvent::Mutation(Ok(())) => Ok(()),
-            CoreEvent::Mutation(Err(err)) => Err(err),
-            _ => Err(CoreError::ReceivedUnexpectedEvent),
+            CoreEvent::Mutation(res) => ok!(fry!(res)),
+            _ => err!(CoreError::ReceivedUnexpectedEvent),
         }))
+}
+
+#[cfg(test)]
+mod tests {
+    use core::utility;
+    use super::*;
+    use tokio_core::channel;
+    use tokio_core::reactor::Core;
+
+    #[test]
+    fn unregistered_client() {
+        let el = unwrap!(Core::new());
+        let (core_tx, _) = unwrap!(channel::channel(&el.handle()));
+
+        let _ = unwrap!(Client::unregistered(core_tx));
+    }
+
+    #[test]
+    fn registered_client() {
+        let el = unwrap!(Core::new());
+        let (core_tx, _) = unwrap!(channel::channel(&el.handle()));
+
+        let sec_0 = unwrap!(utility::generate_random_string(10));
+        let sec_1 = unwrap!(utility::generate_random_string(10));
+        let _ = unwrap!(Client::registered(&sec_0, &sec_1, core_tx));
+    }
+
+    #[test]
+    fn login() {
+        let el = unwrap!(Core::new());
+        let (core_tx, _) = unwrap!(channel::channel(&el.handle()));
+
+        let sec_0 = unwrap!(utility::generate_random_string(10));
+        let sec_1 = unwrap!(utility::generate_random_string(10));
+        let _ = assert!(Client::login(&sec_0, &sec_1, core_tx.clone()).is_err());
+        let _ = unwrap!(Client::registered(&sec_0, &sec_1, core_tx.clone()));
+        let _ = unwrap!(Client::login(&sec_0, &sec_1, core_tx));
+    }
 }

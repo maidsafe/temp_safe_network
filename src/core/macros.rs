@@ -27,9 +27,17 @@ macro_rules! fry {
 }
 
 /// This is the equivalent of `Result::Ok()` adapted to deal with futures. This should be used to
-/// construct the return type equivalent of `Result` in futures paradigm.
-macro_rules! fok {
+/// construct the return type equivalent of `Result::Ok` in futures paradigm.
+macro_rules! ok {
     ($elt:expr) => {
         futures::done(Ok($elt))
+    }
+}
+
+/// This is the equivalent of `Result::Ok()` adapted to deal with futures. This should be used to
+/// construct the return type equivalent of `Result::Err` in futures paradigm.
+macro_rules! err {
+    ($elt:expr) => {
+        futures::done(Err($elt))
     }
 }
