@@ -30,8 +30,8 @@ use routing::{Authority, Data, DataIdentifier, Event, FullId, MessageId, Respons
 use routing::Client as Routing;
 use rust_sodium::crypto::hash::sha256::{self, Digest};
 use self::account::Account;
-use self::mock_routing::MockRouting as Routing;
 #[cfg(feature = "use-mock-routing")]
+use self::mock_routing::MockRouting as Routing;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -123,12 +123,13 @@ impl Client {
         let acc_loc = try!(Account::generate_network_id(&keyword, &pin));
         let user_cred = UserCred::new(password, pin);
         let acc_sd = try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                     acc_loc,
-                                     0,
-                                     try!(acc.encrypt(&user_cred.password, &user_cred.pin)),
-                                     vec![acc.get_public_maid().public_keys().0.clone()],
-                                     Vec::new(),
-                                     Some(&acc.get_maid().secret_keys().0)));
+                                              acc_loc,
+                                              0,
+                                              try!(acc.encrypt(&user_cred.password,
+                                                               &user_cred.pin)),
+                                              vec![acc.get_public_maid().public_keys().0.clone()],
+                                              Vec::new(),
+                                              Some(&acc.get_maid().secret_keys().0)));
 
         let Digest(digest) = sha256::hash(&(acc.get_maid().public_keys().0).0);
         let cm_addr = Authority::ClientManager(XorName(digest));
