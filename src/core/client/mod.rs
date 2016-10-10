@@ -20,8 +20,9 @@ mod account;
 mod mock_routing;
 mod routing_el;
 
-use core::{CoreError, CoreEvent, CoreMsgTx, HeadFuture, utility};
-use futures::{self, Future};
+use core::{CoreError, CoreMsgTx, utility};
+use core::event::CoreEvent;
+use futures::{self, Complete, Future, Oneshot};
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::{Authority, Data, DataIdentifier, Event, FullId, MessageId, Response, StructuredData,
@@ -38,7 +39,7 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-pub type ReturnType = Future<Item = CoreEvent, Error = CoreError>;
+pub type ReturnType<T> = Future<Item = T, Error = CoreError>;
 
 const CONNECTION_TIMEOUT_SECS: u64 = 60;
 const ACC_PKT_TIMEOUT_SECS: u64 = 60;
@@ -51,7 +52,7 @@ const IMMUT_DATA_CACHE_SIZE: usize = 300;
 /// itself is however well equipped for parallel and non-blocking PUTs and GETS.
 pub struct Client {
     routing: Routing,
-    heads: HashMap<MessageId, HeadFuture>,
+    heads: HashMap<MessageId, Complete<CoreEvent>>,
     cache: Rc<RefCell<LruCache<XorName, Data>>>,
     client_type: ClientType,
     stats: Stats,
@@ -244,22 +245,26 @@ impl Client {
         })
     }
 
-    /// Remove `head` of the future chain, the `tail` of which is probaly being processed in event
-    /// loop.
-    pub fn remove_head(&mut self, id: &MessageId) -> Option<HeadFuture> {
+    /// Remove the completion handle associated with the given message id.
+    pub fn remove_head(&mut self, id: &MessageId) -> Option<Complete<CoreEvent>> {
         self.heads.remove(id)
     }
 
     /// Get data from the network. If the data exists locally in the cache (for ImmutableData) then
     /// it will immediately be returned without making an actual network request.
-    pub fn get(&mut self, data_id: DataIdentifier, opt_dst: Option<Authority>) -> Box<ReturnType> {
+    pub fn get(&mut self, data_id: DataIdentifier, opt_dst: Option<Authority>) -> Box<ReturnType<Data>> {
         trace!("GET for {:?}", data_id);
         self.stats.issued_gets += 1;
 
         let (head, oneshot) = futures::oneshot();
-        let rx = oneshot.map_err(|e| CoreError::OperationAborted);
+        let rx = oneshot.map_err(|_| CoreError::OperationAborted)
+                        .and_then(|event| match event {
+                            CoreEvent::Get(Ok(data)) => Ok(data),
+                            CoreEvent::Get(Err(err)) => Err(err),
+                            _ => Err(CoreError::ReceivedUnexpectedEvent),
+                        });
 
-        let rx: Box<ReturnType> = if let DataIdentifier::Immutable(..) = data_id {
+        let rx: Box<ReturnType<Data>> = if let DataIdentifier::Immutable(..) = data_id {
             if let Some(data) = self.cache.borrow_mut().get_mut(data_id.name()) {
                 trace!("ImmutableData found in cache.");
                 head.complete(CoreEvent::Get(Ok(data.clone())));
@@ -267,14 +272,14 @@ impl Client {
             }
 
             let cache = self.cache.clone();
-            Box::new(rx.map(move |event| {
-                match event {
-                    CoreEvent::Get(Ok(ref data @ Data::Immutable(_))) => {
+            Box::new(rx.map(move |data| {
+                match data {
+                    ref data @ Data::Immutable(_) => {
                         let _ = cache.borrow_mut().insert(*data.name(), data.clone());
                     }
                     _ => (),
                 }
-                event
+                data
             }))
         } else {
             Box::new(rx)
@@ -298,12 +303,12 @@ impl Client {
     // TODO All these return the same future from all branches. So convert to impl Trait when it
     // arrives in stable. Change from `Box<ReturnType>` -> `impl ReturnType`.
     /// Put data onto the network.
-    pub fn put(&mut self, data: Data, opt_dst: Option<Authority>) -> Box<ReturnType> {
+    pub fn put(&mut self, data: Data, opt_dst: Option<Authority>) -> Box<ReturnType<()>> {
         trace!("PUT for {:?}", data);
         self.stats.issued_puts += 1;
 
         let (head, oneshot) = futures::oneshot();
-        let rx = Box::new(oneshot.map_err(|_| CoreError::OperationAborted));
+        let rx = build_mutation_future(oneshot);
 
         let dst = match opt_dst {
             Some(auth) => auth,
@@ -329,12 +334,12 @@ impl Client {
     }
 
     /// Post data onto the network.
-    pub fn post(&mut self, data: Data, opt_dst: Option<Authority>) -> Box<ReturnType> {
+    pub fn post(&mut self, data: Data, opt_dst: Option<Authority>) -> Box<ReturnType<()>> {
         trace!("Post for {:?}", data);
         self.stats.issued_posts += 1;
 
         let (head, oneshot) = futures::oneshot();
-        let rx = Box::new(oneshot.map_err(|e| CoreError::OperationAborted));
+        let rx = build_mutation_future(oneshot);
 
         let dst = match opt_dst {
             Some(auth) => auth,
@@ -415,6 +420,8 @@ enum ClientType {
     },
 }
 
+// TODO: remove allow(unused)
+#[allow(unused)]
 impl ClientType {
     fn reg(acc: Account, acc_loc: XorName, user_cred: UserCred, cm_addr: Authority) -> Self {
         ClientType::Registered {
@@ -474,4 +481,12 @@ impl Default for Stats {
     }
 }
 
-// ------------------------------------------------------------
+fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<ReturnType<()>> {
+    Box::new(oneshot
+        .map_err(|_| CoreError::OperationAborted)
+        .and_then(|event| match event {
+            CoreEvent::Mutation(Ok(())) => Ok(()),
+            CoreEvent::Mutation(Err(err)) => Err(err),
+            _ => Err(CoreError::ReceivedUnexpectedEvent),
+        }))
+}
