@@ -31,9 +31,6 @@ pub mod errors;
 // pub mod client;
 /// Utility functions
 pub mod utility;
-/// Events filtered from set of Routing provided events, on which the Client Modules must
-/// specifically act
-pub mod translated_events;
 // /// Implements the Self Encryption storage trait
 // pub mod self_encryption_storage;
 // /// Implements the Self Encryption storage error trait

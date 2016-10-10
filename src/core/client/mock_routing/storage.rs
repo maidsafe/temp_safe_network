@@ -128,7 +128,10 @@ mod sync {
 
 #[cfg(not(test))]
 mod sync {
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
+    extern crate bincode;
+
+    use maidsafe_utilities::serialisation::{deserialise_with_limit, serialise_with_limit};
+    use self::bincode::SizeLimit;
     use std::env;
     use std::fs::File;
     use std::io::{Read, Write};
@@ -142,7 +145,7 @@ mod sync {
             let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata()).len() as usize);
             if let Ok(_) = file.read_to_end(&mut raw_disk_data) {
                 if !raw_disk_data.is_empty() {
-                    return deserialise(&raw_disk_data).ok();
+                    return deserialise_with_limit(&raw_disk_data, SizeLimit::Infinite).ok();
                 }
             }
         }
@@ -152,7 +155,7 @@ mod sync {
 
     pub fn save(storage: &Storage) {
         let mut file = unwrap!(File::create(path()));
-        let _ = file.write_all(&unwrap!(serialise(storage)));
+        let _ = file.write_all(&unwrap!(serialise_with_limit(storage, SizeLimit::Infinite)));
         unwrap!(file.sync_all());
     }
 
