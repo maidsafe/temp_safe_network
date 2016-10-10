@@ -37,17 +37,19 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
+
+// TODO: remove this
+#![allow(unused)]
+
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
                                    option_unwrap_used))]
 #![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))] // TODO: Fix doc_markdown errors.
 
-// TODO Remove this
-#![allow(unused)]
-
 // extern crate config_file_handler;
 extern crate futures;
+#[cfg(feature = "use-mock-routing")]
 #[macro_use]
 extern crate lazy_static;
 // extern crate libc;
@@ -63,6 +65,7 @@ extern crate rust_sodium;
 // extern crate self_encryption;
 // extern crate time;
 extern crate tokio_core;
+#[cfg(feature = "use-mock-routing")]
 #[macro_use]
 extern crate unwrap;
 

@@ -17,30 +17,27 @@
 
 mod account;
 #[cfg(feature = "use-mock-routing")]
-mod non_networking_test_framework;
+mod mock_routing;
 mod routing_el;
 
 use core::{CoreError, CoreEvent, CoreMsgTx, HeadFuture, utility};
 use futures::{self, Future};
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId, Response,
-              StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
+use routing::{Authority, Data, DataIdentifier, Event, FullId, MessageId, Response, StructuredData,
+              TYPE_TAG_SESSION_PACKET, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
-use routing::client_errors::MutationError;
-use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
 use self::account::Account;
+use self::mock_routing::MockRouting as Routing;
 #[cfg(feature = "use-mock-routing")]
-use self::non_networking_test_framework::RoutingMock as Routing;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-/// Return type of all the async functions exposed by `Client`.
 pub type ReturnType = Future<Item = CoreEvent, Error = CoreError>;
 
 const CONNECTION_TIMEOUT_SECS: u64 = 60;
@@ -219,7 +216,7 @@ impl Client {
         self.stats.issued_puts += 1;
 
         let (head, oneshot) = futures::oneshot();
-        let rx = Box::new(oneshot.map_err(|e| CoreError::OperationAborted));
+        let rx = Box::new(oneshot.map_err(|_| CoreError::OperationAborted));
 
         let dst = match opt_dst {
             Some(auth) => auth,
