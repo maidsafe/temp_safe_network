@@ -609,7 +609,7 @@ impl MockRouting {
 
 #[cfg(test)]
 mod test {
-    use core::client::user_account::Account;
+    use core::client::account::Account;
     use core::errors::CoreError;
     use core::utility;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
