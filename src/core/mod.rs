@@ -31,10 +31,8 @@ pub mod errors;
 // pub mod client;
 /// Utility functions
 pub mod utility;
-// /// Implements the Self Encryption storage trait
-// pub mod self_encryption_storage;
-// /// Implements the Self Encryption storage error trait
-// pub mod self_encryption_storage_error;
+/// Implements the Self Encryption storage trait
+pub mod self_encryption_storage;
 // /// Helper functions to handle ImmutableData related operations
 // pub mod immut_data_operations;
 // /// Helper functions to handle StructuredData related operations
@@ -44,8 +42,7 @@ pub use self::client::Client;
 pub use self::core_el::{CoreMsg, CoreMsgTx, TailFuture, run};
 pub use self::errors::CoreError;
 pub use self::event::CoreEvent;
-// pub use self::self_encryption_storage::SelfEncryptionStorage;
-// pub use self::self_encryption_storage_error::SelfEncryptionStorageError;
+pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
 
 /// `Head` of the future chain, the tail part of which is probably being processed in event loop.
 pub type HeadFuture = Complete<CoreEvent>;

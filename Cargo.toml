@@ -23,7 +23,8 @@ rand = "~0.3.14"
 routing = { git = "https://github.com/maidsafe/routing", branch = "stable" }
 rust_sodium = "~0.1.2"
 rustc-serialize = "~0.3.19"
-self_encryption = "~0.7.1"
+# self_encryption = "~0.7.1"
+self_encryption = { git = "https://github.com/madadam/self_encryption.git", branch = "async" }
 time = "~0.1.35"
 tokio-core = { git = "https://github.com/tokio-rs/tokio-core.git" }
 unwrap = "~1.1.0"
