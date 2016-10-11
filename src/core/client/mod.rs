@@ -31,6 +31,7 @@ use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, Mes
 use routing::Client as Routing;
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
+use rust_sodium::crypto::secretbox;
 use self::account::Account;
 #[cfg(feature = "use-mock-routing")]
 use self::mock_routing::MockRouting as Routing;
@@ -231,8 +232,8 @@ impl Client {
         let (head, oneshot) = futures::oneshot();
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
             .and_then(|event| match event {
-                CoreEvent::Get(res) => ok!(fry!(res)),
-                _ => err!(CoreError::ReceivedUnexpectedEvent),
+                CoreEvent::Get(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
             });
 
         let rx = if let DataIdentifier::Immutable(..) = data_id {
@@ -386,8 +387,8 @@ impl Client {
         let (head, oneshot) = futures::oneshot();
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
             .and_then(|event| match event {
-                CoreEvent::AccountInfo(res) => ok!(fry!(res)),
-                _ => err!(CoreError::ReceivedUnexpectedEvent),
+                CoreEvent::AccountInfo(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
             }).into_box();
 
         let dst = match dst {
@@ -412,6 +413,56 @@ impl Client {
         }
 
         rx
+    }
+
+    /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
+    /// store it. It will be retrieved when the user logs into their account. Root directory ID is
+    /// necessary to fetch all of the user's data as all further data is encoded as meta-information
+    /// into the Root Directory or one of its subdirectories.
+    pub fn set_user_root_dir_id(&mut self, dir_id: (XorName, secretbox::Key)) -> Box<ReturnType<()>> {
+        trace!("Setting user root Dir ID.");
+
+        let set = {
+            let mut account = fry!(self.client_type.acc_mut());
+            account.set_user_root_dir_id(dir_id)
+        };
+
+        if set {
+            self.update_session_packet()
+        } else {
+            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+        }
+    }
+
+    /// Get User's Root Directory ID if available in session packet used for current login
+    pub fn user_root_dir_id(&self) -> Option<&(XorName, secretbox::Key)> {
+        self.client_type.acc().ok().and_then(|account| account.user_root_dir())
+    }
+
+    /// Create an entry for the Maidsafe configuration specific Root Directory ID into the
+    /// session packet, encrypt and store it. It will be retrieved when the user logs into
+    /// their account. Root directory ID is necessary to fetch all of configuration data as all
+    /// further data is encoded as meta-information into the config Root Directory or one of its
+    /// subdirectories.
+    pub fn set_config_root_dir_id(&mut self, dir_id: (XorName, secretbox::Key)) -> Box<ReturnType<()>> {
+        trace!("Setting configuration root Dir ID.");
+
+        let set = {
+            let mut account = fry!(self.client_type.acc_mut());
+            account.set_config_root_dir(dir_id)
+        };
+
+        if set {
+            self.update_session_packet()
+        } else {
+            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+        }
+    }
+
+    /// Get Maidsafe specific configuration's Root Directory ID if available in session packet used
+    /// for current login
+    pub fn config_root_dir_id(&self) -> Option<&(XorName, secretbox::Key)> {
+        self.client_type.acc().ok().and_then(|account| account.config_root_dir())
     }
 
     /// Returns the public encryption key
@@ -472,6 +523,11 @@ impl Client {
     pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
         self.routing.set_network_limits(max_ops_count);
     }
+
+    fn update_session_packet(&mut self) -> Box<ReturnType<()>> {
+        // TODO (adam): implement this
+        ok!(()).into_box()
+    }
 }
 
 // ------------------------------------------------------------
@@ -515,6 +571,13 @@ impl ClientType {
     fn acc(&self) -> Result<&Account, CoreError> {
         match *self {
             ClientType::Registered { ref acc, .. } => Ok(acc),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn acc_mut(&mut self) -> Result<&mut Account, CoreError> {
+        match *self {
+            ClientType::Registered { ref mut acc, .. } => Ok(acc),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
         }
     }
@@ -586,8 +649,8 @@ fn spawn_routing_thread(routing_rx: Receiver<Event>, core_tx: CoreMsgTx) -> Join
 
 fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<ReturnType<()>> {
     oneshot.map_err(|_| CoreError::OperationAborted).and_then(|event| match event {
-        CoreEvent::Mutation(res) => ok!(fry!(res)),
-        _ => err!(CoreError::ReceivedUnexpectedEvent),
+        CoreEvent::Mutation(res) => res,
+        _ => Err(CoreError::ReceivedUnexpectedEvent),
     }).into_box()
 }
 
@@ -596,8 +659,10 @@ mod tests {
     use core::{CoreError, CoreMsg, FutureExt};
     use core::{core_el, utility};
     use futures::Future;
+    use rand;
     use routing::{Data, DataIdentifier, ImmutableData};
     use routing::client_errors::MutationError;
+    use rust_sodium::crypto::secretbox;
     use std::cell::RefCell;
     use std::rc::Rc;
     use super::*;
@@ -620,14 +685,14 @@ mod tests {
 
             let orig_data = orig_data.clone();
 
-            let _ = core_tx.send(CoreMsg::new(move |cptr| {
+            unwrap!(core_tx.send(CoreMsg::new(move |cptr| {
                 let future = cptr.borrow_mut().put(orig_data, None)
-                                              .ignore()
+                                              .then(|_| Ok(()))
                                               .into_box();
                 Some(future)
-            }));
+            })));
 
-            let _ = core_tx.send(CoreMsg::build_terminator());
+            unwrap!(core_tx.send(CoreMsg::build_terminator()));
             core_el::run(core, Rc::new(RefCell::new(client)), core_rx);
         }
 
@@ -637,25 +702,44 @@ mod tests {
         let client = unwrap!(Client::unregistered(core_tx.clone()));
 
         let data_id = DataIdentifier::Immutable(*orig_data.name());
-        let _ = core_tx.send(CoreMsg::new(move |cptr| {
+
+        unwrap!(core_tx.send(CoreMsg::new(move |cptr| {
+            let cptr2 = cptr.clone();
+            let cptr3 = cptr.clone();
+
             let future = cptr.borrow_mut().get(data_id, None).map(move |data| {
                 assert_eq!(data, orig_data);
-            }).ignore().into_box();
+            }).and_then(move |_| {
+                let name = rand::random();
+                let key  = secretbox::gen_key();
+
+                let mut cptr = cptr2.borrow_mut();
+                cptr.set_user_root_dir_id((name, key))
+            }).map(|_| {
+                panic!("Unregistered client should not be allowed to set user root dir");
+            }).or_else(move |err| {
+                match err {
+                    CoreError::OperationForbiddenForClient => (),
+                    _ => panic!("Unexpected {:?}", err),
+                }
+
+                let name = rand::random();
+                let key  = secretbox::gen_key();
+
+                let mut cptr = cptr3.borrow_mut();
+                cptr.set_config_root_dir_id((name, key))
+            }).map(|_| {
+                panic!("Unregistered client should not be allowed to set config root dir");
+            }).map_err(|err| {
+                match err {
+                    CoreError::OperationForbiddenForClient => (),
+                    _ => panic!("Unexpected {:?}", err),
+                }
+            }).into_box();
 
             Some(future)
-
-            // TODO:
-            // Operations Not Allowed for Unregistered Client
-            // let rand_name: XorName = rand::random();
-
-            // match (unregistered_client.set_user_root_directory_id(rand_name),
-            //        unregistered_client.set_configuration_root_directory_id(rand_name)) {
-            //     (Err(CoreError::OperationForbiddenForClient),
-            //      Err(CoreError::OperationForbiddenForClient)) => (),
-            //     _ => panic!("Unexpected !!"),
-            // };
-        }));
-        let _ = core_tx.send(CoreMsg::build_terminator());
+        })));
+        unwrap!(core_tx.send(CoreMsg::build_terminator()));
         core_el::run(core, Rc::new(RefCell::new(client)), core_rx);
     }
 
