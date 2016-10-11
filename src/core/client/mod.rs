@@ -245,14 +245,15 @@ impl Client {
 
             let cache = self.cache.clone();
             rx.map(move |data| {
-                match data {
-                    ref data @ Data::Immutable(_) => {
-                        let _ = cache.borrow_mut().insert(*data.name(), data.clone());
+                    match data {
+                        ref data @ Data::Immutable(_) => {
+                            let _ = cache.borrow_mut().insert(*data.name(), data.clone());
+                        }
+                        _ => (),
                     }
-                    _ => (),
-                }
-                data
-            }).into_box()
+                    data
+                })
+                .into_box()
         } else {
             rx.into_box()
         };
@@ -389,7 +390,8 @@ impl Client {
             .and_then(|event| match event {
                 CoreEvent::AccountInfo(res) => res,
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
-            }).into_box();
+            })
+            .into_box();
 
         let dst = match dst {
             Some(auth) => auth,
@@ -419,7 +421,9 @@ impl Client {
     /// store it. It will be retrieved when the user logs into their account. Root directory ID is
     /// necessary to fetch all of the user's data as all further data is encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
-    pub fn set_user_root_dir_id(&mut self, dir_id: (XorName, secretbox::Key)) -> Box<ReturnType<()>> {
+    pub fn set_user_root_dir_id(&mut self,
+                                dir_id: (XorName, secretbox::Key))
+                                -> Box<ReturnType<()>> {
         trace!("Setting user root Dir ID.");
 
         let set = {
@@ -430,7 +434,7 @@ impl Client {
         if set {
             self.update_session_packet()
         } else {
-            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+            err!(CoreError::RootDirectoryAlreadyExists)
         }
     }
 
@@ -444,7 +448,9 @@ impl Client {
     /// their account. Root directory ID is necessary to fetch all of configuration data as all
     /// further data is encoded as meta-information into the config Root Directory or one of its
     /// subdirectories.
-    pub fn set_config_root_dir_id(&mut self, dir_id: (XorName, secretbox::Key)) -> Box<ReturnType<()>> {
+    pub fn set_config_root_dir_id(&mut self,
+                                  dir_id: (XorName, secretbox::Key))
+                                  -> Box<ReturnType<()>> {
         trace!("Setting configuration root Dir ID.");
 
         let set = {
@@ -455,7 +461,7 @@ impl Client {
         if set {
             self.update_session_packet()
         } else {
-            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+            err!(CoreError::RootDirectoryAlreadyExists)
         }
     }
 
@@ -526,7 +532,7 @@ impl Client {
 
     fn update_session_packet(&mut self) -> Box<ReturnType<()>> {
         // TODO (adam): implement this
-        ok!(()).into_box()
+        ok!(())
     }
 }
 
@@ -648,10 +654,12 @@ fn spawn_routing_thread(routing_rx: Receiver<Event>, core_tx: CoreMsgTx) -> Join
 }
 
 fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<ReturnType<()>> {
-    oneshot.map_err(|_| CoreError::OperationAborted).and_then(|event| match event {
-        CoreEvent::Mutation(res) => res,
-        _ => Err(CoreError::ReceivedUnexpectedEvent),
-    }).into_box()
+    oneshot.map_err(|_| CoreError::OperationAborted)
+        .and_then(|event| match event {
+            CoreEvent::Mutation(res) => res,
+            _ => Err(CoreError::ReceivedUnexpectedEvent),
+        })
+        .into_box()
 }
 
 #[cfg(test)]
@@ -686,9 +694,10 @@ mod tests {
             let orig_data = orig_data.clone();
 
             unwrap!(core_tx.send(CoreMsg::new(move |cptr| {
-                let future = cptr.borrow_mut().put(orig_data, None)
-                                              .then(|_| Ok(()))
-                                              .into_box();
+                let future = cptr.borrow_mut()
+                    .put(orig_data, None)
+                    .then(|_| Ok(()))
+                    .into_box();
                 Some(future)
             })));
 
@@ -707,35 +716,43 @@ mod tests {
             let cptr2 = cptr.clone();
             let cptr3 = cptr.clone();
 
-            let future = cptr.borrow_mut().get(data_id, None).map(move |data| {
-                assert_eq!(data, orig_data);
-            }).and_then(move |_| {
-                let name = rand::random();
-                let key  = secretbox::gen_key();
+            let future = cptr.borrow_mut()
+                .get(data_id, None)
+                .map(move |data| {
+                    assert_eq!(data, orig_data);
+                })
+                .and_then(move |_| {
+                    let name = rand::random();
+                    let key = secretbox::gen_key();
 
-                let mut cptr = cptr2.borrow_mut();
-                cptr.set_user_root_dir_id((name, key))
-            }).map(|_| {
-                panic!("Unregistered client should not be allowed to set user root dir");
-            }).or_else(move |err| {
-                match err {
-                    CoreError::OperationForbiddenForClient => (),
-                    _ => panic!("Unexpected {:?}", err),
-                }
+                    let mut cptr = cptr2.borrow_mut();
+                    cptr.set_user_root_dir_id((name, key))
+                })
+                .map(|_| {
+                    panic!("Unregistered client should not be allowed to set user root dir");
+                })
+                .or_else(move |err| {
+                    match err {
+                        CoreError::OperationForbiddenForClient => (),
+                        _ => panic!("Unexpected {:?}", err),
+                    }
 
-                let name = rand::random();
-                let key  = secretbox::gen_key();
+                    let name = rand::random();
+                    let key = secretbox::gen_key();
 
-                let mut cptr = cptr3.borrow_mut();
-                cptr.set_config_root_dir_id((name, key))
-            }).map(|_| {
-                panic!("Unregistered client should not be allowed to set config root dir");
-            }).map_err(|err| {
-                match err {
-                    CoreError::OperationForbiddenForClient => (),
-                    _ => panic!("Unexpected {:?}", err),
-                }
-            }).into_box();
+                    let mut cptr = cptr3.borrow_mut();
+                    cptr.set_config_root_dir_id((name, key))
+                })
+                .map(|_| {
+                    panic!("Unregistered client should not be allowed to set config root dir");
+                })
+                .map_err(|err| {
+                    match err {
+                        CoreError::OperationForbiddenForClient => (),
+                        _ => panic!("Unexpected {:?}", err),
+                    }
+                })
+                .into_box();
 
             Some(future)
         })));
