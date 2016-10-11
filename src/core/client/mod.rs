@@ -261,10 +261,12 @@ impl Client {
 
         let (head, oneshot) = futures::oneshot();
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
-            .and_then(|event| match event {
-                CoreEvent::Get(res) => ok!(fry!(res)),
-                _ => err!(CoreError::ReceivedUnexpectedEvent),
-            });
+                        .and_then(|event| {
+                            match event {
+                                CoreEvent::Get(res) => ok!(fry!(res)),
+                                _ => err!(CoreError::ReceivedUnexpectedEvent),
+                            }
+                        });
 
         let rx: Box<ReturnType<Data>> = if let DataIdentifier::Immutable(..) = data_id {
             if let Some(data) = self.cache.borrow_mut().get_mut(data_id.name()) {
@@ -485,10 +487,12 @@ impl Default for Stats {
 
 fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<ReturnType<()>> {
     Box::new(oneshot.map_err(|_| CoreError::OperationAborted)
-        .and_then(|event| match event {
-            CoreEvent::Mutation(res) => ok!(fry!(res)),
-            _ => err!(CoreError::ReceivedUnexpectedEvent),
-        }))
+                    .and_then(|event| {
+                        match event {
+                            CoreEvent::Mutation(res) => ok!(fry!(res)),
+                            _ => err!(CoreError::ReceivedUnexpectedEvent),
+                        }
+                    }))
 }
 
 #[cfg(test)]
