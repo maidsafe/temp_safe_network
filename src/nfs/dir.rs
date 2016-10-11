@@ -81,7 +81,6 @@ impl Dir {
 
     /// If file is present in this Directory then replace it else insert it
     pub fn upsert_file(&mut self, file: File) {
-        let modified_time = *file.metadata().modified_time();
         // TODO try using the below approach for efficiency - also try the same
         // in upsert_sub_directory
         //     if let Some(mut existing_file) = self.files.iter_mut().find(
@@ -95,7 +94,6 @@ impl Dir {
         } else {
             self.files_mut().push(file);
         }
-        // self.metadata_mut().set_modified_time(modified_time)
     }
 
     /// Remove a file
@@ -110,7 +108,6 @@ impl Dir {
     /// If DirMetadata is present in the sub_dirs of this Directory
     /// then replace it else insert it
     pub fn upsert_sub_dir(&mut self, dir_metadata: DirMetadata) {
-        let modified_time = *dir_metadata.modified_time();
         if let Some(index) = self.sub_dirs()
                                  .iter()
                                  .position(|entry| *entry.locator() == *dir_metadata.locator()) {
@@ -118,7 +115,6 @@ impl Dir {
         } else {
             self.sub_dirs_mut().push(dir_metadata);
         }
-        // self.metadata_mut().set_modified_time(modified_time);
     }
 
     /// Remove a sub_directory
@@ -142,7 +138,7 @@ impl Dir {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::file::File;
     use nfs::metadata::{DirMetadata, FileMetadata};

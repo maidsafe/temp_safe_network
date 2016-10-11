@@ -140,7 +140,7 @@ impl Decodable for DirMetadata {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use rand;
     use super::*;
@@ -148,7 +148,7 @@ mod test {
     #[test]
     fn serialise_directory_metadata_without_parent_directory() {
         let id = rand::random();
-        let obj_before = DirMetadata::new(id, "hello.txt".to_string(), Vec::new(), None);
+        let obj_before = DirMetadata::new(id, "hello.txt", Vec::new(), None);
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after = unwrap!(deserialise(&serialised_data));
         assert_eq!(obj_before, obj_after);
@@ -158,15 +158,13 @@ mod test {
     fn update_using_setters() {
         let modified_time = ::time::now_utc();
         let id = rand::random();
-        let mut obj_before = DirMetadata::new(id, "hello.txt".to_string(), Vec::new(), None);
+        let mut obj_before = DirMetadata::new(id, "hello.txt", Vec::new(), None);
         let user_metadata = "{mime: \"application/json\"}".to_string().into_bytes();
         obj_before.set_user_metadata(user_metadata.clone());
         obj_before.set_modified_time(modified_time);
         obj_before.set_name("index.txt".to_string());
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after: DirMetadata = unwrap!(deserialise(&serialised_data));
-        assert_eq!(*user_metadata, *obj_after.user_metadata());
-        assert_eq!(modified_time, *obj_after.modified_time());
-        assert_eq!("index.txt".to_string(), *obj_after.name());
+        assert_eq!(obj_before, obj_after);
     }
 }

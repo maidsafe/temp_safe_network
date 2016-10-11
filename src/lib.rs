@@ -65,6 +65,7 @@ extern crate tokio_core;
 extern crate unwrap;
 
 /// Core module
+#[macro_use]
 pub mod core;
 /// Nfs module;
 pub mod nfs;
