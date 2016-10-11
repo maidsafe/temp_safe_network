@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use futures::{Async, Future, Poll};
+
 /// This is the equivalent `try!` adapted to deal with futures. It is to be read as `future-try`.
 /// This will convert errors from `Result` into a `done` future with corresponding error and return.
 macro_rules! fry {
@@ -39,5 +41,43 @@ macro_rules! ok {
 macro_rules! err {
     ($elt:expr) => {
         futures::done(Err($elt))
+    }
+}
+
+/// Additional future combinators.
+pub trait FutureExt: Future + Sized {
+    /// Box this future. Similar to `boxed` combinator, but does not require
+    /// the future to implement `Send`.
+    fn into_box(self) -> Box<Future<Item=Self::Item, Error=Self::Error>>;
+
+    /// Maps both item and error of the future to `()`.
+    fn ignore(self) -> Ignore<Self>;
+}
+
+impl<F: Future + 'static> FutureExt for F {
+    fn into_box(self) -> Box<Future<Item=Self::Item, Error=Self::Error>> {
+        Box::new(self)
+    }
+
+    /// Maps both item and error of the future to `()`.
+    fn ignore(self) -> Ignore<Self> {
+        Ignore(self)
+    }
+}
+
+pub struct Ignore<F>(F);
+
+// Note: explicit impl is required here, because the type of the expression
+// `f.map(|_| ()).map_err(|_| ())` cannot be named.
+impl<F: Future> Future for Ignore<F> {
+    type Item=();
+    type Error=();
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        match self.0.poll() {
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Ok(Async::Ready(_)) => Ok(Async::Ready(())),
+            Err(_) => Err(()),
+        }
     }
 }

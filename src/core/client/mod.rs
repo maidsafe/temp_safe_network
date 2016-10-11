@@ -20,7 +20,7 @@ mod account;
 mod mock_routing;
 mod routing_el;
 
-use core::{CoreError, CoreMsgTx, utility};
+use core::{CoreError, CoreMsgTx, FutureExt, utility};
 use core::event::CoreEvent;
 use futures::{self, Complete, Future, Oneshot};
 use lru_cache::LruCache;
@@ -230,22 +230,20 @@ impl Client {
 
         let (head, oneshot) = futures::oneshot();
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
-                        .and_then(|event| {
-                            match event {
-                                CoreEvent::Get(res) => ok!(fry!(res)),
-                                _ => err!(CoreError::ReceivedUnexpectedEvent),
-                            }
-                        });
+            .and_then(|event| match event {
+                CoreEvent::Get(res) => ok!(fry!(res)),
+                _ => err!(CoreError::ReceivedUnexpectedEvent),
+            });
 
-        let rx: Box<ReturnType<Data>> = if let DataIdentifier::Immutable(..) = data_id {
+        let rx = if let DataIdentifier::Immutable(..) = data_id {
             if let Some(data) = self.cache.borrow_mut().get_mut(data_id.name()) {
                 trace!("ImmutableData found in cache.");
                 head.complete(CoreEvent::Get(Ok(data.clone())));
-                return Box::new(rx);
+                return rx.into_box();
             }
 
             let cache = self.cache.clone();
-            Box::new(rx.map(move |data| {
+            rx.map(move |data| {
                 match data {
                     ref data @ Data::Immutable(_) => {
                         let _ = cache.borrow_mut().insert(*data.name(), data.clone());
@@ -253,9 +251,9 @@ impl Client {
                     _ => (),
                 }
                 data
-            }))
+            }).into_box()
         } else {
-            Box::new(rx)
+            rx.into_box()
         };
 
         let dst = match opt_dst {
@@ -390,8 +388,7 @@ impl Client {
             .and_then(|event| match event {
                 CoreEvent::AccountInfo(res) => ok!(fry!(res)),
                 _ => err!(CoreError::ReceivedUnexpectedEvent),
-            });
-        let rx = Box::new(rx);
+            }).into_box();
 
         let dst = match dst {
             Some(auth) => auth,
@@ -588,18 +585,15 @@ fn spawn_routing_thread(routing_rx: Receiver<Event>, core_tx: CoreMsgTx) -> Join
 }
 
 fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<ReturnType<()>> {
-    Box::new(oneshot.map_err(|_| CoreError::OperationAborted)
-                    .and_then(|event| {
-                        match event {
-                            CoreEvent::Mutation(res) => ok!(fry!(res)),
-                            _ => err!(CoreError::ReceivedUnexpectedEvent),
-                        }
-                    }))
+    oneshot.map_err(|_| CoreError::OperationAborted).and_then(|event| match event {
+        CoreEvent::Mutation(res) => ok!(fry!(res)),
+        _ => err!(CoreError::ReceivedUnexpectedEvent),
+    }).into_box()
 }
 
 #[cfg(test)]
 mod tests {
-    use core::{CoreError, CoreMsg};
+    use core::{CoreError, CoreMsg, FutureExt};
     use core::{core_el, utility};
     use futures::Future;
     use routing::{Data, DataIdentifier, ImmutableData};
@@ -627,8 +621,10 @@ mod tests {
             let orig_data = orig_data.clone();
 
             let _ = core_tx.send(CoreMsg::new(move |cptr| {
-                let future = cptr.borrow_mut().put(orig_data, None).map_err(|_| ());
-                Some(Box::new(future))
+                let future = cptr.borrow_mut().put(orig_data, None)
+                                              .ignore()
+                                              .into_box();
+                Some(future)
             }));
 
             let _ = core_tx.send(CoreMsg::build_terminator());
@@ -642,14 +638,11 @@ mod tests {
 
         let data_id = DataIdentifier::Immutable(*orig_data.name());
         let _ = core_tx.send(CoreMsg::new(move |cptr| {
-            let future = cptr.borrow_mut()
-                .get(data_id, None)
-                .map(move |data| {
-                    assert_eq!(data, orig_data);
-                })
-                .map_err(|_| ());
+            let future = cptr.borrow_mut().get(data_id, None).map(move |data| {
+                assert_eq!(data, orig_data);
+            }).ignore().into_box();
 
-            Some(Box::new(future))
+            Some(future)
 
             // TODO:
             // Operations Not Allowed for Unregistered Client

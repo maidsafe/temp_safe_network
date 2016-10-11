@@ -146,8 +146,6 @@ mod tests {
     use self_encryption::DataMap;
     use super::Dir;
 
-    const TAG: u64 = 100;
-
     fn create_directory(name: &str, user_metadata: Vec<u8>) -> DirMetadata {
         let id = rand::random();
         DirMetadata::new(id, name, user_metadata, None)
