@@ -102,7 +102,7 @@ impl Client {
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
-        let acc = Account::new(None, None);
+        let acc = Account::new();
         let id_packet = FullId::with_keys((acc.get_maid().public_keys().1,
                                            acc.get_maid().secret_keys().1.clone()),
                                           (acc.get_maid().public_keys().0,

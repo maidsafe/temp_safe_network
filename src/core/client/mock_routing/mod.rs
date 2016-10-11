@@ -1267,7 +1267,7 @@ mod test {
     }
 
     fn create_account_and_full_id() -> (Account, FullId) {
-        let account = Account::new(None, None);
+        let account = Account::new();
         let id = FullId::with_keys((account.get_maid().public_keys().1,
                                     account.get_maid().secret_keys().1.clone()),
                                    (account.get_maid().public_keys().0,
