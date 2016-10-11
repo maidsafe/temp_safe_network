@@ -15,15 +15,12 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// TODO: remove this
-#![allow(unused)]
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Macros for convenience in dealing with futures.
+/// Helpers to work with futures.
 #[macro_use]
-mod macros;
+mod futures;
 
 /// Public and Private Id types
 pub mod id;
@@ -41,6 +38,7 @@ pub mod self_encryption_storage;
 pub use self::client::Client;
 pub use self::core_el::{CoreMsg, CoreMsgTx, TailFuture, run};
 pub use self::errors::CoreError;
+pub use self::futures::FutureExt;
 pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
 
 /// Handle to the main Client object.

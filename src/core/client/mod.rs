@@ -20,23 +20,25 @@ mod account;
 mod mock_routing;
 mod routing_el;
 
-use core::{CoreError, CoreMsgTx, utility};
+use core::{CoreError, CoreMsgTx, FutureExt, utility};
 use core::event::CoreEvent;
 use futures::{self, Complete, Future, Oneshot};
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::{Authority, Data, DataIdentifier, Event, FullId, MessageId, Response, StructuredData,
-              TYPE_TAG_SESSION_PACKET, XorName};
+use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId, Response,
+              StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
+use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
+use rust_sodium::crypto::secretbox;
 use self::account::Account;
 #[cfg(feature = "use-mock-routing")]
 use self::mock_routing::MockRouting as Routing;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::mpsc;
+use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
 pub type ReturnType<T> = Future<Item = T, Error = CoreError>;
@@ -66,21 +68,8 @@ impl Client {
     pub fn unregistered(core_tx: CoreMsgTx) -> Result<Client, CoreError> {
         trace!("Creating unregistered client.");
 
-        let (routing_tx, routing_rx) = mpsc::channel();
-        let routing = try!(Routing::new(routing_tx, None));
-
-        trace!("Waiting to get connected to the Network...");
-        match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
-            Ok(Event::Connected) => (),
-            x => {
-                warn!("Could not connect to the Network. Unexpected: {:?}", x);
-                return Err(CoreError::OperationAborted);
-            }
-        }
-        trace!("Connected to the Network.");
-
-        let joiner = thread::named("Routing Event Loop",
-                                   move || routing_el::run(routing_rx, core_tx));
+        let (routing, routing_rx) = try!(setup_routing(None));
+        let joiner = spawn_routing_thread(routing_rx, core_tx);
 
         Ok(Client {
             routing: routing,
@@ -108,18 +97,7 @@ impl Client {
                                           (acc.get_maid().public_keys().0,
                                            acc.get_maid().secret_keys().0.clone()));
 
-        let (routing_tx, routing_rx) = mpsc::channel();
-        let routing = try!(Routing::new(routing_tx, Some(id_packet)));
-
-        trace!("Waiting to get connected to the Network...");
-        match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
-            Ok(Event::Connected) => (),
-            x => {
-                warn!("Could not connect to the Network. Unexpected: {:?}", x);
-                return Err(CoreError::OperationAborted);
-            }
-        }
-        trace!("Connected to the Network.");
+        let (routing, routing_rx) = try!(setup_routing(Some(id_packet)));
 
         let acc_loc = try!(Account::generate_network_id(&keyword, &pin));
         let user_cred = UserCred::new(password, pin);
@@ -139,6 +117,15 @@ impl Client {
         try!(routing.send_put_request(cm_addr.clone(), Data::Structured(acc_sd), msg_id));
         match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
             Ok(Event::Response { response: Response::PutSuccess(_, id), .. }) if id == msg_id => (),
+            Ok(Event::Response { response: Response::PutFailure { id,
+                                                        data_id,
+                                                        ref external_error_indicator },
+                                 .. }) if id == msg_id => {
+                return Err(CoreError::MutationFailure {
+                    data_id: data_id,
+                    reason: routing_el::parse_mutation_err(external_error_indicator),
+                });
+            }
             x => {
                 warn!("Could not put session packet to the Network. Unexpected: {:?}",
                       x);
@@ -146,8 +133,7 @@ impl Client {
             }
         }
 
-        let joiner = thread::named("Routing Event Loop",
-                                   move || routing_el::run(routing_rx, core_tx));
+        let joiner = spawn_routing_thread(routing_rx, core_tx);
 
         Ok(Client {
             routing: routing,
@@ -178,18 +164,7 @@ impl Client {
 
         let acc_sd = {
             trace!("Creating throw-away routing getter for account packet.");
-            let (routing_tx, routing_rx) = mpsc::channel();
-            let mut routing = try!(Routing::new(routing_tx, None));
-
-            trace!("Waiting to get connected to the Network...");
-            match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
-                Ok(Event::Connected) => (),
-                x => {
-                    warn!("Could not connect to the Network. Unexpected: {:?}", x);
-                    return Err(CoreError::OperationAborted);
-                }
-            }
-            trace!("Connected to the Network.");
+            let (mut routing, routing_rx) = try!(setup_routing(None));
 
             try!(routing.send_get_request(dst, acc_sd_id, msg_id));
             match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
@@ -200,6 +175,14 @@ impl Client {
                     } else {
                         return Err(CoreError::OperationAborted);
                     }
+                }
+                Ok(Event::Response {
+                    response: Response::GetFailure { id, data_id, ref external_error_indicator }, ..
+                }) if id == msg_id => {
+                    return Err(CoreError::GetFailure {
+                        data_id: data_id,
+                        reason: routing_el::parse_get_err(external_error_indicator),
+                    });
                 }
                 x => {
                     warn!("Could not fetch account packet from the Network. Unexpected: {:?}",
@@ -219,21 +202,8 @@ impl Client {
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         trace!("Creating an actual routing...");
-        let (routing_tx, routing_rx) = mpsc::channel();
-        let routing = try!(Routing::new(routing_tx, Some(id_packet)));
-
-        trace!("Waiting to get connected to the Network...");
-        match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
-            Ok(Event::Connected) => (),
-            x => {
-                warn!("Could not connect to the Network. Unexpected: {:?}", x);
-                return Err(CoreError::OperationAborted);
-            }
-        }
-        trace!("Connected to the Network.");
-
-        let joiner = thread::named("Routing Event Loop",
-                                   move || routing_el::run(routing_rx, core_tx));
+        let (routing, routing_rx) = try!(setup_routing(Some(id_packet)));
+        let joiner = spawn_routing_thread(routing_rx, core_tx);
 
         Ok(Client {
             routing: routing,
@@ -261,22 +231,20 @@ impl Client {
 
         let (head, oneshot) = futures::oneshot();
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
-                        .and_then(|event| {
-                            match event {
-                                CoreEvent::Get(res) => ok!(fry!(res)),
-                                _ => err!(CoreError::ReceivedUnexpectedEvent),
-                            }
-                        });
+            .and_then(|event| match event {
+                CoreEvent::Get(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            });
 
-        let rx: Box<ReturnType<Data>> = if let DataIdentifier::Immutable(..) = data_id {
+        let rx = if let DataIdentifier::Immutable(..) = data_id {
             if let Some(data) = self.cache.borrow_mut().get_mut(data_id.name()) {
                 trace!("ImmutableData found in cache.");
                 head.complete(CoreEvent::Get(Ok(data.clone())));
-                return Box::new(rx);
+                return rx.into_box();
             }
 
             let cache = self.cache.clone();
-            Box::new(rx.map(move |data| {
+            rx.map(move |data| {
                 match data {
                     ref data @ Data::Immutable(_) => {
                         let _ = cache.borrow_mut().insert(*data.name(), data.clone());
@@ -284,9 +252,9 @@ impl Client {
                     _ => (),
                 }
                 data
-            }))
+            }).into_box()
         } else {
-            Box::new(rx)
+            rx.into_box()
         };
 
         let dst = match opt_dst {
@@ -338,26 +306,187 @@ impl Client {
     }
 
     /// Post data onto the network.
-    pub fn post(&mut self, data: Data, opt_dst: Option<Authority>) -> Box<ReturnType<()>> {
+    pub fn post(&mut self, data: Data, dst: Option<Authority>) -> Box<ReturnType<()>> {
         trace!("Post for {:?}", data);
         self.stats.issued_posts += 1;
 
         let (head, oneshot) = futures::oneshot();
         let rx = build_mutation_future(oneshot);
 
-        let dst = match opt_dst {
-            Some(auth) => auth,
-            None => Authority::NaeManager(*data.name()),
-        };
-
+        let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
         let msg_id = MessageId::new();
+
         if let Err(e) = self.routing.send_post_request(dst, data, msg_id) {
-            head.complete(CoreEvent::Get(Err(From::from(e))));
+            head.complete(CoreEvent::Mutation(Err(From::from(e))));
         } else {
             let _ = self.heads.insert(msg_id, head);
         }
 
         rx
+    }
+
+    /// Delete data from the network
+    pub fn delete(&mut self, data: Data, dst: Option<Authority>) -> Box<ReturnType<()>> {
+        trace!("DELETE for {:?}", data);
+
+        self.stats.issued_deletes += 1;
+
+        let (head, oneshot) = futures::oneshot();
+        let rx = build_mutation_future(oneshot);
+
+        let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
+        let msg_id = MessageId::new();
+
+        if let Err(e) = self.routing.send_delete_request(dst, data, msg_id) {
+            head.complete(CoreEvent::Mutation(Err(From::from(e))));
+        } else {
+            let _ = self.heads.insert(msg_id, head);
+        }
+
+        rx
+    }
+
+    /// Append request
+    pub fn append(&mut self,
+                  appender: AppendWrapper,
+                  dst: Option<Authority>)
+                  -> Box<ReturnType<()>> {
+        trace!("APPEND for {:?}", appender);
+
+        self.stats.issued_appends += 1;
+
+        let (head, oneshot) = futures::oneshot();
+        let rx = build_mutation_future(oneshot);
+
+        let dst = match dst {
+            Some(auth) => auth,
+            None => {
+                let append_to = match appender {
+                    AppendWrapper::Pub { ref append_to, .. } |
+                    AppendWrapper::Priv { ref append_to, .. } => *append_to,
+                };
+                Authority::NaeManager(append_to)
+            }
+        };
+
+        let msg_id = MessageId::new();
+
+        if let Err(e) = self.routing.send_append_request(dst, appender, msg_id) {
+            head.complete(CoreEvent::Mutation(Err(From::from(e))));
+        } else {
+            let _ = self.heads.insert(msg_id, head);
+        }
+
+        rx
+    }
+
+    /// Get data from the network.
+    pub fn get_account_info(&mut self, dst: Option<Authority>) -> Box<ReturnType<(u64, u64)>> {
+        trace!("Account info GET issued.");
+
+        let (head, oneshot) = futures::oneshot();
+        let rx = oneshot.map_err(|_| CoreError::OperationAborted)
+            .and_then(|event| match event {
+                CoreEvent::AccountInfo(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            }).into_box();
+
+        let dst = match dst {
+            Some(auth) => auth,
+            None => {
+                match self.cm_addr() {
+                    Ok(addr) => addr.clone(),
+                    Err(e) => {
+                        head.complete(CoreEvent::Mutation(Err(e)));
+                        return rx;
+                    }
+                }
+            }
+        };
+
+
+        let msg_id = MessageId::new();
+        if let Err(e) = self.routing.send_get_account_info_request(dst, msg_id) {
+            head.complete(CoreEvent::AccountInfo(Err(From::from(e))));
+        } else {
+            let _ = self.heads.insert(msg_id, head);
+        }
+
+        rx
+    }
+
+    /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
+    /// store it. It will be retrieved when the user logs into their account. Root directory ID is
+    /// necessary to fetch all of the user's data as all further data is encoded as meta-information
+    /// into the Root Directory or one of its subdirectories.
+    pub fn set_user_root_dir_id(&mut self, dir_id: (XorName, secretbox::Key)) -> Box<ReturnType<()>> {
+        trace!("Setting user root Dir ID.");
+
+        let set = {
+            let mut account = fry!(self.client_type.acc_mut());
+            account.set_user_root_dir_id(dir_id)
+        };
+
+        if set {
+            self.update_session_packet()
+        } else {
+            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+        }
+    }
+
+    /// Get User's Root Directory ID if available in session packet used for current login
+    pub fn user_root_dir_id(&self) -> Option<&(XorName, secretbox::Key)> {
+        self.client_type.acc().ok().and_then(|account| account.user_root_dir())
+    }
+
+    /// Create an entry for the Maidsafe configuration specific Root Directory ID into the
+    /// session packet, encrypt and store it. It will be retrieved when the user logs into
+    /// their account. Root directory ID is necessary to fetch all of configuration data as all
+    /// further data is encoded as meta-information into the config Root Directory or one of its
+    /// subdirectories.
+    pub fn set_config_root_dir_id(&mut self, dir_id: (XorName, secretbox::Key)) -> Box<ReturnType<()>> {
+        trace!("Setting configuration root Dir ID.");
+
+        let set = {
+            let mut account = fry!(self.client_type.acc_mut());
+            account.set_config_root_dir(dir_id)
+        };
+
+        if set {
+            self.update_session_packet()
+        } else {
+            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+        }
+    }
+
+    /// Get Maidsafe specific configuration's Root Directory ID if available in session packet used
+    /// for current login
+    pub fn config_root_dir_id(&self) -> Option<&(XorName, secretbox::Key)> {
+        self.client_type.acc().ok().and_then(|account| account.config_root_dir())
+    }
+
+    /// Returns the public encryption key
+    pub fn public_encryption_key(&self) -> Result<&box_::PublicKey, CoreError> {
+        let account = try!(self.client_type.acc());
+        Ok(&account.get_maid().public_keys().1)
+    }
+
+    /// Returns the Secret encryption key
+    pub fn secret_encryption_key(&self) -> Result<&box_::SecretKey, CoreError> {
+        let account = try!(self.client_type.acc());
+        Ok(&account.get_maid().secret_keys().1)
+    }
+
+    /// Returns the Public Signing key
+    pub fn public_signing_key(&self) -> Result<&sign::PublicKey, CoreError> {
+        let account = try!(self.client_type.acc());
+        Ok(&account.get_maid().public_keys().0)
+    }
+
+    /// Returns the Secret Signing key
+    pub fn secret_signing_key(&self) -> Result<&sign::SecretKey, CoreError> {
+        let account = try!(self.client_type.acc());
+        Ok(&account.get_maid().secret_keys().0)
     }
 
     /// Return the amount of calls that were done to `get`
@@ -394,6 +523,11 @@ impl Client {
     pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
         self.routing.set_network_limits(max_ops_count);
     }
+
+    fn update_session_packet(&mut self) -> Box<ReturnType<()>> {
+        // TODO (adam): implement this
+        ok!(()).into_box()
+    }
 }
 
 // ------------------------------------------------------------
@@ -418,20 +552,18 @@ enum ClientType {
     Unregistered,
     Registered {
         acc: Account,
-        acc_loc: XorName,
-        user_cred: UserCred,
+        _acc_loc: XorName,
+        _user_cred: UserCred,
         cm_addr: Authority,
     },
 }
 
-// TODO: remove allow(unused)
-#[allow(unused)]
 impl ClientType {
     fn reg(acc: Account, acc_loc: XorName, user_cred: UserCred, cm_addr: Authority) -> Self {
         ClientType::Registered {
             acc: acc,
-            acc_loc: acc_loc,
-            user_cred: user_cred,
+            _acc_loc: acc_loc,
+            _user_cred: user_cred,
             cm_addr: cm_addr,
         }
     }
@@ -443,16 +575,23 @@ impl ClientType {
         }
     }
 
-    fn acc_loc(&self) -> Result<XorName, CoreError> {
+    fn acc_mut(&mut self) -> Result<&mut Account, CoreError> {
         match *self {
-            ClientType::Registered { acc_loc, .. } => Ok(acc_loc),
+            ClientType::Registered { ref mut acc, .. } => Ok(acc),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
-    fn user_cred(&self) -> Result<&UserCred, CoreError> {
+    fn _acc_loc(&self) -> Result<XorName, CoreError> {
         match *self {
-            ClientType::Registered { ref user_cred, .. } => Ok(user_cred),
+            ClientType::Registered { _acc_loc, .. } => Ok(_acc_loc),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn _user_cred(&self) -> Result<&UserCred, CoreError> {
+        match *self {
+            ClientType::Registered { ref _user_cred, .. } => Ok(_user_cred),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
         }
     }
@@ -485,29 +624,123 @@ impl Default for Stats {
     }
 }
 
+fn setup_routing(full_id: Option<FullId>) -> Result<(Routing, Receiver<Event>), CoreError> {
+    let (routing_tx, routing_rx) = mpsc::channel();
+    let routing = try!(Routing::new(routing_tx, full_id));
+
+    trace!("Waiting to get connected to the Network...");
+    match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
+        Ok(Event::Connected) => (),
+        x => {
+            warn!("Could not connect to the Network. Unexpected: {:?}", x);
+            // TODO: we should return more descriptive error here
+            return Err(CoreError::OperationAborted);
+        }
+    }
+    trace!("Connected to the Network.");
+
+    Ok((routing, routing_rx))
+}
+
+fn spawn_routing_thread(routing_rx: Receiver<Event>, core_tx: CoreMsgTx) -> Joiner {
+    thread::named("Routing Event Loop",
+                  move || routing_el::run(routing_rx, core_tx))
+}
+
 fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<ReturnType<()>> {
-    Box::new(oneshot.map_err(|_| CoreError::OperationAborted)
-                    .and_then(|event| {
-                        match event {
-                            CoreEvent::Mutation(res) => ok!(fry!(res)),
-                            _ => err!(CoreError::ReceivedUnexpectedEvent),
-                        }
-                    }))
+    oneshot.map_err(|_| CoreError::OperationAborted).and_then(|event| match event {
+        CoreEvent::Mutation(res) => res,
+        _ => Err(CoreError::ReceivedUnexpectedEvent),
+    }).into_box()
 }
 
 #[cfg(test)]
 mod tests {
-    use core::utility;
+    use core::{CoreError, CoreMsg, FutureExt};
+    use core::{core_el, utility};
+    use futures::Future;
+    use rand;
+    use routing::{Data, DataIdentifier, ImmutableData};
+    use routing::client_errors::MutationError;
+    use rust_sodium::crypto::secretbox;
+    use std::cell::RefCell;
+    use std::rc::Rc;
     use super::*;
     use tokio_core::channel;
     use tokio_core::reactor::Core;
 
     #[test]
     fn unregistered_client() {
-        let el = unwrap!(Core::new());
-        let (core_tx, _) = unwrap!(channel::channel(&el.handle()));
+        let orig_data = ImmutableData::new(unwrap!(utility::generate_random_vector(30)));
+        let orig_data = Data::Immutable(orig_data);
 
-        let _ = unwrap!(Client::unregistered(core_tx));
+        // Registered Client PUTs something onto the network
+        {
+            let core = unwrap!(Core::new());
+            let (core_tx, core_rx) = unwrap!(channel::channel(&core.handle()));
+
+            let secret_0 = unwrap!(utility::generate_random_string(10));
+            let secret_1 = unwrap!(utility::generate_random_string(10));
+            let client = unwrap!(Client::registered(&secret_0, &secret_1, core_tx.clone()));
+
+            let orig_data = orig_data.clone();
+
+            unwrap!(core_tx.send(CoreMsg::new(move |cptr| {
+                let future = cptr.borrow_mut().put(orig_data, None)
+                                              .then(|_| Ok(()))
+                                              .into_box();
+                Some(future)
+            })));
+
+            unwrap!(core_tx.send(CoreMsg::build_terminator()));
+            core_el::run(core, Rc::new(RefCell::new(client)), core_rx);
+        }
+
+        // Unregistered Client should be able to retrieve the data
+        let core = unwrap!(Core::new());
+        let (core_tx, core_rx) = unwrap!(channel::channel(&core.handle()));
+        let client = unwrap!(Client::unregistered(core_tx.clone()));
+
+        let data_id = DataIdentifier::Immutable(*orig_data.name());
+
+        unwrap!(core_tx.send(CoreMsg::new(move |cptr| {
+            let cptr2 = cptr.clone();
+            let cptr3 = cptr.clone();
+
+            let future = cptr.borrow_mut().get(data_id, None).map(move |data| {
+                assert_eq!(data, orig_data);
+            }).and_then(move |_| {
+                let name = rand::random();
+                let key  = secretbox::gen_key();
+
+                let mut cptr = cptr2.borrow_mut();
+                cptr.set_user_root_dir_id((name, key))
+            }).map(|_| {
+                panic!("Unregistered client should not be allowed to set user root dir");
+            }).or_else(move |err| {
+                match err {
+                    CoreError::OperationForbiddenForClient => (),
+                    _ => panic!("Unexpected {:?}", err),
+                }
+
+                let name = rand::random();
+                let key  = secretbox::gen_key();
+
+                let mut cptr = cptr3.borrow_mut();
+                cptr.set_config_root_dir_id((name, key))
+            }).map(|_| {
+                panic!("Unregistered client should not be allowed to set config root dir");
+            }).map_err(|err| {
+                match err {
+                    CoreError::OperationForbiddenForClient => (),
+                    _ => panic!("Unexpected {:?}", err),
+                }
+            }).into_box();
+
+            Some(future)
+        })));
+        unwrap!(core_tx.send(CoreMsg::build_terminator()));
+        core_el::run(core, Rc::new(RefCell::new(client)), core_rx);
     }
 
     #[test]
@@ -517,7 +750,16 @@ mod tests {
 
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
-        let _ = unwrap!(Client::registered(&sec_0, &sec_1, core_tx));
+
+        // Account creation for the 1st time - should succeed
+        let _ = unwrap!(Client::registered(&sec_0, &sec_1, core_tx.clone()));
+
+        // Account creation - same secrets - should fail
+        match Client::registered(&sec_0, &sec_1, core_tx) {
+            Ok(_) => panic!("Account name hijacking should fail"),
+            Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
+            Err(err) => panic!("{:?}", err),
+        }
     }
 
     #[test]
@@ -527,7 +769,7 @@ mod tests {
 
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
-        let _ = assert!(Client::login(&sec_0, &sec_1, core_tx.clone()).is_err());
+        assert!(Client::login(&sec_0, &sec_1, core_tx.clone()).is_err());
         let _ = unwrap!(Client::registered(&sec_0, &sec_1, core_tx.clone()));
         let _ = unwrap!(Client::login(&sec_0, &sec_1, core_tx));
     }

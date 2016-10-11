@@ -15,13 +15,18 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use futures::Future;
+
 /// This is the equivalent `try!` adapted to deal with futures. It is to be read as `future-try`.
 /// This will convert errors from `Result` into a `done` future with corresponding error and return.
 macro_rules! fry {
     ($res:expr) => {
         match $res {
             Ok(elt) => elt,
-            Err(e) => return futures::done(Err(From::from(e))),
+            Err(e) => {
+                use $crate::core::futures::FutureExt;
+                return futures::done(Err(From::from(e))).into_box()
+            }
         }
     }
 }
@@ -39,5 +44,18 @@ macro_rules! ok {
 macro_rules! err {
     ($elt:expr) => {
         futures::done(Err($elt))
+    }
+}
+
+/// Additional future combinators.
+pub trait FutureExt: Future + Sized {
+    /// Box this future. Similar to `boxed` combinator, but does not require
+    /// the future to implement `Send`.
+    fn into_box(self) -> Box<Future<Item=Self::Item, Error=Self::Error>>;
+}
+
+impl<F: Future + 'static> FutureExt for F {
+    fn into_box(self) -> Box<Future<Item=Self::Item, Error=Self::Error>> {
+        Box::new(self)
     }
 }
