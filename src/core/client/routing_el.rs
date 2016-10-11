@@ -46,7 +46,7 @@ fn handle_resp(resp: Response) -> (MessageId, CoreEvent) {
     match resp {
         Response::GetSuccess(data, id) => (id, CoreEvent::Get(Ok(data))),
         Response::GetFailure { id, data_id, external_error_indicator } => {
-            let reason = parse_get_err(external_error_indicator);
+            let reason = parse_get_err(&external_error_indicator);
             let e = CoreError::GetFailure {
                 data_id: data_id,
                 reason: reason,
@@ -61,15 +61,7 @@ fn handle_resp(resp: Response) -> (MessageId, CoreEvent) {
         Response::PostFailure { id, data_id, external_error_indicator } |
         Response::DeleteFailure { id, data_id, external_error_indicator } |
         Response::AppendFailure { id, data_id, external_error_indicator } => {
-            let reason: MutationError = match deserialise(&external_error_indicator) {
-                Ok(elt) => elt,
-                Err(e) => {
-                    let err_msg = format!("Couldn't obtain mutation failure reason: {:?}", e);
-                    warn!("{}", err_msg);
-                    MutationError::NetworkOther(err_msg)
-                }
-            };
-
+            let reason = parse_mutation_err(&external_error_indicator);
             let e = CoreError::MutationFailure {
                 data_id: data_id,
                 reason: reason,
@@ -80,20 +72,31 @@ fn handle_resp(resp: Response) -> (MessageId, CoreEvent) {
             (id, CoreEvent::AccountInfo(Ok((data_stored, space_available))))
         }
         Response::GetAccountInfoFailure { id, external_error_indicator } => {
-            let reason = parse_get_err(external_error_indicator);
+            let reason = parse_get_err(&external_error_indicator);
             let e = CoreError::GetAccountInfoFailure { reason: reason };
             (id, CoreEvent::AccountInfo(Err(e)))
         }
     }
 }
 
-fn parse_get_err(reason_raw: Vec<u8>) -> GetError {
+pub fn parse_get_err(reason_raw: &[u8]) -> GetError {
     match deserialise(&reason_raw) {
         Ok(elt) => elt,
         Err(e) => {
             let err_msg = format!("Couldn't obtain get failure reason: {:?}", e);
             warn!("{}", err_msg);
             GetError::NetworkOther(err_msg)
+        }
+    }
+}
+
+pub fn parse_mutation_err(reason_raw: &[u8]) -> MutationError {
+    match deserialise(&reason_raw) {
+        Ok(elt) => elt,
+        Err(e) => {
+            let err_msg = format!("Couldn't obtain mutation failure reason: {:?}", e);
+            warn!("{}", err_msg);
+            MutationError::NetworkOther(err_msg)
         }
     }
 }

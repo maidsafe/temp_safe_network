@@ -14,8 +14,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// /// Common utility functions for writting test cases
-// pub mod test_utils;
+/// Common utility functions for writting test cases
+#[cfg(test)]
+pub mod test_utils;
 
 use core::errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};

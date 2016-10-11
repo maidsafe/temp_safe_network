@@ -61,6 +61,7 @@ extern crate rust_sodium;
 extern crate self_encryption;
 extern crate time;
 extern crate tokio_core;
+#[cfg(any(test, feature = "use-mock-routing"))]
 #[macro_use]
 extern crate unwrap;
 
