@@ -107,6 +107,8 @@ pub fn get_value(client: &Client,
     }).into_box()
 }
 
+// TODO: consider rewriting these two function to not use recursion.
+
 fn pack(client: Client, value: Vec<u8>) -> Box<CoreFuture<ImmutableData>> {
     let data = ImmutableData::new(value);
     let serialised_data = fry!(serialise(&data));
