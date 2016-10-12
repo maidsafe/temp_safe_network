@@ -609,6 +609,12 @@ impl MockRouting {
     }
 }
 
+impl Drop for MockRouting {
+    fn drop(&mut self) {
+        let _ = self.sender.send(Event::Terminate);
+    }
+}
+
 #[cfg(test)]
 mod test {
     use core::client::account::Account;
