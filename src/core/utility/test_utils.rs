@@ -14,17 +14,15 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use core::client::Client;
 use core::core_el::{self, CoreMsg, CoreMsgRx, CoreMsgTx};
-use core::client::{Client, CPtr};
 use core::errors::CoreError;
 use core::futures::FutureExt;
 use core::utility;
 use futures::Future;
 use rust_sodium::crypto::sign;
-use std::cell::RefCell;
-use std::rc::Rc;
-use tokio_core::reactor::Core;
 use tokio_core::channel;
+use tokio_core::reactor::Core;
 
 /// Generates a random mock client for testing
 pub fn get_client(core_tx: CoreMsgTx) -> Result<Client, CoreError> {
@@ -54,12 +52,14 @@ pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
 }
 
 // Helper to create a client and run it inside an event loop.
-pub fn setup_client<F>(f: F) -> Env where F: FnOnce(CoreMsgTx) -> Client {
+pub fn setup_client<F>(f: F) -> Env
+    where F: FnOnce(CoreMsgTx) -> Result<Client, CoreError>
+{
     let core = unwrap!(Core::new());
     let (tx, rx) = unwrap!(channel::channel(&core.handle()));
 
     Env {
-        client: f(tx.clone()),
+        client: unwrap!(f(tx.clone())),
         core: core,
         tx: tx,
         rx: rx,
@@ -77,24 +77,25 @@ impl Env {
     // Spin up an event loop and execute the given closure on it. The closure
     // must return a future which will then be driven to completion.
     pub fn run<F, R>(self, f: F)
-        where F: FnOnce(&CPtr) -> R + Send + 'static,
+        where F: FnOnce(&Client) -> R + Send + 'static,
               R: Future + 'static
     {
-        let client = Rc::new(RefCell::new(self.client));
         let tx = self.tx.clone();
 
-        unwrap!(self.tx.send(CoreMsg::new(move |cptr| {
-            let future = f(cptr).then(move |_| {
-                // When the future completes, send terminator to the event loop
-                // to stop it.
-                unwrap!(tx.send(CoreMsg::build_terminator()));
-                Ok(())
-            }).into_box();
+        unwrap!(self.tx.send(CoreMsg::new(move |client| {
+            let future = f(client)
+                .then(move |_| {
+                    // When the future completes, send terminator to the event loop
+                    // to stop it.
+                    unwrap!(tx.send(CoreMsg::build_terminator()));
+                    Ok(())
+                })
+                .into_box();
 
             Some(future)
         })));
 
-        core_el::run(self.core, client.clone(), self.rx);
+        core_el::run(self.core, self.client, self.rx);
     }
 
     // Return the client stored in this Env.

@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::CPtr;
+use core::Client;
 use futures::Future;
 use futures::stream::Stream;
 use std::io::{self, ErrorKind};
@@ -30,12 +30,12 @@ pub type CoreMsgRx = channel::Receiver<CoreMsg>;
 /// The final future which the event loop will run.
 pub type TailFuture = Box<Future<Item = (), Error = ()>>;
 /// The message format that core event loop understands.
-pub struct CoreMsg(Option<Box<FnMut(&CPtr) -> Option<TailFuture> + Send + 'static>>);
+pub struct CoreMsg(Option<Box<FnMut(&Client) -> Option<TailFuture> + Send + 'static>>);
 impl CoreMsg {
     /// Construct a new message to ask core event loop to do something. If the return value of the
     /// given closure is optionally a future, it will be registered in the event loop.
     pub fn new<F>(f: F) -> Self
-        where F: FnOnce(&CPtr) -> Option<TailFuture> + Send + 'static
+        where F: FnOnce(&Client) -> Option<TailFuture> + Send + 'static
     {
         let mut f = Some(f);
         CoreMsg(Some(Box::new(move |cptr| -> Option<TailFuture> {
@@ -53,12 +53,12 @@ impl CoreMsg {
 
 /// Run the core event loop. This will block until the event loop is alive. Hence must typically be
 /// called inside a spawned thread.
-pub fn run(mut el: Core, cptr: CPtr, el_rx: CoreMsgRx) {
+pub fn run(mut el: Core, client: Client, el_rx: CoreMsgRx) {
     let el_h = el.handle();
 
     let keep_alive = el_rx.for_each(|core_msg| {
         if let Some(mut f) = core_msg.0 {
-            if let Some(tail) = f(&cptr) {
+            if let Some(tail) = f(&client) {
                 el_h.spawn(tail);
             }
             Ok(())

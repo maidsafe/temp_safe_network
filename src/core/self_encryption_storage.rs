@@ -16,7 +16,8 @@
 // relating to use of the SAFE Network Software.
 
 
-use core::{CoreError, CPtr};
+use core::{Client, CoreError};
+use core::futures::FutureExt;
 use futures::{self, Future};
 use routing::{Data, DataIdentifier, ImmutableData, XOR_NAME_LEN, XorName};
 use self_encryption::{Storage, StorageError};
@@ -26,12 +27,12 @@ use std::fmt::{self, Display, Formatter};
 /// Network storage is the concrete type which self-encryption crate will use to put or get data
 /// from the network
 pub struct SelfEncryptionStorage {
-    client: CPtr,
+    client: Client,
 }
 
 impl SelfEncryptionStorage {
     /// Create a new SelfEncryptionStorage instance
-    pub fn new(client: CPtr) -> Self {
+    pub fn new(client: Client) -> Self {
         SelfEncryptionStorage { client: client }
     }
 }
@@ -57,19 +58,20 @@ impl Storage for SelfEncryptionStorage {
         };
 
         let data_id = DataIdentifier::Immutable(XorName(name));
-        Box::new(self.client.borrow_mut()
+        self.client
             .get(data_id, None)
             .and_then(|data| match data {
                 Data::Immutable(data) => Ok(data.value().clone()),
                 _ => Err(CoreError::ReceivedUnexpectedData),
             })
-            .map_err(From::from))
+            .map_err(From::from)
+            .into_box()
     }
 
-    fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Box<Future<Item=(), Error=Self::Error>> {
+    fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Box<Future<Item = (), Error = Self::Error>> {
         trace!("Self encrypt invoked PUT.");
         let data = Data::Immutable(ImmutableData::new(data));
-        Box::new(self.client.borrow_mut().put(data, None).map_err(From::from))
+        self.client.put(data, None).map_err(From::from).into_box()
     }
 }
 

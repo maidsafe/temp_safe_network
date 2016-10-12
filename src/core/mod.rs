@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use futures::Future;
+
 /// Helpers to work with futures.
 #[macro_use]
 mod futures;
@@ -32,11 +34,14 @@ pub mod self_encryption_storage;
 // /// Helper functions to handle StructuredData related operations
 // pub mod structured_data_operations;
 
-pub use self::client::{Client, CPtr};
+pub use self::client::Client;
 pub use self::core_el::{CoreMsg, CoreMsgTx, TailFuture, run};
 pub use self::errors::CoreError;
 pub use self::futures::FutureExt;
 pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
+
+/// Future trait returned from core operations.
+pub type CoreFuture<T> = Future<Item = T, Error = CoreError>;
 
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;
