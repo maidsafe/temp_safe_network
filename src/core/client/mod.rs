@@ -453,7 +453,7 @@ impl Client {
         if set {
             self.update_session_packet()
         } else {
-            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+            err!(CoreError::RootDirectoryAlreadyExists)
         }
     }
 
@@ -479,7 +479,7 @@ impl Client {
         if set {
             self.update_session_packet()
         } else {
-            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+            err!(CoreError::RootDirectoryAlreadyExists)
         }
     }
 

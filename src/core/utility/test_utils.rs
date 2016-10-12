@@ -24,13 +24,6 @@ use rust_sodium::crypto::sign;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
 
-/// Generates a random mock client for testing
-pub fn get_client(core_tx: CoreMsgTx) -> Result<Client, CoreError> {
-    let acc_locator = try!(utility::generate_random_string(10));
-    let acc_password = try!(utility::generate_random_string(10));
-    Client::registered(&acc_locator, &acc_password, core_tx)
-}
-
 /// Generates random public keys
 pub fn generate_public_keys(len: usize) -> Vec<sign::PublicKey> {
     (0..len).map(|_| sign::gen_keypair().0).collect()
@@ -49,6 +42,18 @@ pub fn get_max_sized_public_keys(len: usize) -> Vec<sign::PublicKey> {
 /// Generates secret keys of maximum size
 pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
     ::std::iter::repeat(sign::SecretKey([::std::u8::MAX; sign::SECRETKEYBYTES])).take(len).collect()
+}
+
+// Create random registered client and run it inside an event loop.
+pub fn register_and_run<F, R>(f: F)
+    where F: FnOnce(&Client) -> R + Send + 'static,
+          R: Future + 'static
+{
+    setup_client(|core_tx| {
+        let acc_locator = unwrap!(utility::generate_random_string(10));
+        let acc_password = unwrap!(utility::generate_random_string(10));
+        Client::registered(&acc_locator, &acc_password, core_tx)
+    }).run(f)
 }
 
 // Helper to create a client and run it inside an event loop.
@@ -101,29 +106,5 @@ impl Env {
     // Return the client stored in this Env.
     pub fn unwrap(self) -> Client {
         self.client
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use tokio_core::channel;
-    use tokio_core::reactor::Core;
-
-    #[test]
-    fn random_client() {
-        let core = unwrap!(Core::new());
-        let (core_tx, _) = unwrap!(channel::channel(&core.handle()));
-
-        let client_0 = unwrap!(get_client(core_tx.clone()));
-        let client_1 = unwrap!(get_client(core_tx));
-
-        let sign_key_0 = unwrap!(client_0.public_signing_key());
-        let sign_key_1 = unwrap!(client_1.public_signing_key());
-        let pub_key_0 = unwrap!(client_0.public_encryption_key());
-        let pub_key_1 = unwrap!(client_1.public_encryption_key());
-
-        assert!(sign_key_0 != sign_key_1);
-        assert!(pub_key_0 != pub_key_1);
     }
 }

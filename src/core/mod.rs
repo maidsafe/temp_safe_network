@@ -29,8 +29,8 @@ pub mod errors;
 pub mod utility;
 /// Implements the Self Encryption storage trait
 pub mod self_encryption_storage;
-// /// Helper functions to handle ImmutableData related operations
-// pub mod immut_data_operations;
+/// Helper functions to handle ImmutableData related operations
+pub mod immutable_data;
 // /// Helper functions to handle StructuredData related operations
 // pub mod structured_data_operations;
 
