@@ -203,8 +203,8 @@ impl MockRouting {
 
             {
                 let account = storage.client_accounts
-                                     .entry(self.client_name())
-                                     .or_insert_with(ClientAccount::default);
+                    .entry(self.client_name())
+                    .or_insert_with(ClientAccount::default);
                 account.data_stored += 1;
                 account.space_available -= 1;
             }
@@ -609,6 +609,12 @@ impl MockRouting {
     }
 }
 
+impl Drop for MockRouting {
+    fn drop(&mut self) {
+        let _ = self.sender.send(Event::Terminate);
+    }
+}
+
 #[cfg(test)]
 mod test {
     use core::client::account::Account;
@@ -764,9 +770,9 @@ mod test {
                                                   0,
                                                   unwrap!(serialise(&vec![orig_data.name()])),
                                                   vec![account_packet.get_public_maid()
-                                                                     .public_keys()
-                                                                     .0
-                                                                     .clone()],
+                                                           .public_keys()
+                                                           .0
+                                                           .clone()],
                                                   Vec::new(),
                                                   Some(&account_packet.get_maid().secret_keys().0));
         let mut account_version = unwrap!(account_ver_res);
@@ -872,8 +878,8 @@ mod test {
                                                       vec![owner_key.clone()],
                                                       Vec::new(),
                                                       Some(&account_packet.get_maid()
-                                                                          .secret_keys()
-                                                                          .0)));
+                                                          .secret_keys()
+                                                          .0)));
         data_account_version = Data::Structured(account_version);
 
         // Subsequent PUTs for same StructuredData should fail
@@ -1001,8 +1007,8 @@ mod test {
                                                       vec![owner_key.clone()],
                                                       Vec::new(),
                                                       Some(&account_packet.get_maid()
-                                                                          .secret_keys()
-                                                                          .0)));
+                                                          .secret_keys()
+                                                          .0)));
         data_account_version = Data::Structured(account_version);
 
         // DELETE of Structured Data with version bump should pass
@@ -1082,9 +1088,8 @@ mod test {
 
         // APPEND data
         {
-            let appended_data = unwrap!(AppendedData::new(immut_data_0.identifier(),
-                                                          owner_key,
-                                                          &signing_key));
+            let appended_data =
+                unwrap!(AppendedData::new(immut_data_0.identifier(), owner_key, &signing_key));
             let append_wrapper = AppendWrapper::new_pub(appendable_data_name, appended_data, 0);
 
             unwrap!(do_append(&mut mock_routing,
@@ -1113,9 +1118,8 @@ mod test {
 
         // APPEND more data
         {
-            let appended_data = unwrap!(AppendedData::new(immut_data_1.identifier(),
-                                                          owner_key,
-                                                          &signing_key));
+            let appended_data =
+                unwrap!(AppendedData::new(immut_data_1.identifier(), owner_key, &signing_key));
             let append_wrapper = AppendWrapper::new_pub(appendable_data_name,
                                                         appended_data,
                                                         appendable_data.version);
@@ -1160,9 +1164,9 @@ mod test {
         let appendable_data = unwrap!(PubAppendableData::new(appendable_data.name,
                                                              appendable_data.version + 1,
                                                              appendable_data.current_owner_keys
-                                                                            .clone(),
+                                                                 .clone(),
                                                              appendable_data.previous_owner_keys
-                                                                            .clone(),
+                                                                 .clone(),
                                                              appendable_data.deleted_data.clone(),
                                                              filter,
                                                              Some(&signing_key)));
@@ -1198,9 +1202,8 @@ mod test {
             let immut_data_name = rand::random();
             let immut_data_id = DataIdentifier::Immutable(immut_data_name);
 
-            let appended_data = unwrap!(AppendedData::new(immut_data_id,
-                                                          blacklisted_pk,
-                                                          &blacklisted_sk));
+            let appended_data =
+                unwrap!(AppendedData::new(immut_data_id, blacklisted_pk, &blacklisted_sk));
             let append_wrapper = AppendWrapper::new_pub(appendable_data_name,
                                                         appended_data,
                                                         appendable_data.version);
@@ -1235,9 +1238,8 @@ mod test {
 
         let appendable_data_id = appendable_data.identifier();
 
-        let appended_data = unwrap!(AppendedData::new(immut_data_0.identifier(),
-                                                      owner_key,
-                                                      &signing_key));
+        let appended_data =
+            unwrap!(AppendedData::new(immut_data_0.identifier(), owner_key, &signing_key));
         assert!(appendable_data.append(appended_data));
 
         unwrap!(do_put(&mut mock_routing,

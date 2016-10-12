@@ -146,7 +146,7 @@ impl Account {
     pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Self, CoreError> {
         let (key, nonce) = try!(Self::generate_crypto_keys(password, pin));
         let decrypted_self = try!(secretbox::open(encrypted_self, &nonce, &key)
-                                      .map_err(|_| CoreError::SymmetricDecipherFailure));
+            .map_err(|_| CoreError::SymmetricDecipherFailure));
 
         Ok(try!(deserialise(&decrypted_self)))
     }
@@ -183,8 +183,8 @@ impl Account {
                                 &salt,
                                 pwhash::OPSLIMIT_INTERACTIVE,
                                 pwhash::MEMLIMIT_INTERACTIVE)
-                 .map_err(|_| CoreError::UnsuccessfulPwHash)
-                 .map(|_| Ok(())))
+            .map_err(|_| CoreError::UnsuccessfulPwHash)
+            .map(|_| Ok(())))
     }
 }
 
@@ -210,7 +210,7 @@ mod test {
                                                              1234.to_string().as_bytes()));
         let user1_id3 = unwrap!(Account::generate_network_id(keyword1.as_bytes(),
                                                              ::std::u32::MAX.to_string()
-                                                                            .as_bytes()));
+                                                                 .as_bytes()));
 
         assert!(user1_id1 != user1_id2);
         assert!(user1_id1 != user1_id3);
@@ -224,7 +224,7 @@ mod test {
         assert_eq!(user1_id3,
                    unwrap!(Account::generate_network_id(keyword1.as_bytes(),
                                                         ::std::u32::MAX.to_string()
-                                                                       .as_bytes())));
+                                                            .as_bytes())));
 
         let keyword2 = "user2".to_owned();
         let gen_id_res1 = Account::generate_network_id(keyword1.as_bytes(),
@@ -247,7 +247,7 @@ mod test {
                                                               1234.to_string().as_bytes()));
             let keys3 = unwrap!(Account::generate_crypto_keys(password1.as_bytes(),
                                                               ::std::u32::MAX.to_string()
-                                                                             .as_bytes()));
+                                                                  .as_bytes()));
 
             assert!(keys1 != keys2);
             assert!(keys1 != keys3);

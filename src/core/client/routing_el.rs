@@ -105,9 +105,9 @@ pub fn parse_mutation_err(reason_raw: &[u8]) -> MutationError {
 /// sending fails for some other reason, treat it as an exit condition. The return value thus
 /// signifies if the firing was successful.
 fn fire(core_tx: &CoreMsgTx, id: MessageId, event: CoreEvent) -> bool {
-    let msg = CoreMsg::new(move |cptr| {
+    let msg = CoreMsg::new(move |client| {
         // Using in `if` keeps borrow alive. Do not try to combine the 2 lines into one.
-        let opt_head = cptr.borrow_mut().remove_head(&id);
+        let opt_head = client.remove_head(&id);
         if let Some(head) = opt_head {
             head.complete(event);
         }
