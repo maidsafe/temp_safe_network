@@ -15,10 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use UNVERSIONED_STRUCT_DATA_TYPE_TAG;
 use routing::{DataIdentifier, XorName};
-use rustc_serialize::{Decodable, Decoder};
 use rust_sodium::crypto::secretbox;
+use rustc_serialize::{Decodable, Decoder};
 
 /// Metadata about a File or a Directory
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -41,13 +40,18 @@ impl DirMetadata {
         where S: Into<String>
     {
         DirMetadata {
-            locator: DataIdentifier::Structured(id, UNVERSIONED_STRUCT_DATA_TYPE_TAG),
+            locator: DataIdentifier::Structured(id, ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
             name: name.into(),
             encrypt_key: encrypt_key,
             created: ::time::now_utc(),
             modified: ::time::now_utc(),
             user_metadata: user_metadata,
         }
+    }
+
+    /// Get a directory identifier (locator + encryption key)
+    pub fn id(&self) -> (DataIdentifier, Option<secretbox::Key>) {
+        (self.locator.clone(), self.encrypt_key.clone())
     }
 
     /// Get directory locator (its XorName and type tag)
@@ -74,6 +78,11 @@ impl DirMetadata {
     /// Get user setteble custom metadata
     pub fn user_metadata(&self) -> &[u8] {
         &self.user_metadata
+    }
+
+    /// Get the directory encryption key
+    pub fn encrypt_key(&self) -> Option<&secretbox::Key> {
+        self.encrypt_key.as_ref()
     }
 
     /// Set name associated with the structure (file or directory) that this metadata is a part

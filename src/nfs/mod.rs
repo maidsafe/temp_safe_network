@@ -21,10 +21,8 @@ pub mod dir;
 pub mod errors;
 /// Module for File struct
 pub mod file;
-
-// /// Helper for directory_listing and File for NFS Low level API
-// pub mod helper;
-
+/// Helper for directory_listing and File for NFS Low level API
+pub mod helper;
 /// Directory and File Metadata
 pub mod metadata;
 

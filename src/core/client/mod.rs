@@ -295,6 +295,12 @@ impl Client {
         rx
     }
 
+    ///
+    pub fn put_recover(&self, _: Data, _: Option<Authority>) -> Box<CoreFuture<()>> {
+        // TODO: unimplemented
+        ok!(())
+    }
+
     // TODO All these return the same future from all branches. So convert to impl Trait when it
     // arrives in stable. Change from `Box<CoreFuture>` -> `impl CoreFuture`.
     /// Put data onto the network.
@@ -445,7 +451,9 @@ impl Client {
     /// store it. It will be retrieved when the user logs into their account. Root directory ID is
     /// necessary to fetch all of the user's data as all further data is encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
-    pub fn set_user_root_dir_id(&self, dir_id: (XorName, secretbox::Key)) -> Box<CoreFuture<()>> {
+    pub fn set_user_root_dir_id(&mut self,
+                                dir_id: (DataIdentifier, Option<secretbox::Key>))
+                                -> Box<CoreFuture<()>> {
         trace!("Setting user root Dir ID.");
 
         let set = {
@@ -462,7 +470,7 @@ impl Client {
     }
 
     /// Get User's Root Directory ID if available in session packet used for current login
-    pub fn user_root_dir_id(&self) -> Option<(XorName, secretbox::Key)> {
+    pub fn user_root_dir_id(&self) -> Option<(DataIdentifier, Option<secretbox::Key>)> {
         self.inner().client_type.acc().ok().and_then(|account| account.user_root_dir()).cloned()
     }
 
@@ -471,7 +479,9 @@ impl Client {
     /// their account. Root directory ID is necessary to fetch all of configuration data as all
     /// further data is encoded as meta-information into the config Root Directory or one of its
     /// subdirectories.
-    pub fn set_config_root_dir_id(&self, dir_id: (XorName, secretbox::Key)) -> Box<CoreFuture<()>> {
+    pub fn set_config_root_dir_id(&mut self,
+                                  dir_id: (DataIdentifier, Option<secretbox::Key>))
+                                  -> Box<CoreFuture<()>> {
         trace!("Setting configuration root Dir ID.");
 
         let set = {
@@ -489,7 +499,7 @@ impl Client {
 
     /// Get Maidsafe specific configuration's Root Directory ID if available in session packet used
     /// for current login
-    pub fn config_root_dir_id(&self) -> Option<(XorName, secretbox::Key)> {
+    pub fn config_root_dir_id(&self) -> Option<(DataIdentifier, Option<secretbox::Key>)> {
         self.inner().client_type.acc().ok().and_then(|account| account.config_root_dir()).cloned()
     }
 

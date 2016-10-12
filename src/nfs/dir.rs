@@ -23,7 +23,7 @@ use rust_sodium::crypto::box_;
 use std::cmp;
 
 /// Struct that represent a directory in the network.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct Dir {
     sub_dirs: Vec<DirMetadata>,
     files: Vec<File>,
@@ -87,8 +87,8 @@ impl Dir {
         //             |entry| *entry.name() == *file.name()) {
         //         *existing_file = file;
         if let Some(index) = self.files()
-                                 .iter()
-                                 .position(|entry| *entry.id() == *file.id()) {
+            .iter()
+            .position(|entry| *entry.id() == *file.id()) {
             let mut existing = unwrap!(self.files_mut().get_mut(index));
             *existing = file;
         } else {
@@ -99,9 +99,9 @@ impl Dir {
     /// Remove a file
     pub fn remove_file(&mut self, file_name: &str) -> Result<File, NfsError> {
         let index = try!(self.files()
-                             .iter()
-                             .position(|file| *file.name() == *file_name)
-                             .ok_or(NfsError::FileNotFound));
+            .iter()
+            .position(|file| *file.name() == *file_name)
+            .ok_or(NfsError::FileNotFound));
         Ok(self.files_mut().remove(index))
     }
 
@@ -109,8 +109,8 @@ impl Dir {
     /// then replace it else insert it
     pub fn upsert_sub_dir(&mut self, dir_metadata: DirMetadata) {
         if let Some(index) = self.sub_dirs()
-                                 .iter()
-                                 .position(|entry| *entry.locator() == *dir_metadata.locator()) {
+            .iter()
+            .position(|entry| *entry.locator() == *dir_metadata.locator()) {
             self.sub_dirs_mut()[index] = dir_metadata;
         } else {
             self.sub_dirs_mut().push(dir_metadata);
@@ -118,11 +118,11 @@ impl Dir {
     }
 
     /// Remove a sub_directory
-    pub fn remove_sub_directory(&mut self, directory_name: &str) -> Result<DirMetadata, NfsError> {
+    pub fn remove_sub_dir(&mut self, directory_name: &str) -> Result<DirMetadata, NfsError> {
         let index = try!(self.sub_dirs()
-                             .iter()
-                             .position(|dir_info| *dir_info.name() == *directory_name)
-                             .ok_or(NfsError::DirectoryNotFound));
+            .iter()
+            .position(|dir_info| *dir_info.name() == *directory_name)
+            .ok_or(NfsError::DirectoryNotFound));
         Ok(self.sub_dirs_mut().remove(index))
 
     }
@@ -198,10 +198,10 @@ mod tests {
         let mut dir = Dir::new();
         let mut sub_dir = create_directory("Child one", Vec::new());
         assert!(dir.find_sub_dir(sub_dir.name())
-                   .is_none());
+            .is_none());
         dir.upsert_sub_dir(sub_dir.clone());
         assert!(dir.find_sub_dir(sub_dir.name())
-                   .is_some());
+            .is_some());
 
         sub_dir.set_name("Child_1".to_string());
         dir.upsert_sub_dir(sub_dir.clone());
@@ -214,16 +214,16 @@ mod tests {
         let _ = unwrap!(dir.find_sub_dir(sub_dir.name()), "Directory not found");
         let _ = unwrap!(dir.find_sub_dir(sub_dir_two.name()), "Directory not found");
 
-        let _ = unwrap!(dir.remove_sub_directory(sub_dir.name()));
+        let _ = unwrap!(dir.remove_sub_dir(sub_dir.name()));
         assert!(dir.find_sub_dir(sub_dir.name())
-                   .is_none());
+            .is_none());
         assert!(dir.find_sub_dir(sub_dir_two.name())
-                   .is_some());
+            .is_some());
         assert_eq!(dir.sub_dirs().len(), 1);
 
         // TODO (Spandan) - Fetch and issue a DELETE on the removed directory, check elsewhere in
         // code/test. Also check what can be done for file removals.
-        let _ = unwrap!(dir.remove_sub_directory(sub_dir_two.name()));
+        let _ = unwrap!(dir.remove_sub_dir(sub_dir_two.name()));
         assert_eq!(dir.sub_dirs().len(), 0);
     }
 }

@@ -15,8 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::{SelfEncryptionStorage, SelfEncryptionStorageError};
-use core::CPtr;
+use core::{Client, SelfEncryptionStorage};
 use futures::{self, Future};
 use nfs::NfsFuture;
 use nfs::errors::NfsError;
@@ -27,13 +26,13 @@ use self_encryption::SelfEncryptor;
 /// large
 #[allow(dead_code)]
 pub struct Reader {
-    client: CPtr,
+    client: Client,
     self_encryptor: SelfEncryptor<SelfEncryptionStorage>,
 }
 
 impl Reader {
     /// Create a new instance of Reader
-    pub fn new(client: CPtr,
+    pub fn new(client: Client,
                storage: SelfEncryptionStorage,
                file: &File)
                -> Result<Reader, NfsError> {
@@ -49,7 +48,7 @@ impl Reader {
     }
 
     /// Read data from file/blob
-    pub fn read(&self, position: u64, length: u64) -> NfsFuture<Vec<u8>> {
+    pub fn read(&self, position: u64, length: u64) -> Box<NfsFuture<Vec<u8>>> {
         trace!("Reader reading from pos: {} and size: {}.",
                position,
                length);
