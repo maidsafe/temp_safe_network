@@ -228,6 +228,10 @@ impl Client {
         self.inner_mut().heads.remove(id)
     }
 
+    fn insert_head(&self, msg_id: MessageId, head: Complete<CoreEvent>) {
+        let _ = self.inner_mut().heads.insert(msg_id, head);
+    }
+
     /// Get data from the network. If the data exists locally in the cache (for ImmutableData) then
     /// it will immediately be returned without making an actual network request.
     pub fn get(&self,
@@ -235,7 +239,7 @@ impl Client {
                opt_dst: Option<Authority>)
                -> Box<CoreFuture<Data>> {
         trace!("GET for {:?}", data_id);
-        self.inner_mut().stats.issued_gets += 1;
+        self.stats_mut().issued_gets += 1;
 
         let (head, oneshot) = futures::oneshot();
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
@@ -281,11 +285,11 @@ impl Client {
         };
 
         let msg_id = MessageId::new();
-        let result = self.inner_mut().routing.send_get_request(dst, data_id, msg_id);
+        let result = self.routing_mut().send_get_request(dst, data_id, msg_id);
         if let Err(e) = result {
             head.complete(CoreEvent::Get(Err(From::from(e))));
         } else {
-            let _ = self.inner_mut().heads.insert(msg_id, head);
+            let _ = self.insert_head(msg_id, head);
         }
 
         rx
@@ -296,7 +300,7 @@ impl Client {
     /// Put data onto the network.
     pub fn put(&self, data: Data, dst: Option<Authority>) -> Box<CoreFuture<()>> {
         trace!("PUT for {:?}", data);
-        self.inner_mut().stats.issued_puts += 1;
+        self.stats_mut().issued_puts += 1;
 
         let (head, oneshot) = futures::oneshot();
         let rx = build_mutation_future(oneshot);
@@ -315,11 +319,11 @@ impl Client {
         };
 
         let msg_id = MessageId::new();
-        let result = self.inner_mut().routing.send_put_request(dst, data, msg_id);
+        let result = self.routing_mut().send_put_request(dst, data, msg_id);
         if let Err(e) = result {
             head.complete(CoreEvent::Get(Err(From::from(e))));
         } else {
-            let _ = self.inner_mut().heads.insert(msg_id, head);
+            let _ = self.insert_head(msg_id, head);
         }
 
         rx
@@ -328,19 +332,19 @@ impl Client {
     /// Post data onto the network.
     pub fn post(&self, data: Data, dst: Option<Authority>) -> Box<CoreFuture<()>> {
         trace!("Post for {:?}", data);
-        self.inner_mut().stats.issued_posts += 1;
+        self.stats_mut().issued_posts += 1;
 
         let (head, oneshot) = futures::oneshot();
         let rx = build_mutation_future(oneshot);
 
         let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
         let msg_id = MessageId::new();
-        let result = self.inner_mut().routing.send_post_request(dst, data, msg_id);
+        let result = self.routing_mut().send_post_request(dst, data, msg_id);
 
         if let Err(e) = result {
             head.complete(CoreEvent::Mutation(Err(From::from(e))));
         } else {
-            let _ = self.inner_mut().heads.insert(msg_id, head);
+            let _ = self.insert_head(msg_id, head);
         }
 
         rx
@@ -350,19 +354,19 @@ impl Client {
     pub fn delete(&self, data: Data, dst: Option<Authority>) -> Box<CoreFuture<()>> {
         trace!("DELETE for {:?}", data);
 
-        self.inner_mut().stats.issued_deletes += 1;
+        self.stats_mut().issued_deletes += 1;
 
         let (head, oneshot) = futures::oneshot();
         let rx = build_mutation_future(oneshot);
 
         let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
         let msg_id = MessageId::new();
-        let result = self.inner_mut().routing.send_delete_request(dst, data, msg_id);
+        let result = self.routing_mut().send_delete_request(dst, data, msg_id);
 
         if let Err(e) = result {
             head.complete(CoreEvent::Mutation(Err(From::from(e))));
         } else {
-            let _ = self.inner_mut().heads.insert(msg_id, head);
+            let _ = self.insert_head(msg_id, head);
         }
 
         rx
@@ -372,7 +376,7 @@ impl Client {
     pub fn append(&self, appender: AppendWrapper, dst: Option<Authority>) -> Box<CoreFuture<()>> {
         trace!("APPEND for {:?}", appender);
 
-        self.inner_mut().stats.issued_appends += 1;
+        self.stats_mut().issued_appends += 1;
 
         let (head, oneshot) = futures::oneshot();
         let rx = build_mutation_future(oneshot);
@@ -389,12 +393,12 @@ impl Client {
         };
 
         let msg_id = MessageId::new();
-        let result = self.inner_mut().routing.send_append_request(dst, appender, msg_id);
+        let result = self.routing_mut().send_append_request(dst, appender, msg_id);
 
         if let Err(e) = result {
             head.complete(CoreEvent::Mutation(Err(From::from(e))));
         } else {
-            let _ = self.inner_mut().heads.insert(msg_id, head);
+            let _ = self.insert_head(msg_id, head);
         }
 
         rx
@@ -426,12 +430,12 @@ impl Client {
         };
 
         let msg_id = MessageId::new();
-        let result = self.inner_mut().routing.send_get_account_info_request(dst, msg_id);
+        let result = self.routing_mut().send_get_account_info_request(dst, msg_id);
 
         if let Err(e) = result {
             head.complete(CoreEvent::AccountInfo(Err(From::from(e))));
         } else {
-            let _ = self.inner_mut().heads.insert(msg_id, head);
+            let _ = self.insert_head(msg_id, head);
         }
 
         rx
@@ -453,7 +457,7 @@ impl Client {
         if set {
             self.update_session_packet()
         } else {
-            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+            err!(CoreError::RootDirectoryAlreadyExists)
         }
     }
 
@@ -479,7 +483,7 @@ impl Client {
         if set {
             self.update_session_packet()
         } else {
-            err!(CoreError::RootDirectoryAlreadyExists).into_box()
+            err!(CoreError::RootDirectoryAlreadyExists)
         }
     }
 
@@ -544,7 +548,7 @@ impl Client {
 
     #[cfg(all(test, feature = "use-mock-routing"))]
     pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
-        self.inner_mut().routing.set_network_limits(max_ops_count);
+        self.routing_mut().set_network_limits(max_ops_count);
     }
 
     fn update_session_packet(&self) -> Box<CoreFuture<()>> {
@@ -584,6 +588,14 @@ impl Client {
             })
             .and_then(move |data| self3.post(Data::Structured(data), None))
             .into_box()
+    }
+
+    fn routing_mut(&self) -> RefMut<Routing> {
+        RefMut::map(self.inner.borrow_mut(), |i| &mut i.routing)
+    }
+
+    fn stats_mut(&self) -> RefMut<Stats> {
+        RefMut::map(self.inner.borrow_mut(), |i| &mut i.stats)
     }
 
     fn inner(&self) -> Ref<Inner> {

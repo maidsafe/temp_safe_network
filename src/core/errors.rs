@@ -15,14 +15,12 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-
-// use core::SelfEncryptionStorageError;
-
+use core::SelfEncryptionStorageError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use routing::DataIdentifier;
 use routing::client_errors::{GetError, MutationError};
 use routing::messaging;
-// use self_encryption::SelfEncryptionError;
+use self_encryption::SelfEncryptionError;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::mpsc;
@@ -87,8 +85,8 @@ pub enum CoreError {
         /// Reason for failure
         reason: MutationError,
     },
-    // /// Error while self-encrypting data
-    // SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
+    /// Error while self-encrypting data
+    SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
     /// The request has timed out
     RequestTimeout,
     /// Invalid type tag for StructuredData
@@ -131,11 +129,11 @@ impl From<messaging::Error> for CoreError {
     }
 }
 
-// impl From<SelfEncryptionError<SelfEncryptionStorageError>> for CoreError {
-//     fn from(error: SelfEncryptionError<SelfEncryptionStorageError>) -> CoreError {
-//         CoreError::SelfEncryption(error)
-//     }
-// }
+impl From<SelfEncryptionError<SelfEncryptionStorageError>> for CoreError {
+    fn from(error: SelfEncryptionError<SelfEncryptionStorageError>) -> CoreError {
+        CoreError::SelfEncryption(error)
+    }
+}
 
 impl Into<i32> for CoreError {
     fn into(self) -> i32 {
@@ -195,26 +193,25 @@ impl Into<i32> for CoreError {
             CoreError::MutationFailure { reason: MutationError::DataTooLarge, .. } => {
                 CLIENT_ERROR_START_RANGE - 28
             }
-            // CoreError::SelfEncryption(
-            //     SelfEncryptionError::Compression::<SelfEncryptionStorageError>) => {
-            //     CLIENT_ERROR_START_RANGE - 29
-            // }
-            // CoreError::SelfEncryption(
-            //     SelfEncryptionError::Decryption::<SelfEncryptionStorageError>) => {
-            //     CLIENT_ERROR_START_RANGE - 30
-            // }
-            // CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
-            //     CLIENT_ERROR_START_RANGE - 31
-            // }
+            CoreError::SelfEncryption(
+                SelfEncryptionError::Compression::<SelfEncryptionStorageError>) => {
+                CLIENT_ERROR_START_RANGE - 29
+            }
+            CoreError::SelfEncryption(
+                SelfEncryptionError::Decryption::<SelfEncryptionStorageError>) => {
+                CLIENT_ERROR_START_RANGE - 30
+            }
+            CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
+                CLIENT_ERROR_START_RANGE - 31
+            }
             CoreError::GetAccountInfoFailure { reason: GetError::NoSuchAccount, .. } => {
                 CLIENT_ERROR_START_RANGE - 32
             }
             CoreError::GetAccountInfoFailure { .. } => CLIENT_ERROR_START_RANGE - 33,
             CoreError::RequestTimeout => CLIENT_ERROR_START_RANGE - 34,
-            // CoreError::SelfEncryption(SelfEncryptionError
-            //                           ::Storage
-            //                           ::<SelfEncryptionStorageError>(
-            //                               SelfEncryptionStorageError(err))) => (*err).into(),
+            CoreError::SelfEncryption(
+                SelfEncryptionError::Storage::<SelfEncryptionStorageError>(
+                    SelfEncryptionStorageError(err))) => (*err).into(),
             CoreError::InvalidStructuredDataTypeTag => CLIENT_ERROR_START_RANGE - 35,
             CoreError::ReceivedUnexpectedEvent => CLIENT_ERROR_START_RANGE - 36,
         }
@@ -289,9 +286,9 @@ impl Debug for CoreError {
                        reason,
                        data_id)
             }
-            // CoreError::SelfEncryption(ref error) => {
-            //     write!(formatter, "CoreError::SelfEncryption -> {:?}", error)
-            // }
+            CoreError::SelfEncryption(ref error) => {
+                write!(formatter, "CoreError::SelfEncryption -> {:?}", error)
+            }
             CoreError::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
             CoreError::InvalidStructuredDataTypeTag => {
                 write!(formatter, "CoreError::InvalidStructuredDataTypeTag")
@@ -368,9 +365,9 @@ impl Display for CoreError {
                        "Failed to Put/Post/Delete on network: {}",
                        reason)
             }
-            // CoreError::SelfEncryption(ref error) => {
-            //     write!(formatter, "Self-encryption error: {}", error)
-            // }
+            CoreError::SelfEncryption(ref error) => {
+                write!(formatter, "Self-encryption error: {}", error)
+            }
             CoreError::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
             CoreError::InvalidStructuredDataTypeTag => {
                 write!(formatter, "CoreError::InvalidStructuredDataTypeTag")
@@ -404,7 +401,7 @@ impl Error for CoreError {
             CoreError::GetFailure { ref reason, .. } |
             CoreError::GetAccountInfoFailure { ref reason } => reason.description(),
             CoreError::MutationFailure { ref reason, .. } => reason.description(),
-            // CoreError::SelfEncryption(ref error) => error.description(),
+            CoreError::SelfEncryption(ref error) => error.description(),
             CoreError::RequestTimeout => "Request has timed out",
             CoreError::InvalidStructuredDataTypeTag => "Invalid Structured Data type tag",
         }
@@ -418,6 +415,7 @@ impl Error for CoreError {
             CoreError::GetFailure { ref reason, .. } |
             CoreError::GetAccountInfoFailure { ref reason } => Some(reason),
             CoreError::MutationFailure { ref reason, .. } => Some(reason),
+            CoreError::SelfEncryption(ref error) => Some(error),
             _ => None,
         }
     }
@@ -425,33 +423,28 @@ impl Error for CoreError {
 
 #[cfg(test)]
 mod test {
+    use core::SelfEncryptionStorageError;
+    use rand;
+    use routing::DataIdentifier;
+    use routing::client_errors::MutationError;
+    use self_encryption::SelfEncryptionError;
+    use super::*;
 
-    // use core::SelfEncryptionStorageError;
+    #[test]
+    fn self_encryption_error() {
+        let id = rand::random();
+        let core_err_0 = CoreError::MutationFailure {
+            data_id: DataIdentifier::Structured(id, 10000),
+            reason: MutationError::LowBalance,
+        };
+        let core_err_1 = CoreError::MutationFailure {
+            data_id: DataIdentifier::Structured(id, 10000),
+            reason: MutationError::LowBalance,
+        };
 
-    // use rand;
-    // use routing::DataIdentifier;
-    // use routing::client_errors::MutationError;
-    // use self_encryption::SelfEncryptionError;
-    // use super::*;
+        let se_err = SelfEncryptionError::Storage(SelfEncryptionStorageError(Box::new(core_err_0)));
+        let core_from_se_err = CoreError::from(se_err);
 
-    // #[test]
-    // fn self_encryption_error() {
-    //     let id = rand::random();
-    //     let core_err_0 = CoreError::MutationFailure {
-    //         data_id: DataIdentifier::Structured(id, 10000),
-    //         reason: MutationError::LowBalance,
-    //     };
-    //     let core_err_1 = CoreError::MutationFailure {
-    //         data_id: DataIdentifier::Structured(id, 10000),
-    //         reason: MutationError::LowBalance,
-    //     };
-
-    //     let se_err = SelfEncryptionError
-    //         ::Storage
-    //         ::<SelfEncryptionStorageError>(SelfEncryptionStorageError(Box::new(core_err_0)));
-    //     let core_from_se_err = CoreError::from(se_err);
-
-    //     assert_eq!(<CoreError as Into<i32>>::into(core_err_1),
-    //                <CoreError as Into<i32>>::into(core_from_se_err));
-    // }
+        assert_eq!(Into::<i32>::into(core_err_1), Into::<i32>::into(core_from_se_err));
+    }
 }
