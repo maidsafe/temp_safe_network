@@ -347,7 +347,7 @@ struct Dns {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::client::Client;
     use core::utility::{generate_random_string, test_utils};
     use dns::errors::DnsError;

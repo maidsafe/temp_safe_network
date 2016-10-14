@@ -144,7 +144,7 @@ impl Decodable for FileMetadata {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use super::*;
 

@@ -422,7 +422,7 @@ impl Error for CoreError {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::SelfEncryptionStorageError;
     use rand;
     use routing::DataIdentifier;

@@ -106,7 +106,7 @@ pub fn get(client: &Client, type_tag: u64, id: &XorName) -> Box<CoreFuture<Struc
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::utility::test_utils;
     use routing::MAX_STRUCTURED_DATA_SIZE_IN_BYTES;
     use super::*;

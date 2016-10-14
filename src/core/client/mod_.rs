@@ -744,7 +744,7 @@ impl SessionPacketEncryptionKeys {
 
 /// //////////////////////////////////////////////////////////////
 #[cfg(test)]
-mod test {
+mod tests {
 
     use core::client::response_getter::GetResponseGetter;
     use core::errors::CoreError;

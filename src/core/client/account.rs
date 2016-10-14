@@ -189,7 +189,7 @@ impl Account {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use super::*;
 

@@ -256,7 +256,7 @@ fn decode(raw_data: &[u8], decryption_key: Option<&secretbox::Key>)
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::MAIDSAFE_TAG;
     use core::utility::{self, test_utils};
     use futures::Future;

@@ -115,7 +115,7 @@ impl PublicIdType {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::id::{IdType, MaidTypeTags, MpidTypeTags, Random, RevocationIdType};
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use rust_sodium::crypto::sign;

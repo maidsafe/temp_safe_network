@@ -616,7 +616,7 @@ impl Drop for MockRouting {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::client::account::Account;
     use core::errors::CoreError;
     use core::utility;

@@ -170,7 +170,7 @@ fn get_immutable_data(client: Arc<Mutex<Client>>,
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use core::utility;
     use rand;

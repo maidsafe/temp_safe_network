@@ -109,7 +109,7 @@ fn get_long_names(app: &App) -> Result<Vec<String>, FfiError> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::utility;
     use ffi::test_utils;
 

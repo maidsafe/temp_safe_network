@@ -268,7 +268,7 @@ fn get_file_metadata(app: &App,
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use ffi::app::App;
     use ffi::test_utils;
     use nfs::helper::directory_helper::DirectoryHelper;

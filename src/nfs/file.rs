@@ -81,7 +81,7 @@ impl fmt::Debug for File {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::metadata::FileMetadata;
     use self_encryption::DataMap;

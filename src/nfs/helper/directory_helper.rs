@@ -396,7 +396,7 @@ impl DirectoryHelper {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::utility::test_utils;
     use nfs::AccessLevel;
     use std::sync::{Arc, Mutex};

@@ -96,7 +96,7 @@ impl RevocationIdType {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::id::{MaidTypeTags, MpidTypeTags, Random};
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use rand;
