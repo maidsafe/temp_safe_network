@@ -19,7 +19,7 @@
 use core::Client;
 use core::errors::CoreError;
 use core::futures::FutureExt;
-use core::structured_data_operations::unversioned;
+use core::structured_data::unversioned;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::{Dir, NfsFuture};
@@ -40,12 +40,13 @@ pub fn create(client: Client,
     let id = rand::random();
     let data_id = DataIdentifier::Structured(id, ::UNVERSIONED_STRUCT_DATA_TYPE_TAG);
 
-    let client2 = client.clone();
+    let c2 = client.clone();
 
     save(client.clone(), dir, &data_id, encryption_key)
         .and_then(move |structured_data| {
             let data_id = structured_data.identifier();
-            client2.put_recover(Data::Structured(structured_data), None)
+
+            c2.put_recover(Data::Structured(structured_data), None)
                 .map_err(NfsError::from)
                 .map(move |_| data_id)
         })
@@ -54,7 +55,7 @@ pub fn create(client: Client,
 
 /// Adds a sub directory to a parent.
 /// Parent directory is updated and the sub directory metadata returned as a result.
-pub fn add(client: Client,
+pub fn add_sub_dir(client: Client,
            name: String,
            dir_id: &(DataIdentifier, Option<secretbox::Key>),
            user_metadata: Vec<u8>,
@@ -74,21 +75,21 @@ pub fn add(client: Client,
 
     let parent = parent.clone();
     let (parent_locator, parent_key) = parent_id.clone();
-    let client2 = client.clone();
+    let c2 = client.clone();
+    let c3 = client.clone();
 
     save(client.clone(),
          &parent,
          &parent_locator,
          parent_key.as_ref())
         .and_then(move |structured_data| {
-            let client = client2.clone();
-            client2.put_recover(Data::Structured(structured_data), None)
+            c2.put_recover(Data::Structured(structured_data), None)
                 .map_err(NfsError::from)
-                .and_then(move |_| {
-                    update(client, &(parent_locator, parent_key), &parent)
-                        .map(move |_| metadata)
-                        .into_box()
-                })
+        })
+        .and_then(move |_| {
+            update(c3, &(parent_locator, parent_key), &parent)
+                .map(move |_| metadata)
+                .into_box()
         })
         .into_box()
 }
@@ -111,47 +112,41 @@ pub fn update(client: Client,
               -> Box<NfsFuture<()>> {
     trace!("Updating directory given the directory listing.");
 
-    let client2 = client.clone();
     let dir_clone = directory.clone();
     let (locator, secret_key) = dir_id.clone();
+    let c2 = client.clone();
+    let c3 = client.clone();
+
+    let signing_key = fry!(client.secret_signing_key());
+    let owner_key = fry!(client.public_signing_key());
 
     get_structured_data(client.clone(), &locator)
         .and_then(move |structured_data| {
-            let client2 = client2.clone();
-
-            let signing_key = fry!(client.secret_signing_key());
-            let owner_key = fry!(client.public_signing_key());
-
             let serialised_data = fry!(serialise(&dir_clone));
 
-            let updated_future = {
-                trace!("Updating directory listing with a new one (will convert DL to an \
-                        unversioned StructuredData).");
+            trace!("Updating directory listing with a new one (will convert DL to an \
+                    unversioned StructuredData).");
 
-                if let DataIdentifier::Structured(id, type_tag) = locator {
-                    unversioned::create(client2.clone(),
-                                        type_tag,
-                                        id,
-                                        structured_data.get_version() + 1,
-                                        serialised_data,
-                                        vec![owner_key.clone()],
-                                        Vec::new(),
-                                        &signing_key,
-                                        secret_key.as_ref())
-                        .map_err(NfsError::from)
-                        .into_box()
-                } else {
-                    err!(NfsError::ParameterIsNotValid)
-                }
-            };
-
+            if let DataIdentifier::Structured(id, type_tag) = locator {
+                unversioned::create(c2.clone(),
+                                    type_tag,
+                                    id,
+                                    structured_data.get_version() + 1,
+                                    serialised_data,
+                                    vec![owner_key.clone()],
+                                    Vec::new(),
+                                    &signing_key,
+                                    secret_key.as_ref())
+                    .map_err(NfsError::from)
+                    .into_box()
+            } else {
+                err!(NfsError::ParameterIsNotValid)
+            }
+        }).and_then(move |updated_structured_data| {
             debug!("Posting updated structured data to the network ...");
 
-            updated_future.and_then(move |updated_structured_data| {
-                    client2.post(Data::Structured(updated_structured_data), None)
-                        .map_err(NfsError::from)
-                })
-                .into_box()
+            c3.post(Data::Structured(updated_structured_data), None)
+                .map_err(NfsError::from)
         })
         .into_box()
 }
@@ -160,12 +155,12 @@ pub fn update(client: Client,
 pub fn get(client: Client, dir_id: &(DataIdentifier, Option<secretbox::Key>)) -> Box<NfsFuture<Dir>> {
     trace!("Getting a directory.");
 
-    let client2 = client.clone();
+    let c2 = client.clone();
     let (id, sk) = dir_id.clone();
 
     get_structured_data(client.clone(), &id)
         .and_then(move |structured_data| {
-            unversioned::get_data(client2, &structured_data, sk.as_ref()).map_err(NfsError::from)
+            unversioned::get_data(c2, &structured_data, sk.as_ref()).map_err(NfsError::from)
         })
         .and_then(move |encoded| Ok(try!(deserialise::<Dir>(&encoded))))
         .into_box()
@@ -181,14 +176,14 @@ pub fn user_root_dir(client: Client) -> Box<NfsFuture<Dir>> {
         Some((id, key)) => get(client.clone(), &(id, key)).into_box(),
         None => {
             debug!("Root directory does not exist - creating one.");
-            let mut client2 = client.clone();
+            let c2 = client.clone();
             let key = None;
             let dir = Dir::new();
 
             create(client.clone(), &dir, key)
                 .and_then(move |data_id| {
                     // ::nfs::ROOT_DIRECTORY_NAME.to_string(),
-                    client2.set_user_root_dir_id((data_id, None))
+                    c2.set_user_root_dir_id((data_id, None))
                         .map_err(NfsError::from)
                         .map(move |_| dir)
                 })
@@ -213,14 +208,14 @@ pub fn configuration_dir(client: Client, dir_name: String) -> Box<NfsFuture<Dir>
         None => {
             debug!("Configuartion Root directory does not exist - creating one.");
 
-            let mut client2 = client.clone();
+            let c2 = client.clone();
             let dir = Dir::new();
             let key = None;
 
             create(client.clone(), &dir, key)
                 .and_then(move |created_id| {
                     let config_dir_id = (created_id, None);
-                    client2.set_config_root_dir_id(config_dir_id.clone())
+                    c2.set_config_root_dir_id(config_dir_id.clone())
                         .map_err(NfsError::from)
                         .map(|_| (config_dir_id, dir))
                 })
@@ -245,7 +240,7 @@ pub fn configuration_dir(client: Client, dir_name: String) -> Box<NfsFuture<Dir>
 
                     create(client.clone(), &dir, None)
                         .and_then(move |dir_id| {
-                            add(client.clone(),
+                            add_sub_dir(client.clone(),
                                 dir_name,
                                 &(dir_id, None),
                                 Vec::new(),
@@ -339,33 +334,22 @@ fn get_immutable_data(client: Client, id: XorName) -> Box<NfsFuture<ImmutableDat
 
 #[cfg(test)]
 mod tests {
-    use core::utility::test_utils::get_client;
-    use core::futures::FutureExt;
-    use core::{self, CoreMsg};
+    use core::utility::test_utils;
     use futures::Future;
     use nfs::Dir;
     use nfs::helper::dir_helper;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use tokio_core::channel;
-    use tokio_core::reactor::Core;
 
     #[test]
     fn create_dir() {
-        let core = unwrap!(Core::new());
-        let (core_tx, core_rx) = unwrap!(channel::channel(&core.handle()));
-        let client = unwrap!(get_client(core_tx.clone()));
-
-        unwrap!(core_tx.send(CoreMsg::new(move |cptr| {
+        test_utils::register_and_run(|client| {
             // Create a Directory
             let dir = Dir::new();
-            let cptr2 = cptr.clone();
-            let cptr3 = cptr.clone();
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-            let f = dir_helper::create(cptr.clone(), &dir, None)
-                .map(|_| panic!("test"))
+            dir_helper::create(client.clone(), &dir, None)
                 .and_then(move |dir_id| {
-                    dir_helper::get(cptr2.clone(), &(dir_id, None))
+                    dir_helper::get(c2, &(dir_id, None))
                         .map(move |new_dir| (dir_id, new_dir))
                 })
                 .and_then(move |(dir_id, mut new_dir)| {
@@ -374,8 +358,8 @@ mod tests {
                     // Create a Child directory and update the parent_dir
                     let child_dir = Dir::new();
 
-                    dir_helper::create(cptr3.clone(), &child_dir, None).and_then(move |child_id| {
-                        dir_helper::add(cptr3.clone(),
+                    dir_helper::create(c3.clone(), &child_dir, None).and_then(move |child_id| {
+                        dir_helper::add_sub_dir(c3,
                                         "Child".to_string(),
                                         &(child_id, None),
                                         Vec::new(),
@@ -384,14 +368,8 @@ mod tests {
                     })
                 })
                 .map(|_| ())
-                .map_err(|_| panic!("dir_helper::create returned error"))
-                .into_box();
-
-            Some(f)
-        })));
-
-        unwrap!(core_tx.send(CoreMsg::build_terminator()));
-        core::run(core, Rc::new(RefCell::new(client)), core_rx);
+                .map_err(|e| panic!("dir_helper::create returned error: {:?}", e))
+        });
 
         //let child_metadata = unwrap!(fut.wait());
 

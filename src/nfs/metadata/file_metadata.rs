@@ -32,14 +32,14 @@ pub struct FileMetadata {
 
 impl FileMetadata {
     /// Create a new instance of FileMetadata
-    pub fn new(name: String, user_metadata: Vec<u8>) -> FileMetadata {
+    pub fn new(name: String, user_metadata: Vec<u8>, data_map: DataMap) -> FileMetadata {
         FileMetadata {
             name: name,
-            size: 0,
+            size: data_map.len(),
             created: time::now_utc(),
             modified: time::now_utc(),
             user_metadata: user_metadata,
-            data_map: DataMap::None,
+            data_map: data_map,
         }
     }
 
@@ -51,6 +51,11 @@ impl FileMetadata {
     /// Get time of modification
     pub fn modified_time(&self) -> &Tm {
         &self.modified
+    }
+
+    /// Get the data-map of the File
+    pub fn datamap(&self) -> &DataMap {
+        &self.data_map
     }
 
     /// Get name associated with the structure (file or directory) that this metadata is a part
@@ -69,6 +74,10 @@ impl FileMetadata {
         &self.user_metadata
     }
 
+    /// Set the data-map of the File
+    pub fn set_datamap(&mut self, data_map: DataMap) {
+        self.data_map = data_map;
+    }
 
     /// Set name associated with the structure (file or directory)
     pub fn set_name(&mut self, name: String) {
@@ -104,7 +113,7 @@ impl Encodable for FileMetadata {
             try!(e.emit_struct_field("modified_time_sec", 4, |e| modified_time.sec.encode(e)));
             try!(e.emit_struct_field("modified_time_nsec", 5, |e| modified_time.nsec.encode(e)));
             try!(e.emit_struct_field("user_metadata", 6, |e| self.user_metadata.encode(e)));
-            try!(e.emit_struct_field("data_map", 7, |e| self.user_metadata.encode(e)));
+            try!(e.emit_struct_field("data_map", 7, |e| self.data_map.encode(e)));
 
             Ok(())
         })
@@ -126,7 +135,7 @@ impl Decodable for FileMetadata {
                     nsec: try!(d.read_struct_field("modified_time_nsec", 5, Decodable::decode)),
                 }),
                 user_metadata: try!(d.read_struct_field("user_metadata", 6, Decodable::decode)),
-                data_map: try!(d.read_struct_field("data_map", 6, Decodable::decode)),
+                data_map: try!(d.read_struct_field("data_map", 7, Decodable::decode)),
             })
         })
     }
@@ -135,12 +144,14 @@ impl Decodable for FileMetadata {
 #[cfg(test)]
 mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use self_encryption::DataMap;
     use super::*;
 
     #[test]
     fn serialise_and_deserialise_file_metadata() {
         let obj_before = FileMetadata::new("hello.txt".to_string(),
-                                           "{mime: \"application/json\"}".to_string().into_bytes());
+                                           "{mime: \"application/json\"}".to_string().into_bytes(),
+                                           DataMap::None);
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after = unwrap!(deserialise(&serialised_data));
         assert_eq!(obj_before, obj_after);

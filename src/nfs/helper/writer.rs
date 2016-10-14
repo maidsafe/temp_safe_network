@@ -18,11 +18,11 @@
 use core::Client;
 use core::SelfEncryptionStorage;
 use core::futures::FutureExt;
+use core::immutable_data;
 use futures::Future;
-use nfs::{Dir, NfsFuture};
-use nfs::file::File;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+use nfs::{Dir, DirMetadata, File, FileMetadata, NfsFuture};
 use nfs::helper::dir_helper;
-use nfs::metadata::DirMetadata;
 use self_encryption::SequentialEncryptor;
 
 /// Mode of the writer
@@ -82,30 +82,66 @@ impl Writer {
 
     /// close is invoked only after all the data is completely written
     /// The file/blob is saved only when the close is invoked.
-    /// Returns the update Directory which owns the file and also the updated
-    /// Directory of the file's parent
+    /// Returns the updated Directory which owns the file
     /// Returns (files's updated parent_dir)
     pub fn close(self) -> Box<NfsFuture<Dir>> {
         trace!("Writer induced self-encryptor close.");
 
-        let mut file = self.file;
         let mut dir = self.parent_dir;
-        let metadata = self.parent_dir_metadata;
+        let file = self.file;
+        let dir_metadata = self.parent_dir_metadata;
         let size = self.self_encryptor.len();
         let client = self.client;
+        let c2 = client.clone();
 
         self.self_encryptor
             .close()
             .map_err(From::from)
             .and_then(move |(data_map, _)| {
-                file.set_datamap(data_map);
-                file.metadata_mut().set_modified_time(::time::now_utc());
-                file.metadata_mut().set_size(size);
-                // file.metadata_mut().increment_version();
+                match file {
+                    File::Unversioned(ref metadata) => {
+                        let mut metadata = metadata.clone();
+                        metadata.set_datamap(data_map);
+                        metadata.set_modified_time(::time::now_utc());
+                        metadata.set_size(size);
+                        dir.update_file(metadata.name(), file.clone());
+                        ok!(dir)
+                    }
+                    File::Versioned { ptr_versions, num_of_versions, latest_version } => {
+                        // Create a new file version
+                        let new_version = FileMetadata::new(latest_version.name()
+                                                                .to_owned(),
+                                                            latest_version.user_metadata()
+                                                                .to_owned(),
+                                                            data_map);
 
-                dir.upsert_file(file.clone());
+                        let c2 = client.clone();
 
-                dir_helper::update(client.clone(), &metadata.id(), &dir).map(move |_| dir)
+                        immutable_data::get_value(&client.clone(), &ptr_versions.name(), None)
+                            .and_then(move |versions| {
+                                let mut versions =
+                                    fry!(deserialise::<Vec<FileMetadata>>(&versions));
+                                versions.push(latest_version);
+                                immutable_data::create(&c2, fry!(serialise(&versions)), None)
+                            })
+                            .and_then(move |ptr_versions| {
+                                dir.update_file(&new_version.name().to_owned(),
+                                                File::Versioned {
+                                                    ptr_versions: ptr_versions.identifier(),
+                                                    latest_version: new_version,
+                                                    num_of_versions: num_of_versions + 1,
+                                                });
+                                Ok(dir)
+                            })
+                            .map_err(From::from)
+                            .into_box()
+                    }
+                }
+            })
+            .and_then(move |updated_dir| {
+                dir_helper::update(c2, &dir_metadata.id(), &updated_dir).map(move |_| {
+                    updated_dir
+                })
             })
             .into_box()
     }

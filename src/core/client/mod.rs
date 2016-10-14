@@ -451,7 +451,7 @@ impl Client {
     /// store it. It will be retrieved when the user logs into their account. Root directory ID is
     /// necessary to fetch all of the user's data as all further data is encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
-    pub fn set_user_root_dir_id(&mut self,
+    pub fn set_user_root_dir_id(&self,
                                 dir_id: (DataIdentifier, Option<secretbox::Key>))
                                 -> Box<CoreFuture<()>> {
         trace!("Setting user root Dir ID.");
@@ -479,7 +479,7 @@ impl Client {
     /// their account. Root directory ID is necessary to fetch all of configuration data as all
     /// further data is encoded as meta-information into the config Root Directory or one of its
     /// subdirectories.
-    pub fn set_config_root_dir_id(&mut self,
+    pub fn set_config_root_dir_id(&self,
                                   dir_id: (DataIdentifier, Option<secretbox::Key>))
                                   -> Box<CoreFuture<()>> {
         trace!("Setting configuration root Dir ID.");
@@ -792,10 +792,11 @@ mod tests {
                         assert_eq!(data, orig_data);
                     })
                     .and_then(move |_| {
-                        let name = rand::random();
+                        let name = DataIdentifier::Structured(rand::random(),
+                                                              ::UNVERSIONED_STRUCT_DATA_TYPE_TAG);
                         let key = secretbox::gen_key();
 
-                        client2.set_user_root_dir_id((name, key))
+                        client2.set_user_root_dir_id((name, Some(key)))
                     })
                     .map(|_| {
                         panic!("Unregistered client should not be allowed to set user root dir");
@@ -806,8 +807,8 @@ mod tests {
                             _ => panic!("Unexpected {:?}", err),
                         }
 
-                        let name = rand::random();
-                        let key = secretbox::gen_key();
+                        let name = DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG);
+                        let key = Some(secretbox::gen_key());
 
                         client3.set_config_root_dir_id((name, key))
                     })
@@ -859,7 +860,8 @@ mod tests {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir_id = (rand::random(), secretbox::gen_key());
+        let dir_id = (DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
+                      Some(secretbox::gen_key()));
 
         {
             let dir_id = dir_id.clone();
@@ -886,7 +888,8 @@ mod tests {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir_id = (rand::random(), secretbox::gen_key());
+        let dir_id = (DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
+                      Some(secretbox::gen_key()));
 
         {
             let dir_id = dir_id.clone();

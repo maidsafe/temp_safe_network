@@ -19,7 +19,7 @@ use futures::Future;
 
 /// Helpers to work with futures.
 #[macro_use]
-mod futures;
+pub mod futures;
 
 /// Public and Private Id types
 pub mod id;

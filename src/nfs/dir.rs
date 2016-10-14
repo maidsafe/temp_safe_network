@@ -53,11 +53,6 @@ impl Dir {
         self.files().iter().find(|file| *file.name() == *file_name)
     }
 
-    /// Find file in this Directory by id.
-    pub fn find_file_by_id(&self, id: &XorName) -> Option<&File> {
-        self.files().iter().find(|file| *file.id() == *id)
-    }
-
     /// Get all subdirectories in this Directory.
     pub fn sub_dirs(&self) -> &[DirMetadata] {
         &self.sub_dirs
@@ -79,20 +74,21 @@ impl Dir {
         self.sub_dirs().iter().find(|info| *info.locator() == *id)
     }
 
-    /// If file is present in this Directory then replace it else insert it
-    pub fn upsert_file(&mut self, file: File) {
-        // TODO try using the below approach for efficiency - also try the same
-        // in upsert_sub_directory
-        //     if let Some(mut existing_file) = self.files.iter_mut().find(
-        //             |entry| *entry.name() == *file.name()) {
-        //         *existing_file = file;
+    /// Add a new file to this Dir
+    pub fn add_file(&mut self, file: File) {
+        self.files_mut().push(file);
+    }
+
+    /// If file is present in this Dir then replace it
+    pub fn update_file(&mut self, prev_name: &str, file: File) -> bool {
         if let Some(index) = self.files()
             .iter()
-            .position(|entry| *entry.id() == *file.id()) {
+            .position(|entry| entry.name() == prev_name) {
             let mut existing = unwrap!(self.files_mut().get_mut(index));
             *existing = file;
+            true
         } else {
-            self.files_mut().push(file);
+            false
         }
     }
 
@@ -164,21 +160,23 @@ mod tests {
     }
 
     #[test]
-    fn find_upsert_remove_file() {
+    fn find_add_update_remove_file() {
         let mut dir = Dir::new();
-        let mut file = unwrap!(File::new(FileMetadata::new("index.html".to_string(), Vec::new()),
-                                         DataMap::None));
+        let mut file = File::Unversioned(FileMetadata::new("index.html".to_string(),
+                                                           Vec::new(),
+                                                           DataMap::None));
         assert!(dir.find_file(file.name()).is_none());
 
-        dir.upsert_file(file.clone());
+        dir.add_file(file.clone());
         assert!(dir.find_file(file.name()).is_some());
 
         file.metadata_mut().set_name("home.html".to_string());
-        dir.upsert_file(file.clone());
+        dir.update_file("index.html", file.clone());
         assert_eq!(dir.files().len(), 1);
-        let file2 = unwrap!(File::new(FileMetadata::new("demo.html".to_string(), Vec::new()),
-                                      DataMap::None));
-        dir.upsert_file(file2.clone());
+        let file2 = File::Unversioned(FileMetadata::new("demo.html".to_string(),
+                                                        Vec::new(),
+                                                        DataMap::None));
+        dir.add_file(file2.clone());
         assert_eq!(dir.files().len(), 2);
 
         let _ = unwrap!(dir.find_file(file.name()), "File not found");
