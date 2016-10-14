@@ -286,7 +286,7 @@ fn move_dir(app: &App,
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use ffi::app::App;
     use ffi::test_utils;
     use nfs::AccessLevel;

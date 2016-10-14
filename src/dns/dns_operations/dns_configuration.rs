@@ -107,7 +107,7 @@ pub fn write_dns_configuration_data(client: Arc<Mutex<Client>>,
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::utility;
     use core::utility::test_utils;
     use rust_sodium::crypto::box_;

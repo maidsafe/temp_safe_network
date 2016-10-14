@@ -171,7 +171,7 @@ impl FileHelper {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::client::Client;
     use core::utility::test_utils;
     use nfs::AccessLevel;

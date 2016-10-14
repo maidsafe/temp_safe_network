@@ -64,7 +64,7 @@ pub unsafe extern "C" fn string_list_drop(list: *mut StringList) {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::ffi::CStr;
     use std::ptr;
 

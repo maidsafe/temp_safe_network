@@ -307,7 +307,7 @@ unsafe fn allocate_handle(session: Session) -> *mut SessionHandle {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use ffi::test_utils;
     use std::ptr;
     use super::*;

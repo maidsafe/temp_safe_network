@@ -137,7 +137,7 @@ fn get_file_metadata(app: &App,
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use core::utility;
     use dns::dns_operations::DnsOperations;

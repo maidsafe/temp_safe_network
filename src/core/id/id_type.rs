@@ -101,7 +101,7 @@ impl IdType {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     extern crate rand;
 
     use core::id::{IdType, MaidTypeTags, RevocationIdType};

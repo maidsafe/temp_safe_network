@@ -167,7 +167,7 @@ fn get_services(app: &App, long_name: &str) -> Result<Vec<String>, FfiError> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::utility;
     use ffi::dns::long_name;
     use ffi::test_utils;

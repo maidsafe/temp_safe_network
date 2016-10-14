@@ -169,7 +169,7 @@ fn writer_open(app: &App, file_path: &str, is_path_shared: bool) -> Result<Write
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use ffi::test_utils;
     use nfs::helper::directory_helper::DirectoryHelper;

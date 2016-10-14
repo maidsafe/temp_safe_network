@@ -156,7 +156,7 @@ fn unpack(client: Client, data: ImmutableData) -> Box<CoreFuture<Vec<u8>>> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::utility;
     use core::utility::test_utils;
     use futures::Future;

@@ -21,6 +21,8 @@ use core::futures::FutureExt;
 use core::utility;
 use futures::Future;
 use rust_sodium::crypto::sign;
+use std::iter;
+use std::u8;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
 
@@ -36,12 +38,12 @@ pub fn generate_secret_keys(len: usize) -> Vec<sign::SecretKey> {
 
 /// Generates public keys of maximum size
 pub fn get_max_sized_public_keys(len: usize) -> Vec<sign::PublicKey> {
-    ::std::iter::repeat(sign::PublicKey([::std::u8::MAX; sign::PUBLICKEYBYTES])).take(len).collect()
+    iter::repeat(sign::PublicKey([u8::MAX; sign::PUBLICKEYBYTES])).take(len).collect()
 }
 
 /// Generates secret keys of maximum size
 pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
-    ::std::iter::repeat(sign::SecretKey([::std::u8::MAX; sign::SECRETKEYBYTES])).take(len).collect()
+    iter::repeat(sign::SecretKey([u8::MAX; sign::SECRETKEYBYTES])).take(len).collect()
 }
 
 // Create random registered client and run it inside an event loop.
