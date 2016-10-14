@@ -15,210 +15,274 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-
-use core::client::Client;
-use core::errors::CoreError;
-use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_structured_data};
+use core::{Client, CoreError, CoreFuture, immutable_data};
+use core::futures::FutureExt;
+use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
-use rust_sodium::crypto::sign;
-use std::sync::{Arc, Mutex};
+use routing::{Data, ImmutableData, StructuredData, XorName};
+use rust_sodium::crypto::{secretbox, sign};
+use super::DataFitResult;
 
-/// All fields updated whenever a version is appended/removed
+// Information about versioned data.
 #[derive(RustcEncodable, RustcDecodable, Debug)]
 struct VersionsInfo {
-    /// Contains an ID for Vec<XorName> of versions
-    ptr_to_versions: XorName,
-    /// Total number of available versions
-    total_versions: u64,
-    /// Contains an ID for the current version
-    ptr_to_current_version: XorName,
+    // Name of the immutable data containing list of names of all versions
+    version_list_name: XorName,
+    // Number of versions
+    num_versions: u64,
+    // Name of the current version
+    current_version_name: XorName,
 }
 
-/// Create the StructuredData to manage versioned data.
-#[cfg_attr(feature="clippy", allow(too_many_arguments))]
-pub fn create(client: Arc<Mutex<Client>>,
-              version_name_to_store: XorName,
-              tag_type: u64,
-              name: XorName,
-              version: u64,
+/// Create new versioned structured data (version 0)
+pub fn create(client: &Client,
+              type_tag: u64,
+              id: XorName,
+              value: Vec<u8>,
               owner_keys: Vec<sign::PublicKey>,
-              prev_owner_keys: Vec<sign::PublicKey>,
-              private_signing_key: &sign::SecretKey)
-              -> Result<StructuredData, CoreError> {
-    trace!("Creating versioned StructuredData.");
+              private_signing_key: sign::SecretKey,
+              encryption_key: Option<secretbox::Key>)
+              -> Box<CoreFuture<StructuredData>> {
+    let client2 = client.clone();
 
-    create_impl(client,
-                &[version_name_to_store],
-                tag_type,
-                name,
-                version,
-                owner_keys,
-                prev_owner_keys,
-                private_signing_key)
+    immutable_data::create(client, value, encryption_key)
+        .and_then(move |curr_version_data| {
+            append_version(client2,
+                           type_tag,
+                           id,
+                           0,
+                           curr_version_data,
+                           vec![],
+                           owner_keys,
+                           vec![],
+                           private_signing_key)
+        })
+        .into_box()
 }
 
-/// Get the complete version list
-pub fn get_all_versions(client: Arc<Mutex<Client>>,
-                        struct_data: &StructuredData)
-                        -> Result<Vec<XorName>, CoreError> {
-    trace!("Getting all versions of versioned StructuredData.");
+/// Update the versioned structured data by creating a new version.
+pub fn update(client: &Client,
+              data: StructuredData,
+              value: Vec<u8>,
+              curr_owner_keys: Vec<sign::PublicKey>,
+              private_signing_key: sign::SecretKey,
+              encryption_key: Option<secretbox::Key>)
+              -> Box<CoreFuture<StructuredData>> {
+    let client2 = client.clone();
 
-    let immut_data = try!(get_immutable_data(client, struct_data));
-    Ok(try!(deserialise(&immut_data.value())))
+    let future1 = immutable_data::create(client, value, encryption_key);
+    let future2 = extract_all_version_names(client, &data);
+
+    future1.join(future2)
+        .and_then(move |(curr_version_data, version_list)| {
+            let prev_owner_keys = if curr_owner_keys != *data.get_owner_keys() {
+                data.get_owner_keys().clone()
+            } else {
+                data.get_previous_owner_keys().clone()
+            };
+
+            append_version(client2,
+                           data.get_type_tag(),
+                           *data.name(),
+                           data.get_version() + 1,
+                           curr_version_data,
+                           version_list,
+                           curr_owner_keys,
+                           prev_owner_keys,
+                           private_signing_key)
+        })
+        .into_box()
 }
 
-/// Append a new version
-pub fn append_version(client: Arc<Mutex<Client>>,
-                      struct_data: StructuredData,
-                      version_to_append: XorName,
-                      private_signing_key: &sign::SecretKey,
-                      increment_version_number: bool)
-                      -> Result<StructuredData, CoreError> {
-    trace!("Appending version to versioned StructuredData.");
+/// Extract the value for the given version.
+pub fn extract_value(client: &Client,
+                     data: &StructuredData,
+                     version: u64,
+                     decryption_key: Option<secretbox::Key>)
+                     -> Box<CoreFuture<Vec<u8>>> {
+    let client2 = client.clone();
 
-    // let immut_data = try!(get_immutable_data(mut client, struct_data));
-    // client.delete(immut_data);
-    let mut versions = try!(get_all_versions(client.clone(), &struct_data));
-    versions.push(version_to_append);
-
-    let new_version_number = struct_data.get_version() +
-                             if increment_version_number { 1 } else { 0 };
-
-    create_impl(client,
-                &versions,
-                struct_data.get_type_tag(),
-                *struct_data.name(),
-                new_version_number,
-                struct_data.get_owner_keys().clone(),
-                struct_data.get_previous_owner_keys().clone(),
-                private_signing_key)
+    extract_all_version_names(client, data)
+        .and_then(move |names| {
+            names.get(version as usize).cloned()
+                 // TODO: add proper error variant for this
+                 .ok_or(CoreError::Unexpected("invalid version".to_owned()))
+        })
+        .and_then(move |name| {
+            immutable_data::get_value(&client2, &name, decryption_key)
+        })
+        .into_box()
 }
 
-#[cfg_attr(feature="clippy", allow(too_many_arguments))]
-fn create_impl(client: Arc<Mutex<Client>>,
-               version_names_to_store: &[XorName],
-               tag_type: u64,
-               name: XorName,
-               version: u64,
-               owner_keys: Vec<sign::PublicKey>,
-               prev_owner_keys: Vec<sign::PublicKey>,
-               private_signing_key: &sign::SecretKey)
-               -> Result<StructuredData, CoreError> {
-    let immutable_data = ImmutableData::new(try!(serialise(&version_names_to_store)));
-    let name_of_immutable_data = *immutable_data.name();
+/// Extract the value for the current (latest) version.
+pub fn extract_current_value(client: &Client,
+                             data: &StructuredData,
+                             decryption_key: Option<secretbox::Key>)
+                             -> Box<CoreFuture<Vec<u8>>> {
+    let name = fry!(current_version_name(data));
+    immutable_data::get_value(client, &name, decryption_key)
+}
 
-    let total_versions = version_names_to_store.len();
-    let versions_info = VersionsInfo {
-        ptr_to_versions: name_of_immutable_data,
-        total_versions: total_versions as u64,
-        ptr_to_current_version: version_names_to_store[total_versions - 1],
-    };
+/// Extract the complete list of names of versions of versioned StructuredData.
+pub fn extract_all_version_names(client: &Client, data: &StructuredData)
+                                 -> Box<CoreFuture<Vec<XorName>>> {
+    let info = fry!(deserialise::<VersionsInfo>(&data.get_data()));
+    immutable_data::get_value(client, &info.version_list_name, None)
+        .and_then(|encoded_list| Ok(try!(deserialise(&encoded_list))))
+        .into_box()
+}
 
-    let encoded = try!(serialise(&versions_info));
+/// Get the total number of versions in versioned StructuredData
+pub fn version_count(data: &StructuredData) -> Result<u64, CoreError> {
+    if data.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
+        return Err(CoreError::InvalidStructuredDataTypeTag);
+    }
 
-    match try!(check_if_data_can_fit_in_structured_data(&encoded,
-                                                        owner_keys.clone(),
-                                                        prev_owner_keys.clone())) {
+    let info = try!(deserialise::<VersionsInfo>(&data.get_data()));
+    Ok(info.num_versions)
+}
+
+/// Get the name of the current version of versioned StructuredData
+pub fn current_version_name(data: &StructuredData) -> Result<XorName, CoreError> {
+    if data.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
+        return Err(CoreError::InvalidStructuredDataTypeTag);
+    }
+
+    let info = try!(deserialise::<VersionsInfo>(&data.get_data()));
+    Ok(info.current_version_name)
+}
+
+// Append new version to versioned StructuredData
+fn append_version(client: Client,
+                  type_tag: u64,
+                  id: XorName,
+                  version: u64,
+                  curr_version_data: ImmutableData,
+                  mut version_list: Vec<XorName>,
+                  curr_owner_keys: Vec<sign::PublicKey>,
+                  prev_owner_keys: Vec<sign::PublicKey>,
+                  private_signing_key: sign::SecretKey)
+                  -> Box<CoreFuture<StructuredData>> {
+    let client2 = client.clone();
+
+    version_list.push(*curr_version_data.name());
+    let num_versions = version_list.len() as u64;
+    let encoded_version_list = fry!(serialise(&version_list));
+
+    immutable_data::create(&client, encoded_version_list, None)
+        .map(move |version_list_data| {
+            (version_list_data, curr_version_data)
+        })
+        .and_then(move |(version_list_data, curr_version_data)| {
+            let info = VersionsInfo {
+                version_list_name: *version_list_data.name(),
+                num_versions: num_versions,
+                current_version_name: *curr_version_data.name(),
+            };
+
+            let structured_data = try!(build(type_tag,
+                                             id,
+                                             version,
+                                             info,
+                                             curr_owner_keys,
+                                             prev_owner_keys,
+                                             private_signing_key));
+
+            Ok((structured_data, version_list_data, curr_version_data))
+        })
+        .and_then(move |(structured_data, version_list_data, curr_version_data)| {
+            let put1 = client2.put(Data::Immutable(version_list_data), None);
+            let put2 = client2.put(Data::Immutable(curr_version_data), None);
+            put1.join(put2).map(move |_| structured_data)
+        })
+        .into_box()
+}
+
+// Create StructuredData containing the given VersionsInfo.
+fn build(type_tag: u64,
+         id: XorName,
+         version: u64,
+         info: VersionsInfo,
+         curr_owner_keys: Vec<sign::PublicKey>,
+         prev_owner_keys: Vec<sign::PublicKey>,
+         private_signing_key: sign::SecretKey)
+         -> Result<StructuredData, CoreError> {
+    let encoded = try!(serialise(&info));
+
+    match try!(super::can_data_fit(&encoded,
+                                   curr_owner_keys.clone(),
+                                   prev_owner_keys.clone())) {
+
         DataFitResult::DataFits => {
-            trace!("Name of ImmutableData containing versions fits in StructuredData.");
-
-            let data = Data::Immutable(immutable_data);
-            try!(Client::put_recover(client, data, None));
-
-            Ok(try!(StructuredData::new(tag_type,
-                                        name,
+            Ok(try!(StructuredData::new(type_tag,
+                                        id,
                                         version,
                                         encoded,
-                                        owner_keys,
+                                        curr_owner_keys,
                                         prev_owner_keys,
-                                        Some(private_signing_key))))
+                                        Some(&private_signing_key))))
         }
         _ => {
-            trace!("Name of ImmutableData containing versions does not fit in StructuredData.");
+            trace!("VersionsInfo does not fit in StructuredData.");
             Err(CoreError::StructuredDataHeaderSizeProhibitive)
         }
     }
 }
 
-/// Get a total number of versions in versioned StructuredData
-pub fn version_count(sd: &StructuredData) -> Result<u64, CoreError> {
-    if sd.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
-        return Err(CoreError::InvalidStructuredDataTypeTag);
-    }
-    Ok(try!(deserialise::<VersionsInfo>(&sd.get_data())).total_versions)
-}
-
-/// Get the current version of versioned StructuredData
-pub fn current_version(sd: &StructuredData) -> Result<XorName, CoreError> {
-    if sd.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
-        return Err(CoreError::InvalidStructuredDataTypeTag);
-    }
-    Ok(try!(deserialise::<VersionsInfo>(&sd.get_data())).ptr_to_current_version)
-}
-
-fn get_immutable_data(client: Arc<Mutex<Client>>,
-                      struct_data: &StructuredData)
-                      -> Result<ImmutableData, CoreError> {
-    let name = try!(deserialise::<VersionsInfo>(&struct_data.get_data())).ptr_to_versions;
-    let resp_getter = try!(unwrap!(client.lock()).get(DataIdentifier::Immutable(name), None));
-    let data = try!(resp_getter.get());
-    match data {
-        Data::Immutable(immutable_data) => Ok(immutable_data),
-        _ => Err(CoreError::ReceivedUnexpectedData),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-
     use core::utility;
+    use core::utility::test_utils;
+    use futures::Future;
     use rand;
-    use routing::XorName;
-
-    use std::sync::{Arc, Mutex};
     use super::*;
 
     #[test]
-    fn save_and_retrieve_immutable_data() {
-        let client = unwrap!(utility::test_utils::get_client());
-        let client = Arc::new(Mutex::new(client));
+    fn create_update_retrieve() {
+        let data_name = rand::random();
 
-        let id: XorName = rand::random();
-        let owners = utility::test_utils::generate_public_keys(1);
-        let prev_owners = Vec::new();
-        let secret_key = &utility::test_utils::generate_secret_keys(1)[0];
+        let value0 = unwrap!(utility::generate_random_vector(1024));
+        let value1 = unwrap!(utility::generate_random_vector(1024));
+        let value1_2 = value1.clone();
 
-        let version_0: XorName = rand::random();
+        let owner_keys = test_utils::get_max_sized_public_keys(1);
+        let sign_key = test_utils::get_max_sized_secret_keys(1).remove(0);
 
-        let mut structured_data_result = create(client.clone(),
-                                                version_0,
-                                                ::VERSIONED_STRUCT_DATA_TYPE_TAG,
-                                                id,
-                                                0,
-                                                owners,
-                                                prev_owners,
-                                                secret_key);
+        test_utils::register_and_run(move |client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
+            let client4 = client.clone();
 
-        let mut structured_data = unwrap!(structured_data_result);
-        let mut versions_res = get_all_versions(client.clone(), &structured_data);
-        let mut versions = unwrap!(versions_res);
-        assert_eq!(versions.len(), 1);
-        assert_eq!(unwrap!(version_count(&structured_data)), 1);
-        assert_eq!(unwrap!(current_version(&structured_data)), version_0);
+            create(client,
+                   ::VERSIONED_STRUCT_DATA_TYPE_TAG,
+                   data_name,
+                   value0.clone(),
+                   owner_keys.clone(),
+                   sign_key.clone(),
+                   None)
+                .and_then(move |data| {
+                    assert_eq!(unwrap!(version_count(&data)), 1);
+                    extract_current_value(&client2, &data, None)
+                        .map(move |value| (data, value))
+                })
+                .and_then(move |(data, value_after)| {
+                    assert_eq!(value_after, value0);
 
-        let version_1: XorName = rand::random();
-
-        structured_data_result =
-            append_version(client.clone(), structured_data, version_1, secret_key, true);
-        structured_data = unwrap!(structured_data_result);
-        versions_res = get_all_versions(client, &structured_data);
-        versions = unwrap!(versions_res);
-        assert_eq!(versions.len(), 2);
-        assert_eq!(unwrap!(version_count(&structured_data)), 2);
-
-        assert_eq!(versions[0], version_0);
-        assert_eq!(versions[1], version_1);
-        assert_eq!(unwrap!(current_version(&structured_data)), version_1);
+                    update(&client3,
+                           data,
+                           value1,
+                           owner_keys,
+                           sign_key,
+                           None)
+                })
+                .and_then(move |data| {
+                    assert_eq!(unwrap!(version_count(&data)), 2);
+                    extract_current_value(&client4, &data, None)
+                })
+                .map(move |value_after| {
+                    assert_eq!(value_after, value1_2);
+                })
+                .map_err(|err| panic!("Unexpected {:?}", err))
+        })
     }
 }

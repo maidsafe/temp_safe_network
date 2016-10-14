@@ -82,7 +82,7 @@ pub fn create(client: &Client,
 
 /// Get the raw bytes from StructuredData created via `create()` function in this module.
 pub fn extract_value(client: &Client,
-                     data: StructuredData,
+                     data: &StructuredData,
                      decryption_key: Option<secretbox::Key>)
                      -> Box<CoreFuture<Vec<u8>>> {
     match fry!(decode(data.get_data(), decryption_key.as_ref())) {
@@ -127,7 +127,7 @@ pub fn get_value(client: &Client,
                  -> Box<CoreFuture<Vec<u8>>> {
     let client2 = client.clone();
     super::get(client, type_tag, id)
-        .and_then(move |data| extract_value(&client2, data, decryption_key))
+        .and_then(move |data| extract_value(&client2, &data, decryption_key))
         .into_box()
 }
 
@@ -352,7 +352,7 @@ mod tests {
                    prev_owners.clone(),
                    sign_key,
                    key.clone())
-                .and_then(move |data| extract_value(&client2, data, key))
+                .and_then(move |data| extract_value(&client2, &data, key))
                 .map(move |value_after| {
                     assert_eq!(value_after, value);
                 })
