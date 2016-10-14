@@ -30,8 +30,6 @@ use rust_sodium::crypto::hash::sha256;
 use std::convert::From;
 use std::sync::{Arc, Mutex};
 
-pub mod dns_configuration;
-
 /// This is a representational structure for all safe-dns operations
 pub struct DnsOperations {
     client: Arc<Mutex<Client>>,
