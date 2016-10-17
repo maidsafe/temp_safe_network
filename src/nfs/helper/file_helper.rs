@@ -18,13 +18,9 @@
 /// Provides helper functions to perform Operations on Files
 
 use core::SelfEncryptionStorage;
-use core::CPtr;
-use core::futures::FutureExt;
-use futures;
-use nfs::NfsFuture;
-use nfs::dir::Dir;
+use core::Client;
+use nfs::{File, Dir, NfsFuture};
 use nfs::errors::NfsError;
-use nfs::file::File;
 use nfs::helper::dir_helper;
 use nfs::helper::reader::Reader;
 use nfs::helper::writer::{Mode, Writer};
@@ -38,7 +34,7 @@ use self_encryption::DataMap;
 /// can be written to the network
 /// The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
-pub fn create_file(client: CPtr,
+pub fn create(client: Client,
                    name: String,
                    user_metatdata: Vec<u8>,
                    parent_dir: Dir,
@@ -50,10 +46,7 @@ pub fn create_file(client: CPtr,
         return err!(NfsError::FileAlreadyExistsWithSameName);
     }
 
-    let file = match File::new(FileMetadata::new(name, user_metatdata), DataMap::None) {
-        Ok(file) => file,
-        Err(error) => return err!(error),
-    };
+    let file = File::Unversioned(FileMetadata::new(name, user_metatdata, DataMap::None));
 
     Writer::new(client.clone(),
                 SelfEncryptionStorage::new(client),
@@ -65,7 +58,7 @@ pub fn create_file(client: CPtr,
 
 /// Delete a file from the Directory
 /// Returns Option<parent_directory's parent>
-pub fn delete_file(client: CPtr,
+pub fn delete(client: Client,
                    file_name: String,
                    parent_id: &(DataIdentifier, Option<secretbox::Key>),
                    parent_dir: &mut Dir)
@@ -76,7 +69,8 @@ pub fn delete_file(client: CPtr,
 }
 
 /// Updates the file metadata.
-pub fn update_metadata(client: CPtr,
+pub fn update_metadata(client: Client,
+                       prev_name: &str,
                        file: File,
                        parent_id: &(DataIdentifier, Option<secretbox::Key>),
                        parent_dir: &mut Dir)
@@ -84,14 +78,14 @@ pub fn update_metadata(client: CPtr,
     trace!("Updating metadata for file.");
 
     {
-        let existing_file = fry!(parent_dir.find_file_by_id(file.id())
-                                                 .ok_or(NfsError::FileNotFound));
-        if existing_file.name() != file.name() &&
+        let _ = fry!(parent_dir.find_file(prev_name).ok_or(NfsError::FileNotFound));
+
+        if prev_name != file.name() &&
            parent_dir.find_file(file.name()).is_some() {
             return err!(NfsError::FileAlreadyExistsWithSameName);
         }
     }
-    parent_dir.upsert_file(file);
+    parent_dir.update_file(prev_name, file);
     dir_helper::update(client.clone(), parent_id, parent_dir)
 }
 
@@ -100,7 +94,7 @@ pub fn update_metadata(client: CPtr,
 /// can be written to the network
 /// The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
-pub fn update_content(client: CPtr,
+pub fn update_content(client: Client,
                       file: File,
                       mode: Mode,
                       parent_metadata: DirMetadata,
@@ -127,115 +121,105 @@ pub fn update_content(client: CPtr,
 
 
 /// Returns a reader for reading the file contents
-pub fn read_file(client: CPtr, file: &File) -> Result<Reader, NfsError> {
+pub fn read(client: Client, file: &File) -> Result<Reader, NfsError> {
     trace!("Reading file with name: {}", file.name());
     Reader::new(client.clone(), SelfEncryptionStorage::new(client), file)
 }
 
 #[cfg(test)]
 mod tests {
-    use core::client::Client;
-    use core::utility::test_utils;
-    use nfs::AccessLevel;
-    use nfs::helper::dir_helper::create_dir;
-    use nfs::helper::file_helper::*;
-    use nfs::helper::writer::Mode;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    fn get_client() -> CPtr {
-        let test_client = unwrap!(test_utils::get_client().wait());
-        Rc::new(RefCell::new(test_client))
-    }
+    // use core::utility::test_utils;
+    // use nfs::AccessLevel;
+    // use nfs::helper::{dir_helper, file_helper};
+    // use nfs::helper::writer::Mode;
 
     #[test]
     fn file_crud() {
-        let client = get_client();
-        let dir_helper = DirectoryHelper::new(client.clone());
+        // test_utils::register_and_run(|client| {
+        //     dir_helper::create("DirName".to_string(),
+        //                        Vec::new(),
+        //                        true,
+        //                        AccessLevel::Private,
+        //                        None)
+        //         .and_then(move |(mut directory, _)| {
+        //             let file_name = "hello.txt".to_string();
 
-        create_dir("DirName".to_string(),
-                   Vec::new(),
-                   true,
-                   AccessLevel::Private,
-                   None)
-            .and_then(move |(mut directory, _)| {
-                let file_name = "hello.txt".to_string();
+        //             const ORIG_SIZE: usize = 100;
+        //             {
+        //                 // create
+        //                 let mut writer = unwrap!(file_helper::create(client.clone(),
+        //                                                      file_name.clone(),
+        //                                                      Vec::new(),
+        //                                                      directory));
+        //                 unwrap!(writer.write(&[0u8; ORIG_SIZE]), "");
+        //                 let (updated_directory, _) = unwrap!(writer.close());
+        //                 directory = updated_directory;
+        //                 assert!(directory.find_file(&file_name).is_some());
+        //             }
+        //             {
+        //                 // read
+        //                 let file = unwrap!(directory.find_file(&file_name), "File not found");
+        //                 let mut reader = unwrap!(file_helper::read(file), "");
+        //                 let size = reader.size();
+        //                 assert_eq!(unwrap!(reader.read(0, size)), vec![0u8; 100]);
+        //             }
 
-                const ORIG_SIZE: usize = 100;
-                {
-                    // create
-                    let mut writer = unwrap!(create_file(client.clone(),
-                                                         file_name.clone(),
-                                                         Vec::new(),
-                                                         directory));
-                    unwrap!(writer.write(&[0u8; ORIG_SIZE]), "");
-                    let (updated_directory, _) = unwrap!(writer.close());
-                    directory = updated_directory;
-                    assert!(directory.find_file(&file_name).is_some());
-                }
-                {
-                    // read
-                    let file = unwrap!(directory.find_file(&file_name), "File not found");
-                    let mut reader = unwrap!(read_file(file), "");
-                    let size = reader.size();
-                    assert_eq!(unwrap!(reader.read(0, size)), vec![0u8; 100]);
-                }
+        //             const NEW_SIZE: usize = 50;
+        //             {
+        //                 // update - full rewrite
+        //                 let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
+        //                 {
+        //                     let mut writer = unwrap!(file_helper::update_content(file, Mode::Overwrite, directory));
+        //                     unwrap!(writer.write(&[1u8; NEW_SIZE]));
+        //                     let (updated_directory, _) = unwrap!(writer.close());
+        //                     directory = updated_directory;
+        //                 }
+        //                 let file = unwrap!(directory.find_file(&file_name), "File not found");
+        //                 let mut reader = unwrap!(file_helper::read(file), "");
+        //                 let size = reader.size();
+        //                 assert_eq!(unwrap!(reader.read(0, size)), vec![1u8; 50]);
+        //             }
 
-                const NEW_SIZE: usize = 50;
-                {
-                    // update - full rewrite
-                    let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
-                    {
-                        let mut writer = unwrap!(update_content(file, Mode::Overwrite, directory));
-                        unwrap!(writer.write(&[1u8; NEW_SIZE]));
-                        let (updated_directory, _) = unwrap!(writer.close());
-                        directory = updated_directory;
-                    }
-                    let file = unwrap!(directory.find_file(&file_name), "File not found");
-                    let mut reader = unwrap!(read_file(file), "");
-                    let size = reader.size();
-                    assert_eq!(unwrap!(reader.read(0, size)), vec![1u8; 50]);
-                }
+        //             const APPEND_SIZE: usize = 10;
+        //             {
+        //                 // update - should append (after S.E behaviour changed)
+        //                 let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
+        //                 {
+        //                     let mut writer = unwrap!(file_helper::update_content(file, Mode::Modify, directory));
+        //                     unwrap!(writer.write(&[2u8; APPEND_SIZE]));
+        //                     let (updated_directory, _) = unwrap!(writer.close());
+        //                     directory = updated_directory;
+        //                 }
+        //                 let file = unwrap!(directory.find_file(&file_name), "File not found");
+        //                 let mut reader = unwrap!(file_helper::read(file), "");
+        //                 let size = reader.size();
+        //                 let data = unwrap!(reader.read(0, size));
 
-                const APPEND_SIZE: usize = 10;
-                {
-                    // update - should append (after S.E behaviour changed)
-                    let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
-                    {
-                        let mut writer = unwrap!(update_content(file, Mode::Modify, directory));
-                        unwrap!(writer.write(&[2u8; APPEND_SIZE]));
-                        let (updated_directory, _) = unwrap!(writer.close());
-                        directory = updated_directory;
-                    }
-                    let file = unwrap!(directory.find_file(&file_name), "File not found");
-                    let mut reader = unwrap!(read_file(file), "");
-                    let size = reader.size();
-                    let data = unwrap!(reader.read(0, size));
-
-                    assert_eq!(size, (NEW_SIZE + APPEND_SIZE) as u64);
-                    assert_eq!(data[0..NEW_SIZE].to_owned(), vec![1u8; NEW_SIZE]);
-                    assert_eq!(&data[NEW_SIZE..], [2u8; APPEND_SIZE]);
-                }
-                {
-                    // versions
-                    let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
-                    let versions = unwrap!(get_versions(&file, &directory));
-                    assert_eq!(versions.len(), 3);
-                }
-                {
-                    // Update Metadata
-                    let mut file = unwrap!(directory.find_file(&file_name).cloned(),
-                                           "File not found");
-                    file.get_mut_metadata().set_user_metadata(vec![12u8; 10]);
-                    let _ = unwrap!(update_metadata(file, &mut directory));
-                    let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
-                    assert_eq!(*file.metadata().user_metadata(), [12u8; 10][..]);
-                }
-                {
-                    // Delete
-                    let _ = unwrap!(delete_file(file_name.clone(), &mut directory));
-                    assert!(directory.find_file(&file_name).is_none());
-                }
-            })
+        //                 assert_eq!(size, (NEW_SIZE + APPEND_SIZE) as u64);
+        //                 assert_eq!(data[0..NEW_SIZE].to_owned(), vec![1u8; NEW_SIZE]);
+        //                 assert_eq!(&data[NEW_SIZE..], [2u8; APPEND_SIZE]);
+        //             }
+        //             {
+        //                 // versions
+        //                 let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
+        //                 let versions = unwrap!(file_helper::get_versions(&file, &directory));
+        //                 assert_eq!(versions.len(), 3);
+        //             }
+        //             {
+        //                 // Update Metadata
+        //                 let mut file = unwrap!(directory.find_file(&file_name).cloned(),
+        //                                        "File not found");
+        //                 file.get_mut_metadata().set_user_metadata(vec![12u8; 10]);
+        //                 let _ = unwrap!(file_helper::update_metadata(file, &mut directory));
+        //                 let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
+        //                 assert_eq!(*file.metadata().user_metadata(), [12u8; 10][..]);
+        //             }
+        //             {
+        //                 // Delete
+        //                 let _ = unwrap!(file_helper::delete(file_name.clone(), &mut directory));
+        //                 assert!(directory.find_file(&file_name).is_none());
+        //             }
+        //         })
+        // });
     }
 }

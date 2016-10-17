@@ -19,7 +19,7 @@
 pub mod writer;
 /// Data from a file can be read using Reader
 pub mod reader;
-// /// FileHelper provides functions for CRUD on file
-// pub mod file_helper;
+/// FileHelper provides functions for CRUD on file
+pub mod file_helper;
 /// DirectoryHelper provides functions for CRUD on DirectoryListing
 pub mod dir_helper;
