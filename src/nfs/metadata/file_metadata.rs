@@ -80,8 +80,10 @@ impl FileMetadata {
     }
 
     /// Set name associated with the structure (file or directory)
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
+    pub fn set_name<S>(&mut self, name: S)
+        where S: Into<String>
+    {
+        self.name = name.into();
     }
 
     /// Set the size of file

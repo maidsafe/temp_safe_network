@@ -22,7 +22,7 @@ use core::futures::FutureExt;
 use core::structured_data::unversioned;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{Dir, NfsFuture};
+use nfs::{Dir, DirId, NfsFuture};
 use nfs::errors::NfsError;
 use nfs::metadata::DirMetadata;
 use rand;
@@ -58,10 +58,10 @@ pub fn create(client: Client,
 /// Parent directory is updated and the sub directory metadata returned as a result.
 pub fn add_sub_dir(client: Client,
                    name: String,
-                   dir_id: &(DataIdentifier, Option<secretbox::Key>),
+                   dir_id: &DirId,
                    user_metadata: Vec<u8>,
                    parent: &mut Dir,
-                   parent_id: &(DataIdentifier, Option<secretbox::Key>))
+                   parent_id: &DirId)
                    -> Box<NfsFuture<DirMetadata>> {
     trace!("Creating directory with name: {}", name);
 
@@ -88,7 +88,7 @@ pub fn create_sub_dir(client: Client,
                       encrypt_key: Option<secretbox::Key>,
                       user_metadata: Vec<u8>,
                       parent: &Dir,
-                      parent_id: &(DataIdentifier, Option<secretbox::Key>))
+                      parent_id: &DirId)
                       -> Box<NfsFuture<(Dir, Dir, DirMetadata)>> {
     let dir = Dir::new();
     let c2 = client.clone();
@@ -118,10 +118,7 @@ pub fn delete(client: Client, parent: &mut Dir, dir_to_delete: &str) -> Box<NfsF
 }
 
 /// Updates an existing Directory in the network.
-pub fn update(client: Client,
-              dir_id: &(DataIdentifier, Option<secretbox::Key>),
-              directory: &Dir)
-              -> Box<NfsFuture<()>> {
+pub fn update(client: Client, dir_id: &DirId, directory: &Dir) -> Box<NfsFuture<()>> {
     trace!("Updating directory given the directory listing.");
 
     let dir_clone = directory.clone();
@@ -136,10 +133,9 @@ pub fn update(client: Client,
         .and_then(move |structured_data| {
             let serialised_data = fry!(serialise(&dir_clone));
 
-            trace!("Updating directory listing with a new one (will convert DL to an \
-                    unversioned StructuredData).");
-
             if let DataIdentifier::Structured(id, type_tag) = locator {
+                trace!("Updating directory ID {:?} with a new one.", id);
+
                 unversioned::create(&c2,
                                     type_tag,
                                     id,
@@ -165,9 +161,7 @@ pub fn update(client: Client,
 }
 
 /// Return the Directory
-pub fn get(client: Client,
-           dir_id: &(DataIdentifier, Option<secretbox::Key>))
-           -> Box<NfsFuture<Dir>> {
+pub fn get(client: Client, dir_id: &DirId) -> Box<NfsFuture<Dir>> {
     trace!("Getting a directory.");
 
     let c2 = client.clone();

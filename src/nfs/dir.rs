@@ -19,8 +19,11 @@ use nfs::errors::NfsError;
 use nfs::file::File;
 use nfs::metadata::DirMetadata;
 use routing::{DataIdentifier, XorName};
-use rust_sodium::crypto::box_;
+use rust_sodium::crypto::{box_, secretbox};
 use std::cmp;
+
+/// Shorthand type for directory identifiers
+pub type DirId = (DataIdentifier, Option<secretbox::Key>);
 
 /// Struct that represent a directory in the network.
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
@@ -75,11 +78,27 @@ impl Dir {
     }
 
     /// Add a new file to this Dir
-    pub fn add_file(&mut self, file: File) {
+    pub fn add_file(&mut self, file: File) -> Result<(), NfsError> {
+        if let Some(_) = self.find_file(file.name()) {
+            return Err(NfsError::FileAlreadyExistsWithSameName);
+        }
         self.files_mut().push(file);
+        Ok(())
     }
 
     /// If file is present in this Dir then replace it
+    pub fn upsert_file(&mut self, file: File) -> Result<(), NfsError> {
+        if let Some(_) = self.find_file(file.name()) {
+            let filename = file.name().to_owned();
+            self.update_file(&filename, file);
+            Ok(())
+        } else {
+            self.add_file(file)
+        }
+    }
+
+    /// Updates file previously known by a specified name
+    /// Returns true if file was updated
     pub fn update_file(&mut self, prev_name: &str, file: File) -> bool {
         if let Some(index) = self.files()
             .iter()
@@ -167,7 +186,7 @@ mod tests {
                                                            DataMap::None));
         assert!(dir.find_file(file.name()).is_none());
 
-        dir.add_file(file.clone());
+        unwrap!(dir.add_file(file.clone()));
         assert!(dir.find_file(file.name()).is_some());
 
         file.metadata_mut().set_name("home.html".to_string());
@@ -176,7 +195,7 @@ mod tests {
         let file2 = File::Unversioned(FileMetadata::new("demo.html".to_string(),
                                                         Vec::new(),
                                                         DataMap::None));
-        dir.add_file(file2.clone());
+        unwrap!(dir.add_file(file2.clone()));
         assert_eq!(dir.files().len(), 2);
 
         let _ = unwrap!(dir.find_file(file.name()), "File not found");
