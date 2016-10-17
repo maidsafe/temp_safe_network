@@ -18,7 +18,7 @@
 use core::errors::CoreError;
 use core::id::{IdType, MaidTypeTags, MpidTypeTags, PublicIdType, RevocationIdType};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{XOR_NAME_LEN, XorName};
+use routing::{DataIdentifier, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{pwhash, secretbox};
 use rust_sodium::crypto::hash::sha256;
 
@@ -35,8 +35,8 @@ pub struct Account {
     mpid: IdType,
     public_mpid: PublicIdType,
 
-    user_root_dir: Option<(XorName, secretbox::Key)>,
-    config_root_dir: Option<(XorName, secretbox::Key)>,
+    user_root_dir: Option<(DataIdentifier, Option<secretbox::Key>)>,
+    config_root_dir: Option<(DataIdentifier, Option<secretbox::Key>)>,
 }
 
 #[allow(dead_code)]
@@ -103,12 +103,12 @@ impl Account {
     }
 
     /// Get user's root directory ID
-    pub fn user_root_dir(&self) -> Option<&(XorName, secretbox::Key)> {
+    pub fn user_root_dir(&self) -> Option<&(DataIdentifier, Option<secretbox::Key>)> {
         self.user_root_dir.as_ref()
     }
 
     /// Set user's root directory ID
-    pub fn set_user_root_dir_id(&mut self, dir: (XorName, secretbox::Key)) -> bool {
+    pub fn set_user_root_dir_id(&mut self, dir: (DataIdentifier, Option<secretbox::Key>)) -> bool {
         if self.user_root_dir.is_none() {
             self.user_root_dir = Some(dir);
             true
@@ -118,12 +118,12 @@ impl Account {
     }
 
     /// Get maidsafe configuration specific root directory ID
-    pub fn config_root_dir(&self) -> Option<&(XorName, secretbox::Key)> {
+    pub fn config_root_dir(&self) -> Option<&(DataIdentifier, Option<secretbox::Key>)> {
         self.config_root_dir.as_ref()
     }
 
     /// Set maidsafe configuration specific root directory ID
-    pub fn set_config_root_dir(&mut self, dir: (XorName, secretbox::Key)) -> bool {
+    pub fn set_config_root_dir(&mut self, dir: (DataIdentifier, Option<secretbox::Key>)) -> bool {
         if self.config_root_dir.is_none() {
             self.config_root_dir = Some(dir);
             true

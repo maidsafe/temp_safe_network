@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
+use self_encryption::DataMap;
 use time::{self, Timespec, Tm};
 
 /// FileMetadata about a File or a Directory
@@ -23,40 +24,38 @@ use time::{self, Timespec, Tm};
 pub struct FileMetadata {
     name: String,
     size: u64,
-    created_time: Tm,
-    modified_time: Tm,
+    created: Tm,
+    modified: Tm,
     user_metadata: Vec<u8>,
-    version: u32,
+    data_map: DataMap,
 }
 
 impl FileMetadata {
     /// Create a new instance of FileMetadata
-    pub fn new(name: String, user_metadata: Vec<u8>) -> FileMetadata {
+    pub fn new(name: String, user_metadata: Vec<u8>, data_map: DataMap) -> FileMetadata {
         FileMetadata {
             name: name,
-            size: 0,
-            // Version 0 is considered as invalid - do not change to version 0. This is used as
-            // default vaule in comparisons.
-            version: 1,
-            created_time: time::now_utc(),
-            modified_time: time::now_utc(),
+            size: data_map.len(),
+            created: time::now_utc(),
+            modified: time::now_utc(),
             user_metadata: user_metadata,
+            data_map: data_map,
         }
-    }
-
-    /// Get version
-    pub fn version(&self) -> u32 {
-        self.version
     }
 
     /// Get time of creation
     pub fn created_time(&self) -> &Tm {
-        &self.created_time
+        &self.created
     }
 
     /// Get time of modification
     pub fn modified_time(&self) -> &Tm {
-        &self.modified_time
+        &self.modified
+    }
+
+    /// Get the data-map of the File
+    pub fn datamap(&self) -> &DataMap {
+        &self.data_map
     }
 
     /// Get name associated with the structure (file or directory) that this metadata is a part
@@ -75,15 +74,14 @@ impl FileMetadata {
         &self.user_metadata
     }
 
+    /// Set the data-map of the File
+    pub fn set_datamap(&mut self, data_map: DataMap) {
+        self.data_map = data_map;
+    }
 
     /// Set name associated with the structure (file or directory)
     pub fn set_name(&mut self, name: String) {
         self.name = name;
-    }
-
-    /// Increment the file version
-    pub fn increment_version(&mut self) {
-        self.version = self.version.wrapping_add(1);
     }
 
     /// Set the size of file
@@ -93,7 +91,7 @@ impl FileMetadata {
 
     /// Set time of modification
     pub fn set_modified_time(&mut self, modified_time: Tm) {
-        self.modified_time = modified_time
+        self.modified = modified_time
     }
 
     /// User setteble metadata for custom metadata
@@ -104,8 +102,8 @@ impl FileMetadata {
 
 impl Encodable for FileMetadata {
     fn encode<E: Encoder>(&self, e: &mut E) -> Result<(), E::Error> {
-        let created_time = self.created_time.to_timespec();
-        let modified_time = self.modified_time.to_timespec();
+        let created_time = self.created.to_timespec();
+        let modified_time = self.modified.to_timespec();
 
         e.emit_struct("FileMetadata", 8, |e| {
             try!(e.emit_struct_field("name", 0, |e| self.name.encode(e)));
@@ -115,7 +113,7 @@ impl Encodable for FileMetadata {
             try!(e.emit_struct_field("modified_time_sec", 4, |e| modified_time.sec.encode(e)));
             try!(e.emit_struct_field("modified_time_nsec", 5, |e| modified_time.nsec.encode(e)));
             try!(e.emit_struct_field("user_metadata", 6, |e| self.user_metadata.encode(e)));
-            try!(e.emit_struct_field("version", 7, |e| self.version.encode(e)));
+            try!(e.emit_struct_field("data_map", 7, |e| self.data_map.encode(e)));
 
             Ok(())
         })
@@ -128,16 +126,16 @@ impl Decodable for FileMetadata {
             Ok(FileMetadata {
                 name: try!(d.read_struct_field("name", 0, Decodable::decode)),
                 size: try!(d.read_struct_field("size", 1, Decodable::decode)),
-                created_time: ::time::at_utc(Timespec {
+                created: ::time::at_utc(Timespec {
                     sec: try!(d.read_struct_field("created_time_sec", 2, Decodable::decode)),
                     nsec: try!(d.read_struct_field("created_time_nsec", 3, Decodable::decode)),
                 }),
-                modified_time: ::time::at_utc(Timespec {
+                modified: ::time::at_utc(Timespec {
                     sec: try!(d.read_struct_field("modified_time_sec", 4, Decodable::decode)),
                     nsec: try!(d.read_struct_field("modified_time_nsec", 5, Decodable::decode)),
                 }),
                 user_metadata: try!(d.read_struct_field("user_metadata", 6, Decodable::decode)),
-                version: try!(d.read_struct_field("version", 7, Decodable::decode)),
+                data_map: try!(d.read_struct_field("data_map", 7, Decodable::decode)),
             })
         })
     }
@@ -146,12 +144,14 @@ impl Decodable for FileMetadata {
 #[cfg(test)]
 mod tests {
     use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use self_encryption::DataMap;
     use super::*;
 
     #[test]
     fn serialise_and_deserialise_file_metadata() {
         let obj_before = FileMetadata::new("hello.txt".to_string(),
-                                           "{mime: \"application/json\"}".to_string().into_bytes());
+                                           "{mime: \"application/json\"}".to_string().into_bytes(),
+                                           DataMap::None);
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after = unwrap!(deserialise(&serialised_data));
         assert_eq!(obj_before, obj_after);

@@ -23,7 +23,7 @@ use rust_sodium::crypto::box_;
 use std::cmp;
 
 /// Struct that represent a directory in the network.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct Dir {
     sub_dirs: Vec<DirMetadata>,
     files: Vec<File>,
@@ -53,11 +53,6 @@ impl Dir {
         self.files().iter().find(|file| *file.name() == *file_name)
     }
 
-    /// Find file in this Directory by id.
-    pub fn find_file_by_id(&self, id: &XorName) -> Option<&File> {
-        self.files().iter().find(|file| *file.id() == *id)
-    }
-
     /// Get all subdirectories in this Directory.
     pub fn sub_dirs(&self) -> &[DirMetadata] {
         &self.sub_dirs
@@ -79,29 +74,30 @@ impl Dir {
         self.sub_dirs().iter().find(|info| *info.locator() == *id)
     }
 
-    /// If file is present in this Directory then replace it else insert it
-    pub fn upsert_file(&mut self, file: File) {
-        // TODO try using the below approach for efficiency - also try the same
-        // in upsert_sub_directory
-        //     if let Some(mut existing_file) = self.files.iter_mut().find(
-        //             |entry| *entry.name() == *file.name()) {
-        //         *existing_file = file;
+    /// Add a new file to this Dir
+    pub fn add_file(&mut self, file: File) {
+        self.files_mut().push(file);
+    }
+
+    /// If file is present in this Dir then replace it
+    pub fn update_file(&mut self, prev_name: &str, file: File) -> bool {
         if let Some(index) = self.files()
-                                 .iter()
-                                 .position(|entry| *entry.id() == *file.id()) {
+            .iter()
+            .position(|entry| entry.name() == prev_name) {
             let mut existing = unwrap!(self.files_mut().get_mut(index));
             *existing = file;
+            true
         } else {
-            self.files_mut().push(file);
+            false
         }
     }
 
     /// Remove a file
     pub fn remove_file(&mut self, file_name: &str) -> Result<File, NfsError> {
         let index = try!(self.files()
-                             .iter()
-                             .position(|file| *file.name() == *file_name)
-                             .ok_or(NfsError::FileNotFound));
+            .iter()
+            .position(|file| *file.name() == *file_name)
+            .ok_or(NfsError::FileNotFound));
         Ok(self.files_mut().remove(index))
     }
 
@@ -109,8 +105,8 @@ impl Dir {
     /// then replace it else insert it
     pub fn upsert_sub_dir(&mut self, dir_metadata: DirMetadata) {
         if let Some(index) = self.sub_dirs()
-                                 .iter()
-                                 .position(|entry| *entry.locator() == *dir_metadata.locator()) {
+            .iter()
+            .position(|entry| *entry.locator() == *dir_metadata.locator()) {
             self.sub_dirs_mut()[index] = dir_metadata;
         } else {
             self.sub_dirs_mut().push(dir_metadata);
@@ -118,11 +114,11 @@ impl Dir {
     }
 
     /// Remove a sub_directory
-    pub fn remove_sub_directory(&mut self, directory_name: &str) -> Result<DirMetadata, NfsError> {
+    pub fn remove_sub_dir(&mut self, directory_name: &str) -> Result<DirMetadata, NfsError> {
         let index = try!(self.sub_dirs()
-                             .iter()
-                             .position(|dir_info| *dir_info.name() == *directory_name)
-                             .ok_or(NfsError::DirectoryNotFound));
+            .iter()
+            .position(|dir_info| *dir_info.name() == *directory_name)
+            .ok_or(NfsError::DirectoryNotFound));
         Ok(self.sub_dirs_mut().remove(index))
 
     }
@@ -164,21 +160,23 @@ mod tests {
     }
 
     #[test]
-    fn find_upsert_remove_file() {
+    fn find_add_update_remove_file() {
         let mut dir = Dir::new();
-        let mut file = unwrap!(File::new(FileMetadata::new("index.html".to_string(), Vec::new()),
-                                         DataMap::None));
+        let mut file = File::Unversioned(FileMetadata::new("index.html".to_string(),
+                                                           Vec::new(),
+                                                           DataMap::None));
         assert!(dir.find_file(file.name()).is_none());
 
-        dir.upsert_file(file.clone());
+        dir.add_file(file.clone());
         assert!(dir.find_file(file.name()).is_some());
 
         file.metadata_mut().set_name("home.html".to_string());
-        dir.upsert_file(file.clone());
+        dir.update_file("index.html", file.clone());
         assert_eq!(dir.files().len(), 1);
-        let file2 = unwrap!(File::new(FileMetadata::new("demo.html".to_string(), Vec::new()),
-                                      DataMap::None));
-        dir.upsert_file(file2.clone());
+        let file2 = File::Unversioned(FileMetadata::new("demo.html".to_string(),
+                                                        Vec::new(),
+                                                        DataMap::None));
+        dir.add_file(file2.clone());
         assert_eq!(dir.files().len(), 2);
 
         let _ = unwrap!(dir.find_file(file.name()), "File not found");
@@ -198,10 +196,10 @@ mod tests {
         let mut dir = Dir::new();
         let mut sub_dir = create_directory("Child one", Vec::new());
         assert!(dir.find_sub_dir(sub_dir.name())
-                   .is_none());
+            .is_none());
         dir.upsert_sub_dir(sub_dir.clone());
         assert!(dir.find_sub_dir(sub_dir.name())
-                   .is_some());
+            .is_some());
 
         sub_dir.set_name("Child_1".to_string());
         dir.upsert_sub_dir(sub_dir.clone());
@@ -214,16 +212,16 @@ mod tests {
         let _ = unwrap!(dir.find_sub_dir(sub_dir.name()), "Directory not found");
         let _ = unwrap!(dir.find_sub_dir(sub_dir_two.name()), "Directory not found");
 
-        let _ = unwrap!(dir.remove_sub_directory(sub_dir.name()));
+        let _ = unwrap!(dir.remove_sub_dir(sub_dir.name()));
         assert!(dir.find_sub_dir(sub_dir.name())
-                   .is_none());
+            .is_none());
         assert!(dir.find_sub_dir(sub_dir_two.name())
-                   .is_some());
+            .is_some());
         assert_eq!(dir.sub_dirs().len(), 1);
 
         // TODO (Spandan) - Fetch and issue a DELETE on the removed directory, check elsewhere in
         // code/test. Also check what can be done for file removals.
-        let _ = unwrap!(dir.remove_sub_directory(sub_dir_two.name()));
+        let _ = unwrap!(dir.remove_sub_dir(sub_dir_two.name()));
         assert_eq!(dir.sub_dirs().len(), 0);
     }
 }

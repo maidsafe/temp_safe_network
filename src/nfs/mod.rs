@@ -16,21 +16,20 @@
 // relating to use of the SAFE Network Software.
 
 /// Module for directory related structs
-pub mod dir;
+mod dir;
 /// Errors
 pub mod errors;
 /// Module for File struct
-pub mod file;
-
-// /// Helper for directory_listing and File for NFS Low level API
-// pub mod helper;
-
+mod file;
+/// Helper for directory_listing and File for NFS Low level API
+pub mod helper;
 /// Directory and File Metadata
-pub mod metadata;
+mod metadata;
 
 use futures::Future;
 pub use nfs::dir::Dir;
 pub use nfs::file::File;
+pub use nfs::metadata::{DirMetadata, FileMetadata};
 
 /// Configuration directory Name stored in the session packet
 pub const CONFIGURATION_DIRECTORY_NAME: &'static str = "CONFIGURATION_ROOT";
