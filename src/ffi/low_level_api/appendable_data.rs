@@ -728,7 +728,7 @@ pub unsafe extern "C" fn appendable_data_validate_size(handle: AppendableDataHan
                                                        o_valid: *mut bool)
                                                        -> i32 {
     helper::catch_unwind_i32(|| {
-        *o_valid = match ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
+        *o_valid = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
             AppendableData::Pub(ref elt) => elt.validate_size(),
             AppendableData::Priv(ref elt) => elt.validate_size(),
         };
