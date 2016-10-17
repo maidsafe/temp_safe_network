@@ -26,7 +26,8 @@ use ffi::low_level_api::{CipherOptHandle, DataIdHandle, StructDataHandle};
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use ffi::low_level_api::object_cache::object_cache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XOR_NAME_LEN, XorName};
+use routing::{Data, DataIdentifier, ImmutableData, NO_OWNER_PUB_KEY, StructuredData, XOR_NAME_LEN,
+              XorName};
 use std::{mem, ptr, slice};
 use std::sync::{Arc, Mutex};
 
@@ -367,13 +368,33 @@ pub unsafe extern "C" fn struct_data_put(app: *const App, sd_h: StructDataHandle
     })
 }
 
+// TODO add test case for this
+/// Make StructuredData unclaimable - after this operation, the StructuredData will remain in the
+/// network with no data but will not be claimable by anyone anymore including the original owner.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_make_unclaimable(app: *const App,
+                                                      sd_h: StructDataHandle)
+                                                      -> i32 {
+    helper::catch_unwind_i32(|| {
+        let mut object_cache = unwrap!(object_cache());
+        let sd = ffi_try!(object_cache.get_sd(sd_h));
+        match struct_data_post_impl((*app).get_client(), sd, true) {
+            Ok(new_sd) => {
+                *sd = new_sd;
+                0
+            }
+            Err(e) => ffi_try!(Err(e)),
+        }
+    })
+}
+
 /// POST StructuredData. This will bump version.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_post(app: *const App, sd_h: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let mut object_cache = unwrap!(object_cache());
         let sd = ffi_try!(object_cache.get_sd(sd_h));
-        match struct_data_post_impl((*app).get_client(), sd) {
+        match struct_data_post_impl((*app).get_client(), sd, false) {
             Ok(new_sd) => {
                 *sd = new_sd;
                 0
@@ -384,18 +405,34 @@ pub unsafe extern "C" fn struct_data_post(app: *const App, sd_h: StructDataHandl
 }
 
 fn struct_data_post_impl(client: Arc<Mutex<Client>>,
-                         sd: &StructuredData)
+                         sd: &StructuredData,
+                         make_unclaimable: bool)
                          -> Result<StructuredData, FfiError> {
-    let sign_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    // TODO Ask routing to remove this inefficiency of requiring to clone data and all
-    let new_sd = try!(StructuredData::new(sd.get_type_tag(),
-                                          *sd.name(),
-                                          sd.get_version() + 1,
-                                          sd.get_data().clone(),
-                                          sd.get_owner_keys().clone(),
-                                          sd.get_previous_owner_keys().clone(),
-                                          Some(&sign_key))
-        .map_err(CoreError::from));
+    let new_sd = {
+        let client_guard = unwrap!(client.lock());
+        let sign_key = try!(client_guard.get_secret_signing_key());
+
+        if make_unclaimable {
+            try!(StructuredData::new(sd.get_type_tag(),
+                                     *sd.name(),
+                                     sd.get_version() + 1,
+                                     vec![],
+                                     vec![NO_OWNER_PUB_KEY],
+                                     sd.get_owner_keys().clone(),
+                                     Some(sign_key))
+                .map_err(CoreError::from))
+        } else {
+            // TODO Ask routing to remove this inefficiency of requiring to clone data and all
+            try!(StructuredData::new(sd.get_type_tag(),
+                                     *sd.name(),
+                                     sd.get_version() + 1,
+                                     sd.get_data().clone(),
+                                     sd.get_owner_keys().clone(),
+                                     sd.get_previous_owner_keys().clone(),
+                                     Some(sign_key))
+                .map_err(CoreError::from))
+        }
+    };
 
     let data = Data::Structured(new_sd.clone());
     let resp_getter = try!(unwrap!(client.lock()).post(data, None));
@@ -439,6 +476,17 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
     try!(resp_getter.get());
 
     Ok(new_sd)
+}
+
+/// See if StructuredData size is valid.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_validate_size(handle: StructDataHandle,
+                                                   o_valid: *mut bool)
+                                                   -> i32 {
+    helper::catch_unwind_i32(|| {
+        *o_valid = ffi_try!(unwrap!(object_cache()).get_sd(handle)).validate_size();
+        0
+    })
 }
 
 /// Get the current version of StructuredData by its handle
