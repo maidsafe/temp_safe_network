@@ -296,12 +296,6 @@ impl Client {
         rx
     }
 
-    ///
-    pub fn put_recover(&self, _: Data, _: Option<Authority>) -> Box<CoreFuture<()>> {
-        // TODO: unimplemented
-        ok!(())
-    }
-
     // TODO All these return the same future from all branches. So convert to impl Trait when it
     // arrives in stable. Change from `Box<CoreFuture>` -> `impl CoreFuture`.
     /// Put data onto the network.
@@ -447,10 +441,10 @@ impl Client {
             .then(|result| {
                 match result {
                     Ok(()) |
-                Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => {
-                    debug!("DELETE recovery successful !");
-                    Ok(())
-                }
+                    Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => {
+                        debug!("DELETE recovery successful !");
+                        Ok(())
+                    }
                     Err(err) => {
                         debug!("DELETE recovery failed: {:?}", err);
                         Err(err)
@@ -889,7 +883,8 @@ mod tests {
                             _ => panic!("Unexpected {:?}", err),
                         }
 
-                        let name = DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG);
+                        let name = DataIdentifier::Structured(rand::random(),
+                                                              ::UNVERSIONED_STRUCT_DATA_TYPE_TAG);
                         let key = Some(secretbox::gen_key());
 
                         client3.set_config_root_dir_id((name, key))
@@ -942,7 +937,8 @@ mod tests {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir_id = (DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
+        let dir_id = (DataIdentifier::Structured(rand::random(),
+                                                 ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
                       Some(secretbox::gen_key()));
 
         {
@@ -970,7 +966,8 @@ mod tests {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir_id = (DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
+        let dir_id = (DataIdentifier::Structured(rand::random(),
+                                                 ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
                       Some(secretbox::gen_key()));
 
         {

@@ -19,12 +19,9 @@ use core::{Client, CoreError, CoreFuture, SelfEncryptionStorage, utility};
 use core::futures::FutureExt;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Data, DataIdentifier, ImmutableData, XorName};
+use routing::{Data, DataIdentifier, ImmutableData, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, XorName};
 use rust_sodium::crypto::secretbox;
 use self_encryption::{DataMap, SelfEncryptor};
-
-// TODO(Spandan) Ask Routing to define this constant and use it from there
-const MAX_IMMUTABLE_DATA_SIZE_IN_BYTES: usize = 1024 * 1024;
 
 #[derive(RustcEncodable, RustcDecodable)]
 enum DataTypeEncoding {
