@@ -91,7 +91,6 @@ impl DirectoryHelper {
                   -> Result<Option<DirectoryListing>, NfsError> {
         trace!("Deleting directory with name: {}", directory_to_delete);
 
-        // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
         let dir_meta = try!(parent_directory.remove_sub_directory(directory_to_delete));
         let sd = try!(self.get_structured_data(dir_meta.get_id(), dir_meta.get_type_tag()));
         let sign_key = try!(unwrap!(self.client.lock()).get_secret_signing_key()).clone();
