@@ -493,51 +493,49 @@ mod tests {
 
     #[test]
     fn delete_directory() {
-        // test_utils::register_and_run(move |client| {
-        //     // Create a Directory
-        //     let parent = Dir::new();
+        test_utils::register_and_run(move |client| {
+            // Create a Directory
+            let mut parent = Dir::new();
+            parent.sub_dirs_mut()
+                .push(DirMetadata::new(rand::random(), "fake_sub_dir", Vec::new(), None));
 
-        //     dir_helper::create(client.clone(), &parent, None)
-        //         .and_then(|parent_id| {
-        //             let get = dir_helper::get(client.clone(), directory.key());
-        //             assert_eq!(directory, get);
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
 
-        //             // Create a Child directory and update the parent_dir
-        //             dir_helper::add_sub_dir(client.clone(),
-        //                                     "Child".to_string(),
-        //                                     Vec::new(),
-        //                                     true,
-        //                                     Some(&mut directory))
-        //         })
-        //         .and_then(|child_dir| {
-        //             // Assert whether parent is updated
-        //             let parent = unwrap!(dir_helper::get(client.clone(), directory.key()));
-        //             assert!(parent.find_sub_dir(child_dir.metadata().name()).is_some());
+            dir_helper::create(client.clone(), &parent, None)
+                .and_then(move |parent_id| {
+                    dir_helper::get(c2, &(parent_id, None))
+                        .map(move |get_result| (get_result, parent_id))
+                })
+                .and_then(move |(get_result, parent_id)| {
+                    assert_eq!(parent, get_result);
 
-        //             dir_helper::create_sub_dir("Grand Child".to_string(),
-        //                                        Vec::new(),
-        //                                        true,
-        //                                        AccessLevel::Private,
-        //                                        Some(&mut child_directory))
+                    // Create a Child directory and update the parent_dir
+                    dir_helper::create_sub_dir(c3,
+                                               "Child".to_string(),
+                                               None,
+                                               Vec::new(),
+                                               &parent,
+                                               &(parent_id, None))
+                })
+                .and_then(move |(parent_dir, _, metadata)| {
+                    // Assert whether parent is updated
+                    assert!(parent_dir.find_sub_dir(metadata.name()).is_some());
 
-        //         })
-        //         .and_then(|grand_child_dir| {
-        //             let delete_result = dir_helper::delete(client.clone(),
-        //                                                    &mut child_directory,
-        //                                                    grand_child_directory.metadata()
-        //                                                        .name()
-        //                                                        .wait());
-
-        //             let updated_grand_parent = unwrap!(delete_result,
-        //                                                "Parent directory should be returned");
-        //             assert_eq!(*updated_grand_parent.metadata().id(),
-        //                        *directory.metadata().id());
-
-        //             dir_helper::delete(client.clone(),
-        //                                &mut directory,
-        //                                child_directory.metadata()
-        //                                    .name())
-        //         })
-        // });
+                    dir_helper::create_sub_dir(c4,
+                                               "Grand Child".to_string(),
+                                               None,
+                                               Vec::new(),
+                                               &parent_dir,
+                                               &metadata.id())
+                })
+                .and_then(move |(mut parent_dir, _, metadata)| {
+                    dir_helper::delete(c5, &mut parent_dir, metadata.name()).map(move |_| {
+                        assert!(parent_dir.find_sub_dir("Grand Child").is_none());
+                    })
+                })
+        });
     }
 }
