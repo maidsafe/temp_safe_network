@@ -92,7 +92,19 @@ impl DirectoryHelper {
         trace!("Deleting directory with name: {}", directory_to_delete);
 
         // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
-        let _dir_meta = try!(parent_directory.remove_sub_directory(directory_to_delete));
+        let dir_meta = try!(parent_directory.remove_sub_directory(directory_to_delete));
+        let sd = try!(self.get_structured_data(dir_meta.get_id(), dir_meta.get_type_tag()));
+        let sign_key = try!(unwrap!(self.client.lock()).get_secret_signing_key()).clone();
+        let delete_sd = try!(unversioned::create(self.client.clone(),
+                                                 sd.get_type_tag(),
+                                                 *sd.name(),
+                                                 sd.get_version() + 1,
+                                                 vec![],
+                                                 sd.get_owner_keys().clone(),
+                                                 vec![],
+                                                 &sign_key,
+                                                 None));
+        try!(Client::delete_recover(self.client.clone(), Data::Structured(delete_sd), None));
         parent_directory.get_mut_metadata().set_modified_time(::time::now_utc());
         self.update(parent_directory)
     }
