@@ -465,9 +465,9 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
     let new_sd = try!(StructuredData::new(sd.get_type_tag(),
                                           *sd.name(),
                                           sd.get_version() + 1,
-                                          Vec::new(),
+                                          vec![],
+                                          vec![],
                                           sd.get_owner_keys().clone(),
-                                          sd.get_previous_owner_keys().clone(),
                                           Some(&sign_key))
         .map_err(CoreError::from));
 
