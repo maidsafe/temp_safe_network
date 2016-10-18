@@ -529,7 +529,8 @@ impl Client {
         let resp_getter = try!(unwrap!(client.lock()).delete(data, opt_dst));
         match resp_getter.get() {
             Ok(()) |
-            Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => {
+            Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) |
+            Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. })  => {
                 debug!("DELETE recovery successful !");
                 Ok(())
             }

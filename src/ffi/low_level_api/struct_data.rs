@@ -632,8 +632,8 @@ mod tests {
             assert_eq!(struct_data_delete(&app, sd_h), 0);
             let _ = unwrap!(object_cache()).get_sd(sd_h);
 
-            // Re-delete shold fail - MutationError::NoSuchData; Fetch should be successful
-            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            // Re-delete shold fail - MutationError::InvalidOperation; Fetch should be successful
+            assert_eq!(struct_data_delete(&app, sd_h), -26);
             assert_eq!(struct_data_free(sd_h), 0);
             assert_eq!(struct_data_free(sd_h),
                        FfiError::InvalidStructDataHandle.into());
@@ -731,8 +731,8 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -22 is CoreError::MutationFailure { reason: MutationError::NoSuchData }
-            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            // -26 is CoreError::MutationFailure { reason: MutationError::InvalidOperation }
+            assert_eq!(struct_data_delete(&app, sd_h), -26);
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
         }
     }
@@ -802,8 +802,8 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -22 is CoreError::MutationFailure { reason: MutationError::NoSuchData }
-            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            // -26 is CoreError::MutationFailure { reason: MutationError::InvalidOperation }
+            assert_eq!(struct_data_delete(&app, sd_h), -26);
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
         }
     }
