@@ -516,6 +516,15 @@ impl DataManager {
                     .send_post_failure(dst, src, data_id, post_error, message_id)));
             }
             (Data::Structured(new_sd), Ok(Data::Structured(mut sd))) => {
+                if sd.is_deleted() {
+                    warn!("Post operation for deleted data. {:?} - {:?}",
+                          data_id,
+                          message_id);
+                    let post_error =
+                        try!(serialisation::serialise(&MutationError::InvalidOperation));
+                    return Ok(try!(self.routing_node
+                        .send_post_failure(dst, src, data_id, post_error, message_id)));
+                }
                 let result = sd.replace_with_other(new_sd);
                 result.map(|()| Data::Structured(sd))
             }
@@ -560,22 +569,26 @@ impl DataManager {
                          -> Result<(), InternalError> {
         let data_id = new_data.identifier();
 
-        if let Ok(Data::Structured(mut data)) = self.chunk_store.get(&data_id) {
-            if data.delete_if_valid_successor(&new_data).is_ok() {
-                return self.update_pending_writes(Data::Structured(data),
-                                                  PendingMutationType::Delete,
-                                                  src,
-                                                  dst,
-                                                  message_id);
+        let error = match self.chunk_store.get(&data_id) {
+            Ok(Data::Structured(mut data)) => {
+                if data.is_deleted() {
+                    MutationError::InvalidOperation
+                } else if data.delete_if_valid_successor(&new_data).is_ok() {
+                    return self.update_pending_writes(Data::Structured(data),
+                                                      PendingMutationType::Delete,
+                                                      src,
+                                                      dst,
+                                                      message_id);
+                } else {
+                    MutationError::InvalidSuccessor
+                }
             }
-        }
+            Ok(_) => MutationError::InvalidOperation,
+            Err(_) => MutationError::NoSuchData,
+        };
         trace!("DM sending delete_failure for {:?}", new_data.identifier());
-        try!(self.routing_node.send_delete_failure(dst,
-                                                   src,
-                                                   data_id,
-                                                   try!(serialisation::serialise(
-                                                           &MutationError::InvalidSuccessor)),
-                                                   message_id));
+        let err_data = try!(serialisation::serialise(&error));
+        try!(self.routing_node.send_delete_failure(dst, src, data_id, err_data, message_id));
         Ok(())
     }
 
