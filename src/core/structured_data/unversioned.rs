@@ -80,6 +80,45 @@ pub fn create(client: &Client,
     }
 }
 
+/// Update structured data with new value and POST it to the network.
+pub fn update(client: &Client,
+              data: StructuredData,
+              new_value: Vec<u8>,
+              private_signing_key: sign::SecretKey,
+              encryption_key: Option<secretbox::Key>)
+              -> Box<CoreFuture<()>> {
+    let client2 = client.clone();
+
+    create(client,
+           data.get_type_tag(),
+           *data.name(),
+           data.get_version() + 1,
+           new_value,
+           data.get_owner_keys().clone(),
+           data.get_previous_owner_keys().clone(),
+           private_signing_key,
+           encryption_key)
+        .and_then(move |data| client2.post(Data::Structured(data), None))
+        .into_box()
+}
+
+/// Delete structured data from the network.
+pub fn delete(client: &Client,
+              data: StructuredData,
+              signing_key: &sign::SecretKey) -> Box<CoreFuture<()>> {
+    let data = fry!(create_for_deletion(data, signing_key));
+    client.delete(Data::Structured(data), None)
+}
+
+/// Delete structured data from the network, with recovery
+pub fn delete_recover(client: &Client,
+                      data: StructuredData,
+                      signing_key: &sign::SecretKey) -> Box<CoreFuture<()>> {
+    let data = fry!(create_for_deletion(data, signing_key));
+    client.delete_recover(Data::Structured(data), None)
+}
+
+
 /// Get the raw bytes from StructuredData created via `create()` function in this module.
 pub fn extract_value(client: &Client,
                      data: &StructuredData,
@@ -231,6 +270,18 @@ fn create_with_immutable_data(client: Client,
             }
         })
         .into_box()
+}
+
+fn create_for_deletion(data: StructuredData,
+                       signing_key: &sign::SecretKey)
+                       -> Result<StructuredData, CoreError> {
+    Ok(try!(StructuredData::new(data.get_type_tag(),
+                                *data.name(),
+                                data.get_version() + 1,
+                                vec![],
+                                vec![],
+                                data.get_owner_keys().clone(),
+                                Some(signing_key))))
 }
 
 fn encode(data: DataTypeEncoding,

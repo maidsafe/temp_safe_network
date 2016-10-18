@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-//! Dns configuration.
+//! DNS configuration.
 
 use core::Client;
 use core::futures::FutureExt;
@@ -82,14 +82,14 @@ pub fn write(client: &Client, config: Vec<DnsConfig>) -> Box<DnsFuture<()>> {
                 file_helper::update_content(client2,
                                             file,
                                             Mode::Overwrite,
-                                            dir_metadata,
+                                            dir_metadata.id(),
                                             dir)
             } else {
                 file_helper::create(client2,
                                     DNS_CONFIG_FILE_NAME.to_string(),
                                     vec![],
-                                    dir,
-                                    dir_metadata)
+                                    dir_metadata.id(),
+                                    dir)
             }
         })
         .and_then(move |writer| writer.write(&encoded_config).map(move |_| writer))

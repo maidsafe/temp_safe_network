@@ -15,584 +15,747 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! DNS operations.
 
-use core::client::Client;
-use core::errors::CoreError;
-use core::structured_data_operations::unversioned;
-use dns::errors::DnsError;
+use core::{Client, CoreError};
+use core::futures::FutureExt;
+use core::structured_data::{self, unversioned};
+use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::metadata::directory_key::DirectoryKey;
-use routing::{Data, DataIdentifier, StructuredData, XorName};
-use routing::TYPE_TAG_DNS_PACKET;
+use nfs::DirId;
+use routing::{Data, StructuredData, XorName, TYPE_TAG_DNS_PACKET};
 use routing::client_errors::{GetError, MutationError};
-use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::{box_, sign, secretbox};
 use rust_sodium::crypto::hash::sha256;
-use std::convert::From;
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use super::config::{self, DnsConfig};
+use super::DnsFuture;
+use super::errors::DnsError;
 
-/// This is a representational structure for all safe-dns operations
-pub struct DnsOperations {
-    client: Arc<Mutex<Client>>,
+/// Register one's own Dns - eg., pepsico.com, spandansharma.com, krishnakumar.in etc
+pub fn register_dns(client: &Client,
+                    long_name: String,
+                    public_messaging_encryption_key: box_::PublicKey,
+                    secret_messaging_encryption_key: box_::SecretKey,
+                    services: &[(String, DirId)],
+                    owners: Vec<sign::PublicKey>,
+                    private_signing_key: sign::SecretKey,
+                    encryption_key: Option<secretbox::Key>)
+                    -> Box<DnsFuture<()>> {
+    trace!("Registering dns with name: {}", long_name);
+
+    let client2 = client.clone();
+    let client3 = client.clone();
+    let client4 = client.clone();
+
+    let services = services.iter().cloned().collect();
+    let public_messaging_encryption_key2 = public_messaging_encryption_key.clone();
+
+    config::read(client)
+        .and_then(move |saved_configs| {
+            if saved_configs.iter().any(|config| config.long_name == long_name) {
+                Err(DnsError::DnsNameAlreadyRegistered)
+            } else {
+                let dns_record = Dns {
+                    long_name: long_name.clone(),
+                    services: services,
+                    encryption_key: public_messaging_encryption_key2,
+                };
+                let encoded_dns_record = try!(serialise(&dns_record));
+
+                Ok((encoded_dns_record, saved_configs, long_name))
+            }
+        })
+        .and_then(move |(encoded_dns_record, saved_configs, long_name)| {
+            let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
+            unversioned::create(&client2,
+                                TYPE_TAG_DNS_PACKET,
+                                identifier,
+                                0,
+                                encoded_dns_record,
+                                owners,
+                                vec![],
+                                private_signing_key,
+                                encryption_key)
+                .map(move |struct_data| (struct_data, saved_configs, long_name))
+                .map_err(DnsError::from)
+        })
+        .and_then(move |(struct_data, saved_configs, long_name)| {
+            client3.put_recover(Data::Structured(struct_data), None)
+                .map(move |_| (saved_configs, long_name))
+                .map_err(|err| match err {
+                    CoreError::MutationFailure {
+                        reason: MutationError::DataExists, ..
+                    } => DnsError::DnsNameAlreadyRegistered,
+                    err => DnsError::from(err),
+                })
+        })
+        .and_then(move |(mut saved_configs, long_name)| {
+            trace!("Adding encryption key pair to the retrieved saved dns configuration.");
+            saved_configs.push(DnsConfig {
+                long_name: long_name,
+                encryption_keypair: (public_messaging_encryption_key,
+                                     secret_messaging_encryption_key),
+            });
+
+            config::write(&client4, saved_configs)
+        })
+        .into_box()
 }
 
-impl DnsOperations {
-    /// Create a new instance of DnsOperations. It is intended that only one of this be created as
-    /// it operates on global data such as files.
-    pub fn new(client: Arc<Mutex<Client>>) -> Result<DnsOperations, DnsError> {
-        try!(dns_configuration::initialise_dns_configuaration(client.clone()));
 
-        Ok(DnsOperations { client: client })
-    }
+/// Delete the Dns-Record
+pub fn delete_dns(client: &Client,
+                  long_name: String,
+                  private_signing_key: sign::SecretKey)
+                  -> Box<DnsFuture<()>> {
+    trace!("Deleting dns with name: {}", long_name);
 
-    /// Create a new instance of DnsOperations. This is used for an unregistered client and will
-    /// have very limited set of functionalities - mostly reads. This is ideal for browsers etc.,
-    /// which only want to fetch from the Network, not mutate it.
-    /// It is intended that only one of this be created as it operates on global data such as
-    /// files.
-    pub fn new_unregistered(unregistered_client: Arc<Mutex<Client>>) -> DnsOperations {
-        DnsOperations { client: unregistered_client }
-    }
+    let client2 = client.clone();
+    let client3 = client.clone();
 
-    /// Register one's own Dns - eg., pepsico.com, spandansharma.com, krishnakumar.in etc
-    #[cfg_attr(feature="clippy", allow(too_many_arguments))]
-    pub fn register_dns(&self,
-                        long_name: String,
-                        public_messaging_encryption_key: &box_::PublicKey,
-                        secret_messaging_encryption_key: &box_::SecretKey,
-                        services: &[(String, DirectoryKey)],
-                        owners: Vec<sign::PublicKey>,
-                        private_signing_key: &sign::SecretKey,
-                        data_encryption_keys: Option<(&box_::PublicKey,
-                                                      &box_::SecretKey,
-                                                      &box_::Nonce)>)
-                        -> Result<(), DnsError> {
-        trace!("Registering dns with name: {}", long_name);
+    config::read(client)
+        .and_then(move |saved_configs| {
+            saved_configs.iter()
+                .position(|config| config.long_name == long_name)
+                .ok_or(DnsError::DnsRecordNotFound)
+                .map(move |pos| (saved_configs, pos, long_name))
+        })
+        .and_then(move |(saved_configs, pos, long_name)| {
+            get_housing_structured_data(&client2, &long_name)
+                .and_then(move |struct_data| {
+                    unversioned::delete_recover(&client2,
+                                                struct_data,
+                                                &private_signing_key)
+                        .map_err(DnsError::from)
+                })
+                .or_else(|err| match err {
+                    DnsError::CoreError(CoreError::GetFailure {
+                        reason: GetError::NoSuchData, ..
+                    }) => Ok(()),
+                    err => Err(err),
+                })
+                .map(move |_| (saved_configs, pos))
+        })
+        .and_then(move |(mut saved_configs, pos)| {
+            trace!("Removing dns entry from the retrieved saved config.");
+            let _ = saved_configs.remove(pos);
+            config::write(&client3, saved_configs)
+        })
+        .into_box()
+}
 
-        let mut saved_configs = try!(dns_configuration::get_dns_configuration_data(self.client
-            .clone()));
-        if saved_configs.iter().any(|config| config.long_name == long_name) {
-            Err(DnsError::DnsNameAlreadyRegistered)
-        } else {
-            let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
+/// Get all the Dns-names registered by the user so far in the network.
+pub fn get_all_registered_names(client: &Client) -> Box<DnsFuture<Vec<String>>> {
+    trace!("Get all dns long names that we own.");
+    config::read(client)
+        .map(|configs| configs.iter().map(|c| c.long_name.clone()).collect())
+        .into_box()
+}
 
-            let dns_record = Dns {
-                long_name: long_name.clone(),
-                services: services.iter().cloned().collect(),
-                encryption_key: *public_messaging_encryption_key,
-            };
+/// Get the messaging encryption keys that the user has associated with one's particular
+/// Dns-name.
+pub fn get_messaging_encryption_keys(client: &Client, long_name: String)
+                                     -> Box<DnsFuture<(box_::PublicKey,
+                                                       box_::SecretKey)>> {
+    trace!("Get messaging encryption keys for owned dns with name: {}",
+           long_name);
 
-            let struct_data = try!(unversioned::create(self.client.clone(),
-                                                       TYPE_TAG_DNS_PACKET,
-                                                       identifier,
-                                                       0,
-                                                       try!(serialise(&dns_record)),
-                                                       owners,
-                                                       vec![],
-                                                       private_signing_key,
-                                                       data_encryption_keys));
-            match Client::put_recover(self.client.clone(), Data::Structured(struct_data), None) {
-                Ok(()) => (),
-                Err(CoreError::MutationFailure { reason: MutationError::DataExists, .. }) => {
-                    return Err(DnsError::DnsNameAlreadyRegistered)
-                }
-                Err(err) => return Err(From::from(err)),
-            }
+    find_dns_record(client, long_name)
+        .map(|record| record.encryption_keypair)
+        .into_box()
+}
 
-            trace!("Adding encryption key pair to the retrieved saved dns configuration.");
-            saved_configs.push(dns_configuration::DnsConfiguration {
-                long_name: long_name,
-                encryption_keypair: (*public_messaging_encryption_key,
-                                     secret_messaging_encryption_key.clone()),
-            });
-            try!(dns_configuration::write_dns_configuration_data(self.client.clone(),
-                                                                 &saved_configs));
+/// Get all the services (www, blog, micro-blog etc) that user has associated with this
+/// Dns-name
+pub fn get_all_services(client: &Client,
+                        long_name: &str,
+                        decryption_key: Option<secretbox::Key>)
+                        -> Box<DnsFuture<Vec<String>>> {
+    trace!("Get all services for the dns with name: {}", long_name);
 
-            Ok(())
-        }
-    }
+    get_housing_structured_data_and_dns_record(client, long_name, decryption_key)
+        .map(|(_, dns_record)| {
+            dns_record.services.keys().cloned().collect()
+        })
+        .into_box()
+}
 
-    /// Delete the Dns-Record
-    pub fn delete_dns(&self,
-                      long_name: &str,
-                      private_signing_key: &sign::SecretKey)
-                      -> Result<(), DnsError> {
-        trace!("Deleting dns with name: {}", long_name);
+/// Add a new service for the given Dns-name.
+pub fn add_service(client: &Client,
+                   long_name: String,
+                   new_service: (String, DirId),
+                   private_signing_key: sign::SecretKey,
+                   encryption_key: Option<secretbox::Key>)
+                   -> Box<DnsFuture<()>> {
+    trace!("Add service {:?} to dns with name: {}",
+           new_service,
+           long_name);
 
-        let mut saved_configs = try!(dns_configuration::get_dns_configuration_data(self.client
-            .clone()));
-        let pos = try!(saved_configs.iter()
-            .position(|config| config.long_name == *long_name)
-            .ok_or(DnsError::DnsRecordNotFound));
+    let client2 = client.clone();
 
-        match self.get_housing_structured_data(long_name) {
-            Ok(prev_struct_data) => {
-                let struct_data = try!(unversioned::create(self.client.clone(),
-                                             TYPE_TAG_DNS_PACKET,
-                                             *prev_struct_data.name(),
-                                             prev_struct_data.get_version() + 1,
-                                             vec![],
-                                             prev_struct_data.get_owner_keys().clone(),
-                                             prev_struct_data.get_previous_owner_keys()
-                                                 .clone(),
-                                             private_signing_key,
-                                             None));
-                try!(Client::delete_recover(self.client.clone(),
-                                            Data::Structured(struct_data),
-                                            None));
-            }
-            Err(DnsError::CoreError(CoreError::GetFailure {
-                reason: GetError::NoSuchData,
-                ..
-            })) => (),
-            Err(e) => return Err(e),
-        };
+    let future1 = get_housing_structured_data_and_dns_record(
+                        client,
+                        &long_name,
+                        encryption_key.clone());
+    let future2 = find_dns_record(client, long_name);
 
-        trace!("Removing dns entry from the retrieved saved config.");
-        let _ = saved_configs.remove(pos);
-        try!(dns_configuration::write_dns_configuration_data(self.client.clone(), &saved_configs));
-
-        Ok(())
-    }
-
-    /// Get all the Dns-names registered by the user so far in the network.
-    pub fn get_all_registered_names(&self) -> Result<Vec<String>, DnsError> {
-        trace!("Get all dns long names that we own.");
-
-        dns_configuration::get_dns_configuration_data(self.client.clone())
-            .map(|v| v.iter().map(|a| a.long_name.clone()).collect())
-    }
-
-    /// Get the messaging encryption keys that the user has associated with one's particular
-    /// Dns-name.
-    pub fn get_messaging_encryption_keys
-        (&self,
-         long_name: &str)
-         -> Result<(box_::PublicKey, box_::SecretKey), DnsError> {
-        trace!("Get messaging encryption keys for owned dns with name: {}",
-               long_name);
-
-        let dns_config_record = try!(self.find_dns_record(long_name));
-        Ok(dns_config_record.encryption_keypair.clone())
-    }
-
-    /// Get all the services (www, blog, micro-blog etc) that user has associated with this
-    /// Dns-name
-    pub fn get_all_services(&self,
-                            long_name: &str,
-                            data_decryption_keys: Option<(&box_::PublicKey,
-                                                          &box_::SecretKey,
-                                                          &box_::Nonce)>)
-                            -> Result<Vec<String>, DnsError> {
-        trace!("Get all services for the dns with name: {}", long_name);
-
-        let (_, dns_record) =
-            try!(self.get_housing_structured_data_and_dns_record(long_name, data_decryption_keys));
-        Ok(dns_record.services.keys().cloned().collect())
-    }
-
-    /// Get the home directory (eg., homepage containing HOME.html, INDEX.html) for the given
-    /// service.
-    pub fn get_service_home_directory_key(&self,
-                                          long_name: &str,
-                                          service_name: &str,
-                                          data_decryption_keys: Option<(&box_::PublicKey,
-                                                                        &box_::SecretKey,
-                                                                        &box_::Nonce)>)
-                                          -> Result<DirectoryKey, DnsError> {
-        trace!("Get service home directory key (to locate the home directory on SAFE Network) \
-                for \"//{}.{}\".",
-               service_name,
-               long_name);
-
-        let (_, dns_record) =
-            try!(self.get_housing_structured_data_and_dns_record(long_name, data_decryption_keys));
-        dns_record.services
-            .get(service_name)
-            .cloned()
-            .ok_or(DnsError::ServiceNotFound)
-    }
-
-    /// Add a new service for the given Dns-name.
-    pub fn add_service(&self,
-                       long_name: &str,
-                       new_service: (String, DirectoryKey),
-                       private_signing_key: &sign::SecretKey,
-                       data_encryption_decryption_keys: Option<(&box_::PublicKey,
-                                                                &box_::SecretKey,
-                                                                &box_::Nonce)>)
-                       -> Result<(), DnsError> {
-        trace!("Add service {:?} to dns with name: {}",
-               new_service,
-               long_name);
-
-        self.add_remove_service_impl(long_name,
-                                     (new_service.0, Some(new_service.1)),
-                                     private_signing_key,
-                                     data_encryption_decryption_keys)
-    }
-
-    /// Remove a service from the given Dns-name.
-    pub fn remove_service(&self,
-                          long_name: &str,
-                          service_to_remove: String,
-                          private_signing_key: &sign::SecretKey,
-                          data_encryption_decryption_keys: Option<(&box_::PublicKey,
-                                                                   &box_::SecretKey,
-                                                                   &box_::Nonce)>)
-                          -> Result<(), DnsError> {
-        trace!("Remove service {:?} from dns with name: {}",
-               service_to_remove,
-               long_name);
-
-        self.add_remove_service_impl(long_name,
-                                     (service_to_remove, None),
-                                     private_signing_key,
-                                     data_encryption_decryption_keys)
-    }
-
-    fn find_dns_record(&self,
-                       long_name: &str)
-                       -> Result<dns_configuration::DnsConfiguration, DnsError> {
-        let config_vec = try!(dns_configuration::get_dns_configuration_data(self.client.clone()));
-        config_vec.iter()
-            .find(|config| config.long_name == *long_name)
-            .cloned()
-            .ok_or(DnsError::DnsRecordNotFound)
-    }
-
-    fn add_remove_service_impl(&self,
-                               long_name: &str,
-                               service: (String, Option<DirectoryKey>),
-                               private_signing_key: &sign::SecretKey,
-                               data_encryption_decryption_keys: Option<(&box_::PublicKey,
-                                                                        &box_::SecretKey,
-                                                                        &box_::Nonce)>)
-                               -> Result<(), DnsError> {
-        let _ = try!(self.find_dns_record(long_name));
-
-        let is_add_service = service.1.is_some();
-        let (prev_struct_data, mut dns_record) =
-            try!(self.get_housing_structured_data_and_dns_record(long_name,
-                                                                 data_encryption_decryption_keys));
-
-        if !is_add_service && !dns_record.services.contains_key(&service.0) {
-            Err(DnsError::ServiceNotFound)
-        } else if is_add_service && dns_record.services.contains_key(&service.0) {
-            Err(DnsError::ServiceAlreadyExists)
-        } else {
-            if is_add_service {
-                debug!("Inserting service ...");
-                let _ = dns_record.services
-                    .insert(service.0,
-                            try!(service.1
-                                .ok_or(DnsError::from("Programming Error - Investigate !!"))));
+    future1.join(future2)
+        .and_then(move |((prev_data, mut dns_record), _)| {
+            if dns_record.services.contains_key(&new_service.0) {
+                Err(DnsError::ServiceAlreadyExists)
             } else {
-                debug!("Removing service ...");
-                let _ = dns_record.services.remove(&service.0);
+                let _ = dns_record.services.insert(new_service.0, new_service.1);
+                let encoded_dns_record = try!(serialise(&dns_record));
+                Ok((prev_data, encoded_dns_record))
             }
+        })
+        .and_then(move |(prev_data, encoded_dns_record)| {
+            unversioned::update(&client2,
+                                prev_data,
+                                encoded_dns_record,
+                                private_signing_key,
+                                encryption_key)
+                .map_err(DnsError::from)
+        })
+        .into_box()
+}
 
-            let struct_data = try!(unversioned::create(self.client.clone(),
-                                                       TYPE_TAG_DNS_PACKET,
-                                                       *prev_struct_data.name(),
-                                                       prev_struct_data.get_version() + 1,
-                                                       try!(serialise(&dns_record)),
-                                                       prev_struct_data.get_owner_keys().clone(),
-                                                       prev_struct_data.get_previous_owner_keys()
-                                                           .clone(),
-                                                       private_signing_key,
-                                                       data_encryption_decryption_keys));
-            let resp_getter = try!(unwrap!(self.client.lock())
-                .post(Data::Structured(struct_data), None));
-            try!(resp_getter.get());
+/// Remove a service from the given Dns-name.
+pub fn remove_service(client: &Client,
+                      long_name: String,
+                      service: String,
+                      private_signing_key: sign::SecretKey,
+                      encryption_key: Option<secretbox::Key>)
+                      -> Box<DnsFuture<()>> {
+    trace!("Remove service {:?} from dns with name: {}",
+           service,
+           long_name);
 
-            Ok(())
-        }
-    }
+    let client2 = client.clone();
 
-    fn get_housing_structured_data_and_dns_record(&self,
-                                                  long_name: &str,
-                                                  data_decryption_keys: Option<(&box_::PublicKey,
-                                                                                &box_::SecretKey,
-                                                                                &box_::Nonce)>)
-                                                  -> Result<(StructuredData, Dns), DnsError> {
-        let struct_data = try!(self.get_housing_structured_data(long_name));
-        let dns_record = try!(deserialise(&try!(unversioned::get_data(self.client.clone(),
-                                                                      &struct_data,
-                                                                      data_decryption_keys))));
-        Ok((struct_data, dns_record))
-    }
+    let future1 = get_housing_structured_data_and_dns_record(
+                        client,
+                        &long_name,
+                        encryption_key.clone());
+    let future2 = find_dns_record(client, long_name);
 
-    fn get_housing_structured_data(&self, long_name: &str) -> Result<StructuredData, DnsError> {
-        trace!("Fetch capsule from network for dns with name: {}",
-               long_name);
+    future1.join(future2)
+        .and_then(move |((prev_data, mut dns_record), _)| {
+            if !dns_record.services.contains_key(&service) {
+                Err(DnsError::ServiceNotFound)
+            } else {
+                let _ = dns_record.services.remove(&service);
+                let encoded_dns_record = try!(serialise(&dns_record));
+                Ok((prev_data, encoded_dns_record))
+            }
+        })
+        .and_then(move |(prev_data, encoded_dns_record)| {
+            unversioned::update(&client2,
+                                prev_data,
+                                encoded_dns_record,
+                                private_signing_key,
+                                encryption_key)
+                .map_err(DnsError::from)
+        })
+        .into_box()
+}
 
-        let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
-        let request = DataIdentifier::Structured(identifier, TYPE_TAG_DNS_PACKET);
-        let response_getter = try!(unwrap!(self.client.lock()).get(request, None));
-        if let Data::Structured(struct_data) = try!(response_getter.get()) {
-            Ok(struct_data)
-        } else {
-            Err(DnsError::from(CoreError::ReceivedUnexpectedData))
-        }
-    }
+/// Get the home directory (eg., homepage containing HOME.html, INDEX.html) for the given
+/// service.
+pub fn get_service_home_dir_id(client: &Client,
+                               long_name: &str,
+                               service_name: String,
+                               decryption_key: Option<secretbox::Key>)
+                               -> Box<DnsFuture<DirId>> {
+    trace!("Get service home directory key (to locate the home directory on SAFE Network) \
+            for \"//{}.{}\".",
+           service_name,
+           long_name);
+
+    get_housing_structured_data_and_dns_record(client,
+                                               long_name,
+                                               decryption_key)
+        .and_then(move |(_, dns_record)| {
+            dns_record.services
+                .get(&service_name)
+                .cloned()
+                .ok_or(DnsError::ServiceNotFound)
+        })
+        .into_box()
+}
+
+fn get_housing_structured_data(client: &Client, long_name: &str)
+                               -> Box<DnsFuture<StructuredData>> {
+    trace!("Fetch capsule from network for dns with name: {}",
+           long_name);
+
+    let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
+
+    structured_data::get(client, TYPE_TAG_DNS_PACKET, &identifier)
+        .map_err(DnsError::from)
+        .into_box()
+}
+
+fn get_housing_structured_data_and_dns_record(client: &Client,
+                                              long_name: &str,
+                                              decryption_key: Option<secretbox::Key>)
+                                              -> Box<DnsFuture<(StructuredData, Dns)>> {
+    let client2 = client.clone();
+
+    get_housing_structured_data(client, long_name)
+        .and_then(move |struct_data| {
+            unversioned::extract_value(&client2, &struct_data, decryption_key)
+                .map(move |encoded| (struct_data, encoded))
+                .map_err(DnsError::from)
+        })
+        .and_then(|(struct_data, encoded)| {
+            let dns_record = try!(deserialise(&encoded));
+            Ok((struct_data, dns_record))
+        })
+        .into_box()
+}
+
+fn find_dns_record(client: &Client, long_name: String)
+                   -> Box<DnsFuture<DnsConfig>> {
+    config::read(client)
+        .and_then(move |configs| {
+            configs.iter()
+                   .find(|config| config.long_name == *long_name)
+                   .cloned()
+                   .ok_or(DnsError::DnsRecordNotFound)
+        })
+        .into_box()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 struct Dns {
     long_name: String,
-    services: ::std::collections::HashMap<String, DirectoryKey>,
+    services: HashMap<String, DirId>,
     encryption_key: box_::PublicKey,
 }
 
 #[cfg(test)]
 mod tests {
-    use core::client::Client;
-    use core::utility::{generate_random_string, test_utils};
+    use core::Client;
+    use core::utility::{self, test_utils};
     use dns::errors::DnsError;
-    use nfs::AccessLevel;
-    use nfs::metadata::directory_key::DirectoryKey;
-    use routing::{XOR_NAME_LEN, XorName};
+    use futures::Future;
+    use nfs::DirId;
+    use rand;
+    use routing::DataIdentifier;
     use rust_sodium::crypto::box_;
-    use std::sync::{Arc, Mutex};
     use super::*;
 
     #[test]
-    fn register_and_delete_dns() {
-        let client = Arc::new(Mutex::new(unwrap!(test_utils::get_client())));
-        let dns_operations = unwrap!(DnsOperations::new(client.clone()));
+    fn register_basics() {
+        test_utils::register_and_run(move |client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
 
-        let dns_name = unwrap!(generate_random_string(10));
-        let messaging_keypair = box_::gen_keypair();
-        let owners = vec![unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone()];
-
-        let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-
-        // Trying to delete before we've registered should give the right error.
-        match dns_operations.delete_dns(&dns_name, &secret_signing_key) {
-            Ok(x) => {
-                panic!("Deleting before we registered should have been an error.
-                             \
-                        Instead we got: {:?}",
-                       x)
-            }
-            Err(DnsError::DnsRecordNotFound) => (),
-            Err(e) => panic!("Got the wrong error: {:?}", e),
-        };
-
-        // Trying to delete when it's in our config but not on the network should succeed.
-        let mut saved_configs =
-            unwrap!(dns_configuration::get_dns_configuration_data(dns_operations.client
-                .clone()));
-        saved_configs.push(dns_configuration::DnsConfiguration {
-            long_name: dns_name.clone(),
-            encryption_keypair: (messaging_keypair.0, messaging_keypair.1.clone()),
-        });
-        unwrap!(dns_configuration::write_dns_configuration_data(dns_operations.client.clone(),
-                                                                &saved_configs));
-        unwrap!(dns_operations.delete_dns(&dns_name, &secret_signing_key));
-
-        // Trying to delete a second time should error again.
-        match dns_operations.delete_dns(&dns_name, &secret_signing_key) {
-            Ok(x) => {
-                panic!("Deleting before we registered should have been an error.
-                             \
-                        Instead we got: {:?}",
-                       x)
-            }
-            Err(DnsError::DnsRecordNotFound) => (),
-            Err(e) => panic!("Got the wrong error: {:?}", e),
-        };
-
-        // Register
-        unwrap!(dns_operations.register_dns(dns_name.clone(),
-                                            &messaging_keypair.0,
-                                            &messaging_keypair.1,
-                                            &[],
-                                            owners.clone(),
-                                            &secret_signing_key,
-                                            None));
-
-        // Get Services
-        let services = unwrap!(dns_operations.get_all_services(&dns_name, None));
-        assert_eq!(services.len(), 0);
-
-        // Re-registering by the same client is not allowed
-        match dns_operations.register_dns(dns_name.clone(),
-                                          &messaging_keypair.0,
-                                          &messaging_keypair.1,
-                                          &[],
-                                          owners.clone(),
-                                          &secret_signing_key,
-                                          None) {
-            Ok(_) => panic!("Should have been an error"),
-            Err(DnsError::DnsNameAlreadyRegistered) => (),
-            Err(error) => panic!("{:?}", error),
-        }
-
-        // Pretend that the last registration failed at our end. Re-registering should succeed.
-        unwrap!(dns_configuration::write_dns_configuration_data(dns_operations.client.clone(),
-                                                                &[]));
-        unwrap!(dns_operations.register_dns(dns_name.clone(),
-                                            &messaging_keypair.0,
-                                            &messaging_keypair.1,
-                                            &[],
-                                            owners.clone(),
-                                            &secret_signing_key,
-                                            None));
-
-
-        // Re-registering by the same client is not allowed again (check that we're back in a sane
-        // state).
-        match dns_operations.register_dns(dns_name.clone(),
-                                          &messaging_keypair.0,
-                                          &messaging_keypair.1,
-                                          &[],
-                                          owners.clone(),
-                                          &secret_signing_key,
-                                          None) {
-            Ok(_) => panic!("Should have been an error"),
-            Err(DnsError::DnsNameAlreadyRegistered) => (),
-            Err(error) => panic!("{:?}", error),
-        }
-
-        // Re-registering by a different new_client is not allowed
-        {
-            let new_client = Arc::new(Mutex::new(unwrap!(test_utils::get_client())));
-            let dns_operations = unwrap!(DnsOperations::new(new_client.clone()));
+            let dns_name = unwrap!(utility::generate_random_string(10));
+            let dns_name2 = dns_name.clone();
 
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(unwrap!(new_client.lock()).get_public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
 
-            let secret_signing_key = unwrap!(unwrap!(new_client.lock()).get_secret_signing_key())
-                .clone();
-            match dns_operations.register_dns(dns_name.clone(),
-                                              &messaging_keypair.0,
-                                              &messaging_keypair.1,
-                                              &[],
-                                              owners.clone(),
-                                              &secret_signing_key,
-                                              None) {
-                Ok(_) => panic!("Should have been an error"),
-                Err(DnsError::DnsNameAlreadyRegistered) => (),
-                Err(error) => panic!("{:?}", error),
-            }
-        }
+            get_all_registered_names(client)
+                .and_then(move |names| {
+                    assert!(names.is_empty());
 
-        // Delete
-        unwrap!(dns_operations.delete_dns(&dns_name, &secret_signing_key));
-
-        // Registering again should be allowed
-        unwrap!(dns_operations.register_dns(dns_name,
-                                            &messaging_keypair.0,
-                                            &messaging_keypair.1,
-                                            &[],
-                                            owners,
-                                            &secret_signing_key,
-                                            None));
+                    register_dns(&client2,
+                                 dns_name,
+                                 messaging_keypair.0,
+                                 messaging_keypair.1,
+                                 &[],
+                                 owners,
+                                 signing_key,
+                                 None)
+                })
+                .and_then(move |_| get_all_registered_names(&client3))
+                .map(move |names| {
+                    assert_eq!(names.len(), 1);
+                    assert_eq!(names[0], dns_name2);
+                })
+                .map_err(|err| panic!("{:?}", err))
+        })
     }
 
     #[test]
-    fn manipulate_services() {
-        let client = Arc::new(Mutex::new(unwrap!(test_utils::get_client())));
-        let dns_operations = unwrap!(DnsOperations::new(client.clone()));
+    fn register_with_services() {
+        let dns_name = unwrap!(utility::generate_random_string(10));
+        let dns_name2 = dns_name.clone();
+        let dns_name3 = dns_name.clone();
 
-        let dns_name = unwrap!(generate_random_string(10));
-        let messaging_keypair = box_::gen_keypair();
+        let services = vec![gen_service("blog"), gen_service("chat")];
+        let service_names = services.iter().map(|s| s.0.clone()).collect::<Vec<_>>();
+        let service_names2 = service_names.clone();
 
-        let mut services = vec![("www".to_string(),
-                                 DirectoryKey::new(XorName([123; XOR_NAME_LEN]),
-                                                   false,
-                                                   AccessLevel::Public)),
-                                ("blog".to_string(),
-                                 DirectoryKey::new(XorName([123; XOR_NAME_LEN]),
-                                                   false,
-                                                   AccessLevel::Public)),
-                                ("bad-ass".to_string(),
-                                 DirectoryKey::new(XorName([123; XOR_NAME_LEN]),
-                                                   false,
-                                                   AccessLevel::Public))];
+        test_utils::register_and_run(move |client| {
+            let client2 = client.clone();
 
-        let owners = vec![unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone()];
+            let messaging_keypair = box_::gen_keypair();
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
 
-        let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-
-        // Register
-        unwrap!(dns_operations.register_dns(dns_name.clone(),
-                                            &messaging_keypair.0,
-                                            &messaging_keypair.1,
-                                            &services,
-                                            owners.clone(),
-                                            &secret_signing_key,
-                                            None));
-
-        // Get all dns-names
-        let dns_records_vec = unwrap!(dns_operations.get_all_registered_names());
-        assert_eq!(dns_records_vec.len(), 1);
+            register_dns(client,
+                         dns_name,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &services,
+                         owners,
+                         signing_key,
+                         None)
+                .and_then(move |_| get_all_services(&client2, &dns_name2, None))
+                .map(move |names| {
+                    assert_eq!(names, service_names);
+                })
+                .map_err(|err| panic!("{:?}", err))
+        });
 
         // Gets should be possible with unregistered clients
-        let unregistered_client =
-            Arc::new(Mutex::new(unwrap!(Client::create_unregistered_client())));
-        let dns_operations_unregistered = DnsOperations::new_unregistered(unregistered_client);
+        test_utils::setup_client(|core_tx| {
+            Client::unregistered(core_tx)
+        }).run(move |client| {
+            get_all_services(client, &dns_name3, None)
+                .map(move |names| {
+                    assert_eq!(names, service_names2);
+                })
+                .map_err(|err| panic!("{:?}", err))
 
-        // Get all services for a dns-name
-        let services_vec = unwrap!(dns_operations_unregistered.get_all_services(&dns_name, None));
-        assert_eq!(services.len(), services_vec.len());
-        assert!(services.iter()
-            .all(|&(ref a, _)| services_vec.iter().find(|b| *a == **b).is_some()));
-
-        assert!(dns_operations.get_service_home_directory_key(&"bogus".to_string(),
-                                                              &services[0].0,
-                                                              None)
-                              .is_err());
-
-        // Get information about a service - the home-directory and its type
-        let home_dir_key_result =
-            dns_operations_unregistered.get_service_home_directory_key(&dns_name,
-                                                                       &services[1].0,
-                                                                       None);
-        let home_dir_key = unwrap!(home_dir_key_result);
-        assert_eq!(home_dir_key, services[1].1);
-
-        // Remove a service
-        let removed_service = services.remove(1);
-        unwrap!(dns_operations.remove_service(&dns_name,
-                                              removed_service.0.clone(),
-                                              &secret_signing_key,
-                                              None));
-        ::std::thread::sleep(::std::time::Duration::from_secs(1));
-
-        // Get all services
-        let services_vec = unwrap!(dns_operations_unregistered.get_all_services(&dns_name, None));
-        assert_eq!(services.len(), services_vec.len());
-        assert!(services.iter()
-            .all(|&(ref a, _)| services_vec.iter().find(|b| *a == **b).is_some()));
-
-        // Try to enquire about a deleted service
-        match dns_operations_unregistered.get_service_home_directory_key(&dns_name,
-                                                                         &removed_service.0,
-                                                                         None) {
-            Ok(_) => panic!("Should have been an error"),
-            Err(DnsError::ServiceNotFound) => (),
-            Err(error) => panic!("{:?}", error),
-        }
-
-        // Add a service
-        services.push(("added-service".to_string(),
-                       DirectoryKey::new(XorName([126; XOR_NAME_LEN]),
-                                         false,
-                                         AccessLevel::Public)));
-        let services_size = services.len();
-        unwrap!(dns_operations.add_service(&dns_name,
-                                           services[services_size - 1].clone(),
-                                           &secret_signing_key,
-                                           None));
-
-        // Get all services
-        let services_vec = unwrap!(dns_operations_unregistered.get_all_services(&dns_name, None));
-        assert_eq!(services.len(), services_vec.len());
-        assert!(services.iter()
-            .all(|&(ref a, _)| services_vec.iter().find(|b| *a == **b).is_some()));
+        })
     }
+
+    #[test]
+    fn register_existing_name_using_the_same_client_fails() {
+        test_utils::register_and_run(move |client| {
+            let client2 = client.clone();
+
+            let dns_name = unwrap!(utility::generate_random_string(10));
+            let dns_name2 = dns_name.clone();
+
+            let messaging_keypair = box_::gen_keypair();
+            let messaging_keypair2 = messaging_keypair.clone();
+
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners2 = owners.clone();
+
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+            let signing_key2 = signing_key.clone();
+
+            register_dns(client,
+                         dns_name,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &[],
+                         owners,
+                         signing_key,
+                         None)
+                .map_err(|err| panic!("{:?}", err))
+                .and_then(move |_| {
+                    register_dns(&client2,
+                                 dns_name2,
+                                 messaging_keypair2.0,
+                                 messaging_keypair2.1,
+                                 &[],
+                                 owners2,
+                                 signing_key2,
+                                 None)
+                })
+                .then(|result| -> Result<_, DnsError> {
+                    match result {
+                        Ok(_) => panic!("Should fail"),
+                        Err(DnsError::DnsNameAlreadyRegistered) => Ok(()),
+                        Err(err) => panic!("{:?}", err),
+                    }
+                })
+        })
+    }
+
+    #[test]
+    fn register_existing_name_using_different_client_fails() {
+        let dns_name = unwrap!(utility::generate_random_string(10));
+        let dns_name2 = dns_name.clone();
+
+        // Client 1
+        test_utils::register_and_run(move |client| {
+            let messaging_keypair = box_::gen_keypair();
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+
+            register_dns(client,
+                         dns_name,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &[],
+                         owners,
+                         signing_key,
+                         None)
+                .map_err(|err| panic!("{:?}", err))
+        });
+
+        // Client 2
+        test_utils::register_and_run(move |client| {
+            let messaging_keypair = box_::gen_keypair();
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+
+            register_dns(client,
+                         dns_name2,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &[],
+                         owners,
+                         signing_key,
+                         None)
+                .then(|result| -> Result<_, DnsError> {
+                    match result {
+                        Ok(_) => panic!("Should fail"),
+                        Err(DnsError::DnsNameAlreadyRegistered) => Ok(()),
+                        Err(err) => panic!("{:?}", err),
+                    }
+                })
+        })
+    }
+
+    #[test]
+    fn register_and_delete() {
+        test_utils::register_and_run(move |client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
+
+            let dns_name = unwrap!(utility::generate_random_string(10));
+            let dns_name2 = dns_name.clone();
+            let dns_name3 = dns_name.clone();
+
+            let messaging_keypair = box_::gen_keypair();
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+            let signing_key2 = signing_key.clone();
+
+            register_dns(client,
+                         dns_name,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &[],
+                         owners,
+                         signing_key,
+                         None)
+                .and_then(move |_| delete_dns(&client2, dns_name2, signing_key2))
+                .and_then(move |_| get_all_registered_names(&client3))
+                .map(move |names| {
+                    assert!(!names.contains(&dns_name3));
+                })
+                .map_err(|err| panic!("{:?}", err))
+        })
+    }
+
+    #[test]
+    fn delete_non_existing_name_fails() {
+        test_utils::register_and_run(move |client| {
+            let dns_name = unwrap!(utility::generate_random_string(10));
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+
+            delete_dns(client, dns_name, signing_key)
+                .then(|result| -> Result<_, DnsError> {
+                    match result {
+                        Ok(_) => panic!("Should fail"),
+                        Err(DnsError::DnsRecordNotFound) => Ok(()),
+                        Err(err) => panic!("{:?}", err),
+                    }
+                })
+        })
+    }
+
+    #[test]
+    fn delete_deleted_name_fails() {
+        test_utils::register_and_run(move |client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
+
+            let dns_name = unwrap!(utility::generate_random_string(10));
+            let dns_name2 = dns_name.clone();
+            let dns_name3 = dns_name.clone();
+
+            let messaging_keypair = box_::gen_keypair();
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+            let signing_key2 = signing_key.clone();
+            let signing_key3 = signing_key.clone();
+
+            register_dns(client,
+                         dns_name,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &[],
+                         owners,
+                         signing_key,
+                         None)
+                .map_err(|err| panic!("{:?}", err))
+                .and_then(move |_| delete_dns(&client2, dns_name2, signing_key2))
+                .map_err(|err| panic!("{:?}", err))
+                .and_then(move |_| delete_dns(&client3, dns_name3, signing_key3))
+                .then(|result| -> Result<_, DnsError> {
+                    match result {
+                        Ok(_) => panic!("Should fail"),
+                        Err(DnsError::DnsRecordNotFound) => Ok(()),
+                        Err(err) => panic!("{:?}", err),
+                    }
+                })
+        })
+    }
+
+    #[test]
+    fn add_service_basics() {
+        test_utils::register_and_run(|client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
+            let client4 = client.clone();
+
+            let dns_name = unwrap!(utility::generate_random_string(10));
+            let dns_name2 = dns_name.clone();
+            let dns_name3 = dns_name.clone();
+            let dns_name4 = dns_name.clone();
+
+            let service = gen_service("www");
+            let service_name = service.0.clone();
+
+            let messaging_keypair = box_::gen_keypair();
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+            let signing_key2 = signing_key.clone();
+
+            register_dns(client,
+                         dns_name,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &[],
+                         owners,
+                         signing_key,
+                         None)
+                .and_then(move |_| get_all_services(&client2, &dns_name2, None))
+                .and_then(move |names| {
+                    assert!(names.is_empty());
+
+                    add_service(&client3,
+                                dns_name3,
+                                service,
+                                signing_key2,
+                                None)
+                })
+                .and_then(move |_| get_all_services(&client4, &dns_name4, None))
+                .map(move |names| {
+                    assert_eq!(&names, &[service_name]);
+                })
+                .map_err(|err| panic!("{:?}", err))
+        })
+    }
+
+    #[test]
+    fn remove_service_basics() {
+        test_utils::register_and_run(|client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
+            let client4 = client.clone();
+
+            let dns_name = unwrap!(utility::generate_random_string(10));
+            let dns_name2 = dns_name.clone();
+            let dns_name3 = dns_name.clone();
+            let dns_name4 = dns_name.clone();
+
+            let service = gen_service("www");
+
+            let messaging_keypair = box_::gen_keypair();
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+            let signing_key2 = unwrap!(client.secret_signing_key()).clone();
+
+            register_dns(client,
+                         dns_name,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &[service.clone()],
+                         owners,
+                         signing_key,
+                         None)
+                .and_then(move |_| get_all_services(&client2, &dns_name2, None))
+                .and_then(move |names| {
+                    assert_eq!(names, [service.0.clone()]);
+
+                    remove_service(&client3,
+                                   dns_name3,
+                                   service.0.clone(),
+                                   signing_key2,
+                                   None)
+                })
+                .and_then(move |_| get_all_services(&client4, &dns_name4, None))
+                .map(|names| {
+                    assert!(names.is_empty())
+                })
+                .map_err(|err| panic!("{:?}", err))
+        })
+    }
+
+    #[test]
+    fn service_home_dir() {
+        let dns_name = unwrap!(utility::generate_random_string(10));
+        let dns_name2 = dns_name.clone();
+        let dns_name3 = dns_name.clone();
+
+        let service = gen_service("www");
+
+        let service_name = service.0.clone();
+        let service_name2 = service.0.clone();
+
+        let service_dir_id = service.1.clone();
+        let service_dir_id2 = service.1.clone();
+
+        test_utils::register_and_run(move |client| {
+            let client2 = client.clone();
+
+            let messaging_keypair = box_::gen_keypair();
+            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+
+            register_dns(client,
+                         dns_name,
+                         messaging_keypair.0,
+                         messaging_keypair.1,
+                         &[service],
+                         owners,
+                         signing_key,
+                         None)
+                .and_then(move |_| get_service_home_dir_id(&client2,
+                                                           &dns_name2,
+                                                           service_name,
+                                                           None))
+                .map(move |dir_id| {
+                    assert_eq!(dir_id, service_dir_id);
+                })
+                .map_err(|err| panic!("{:?}", err))
+        });
+
+        // unregistered clients can get the home dir too
+        test_utils::setup_client(|core_tx| {
+            Client::unregistered(core_tx)
+        }).run(move |client| {
+            get_service_home_dir_id(client,
+                                    &dns_name3,
+                                    service_name2,
+                                    None)
+                .map(move |dir_id| {
+                    assert_eq!(dir_id, service_dir_id2);
+                })
+                .map_err(|err| panic!("{:?}", err))
+        })
+    }
+
+    /* TODO: port this test to async/futures
 
     #[test]
     #[cfg(feature = "use-mock-routing")]
@@ -699,5 +862,12 @@ mod tests {
                                             &secret_signing_key,
                                             None));
 
+    }
+    */
+
+    fn gen_service(name: &str) -> (String, DirId) {
+        use ::UNVERSIONED_STRUCT_DATA_TYPE_TAG as TAG;
+        let id = DataIdentifier::Structured(rand::random(), TAG);
+        (name.to_string(), (id, None))
     }
 }

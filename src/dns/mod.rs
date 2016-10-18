@@ -17,10 +17,8 @@
 
 use futures::Future;
 
-/// Safe-Dns errors
 pub mod errors;
-// /// Contains interfaces for all dns related operations
-// pub mod operations;
+pub mod operations;
 pub mod config;
 
 /// Future returned from DNS operations.
