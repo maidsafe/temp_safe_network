@@ -643,6 +643,24 @@ mod tests {
             assert_eq!(struct_data_free(sd_h), 0);
             assert_eq!(struct_data_free(sd_h),
                        FfiError::InvalidStructDataHandle.into());
+
+            // Re-claim via PUT
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
+            let mut version = 0;
+            assert_eq!(struct_data_version(sd_h, &mut version), 0);
+            assert_eq!(struct_data_free(sd_h), 0);
+            // Create
+            assert_eq!(struct_data_new(&app,
+                                       ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
+                                       &id,
+                                       version + 1,
+                                       cipher_opt_h,
+                                       plain_text.as_ptr(),
+                                       plain_text.len(),
+                                       &mut sd_h),
+                       0);
+            // Put - Reclaim
+            assert_eq!(struct_data_put(&app, sd_h), 0);
         }
     }
 
