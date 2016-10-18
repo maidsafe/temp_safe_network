@@ -722,6 +722,21 @@ pub unsafe extern "C" fn appendable_data_version(handle: AppendableDataHandle,
     })
 }
 
+/// See if AppendableData size is valid.
+#[no_mangle]
+pub unsafe extern "C" fn appendable_data_validate_size(handle: AppendableDataHandle,
+                                                       o_valid: *mut bool)
+                                                       -> i32 {
+    helper::catch_unwind_i32(|| {
+        *o_valid = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
+            AppendableData::Pub(ref elt) => elt.validate_size(),
+            AppendableData::Priv(ref elt) => elt.validate_size(),
+        };
+
+        0
+    })
+}
+
 /// Returns true if the app is one of the owners of the provided AppendableData.
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_is_owned(app: *const App,

@@ -62,11 +62,6 @@ impl Storage {
             .map_err(StorageError::SerialisationError)
     }
 
-    // Remove data from the storage.
-    pub fn remove_data(&mut self, name: &XorName) {
-        let _ = self.data_store.remove(name);
-    }
-
     // Synchronize the storage with the disk.
     pub fn sync(&self) {
         sync::save(self)
@@ -128,8 +123,7 @@ mod sync {
 
 #[cfg(not(test))]
 mod sync {
-    use bincode::SizeLimit;
-    use maidsafe_utilities::serialisation::{deserialise_with_limit, serialise_with_limit};
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::env;
     use std::fs::File;
     use std::io::{Read, Write};
@@ -143,7 +137,7 @@ mod sync {
             let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata()).len() as usize);
             if let Ok(_) = file.read_to_end(&mut raw_disk_data) {
                 if !raw_disk_data.is_empty() {
-                    return deserialise_with_limit(&raw_disk_data, SizeLimit::Infinite).ok();
+                    return deserialise(&raw_disk_data).ok();
                 }
             }
         }
@@ -153,7 +147,7 @@ mod sync {
 
     pub fn save(storage: &Storage) {
         let mut file = unwrap!(File::create(path()));
-        let _ = file.write_all(&unwrap!(serialise_with_limit(storage, SizeLimit::Infinite)));
+        let _ = file.write_all(&unwrap!(serialise(storage)));
         unwrap!(file.sync_all());
     }
 

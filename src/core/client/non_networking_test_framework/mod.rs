@@ -29,7 +29,7 @@ use routing::client_errors::{GetError, MutationError};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use rustc_serialize::Encodable;
-use self::storage::{ClientAccount, Storage};
+use self::storage::{ClientAccount, Storage, StorageError};
 use std;
 use std::cell::Cell;
 use std::sync::Mutex;
@@ -172,29 +172,35 @@ impl RoutingMock {
         let err = if self.network_limits_reached() {
             info!("Mock PUT: {:?} {:?} [0]", data_id, msg_id);
             Some(MutationError::NetworkOther("Max operations exhausted".to_string()))
-        } else if storage.contains_data(&data_name) {
-            match data {
-                Data::Immutable(_) => {
-                    match storage.get_data(&data_name) {
-                        // Immutable data is de-duplicated so always allowed
-                        Ok(Data::Immutable(_)) => None,
-                        Ok(_) => Some(MutationError::DataExists),
-                        Err(error) => Some(MutationError::from(error)),
-                    }
-                }
-                Data::Structured(struct_data) => {
-                    if struct_data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
+        } else {
+            match (data, storage.get_data(&data_name)) {
+                // Immutable data is de-duplicated so always allowed
+                (Data::Immutable(_), Ok(Data::Immutable(_))) => None,
+                (Data::Structured(sd_new), Ok(Data::Structured(sd_stored))) => {
+                    if sd_stored.is_deleted() {
+                        match sd_stored.validate_self_against_successor(&sd_new) {
+                            Ok(_) => {
+                                match storage.put_data(data_name, Data::Structured(sd_new)) {
+                                    Ok(()) => None,
+                                    Err(error) => Some(MutationError::from(error)),
+                                }
+                            }
+                            Err(_) => Some(MutationError::InvalidSuccessor),
+                        }
+                    } else if sd_stored.get_type_tag() == TYPE_TAG_SESSION_PACKET {
                         Some(MutationError::AccountExists)
                     } else {
                         Some(MutationError::DataExists)
                     }
                 }
-                _ => Some(MutationError::DataExists),
-            }
-        } else {
-            match storage.put_data(data_name, data) {
-                Ok(()) => None,
-                Err(error) => Some(MutationError::from(error)),
+                (_, Ok(_)) => Some(MutationError::DataExists),
+                (data, Err(StorageError::NoSuchData)) => {
+                    match storage.put_data(data_name, data) {
+                        Ok(()) => None,
+                        Err(error) => Some(MutationError::from(error)),
+                    }
+                }
+                (_, Err(error)) => Some(MutationError::from(error)),
             }
         };
 
@@ -253,7 +259,9 @@ impl RoutingMock {
             } else {
                 match (data, storage.get_data(&data_name)) {
                     (Data::Structured(sd_new), Ok(Data::Structured(sd_stored))) => {
-                        if let Ok(_) = sd_stored.validate_self_against_successor(&sd_new) {
+                        if sd_stored.is_deleted() {
+                            Err(MutationError::InvalidOperation)
+                        } else if let Ok(_) = sd_stored.validate_self_against_successor(&sd_new) {
                             Ok(Data::Structured(sd_new))
                         } else {
                             Err(MutationError::InvalidSuccessor)
@@ -335,11 +343,16 @@ impl RoutingMock {
             Some(MutationError::NetworkOther("Max operations exhausted".to_string()))
         } else {
             match (data, storage.get_data(&data_name)) {
-                (Data::Structured(sd_new), Ok(Data::Structured(sd_stored))) => {
-                    if let Ok(_) = sd_stored.validate_self_against_successor(&sd_new) {
-                        storage.remove_data(&data_name);
-                        storage.sync();
-                        None
+                (Data::Structured(sd_new), Ok(Data::Structured(mut sd_stored))) => {
+                    if sd_stored.is_deleted() {
+                        Some(MutationError::InvalidOperation)
+                    } else if let Ok(_) = sd_stored.delete_if_valid_successor(&sd_new) {
+                        if let Err(err) = storage.put_data(data_name, Data::Structured(sd_stored)) {
+                            Some(MutationError::from(err))
+                        } else {
+                            storage.sync();
+                            None
+                        }
                     } else {
                         Some(MutationError::InvalidSuccessor)
                     }
@@ -772,6 +785,7 @@ mod test {
         }
 
         let owner_key = account_packet.get_public_maid().public_keys().0.clone();
+        let sign_key = &account_packet.get_maid().secret_keys().0;
 
         // Construct ImmutableData
         let orig_immutable_data = generate_random_immutable_data();
@@ -784,14 +798,13 @@ mod test {
         let pin = unwrap!(utility::generate_random_string(10));
         let user_id = unwrap!(Account::generate_network_id(keyword.as_bytes(),
                                                            pin.to_string().as_bytes()));
-        let account_ver_res =
-            StructuredData::new(TYPE_TAG,
-                                user_id,
-                                0,
-                                unwrap!(serialise(&vec![orig_data.name()])),
-                                vec![account_packet.get_public_maid().public_keys().0.clone()],
-                                Vec::new(),
-                                Some(&account_packet.get_maid().secret_keys().0));
+        let account_ver_res = StructuredData::new(TYPE_TAG,
+                                                  user_id,
+                                                  0,
+                                                  unwrap!(serialise(&vec![orig_data.name()])),
+                                                  vec![owner_key.clone()],
+                                                  Vec::new(),
+                                                  Some(sign_key));
         let mut account_version = unwrap!(account_ver_res);
         let mut data_account_version = Data::Structured(account_version);
 
@@ -862,20 +875,18 @@ mod test {
                        location_client_mgr_struct.clone(),
                        new_data.clone()));
 
-        // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Versioning
+        // Construct StructuredData, 2nd version, for this ImmutableData - INVALID Versioning
         let invalid_version_account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                               user_id,
-                                               0,
-                                               Vec::new(),
-                                               vec![owner_key.clone()],
-                                               Vec::new(),
-                                               Some(&account_packet.get_maid()
-                                                   .secret_keys()
-                                                   .0)));
+                                                                          user_id,
+                                                                          0,
+                                                                          Vec::new(),
+                                                                          vec![owner_key.clone()],
+                                                                          Vec::new(),
+                                                                          Some(sign_key)));
         let invalid_version_data_account_version =
             Data::Structured(invalid_version_account_version);
 
-        // Construct StructuredData, 2nd version, for this ImmutableData - IVALID Signature
+        // Construct StructuredData, 2nd version, for this ImmutableData - INVALID Signature
         let invalid_signature_account_version = unwrap!(StructuredData::new(TYPE_TAG,
                                         user_id,
                                         1,
@@ -894,9 +905,7 @@ mod test {
                                                       data_for_version_2,
                                                       vec![owner_key.clone()],
                                                       Vec::new(),
-                                                      Some(&account_packet.get_maid()
-                                                          .secret_keys()
-                                                          .0)));
+                                                      Some(sign_key)));
         data_account_version = Data::Structured(account_version);
 
         // Subsequent PUTs for same StructuredData should fail
@@ -1023,37 +1032,103 @@ mod test {
                                                       Vec::new(),
                                                       vec![owner_key.clone()],
                                                       Vec::new(),
-                                                      Some(&account_packet.get_maid()
-                                                          .secret_keys()
-                                                          .0)));
+                                                      Some(sign_key)));
         data_account_version = Data::Structured(account_version);
 
         // DELETE of Structured Data with version bump should pass
         unwrap!(do_delete(&mut mock_routing,
                           message_queue.clone(),
-                          location_client_mgr_struct,
+                          location_client_mgr_struct.clone(),
                           data_account_version));
 
         // GET for DELETED StructuredData version should fail
         {
             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
-            let result = do_get(&mut mock_routing,
-                                message_queue.clone(),
-                                location_nae_mgr_struct.clone(),
-                                struct_data_id);
+            let data = unwrap!(do_get(&mut mock_routing,
+                                      message_queue.clone(),
+                                      location_nae_mgr_struct.clone(),
+                                      struct_data_id));
 
-            match result {
-                Ok(_) => panic!("Expected Get Failure!"),
-                Err(CoreError::GetFailure { reason: GetError::NoSuchData, .. }) => (),
-                Err(err) => panic!("Unexpected: {:?}", err),
-            }
+            let data = match data {
+                Data::Structured(data) => data,
+                x => panic!("Unexpected data type {:?}", x),
+            };
+
+            assert!(data.get_data().is_empty());
+            assert!(data.get_owner_keys().is_empty());
         }
+
+        // PUT after DELETE without version bump fails
+        account_version = unwrap!(StructuredData::new(TYPE_TAG,
+                                                      user_id,
+                                                      0,
+                                                      vec![],
+                                                      vec![owner_key.clone()],
+                                                      vec![],
+                                                      Some(sign_key)));
+        data_account_version = Data::Structured(account_version);
+
+        let result = do_put(&mut mock_routing,
+                            message_queue.clone(),
+                            location_client_mgr_struct.clone(),
+                            data_account_version);
+
+        match result {
+            Ok(_) => panic!("Expected PUT Failure!"),
+            Err(CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. }) => (),
+            Err(err) => panic!("Unexpected: {:?}", err),
+        }
+
+        // Repeated DELETE fails
+        account_version = unwrap!(StructuredData::new(TYPE_TAG,
+                                                      user_id,
+                                                      3,
+                                                      vec![],
+                                                      vec![owner_key.clone()],
+                                                      vec![],
+                                                      Some(sign_key)));
+        data_account_version = Data::Structured(account_version);
+
+        let result = do_delete(&mut mock_routing,
+                               message_queue.clone(),
+                               location_client_mgr_struct.clone(),
+                               data_account_version);
+
+        match result {
+            Ok(_) => panic!("Expected DELETE Failure!"),
+            Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. }) => (),
+            Err(err) => panic!("Unexpected: {:?}", err),
+        }
+
+        // PUT after DELETE with version bump restores data
+        account_version = unwrap!(StructuredData::new(TYPE_TAG,
+                                                      user_id,
+                                                      3,
+                                                      vec![],
+                                                      vec![owner_key.clone()],
+                                                      vec![],
+                                                      Some(sign_key)));
+        data_account_version = Data::Structured(account_version);
+
+        unwrap!(do_put(&mut mock_routing,
+                       message_queue.clone(),
+                       location_client_mgr_struct.clone(),
+                       data_account_version.clone()));
+
+        let data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
+        let data = unwrap!(do_get(&mut mock_routing,
+                                  message_queue.clone(),
+                                  location_nae_mgr_struct.clone(),
+                                  data_id));
+
+        assert_eq!(data, data_account_version);
+
 
         // GetAccountInfo should pass and show three chunks stored
         assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
                                                message_queue.clone(),
                                                location_client_mgr_immut)),
-                   (3, DEFAULT_CLIENT_ACCOUNT_SIZE - 3));
+                   (4, DEFAULT_CLIENT_ACCOUNT_SIZE - 4));
     }
 
     #[test]

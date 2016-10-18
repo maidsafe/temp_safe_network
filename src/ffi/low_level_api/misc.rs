@@ -364,6 +364,7 @@ mod tests {
             assert_eq!(struct_data_new(&app,
                                        ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
                                        &sd_id,
+                                       0,
                                        cipher_opt_h,
                                        plain_text.as_ptr(),
                                        plain_text.len(),
