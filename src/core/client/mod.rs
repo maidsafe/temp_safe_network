@@ -29,6 +29,7 @@ use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, Mes
               StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
+use routing::client_errors::MutationError;
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
 use rust_sodium::crypto::secretbox;
@@ -295,12 +296,6 @@ impl Client {
         rx
     }
 
-    ///
-    pub fn put_recover(&self, _: Data, _: Option<Authority>) -> Box<CoreFuture<()>> {
-        // TODO: unimplemented
-        ok!(())
-    }
-
     // TODO All these return the same future from all branches. So convert to impl Trait when it
     // arrives in stable. Change from `Box<CoreFuture>` -> `impl CoreFuture`.
     /// Put data onto the network.
@@ -333,6 +328,65 @@ impl Client {
         }
 
         rx
+    }
+
+    /// Put data to the network, with recovery.
+    pub fn put_recover(&self, data: Data, dst: Option<Authority>) -> Box<CoreFuture<()>> {
+        trace!("PUT with recovery for {:?}", data);
+
+        let self2 = self.clone();
+
+        let owner_keys_before = match data {
+            Data::Structured(ref data) => data.get_owner_keys().clone(),
+            Data::PrivAppendable(ref data) => data.get_owner_keys().clone(),
+            Data::PubAppendable(ref data) => data.get_owner_keys().clone(),
+            _ => {
+                // Don't do recovery for non-structured-data.
+                return self.put(data, dst);
+            }
+        };
+
+        let data_id = data.identifier();
+
+        self.put(data, dst.clone())
+            .or_else(move |put_err| {
+                debug!("PUT failed with {:?}. Attempting recovery.", put_err);
+
+                if let CoreError::MutationFailure { reason: MutationError::LowBalance, .. } =
+                       put_err {
+                    debug!("Low balance error cannot be recovered from.");
+                    return err!(put_err);
+                }
+
+                self2.get(data_id, dst)
+                    .then(move |get_result| {
+                        let owner_keys_after = match get_result {
+                            Ok(Data::Structured(ref data)) => data.get_owner_keys(),
+                            Ok(Data::PrivAppendable(ref data)) => data.get_owner_keys(),
+                            Ok(Data::PubAppendable(ref data)) => data.get_owner_keys(),
+                            Ok(data) => {
+                                debug!("Address space already occupied by: {:?}.", data);
+                                return Err(put_err);
+                            }
+                            Err(get_err) => {
+                                debug!("Address space is vacant but still unable to PUT due to \
+                                        {:?}.",
+                                       get_err);
+                                return Err(put_err);
+                            }
+                        };
+
+                        if *owner_keys_after == owner_keys_before {
+                            debug!("PUT recovery successful !");
+                            Ok(())
+                        } else {
+                            debug!("Data exists but we are not the owner.");
+                            Err(put_err)
+                        }
+                    })
+                    .into_box()
+            })
+            .into_box()
     }
 
     /// Post data onto the network.
@@ -376,6 +430,28 @@ impl Client {
         }
 
         rx
+    }
+
+    /// A version of `delete` that returns success if the data was already not present on
+    /// the network.
+    pub fn delete_recover(&self, data: Data, dst: Option<Authority>) -> Box<CoreFuture<()>> {
+        trace!("DELETE with recovery for {:?}", data);
+
+        self.delete(data, dst)
+            .then(|result| {
+                match result {
+                    Ok(()) |
+                    Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => {
+                        debug!("DELETE recovery successful !");
+                        Ok(())
+                    }
+                    Err(err) => {
+                        debug!("DELETE recovery failed: {:?}", err);
+                        Err(err)
+                    }
+                }
+            })
+            .into_box()
     }
 
     /// Append request
@@ -807,7 +883,8 @@ mod tests {
                             _ => panic!("Unexpected {:?}", err),
                         }
 
-                        let name = DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG);
+                        let name = DataIdentifier::Structured(rand::random(),
+                                                              ::UNVERSIONED_STRUCT_DATA_TYPE_TAG);
                         let key = Some(secretbox::gen_key());
 
                         client3.set_config_root_dir_id((name, key))
@@ -860,7 +937,8 @@ mod tests {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir_id = (DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
+        let dir_id = (DataIdentifier::Structured(rand::random(),
+                                                 ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
                       Some(secretbox::gen_key()));
 
         {
@@ -888,7 +966,8 @@ mod tests {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir_id = (DataIdentifier::Structured(rand::random(), ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
+        let dir_id = (DataIdentifier::Structured(rand::random(),
+                                                 ::UNVERSIONED_STRUCT_DATA_TYPE_TAG),
                       Some(secretbox::gen_key()));
 
         {

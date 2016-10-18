@@ -62,11 +62,6 @@ impl Storage {
             .map_err(StorageError::SerialisationError)
     }
 
-    // Remove data from the storage.
-    pub fn remove_data(&mut self, name: &XorName) {
-        let _ = self.data_store.remove(name);
-    }
-
     // Synchronize the storage with the disk.
     pub fn sync(&self) {
         sync::save(self)

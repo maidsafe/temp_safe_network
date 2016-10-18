@@ -206,8 +206,7 @@ fn create_with_immutable_data(client: Client,
     let immutable_data = ImmutableData::new(value);
     let name = *immutable_data.name();
 
-    // TODO: replace `put` with `put_recover`
-    client.put(Data::Immutable(immutable_data), None)
+    client.put_recover(Data::Immutable(immutable_data), None)
         .and_then(move |_| {
             let encoded_name = try!(encode(DataTypeEncoding::MapName(name),
                                            encryption_key.as_ref()));

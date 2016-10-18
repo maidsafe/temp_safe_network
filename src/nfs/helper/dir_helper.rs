@@ -46,8 +46,7 @@ pub fn create(client: Client,
         .and_then(move |structured_data| {
             let data_id = structured_data.identifier();
 
-            // FIXME(nbaksalyar): should be put_recover
-            c2.put(Data::Structured(structured_data), None)
+            c2.put_recover(Data::Structured(structured_data), None)
                 .map_err(NfsError::from)
                 .map(move |_| data_id)
         })
@@ -303,7 +302,6 @@ fn save_as_immutable_data(client: Client, data: Vec<u8>) -> Box<NfsFuture<XorNam
     let name = *immutable_data.name();
     debug!("Posting PUT request to save immutable data to the network ...");
 
-    // FIXME(nbaksalyar): it should be put_recover
     client.put(Data::Immutable(immutable_data), None)
         .map(move |_| name)
         .map_err(NfsError::from)
