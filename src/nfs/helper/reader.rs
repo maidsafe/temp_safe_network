@@ -16,7 +16,8 @@
 // relating to use of the SAFE Network Software.
 
 use core::{Client, SelfEncryptionStorage};
-use futures::{self, Future};
+use core::futures::FutureExt;
+use futures::Future;
 use nfs::NfsFuture;
 use nfs::errors::NfsError;
 use nfs::file::File;
@@ -54,12 +55,12 @@ impl Reader {
                length);
 
         if (position + length) > self.size() {
-            Box::new(futures::failed(NfsError::InvalidRangeSpecified))
+            err!(NfsError::InvalidRangeSpecified)
         } else {
             debug!("Reading {len} bytes of data from file starting at offset of {pos} bytes ...",
                    len = length,
                    pos = position);
-            Box::new(self.self_encryptor.read(position, length).map_err(From::from))
+            self.self_encryptor.read(position, length).map_err(From::from).into_box()
         }
     }
 }

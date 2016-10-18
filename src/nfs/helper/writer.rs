@@ -21,8 +21,10 @@ use core::futures::FutureExt;
 use core::immutable_data;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{Dir, DirMetadata, File, FileMetadata, NfsFuture};
+use nfs::{Dir, File, FileMetadata, NfsFuture};
 use nfs::helper::dir_helper;
+use routing::DataIdentifier;
+use rust_sodium::crypto::secretbox;
 use self_encryption::SequentialEncryptor;
 
 /// Mode of the writer
@@ -38,8 +40,8 @@ pub enum Mode {
 pub struct Writer {
     client: Client,
     file: File,
-    parent_dir: Dir,
-    parent_dir_metadata: DirMetadata,
+    dir: Dir,
+    dir_id: (DataIdentifier, Option<secretbox::Key>),
     self_encryptor: SequentialEncryptor<SelfEncryptionStorage>,
 }
 
@@ -48,8 +50,8 @@ impl Writer {
     pub fn new(client: Client,
                storage: SelfEncryptionStorage,
                mode: Mode,
+               parent_dir_id: (DataIdentifier, Option<secretbox::Key>),
                parent_dir: Dir,
-               parent_dir_metadata: DirMetadata,
                file: File)
                -> Box<NfsFuture<Writer>> {
         let data_map = match mode {
@@ -58,26 +60,28 @@ impl Writer {
         };
 
         let client = client.clone();
-        let future = SequentialEncryptor::new(storage, data_map)
+        SequentialEncryptor::new(storage, data_map)
             .map(move |encryptor| {
                 Writer {
                     client: client,
                     file: file,
-                    parent_dir: parent_dir,
-                    parent_dir_metadata: parent_dir_metadata,
+                    dir: parent_dir,
+                    dir_id: parent_dir_id,
                     self_encryptor: encryptor,
                 }
             })
-            .map_err(From::from);
-
-        Box::new(future)
+            .map_err(From::from)
+            .into_box()
     }
 
     /// Data of a file/blob can be written in smaller chunks
     pub fn write(&self, data: &[u8]) -> Box<NfsFuture<()>> {
         trace!("Writer writing file data of size {} into self-encryptor.",
                data.len());
-        Box::new(self.self_encryptor.write(data).map_err(From::from))
+        self.self_encryptor
+            .write(data)
+            .map_err(From::from)
+            .into_box()
     }
 
     /// close is invoked only after all the data is completely written
@@ -87,9 +91,9 @@ impl Writer {
     pub fn close(self) -> Box<NfsFuture<Dir>> {
         trace!("Writer induced self-encryptor close.");
 
-        let mut dir = self.parent_dir;
+        let mut dir = self.dir;
+        let dir_id = self.dir_id;
         let file = self.file;
-        let dir_metadata = self.parent_dir_metadata;
         let size = self.self_encryptor.len();
         let client = self.client;
         let c2 = client.clone();
@@ -104,7 +108,7 @@ impl Writer {
                         metadata.set_datamap(data_map);
                         metadata.set_modified_time(::time::now_utc());
                         metadata.set_size(size);
-                        dir.update_file(metadata.name(), file.clone());
+                        fry!(dir.upsert_file(File::Unversioned(metadata)));
                         ok!(dir)
                     }
                     File::Versioned { ptr_versions, num_of_versions, latest_version } => {
@@ -139,9 +143,7 @@ impl Writer {
                 }
             })
             .and_then(move |updated_dir| {
-                dir_helper::update(c2, &dir_metadata.id(), &updated_dir).map(move |_| {
-                    updated_dir
-                })
+                dir_helper::update(c2, &dir_id, &updated_dir).map(move |_| updated_dir)
             })
             .into_box()
     }

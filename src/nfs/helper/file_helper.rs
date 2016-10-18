@@ -24,7 +24,7 @@ use nfs::errors::NfsError;
 use nfs::helper::dir_helper;
 use nfs::helper::reader::Reader;
 use nfs::helper::writer::{Mode, Writer};
-use nfs::metadata::{DirMetadata, FileMetadata};
+use nfs::metadata::FileMetadata;
 use routing::DataIdentifier;
 use rust_sodium::crypto::secretbox;
 use self_encryption::DataMap;
@@ -34,37 +34,39 @@ use self_encryption::DataMap;
 /// can be written to the network
 /// The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
-pub fn create(client: Client,
-                   name: String,
-                   user_metatdata: Vec<u8>,
-                   parent_dir: Dir,
-                   parent_metadata: DirMetadata)
-                   -> Box<NfsFuture<Writer>> {
+pub fn create<S>(client: Client,
+                 name: S,
+                 user_metadata: Vec<u8>,
+                 parent_id: (DataIdentifier, Option<secretbox::Key>),
+                 parent_dir: Dir)
+                 -> Box<NfsFuture<Writer>>
+    where S: Into<String> {
+    let name = name.into();
     trace!("Creating file with name: {}", name);
 
     if parent_dir.find_file(&name).is_some() {
         return err!(NfsError::FileAlreadyExistsWithSameName);
     }
 
-    let file = File::Unversioned(FileMetadata::new(name, user_metatdata, DataMap::None));
+    let file = File::Unversioned(FileMetadata::new(name, user_metadata, DataMap::None));
 
     Writer::new(client.clone(),
                 SelfEncryptionStorage::new(client),
                 Mode::Overwrite,
+                parent_id,
                 parent_dir,
-                parent_metadata,
                 file)
 }
 
 /// Delete a file from the Directory
 /// Returns Option<parent_directory's parent>
 pub fn delete(client: Client,
-                   file_name: String,
-                   parent_id: &(DataIdentifier, Option<secretbox::Key>),
-                   parent_dir: &mut Dir)
-                   -> Box<NfsFuture<()>> {
+              file_name: &str,
+              parent_id: &(DataIdentifier, Option<secretbox::Key>),
+              parent_dir: &mut Dir)
+              -> Box<NfsFuture<()>> {
     trace!("Deleting file with name {}.", file_name);
-    let _ = fry!(parent_dir.remove_file(&file_name));
+    let _ = fry!(parent_dir.remove_file(file_name));
     dir_helper::update(client, parent_id, parent_dir)
 }
 
@@ -81,9 +83,9 @@ pub fn update_metadata(client: Client,
         let _ = fry!(parent_dir.find_file(prev_name).ok_or(NfsError::FileNotFound));
 
         if prev_name != file.name() &&
-           parent_dir.find_file(file.name()).is_some() {
-            return err!(NfsError::FileAlreadyExistsWithSameName);
-        }
+            parent_dir.find_file(file.name()).is_some() {
+                return err!(NfsError::FileAlreadyExistsWithSameName);
+            }
     }
     parent_dir.update_file(prev_name, file);
     dir_helper::update(client.clone(), parent_id, parent_dir)
@@ -97,14 +99,14 @@ pub fn update_metadata(client: Client,
 pub fn update_content(client: Client,
                       file: File,
                       mode: Mode,
-                      parent_metadata: DirMetadata,
+                      parent_id: (DataIdentifier, Option<secretbox::Key>),
                       parent_dir: Dir)
                       -> Box<NfsFuture<Writer>> {
     trace!("Updating content in file with name {}", file.name());
 
     {
         let existing_file = fry!(parent_dir.find_file(file.name())
-                                                 .ok_or(NfsError::FileNotFound));
+                                 .ok_or(NfsError::FileNotFound));
 
         if *existing_file != file {
             return err!(NfsError::FileDoesNotMatch);
@@ -114,8 +116,8 @@ pub fn update_content(client: Client,
     Writer::new(client.clone(),
                 SelfEncryptionStorage::new(client),
                 mode,
+                parent_id,
                 parent_dir,
-                parent_metadata,
                 file)
 }
 
@@ -128,98 +130,149 @@ pub fn read(client: Client, file: &File) -> Result<Reader, NfsError> {
 
 #[cfg(test)]
 mod tests {
-    // use core::utility::test_utils;
-    // use nfs::AccessLevel;
-    // use nfs::helper::{dir_helper, file_helper};
-    // use nfs::helper::writer::Mode;
+    use core::Client;
+    use core::futures::FutureExt;
+    use core::utility::test_utils;
+    use futures::Future;
+    use nfs::{Dir, DirId, NfsFuture};
+    use nfs::helper::{dir_helper, file_helper};
+    use nfs::helper::writer::Mode;
+
+    const APPEND_SIZE: usize = 10;
+    const ORIG_SIZE: usize = 100;
+    const NEW_SIZE: usize = 50;
+
+    fn create_test_file(client: Client) -> Box<NfsFuture<(Dir, DirId)>> {
+        let c2 = client.clone();
+        let dir = Dir::new();
+
+        dir_helper::create(client, &dir, None)
+            .and_then(move |dir_id| {
+                file_helper::create(c2, "hello.txt", Vec::new(), (dir_id, None), dir)
+                    .map(move |writer| (writer, (dir_id, None)))
+            })
+            .and_then(move |(writer, dir_id)| {
+                writer.write(&[0u8; ORIG_SIZE])
+                    .and_then(move |_| writer.close())
+                    .map(move |updated_dir| (updated_dir, dir_id))
+            })
+            .into_box()
+    }
 
     #[test]
-    fn file_crud() {
-        // test_utils::register_and_run(|client| {
-        //     dir_helper::create("DirName".to_string(),
-        //                        Vec::new(),
-        //                        true,
-        //                        AccessLevel::Private,
-        //                        None)
-        //         .and_then(move |(mut directory, _)| {
-        //             let file_name = "hello.txt".to_string();
+    fn file_read() {
+        test_utils::register_and_run(|client| {
+            let c2 = client.clone();
 
-        //             const ORIG_SIZE: usize = 100;
-        //             {
-        //                 // create
-        //                 let mut writer = unwrap!(file_helper::create(client.clone(),
-        //                                                      file_name.clone(),
-        //                                                      Vec::new(),
-        //                                                      directory));
-        //                 unwrap!(writer.write(&[0u8; ORIG_SIZE]), "");
-        //                 let (updated_directory, _) = unwrap!(writer.close());
-        //                 directory = updated_directory;
-        //                 assert!(directory.find_file(&file_name).is_some());
-        //             }
-        //             {
-        //                 // read
-        //                 let file = unwrap!(directory.find_file(&file_name), "File not found");
-        //                 let mut reader = unwrap!(file_helper::read(file), "");
-        //                 let size = reader.size();
-        //                 assert_eq!(unwrap!(reader.read(0, size)), vec![0u8; 100]);
-        //             }
+            create_test_file(client.clone())
+                .and_then(move |(dir, _)| {
+                    let file = unwrap!(dir.find_file("hello.txt"), "File not found");
+                    let reader = unwrap!(file_helper::read(c2, file));
+                    let size = reader.size();
+                    println!("reading {} bytes", size);
+                    reader.read(0, size)
+                })
+                .map(move |data| {
+                    assert_eq!(data, vec![0u8; 100]);
+                })
+        });
+    }
 
-        //             const NEW_SIZE: usize = 50;
-        //             {
-        //                 // update - full rewrite
-        //                 let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
-        //                 {
-        //                     let mut writer = unwrap!(file_helper::update_content(file, Mode::Overwrite, directory));
-        //                     unwrap!(writer.write(&[1u8; NEW_SIZE]));
-        //                     let (updated_directory, _) = unwrap!(writer.close());
-        //                     directory = updated_directory;
-        //                 }
-        //                 let file = unwrap!(directory.find_file(&file_name), "File not found");
-        //                 let mut reader = unwrap!(file_helper::read(file), "");
-        //                 let size = reader.size();
-        //                 assert_eq!(unwrap!(reader.read(0, size)), vec![1u8; 50]);
-        //             }
+    #[test]
+    fn file_update() {
+        test_utils::register_and_run(|client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-        //             const APPEND_SIZE: usize = 10;
-        //             {
-        //                 // update - should append (after S.E behaviour changed)
-        //                 let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
-        //                 {
-        //                     let mut writer = unwrap!(file_helper::update_content(file, Mode::Modify, directory));
-        //                     unwrap!(writer.write(&[2u8; APPEND_SIZE]));
-        //                     let (updated_directory, _) = unwrap!(writer.close());
-        //                     directory = updated_directory;
-        //                 }
-        //                 let file = unwrap!(directory.find_file(&file_name), "File not found");
-        //                 let mut reader = unwrap!(file_helper::read(file), "");
-        //                 let size = reader.size();
-        //                 let data = unwrap!(reader.read(0, size));
+            create_test_file(client.clone())
+                .and_then(move |(dir, metadata)| {
+                    // Update - full rewrite
+                    let file = unwrap!(dir.find_file("hello.txt").cloned(), "File not found");
+                    file_helper::update_content(c2, file, Mode::Overwrite, metadata, dir)
+                })
+                .and_then(move |writer| {
+                    writer.write(&[1u8; NEW_SIZE])
+                        .and_then(move |_| writer.close())
+                })
+                .and_then(move |dir| {
+                    let file = unwrap!(dir.find_file("hello.txt"), "File not found");
 
-        //                 assert_eq!(size, (NEW_SIZE + APPEND_SIZE) as u64);
-        //                 assert_eq!(data[0..NEW_SIZE].to_owned(), vec![1u8; NEW_SIZE]);
-        //                 assert_eq!(&data[NEW_SIZE..], [2u8; APPEND_SIZE]);
-        //             }
-        //             {
-        //                 // versions
-        //                 let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
-        //                 let versions = unwrap!(file_helper::get_versions(&file, &directory));
-        //                 assert_eq!(versions.len(), 3);
-        //             }
-        //             {
-        //                 // Update Metadata
-        //                 let mut file = unwrap!(directory.find_file(&file_name).cloned(),
-        //                                        "File not found");
-        //                 file.get_mut_metadata().set_user_metadata(vec![12u8; 10]);
-        //                 let _ = unwrap!(file_helper::update_metadata(file, &mut directory));
-        //                 let file = unwrap!(directory.find_file(&file_name).cloned(), "File not found");
-        //                 assert_eq!(*file.metadata().user_metadata(), [12u8; 10][..]);
-        //             }
-        //             {
-        //                 // Delete
-        //                 let _ = unwrap!(file_helper::delete(file_name.clone(), &mut directory));
-        //                 assert!(directory.find_file(&file_name).is_none());
-        //             }
-        //         })
-        // });
+                    let reader = unwrap!(file_helper::read(c3, file));
+                    let size = reader.size();
+                    println!("reading {} bytes", size);
+                    reader.read(0, size)
+                })
+                .map(move |data| {
+                    assert_eq!(data, vec![1u8; 50]);
+                })
+        });
+    }
+
+    #[test]
+    fn file_update_append() {
+        test_utils::register_and_run(|client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+
+            create_test_file(client.clone())
+                .and_then(move |(dir, metadata)| {
+                    // Update - should append (after S.E behaviour changed)
+                    let file = unwrap!(dir.find_file("hello.txt").cloned(), "File not found");
+                    file_helper::update_content(c2, file, Mode::Modify, metadata, dir)
+                })
+                .and_then(move |writer| {
+                    writer.write(&[2u8; APPEND_SIZE])
+                        .and_then(move |_| writer.close())
+                })
+                .and_then(move |dir| {
+                    let file = unwrap!(dir.find_file("hello.txt"), "File not found");
+
+                    let reader = unwrap!(file_helper::read(c3, file));
+                    let size = reader.size();
+                    reader.read(0, size)
+                        .map(move |data| {
+                            assert_eq!(size, (ORIG_SIZE + APPEND_SIZE) as u64);
+                            assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
+                            assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
+                        })
+                })
+        });
+    }
+
+    #[test]
+    fn file_update_metadata() {
+        test_utils::register_and_run(|client| {
+            let c2 = client.clone();
+
+            create_test_file(client.clone())
+                .and_then(move |(mut dir, dir_metadata)| {
+                    // Update Metadata
+                    let mut file = unwrap!(dir.find_file("hello.txt").cloned(),
+                                           "File not found");
+                    file.metadata_mut().set_name("hello.jpg");
+                    file.metadata_mut().set_user_metadata(vec![12u8; 10]);
+                    file_helper::update_metadata(c2, "hello.txt", file, &dir_metadata, &mut dir)
+                        .map(|_| dir)
+                })
+                .map(|dir| {
+                    let file = unwrap!(dir.find_file("hello.jpg").cloned(), "File not found");
+                    assert_eq!(*file.metadata().user_metadata(), [12u8; 10][..]);
+                })
+        });
+    }
+
+    #[test]
+    fn file_delete() {
+        test_utils::register_and_run(|client| {
+            let c2 = client.clone();
+
+            create_test_file(client.clone())
+                .and_then(move |(mut dir, metadata)| {
+                    file_helper::delete(c2, "hello.txt", &metadata, &mut dir)
+                        .map(move |_| {
+                            assert!(dir.find_file("hello.txt").is_none());
+                        })
+                })
+        })
     }
 }

@@ -27,7 +27,7 @@ pub mod helper;
 mod metadata;
 
 use futures::Future;
-pub use nfs::dir::Dir;
+pub use nfs::dir::{Dir, DirId};
 pub use nfs::file::File;
 pub use nfs::metadata::{DirMetadata, FileMetadata};
 
