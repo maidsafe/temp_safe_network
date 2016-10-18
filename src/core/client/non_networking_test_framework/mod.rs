@@ -891,7 +891,7 @@ mod test {
                                         Vec::new(),
                                         vec![owner_key.clone()],
                                         Vec::new(),
-                                        Some(sign_key)));
+                                        Some(&account_packet.get_mpid().secret_keys().0)));
         let invalid_signature_data_account_version =
             Data::Structured(invalid_signature_account_version);
 
@@ -903,9 +903,7 @@ mod test {
                                                       data_for_version_2,
                                                       vec![owner_key.clone()],
                                                       Vec::new(),
-                                                      Some(&account_packet.get_maid()
-                                                          .secret_keys()
-                                                          .0)));
+                                                      Some(sign_key)));
         data_account_version = Data::Structured(account_version);
 
         // Subsequent PUTs for same StructuredData should fail
@@ -1128,7 +1126,7 @@ mod test {
         assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
                                                message_queue.clone(),
                                                location_client_mgr_immut)),
-                   (3, DEFAULT_CLIENT_ACCOUNT_SIZE - 3));
+                   (4, DEFAULT_CLIENT_ACCOUNT_SIZE - 4));
     }
 
     #[test]

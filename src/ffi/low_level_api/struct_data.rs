@@ -629,11 +629,16 @@ mod tests {
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
             let _ = unwrap!(object_cache()).get_sd(sd_h);
+
+            // Re-delete shold fail - MutationError::NoSuchData; Fetch should be successful
+            assert_eq!(struct_data_delete(&app, sd_h), -22);
             assert_eq!(struct_data_free(sd_h), 0);
+            assert_eq!(struct_data_free(sd_h),
+                       FfiError::InvalidStructDataHandle.into());
             assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
 
-            // Fetch - should error out
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), -18);
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
+            assert_eq!(struct_data_free(sd_h), 0);
             assert_eq!(struct_data_free(sd_h),
                        FfiError::InvalidStructDataHandle.into());
         }
@@ -705,8 +710,9 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -18 is CoreError::GetFailure { reason: GetError::NoSuchData }
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), -18);
+            // -22 is CoreError::MutationFailure { reason: MutationError::NoSuchData }
+            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
         }
     }
 
@@ -773,8 +779,9 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -18 is CoreError::GetFailure { reason: GetError::NoSuchData }
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), -18);
+            // -22 is CoreError::MutationFailure { reason: MutationError::NoSuchData }
+            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
         }
     }
 
