@@ -439,18 +439,14 @@ impl DataManager {
                 DataIdentifier::PubAppendable(..) |
                 DataIdentifier::PrivAppendable(..) |
                 DataIdentifier::Structured(..) => {
-                    let mut overwrite_deleted = false;
-                    if let Ok(Data::Structured(old_data)) = self.chunk_store.get(&data_id) {
-                        if old_data.is_deleted() {
-                            let new_version = match data {
-                                Data::Structured(ref new_data) => new_data.get_version(),
-                                _ => unimplemented!(),
-                            };
-                            if old_data.get_version() + 1 == new_version {
-                                overwrite_deleted = true;
-                            }
+                    let old_data_result = self.chunk_store.get(&data_id);
+                    let overwrite_deleted = match (old_data_result, &data) {
+                        (Ok(Data::Structured(ref old_data)), &Data::Structured(ref new_data)) => {
+                            old_data.is_deleted() &&
+                            old_data.validate_self_against_successor(new_data).is_ok()
                         }
-                    }
+                        _ => false,
+                    };
                     if !overwrite_deleted {
                         let error = MutationError::DataExists;
                         let external_error_indicator = try!(serialisation::serialise(&error));
