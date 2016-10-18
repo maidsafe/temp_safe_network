@@ -1,5 +1,11 @@
 # Safe Core - Change Log
 
+## [0.22.0]
+- New error type - MutationError::DataTooLarge.
+- New Delete handling and update of code and test cases.
+- New APIs - Put to re-claim deleted data (specify version), make data unclaimable.
+- Changes and fixes in mock-routing to conform to routing and vaults for error deduction and error types.
+
 ## [0.21.2]
 - Serialisation and deserialisation for Sign Keys.
 - API for getting Filtered keys from AppendableData.
