@@ -1,5 +1,9 @@
 # Safe Vault - Change Log
 
+## [0.12.1]
+- Enforce data size caps.
+- Enable new delete mechanism.
+
 ## [0.12.0]
 - Handle appendable data types in data manager.
 - Fix a synchronisation problem in Put/Post handling.
