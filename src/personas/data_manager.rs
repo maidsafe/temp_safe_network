@@ -536,7 +536,7 @@ impl DataManager {
                 warn!("Post operation for Invalid Data Type. {:?} - {:?}",
                       data_id,
                       message_id);
-                let post_error = try!(serialisation::serialise(&MutationError::NoSuchData));
+                let post_error = try!(serialisation::serialise(&MutationError::InvalidOperation));
                 return Ok(try!(self.routing_node
                     .send_post_failure(dst, src, data_id, post_error, message_id)));
             }

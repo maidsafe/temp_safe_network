@@ -68,7 +68,8 @@ fn put_oversized_data() {
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    match client.put_and_verify(Data::Immutable(test_utils::random_immutable_data(1048576, &mut rng)), &mut nodes) {
+    match client.put_and_verify(Data::Immutable(
+            test_utils::random_immutable_data(1100 * 1024, &mut rng)), &mut nodes) {
         Err(Some(error)) => assert_eq!(error, MutationError::DataTooLarge),
         unexpected => panic!("Got unexpected response: {:?}", unexpected),
     }
