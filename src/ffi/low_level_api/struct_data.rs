@@ -26,7 +26,7 @@ use ffi::low_level_api::{CipherOptHandle, DataIdHandle, StructDataHandle};
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use ffi::low_level_api::object_cache::object_cache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XOR_NAME_LEN, XorName};
+use routing::{Data, DataIdentifier, ImmutableData, NO_OWNER_PUB_KEY, StructuredData, XOR_NAME_LEN, XorName};
 use std::{mem, ptr, slice};
 use std::sync::{Arc, Mutex};
 
@@ -35,6 +35,7 @@ use std::sync::{Arc, Mutex};
 pub unsafe extern "C" fn struct_data_new(app: *const App,
                                          type_tag: u64,
                                          id: *const [u8; XOR_NAME_LEN],
+                                         version: u64,
                                          cipher_opt_h: CipherOptHandle,
                                          data: *const u8,
                                          size: usize,
@@ -56,18 +57,18 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
         let sd = match type_tag {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .get_cipher_opt(cipher_opt_h))
-                    .encrypt(app, &plain_text));
+                                                     .get_cipher_opt(cipher_opt_h))
+                                        .encrypt(app, &plain_text));
 
-                ffi_try!(unversioned::create(client,
-                                             type_tag,
-                                             xor_id,
-                                             0,
-                                             raw_data,
-                                             owner_keys,
-                                             Vec::new(),
-                                             &sign_key,
-                                             None))
+                unversioned::create(client,
+                                    type_tag,
+                                    xor_id,
+                                    version,
+                                    raw_data,
+                                    owner_keys,
+                                    Vec::new(),
+                                    &sign_key,
+                                    None)
             }
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let immut_data =
@@ -86,14 +87,14 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
                 let resp_getter = ffi_try!(unwrap!(client.lock()).put(immut_data_final, None));
                 ffi_try!(resp_getter.get());
 
-                ffi_try!(versioned::create(client,
-                                           immut_data_final_name,
-                                           type_tag,
-                                           xor_id,
-                                           0,
-                                           owner_keys,
-                                           Vec::new(),
-                                           &sign_key))
+                versioned::create(client,
+                                  immut_data_final_name,
+                                  type_tag,
+                                  xor_id,
+                                  version,
+                                  owner_keys,
+                                  Vec::new(),
+                                  &sign_key)
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
@@ -102,7 +103,7 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
 
                 ffi_try!(StructuredData::new(type_tag,
                                              xor_id,
-                                             0,
+                                             version,
                                              raw_data,
                                              owner_keys,
                                              Vec::new(),
@@ -506,6 +507,7 @@ mod tests {
             assert_eq!(struct_data_new(&app,
                                        ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
                                        &id,
+                                       0,
                                        cipher_opt_h,
                                        plain_text.as_ptr(),
                                        plain_text.len(),
@@ -581,11 +583,16 @@ mod tests {
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
             let _ = unwrap!(object_cache()).get_sd(sd_h);
+
+            // Re-delete shold fail - MutationError::NoSuchData; Fetch should be successful
+            assert_eq!(struct_data_delete(&app, sd_h), -22);
             assert_eq!(struct_data_free(sd_h), 0);
+            assert_eq!(struct_data_free(sd_h),
+                       FfiError::InvalidStructDataHandle.into());
             assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
 
-            // Fetch - should error out
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), -18);
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
+            assert_eq!(struct_data_free(sd_h), 0);
             assert_eq!(struct_data_free(sd_h),
                        FfiError::InvalidStructDataHandle.into());
         }
@@ -610,6 +617,7 @@ mod tests {
             assert_eq!(struct_data_new(&app,
                                        ::VERSIONED_STRUCT_DATA_TYPE_TAG,
                                        &name,
+                                       0,
                                        cipher_opt_h,
                                        data0.as_ptr(),
                                        data0.len(),
@@ -657,8 +665,9 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -18 is CoreError::GetFailure { reason: GetError::NoSuchData }
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), -18);
+            // -22 is CoreError::MutationFailure { reason: MutationError::NoSuchData }
+            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
         }
     }
 
@@ -681,6 +690,7 @@ mod tests {
             assert_eq!(struct_data_new(&app,
                                        CLIENT_STRUCTURED_DATA_TAG - 1,
                                        &name,
+                                       0,
                                        cipher_opt_h,
                                        data0.as_ptr(),
                                        data0.len(),
@@ -691,6 +701,7 @@ mod tests {
             assert_eq!(struct_data_new(&app,
                                        CLIENT_STRUCTURED_DATA_TAG + 1,
                                        &name,
+                                       0,
                                        cipher_opt_h,
                                        data0.as_ptr(),
                                        data0.len(),
@@ -725,8 +736,9 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -18 is CoreError::GetFailure { reason: GetError::NoSuchData }
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), -18);
+            // -22 is CoreError::MutationFailure { reason: MutationError::NoSuchData }
+            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
         }
     }
 

@@ -741,6 +741,21 @@ pub unsafe extern "C" fn appendable_data_is_owned(app: *const App,
     })
 }
 
+/// See if AppendableData size is valid.
+#[no_mangle]
+pub unsafe extern "C" fn appendable_data_validate_size(handle: AppendableDataHandle,
+                                                       o_valid: *mut bool)
+                                                       -> i32 {
+    helper::catch_unwind_i32(|| {
+        *o_valid = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
+            AppendableData::Pub(ref elt) => elt.validate_size(),
+            AppendableData::Priv(ref elt) => elt.validate_size(),
+        };
+
+        0
+    })
+}
+
 /// Free AppendableData handle
 #[no_mangle]
 pub extern "C" fn appendable_data_free(handle: AppendableDataHandle) -> i32 {

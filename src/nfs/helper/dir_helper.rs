@@ -120,9 +120,30 @@ pub fn create_sub_dir(client: Client,
 pub fn delete(client: Client, parent: &mut Dir, dir_to_delete: &str) -> Box<NfsFuture<()>> {
     trace!("Deleting directory with name: {}", dir_to_delete);
 
-    // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
-    let _dir_meta = fry!(parent.remove_sub_dir(dir_to_delete));
-    update(client.clone(), &_dir_meta.id(), parent)
+    let dir_meta = fry!(parent.remove_sub_dir(dir_to_delete));
+    let c2 = client.clone();
+    let c3 = client.clone();
+    let parent = parent.clone();
+
+    get_structured_data(client.clone(), &dir_meta.id().0)
+        .and_then(move |sd| {
+            let sign_key = fry!(c2.secret_signing_key()).clone();
+
+            let delete_sd = fry!(StructuredData::new(sd.get_type_tag(),
+                                                     *sd.name(),
+                                                     sd.get_version() + 1,
+                                                     vec![],
+                                                     vec![],
+                                                     sd.get_owner_keys().clone(),
+                                                     Some(&sign_key))
+                .map_err(CoreError::from));
+
+            c2.delete_recover(Data::Structured(delete_sd), None)
+                .map_err(NfsError::from)
+                .into_box()
+        })
+        .and_then(move |_| update(c3, &dir_meta.id(), &parent))
+        .into_box()
 }
 
 /// Updates an existing Directory in the network.
