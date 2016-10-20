@@ -29,8 +29,7 @@ use rust_sodium::crypto::{box_, sign, secretbox};
 use rust_sodium::crypto::hash::sha256;
 use std::collections::HashMap;
 use super::config::{self, DnsConfig};
-use super::DnsFuture;
-use super::errors::DnsError;
+use super::{DnsError, DnsFuture};
 
 /// Register one's own Dns - eg., pepsico.com, spandansharma.com, krishnakumar.in etc
 pub fn register_dns(client: &Client,
@@ -345,6 +344,7 @@ mod tests {
     use rand;
     use routing::DataIdentifier;
     use rust_sodium::crypto::box_;
+    use std::collections::HashSet;
     use super::*;
 
     #[test]
@@ -389,7 +389,7 @@ mod tests {
         let dns_name3 = dns_name.clone();
 
         let services = vec![gen_service("blog"), gen_service("chat")];
-        let service_names = services.iter().map(|s| s.0.clone()).collect::<Vec<_>>();
+        let service_names = services.iter().map(|s| s.0.clone()).collect::<HashSet<_>>();
         let service_names2 = service_names.clone();
 
         test_utils::register_and_run(move |client| {
@@ -409,6 +409,8 @@ mod tests {
                          None)
                 .and_then(move |_| get_all_services(&client2, &dns_name2, None))
                 .map(move |names| {
+                    // Convert to HashSet to ignore order.
+                    let names = names.into_iter().collect::<HashSet<_>>();
                     assert_eq!(names, service_names);
                 })
                 .map_err(|err| panic!("{:?}", err))
@@ -420,6 +422,8 @@ mod tests {
         }).run(move |client| {
             get_all_services(client, &dns_name3, None)
                 .map(move |names| {
+                    // Convert to HashSet to ignore order.
+                    let names = names.into_iter().collect::<HashSet<_>>();
                     assert_eq!(names, service_names2);
                 })
                 .map_err(|err| panic!("{:?}", err))

@@ -25,8 +25,7 @@ use nfs::errors::NfsError;
 use nfs::helper::{dir_helper, file_helper};
 use nfs::helper::writer::Mode;
 use rust_sodium::crypto::box_;
-use super::DnsFuture;
-use super::errors::DnsError;
+use super::{DnsError, DnsFuture};
 
 const DNS_CONFIG_DIR_NAME: &'static str = "DnsReservedDirectory";
 const DNS_CONFIG_FILE_NAME: &'static str = "DnsConfigurationFile";

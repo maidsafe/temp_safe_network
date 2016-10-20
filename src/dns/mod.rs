@@ -17,9 +17,11 @@
 
 use futures::Future;
 
-pub mod errors;
+mod errors;
 pub mod operations;
 pub mod config;
 
+pub use self::errors::DnsError;
+
 /// Future returned from DNS operations.
-pub type DnsFuture<T> = Future<Item = T, Error = errors::DnsError>;
+pub type DnsFuture<T> = Future<Item = T, Error = DnsError>;
