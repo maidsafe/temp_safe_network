@@ -441,7 +441,8 @@ impl Client {
             .then(|result| {
                 match result {
                     Ok(()) |
-                    Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => {
+                    Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) |
+                    Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. }) => {
                         debug!("DELETE recovery successful !");
                         Ok(())
                     }
