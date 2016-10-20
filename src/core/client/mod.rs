@@ -634,7 +634,7 @@ impl Client {
     }
 
     #[cfg(all(test, feature = "use-mock-routing"))]
-    pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
+    pub fn set_network_limits(&self, max_ops_count: Option<u64>) {
         self.routing_mut().set_network_limits(max_ops_count);
     }
 

@@ -20,6 +20,7 @@ use futures::Future;
 mod errors;
 pub mod operations;
 pub mod config;
+mod tests;
 
 pub use self::errors::DnsError;
 
