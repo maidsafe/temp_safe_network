@@ -15,17 +15,23 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+macro_rules! ffi_error_code {
+    ($result:expr) => {{
+        let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
+        let err_str = format!("{:?}", $result);
+        let err_code = $result.into();
+        info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
+              decorator, err_code, err_str, decorator);
+        err_code
+    }}
+}
+
 macro_rules! ffi_try {
     ($result:expr) => {
         match $result {
             Ok(value)  => value,
             Err(error) => {
-                let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-                let err_str = format!("{:?}", error);
-                let err_code = error.into();
-                info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
-                      decorator, err_code, err_str, decorator);
-                return err_code
+                return ffi_error_code!(error)
             },
         }
     }
@@ -36,12 +42,7 @@ macro_rules! ffi_ptr_try {
         match $result {
             Ok(value)  => value,
             Err(error) => {
-                let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-                let err_str = format!("{:?}", error);
-                let err_code = error.into();
-                info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
-                      decorator, err_code, err_str, decorator);
-                ::std::ptr::write($out, err_code);
+                let _ = ffi_error_code!(error);
                 return ::std::ptr::null();
             },
         }

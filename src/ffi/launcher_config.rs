@@ -23,40 +23,28 @@ use ffi::config::{LAUNCHER_GLOBAL_CONFIG_FILE_NAME, LAUNCHER_GLOBAL_DIRECTORY_NA
 use ffi::errors::FfiError;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{AccessLevel, Dir, DirMetadata};
+use nfs::{Dir, DirMetadata};
 use nfs::helper::{dir_helper, file_helper};
 use nfs::helper::writer::Mode::Overwrite;
 use routing::XorName;
 use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::hash::sha256;
+use std::collections::HashMap;
+use super::App;
 
-#[derive(RustcEncodable, RustcDecodable, Debug)]
-pub struct LauncherConfiguration {
-    pub app_id: XorName,
-    pub app_info: AppInfo,
-}
-
-#[derive(RustcEncodable, RustcDecodable, Debug, Clone)]
-pub struct AppInfo {
-    pub app_root_dir: Dir,
-    pub asym_keys: (box_::PublicKey, box_::SecretKey),
-    pub sym_key: secretbox::Key,
-}
-
-pub fn app_info(client: Client,
+pub fn app_info(client: &Client,
                 app_name: String,
                 app_key: String,
-                vendor: String)
-                -> Box<FfiFuture<AppInfo>> {
+                vendor: String,
+                safe_drive_access: bool)
+                -> Box<FfiFuture<App>> {
     let app_id = app_id(&app_key, &vendor);
     let c2 = client.clone();
 
     launcher_global_config_and_dir(&client)
         .and_then(move |(configs, _, metadata)| {
-            match configs.into_iter()
-                .find(|config| config.app_id == app_id)
-                .map(|config| config) {
-                Some(config) => ok!(config.app_info),
+            match configs.get(&app_id) {
+                Some(config) => ok!(config.clone()),
                 None => {
                     trace!("App's exclusive directory is not mapped inside Launcher's config. \
                             This must imply it's not present inside user-root-dir also - \
@@ -77,21 +65,16 @@ pub fn app_info(client: Client,
                                                        &metadata.id())
                         })
                         .map_err(FfiError::from)
-                        .and_then(move |(_, dir, metadata)| {
-                            let app_info = AppInfo {
-                                app_root_dir: dir,
-                                asym_keys: box_::gen_keypair(),
+                        .and_then(move |(_, dir, _metadata)| {
+                            let app = App::Registered {
+                                app_dir: dir,
+                                asym_enc_keys: box_::gen_keypair(),
                                 sym_key: secretbox::gen_key(),
+                                safe_drive_access: safe_drive_access,
                             };
 
-                            let app_config = LauncherConfiguration {
-                                app_id: app_id,
-                                app_info: app_info.clone(),
-                            };
-
-                            upsert_to_launcher_global_config(&c2, app_config).map(move |_| {
-                                app_info
-                            })
+                            upsert_to_launcher_global_config(&c2, app_id, app.clone())
+                                .map(move |_| app)
                         })
                         .into_box()
                 }
@@ -124,7 +107,8 @@ fn app_dir_name(app_name: &str, directory: &Dir) -> String {
 }
 
 fn upsert_to_launcher_global_config(client: &Client,
-                                    config: LauncherConfiguration)
+                                    app_id: XorName,
+                                    config: App)
                                     -> Box<FfiFuture<()>> {
     trace!("Update (by overwriting) Launcher's config file by appending a new config.");
 
@@ -133,18 +117,7 @@ fn upsert_to_launcher_global_config(client: &Client,
     launcher_global_config_and_dir(&client)
         .map_err(FfiError::from)
         .and_then(move |(mut global_configs, dir, metadata)| {
-            // (Spandan)
-            // Unable to use `if let Some() .. else` logic to upsert to a vector due to
-            // a language bug. Once the bug is resolved
-            // - https://github.com/rust-lang/rust/issues/28449
-            // then modify the following to use it.
-            if let Some(pos) = global_configs.iter()
-                .position(|existing_config| existing_config.app_id == config.app_id) {
-                let existing_config = unwrap!(global_configs.get_mut(pos));
-                *existing_config = config;
-            } else {
-                global_configs.push(config);
-            }
+            let _ = global_configs.insert(app_id, config);
 
             let file = unwrap!(dir.find_file(LAUNCHER_GLOBAL_CONFIG_FILE_NAME),
                                "Logic Error - Launcher start-up should ensure the file must be \
@@ -165,9 +138,8 @@ fn upsert_to_launcher_global_config(client: &Client,
         .into_box()
 }
 
-fn launcher_global_config_and_dir
-    (client: &Client)
-     -> Box<FfiFuture<(Vec<LauncherConfiguration>, Dir, DirMetadata)>> {
+fn launcher_global_config_and_dir(client: &Client)
+                                  -> Box<FfiFuture<(HashMap<XorName, App>, Dir, DirMetadata)>> {
     trace!("Get Launcher's config directory.");
 
     let c2 = client.clone();
@@ -176,7 +148,7 @@ fn launcher_global_config_and_dir
         .map_err(FfiError::from)
         .and_then(move |(dir, metadata)| {
             let file_fut = match dir.find_file(LAUNCHER_GLOBAL_CONFIG_FILE_NAME).cloned() {
-                Some(file) => ok!(file),
+                Some(file) => ok!((dir, file)),
                 None => {
                     trace!("Launcher's config file does not exist inside its config dir - \
                             creating one.");
@@ -189,25 +161,29 @@ fn launcher_global_config_and_dir
                         .and_then(move |writer| writer.close())
                         .map_err(FfiError::from)
                         .map(move |updated_dir| {
-                            unwrap!(updated_dir.find_file(LAUNCHER_GLOBAL_CONFIG_FILE_NAME)).clone()
+                            let config_file =
+                                unwrap!(updated_dir.find_file(LAUNCHER_GLOBAL_CONFIG_FILE_NAME))
+                                    .clone();
+                            (updated_dir, config_file)
                         })
                         .into_box()
                 }
             };
 
-            file_fut.and_then(move |file| {
+            file_fut.and_then(move |(dir, file)| {
                     let reader = fry!(file_helper::read(c2, &file).map_err(FfiError::from));
                     let size = reader.size();
                     if size == 0 {
-                        ok!(Vec::new())
+                        ok!((dir, HashMap::new()))
                     } else {
                         reader.read(0, size)
                             .map_err(FfiError::from)
                             .and_then(move |data| deserialise(&data).map_err(FfiError::from))
+                            .map(|global_configs| (dir, global_configs))
                             .into_box()
                     }
                 })
-                .map(move |global_configs| (global_configs, dir, metadata))
+                .map(move |(dir, global_configs)| (global_configs, dir, metadata))
                 .map_err(FfiError::from)
                 .into_box()
         })

@@ -15,22 +15,24 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use ffi::helper;
-use ffi::low_level_api::DataIdHandle;
-use ffi::low_level_api::object_cache::object_cache;
+use ffi::{Session, helper};
+use ffi::object_cache::DataIdHandle;
 use routing::{DataIdentifier, XOR_NAME_LEN, XorName};
 use std::ptr;
 
 /// Construct DataIdentifier for StructuredData.
 #[no_mangle]
-pub unsafe extern "C" fn data_id_new_struct_data(type_tag: u64,
+pub unsafe extern "C" fn data_id_new_struct_data(session: *const Session,
+                                                 type_tag: u64,
                                                  id: *const [u8; XOR_NAME_LEN],
                                                  o_handle: *mut DataIdHandle)
                                                  -> i32 {
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Structured(xor_id, type_tag);
-        let handle = unwrap!(object_cache()).insert_data_id(data_id);
+
+        let obj_cache = (*session).object_cache();
+        let handle = obj_cache.borrow_mut().insert_data_id(data_id);
 
         ptr::write(o_handle, handle);
         0
@@ -39,13 +41,16 @@ pub unsafe extern "C" fn data_id_new_struct_data(type_tag: u64,
 
 /// Construct DataIdentifier for ImmutableData.
 #[no_mangle]
-pub unsafe extern "C" fn data_id_new_immut_data(id: *const [u8; XOR_NAME_LEN],
+pub unsafe extern "C" fn data_id_new_immut_data(session: *const Session,
+                                                id: *const [u8; XOR_NAME_LEN],
                                                 o_handle: *mut DataIdHandle)
                                                 -> i32 {
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Immutable(xor_id);
-        let handle = unwrap!(object_cache()).insert_data_id(data_id);
+
+        let obj_cache = (*session).object_cache();
+        let handle = obj_cache.borrow_mut().insert_data_id(data_id);
 
         ptr::write(o_handle, handle);
         0
@@ -54,7 +59,8 @@ pub unsafe extern "C" fn data_id_new_immut_data(id: *const [u8; XOR_NAME_LEN],
 
 /// Construct DataIdentifier for AppendableData.
 #[no_mangle]
-pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LEN],
+pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
+                                                     id: *const [u8; XOR_NAME_LEN],
                                                      is_private: bool,
                                                      o_handle: *mut DataIdHandle)
                                                      -> i32 {
@@ -66,7 +72,8 @@ pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LE
             DataIdentifier::PubAppendable(xor_id)
         };
 
-        let handle = unwrap!(object_cache()).insert_data_id(data_id);
+        let obj_cache = (*session).object_cache();
+        let handle = obj_cache.borrow_mut().insert_data_id(data_id);
 
         ptr::write(o_handle, handle);
         0
@@ -75,9 +82,10 @@ pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LE
 
 /// Free DataIdentifier handle
 #[no_mangle]
-pub extern "C" fn data_id_free(handle: DataIdHandle) -> i32 {
+pub unsafe extern "C" fn data_id_free(session: *const Session, handle: DataIdHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache()).remove_data_id(handle));
+        let obj_cache = (*session).object_cache();
+        let _ = ffi_try!(obj_cache.borrow_mut().remove_data_id(handle));
         0
     })
 }
@@ -85,13 +93,16 @@ pub extern "C" fn data_id_free(handle: DataIdHandle) -> i32 {
 #[cfg(test)]
 mod tests {
     use ffi::errors::FfiError;
-    use ffi::low_level_api::object_cache::object_cache;
+    use ffi::test_utils;
     use rand;
     use routing::XOR_NAME_LEN;
     use super::*;
 
     #[test]
     fn create_and_free() {
+        let sess = test_utils::create_session();
+        let sess_ptr = Box::into_raw(Box::new(sess.clone()));
+
         let type_tag = rand::random();
         let struct_id_arr: [u8; XOR_NAME_LEN] = rand::random();
 
@@ -106,43 +117,54 @@ mod tests {
         let mut data_id_handle_pub_appendable = 0;
 
         unsafe {
-            assert_eq!(data_id_new_struct_data(type_tag,
+            assert_eq!(data_id_new_struct_data(sess_ptr,
+                                               type_tag,
                                                &struct_id_arr,
                                                &mut data_id_handle_struct),
                        0);
-            assert_eq!(data_id_new_immut_data(&immut_id_arr, &mut data_id_handle_immut),
+            assert_eq!(data_id_new_immut_data(sess_ptr, &immut_id_arr, &mut data_id_handle_immut),
                        0);
-            assert_eq!(data_id_new_appendable_data(&priv_app_id_arr,
+            assert_eq!(data_id_new_appendable_data(sess_ptr,
+                                                   &priv_app_id_arr,
                                                    true,
                                                    &mut data_id_handle_priv_appendable),
                        0);
-            assert_eq!(data_id_new_appendable_data(&pub_app_id_arr,
+            assert_eq!(data_id_new_appendable_data(sess_ptr,
+                                                   &pub_app_id_arr,
                                                    false,
                                                    &mut data_id_handle_pub_appendable),
                        0);
         }
 
         {
-            let mut obj_cache = unwrap!(object_cache());
+            let obj_cache = sess.object_cache();
+            let mut obj_cache = obj_cache.borrow_mut();
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_struct));
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_immut));
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_priv_appendable));
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_pub_appendable));
         }
 
-        assert_eq!(data_id_free(data_id_handle_struct), 0);
-        assert_eq!(data_id_free(data_id_handle_immut), 0);
-        assert_eq!(data_id_free(data_id_handle_priv_appendable), 0);
-        assert_eq!(data_id_free(data_id_handle_pub_appendable), 0);
+        unsafe {
+            assert_eq!(data_id_free(sess_ptr, data_id_handle_struct), 0);
+            assert_eq!(data_id_free(sess_ptr, data_id_handle_immut), 0);
+            assert_eq!(data_id_free(sess_ptr, data_id_handle_priv_appendable), 0);
+            assert_eq!(data_id_free(sess_ptr, data_id_handle_pub_appendable), 0);
+        }
 
         let err_code = FfiError::InvalidDataIdHandle.into();
-        assert_eq!(data_id_free(data_id_handle_struct), err_code);
-        assert_eq!(data_id_free(data_id_handle_immut), err_code);
-        assert_eq!(data_id_free(data_id_handle_priv_appendable), err_code);
-        assert_eq!(data_id_free(data_id_handle_pub_appendable), err_code);
+        unsafe {
+            assert_eq!(data_id_free(sess_ptr, data_id_handle_struct), err_code);
+            assert_eq!(data_id_free(sess_ptr, data_id_handle_immut), err_code);
+            assert_eq!(data_id_free(sess_ptr, data_id_handle_priv_appendable),
+                       err_code);
+            assert_eq!(data_id_free(sess_ptr, data_id_handle_pub_appendable),
+                       err_code);
+        }
 
         {
-            let mut obj_cache = unwrap!(object_cache());
+            let obj_cache = sess.object_cache();
+            let mut obj_cache = obj_cache.borrow_mut();
             assert!(obj_cache.get_data_id(data_id_handle_struct).is_err());
             assert!(obj_cache.get_data_id(data_id_handle_immut).is_err());
             assert!(obj_cache.get_data_id(data_id_handle_priv_appendable).is_err());

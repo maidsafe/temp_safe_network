@@ -79,6 +79,8 @@ pub enum FfiError {
     InvalidIndex,
     /// Unsupported Operation (e.g. mixing Pub/PrivAppendableData operations
     UnsupportedOperation,
+    /// Input/output Error
+    IoError(::std::io::Error),
 }
 
 impl From<SerialisationError> for FfiError {
@@ -89,6 +91,12 @@ impl From<SerialisationError> for FfiError {
 impl<'a> From<&'a str> for FfiError {
     fn from(error: &'a str) -> FfiError {
         FfiError::Unexpected(error.to_string())
+    }
+}
+
+impl From<::std::io::Error> for FfiError {
+    fn from(error: ::std::io::Error) -> FfiError {
+        FfiError::IoError(error)
     }
 }
 
@@ -145,6 +153,7 @@ impl Into<i32> for FfiError {
             FfiError::InvalidSelfEncryptorReadOffsets => FFI_ERROR_START_RANGE - 22,
             FfiError::InvalidIndex => FFI_ERROR_START_RANGE - 23,
             FfiError::UnsupportedOperation => FFI_ERROR_START_RANGE - 24,
+            FfiError::IoError(_) => FFI_ERROR_START_RANGE - 25,
         }
     }
 }
@@ -187,6 +196,7 @@ impl fmt::Debug for FfiError {
             }
             FfiError::InvalidIndex => write!(f, "FfiError::InvalidIndex"),
             FfiError::UnsupportedOperation => write!(f, "FfiError::UnsupportedOperation"),
+            FfiError::IoError(ref error) => write!(f, "FfiError::IoError -> {:?}", error),
         }
     }
 }

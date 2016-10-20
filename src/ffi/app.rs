@@ -21,109 +21,87 @@
 // TODO(Spandan) - Run through this and make interfaces efficient (return references instead of
 // copies etc.) and uniform (i.e. not use get_ prefix for mem functions.
 
-use core::client::Client;
+use core::CoreMsg;
+use core::futures::FutureExt;
+use futures::Future;
 use libc::int32_t;
-use nfs::metadata::directory_key::DirectoryKey;
+use nfs::Dir;
 use rust_sodium::crypto::{box_, secretbox};
-use std::sync::{Arc, Mutex};
+use super::Session;
 use super::errors::FfiError;
 use super::helper;
-use super::launcher_config_handler::ConfigHandler;
-use super::session::{Session, SessionHandle};
+use super::launcher_config;
+use super::object_cache::AppHandle;
 
 /// Represents an application connected to the launcher.
-pub struct App {
-    session: Arc<Mutex<Session>>,
-    app_dir_key: Option<DirectoryKey>,
-    safe_drive_access: bool,
-    asym_keys: Option<(box_::PublicKey, box_::SecretKey)>,
-    sym_key: Option<secretbox::Key>,
+#[derive(RustcEncodable, RustcDecodable, Debug, Clone)]
+pub enum App {
+    /// Unautorised applicationa
+    Unauthorised,
+    /// Authorised application
+    Registered {
+        /// Application directory
+        app_dir: Dir,
+        /// Defines whether the application has access to SAFE Drive
+        safe_drive_access: bool,
+        /// Asymmetric encryption keys of the app
+        asym_enc_keys: (box_::PublicKey, box_::SecretKey),
+        /// Symmetric encryption key of the app
+        sym_key: secretbox::Key,
+    },
 }
 
 impl App {
-    /// Create new app for registered client.
-    pub fn registered(session: Arc<Mutex<Session>>,
-                      app_name: String,
-                      unique_token: String,
-                      vendor: String,
-                      safe_drive_access: bool)
-                      -> Result<Self, FfiError> {
-        let client = unwrap!(session.lock()).get_client();
-        let handler = ConfigHandler::new(client);
-        let app_info = try!(handler.get_app_info(app_name, unique_token, vendor));
-
-        Ok(App {
-            session: session,
-            app_dir_key: Some(app_info.app_root_dir_key),
-            safe_drive_access: safe_drive_access,
-            asym_keys: Some(app_info.asym_keys),
-            sym_key: Some(app_info.sym_key),
-        })
-    }
-
-    /// Create new app for unregistered client.
-    pub fn unregistered(session: Arc<Mutex<Session>>) -> Self {
-        App {
-            session: session,
-            app_dir_key: None,
-            safe_drive_access: false,
-            asym_keys: None,
-            sym_key: None,
+    /// Get app root directory key
+    pub fn sym_key(&self) -> Result<secretbox::Key, FfiError> {
+        if let App::Registered { ref sym_key, .. } = *self {
+            Ok(sym_key.clone())
+        } else {
+            Err(FfiError::OperationForbiddenForApp)
         }
     }
 
-    /// Get the client.
-    pub fn get_client(&self) -> Arc<Mutex<Client>> {
-        unwrap!(self.session.lock()).get_client()
-    }
-
-    // TODO Maybe change all of these to operation forbidden for app
-    /// Get app root directory key
-    pub fn get_app_dir_key(&self) -> Option<DirectoryKey> {
-        self.app_dir_key
-    }
-
-    /// Get app asym_keys
-    pub fn asym_keys(&self) -> Result<&(box_::PublicKey, box_::SecretKey), FfiError> {
-        self.asym_keys.as_ref().ok_or(FfiError::OperationForbiddenForApp)
-    }
-
-    /// Get app root directory key
-    pub fn sym_key(&self) -> Result<&secretbox::Key, FfiError> {
-        self.sym_key.as_ref().ok_or(FfiError::OperationForbiddenForApp)
-    }
-
-    /// Get SAFEdrive directory key.
-    pub fn get_safe_drive_dir_key(&self) -> Option<DirectoryKey> {
-        *unwrap!(self.session.lock()).get_safe_drive_dir_key()
-    }
-
-    /// Has this app access to the SAFEdrive?
-    pub fn has_safe_drive_access(&self) -> bool {
-        self.safe_drive_access
-    }
-
-    /// Get root directory key: for shared paths, this is the SAFEdrive directory,
-    /// otherwise it's the app directory.
-    pub fn get_root_dir_key(&self, is_shared: bool) -> Result<DirectoryKey, FfiError> {
-        if is_shared {
-            if !self.has_safe_drive_access() {
-                return Err(FfiError::PermissionDenied);
-            }
-
-            self.get_safe_drive_dir_key()
-                .ok_or(FfiError::from("Safe Drive directory key is not present"))
+    /// Get asymmetric encryption key for the app
+    pub fn asym_enc_keys(&self) -> Result<(box_::PublicKey, box_::SecretKey), FfiError> {
+        if let App::Registered { ref asym_enc_keys, .. } = *self {
+            Ok(asym_enc_keys.clone())
         } else {
-            self.get_app_dir_key()
-                .ok_or(FfiError::from("Application directory key is not present"))
+            Err(FfiError::OperationForbiddenForApp)
         }
     }
 }
+
+// // TODO Maybe change all of these to operation forbidden for app
+// /// Get app root directory
+// pub fn app_dir(&self) -> Option<Dir> {
+//     self.app_dir
+// }
+
+// /// Get SAFEdrive directory key.
+// pub fn safe_drive_dir(&self) -> Option<Dir> {
+//     self.session.safe_drive_dir()
+// }
+
+// /// Get root directory: for shared paths, this is the SAFEdrive directory,
+// /// otherwise it's the app directory.
+// pub fn root_dir(&self, is_shared: bool) -> Result<Dir, FfiError> {
+//     if is_shared {
+//         if !self.has_safe_drive_access() {
+//             return Err(FfiError::PermissionDenied);
+//         }
+
+//         self.safe_drive_dir()
+//             .ok_or(FfiError::from("Safe Drive directory key is not present"))
+//     } else {
+//         self.app_dir()
+//             .ok_or(FfiError::from("Application directory is not present"))
+//     }
+// }
 
 /// Register an app with the launcher. The returned app handle must be disposed
 /// of by calling `drop_app` once no longer needed.
 #[no_mangle]
-pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
+pub unsafe extern "C" fn register_app(session: *mut Session,
                                       app_name: *const u8,
                                       app_name_len: usize,
                                       unique_token: *const u8,
@@ -131,33 +109,46 @@ pub unsafe extern "C" fn register_app(session_handle: *mut SessionHandle,
                                       vendor: *const u8,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
-                                      app_handle: *mut *mut App)
+                                      user_data: usize,
+                                      o_cb: extern "C" fn(i32, usize, AppHandle))
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let app_name = ffi_try!(helper::c_utf8_to_string(app_name, app_name_len));
         let unique_token = ffi_try!(helper::c_utf8_to_string(unique_token, token_len));
         let vendor = ffi_try!(helper::c_utf8_to_string(vendor, vendor_len));
 
-        let session = (*session_handle).clone();
+        let s2 = (*session).clone();
 
-        let app =
-            ffi_try!(App::registered(session, app_name, unique_token, vendor, safe_drive_access));
+        ffi_try!((*session)
+            .send(CoreMsg::new(move |client| {
+                let fut = launcher_config::app_info(client,
+                                                    app_name,
+                                                    unique_token,
+                                                    vendor,
+                                                    safe_drive_access)
+                    .map_err(move |e| o_cb(ffi_error_code!(e), user_data, 0))
+                    .map(move |app| {
+                        let obj_cache = s2.object_cache();
+                        let app_handle = obj_cache.borrow_mut().insert_app(app);
+                        o_cb(0, user_data, app_handle);
+                    })
+                    .into_box();
+                Some(fut)
+            }))
+            .map_err(FfiError::from));
 
-        *app_handle = Box::into_raw(Box::new(app));
         0
     })
 }
 
 /// Register an annonymous app with the launcher. Can access only public data
 #[no_mangle]
-pub unsafe extern "C" fn create_unauthorised_app(session_handle: *mut SessionHandle,
-                                                 app_handle: *mut *mut App)
+pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
+                                                 o_app_handle: *mut AppHandle)
                                                  -> int32_t {
     helper::catch_unwind_i32(|| {
-        let session = (*session_handle).clone();
-        let app = App::unregistered(session);
-
-        *app_handle = Box::into_raw(Box::new(app));
+        let obj_cache = (*session).object_cache();
+        *o_app_handle = obj_cache.borrow_mut().insert_app(App::Unauthorised);
         0
     })
 }

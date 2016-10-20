@@ -38,19 +38,28 @@
 #[macro_use]
 mod macros;
 
-pub mod app;
-pub mod directory_details;
-pub mod dns;
+mod app;
+// pub mod directory_details;
+// pub mod dns;
 pub mod errors;
-pub mod file_details;
-pub mod logging;
+// pub mod file_details;
+// pub mod logging;
 pub mod low_level_api;
-pub mod nfs;
-pub mod session;
-pub mod string_list;
+// pub mod nfs;
+mod session;
+// pub mod string_list;
 
 mod config;
 mod helper;
-mod launcher_config_handler;
+mod launcher_config;
+mod object_cache;
 #[cfg(test)]
 mod test_utils;
+
+pub use ffi::app::App;
+pub use ffi::errors::FfiError;
+pub use ffi::session::Session;
+
+use futures::Future;
+/// Helper type to represent the FFI future result
+pub type FfiFuture<T> = Future<Item = T, Error = FfiError>;
