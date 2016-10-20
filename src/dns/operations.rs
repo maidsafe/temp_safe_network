@@ -50,6 +50,8 @@ pub fn register_dns(client: &Client,
     let services = services.iter().cloned().collect();
     let public_messaging_encryption_key2 = public_messaging_encryption_key.clone();
 
+    let private_signing_key2 = private_signing_key.clone();
+
     config::read(client)
         .and_then(move |saved_configs| {
             if saved_configs.iter().any(|config| config.long_name == long_name) {
@@ -80,7 +82,9 @@ pub fn register_dns(client: &Client,
                 .map_err(DnsError::from)
         })
         .and_then(move |(struct_data, saved_configs, long_name)| {
-            client3.put_recover(Data::Structured(struct_data), None)
+            client3.put_or_reclaim(Data::Structured(struct_data),
+                                   None,
+                                   private_signing_key2)
                 .map(move |_| (saved_configs, long_name))
                 .map_err(|err| match err {
                     CoreError::MutationFailure {
@@ -524,20 +528,26 @@ mod tests {
     }
 
     #[test]
-    fn register_and_delete() {
+    fn register_delete_and_reregister() {
         test_utils::register_and_run(move |client| {
             let client2 = client.clone();
             let client3 = client.clone();
+            let client4 = client.clone();
 
             let dns_name = unwrap!(utility::generate_random_string(10));
             let dns_name2 = dns_name.clone();
             let dns_name3 = dns_name.clone();
+            let dns_name4 = dns_name.clone();
 
             let messaging_keypair = box_::gen_keypair();
+            let messaging_keypair2 = messaging_keypair.clone();
+
             let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners2 = owners.clone();
 
             let signing_key = unwrap!(client.secret_signing_key()).clone();
             let signing_key2 = signing_key.clone();
+            let signing_key3 = signing_key.clone();
 
             register_dns(client,
                          dns_name,
@@ -547,10 +557,28 @@ mod tests {
                          owners,
                          signing_key,
                          None)
-                .and_then(move |_| delete_dns(&client2, dns_name2, signing_key2))
-                .and_then(move |_| get_all_registered_names(&client3))
-                .map(move |names| {
+                .then(move |result| {
+                    unwrap!(result);
+                    delete_dns(&client2, dns_name2, signing_key2)
+                })
+                .then(move |result| {
+                    unwrap!(result);
+                    get_all_registered_names(&client3)
+                })
+                .then(move |result| -> Result<_, DnsError> {
+                    let names = unwrap!(result);
                     assert!(!names.contains(&dns_name3));
+                    Ok(())
+                })
+                .then(move |_| {
+                    register_dns(&client4,
+                                 dns_name4,
+                                 messaging_keypair2.0,
+                                 messaging_keypair2.1,
+                                 &[],
+                                 owners2,
+                                 signing_key3,
+                                 None)
                 })
                 .map_err(|err| panic!("{:?}", err))
         })

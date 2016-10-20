@@ -257,7 +257,9 @@ impl MockRouting {
             } else {
                 match (data, storage.get_data(&data_name)) {
                     (Data::Structured(sd_new), Ok(Data::Structured(sd_stored))) => {
-                        if let Ok(_) = sd_stored.validate_self_against_successor(&sd_new) {
+                        if sd_stored.is_deleted() {
+                            Err(MutationError::InvalidOperation)
+                        } else if let Ok(_) = sd_stored.validate_self_against_successor(&sd_new) {
                             Ok(Data::Structured(sd_new))
                         } else {
                             Err(MutationError::InvalidSuccessor)

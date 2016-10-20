@@ -341,7 +341,7 @@ impl Client {
             Data::PrivAppendable(ref data) => data.get_owner_keys().clone(),
             Data::PubAppendable(ref data) => data.get_owner_keys().clone(),
             _ => {
-                // Don't do recovery for non-structured-data.
+                // Don't do recovery for non-structured data.
                 return self.put(data, dst);
             }
         };
@@ -383,6 +383,56 @@ impl Client {
                             debug!("Data exists but we are not the owner.");
                             Err(put_err)
                         }
+                    })
+                    .into_box()
+            })
+            .into_box()
+    }
+
+    /// Put data to the network. If a data with the same name already existed,
+    /// but was deleted, reclaim that data instead.
+    pub fn put_or_reclaim(&self,
+                          data: Data,
+                          dst: Option<Authority>,
+                          private_signing_key: sign::SecretKey)
+                          -> Box<CoreFuture<()>> {
+        // Don't attempt reclaim for non-structured data
+        let data = match data {
+            Data::Structured(data) => data,
+            _ => return self.put(data, dst),
+        };
+
+        let self2 = self.clone();
+        let self3 = self.clone();
+
+        self.put(Data::Structured(data.clone()), dst.clone())
+            .or_else(move |err| {
+                match err {
+                    CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. } => (),
+                    _ => return err!(err),
+                }
+
+                self2.get(data.identifier(), None)
+                    .and_then(move |retrieved_data| {
+                        let deleted_data = match retrieved_data {
+                            Data::Structured(data) => if data.is_deleted() {
+                                data
+                            } else {
+                                return Err(CoreError::ReceivedUnexpectedData);
+                            },
+                            _ => return Err(CoreError::ReceivedUnexpectedData),
+                        };
+
+                        Ok(try!(StructuredData::new(data.get_type_tag(),
+                                                    *data.name(),
+                                                    deleted_data.get_version() + 1,
+                                                    data.get_data().clone(),
+                                                    data.get_owner_keys().clone(),
+                                                    data.get_previous_owner_keys().clone(),
+                                                    Some(&private_signing_key))))
+                    })
+                    .and_then(move |data| {
+                        self3.put(Data::Structured(data), dst)
                     })
                     .into_box()
             })
@@ -832,7 +882,7 @@ mod tests {
     use core::utility::{self, test_utils};
     use futures::Future;
     use rand;
-    use routing::{Data, DataIdentifier, ImmutableData};
+    use routing::{Data, DataIdentifier, ImmutableData, StructuredData};
     use routing::client_errors::MutationError;
     use rust_sodium::crypto::secretbox;
     use super::*;
@@ -993,4 +1043,87 @@ mod tests {
         }
     }
 
+    #[test]
+    fn put_or_reclaim_structured_data() {
+        test_utils::register_and_run(|client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
+            let client4 = client.clone();
+
+            let owner_keys = vec![unwrap!(client.public_signing_key()).clone()];
+            let owner_keys2 = owner_keys.clone();
+            let owner_keys3 = owner_keys.clone();
+            let owner_keys4 = owner_keys.clone();
+
+            let signing_key = unwrap!(client.secret_signing_key()).clone();
+            let signing_key2 = signing_key.clone();
+            let signing_key3 = signing_key.clone();
+            let signing_key4 = signing_key.clone();
+
+            let tag = ::UNVERSIONED_STRUCT_DATA_TYPE_TAG;
+            let name = rand::random();
+            let value = unwrap!(utility::generate_random_vector(10));
+
+            // PUT the data to the network.
+            let data = unwrap!(StructuredData::new(tag,
+                                                   name,
+                                                   0,
+                                                   value,
+                                                   owner_keys,
+                                                   vec![],
+                                                   Some(&signing_key)));
+
+            client.put(Data::Structured(data), None)
+                .then(move |result| {
+                    unwrap!(result);
+
+                    // DELETE it.
+                    let data = unwrap!(StructuredData::new(tag,
+                                                           name,
+                                                           1,
+                                                           vec![],
+                                                           vec![],
+                                                           owner_keys2,
+                                                           Some(&signing_key2)));
+                    client2.delete(Data::Structured(data), None)
+                })
+                .then(move |result| {
+                    unwrap!(result);
+
+                    // Try to PUT new data under the same name. Should fail.
+                    let value = unwrap!(utility::generate_random_vector(10));
+                    let data = unwrap!(StructuredData::new(tag,
+                                                           name,
+                                                           0,
+                                                           value,
+                                                           owner_keys3,
+                                                           vec![],
+                                                           Some(&signing_key3)));
+                    client3.put(Data::Structured(data), None)
+                })
+                .then(move |result| {
+                    match result {
+                        Err(CoreError::MutationFailure {
+                            reason: MutationError::InvalidSuccessor, ..
+                        }) => (),
+                        Ok(()) => panic!("Unexpected success"),
+                        Err(err) => panic!("{:?}", err),
+                    }
+
+                    // Not try again, but using `put_or_reclaim`. Should succeed.
+                    let value = unwrap!(utility::generate_random_vector(10));
+                    let data = unwrap!(StructuredData::new(tag,
+                                                           name,
+                                                           0,
+                                                           value,
+                                                           owner_keys4,
+                                                           vec![],
+                                                           Some(&signing_key4)));
+                    client4.put_or_reclaim(Data::Structured(data),
+                                           None,
+                                           signing_key4)
+                })
+                .map_err(|err| panic!("{:?}", err))
+        })
+    }
 }
