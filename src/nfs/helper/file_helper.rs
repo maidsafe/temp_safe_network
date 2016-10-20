@@ -1,9 +1,7 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
-// Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3,
-// depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project
@@ -153,11 +151,13 @@ mod tests {
         let dir = Dir::new();
 
         dir_helper::create(client, &dir, None)
-            .and_then(move |dir_id| {
+            .then(move |dir_id| {
+                let dir_id = unwrap!(dir_id);
                 file_helper::create(c2, "hello.txt", Vec::new(), (dir_id, None), dir)
                     .map(move |writer| (writer, (dir_id, None)))
             })
-            .and_then(move |(writer, dir_id)| {
+            .then(move |result| {
+                let (writer, dir_id) = unwrap!(result);
                 writer.write(&[0u8; ORIG_SIZE])
                     .and_then(move |_| writer.close())
                     .map(move |updated_dir| (updated_dir, dir_id))
@@ -283,7 +283,6 @@ mod tests {
                 file_helper::delete(c2, "hello.txt", &metadata, &mut dir).map(move |_| {
                     assert!(dir.find_file("hello.txt").is_none());
                 })
-            })
         })
     }
 }
