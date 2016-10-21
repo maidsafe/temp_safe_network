@@ -38,7 +38,7 @@ pub fn register_dns(client: &Client,
                     secret_messaging_encryption_key: box_::SecretKey,
                     services: &[(String, DirId)],
                     owners: Vec<sign::PublicKey>,
-                    private_signing_key: sign::SecretKey,
+                    sign_sk: sign::SecretKey,
                     encryption_key: Option<secretbox::Key>)
                     -> Box<DnsFuture<()>> {
     trace!("Registering dns with name: {}", long_name);
@@ -50,7 +50,7 @@ pub fn register_dns(client: &Client,
     let services = services.iter().cloned().collect();
     let public_messaging_encryption_key2 = public_messaging_encryption_key.clone();
 
-    let private_signing_key2 = private_signing_key.clone();
+    let sign_sk2 = sign_sk.clone();
 
     config::read(client)
         .and_then(move |saved_configs| {
@@ -76,7 +76,7 @@ pub fn register_dns(client: &Client,
                                 encoded_dns_record,
                                 owners,
                                 vec![],
-                                private_signing_key,
+                                sign_sk,
                                 encryption_key)
                 .map(move |struct_data| (struct_data, saved_configs, long_name))
                 .map_err(DnsError::from)
@@ -84,7 +84,7 @@ pub fn register_dns(client: &Client,
         .and_then(move |(struct_data, saved_configs, long_name)| {
             client3.put_recover(Data::Structured(struct_data),
                                 None,
-                                private_signing_key2)
+                                sign_sk2)
                 .map(move |_| (saved_configs, long_name))
                 .map_err(|err| match err {
                     CoreError::MutationFailure {
@@ -110,7 +110,7 @@ pub fn register_dns(client: &Client,
 /// Delete the Dns-Record
 pub fn delete_dns(client: &Client,
                   long_name: String,
-                  private_signing_key: sign::SecretKey)
+                  sign_sk: sign::SecretKey)
                   -> Box<DnsFuture<()>> {
     trace!("Deleting dns with name: {}", long_name);
 
@@ -129,7 +129,7 @@ pub fn delete_dns(client: &Client,
                 .and_then(move |struct_data| {
                     unversioned::delete_recover(&client2,
                                                 struct_data,
-                                                &private_signing_key)
+                                                &sign_sk)
                         .map_err(DnsError::from)
                 })
                 .or_else(|err| match err {
@@ -188,7 +188,7 @@ pub fn get_all_services(client: &Client,
 pub fn add_service(client: &Client,
                    long_name: String,
                    new_service: (String, DirId),
-                   private_signing_key: sign::SecretKey,
+                   sign_sk: sign::SecretKey,
                    encryption_key: Option<secretbox::Key>)
                    -> Box<DnsFuture<()>> {
     trace!("Add service {:?} to dns with name: {}",
@@ -217,7 +217,7 @@ pub fn add_service(client: &Client,
             unversioned::update(&client2,
                                 prev_data,
                                 encoded_dns_record,
-                                private_signing_key,
+                                sign_sk,
                                 encryption_key)
                 .map_err(DnsError::from)
         })
@@ -228,7 +228,7 @@ pub fn add_service(client: &Client,
 pub fn remove_service(client: &Client,
                       long_name: String,
                       service: String,
-                      private_signing_key: sign::SecretKey,
+                      sign_sk: sign::SecretKey,
                       encryption_key: Option<secretbox::Key>)
                       -> Box<DnsFuture<()>> {
     trace!("Remove service {:?} from dns with name: {}",
@@ -257,7 +257,7 @@ pub fn remove_service(client: &Client,
             unversioned::update(&client2,
                                 prev_data,
                                 encoded_dns_record,
-                                private_signing_key,
+                                sign_sk,
                                 encryption_key)
                 .map_err(DnsError::from)
         })

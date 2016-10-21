@@ -39,7 +39,7 @@ pub fn create(client: &Client,
               value: Vec<u8>,
               curr_owner_keys: Vec<sign::PublicKey>,
               prev_owner_keys: Vec<sign::PublicKey>,
-              private_signing_key: sign::SecretKey,
+              sign_sk: sign::SecretKey,
               encryption_key: Option<secretbox::Key>)
               -> Box<CoreFuture<StructuredData>> {
     trace!("Creating unversioned StructuredData.");
@@ -58,7 +58,7 @@ pub fn create(client: &Client,
                                 encoded_value,
                                 curr_owner_keys,
                                 prev_owner_keys,
-                                Some(&private_signing_key))
+                                Some(&sign_sk))
                 .map_err(From::from)
                 .into_future()
                 .into_box()
@@ -73,7 +73,7 @@ pub fn create(client: &Client,
                                  value,
                                  curr_owner_keys,
                                  prev_owner_keys,
-                                 private_signing_key,
+                                 sign_sk,
                                  encryption_key)
         }
         DataFitResult::NoDataCanFit => err!(CoreError::StructuredDataHeaderSizeProhibitive),
@@ -84,7 +84,7 @@ pub fn create(client: &Client,
 pub fn update(client: &Client,
               data: StructuredData,
               new_value: Vec<u8>,
-              private_signing_key: sign::SecretKey,
+              sign_sk: sign::SecretKey,
               encryption_key: Option<secretbox::Key>)
               -> Box<CoreFuture<()>> {
     let client2 = client.clone();
@@ -96,7 +96,7 @@ pub fn update(client: &Client,
            new_value,
            data.get_owner_keys().clone(),
            data.get_previous_owner_keys().clone(),
-           private_signing_key,
+           sign_sk,
            encryption_key)
         .and_then(move |data| client2.post(Data::Structured(data), None))
         .into_box()
@@ -178,7 +178,7 @@ fn create_with_data_map(client: Client,
                         value: Vec<u8>,
                         curr_owner_keys: Vec<sign::PublicKey>,
                         prev_owner_keys: Vec<sign::PublicKey>,
-                        private_signing_key: sign::SecretKey,
+                        sign_sk: sign::SecretKey,
                         encryption_key: Option<secretbox::Key>)
                         -> Box<CoreFuture<StructuredData>> {
 
@@ -205,7 +205,7 @@ fn create_with_data_map(client: Client,
                                         encoded_data_map,
                                         curr_owner_keys,
                                         prev_owner_keys,
-                                        Some(&private_signing_key))
+                                        Some(&sign_sk))
                         .map_err(From::from)
                         .into_future()
                         .into_box()
@@ -221,7 +221,7 @@ fn create_with_data_map(client: Client,
                                                encoded_data_map,
                                                curr_owner_keys,
                                                prev_owner_keys,
-                                               private_signing_key,
+                                               sign_sk,
                                                encryption_key)
                 }
                 DataFitResult::NoDataCanFit => err!(CoreError::StructuredDataHeaderSizeProhibitive),
@@ -239,13 +239,13 @@ fn create_with_immutable_data(client: Client,
                               value: Vec<u8>,
                               curr_owner_keys: Vec<sign::PublicKey>,
                               prev_owner_keys: Vec<sign::PublicKey>,
-                              private_signing_key: sign::SecretKey,
+                              sign_sk: sign::SecretKey,
                               encryption_key: Option<secretbox::Key>)
                               -> Box<CoreFuture<StructuredData>> {
     let immutable_data = ImmutableData::new(value);
     let name = *immutable_data.name();
 
-    client.put_recover(Data::Immutable(immutable_data), None, private_signing_key.clone())
+    client.put_recover(Data::Immutable(immutable_data), None, sign_sk.clone())
         .and_then(move |_| {
             let encoded_name = try!(encode(DataTypeEncoding::MapName(name),
                                            encryption_key.as_ref()));
@@ -260,7 +260,7 @@ fn create_with_immutable_data(client: Client,
                                                 encoded_name,
                                                 curr_owner_keys,
                                                 prev_owner_keys,
-                                                Some(&private_signing_key))))
+                                                Some(&sign_sk))))
                 }
                 _ => {
                     trace!("Even name of ImmutableData does not fit in \

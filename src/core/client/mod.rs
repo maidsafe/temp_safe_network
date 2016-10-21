@@ -342,7 +342,7 @@ impl Client {
     pub fn put_recover(&self,
                        data: Data,
                        dst: Option<Authority>,
-                       private_signing_key: sign::SecretKey)
+                       sign_sk: sign::SecretKey)
                        -> Box<CoreFuture<u64>> {
         let version = match data {
             Data::Structured(ref data) => data.get_version(),
@@ -372,7 +372,8 @@ impl Client {
                 self2.get(data.identifier(), None)
                     .then(move |result| {
                         let owner_match = match (result, data) {
-                            (Ok(Data::Structured(ref old)), Data::Structured(ref new)) if old.is_deleted() => {
+                            (Ok(Data::Structured(ref old)), Data::Structured(ref new))
+                                if old.is_deleted() => {
                                 // The existing data is deleted. Attempt reclaim.
                                 let data = fry!(StructuredData::new(
                                     new.get_type_tag(),
@@ -381,7 +382,7 @@ impl Client {
                                     new.get_data().clone(),
                                     new.get_owner_keys().clone(),
                                     new.get_previous_owner_keys().clone(),
-                                    Some(&private_signing_key))
+                                    Some(&sign_sk))
                                         .map_err(move |_| put_err));
 
                                 let version = data.get_version();
@@ -476,8 +477,12 @@ impl Client {
             .then(|result| {
                 match result {
                     Ok(()) |
-                    Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) |
-                    Err(CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. }) => {
+                    Err(CoreError::MutationFailure {
+                        reason: MutationError::NoSuchData, ..
+                    }) |
+                    Err(CoreError::MutationFailure {
+                        reason: MutationError::InvalidOperation, ..
+                    }) => {
                         debug!("DELETE recovery successful !");
                         Ok(())
                     }
@@ -1040,10 +1045,10 @@ mod tests {
             let owner_keys3 = owner_keys.clone();
             let owner_keys4 = owner_keys.clone();
 
-            let signing_key = unwrap!(client.secret_signing_key());
-            let signing_key2 = signing_key.clone();
-            let signing_key3 = signing_key.clone();
-            let signing_key4 = signing_key.clone();
+            let sign_sk = unwrap!(client.secret_signing_key());
+            let sign_sk2 = sign_sk.clone();
+            let sign_sk3 = sign_sk.clone();
+            let sign_sk4 = sign_sk.clone();
 
             let tag = ::UNVERSIONED_STRUCT_DATA_TYPE_TAG;
             let name = rand::random();
@@ -1056,7 +1061,7 @@ mod tests {
                                                    value,
                                                    owner_keys,
                                                    vec![],
-                                                   Some(&signing_key)));
+                                                   Some(&sign_sk)));
 
             client.put(Data::Structured(data), None)
                 .then(move |result| {
@@ -1069,7 +1074,7 @@ mod tests {
                                                            vec![],
                                                            vec![],
                                                            owner_keys2,
-                                                           Some(&signing_key2)));
+                                                           Some(&sign_sk2)));
                     client2.delete(Data::Structured(data), None)
                 })
                 .then(move |result| {
@@ -1083,7 +1088,7 @@ mod tests {
                                                            value,
                                                            owner_keys3,
                                                            vec![],
-                                                           Some(&signing_key3)));
+                                                           Some(&sign_sk3)));
                     client3.put(Data::Structured(data), None)
                 })
                 .then(move |result| {
@@ -1103,10 +1108,8 @@ mod tests {
                                                            value,
                                                            owner_keys4,
                                                            vec![],
-                                                           Some(&signing_key4)));
-                    client4.put_recover(Data::Structured(data),
-                                        None,
-                                        signing_key4)
+                                                           Some(&sign_sk4)));
+                    client4.put_recover(Data::Structured(data), None, sign_sk4)
                 })
                 .map_err(|err| panic!("{:?}", err))
         })
