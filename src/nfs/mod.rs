@@ -28,6 +28,7 @@ mod metadata;
 
 use futures::Future;
 pub use nfs::dir::{Dir, DirId};
+pub use nfs::errors::NfsError;
 pub use nfs::file::File;
 pub use nfs::metadata::{DirMetadata, FileMetadata};
 
@@ -46,4 +47,4 @@ pub enum AccessLevel {
 }
 
 /// Helper type for futures that can result in NfsError
-pub type NfsFuture<T> = Future<Item = T, Error = errors::NfsError>;
+pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;

@@ -40,7 +40,7 @@ pub fn create(client: &Client,
               id: XorName,
               value: Vec<u8>,
               owner_keys: Vec<sign::PublicKey>,
-              private_signing_key: sign::SecretKey,
+              sig_sk: sign::SecretKey,
               encryption_key: Option<secretbox::Key>)
               -> Box<CoreFuture<StructuredData>> {
     let client2 = client.clone();
@@ -55,7 +55,7 @@ pub fn create(client: &Client,
                            vec![],
                            owner_keys,
                            vec![],
-                           private_signing_key)
+                           sig_sk)
         })
         .into_box()
 }
@@ -65,7 +65,7 @@ pub fn update(client: &Client,
               data: StructuredData,
               value: Vec<u8>,
               curr_owner_keys: Vec<sign::PublicKey>,
-              private_signing_key: sign::SecretKey,
+              sig_sk: sign::SecretKey,
               encryption_key: Option<secretbox::Key>)
               -> Box<CoreFuture<StructuredData>> {
     let client2 = client.clone();
@@ -89,7 +89,7 @@ pub fn update(client: &Client,
                            version_list,
                            curr_owner_keys,
                            prev_owner_keys,
-                           private_signing_key)
+                           sig_sk)
         })
         .into_box()
 }
@@ -161,7 +161,7 @@ fn append_version(client: Client,
                   mut version_list: Vec<XorName>,
                   curr_owner_keys: Vec<sign::PublicKey>,
                   prev_owner_keys: Vec<sign::PublicKey>,
-                  private_signing_key: sign::SecretKey)
+                  sig_sk: sign::SecretKey)
                   -> Box<CoreFuture<StructuredData>> {
     let client2 = client.clone();
 
@@ -186,7 +186,7 @@ fn append_version(client: Client,
                                              info,
                                              curr_owner_keys,
                                              prev_owner_keys,
-                                             private_signing_key));
+                                             sig_sk));
 
             Ok((structured_data, version_list_data, curr_version_data))
         })
@@ -205,7 +205,7 @@ fn build(type_tag: u64,
          info: VersionsInfo,
          curr_owner_keys: Vec<sign::PublicKey>,
          prev_owner_keys: Vec<sign::PublicKey>,
-         private_signing_key: sign::SecretKey)
+         sig_sk: sign::SecretKey)
          -> Result<StructuredData, CoreError> {
     let encoded = try!(serialise(&info));
 
@@ -220,7 +220,7 @@ fn build(type_tag: u64,
                                         encoded,
                                         curr_owner_keys,
                                         prev_owner_keys,
-                                        Some(&private_signing_key))))
+                                        Some(&sig_sk))))
         }
         _ => {
             trace!("VersionsInfo does not fit in StructuredData.");

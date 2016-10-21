@@ -15,7 +15,14 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-/// Safe-Dns errors
-pub mod errors;
-/// Contains interfaces for all dns related operations
-pub mod dns_operations;
+use futures::Future;
+
+mod errors;
+pub mod operations;
+pub mod config;
+mod tests;
+
+pub use self::errors::DnsError;
+
+/// Future returned from DNS operations.
+pub type DnsFuture<T> = Future<Item = T, Error = DnsError>;

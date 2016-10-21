@@ -15,7 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::errors::CoreError;
+//! DNS errors.
+
+use core::CoreError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use nfs::errors::{NFS_ERROR_START_RANGE, NfsError};
 

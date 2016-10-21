@@ -39,7 +39,7 @@ pub fn create(client: &Client,
               value: Vec<u8>,
               curr_owner_keys: Vec<sign::PublicKey>,
               prev_owner_keys: Vec<sign::PublicKey>,
-              private_signing_key: sign::SecretKey,
+              sign_sk: sign::SecretKey,
               encryption_key: Option<secretbox::Key>)
               -> Box<CoreFuture<StructuredData>> {
     trace!("Creating unversioned StructuredData.");
@@ -58,7 +58,7 @@ pub fn create(client: &Client,
                                 encoded_value,
                                 curr_owner_keys,
                                 prev_owner_keys,
-                                Some(&private_signing_key))
+                                Some(&sign_sk))
                 .map_err(From::from)
                 .into_future()
                 .into_box()
@@ -73,12 +73,51 @@ pub fn create(client: &Client,
                                  value,
                                  curr_owner_keys,
                                  prev_owner_keys,
-                                 private_signing_key,
+                                 sign_sk,
                                  encryption_key)
         }
         DataFitResult::NoDataCanFit => err!(CoreError::StructuredDataHeaderSizeProhibitive),
     }
 }
+
+/// Update structured data with new value and POST it to the network.
+pub fn update(client: &Client,
+              data: StructuredData,
+              new_value: Vec<u8>,
+              sign_sk: sign::SecretKey,
+              encryption_key: Option<secretbox::Key>)
+              -> Box<CoreFuture<()>> {
+    let client2 = client.clone();
+
+    create(client,
+           data.get_type_tag(),
+           *data.name(),
+           data.get_version() + 1,
+           new_value,
+           data.get_owner_keys().clone(),
+           data.get_previous_owner_keys().clone(),
+           sign_sk,
+           encryption_key)
+        .and_then(move |data| client2.post(Data::Structured(data), None))
+        .into_box()
+}
+
+/// Delete structured data from the network.
+pub fn delete(client: &Client,
+              data: StructuredData,
+              signing_key: &sign::SecretKey) -> Box<CoreFuture<()>> {
+    let data = fry!(create_for_deletion(data, signing_key));
+    client.delete(Data::Structured(data), None)
+}
+
+/// Delete structured data from the network, with recovery
+pub fn delete_recover(client: &Client,
+                      data: StructuredData,
+                      signing_key: &sign::SecretKey) -> Box<CoreFuture<()>> {
+    let data = fry!(create_for_deletion(data, signing_key));
+    client.delete_recover(Data::Structured(data), None)
+}
+
 
 /// Get the raw bytes from StructuredData created via `create()` function in this module.
 pub fn extract_value(client: &Client,
@@ -139,7 +178,7 @@ fn create_with_data_map(client: Client,
                         value: Vec<u8>,
                         curr_owner_keys: Vec<sign::PublicKey>,
                         prev_owner_keys: Vec<sign::PublicKey>,
-                        private_signing_key: sign::SecretKey,
+                        sign_sk: sign::SecretKey,
                         encryption_key: Option<secretbox::Key>)
                         -> Box<CoreFuture<StructuredData>> {
 
@@ -166,7 +205,7 @@ fn create_with_data_map(client: Client,
                                         encoded_data_map,
                                         curr_owner_keys,
                                         prev_owner_keys,
-                                        Some(&private_signing_key))
+                                        Some(&sign_sk))
                         .map_err(From::from)
                         .into_future()
                         .into_box()
@@ -182,7 +221,7 @@ fn create_with_data_map(client: Client,
                                                encoded_data_map,
                                                curr_owner_keys,
                                                prev_owner_keys,
-                                               private_signing_key,
+                                               sign_sk,
                                                encryption_key)
                 }
                 DataFitResult::NoDataCanFit => err!(CoreError::StructuredDataHeaderSizeProhibitive),
@@ -200,13 +239,13 @@ fn create_with_immutable_data(client: Client,
                               value: Vec<u8>,
                               curr_owner_keys: Vec<sign::PublicKey>,
                               prev_owner_keys: Vec<sign::PublicKey>,
-                              private_signing_key: sign::SecretKey,
+                              sign_sk: sign::SecretKey,
                               encryption_key: Option<secretbox::Key>)
                               -> Box<CoreFuture<StructuredData>> {
     let immutable_data = ImmutableData::new(value);
     let name = *immutable_data.name();
 
-    client.put_recover(Data::Immutable(immutable_data), None)
+    client.put_recover(Data::Immutable(immutable_data), None, sign_sk.clone())
         .and_then(move |_| {
             let encoded_name = try!(encode(DataTypeEncoding::MapName(name),
                                            encryption_key.as_ref()));
@@ -221,7 +260,7 @@ fn create_with_immutable_data(client: Client,
                                                 encoded_name,
                                                 curr_owner_keys,
                                                 prev_owner_keys,
-                                                Some(&private_signing_key))))
+                                                Some(&sign_sk))))
                 }
                 _ => {
                     trace!("Even name of ImmutableData does not fit in \
@@ -231,6 +270,18 @@ fn create_with_immutable_data(client: Client,
             }
         })
         .into_box()
+}
+
+fn create_for_deletion(data: StructuredData,
+                       signing_key: &sign::SecretKey)
+                       -> Result<StructuredData, CoreError> {
+    Ok(try!(StructuredData::new(data.get_type_tag(),
+                                *data.name(),
+                                data.get_version() + 1,
+                                vec![],
+                                vec![],
+                                data.get_owner_keys().clone(),
+                                Some(signing_key))))
 }
 
 fn encode(data: DataTypeEncoding,

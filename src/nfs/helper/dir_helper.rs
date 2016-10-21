@@ -41,12 +41,13 @@ pub fn create(client: Client,
     let data_id = DataIdentifier::Structured(id, ::UNVERSIONED_STRUCT_DATA_TYPE_TAG);
 
     let c2 = client.clone();
+    let signing_key = fry!(client.secret_signing_key());
 
     save(client.clone(), dir, &data_id, encryption_key)
         .and_then(move |structured_data| {
             let data_id = structured_data.identifier();
 
-            c2.put_recover(Data::Structured(structured_data), None)
+            c2.put_recover(Data::Structured(structured_data), None, signing_key)
                 .map_err(NfsError::from)
                 .map(move |_| data_id)
         })

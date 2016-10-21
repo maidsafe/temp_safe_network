@@ -331,57 +331,93 @@ impl Client {
     }
 
     /// Put data to the network, with recovery.
-    pub fn put_recover(&self, data: Data, dst: Option<Authority>) -> Box<CoreFuture<()>> {
-        trace!("PUT with recovery for {:?}", data);
-
-        let self2 = self.clone();
-
-        let owner_keys_before = match data {
-            Data::Structured(ref data) => data.get_owner_keys().clone(),
-            Data::PrivAppendable(ref data) => data.get_owner_keys().clone(),
-            Data::PubAppendable(ref data) => data.get_owner_keys().clone(),
+    ///
+    /// 1. If a data with the same name didn't previously exist, this is the same
+    ///    as normal PUT.
+    /// 2. If it existed, but was deleted, attempt to reclaim it.
+    /// 3. Otherwise succeed only if there is owners match.
+    ///
+    /// Resolves to the current version of the data, or 0 if the data doesn't have
+    /// version.
+    pub fn put_recover(&self,
+                       data: Data,
+                       dst: Option<Authority>,
+                       sign_sk: sign::SecretKey)
+                       -> Box<CoreFuture<u64>> {
+        let version = match data {
+            Data::Structured(ref data) => data.get_version(),
+            Data::PrivAppendable(ref data) => data.get_version(),
+            Data::PubAppendable(ref data) => data.get_version(),
             _ => {
-                // Don't do recovery for non-structured-data.
-                return self.put(data, dst);
+                // Don't do recovery for other types
+                return self.put(data, dst).map(|_| 0).into_box();
             }
         };
 
-        let data_id = data.identifier();
+        let self2 = self.clone();
+        let self3 = self.clone();
 
-        self.put(data, dst.clone())
+        self.put(data.clone(), dst.clone())
+            .map(move |_| version)
             .or_else(move |put_err| {
                 debug!("PUT failed with {:?}. Attempting recovery.", put_err);
 
-                if let CoreError::MutationFailure { reason: MutationError::LowBalance, .. } =
-                       put_err {
-                    debug!("Low balance error cannot be recovered from.");
-                    return err!(put_err);
+                // Only attempt recovery on these errors:
+                match put_err {
+                    CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. } |
+                    CoreError::MutationFailure { reason: MutationError::DataExists, .. } => (),
+                    _ => return err!(put_err),
                 }
 
-                self2.get(data_id, dst)
-                    .then(move |get_result| {
-                        let owner_keys_after = match get_result {
-                            Ok(Data::Structured(ref data)) => data.get_owner_keys(),
-                            Ok(Data::PrivAppendable(ref data)) => data.get_owner_keys(),
-                            Ok(Data::PubAppendable(ref data)) => data.get_owner_keys(),
-                            Ok(data) => {
-                                debug!("Address space already occupied by: {:?}.", data);
-                                return Err(put_err);
+                self2.get(data.identifier(), None)
+                    .then(move |result| {
+                        let owner_match = match (result, data) {
+                            (Ok(Data::Structured(ref old)), Data::Structured(ref new))
+                                if old.is_deleted() => {
+                                // The existing data is deleted. Attempt reclaim.
+                                let data = fry!(StructuredData::new(
+                                    new.get_type_tag(),
+                                    *new.name(),
+                                    old.get_version() + 1,
+                                    new.get_data().clone(),
+                                    new.get_owner_keys().clone(),
+                                    new.get_previous_owner_keys().clone(),
+                                    Some(&sign_sk))
+                                        .map_err(move |_| put_err));
+
+                                let version = data.get_version();
+
+                                return self3.put(Data::Structured(data), dst)
+                                    .map(move |_| version)
+                                    .into_box();
                             }
-                            Err(get_err) => {
+                            (Ok(Data::Structured(old)), Data::Structured(new)) => {
+                                old.get_owner_keys() == new.get_owner_keys()
+                            }
+                            (Ok(Data::PrivAppendable(old)), Data::PrivAppendable(new)) => {
+                                old.get_owner_keys() == new.get_owner_keys()
+                            }
+                            (Ok(Data::PubAppendable(old)), Data::PubAppendable(new)) => {
+                                old.get_owner_keys() == new.get_owner_keys()
+                            }
+                            (Ok(old), _) => {
+                                debug!("Address space already occupied by: {:?}.", old);
+                                return err!(put_err);
+                            }
+                            (Err(get_err), _) => {
                                 debug!("Address space is vacant but still unable to PUT due to \
                                         {:?}.",
                                        get_err);
-                                return Err(put_err);
+                                return err!(put_err);
                             }
                         };
 
-                        if *owner_keys_after == owner_keys_before {
+                        if owner_match {
                             debug!("PUT recovery successful !");
-                            Ok(())
+                            ok!(version)
                         } else {
                             debug!("Data exists but we are not the owner.");
-                            Err(put_err)
+                            err!(put_err)
                         }
                     })
                     .into_box()
@@ -441,7 +477,12 @@ impl Client {
             .then(|result| {
                 match result {
                     Ok(()) |
-                    Err(CoreError::MutationFailure { reason: MutationError::NoSuchData, .. }) => {
+                    Err(CoreError::MutationFailure {
+                        reason: MutationError::NoSuchData, ..
+                    }) |
+                    Err(CoreError::MutationFailure {
+                        reason: MutationError::InvalidOperation, ..
+                    }) => {
                         debug!("DELETE recovery successful !");
                         Ok(())
                     }
@@ -633,7 +674,7 @@ impl Client {
     }
 
     #[cfg(all(test, feature = "use-mock-routing"))]
-    pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
+    pub fn set_network_limits(&self, max_ops_count: Option<u64>) {
         self.routing_mut().set_network_limits(max_ops_count);
     }
 
@@ -831,7 +872,7 @@ mod tests {
     use core::utility::{self, test_utils};
     use futures::Future;
     use rand;
-    use routing::{Data, DataIdentifier, ImmutableData};
+    use routing::{Data, DataIdentifier, ImmutableData, StructuredData};
     use routing::client_errors::MutationError;
     use rust_sodium::crypto::secretbox;
     use super::*;
@@ -992,4 +1033,85 @@ mod tests {
         }
     }
 
+    #[test]
+    fn put_or_reclaim_structured_data() {
+        test_utils::register_and_run(|client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
+            let client4 = client.clone();
+
+            let owner_keys = vec![unwrap!(client.public_signing_key())];
+            let owner_keys2 = owner_keys.clone();
+            let owner_keys3 = owner_keys.clone();
+            let owner_keys4 = owner_keys.clone();
+
+            let sign_sk = unwrap!(client.secret_signing_key());
+            let sign_sk2 = sign_sk.clone();
+            let sign_sk3 = sign_sk.clone();
+            let sign_sk4 = sign_sk.clone();
+
+            let tag = ::UNVERSIONED_STRUCT_DATA_TYPE_TAG;
+            let name = rand::random();
+            let value = unwrap!(utility::generate_random_vector(10));
+
+            // PUT the data to the network.
+            let data = unwrap!(StructuredData::new(tag,
+                                                   name,
+                                                   0,
+                                                   value,
+                                                   owner_keys,
+                                                   vec![],
+                                                   Some(&sign_sk)));
+
+            client.put(Data::Structured(data), None)
+                .then(move |result| {
+                    unwrap!(result);
+
+                    // DELETE it.
+                    let data = unwrap!(StructuredData::new(tag,
+                                                           name,
+                                                           1,
+                                                           vec![],
+                                                           vec![],
+                                                           owner_keys2,
+                                                           Some(&sign_sk2)));
+                    client2.delete(Data::Structured(data), None)
+                })
+                .then(move |result| {
+                    unwrap!(result);
+
+                    // Try to PUT new data under the same name. Should fail.
+                    let value = unwrap!(utility::generate_random_vector(10));
+                    let data = unwrap!(StructuredData::new(tag,
+                                                           name,
+                                                           0,
+                                                           value,
+                                                           owner_keys3,
+                                                           vec![],
+                                                           Some(&sign_sk3)));
+                    client3.put(Data::Structured(data), None)
+                })
+                .then(move |result| {
+                    match result {
+                        Err(CoreError::MutationFailure {
+                            reason: MutationError::InvalidSuccessor, ..
+                        }) => (),
+                        Ok(()) => panic!("Unexpected success"),
+                        Err(err) => panic!("{:?}", err),
+                    }
+
+                    // Not try again, but using `put_or_reclaim`. Should succeed.
+                    let value = unwrap!(utility::generate_random_vector(10));
+                    let data = unwrap!(StructuredData::new(tag,
+                                                           name,
+                                                           0,
+                                                           value,
+                                                           owner_keys4,
+                                                           vec![],
+                                                           Some(&sign_sk4)));
+                    client4.put_recover(Data::Structured(data), None, sign_sk4)
+                })
+                .map_err(|err| panic!("{:?}", err))
+        })
+    }
 }
