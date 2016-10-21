@@ -130,15 +130,20 @@ mod tests {
 
             // Get the Stored Configurations
             read(client)
-                .and_then(move |mut config_vec| {
+                .then(move |result| {
+                    let mut config_vec = unwrap!(result);
                     assert!(config_vec.is_empty());
 
                     // Put in the 1st record
                     config_vec.push(config_0);
                     write(&client2, config_vec)
                 })
-                .and_then(move |_| read(&client3))
-                .and_then(move |mut config_vec| {
+                .then(move |result| {
+                    unwrap!(result);
+                    read(&client3)
+                })
+                .then(move |result| {
+                    let mut config_vec = unwrap!(result);
                     assert_eq!(config_vec.len(), 1);
                     assert_eq!(config_vec[0], config_0_2);
 
@@ -146,8 +151,12 @@ mod tests {
                     config_vec[0] = config_1;
                     write(&client4, config_vec)
                 })
-                .and_then(move |_| read(&client5))
-                .and_then(move |mut config_vec| {
+                .then(move |result| {
+                    unwrap!(result);
+                    read(&client5)
+                })
+                .then(move |result| {
+                    let mut config_vec = unwrap!(result);
                     assert_eq!(config_vec.len(), 1);
                     assert_eq!(config_vec[0], config_1_2);
 
@@ -155,11 +164,14 @@ mod tests {
                     config_vec.clear();
                     write(&client6, config_vec)
                 })
-                .and_then(move |_| read(&client7))
+                .then(move |result| {
+                    unwrap!(result);
+                    read(&client7)
+                })
                 .map(|config_vec| {
                     assert!(config_vec.is_empty());
                 })
-                .map_err(|err| panic!("Unexpected {:?}", err))
+                .map_err(|err| panic!("{:?}", err))
         })
     }
 }

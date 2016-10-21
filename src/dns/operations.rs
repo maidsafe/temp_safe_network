@@ -82,9 +82,9 @@ pub fn register_dns(client: &Client,
                 .map_err(DnsError::from)
         })
         .and_then(move |(struct_data, saved_configs, long_name)| {
-            client3.put_or_reclaim(Data::Structured(struct_data),
-                                   None,
-                                   private_signing_key2)
+            client3.put_recover(Data::Structured(struct_data),
+                                None,
+                                private_signing_key2)
                 .map(move |_| (saved_configs, long_name))
                 .map_err(|err| match err {
                     CoreError::MutationFailure {
@@ -365,7 +365,8 @@ mod tests {
             let signing_key = unwrap!(client.secret_signing_key()).clone();
 
             get_all_registered_names(client)
-                .and_then(move |names| {
+                .then(move |result| {
+                    let names = unwrap!(result);
                     assert!(names.is_empty());
 
                     register_dns(&client2,
@@ -377,7 +378,10 @@ mod tests {
                                  signing_key,
                                  None)
                 })
-                .and_then(move |_| get_all_registered_names(&client3))
+                .then(move |result| {
+                    unwrap!(result);
+                    get_all_registered_names(&client3)
+                })
                 .map(move |names| {
                     assert_eq!(names.len(), 1);
                     assert_eq!(names[0], dns_name2);
@@ -411,7 +415,10 @@ mod tests {
                          owners,
                          signing_key,
                          None)
-                .and_then(move |_| get_all_services(&client2, &dns_name2, None))
+                .then(move |result| {
+                    unwrap!(result);
+                    get_all_services(&client2, &dns_name2, None)
+                })
                 .map(move |names| {
                     // Convert to HashSet to ignore order.
                     let names = names.into_iter().collect::<HashSet<_>>();
@@ -460,8 +467,8 @@ mod tests {
                          owners,
                          signing_key,
                          None)
-                .map_err(|err| panic!("{:?}", err))
-                .and_then(move |_| {
+                .then(move |result| {
+                    unwrap!(result);
                     register_dns(&client2,
                                  dns_name2,
                                  messaging_keypair2.0,
@@ -626,10 +633,14 @@ mod tests {
                          owners,
                          signing_key,
                          None)
-                .map_err(|err| panic!("{:?}", err))
-                .and_then(move |_| delete_dns(&client2, dns_name2, signing_key2))
-                .map_err(|err| panic!("{:?}", err))
-                .and_then(move |_| delete_dns(&client3, dns_name3, signing_key3))
+                .then(move |result| {
+                    unwrap!(result);
+                    delete_dns(&client2, dns_name2, signing_key2)
+                })
+                .then(move |result| {
+                    unwrap!(result);
+                    delete_dns(&client3, dns_name3, signing_key3)
+                })
                 .then(|result| -> Result<_, DnsError> {
                     match result {
                         Ok(_) => panic!("Should fail"),
@@ -669,8 +680,12 @@ mod tests {
                          owners,
                          signing_key,
                          None)
-                .and_then(move |_| get_all_services(&client2, &dns_name2, None))
-                .and_then(move |names| {
+                .then(move |result| {
+                    unwrap!(result);
+                    get_all_services(&client2, &dns_name2, None)
+                })
+                .then(move |result| {
+                    let names = unwrap!(result);
                     assert!(names.is_empty());
 
                     add_service(&client3,
@@ -679,7 +694,10 @@ mod tests {
                                 signing_key2,
                                 None)
                 })
-                .and_then(move |_| get_all_services(&client4, &dns_name4, None))
+                .then(move |result| {
+                    unwrap!(result);
+                    get_all_services(&client4, &dns_name4, None)
+                })
                 .map(move |names| {
                     assert_eq!(&names, &[service_name]);
                 })
@@ -715,8 +733,12 @@ mod tests {
                          owners,
                          signing_key,
                          None)
-                .and_then(move |_| get_all_services(&client2, &dns_name2, None))
-                .and_then(move |names| {
+                .then(move |result| {
+                    unwrap!(result);
+                    get_all_services(&client2, &dns_name2, None)
+                })
+                .then(move |result| {
+                    let names = unwrap!(result);
                     assert_eq!(names, [service.0.clone()]);
 
                     remove_service(&client3,
@@ -725,7 +747,10 @@ mod tests {
                                    signing_key2,
                                    None)
                 })
-                .and_then(move |_| get_all_services(&client4, &dns_name4, None))
+                .then(move |result| {
+                    unwrap!(result);
+                    get_all_services(&client4, &dns_name4, None)
+                })
                 .map(|names| {
                     assert!(names.is_empty())
                 })
@@ -762,10 +787,13 @@ mod tests {
                          owners,
                          signing_key,
                          None)
-                .and_then(move |_| get_service_home_dir_id(&client2,
-                                                           &dns_name2,
-                                                           service_name,
-                                                           None))
+                .then(move |result| {
+                    unwrap!(result);
+                    get_service_home_dir_id(&client2,
+                                            &dns_name2,
+                                            service_name,
+                                            None)
+                })
                 .map(move |dir_id| {
                     assert_eq!(dir_id, service_dir_id);
                 })
