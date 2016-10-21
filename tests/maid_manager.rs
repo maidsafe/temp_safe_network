@@ -21,7 +21,7 @@
 use itertools::Itertools;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
-use routing::{Data, GROUP_SIZE, ImmutableData, StructuredData, XorName};
+use routing::{Data, GROUP_SIZE, ImmutableData, StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Network};
 use rust_sodium::crypto::box_;
@@ -171,7 +171,13 @@ fn create_account_twice() {
     assert_eq!(Err(Some(GetError::NoSuchAccount)),
                client1.get_account_info_response(&mut nodes));
 
-    let account = unwrap!(StructuredData::new(0, rng.gen(), 0, vec![], vec![], vec![], None));
+    let account = unwrap!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
+                                              rng.gen(),
+                                              0,
+                                              vec![],
+                                              vec![],
+                                              vec![],
+                                              None));
 
     // Create an account using `client0`.
     unwrap!(client0.put_and_verify(Data::Structured(account.clone()), &mut nodes));

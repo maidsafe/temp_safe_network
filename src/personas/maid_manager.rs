@@ -21,7 +21,7 @@ use itertools::Itertools;
 use kademlia_routing_table::RoutingTable;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, Data, DataIdentifier, GROUP_SIZE, ImmutableData, MessageId,
-              StructuredData, XorName};
+              StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -167,7 +167,8 @@ impl MaidManager {
                 // Send failure response back to client
                 let error = match (data_id,
                                    try!(serialisation::deserialise(external_error_indicator))) {
-                    (DataIdentifier::Structured(_, 0), MutationError::DataExists) => {
+                    (DataIdentifier::Structured(_, TYPE_TAG_SESSION_PACKET),
+                     MutationError::DataExists) => {
                         // We wouldn't have forwarded two `Put` requests for the same account, so
                         // it must have been created via another client manager.
                         let _ = self.accounts.remove(&client_name);
@@ -303,9 +304,10 @@ impl MaidManager {
                                   data: StructuredData,
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
-        // If the type_tag is 0, the account must not exist, else it must exist.
+        // If the type_tag is `TYPE_TAG_SESSION_PACKET`, the account must not exist, else it must
+        // exist.
         let client_name = utils::client_name(&src);
-        if data.get_type_tag() == 0 {
+        if data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
             if self.accounts.contains_key(&client_name) {
                 let error = MutationError::AccountExists;
                 try!(self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error));
