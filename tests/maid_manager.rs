@@ -21,7 +21,7 @@
 use itertools::Itertools;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
-use routing::{Data, GROUP_SIZE, ImmutableData, XorName};
+use routing::{Data, GROUP_SIZE, ImmutableData, StructuredData, XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Network};
 use rust_sodium::crypto::box_;
@@ -144,6 +144,61 @@ fn handle_put_with_account() {
     expected_space_available = default_account_size - expected_data_stored;
     assert_eq!(unwrap!(client.get_account_info_response(&mut nodes)),
                (expected_data_stored, expected_space_available));
+}
+
+#[test]
+fn create_account_twice() {
+    let default_account_size = 100;
+    let expected_data_stored = 1;
+    let expected_space_available = default_account_size - expected_data_stored;
+    let acct_info = (expected_data_stored, expected_space_available);
+    let acct_err = Err(Some(GetError::NoSuchAccount));
+    let acct_exists = Err(Some(MutationError::AccountExists));
+
+    let network = Network::new(None);
+    let node_count = TEST_NET_SIZE;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client0 = TestClient::new(&network, Some(config.clone()));
+    let mut client1 = TestClient::new(&network, Some(config.clone()));
+    let mut rng = network.new_rng();
+
+    client0.ensure_connected(&mut nodes);
+    client1.ensure_connected(&mut nodes);
+
+    assert_eq!(Err(Some(GetError::NoSuchAccount)),
+               client0.get_account_info_response(&mut nodes));
+    assert_eq!(Err(Some(GetError::NoSuchAccount)),
+               client1.get_account_info_response(&mut nodes));
+
+    let account = unwrap!(StructuredData::new(0, rng.gen(), 0, vec![], vec![], vec![], None));
+
+    // Create an account using `client0`.
+    unwrap!(client0.put_and_verify(Data::Structured(account.clone()), &mut nodes));
+
+    assert_eq!(unwrap!(client0.get_account_info_response(&mut nodes)),
+               acct_info);
+    assert_eq!(client1.get_account_info_response(&mut nodes), acct_err);
+
+    // Create the account again using `client0`.
+    assert_eq!(client0.put_and_verify(Data::Structured(account.clone()), &mut nodes),
+               acct_exists);
+    let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client0);
+
+    // That should not have changed anything.
+    assert_eq!(unwrap!(client0.get_account_info_response(&mut nodes)),
+               acct_info);
+    assert_eq!(client1.get_account_info_response(&mut nodes), acct_err);
+
+    // Create the same account using `client1`.
+    assert_eq!(client1.put_and_verify(Data::Structured(account.clone()), &mut nodes),
+               acct_exists);
+    let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client1);
+
+    // That should not succeed.
+    assert_eq!(unwrap!(client0.get_account_info_response(&mut nodes)),
+               acct_info);
+    assert_eq!(client1.get_account_info_response(&mut nodes), acct_err);
 }
 
 #[test]
