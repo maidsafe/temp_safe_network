@@ -21,7 +21,7 @@ use itertools::Itertools;
 use kademlia_routing_table::RoutingTable;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, Data, DataIdentifier, GROUP_SIZE, ImmutableData, MessageId,
-              StructuredData, XorName};
+              StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -37,7 +37,10 @@ const DEFAULT_ACCOUNT_SIZE: u64 = 500;
 const DEFAULT_ACCOUNT_SIZE: u64 = 100;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
-struct Refresh(XorName, Account);
+enum Refresh {
+    Update(XorName, Account),
+    Delete(XorName),
+}
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
 pub struct Account {
@@ -162,8 +165,26 @@ impl MaidManager {
                                   self.accounts.get(&client_name).expect("Account not found."),
                                   MessageId::zero());
                 // Send failure response back to client
-                let error =
-                    try!(serialisation::deserialise::<MutationError>(external_error_indicator));
+                let error = match (data_id,
+                                   try!(serialisation::deserialise(external_error_indicator))) {
+                    (DataIdentifier::Structured(_, TYPE_TAG_SESSION_PACKET),
+                     MutationError::DataExists) => {
+                        // We wouldn't have forwarded two `Put` requests for the same account, so
+                        // it must have been created via another client manager.
+                        let _ = self.accounts.remove(&client_name);
+                        let refresh = Refresh::Delete(client_name);
+                        if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
+                            trace!("MM sending delete refresh for account {}", src.name());
+                            let _ = self.routing_node
+                                .send_refresh_request(dst.clone(),
+                                                      dst.clone(),
+                                                      serialised_refresh,
+                                                      msg_id);
+                        }
+                        MutationError::AccountExists
+                    }
+                    (_, error) => error,
+                };
                 self.reply_with_put_failure(src, dst, data_id, msg_id, &error)
             }
             None => Err(InternalError::FailedToFindCachedRequest(msg_id)),
@@ -191,24 +212,29 @@ impl MaidManager {
     }
 
     pub fn handle_refresh(&mut self, serialised_msg: &[u8]) -> Result<(), InternalError> {
-        let Refresh(maid_name, account) =
-            try!(serialisation::deserialise::<Refresh>(serialised_msg));
-
-        match self.routing_node.close_group(maid_name) {
-            Ok(None) | Err(_) => return Ok(()),
-            Ok(Some(_)) => (),
-        }
-        let account_count = self.accounts.len();
-        match self.accounts.entry(maid_name) {
-            Entry::Vacant(entry) => {
-                let _ = entry.insert(account);
-                info!("Stats - {} client accounts.", account_count + 1);
-            }
-            Entry::Occupied(mut entry) => {
-                if entry.get().version < account.version {
-                    trace!("Client account {:?}: {:?}", maid_name, account);
-                    let _ = entry.insert(account);
+        match try!(serialisation::deserialise::<Refresh>(serialised_msg)) {
+            Refresh::Update(maid_name, account) => {
+                match self.routing_node.close_group(maid_name) {
+                    Ok(None) | Err(_) => return Ok(()),
+                    Ok(Some(_)) => (),
                 }
+                let account_count = self.accounts.len();
+                match self.accounts.entry(maid_name) {
+                    Entry::Vacant(entry) => {
+                        let _ = entry.insert(account);
+                        info!("Stats - {} client accounts.", account_count + 1);
+                    }
+                    Entry::Occupied(mut entry) => {
+                        if entry.get().version < account.version {
+                            trace!("Client account {:?}: {:?}", maid_name, account);
+                            let _ = entry.insert(account);
+                        }
+                    }
+                }
+            }
+            Refresh::Delete(maid_name) => {
+                let _ = self.accounts.remove(&maid_name);
+                info!("Stats - {} client accounts.", self.accounts.len());
             }
         }
         Ok(())
@@ -251,7 +277,7 @@ impl MaidManager {
 
     fn send_refresh(&self, maid_name: &XorName, account: &Account, msg_id: MessageId) {
         let src = Authority::ClientManager(*maid_name);
-        let refresh = Refresh(*maid_name, account.clone());
+        let refresh = Refresh::Update(*maid_name, account.clone());
         if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
             trace!("MM sending refresh for account {}", src.name());
             let _ = self.routing_node
@@ -278,9 +304,10 @@ impl MaidManager {
                                   data: StructuredData,
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
-        // If the type_tag is 0, the account must not exist, else it must exist.
+        // If the type_tag is `TYPE_TAG_SESSION_PACKET`, the account must not exist, else it must
+        // exist.
         let client_name = utils::client_name(&src);
-        if data.get_type_tag() == 0 {
+        if data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
             if self.accounts.contains_key(&client_name) {
                 let error = MutationError::AccountExists;
                 try!(self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error));
