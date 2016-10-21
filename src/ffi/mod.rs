@@ -63,3 +63,8 @@ pub use ffi::session::Session;
 use futures::Future;
 /// Helper type to represent the FFI future result
 pub type FfiFuture<T> = Future<Item = T, Error = FfiError>;
+
+/// Type that holds opaque user data handed into FFI functions
+#[derive(Clone, Copy)]
+pub struct OpaqueCtx(*const ::libc::c_void);
+unsafe impl Send for OpaqueCtx {}

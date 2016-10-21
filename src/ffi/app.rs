@@ -23,8 +23,9 @@
 
 use core::CoreMsg;
 use core::futures::FutureExt;
+use ffi::OpaqueCtx;
 use futures::Future;
-use libc::{int32_t, int64_t};
+use libc::int32_t;
 use nfs::Dir;
 use rust_sodium::crypto::{box_, secretbox};
 use super::Session;
@@ -109,8 +110,8 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                                       vendor: *const u8,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
-                                      user_data: int64_t,
-                                      o_cb: extern "C" fn(int32_t, int64_t, AppHandle))
+                                      user_data: OpaqueCtx,
+                                      o_cb: extern "C" fn(int32_t, OpaqueCtx, AppHandle))
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let app_name = ffi_try!(helper::c_utf8_to_string(app_name, app_name_len));
