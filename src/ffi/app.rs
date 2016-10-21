@@ -24,7 +24,7 @@
 use core::CoreMsg;
 use core::futures::FutureExt;
 use futures::Future;
-use libc::int32_t;
+use libc::{int32_t, int64_t};
 use nfs::Dir;
 use rust_sodium::crypto::{box_, secretbox};
 use super::Session;
@@ -109,8 +109,8 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                                       vendor: *const u8,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
-                                      user_data: usize,
-                                      o_cb: extern "C" fn(i32, usize, AppHandle))
+                                      user_data: int64_t,
+                                      o_cb: extern "C" fn(int32_t, int64_t, AppHandle))
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let app_name = ffi_try!(helper::c_utf8_to_string(app_name, app_name_len));
@@ -121,18 +121,15 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
 
         ffi_try!((*session)
             .send(CoreMsg::new(move |client| {
-                let fut = launcher_config::app_info(client,
-                                                    app_name,
-                                                    unique_token,
-                                                    vendor,
-                                                    safe_drive_access)
-                    .map_err(move |e| o_cb(ffi_error_code!(e), user_data, 0))
-                    .map(move |app| {
-                        let obj_cache = s2.object_cache();
-                        let app_handle = obj_cache.borrow_mut().insert_app(app);
-                        o_cb(0, user_data, app_handle);
-                    })
-                    .into_box();
+                let fut =
+                    launcher_config::app(client, app_name, unique_token, vendor, safe_drive_access)
+                        .map_err(move |e| o_cb(ffi_error_code!(e), user_data, 0))
+                        .map(move |app| {
+                            let obj_cache = s2.object_cache();
+                            let app_handle = obj_cache.borrow_mut().insert_app(app);
+                            o_cb(0, user_data, app_handle);
+                        })
+                        .into_box();
                 Some(fut)
             }))
             .map_err(FfiError::from));

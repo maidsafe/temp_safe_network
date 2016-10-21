@@ -429,22 +429,33 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
     let new_sd = try!(StructuredData::new(sd.get_type_tag(),
                                           *sd.name(),
                                           sd.get_version() + 1,
-                                          Vec::new(),
+                                          vec![],
+                                          vec![],
                                           sd.get_owner_keys().clone(),
-                                          sd.get_previous_owner_keys().clone(),
                                           Some(&sign_key))
-        .map_err(CoreError::from));
+                          .map_err(CoreError::from));
 
     let data = Data::Structured(new_sd.clone());
-    let resp_getter = try!(unwrap!(client.lock()).delete(data, None));
-    try!(resp_getter.get());
 
-    Ok(new_sd)
+    client.delete(data, None).map(|| new_sd)
+}
+
+
+/// See if StructuredData size is valid.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_validate_size(handle: StructDataHandle,
+                                                   o_valid: *mut bool)
+                                                   -> i32 {
+    helper::catch_unwind_i32(|| {
+        *o_valid = ffi_try!(unwrap!(object_cache()).get_sd(handle)).validate_size();
+        0
+    })
 }
 
 /// Get the current version of StructuredData by its handle
 #[no_mangle]
-pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle, o_version: *mut u64) -> i32 {
+pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle,
+                                             o_version: *mut u64) -> i32 {
     helper::catch_unwind_i32(|| {
         *o_version = ffi_try!(unwrap!(object_cache()).get_sd(handle)).get_version();
         0
@@ -595,6 +606,24 @@ mod tests {
             assert_eq!(struct_data_free(sd_h), 0);
             assert_eq!(struct_data_free(sd_h),
                        FfiError::InvalidStructDataHandle.into());
+
+            // Re-claim via PUT
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
+            let mut version = 0;
+            assert_eq!(struct_data_version(sd_h, &mut version), 0);
+            assert_eq!(struct_data_free(sd_h), 0);
+            // Create
+            assert_eq!(struct_data_new(&app,
+                                       ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
+                                       &id,
+                                       version + 1,
+                                       cipher_opt_h,
+                                       plain_text.as_ptr(),
+                                       plain_text.len(),
+                                       &mut sd_h),
+                       0);
+            // Put - Reclaim
+            assert_eq!(struct_data_put(&app, sd_h), 0);
         }
     }
 
@@ -665,8 +694,8 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -22 is CoreError::MutationFailure { reason: MutationError::NoSuchData }
-            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            // -26 is CoreError::MutationFailure { reason: MutationError::InvalidOperation }
+            assert_eq!(struct_data_delete(&app, sd_h), -26);
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
         }
     }
@@ -736,8 +765,8 @@ mod tests {
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -22 is CoreError::MutationFailure { reason: MutationError::NoSuchData }
-            assert_eq!(struct_data_delete(&app, sd_h), -22);
+            // -26 is CoreError::MutationFailure { reason: MutationError::InvalidOperation }
+            assert_eq!(struct_data_delete(&app, sd_h), -26);
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
         }
     }

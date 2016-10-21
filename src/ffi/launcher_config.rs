@@ -32,12 +32,12 @@ use rust_sodium::crypto::hash::sha256;
 use std::collections::HashMap;
 use super::App;
 
-pub fn app_info(client: &Client,
-                app_name: String,
-                app_key: String,
-                vendor: String,
-                safe_drive_access: bool)
-                -> Box<FfiFuture<App>> {
+pub fn app(client: &Client,
+           app_name: String,
+           app_key: String,
+           vendor: String,
+           safe_drive_access: bool)
+           -> Box<FfiFuture<App>> {
     let app_id = app_id(&app_key, &vendor);
     let c2 = client.clone();
 
