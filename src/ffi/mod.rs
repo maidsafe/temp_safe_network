@@ -39,7 +39,7 @@
 mod macros;
 
 mod app;
-// pub mod directory_details;
+pub mod dir_details;
 // pub mod dns;
 pub mod errors;
 // pub mod file_details;
