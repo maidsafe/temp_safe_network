@@ -24,9 +24,7 @@ use ffi::object_cache::ObjectCache;
 use futures::Future;
 use libc::{int32_t, int64_t, uint64_t};
 use maidsafe_utilities::thread::{self, Joiner};
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::mpsc;
+use std::sync::{Arc, LockResult, Mutex, MutexGuard, mpsc};
 use super::helper;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
@@ -34,28 +32,25 @@ use tokio_core::reactor::Core;
 /// Represents user session on the SAFE network. There should be one session per launcher.
 #[derive(Clone)]
 pub struct Session {
-    inner: Rc<RefCell<Inner>>,
+    inner: Arc<Inner>,
 }
-
-// TODO(nbaksalyar) temporary workaround
-unsafe impl Send for Session {}
 
 struct Inner {
     // Channel to communicate with the core event loop
-    pub core_el_tx: CoreMsgTx,
-    object_cache: Rc<RefCell<ObjectCache>>,
+    pub core_el_tx: Mutex<CoreMsgTx>,
+    object_cache: Arc<Mutex<ObjectCache>>,
     _core_joiner: Joiner,
 }
 
 impl Session {
     /// Send a message to the core event loop
     pub fn send(&self, msg: CoreMsg) -> Result<(), FfiError> {
-        self.inner.borrow_mut().core_el_tx.send(msg).map_err(FfiError::from)
+        unwrap!(self.inner.core_el_tx.lock()).send(msg).map_err(FfiError::from)
     }
 
     /// Returns an object cache tied to the session
-    pub fn object_cache(&self) -> Rc<RefCell<ObjectCache>> {
-        self.inner.borrow_mut().object_cache.clone()
+    pub fn object_cache(&self) -> LockResult<MutexGuard<ObjectCache>> {
+        self.inner.object_cache.lock()
     }
 
     /// Create unregistered client.
@@ -77,11 +72,11 @@ impl Session {
         let tx = unwrap!(rx.recv());
 
         Session {
-            inner: Rc::new(RefCell::new(Inner {
-                core_el_tx: tx,
+            inner: Arc::new(Inner {
+                core_el_tx: Mutex::new(tx),
                 _core_joiner: joiner,
-                object_cache: Rc::new(RefCell::new(ObjectCache::default())),
-            })),
+                object_cache: Arc::new(Mutex::new(ObjectCache::default())),
+            }),
         }
     }
 
@@ -109,11 +104,11 @@ impl Session {
         let tx = unwrap!(rx.recv());
 
         Session {
-            inner: Rc::new(RefCell::new(Inner {
-                core_el_tx: tx,
+            inner: Arc::new(Inner {
+                core_el_tx: Mutex::new(tx),
                 _core_joiner: joiner,
-                object_cache: Rc::new(RefCell::new(ObjectCache::default())),
-            })),
+                object_cache: Arc::new(Mutex::new(ObjectCache::default())),
+            }),
         }
     }
 
@@ -141,11 +136,11 @@ impl Session {
         let tx = unwrap!(rx.recv());
 
         Session {
-            inner: Rc::new(RefCell::new(Inner {
-                core_el_tx: tx,
+            inner: Arc::new(Inner {
+                core_el_tx: Mutex::new(tx),
                 _core_joiner: joiner,
-                object_cache: Rc::new(RefCell::new(ObjectCache::default())),
-            })),
+                object_cache: Arc::new(Mutex::new(ObjectCache::default())),
+            }),
         }
     }
 

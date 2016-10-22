@@ -70,13 +70,16 @@ impl App {
             Err(FfiError::OperationForbiddenForApp)
         }
     }
-}
 
-// // TODO Maybe change all of these to operation forbidden for app
-// /// Get app root directory
-// pub fn app_dir(&self) -> Option<Dir> {
-//     self.app_dir
-// }
+    /// Get app root directory
+    pub fn app_dir(&self) -> Result<&Dir, FfiError> {
+        if let App::Registered { ref app_dir, .. } = *self {
+            Ok(app_dir)
+        } else {
+            Err(FfiError::OperationForbiddenForApp)
+        }
+    }
+}
 
 // /// Get SAFEdrive directory key.
 // pub fn safe_drive_dir(&self) -> Option<Dir> {
@@ -126,8 +129,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                     launcher_config::app(client, app_name, unique_token, vendor, safe_drive_access)
                         .map_err(move |e| o_cb(ffi_error_code!(e), user_data, 0))
                         .map(move |app| {
-                            let obj_cache = s2.object_cache();
-                            let app_handle = obj_cache.borrow_mut().insert_app(app);
+                            let app_handle = unwrap!(s2.object_cache()).insert_app(app);
                             o_cb(0, user_data, app_handle);
                         })
                         .into_box();
@@ -145,8 +147,7 @@ pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
                                                  o_app_handle: *mut AppHandle)
                                                  -> int32_t {
     helper::catch_unwind_i32(|| {
-        let obj_cache = (*session).object_cache();
-        *o_app_handle = obj_cache.borrow_mut().insert_app(App::Unauthorised);
+        *o_app_handle = unwrap!((*session).object_cache()).insert_app(App::Unauthorised);
         0
     })
 }
