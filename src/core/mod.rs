@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use futures::Future;
+use tokio_core::channel;
 
 /// Helpers to work with futures.
 #[macro_use]
@@ -37,11 +38,16 @@ pub mod structured_data;
 pub use self::client::Client;
 pub use self::core_el::{CoreMsg, CoreMsgTx, TailFuture, run};
 pub use self::errors::CoreError;
+pub use self::event::NetworkEvent;
 pub use self::futures::FutureExt;
 pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
 
 /// Future trait returned from core operations.
 pub type CoreFuture<T> = Future<Item = T, Error = CoreError>;
+/// NetworkEvent receiver stream.
+pub type NetworkRx = channel::Receiver<NetworkEvent>;
+/// NetworkEvent transmitter.
+pub type NetworkTx = channel::Sender<NetworkEvent>;
 
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;

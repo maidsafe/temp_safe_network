@@ -20,7 +20,7 @@ mod account;
 mod mock_routing;
 mod routing_el;
 
-use core::{CoreError, CoreFuture, CoreMsgTx, FutureExt, utility};
+use core::{CoreError, CoreFuture, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx, utility};
 use core::event::CoreEvent;
 use futures::{self, Complete, Future, Oneshot};
 use lru_cache::LruCache;
@@ -43,7 +43,7 @@ use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
-const CONNECTION_TIMEOUT_SECS: u64 = 60;
+const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const ACC_PKT_TIMEOUT_SECS: u64 = 60;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 
@@ -60,29 +60,35 @@ pub struct Client {
 struct Inner {
     routing: Routing,
     heads: HashMap<MessageId, Complete<CoreEvent>>,
+    core_tx: CoreMsgTx,
+    net_tx: NetworkTx,
     cache: LruCache<XorName, Data>,
     client_type: ClientType,
     stats: Stats,
-    _joiner: Joiner,
+    joiner: Joiner,
 }
 
 impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will create an
     /// unregistered random client, which can do very limited set of operations - eg., a
     /// Network-Get
-    pub fn unregistered(core_tx: CoreMsgTx) -> Result<Self, CoreError> {
+    pub fn unregistered(core_tx: CoreMsgTx, net_tx: NetworkTx) -> Result<Self, CoreError> {
         trace!("Creating unregistered client.");
 
         let (routing, routing_rx) = try!(setup_routing(None));
-        let joiner = spawn_routing_thread(routing_rx, core_tx);
+        let net_tx_clone = net_tx.clone();
+        let core_tx_clone = core_tx.clone();
+        let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
             routing: routing,
             heads: HashMap::with_capacity(10),
+            core_tx: core_tx,
+            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::Unregistered,
             stats: Default::default(),
-            _joiner: joiner,
+            joiner: joiner,
         }))
     }
 
@@ -90,7 +96,8 @@ impl Client {
     /// the user in the SAFE-network.
     pub fn registered(acc_locator: &str,
                       acc_password: &str,
-                      core_tx: CoreMsgTx)
+                      core_tx: CoreMsgTx,
+                      net_tx: NetworkTx)
                       -> Result<Client, CoreError> {
         trace!("Creating an acc.");
 
@@ -138,15 +145,19 @@ impl Client {
             }
         }
 
-        let joiner = spawn_routing_thread(routing_rx, core_tx);
+        let net_tx_clone = net_tx.clone();
+        let core_tx_clone = core_tx.clone();
+        let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
             routing: routing,
             heads: HashMap::with_capacity(10),
+            core_tx: core_tx,
+            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
-            _joiner: joiner,
+            joiner: joiner,
         }))
     }
 
@@ -154,7 +165,8 @@ impl Client {
     /// existing account of the user in the SAFE-network.
     pub fn login(acc_locator: &str,
                  acc_password: &str,
-                 core_tx: CoreMsgTx)
+                 core_tx: CoreMsgTx,
+                 net_tx: NetworkTx)
                  -> Result<Client, CoreError> {
         trace!("Attempting to log into an acc.");
 
@@ -208,20 +220,59 @@ impl Client {
 
         trace!("Creating an actual routing...");
         let (routing, routing_rx) = try!(setup_routing(Some(id_packet)));
-        let joiner = spawn_routing_thread(routing_rx, core_tx);
+        let net_tx_clone = net_tx.clone();
+        let core_tx_clone = core_tx.clone();
+        let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
             routing: routing,
             heads: HashMap::with_capacity(10),
+            core_tx: core_tx,
+            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
-            _joiner: joiner,
+            joiner: joiner,
         }))
     }
 
     fn new(inner: Inner) -> Self {
         Client { inner: Rc::new(RefCell::new(inner)) }
+    }
+
+    #[doc(hidden)]
+    pub fn restart_routing(&self) {
+        let opt_id = if let ClientType::Registered { ref acc, .. } = self.inner().client_type {
+            Some(FullId::with_keys((acc.get_maid().public_keys().1,
+                                    acc.get_maid().secret_keys().1.clone()),
+                                   (acc.get_maid().public_keys().0,
+                                    acc.get_maid().secret_keys().0.clone())))
+        } else {
+            None
+        };
+
+        let (routing, routing_rx) = match setup_routing(opt_id) {
+            Ok(rt, rt_rx) => (rt, rt_rx),
+            Err(e) => {
+                info!("Could not restart routing (will re-attempt, unless dropped): {:?}",
+                      e);
+                let msg = CoreMsg::new(|client| {
+                    client.restart_routing();
+                    None
+                });
+                let _ = core_el_tx.send(msg);
+                return;
+            }
+        };
+
+        let net_tx = self.inner().net_tx.clone();
+        let _ = net_tx.send(NetworkEvent::Connected);
+
+        let core_tx = self.inner().core_tx.clone();
+        let joiner = spawn_routing_thread(routing_rx, core_tx, net_tx);
+
+        self.inner_mut().routing = routing;
+        self.inner_mut().joiner = joiner;
     }
 
     /// Remove the completion handle associated with the given message id.

@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::{Client, CoreError, CoreFuture, immutable_data, SelfEncryptionStorage, utility};
+use core::{Client, CoreError, CoreFuture, SelfEncryptionStorage, immutable_data, utility};
 use core::futures::FutureExt;
 use futures::{Future, IntoFuture};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -105,7 +105,8 @@ pub fn update(client: &Client,
 /// Delete structured data from the network.
 pub fn delete(client: &Client,
               data: StructuredData,
-              signing_key: &sign::SecretKey) -> Box<CoreFuture<()>> {
+              signing_key: &sign::SecretKey)
+              -> Box<CoreFuture<()>> {
     let data = fry!(create_for_deletion(data, signing_key));
     client.delete(Data::Structured(data), None)
 }
@@ -113,7 +114,8 @@ pub fn delete(client: &Client,
 /// Delete structured data from the network, with recovery
 pub fn delete_recover(client: &Client,
                       data: StructuredData,
-                      signing_key: &sign::SecretKey) -> Box<CoreFuture<()>> {
+                      signing_key: &sign::SecretKey)
+                      -> Box<CoreFuture<()>> {
     let data = fry!(create_for_deletion(data, signing_key));
     client.delete_recover(Data::Structured(data), None)
 }
@@ -140,8 +142,7 @@ pub fn extract_value(client: &Client,
                     match fry!(decode(immutable_data.value(), decryption_key.as_ref())) {
                         DataTypeEncoding::Map(data_map) => {
                             let storage = SelfEncryptionStorage::new(client2);
-                            let self_encryptor = fry!(SelfEncryptor::new(storage,
-                                                                         data_map));
+                            let self_encryptor = fry!(SelfEncryptor::new(storage, data_map));
                             let length = self_encryptor.len();
                             self_encryptor.read(0, length)
                                 .map_err(From::from)
@@ -295,7 +296,8 @@ fn encode(data: DataTypeEncoding,
     }
 }
 
-fn decode(raw_data: &[u8], decryption_key: Option<&secretbox::Key>)
+fn decode(raw_data: &[u8],
+          decryption_key: Option<&secretbox::Key>)
           -> Result<DataTypeEncoding, CoreError> {
     if let Some(key) = decryption_key {
         let decrypted = try!(utility::symmetric_decrypt(raw_data, key));

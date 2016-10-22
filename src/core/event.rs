@@ -22,7 +22,6 @@ use routing::Data;
 /// beyond the FFI boudaries when required
 pub const NETWORK_EVENT_START_RANGE: i32 = 0;
 
-/// Core events that occur as routing responds.
 #[derive(Debug)]
 pub enum CoreEvent {
     /// Response to a previous GET request
@@ -35,22 +34,19 @@ pub enum CoreEvent {
 
 /// Netowork Events that Client Modules need to deal with
 #[derive(Debug)]
-pub enum _NetworkEvent {
+pub enum NetworkEvent {
     /// The client engine is connected to atleast one peer
     Connected,
     /// The client engine is disconnected from the network (under usual circumstances this would
     /// indicate that client connection to proxy node has been lost)
     Disconnected,
-    /// Graceful Exit Condition
-    Terminated,
 }
 
-impl Into<i32> for _NetworkEvent {
+impl Into<i32> for NetworkEvent {
     fn into(self) -> i32 {
         match self {
-            _NetworkEvent::Connected => NETWORK_EVENT_START_RANGE,
-            _NetworkEvent::Disconnected => NETWORK_EVENT_START_RANGE + 1,
-            _NetworkEvent::Terminated => NETWORK_EVENT_START_RANGE + 2,
+            NetworkEvent::Connected => NETWORK_EVENT_START_RANGE,
+            NetworkEvent::Disconnected => NETWORK_EVENT_START_RANGE - 1,
         }
     }
 }

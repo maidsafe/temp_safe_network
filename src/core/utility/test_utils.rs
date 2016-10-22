@@ -14,11 +14,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::client::Client;
-use core::core_el::{self, CoreMsg, CoreMsgRx, CoreMsgTx};
-use core::errors::CoreError;
-use core::futures::FutureExt;
-use core::utility;
+use el::client::Client;
+use el::core_el::{self, CoreMsg, CoreMsgRx, CoreMsgTx, NetworkTx};
+use el::errors::CoreError;
+use el::futures::FutureExt;
+use el::utility;
 use futures::Future;
 use rust_sodium::crypto::sign;
 use std::iter;
@@ -51,33 +51,43 @@ pub fn register_and_run<F, R>(f: F)
     where F: FnOnce(&Client) -> R + Send + 'static,
           R: Future + 'static
 {
-    setup_client(|core_tx| {
-        let acc_locator = unwrap!(utility::generate_random_string(10));
-        let acc_password = unwrap!(utility::generate_random_string(10));
-        Client::registered(&acc_locator, &acc_password, core_tx)
-    }).run(f)
+    setup_client(|core_tx, net_tx| {
+            let acc_locator = unwrap!(utility::generate_random_string(10));
+            let acc_password = unwrap!(utility::generate_random_string(10));
+            Client::registered(&acc_locator, &acc_password, core_tx, net_tx)
+        })
+        .run(f)
 }
 
+// TODO Expand this to take a callback when ffi is coded - that way disconnections can be tested.
 // Helper to create a client and run it inside an event loop.
 pub fn setup_client<F>(f: F) -> Env
-    where F: FnOnce(CoreMsgTx) -> Result<Client, CoreError>
+    where F: FnOnce(CoreMsgTx, NetworkTx) -> Result<Client, CoreError>
 {
-    let core = unwrap!(Core::new());
-    let (tx, rx) = unwrap!(channel::channel(&core.handle()));
+    let el = unwrap!(Core::new());
+    let el_h = el.handle();
+    let (core_tx, core_rx) = unwrap!(channel::channel(&el_handle));
+    let (net_tx, net_rx) = unwrap!(channel::channel(&el_handle));
+    let net_fut = net_rx.for_each(|net_event| {
+            debug!("Network event encountered: {:?}", net_event);
+            Ok(())
+        })
+        .map_err(|e| debug!("Network event stream error: {:?}", e));
+    el_h.spawn(net_fut);
 
     Env {
-        client: unwrap!(f(tx.clone())),
-        core: core,
-        tx: tx,
-        rx: rx,
+        client: unwrap!(f(core_tx.clone(), net_tx)),
+        el: el,
+        core_tx: core_tx,
+        core_rx: core_rx,
     }
 }
 
 pub struct Env {
     client: Client,
-    core: Core,
-    tx: CoreMsgTx,
-    rx: CoreMsgRx,
+    el: Core,
+    core_tx: CoreMsgTx,
+    core_rx: CoreMsgRx,
 }
 
 impl Env {
@@ -87,14 +97,14 @@ impl Env {
         where F: FnOnce(&Client) -> R + Send + 'static,
               R: Future + 'static
     {
-        let tx = self.tx.clone();
+        let core_tx = self.core_tx.clone();
 
-        unwrap!(self.tx.send(CoreMsg::new(move |client| {
+        unwrap!(self.core_tx.send(CoreMsg::new(move |client| {
             let future = f(client)
                 .then(move |_| {
                     // When the future completes, send terminator to the event loop
                     // to stop it.
-                    unwrap!(tx.send(CoreMsg::build_terminator()));
+                    unwrap!(core_tx.send(CoreMsg::build_terminator()));
                     Ok(())
                 })
                 .into_box();
@@ -102,7 +112,7 @@ impl Env {
             Some(future)
         })));
 
-        core_el::run(self.core, self.client, self.rx);
+        core_el::run(self.el, self.client, self.core_rx);
     }
 
     // Return the client stored in this Env.

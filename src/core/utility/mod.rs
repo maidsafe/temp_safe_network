@@ -25,7 +25,8 @@ use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::hash::sha512::{self, DIGESTBYTES, Digest};
 
 /// Symmetric encryption
-pub fn symmetric_encrypt(plain_text: &[u8], secret_key: &secretbox::Key)
+pub fn symmetric_encrypt(plain_text: &[u8],
+                         secret_key: &secretbox::Key)
                          -> Result<Vec<u8>, CoreError> {
     let nonce = secretbox::gen_nonce();
     let cipher_text = secretbox::seal(plain_text, &nonce, secret_key);
@@ -34,10 +35,12 @@ pub fn symmetric_encrypt(plain_text: &[u8], secret_key: &secretbox::Key)
 }
 
 /// Symmetric decryption
-pub fn symmetric_decrypt(cipher_text: &[u8], secret_key: &secretbox::Key)
-                        -> Result<Vec<u8>, CoreError> {
+pub fn symmetric_decrypt(cipher_text: &[u8],
+                         secret_key: &secretbox::Key)
+                         -> Result<Vec<u8>, CoreError> {
     let (nonce, cipher_text) = try!(deserialise::<(secretbox::Nonce, Vec<u8>)>(cipher_text));
-    secretbox::open(&cipher_text, &nonce, secret_key).map_err(|_| CoreError::SymmetricDecipherFailure)
+    secretbox::open(&cipher_text, &nonce, secret_key)
+        .map_err(|_| CoreError::SymmetricDecipherFailure)
 }
 
 /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and

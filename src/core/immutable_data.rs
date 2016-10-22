@@ -81,8 +81,7 @@ pub fn extract_value(client: &Client,
     unpack(client.clone(), data)
         .and_then(move |value| {
             let data_map = if let Some(key) = decryption_key {
-                let plain_text =
-                    try!(utility::symmetric_decrypt(&value, &key));
+                let plain_text = try!(utility::symmetric_decrypt(&value, &key));
                 try!(deserialise(&plain_text))
             } else {
                 try!(deserialise(&value))

@@ -108,9 +108,7 @@ pub fn extract_value(client: &Client,
                  // TODO: add proper error variant for this
                  .ok_or(CoreError::Unexpected("invalid version".to_owned()))
         })
-        .and_then(move |name| {
-            immutable_data::get_value(&client2, &name, decryption_key)
-        })
+        .and_then(move |name| immutable_data::get_value(&client2, &name, decryption_key))
         .into_box()
 }
 
@@ -124,7 +122,8 @@ pub fn extract_current_value(client: &Client,
 }
 
 /// Extract the complete list of names of versions of versioned StructuredData.
-pub fn extract_all_version_names(client: &Client, data: &StructuredData)
+pub fn extract_all_version_names(client: &Client,
+                                 data: &StructuredData)
                                  -> Box<CoreFuture<Vec<XorName>>> {
     let info = fry!(deserialise::<VersionsInfo>(&data.get_data()));
     immutable_data::get_value(client, &info.version_list_name, None)
@@ -170,9 +169,7 @@ fn append_version(client: Client,
     let encoded_version_list = fry!(serialise(&version_list));
 
     immutable_data::create(&client, encoded_version_list, None)
-        .map(move |version_list_data| {
-            (version_list_data, curr_version_data)
-        })
+        .map(move |version_list_data| (version_list_data, curr_version_data))
         .and_then(move |(version_list_data, curr_version_data)| {
             let info = VersionsInfo {
                 version_list_name: *version_list_data.name(),
@@ -209,9 +206,7 @@ fn build(type_tag: u64,
          -> Result<StructuredData, CoreError> {
     let encoded = try!(serialise(&info));
 
-    match try!(super::can_data_fit(&encoded,
-                                   curr_owner_keys.clone(),
-                                   prev_owner_keys.clone())) {
+    match try!(super::can_data_fit(&encoded, curr_owner_keys.clone(), prev_owner_keys.clone())) {
 
         DataFitResult::DataFits => {
             Ok(try!(StructuredData::new(type_tag,
@@ -262,18 +257,12 @@ mod tests {
                    None)
                 .and_then(move |data| {
                     assert_eq!(unwrap!(version_count(&data)), 1);
-                    extract_current_value(&client2, &data, None)
-                        .map(move |value| (data, value))
+                    extract_current_value(&client2, &data, None).map(move |value| (data, value))
                 })
                 .and_then(move |(data, value_after)| {
                     assert_eq!(value_after, value0);
 
-                    update(&client3,
-                           data,
-                           value1,
-                           owner_keys,
-                           sign_key,
-                           None)
+                    update(&client3, data, value1, owner_keys, sign_key, None)
                 })
                 .and_then(move |data| {
                     assert_eq!(unwrap!(version_count(&data)), 2);

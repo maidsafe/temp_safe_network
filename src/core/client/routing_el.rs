@@ -15,21 +15,33 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::{CoreError, CoreMsg, CoreMsgTx};
-use core::event::CoreEvent;
+use core::{CoreError, CoreMsg, CoreMsgTx, NetworkTx};
+use core::event::{CoreEvent, NetworkEvent};
 use maidsafe_utilities::serialisation::deserialise;
 use routing::{Event, MessageId, Response};
 use routing::client_errors::{GetError, MutationError};
 use std::sync::mpsc::Receiver;
 
 /// Run the routing event loop - this will receive messages from routing.
-pub fn run(routing_rx: Receiver<Event>, core_tx: CoreMsgTx) {
+pub fn run(routing_rx: Receiver<Event>, core_tx: CoreMsgTx, net_tx: NetworkTx) {
     for it in routing_rx.iter() {
         trace!("Received Routing Event: {:?}", it);
         match it {
             Event::Response { response, .. } => {
                 let (id, event) = handle_resp(response);
                 if !fire(&core_tx, id, event) {
+                    break;
+                }
+            }
+            Event::RestartRequired => {
+                if net_tx.send(NetworkEvent::Disconnected).is_err() {
+                    break;
+                }
+                let msg = CoreMsg::new(|client| {
+                    client.restart_routing();
+                    None
+                });
+                if core_tx.send(msg).is_err() {
                     break;
                 }
             }

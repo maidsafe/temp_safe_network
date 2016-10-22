@@ -445,6 +445,7 @@ mod tests {
         let se_err = SelfEncryptionError::Storage(SelfEncryptionStorageError(Box::new(core_err_0)));
         let core_from_se_err = CoreError::from(se_err);
 
-        assert_eq!(Into::<i32>::into(core_err_1), Into::<i32>::into(core_from_se_err));
+        assert_eq!(Into::<i32>::into(core_err_1),
+                   Into::<i32>::into(core_from_se_err));
     }
 }

@@ -19,7 +19,8 @@ use core::{Client, CoreError, CoreFuture};
 use core::futures::FutureExt;
 use futures::Future;
 use maidsafe_utilities::serialisation::serialise;
-use routing::{Data, DataIdentifier, MAX_STRUCTURED_DATA_SIZE_IN_BYTES, StructuredData, XOR_NAME_LEN, XorName};
+use routing::{Data, DataIdentifier, MAX_STRUCTURED_DATA_SIZE_IN_BYTES, StructuredData,
+              XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::sign;
 use std::{u64, u8};
 
