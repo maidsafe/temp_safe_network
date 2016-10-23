@@ -1,18 +1,26 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 //! Session management
@@ -29,7 +37,8 @@ use super::helper;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
 
-/// Represents user session on the SAFE network. There should be one session per launcher.
+/// Represents user session on the SAFE network. There should be one session
+/// per launcher.
 #[derive(Clone)]
 pub struct Session {
     inner: Arc<Inner>,
@@ -37,7 +46,7 @@ pub struct Session {
 
 struct Inner {
     // Channel to communicate with the core event loop
-    pub core_el_tx: Mutex<CoreMsgTx>,
+    pub core_tx: Mutex<CoreMsgTx>,
     object_cache: Arc<Mutex<ObjectCache>>,
     _core_joiner: Joiner,
 }
@@ -45,7 +54,7 @@ struct Inner {
 impl Session {
     /// Send a message to the core event loop
     pub fn send(&self, msg: CoreMsg) -> Result<(), FfiError> {
-        unwrap!(self.inner.core_el_tx.lock()).send(msg).map_err(FfiError::from)
+        unwrap!(self.inner.core_tx.lock()).send(msg).map_err(FfiError::from)
     }
 
     /// Returns an object cache tied to the session
@@ -59,21 +68,24 @@ impl Session {
 
         let joiner = thread::named("Core Event Loop", move || {
             let el = unwrap!(Core::new(), "Failed to create the event loop");
+            let el_h = el.handle();
 
-            let (core_el_tx, core_el_rx) = channel::channel(&el.handle()).unwrap();
-            let core_el_tx_clone = core_el_tx.clone();
-            tx.send(core_el_tx).unwrap();
+            let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
+            let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
+            let core_tx_clone = core_tx.clone();
 
-            let client = unwrap!(Client::unregistered(core_el_tx_clone),
+            tx.send(core_tx).unwrap();
+
+            let client = unwrap!(Client::unregistered(core_tx_clone, net_tx),
                                  "Failed to create client");
-            core::run(el, client, core_el_rx);
+            core::run(el, client, core_rx);
         });
 
         let tx = unwrap!(rx.recv());
 
         Session {
             inner: Arc::new(Inner {
-                core_el_tx: Mutex::new(tx),
+                core_tx: Mutex::new(tx),
                 _core_joiner: joiner,
                 object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
@@ -91,21 +103,24 @@ impl Session {
 
         let joiner = thread::named("Core Event Loop", move || {
             let el = unwrap!(Core::new(), "Failed to create the event loop");
+            let el_h = el.handle();
 
-            let (core_el_tx, core_el_rx) = channel::channel(&el.handle()).unwrap();
-            let core_el_tx_clone = core_el_tx.clone();
-            tx.send(core_el_tx).unwrap();
+            let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
+            let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
+            let core_tx_clone = core_tx.clone();
 
-            let client = unwrap!(Client::registered(&locator, &password, core_el_tx_clone),
+            tx.send(core_tx).unwrap();
+
+            let client = unwrap!(Client::registered(&locator, &password, core_tx_clone, net_tx),
                                  "Failed to create client");
-            core::run(el, client, core_el_rx);
+            core::run(el, client, core_rx);
         });
 
         let tx = unwrap!(rx.recv());
 
         Session {
             inner: Arc::new(Inner {
-                core_el_tx: Mutex::new(tx),
+                core_tx: Mutex::new(tx),
                 _core_joiner: joiner,
                 object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
@@ -123,21 +138,23 @@ impl Session {
 
         let joiner = thread::named("Core Event Loop", move || {
             let el = unwrap!(Core::new(), "Failed to create the event loop");
+            let el_h = el.handle();
 
-            let (core_el_tx, core_el_rx) = channel::channel(&el.handle()).unwrap();
-            let core_el_tx_clone = core_el_tx.clone();
-            tx.send(core_el_tx).unwrap();
+            let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
+            let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
+            let core_tx_clone = core_tx.clone();
+            tx.send(core_tx).unwrap();
 
-            let client = unwrap!(Client::login(&locator, &password, core_el_tx_clone),
+            let client = unwrap!(Client::login(&locator, &password, core_tx_clone, net_tx),
                                  "Failed to create client");
-            core::run(el, client, core_el_rx);
+            core::run(el, client, core_rx);
         });
 
         let tx = unwrap!(rx.recv());
 
         Session {
             inner: Arc::new(Inner {
-                core_el_tx: Mutex::new(tx),
+                core_tx: Mutex::new(tx),
                 _core_joiner: joiner,
                 object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
@@ -207,8 +224,10 @@ impl Drop for Session {
     }
 }
 
-/// Create a session as an unregistered client. This or any one of the other companion functions to
-/// get a session must be called before initiating any operation allowed by this crate.
+/// Create a session as an unregistered client. This or any one of the other
+/// companion functions to
+/// get a session must be called before initiating any operation allowed by
+/// this crate.
 #[no_mangle]
 pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut Session) -> int32_t {
     helper::catch_unwind_i32(|| {
@@ -220,9 +239,12 @@ pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut Se
     })
 }
 
-/// Create a registered client. This or any one of the other companion functions to get a
-/// session must be called before initiating any operation allowed by this crate. `session_handle`
-/// is a pointer to a pointer and must point to a valid pointer not junk, else the consequences are
+/// Create a registered client. This or any one of the other companion
+/// functions to get a
+/// session must be called before initiating any operation allowed by this
+/// crate. `session_handle`
+/// is a pointer to a pointer and must point to a valid pointer not junk, else
+/// the consequences are
 /// undefined.
 #[no_mangle]
 pub unsafe extern "C" fn create_account(account_locator: *const u8,
@@ -243,9 +265,12 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
     })
 }
 
-/// Log into a registered client. This or any one of the other companion functions to get a
-/// session must be called before initiating any operation allowed by this crate. `session_handle`
-/// is a pointer to a pointer and must point to a valid pointer not junk, else the consequences are
+/// Log into a registered client. This or any one of the other companion
+/// functions to get a
+/// session must be called before initiating any operation allowed by this
+/// crate. `session_handle`
+/// is a pointer to a pointer and must point to a valid pointer not junk, else
+/// the consequences are
 /// undefined.
 #[no_mangle]
 pub unsafe extern "C" fn log_in(account_locator: *const u8,
@@ -266,11 +291,14 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
     })
 }
 
-// /// Register an observer to network events like Connected, Disconnected etc. as provided by the
+// /// Register an observer to network events like Connected, Disconnected etc.
+// as provided by the
 // /// core module
 // #[no_mangle]
-// pub unsafe extern "C" fn register_network_event_observer(session: *mut Session,
-//                                                          callback: extern "C" fn(i32))
+// pub unsafe extern "C" fn register_network_event_observer(session: *mut
+// Session,
+// callback: extern
+// "C" fn(i32))
 //                                                          -> int32_t {
 //     helper::catch_unwind_i32(|| {
 //         trace!("FFI register a network event observer.");
@@ -384,9 +412,12 @@ pub unsafe extern "C" fn get_account_info(session: *const Session,
     })
 }
 
-/// Discard and clean up the previously allocated session. Use this only if the session is obtained
-/// from one of the session obtainment functions in this crate (`create_account`, `log_in`,
-/// `create_unregistered_client`). Using `session` after a call to this functions is
+/// Discard and clean up the previously allocated session. Use this only if the
+/// session is obtained
+/// from one of the session obtainment functions in this crate
+/// (`create_account`, `log_in`,
+/// `create_unregistered_client`). Using `session` after a call to this
+/// functions is
 /// undefined behaviour.
 #[no_mangle]
 pub unsafe extern "C" fn drop_session(session: *mut Session) {

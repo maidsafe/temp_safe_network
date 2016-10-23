@@ -25,7 +25,7 @@
 
 use core::Client;
 use core::SelfEncryptionStorage;
-use nfs::{Dir, File, NfsFuture};
+use nfs::{Dir, DirId, File, NfsFuture};
 use nfs::errors::NfsError;
 use nfs::helper::dir_helper;
 use nfs::helper::reader::Reader;
@@ -43,7 +43,7 @@ use self_encryption::DataMap;
 pub fn create<S>(client: Client,
                  name: S,
                  user_metadata: Vec<u8>,
-                 parent_id: (DataIdentifier, Option<secretbox::Key>),
+                 parent_id: DirId,
                  parent_dir: Dir)
                  -> Box<NfsFuture<Writer>>
     where S: Into<String>
@@ -69,7 +69,7 @@ pub fn create<S>(client: Client,
 /// Returns Option<parent_directory's parent>
 pub fn delete(client: Client,
               file_name: &str,
-              parent_id: &(DataIdentifier, Option<secretbox::Key>),
+              parent_id: &DirId,
               parent_dir: &mut Dir)
               -> Box<NfsFuture<()>> {
     trace!("Deleting file with name {}.", file_name);
@@ -105,7 +105,7 @@ pub fn update_metadata(client: Client,
 pub fn update_content(client: Client,
                       file: File,
                       mode: Mode,
-                      parent_id: (DataIdentifier, Option<secretbox::Key>),
+                      parent_id: DirId,
                       parent_dir: Dir)
                       -> Box<NfsFuture<Writer>> {
     trace!("Updating content in file with name {}", file.name());

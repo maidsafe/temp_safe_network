@@ -1,18 +1,26 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 //! Directory operations.
@@ -219,13 +227,16 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
 //                                       is_dst_path_shared: bool,
 //                                       retain_src: bool,
 //                                       user_data: *mut c_void,
-//                                       o_cb: extern "C" fn(int32_t, *mut c_void))
+// o_cb: extern "C" fn(int32_t, *mut
+// c_void))
 //                                       -> int32_t {
 //     helper::catch_unwind_i32(|| {
 //         trace!("FFI move directory, from {:?} to {:?}.", src_path, dst_path);
 
-//         let src_path = ffi_try!(helper::c_utf8_to_str(src_path, src_path_len));
-//         let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path, dst_path_len));
+// let src_path = ffi_try!(helper::c_utf8_to_str(src_path,
+// src_path_len));
+// let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path,
+// dst_path_len));
 //         let user_data = OpaqueCtx(user_data);
 
 //         ffi_try!((*session).send(CoreMsg::new(move |client| {
@@ -236,7 +247,8 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
 //                                dst_path,
 //                                is_dst_path_shared,
 //                                retain_src)
-//                 .then(|result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+// .then(|result| Ok(o_cb(ffi_result_code!(result),
+// user_data.0)))
 //                 .into_box();
 //             Some(fut)
 //         })));
@@ -374,7 +386,8 @@ fn modify_dir(client: &Client,
 //     let mut dst_dir = try!(helper::dir(app, dst_path, is_dst_path_shared));
 
 //     if dst_dir.find_sub_directory(src_dir.metadata().name()).is_some() {
-//         return Err(FfiError::from(NfsError::DirectoryAlreadyExistsWithSameName));
+// return
+// Err(FfiError::from(NfsError::DirectoryAlreadyExistsWithSameName));
 //     }
 
 //     let org_parent_of_src_dir = try!(src_dir.metadata()
@@ -414,9 +427,12 @@ fn modify_dir(client: &Client,
 //         dst_dir.upsert_sub_directory(src_dir.metadata().clone());
 //         let _ = try!(dir_helper::update(&dst_dir));
 //         let _ = try!(dir_helper::update(&src_dir));
-//         let mut parent_of_src_dir = try!(dir_helper::get(&org_parent_of_src_dir));
-//         // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
-//         let _dir_meta = try!(parent_of_src_dir.remove_sub_directory(src_dir.metadata()
+// let mut parent_of_src_dir =
+// try!(dir_helper::get(&org_parent_of_src_dir));
+// // TODO (Spandan) - Fetch and issue a DELETE on the removed
+// directory.
+// let _dir_meta =
+// try!(parent_of_src_dir.remove_sub_directory(src_dir.metadata()
 //             .name()));
 //         let _ = try!(dir_helper::update(&parent_of_src_dir));
 //     }
@@ -435,8 +451,6 @@ mod tests {
     use std::slice;
     use std::sync::mpsc;
     use std::time::Duration;
-
-    extern crate env_logger;
 
     fn create_test_dir(client: Client, app: &App, name: &str) -> Box<FfiFuture<()>> {
         let app_dir_id = unwrap!(app.app_dir());
@@ -458,8 +472,6 @@ mod tests {
 
     #[test]
     fn create_dir() {
-        env_logger::init().unwrap();
-
         let sess = test_utils::create_session();
         let app = test_utils::create_app(&sess, false);
 
@@ -636,7 +648,7 @@ mod tests {
                     unsafe {
                         let name = slice::from_raw_parts(details.metadata.name,
                                                          details.metadata.name_len);
-                        let name = String::from_utf8(name.to_owned()).unwrap();
+                        let name = unwrap!(String::from_utf8(name.to_owned()));
                         assert_eq!(name, "test_dir");
                     }
                     assert_eq!(details.files.len(), 0);
