@@ -1,17 +1,25 @@
 // Copyright 2015 MaidSafe.net limited.
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 /// Common utility functions for writting test cases
@@ -43,10 +51,14 @@ pub fn symmetric_decrypt(cipher_text: &[u8],
         .map_err(|_| CoreError::SymmetricDecipherFailure)
 }
 
-/// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and
-/// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text produces different
-/// cipher-texts for each fresh symmetric encryption. The Key and IV are then asymmetrically
-/// enrypted using Public-MAID and the whole thing is then serialised into a single Vec<u8>.
+/// Combined Asymmetric and Symmetric encryption. The data is encrypted using
+/// random Key and
+/// IV with Xsalsa-symmetric encryption. Random IV ensures that same plain text
+/// produces different
+/// cipher-texts for each fresh symmetric encryption. The Key and IV are then
+/// asymmetrically
+/// enrypted using Public-MAID and the whole thing is then serialised into a
+/// single Vec<u8>.
 pub fn hybrid_encrypt(plain_text: &[u8],
                       asym_nonce: &box_::Nonce,
                       asym_public_key: &box_::PublicKey,

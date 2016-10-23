@@ -1,18 +1,26 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 mod account;
@@ -47,10 +55,14 @@ const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const ACC_PKT_TIMEOUT_SECS: u64 = 60;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 
-/// The main self-authentication client instance that will interface all the request from high
-/// level API's to the actual routing layer and manage all interactions with it. This is
-/// essentially a non-blocking Client with upper layers having an option to either block and wait
-/// on the returned ResponseGetters for receiving network response or spawn a new thread. The Client
+/// The main self-authentication client instance that will interface all the
+/// request from high
+/// level API's to the actual routing layer and manage all interactions with
+/// it. This is
+/// essentially a non-blocking Client with upper layers having an option to
+/// either block and wait
+/// on the returned ResponseGetters for receiving network response or spawn a
+/// new thread. The Client
 /// itself is however well equipped for parallel and non-blocking PUTs and GETS.
 #[derive(Clone)]
 pub struct Client {
@@ -69,8 +81,10 @@ struct Inner {
 }
 
 impl Client {
-    /// This is a getter-only Gateway function to the Maidsafe network. It will create an
-    /// unregistered random client, which can do very limited set of operations - eg., a
+    /// This is a getter-only Gateway function to the Maidsafe network. It will
+    /// create an
+    /// unregistered random client, which can do very limited set of operations
+    /// - eg., a
     /// Network-Get
     pub fn unregistered(core_tx: CoreMsgTx, net_tx: NetworkTx) -> Result<Self, CoreError> {
         trace!("Creating unregistered client.");
@@ -92,7 +106,8 @@ impl Client {
         }))
     }
 
-    /// This is a Gateway function to the Maidsafe network. This will help create a fresh acc for
+    /// This is a Gateway function to the Maidsafe network. This will help
+    /// create a fresh acc for
     /// the user in the SAFE-network.
     pub fn registered(acc_locator: &str,
                       acc_password: &str,
@@ -161,7 +176,8 @@ impl Client {
         }))
     }
 
-    /// This is a Gateway function to the Maidsafe network. This will help login to an already
+    /// This is a Gateway function to the Maidsafe network. This will help
+    /// login to an already
     /// existing account of the user in the SAFE-network.
     pub fn login(acc_locator: &str,
                  acc_password: &str,
@@ -289,8 +305,10 @@ impl Client {
         let _ = self.inner_mut().hooks.insert(msg_id, hook);
     }
 
-    /// Get data from the network. If the data exists locally in the cache (for ImmutableData) then
-    /// it will immediately be returned without making an actual network request.
+    /// Get data from the network. If the data exists locally in the cache (for
+    /// ImmutableData) then
+    /// it will immediately be returned without making an actual network
+    /// request.
     pub fn get(&self,
                data_id: DataIdentifier,
                opt_dst: Option<Authority>)
@@ -353,7 +371,8 @@ impl Client {
         rx
     }
 
-    // TODO All these return the same future from all branches. So convert to impl Trait when it
+    // TODO All these return the same future from all branches. So convert to impl
+    // Trait when it
     // arrives in stable. Change from `Box<CoreFuture>` -> `impl CoreFuture`.
     /// Put data onto the network.
     pub fn put(&self, data: Data, dst: Option<Authority>) -> Box<CoreFuture<()>> {
@@ -389,12 +408,14 @@ impl Client {
 
     /// Put data to the network, with recovery.
     ///
-    /// 1. If a data with the same name didn't previously exist, this is the same
+    /// 1. If a data with the same name didn't previously exist, this is the
+    /// same
     ///    as normal PUT.
     /// 2. If it existed, but was deleted, attempt to reclaim it.
     /// 3. Otherwise succeed only if there is owners match.
     ///
-    /// Resolves to the current version of the data, or 0 if the data doesn't have
+    /// Resolves to the current version of the data, or 0 if the data doesn't
+    /// have
     /// version.
     pub fn put_recover(&self,
                        data: Data,
@@ -525,7 +546,8 @@ impl Client {
         rx
     }
 
-    /// A version of `delete` that returns success if the data was already not present on
+    /// A version of `delete` that returns success if the data was already not
+    /// present on
     /// the network, or it was present but in a deleted state already.
     pub fn delete_recover(&self, data: Data, dst: Option<Authority>) -> Box<CoreFuture<()>> {
         trace!("DELETE with recovery for {:?}", data);
@@ -621,9 +643,12 @@ impl Client {
         rx
     }
 
-    /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
-    /// store it. It will be retrieved when the user logs into their account. Root directory ID is
-    /// necessary to fetch all of the user's data as all further data is encoded as meta-information
+    /// Create an entry for the Root Directory ID for the user into the session
+    /// packet, encrypt and
+    /// store it. It will be retrieved when the user logs into their account.
+    /// Root directory ID is
+    /// necessary to fetch all of the user's data as all further data is
+    /// encoded as meta-information
     /// into the Root Directory or one of its subdirectories.
     pub fn set_user_root_dir_id(&self,
                                 dir_id: (DataIdentifier, Option<secretbox::Key>))
@@ -643,15 +668,20 @@ impl Client {
         }
     }
 
-    /// Get User's Root Directory ID if available in session packet used for current login
+    /// Get User's Root Directory ID if available in session packet used for
+    /// current login
     pub fn user_root_dir_id(&self) -> Option<(DataIdentifier, Option<secretbox::Key>)> {
         self.inner().client_type.acc().ok().and_then(|account| account.user_root_dir()).cloned()
     }
 
-    /// Create an entry for the Maidsafe configuration specific Root Directory ID into the
-    /// session packet, encrypt and store it. It will be retrieved when the user logs into
-    /// their account. Root directory ID is necessary to fetch all of configuration data as all
-    /// further data is encoded as meta-information into the config Root Directory or one of its
+    /// Create an entry for the Maidsafe configuration specific Root Directory
+    /// ID into the
+    /// session packet, encrypt and store it. It will be retrieved when the
+    /// user logs into
+    /// their account. Root directory ID is necessary to fetch all of
+    /// configuration data as all
+    /// further data is encoded as meta-information into the config Root
+    /// Directory or one of its
     /// subdirectories.
     pub fn set_config_root_dir_id(&self,
                                   dir_id: (DataIdentifier, Option<secretbox::Key>))
@@ -671,7 +701,8 @@ impl Client {
         }
     }
 
-    /// Get Maidsafe specific configuration's Root Directory ID if available in session packet used
+    /// Get Maidsafe specific configuration's Root Directory ID if available in
+    /// session packet used
     /// for current login
     pub fn config_root_dir_id(&self) -> Option<(DataIdentifier, Option<secretbox::Key>)> {
         self.inner().client_type.acc().ok().and_then(|account| account.config_root_dir()).cloned()
