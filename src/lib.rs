@@ -81,8 +81,8 @@ extern crate unwrap;
 pub mod core;
 /// Nfs module;
 pub mod nfs;
-// /// Dns module;
-// pub mod dns;
+/// Dns module;
+pub mod dns;
 // /// Ffi module;
 // pub mod ffi;
 

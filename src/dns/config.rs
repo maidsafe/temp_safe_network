@@ -1,18 +1,26 @@
 // Copyright 2015 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 //! DNS configuration.
@@ -60,9 +68,7 @@ pub fn read(client: &Client) -> Box<DnsFuture<Vec<DnsConfig>>> {
             let size = reader.size();
             reader.read(0, size)
         })
-        .and_then(|encoded| {
-            Ok(try!(deserialise(&encoded)))
-        })
+        .and_then(|encoded| Ok(try!(deserialise(&encoded))))
         .or_else(|err| match err {
             NfsError::FileNotFound => Ok(vec![]),
             err => Err(DnsError::from(err)),
@@ -78,11 +84,7 @@ pub fn write(client: &Client, config: Vec<DnsConfig>) -> Box<DnsFuture<()>> {
     dir_helper::configuration_dir(client.clone(), DNS_CONFIG_DIR_NAME.to_owned())
         .and_then(|(dir, dir_metadata)| {
             if let Some(file) = dir.find_file(DNS_CONFIG_FILE_NAME).cloned() {
-                file_helper::update_content(client2,
-                                            file,
-                                            Mode::Overwrite,
-                                            dir_metadata.id(),
-                                            dir)
+                file_helper::update_content(client2, file, Mode::Overwrite, dir_metadata.id(), dir)
             } else {
                 file_helper::create(client2,
                                     DNS_CONFIG_FILE_NAME.to_string(),
@@ -101,7 +103,7 @@ pub fn write(client: &Client, config: Vec<DnsConfig>) -> Box<DnsFuture<()>> {
 #[cfg(test)]
 mod tests {
     use core::utility;
-    use core::utility::test_utils;
+    use core::utility::test_utils::random_client;
     use futures::Future;
     use rust_sodium::crypto::box_;
     use super::*;
@@ -120,7 +122,7 @@ mod tests {
         };
         let config_1_2 = config_1.clone();
 
-        test_utils::register_and_run(move |client| {
+        random_client(move |client| {
             let client2 = client.clone();
             let client3 = client.clone();
             let client4 = client.clone();
@@ -171,7 +173,6 @@ mod tests {
                 .map(|config_vec| {
                     assert!(config_vec.is_empty());
                 })
-                .map_err(|err| panic!("{:?}", err))
         })
     }
 }
