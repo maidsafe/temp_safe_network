@@ -1214,6 +1214,7 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "use-mock-routing")]
     #[test]
     fn restart_routing() {
         let (tx, rx) = mpsc::channel();
