@@ -1,18 +1,26 @@
 // Copyright 2015 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 use core::{Client, CoreError, CoreFuture, SelfEncryptionStorage, utility};
@@ -29,8 +37,10 @@ enum DataTypeEncoding {
     DataMap(DataMap),
 }
 
-/// Create and obtain immutable data out of the given raw bytes. The API will encrypt the right
-/// content if the keys are provided and will ensure the maximum immutable data chunk size is
+/// Create and obtain immutable data out of the given raw bytes. The API will
+/// encrypt the right
+/// content if the keys are provided and will ensure the maximum immutable data
+/// chunk size is
 /// respected.
 pub fn create(client: &Client,
               value: Vec<u8>,
@@ -71,7 +81,8 @@ pub fn get(client: &Client, name: &XorName) -> Box<CoreFuture<ImmutableData>> {
         .into_box()
 }
 
-/// Get the raw bytes from ImmutableData created via `create()` function in this module.
+/// Get the raw bytes from ImmutableData created via `create()` function in
+/// this module.
 pub fn extract_value(client: &Client,
                      data: ImmutableData,
                      decryption_key: Option<secretbox::Key>)
@@ -81,8 +92,7 @@ pub fn extract_value(client: &Client,
     unpack(client.clone(), data)
         .and_then(move |value| {
             let data_map = if let Some(key) = decryption_key {
-                let plain_text =
-                    try!(utility::symmetric_decrypt(&value, &key));
+                let plain_text = try!(utility::symmetric_decrypt(&value, &key));
                 try!(deserialise(&plain_text))
             } else {
                 try!(deserialise(&value))
@@ -155,7 +165,7 @@ fn unpack(client: Client, data: ImmutableData) -> Box<CoreFuture<Vec<u8>>> {
 #[cfg(test)]
 mod tests {
     use core::utility;
-    use core::utility::test_utils;
+    use core::utility::test_utils::{finish, random_client};
     use futures::Future;
     use routing::Data;
     use rust_sodium::crypto::secretbox;
@@ -176,9 +186,8 @@ mod tests {
         create_and_retrieve(2 * 1024 * 1024)
     }
 
-    // #[ignore]'d becayse it takes a very long time in debug mode - it is due to S.E crate.
+    #[cfg(not(debug_assertions))]
     #[test]
-    #[ignore]
     fn create_and_retrieve_10mb() {
         create_and_retrieve(10 * 1024 * 1024)
     }
@@ -190,21 +199,26 @@ mod tests {
         {
             let value_before = value.clone();
 
-            test_utils::register_and_run(move |client| {
+            random_client(move |client| {
                 let client2 = client.clone();
                 let client3 = client.clone();
 
                 create(client, value_before.clone(), None)
-                    .and_then(move |data_before| {
+                    .then(move |res| {
+                        let data_before = unwrap!(res);
                         let data_name = *data_before.name();
                         client2.put(Data::Immutable(data_before), None)
                             .map(move |_| data_name)
                     })
-                    .and_then(move |data_name| get_value(&client3, &data_name, None))
-                    .map(move |value_after| {
-                        assert_eq!(value_after, value_before);
+                    .then(move |res| {
+                        let data_name = unwrap!(res);
+                        get_value(&client3, &data_name, None)
                     })
-                    .map_err(|error| panic!("Unexpected {:?}", error))
+                    .then(move |res| {
+                        let value_after = unwrap!(res);
+                        assert_eq!(value_after, value_before);
+                        finish()
+                    })
             })
         }
 
@@ -213,21 +227,26 @@ mod tests {
             let value_before = value.clone();
             let key = secretbox::gen_key();
 
-            test_utils::register_and_run(move |client| {
+            random_client(move |client| {
                 let client2 = client.clone();
                 let client3 = client.clone();
 
                 create(client, value_before.clone(), Some(key.clone()))
-                    .and_then(move |data_before| {
+                    .then(move |res| {
+                        let data_before = unwrap!(res);
                         let data_name = *data_before.name();
                         client2.put(Data::Immutable(data_before), None)
                             .map(move |_| data_name)
                     })
-                    .and_then(move |data_name| get_value(&client3, &data_name, Some(key)))
-                    .map(move |value_after| {
-                        assert_eq!(value_after, value_before);
+                    .then(move |res| {
+                        let data_name = unwrap!(res);
+                        get_value(&client3, &data_name, Some(key))
                     })
-                    .map_err(|error| panic!("Unexpected {:?}", error))
+                    .then(move |res| {
+                        let value_after = unwrap!(res);
+                        assert_eq!(value_after, value_before);
+                        finish()
+                    })
             })
         }
 
@@ -236,18 +255,25 @@ mod tests {
             let value = value.clone();
             let key = secretbox::gen_key();
 
-            test_utils::register_and_run(move |client| {
+            random_client(move |client| {
                 let client2 = client.clone();
                 let client3 = client.clone();
 
                 create(client, value, None)
-                    .and_then(move |data| {
+                    .then(move |res| {
+                        let data = unwrap!(res);
                         let data_name = *data.name();
                         client2.put(Data::Immutable(data), None)
                             .map(move |_| data_name)
                     })
-                    .and_then(move |data_name| get_value(&client3, &data_name, Some(key)))
-                    .map(|_| panic!("get_value should fail"))
+                    .then(move |res| {
+                        let data_name = unwrap!(res);
+                        get_value(&client3, &data_name, Some(key))
+                    })
+                    .then(|res| {
+                        assert!(res.is_err());
+                        finish()
+                    })
             })
         }
 
@@ -256,18 +282,25 @@ mod tests {
             let value = value.clone();
             let key = secretbox::gen_key();
 
-            test_utils::register_and_run(move |client| {
+            random_client(move |client| {
                 let client2 = client.clone();
                 let client3 = client.clone();
 
                 create(client, value, Some(key))
-                    .and_then(move |data| {
+                    .then(move |res| {
+                        let data = unwrap!(res);
                         let data_name = *data.name();
                         client2.put(Data::Immutable(data), None)
                             .map(move |_| data_name)
                     })
-                    .and_then(move |data_name| get_value(&client3, &data_name, None))
-                    .map(|_| panic!("get_value should fail"))
+                    .then(move |res| {
+                        let data_name = unwrap!(res);
+                        get_value(&client3, &data_name, None)
+                    })
+                    .then(|res| {
+                        assert!(res.is_err());
+                        finish()
+                    })
 
             })
         }

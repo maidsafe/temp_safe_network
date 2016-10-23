@@ -1,18 +1,26 @@
 // Copyright 2015 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 use core::errors::CoreError;
@@ -22,8 +30,10 @@ use routing::{DataIdentifier, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{pwhash, secretbox};
 use rust_sodium::crypto::hash::sha256;
 
-/// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
-/// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also their Root
+/// Represents a Session Packet for the user. It is necessary to fetch and
+/// decode this via user
+/// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and
+/// also their Root
 /// Directory ID if they have put data onto the network.
 #[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
 pub struct Account {
@@ -41,7 +51,8 @@ pub struct Account {
 
 #[allow(dead_code)]
 impl Account {
-    /// Create a new Session Packet with Randomly generated Maid keys for the user
+    /// Create a new Session Packet with Randomly generated Maid keys for the
+    /// user
     pub fn new() -> Self {
         let an_maid = RevocationIdType::new::<MaidTypeTags>();
         let maid = IdType::new(&an_maid);
@@ -63,7 +74,8 @@ impl Account {
         }
     }
 
-    /// Generate User's Identity for the network using supplied credentials in a deterministic way.
+    /// Generate User's Identity for the network using supplied credentials in
+    /// a deterministic way.
     /// This is similar to the username in various places.
     pub fn generate_network_id(keyword: &[u8], pin: &[u8]) -> Result<XorName, CoreError> {
         let mut id = XorName([0; XOR_NAME_LEN]);
@@ -132,7 +144,8 @@ impl Account {
         }
     }
 
-    /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
+    /// Symmetric encryption of Session Packet using User's credentials.
+    /// Credentials are passed
     /// through key-derivation-function first
     pub fn encrypt(&self, password: &[u8], pin: &[u8]) -> Result<Vec<u8>, CoreError> {
         let serialised_self = try!(serialise(self));
@@ -141,7 +154,8 @@ impl Account {
         Ok(secretbox::seal(&serialised_self, &nonce, &key))
     }
 
-    /// Symmetric decryption of Session Packet using User's credentials. Credentials are passed
+    /// Symmetric decryption of Session Packet using User's credentials.
+    /// Credentials are passed
     /// through key-derivation-function first
     pub fn decrypt(encrypted_self: &[u8], password: &[u8], pin: &[u8]) -> Result<Self, CoreError> {
         let (key, nonce) = try!(Self::generate_crypto_keys(password, pin));

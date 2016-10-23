@@ -1,18 +1,26 @@
 // Copyright 2015 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 use core::SelfEncryptionStorageError;
@@ -25,9 +33,10 @@ use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::mpsc;
 
-/// Intended for converting Client Errors into numeric codes for propagating some error information
+/// Intended for converting Client Errors into numeric codes for propagating
+/// some error information
 /// across FFI boundaries and specially to C.
-pub const CLIENT_ERROR_START_RANGE: i32 = -1;
+pub const CORE_ERROR_START_RANGE: i32 = -1;
 
 /// Client Errors
 pub enum CoreError {
@@ -59,7 +68,8 @@ pub enum CoreError {
     RoutingInterfaceError(::routing::InterfaceError),
     /// Unable to pack into or operate with size of Salt
     UnsupportedSaltSizeForPwHash,
-    /// Unable to complete computation for password hashing - usually because OS refused to
+    /// Unable to complete computation for password hashing - usually because
+    /// OS refused to
     /// allocate amount of requested memory
     UnsuccessfulPwHash,
     /// Blocking operation was cancelled
@@ -138,82 +148,82 @@ impl From<SelfEncryptionError<SelfEncryptionStorageError>> for CoreError {
 impl Into<i32> for CoreError {
     fn into(self) -> i32 {
         match self {
-            CoreError::StructuredDataHeaderSizeProhibitive => CLIENT_ERROR_START_RANGE,
-            CoreError::UnsuccessfulEncodeDecode(_) => CLIENT_ERROR_START_RANGE - 1,
-            CoreError::AsymmetricDecipherFailure => CLIENT_ERROR_START_RANGE - 2,
-            CoreError::SymmetricDecipherFailure => CLIENT_ERROR_START_RANGE - 3,
-            CoreError::ReceivedUnexpectedData => CLIENT_ERROR_START_RANGE - 4,
-            CoreError::VersionCacheMiss => CLIENT_ERROR_START_RANGE - 5,
-            CoreError::RootDirectoryAlreadyExists => CLIENT_ERROR_START_RANGE - 6,
-            CoreError::RandomDataGenerationFailure => CLIENT_ERROR_START_RANGE - 7,
-            CoreError::OperationForbiddenForClient => CLIENT_ERROR_START_RANGE - 8,
-            CoreError::Unexpected(_) => CLIENT_ERROR_START_RANGE - 9,
-            CoreError::RoutingError(_) => CLIENT_ERROR_START_RANGE - 10,
-            CoreError::RoutingInterfaceError(_) => CLIENT_ERROR_START_RANGE - 11,
-            CoreError::UnsupportedSaltSizeForPwHash => CLIENT_ERROR_START_RANGE - 12,
-            CoreError::UnsuccessfulPwHash => CLIENT_ERROR_START_RANGE - 13,
-            CoreError::OperationAborted => CLIENT_ERROR_START_RANGE - 14,
-            CoreError::MpidMessagingError(_) => CLIENT_ERROR_START_RANGE - 15,
+            CoreError::StructuredDataHeaderSizeProhibitive => CORE_ERROR_START_RANGE,
+            CoreError::UnsuccessfulEncodeDecode(_) => CORE_ERROR_START_RANGE - 1,
+            CoreError::AsymmetricDecipherFailure => CORE_ERROR_START_RANGE - 2,
+            CoreError::SymmetricDecipherFailure => CORE_ERROR_START_RANGE - 3,
+            CoreError::ReceivedUnexpectedData => CORE_ERROR_START_RANGE - 4,
+            CoreError::VersionCacheMiss => CORE_ERROR_START_RANGE - 5,
+            CoreError::RootDirectoryAlreadyExists => CORE_ERROR_START_RANGE - 6,
+            CoreError::RandomDataGenerationFailure => CORE_ERROR_START_RANGE - 7,
+            CoreError::OperationForbiddenForClient => CORE_ERROR_START_RANGE - 8,
+            CoreError::Unexpected(_) => CORE_ERROR_START_RANGE - 9,
+            CoreError::RoutingError(_) => CORE_ERROR_START_RANGE - 10,
+            CoreError::RoutingInterfaceError(_) => CORE_ERROR_START_RANGE - 11,
+            CoreError::UnsupportedSaltSizeForPwHash => CORE_ERROR_START_RANGE - 12,
+            CoreError::UnsuccessfulPwHash => CORE_ERROR_START_RANGE - 13,
+            CoreError::OperationAborted => CORE_ERROR_START_RANGE - 14,
+            CoreError::MpidMessagingError(_) => CORE_ERROR_START_RANGE - 15,
             CoreError::GetFailure { reason: GetError::NoSuchAccount, .. } => {
-                CLIENT_ERROR_START_RANGE - 16
+                CORE_ERROR_START_RANGE - 16
             }
             CoreError::GetFailure { reason: GetError::NoSuchData, .. } => {
-                CLIENT_ERROR_START_RANGE - 17
+                CORE_ERROR_START_RANGE - 17
             }
             CoreError::GetFailure { reason: GetError::NetworkOther(_), .. } => {
-                CLIENT_ERROR_START_RANGE - 18
+                CORE_ERROR_START_RANGE - 18
             }
             CoreError::MutationFailure { reason: MutationError::NoSuchAccount, .. } => {
-                CLIENT_ERROR_START_RANGE - 19
+                CORE_ERROR_START_RANGE - 19
             }
             CoreError::MutationFailure { reason: MutationError::AccountExists, .. } => {
-                CLIENT_ERROR_START_RANGE - 20
+                CORE_ERROR_START_RANGE - 20
             }
             CoreError::MutationFailure { reason: MutationError::NoSuchData, .. } => {
-                CLIENT_ERROR_START_RANGE - 21
+                CORE_ERROR_START_RANGE - 21
             }
             CoreError::MutationFailure { reason: MutationError::DataExists, .. } => {
-                CLIENT_ERROR_START_RANGE - 22
+                CORE_ERROR_START_RANGE - 22
             }
             CoreError::MutationFailure { reason: MutationError::LowBalance, .. } => {
-                CLIENT_ERROR_START_RANGE - 23
+                CORE_ERROR_START_RANGE - 23
             }
             CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. } => {
-                CLIENT_ERROR_START_RANGE - 24
+                CORE_ERROR_START_RANGE - 24
             }
             CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. } => {
-                CLIENT_ERROR_START_RANGE - 25
+                CORE_ERROR_START_RANGE - 25
             }
             CoreError::MutationFailure { reason: MutationError::NetworkOther(_), .. } => {
-                CLIENT_ERROR_START_RANGE - 26
+                CORE_ERROR_START_RANGE - 26
             }
             CoreError::MutationFailure { reason: MutationError::NetworkFull, .. } => {
-                CLIENT_ERROR_START_RANGE - 27
+                CORE_ERROR_START_RANGE - 27
             }
             CoreError::MutationFailure { reason: MutationError::DataTooLarge, .. } => {
-                CLIENT_ERROR_START_RANGE - 28
+                CORE_ERROR_START_RANGE - 28
             }
             CoreError::SelfEncryption(
                 SelfEncryptionError::Compression::<SelfEncryptionStorageError>) => {
-                CLIENT_ERROR_START_RANGE - 29
+                CORE_ERROR_START_RANGE - 29
             }
             CoreError::SelfEncryption(
                 SelfEncryptionError::Decryption::<SelfEncryptionStorageError>) => {
-                CLIENT_ERROR_START_RANGE - 30
+                CORE_ERROR_START_RANGE - 30
             }
             CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
-                CLIENT_ERROR_START_RANGE - 31
+                CORE_ERROR_START_RANGE - 31
             }
             CoreError::GetAccountInfoFailure { reason: GetError::NoSuchAccount, .. } => {
-                CLIENT_ERROR_START_RANGE - 32
+                CORE_ERROR_START_RANGE - 32
             }
-            CoreError::GetAccountInfoFailure { .. } => CLIENT_ERROR_START_RANGE - 33,
-            CoreError::RequestTimeout => CLIENT_ERROR_START_RANGE - 34,
+            CoreError::GetAccountInfoFailure { .. } => CORE_ERROR_START_RANGE - 33,
+            CoreError::RequestTimeout => CORE_ERROR_START_RANGE - 34,
             CoreError::SelfEncryption(
                 SelfEncryptionError::Storage::<SelfEncryptionStorageError>(
                     SelfEncryptionStorageError(err))) => (*err).into(),
-            CoreError::InvalidStructuredDataTypeTag => CLIENT_ERROR_START_RANGE - 35,
-            CoreError::ReceivedUnexpectedEvent => CLIENT_ERROR_START_RANGE - 36,
+            CoreError::InvalidStructuredDataTypeTag => CORE_ERROR_START_RANGE - 35,
+            CoreError::ReceivedUnexpectedEvent => CORE_ERROR_START_RANGE - 36,
         }
     }
 }
@@ -445,6 +455,7 @@ mod tests {
         let se_err = SelfEncryptionError::Storage(SelfEncryptionStorageError(Box::new(core_err_0)));
         let core_from_se_err = CoreError::from(se_err);
 
-        assert_eq!(Into::<i32>::into(core_err_1), Into::<i32>::into(core_from_se_err));
+        assert_eq!(Into::<i32>::into(core_err_1),
+                   Into::<i32>::into(core_from_se_err));
     }
 }

@@ -1,18 +1,26 @@
 // Copyright 2015 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 use core::{Client, CoreError, CoreFuture, immutable_data};
@@ -108,9 +116,7 @@ pub fn extract_value(client: &Client,
                  // TODO: add proper error variant for this
                  .ok_or(CoreError::Unexpected("invalid version".to_owned()))
         })
-        .and_then(move |name| {
-            immutable_data::get_value(&client2, &name, decryption_key)
-        })
+        .and_then(move |name| immutable_data::get_value(&client2, &name, decryption_key))
         .into_box()
 }
 
@@ -124,7 +130,8 @@ pub fn extract_current_value(client: &Client,
 }
 
 /// Extract the complete list of names of versions of versioned StructuredData.
-pub fn extract_all_version_names(client: &Client, data: &StructuredData)
+pub fn extract_all_version_names(client: &Client,
+                                 data: &StructuredData)
                                  -> Box<CoreFuture<Vec<XorName>>> {
     let info = fry!(deserialise::<VersionsInfo>(&data.get_data()));
     immutable_data::get_value(client, &info.version_list_name, None)
@@ -170,9 +177,7 @@ fn append_version(client: Client,
     let encoded_version_list = fry!(serialise(&version_list));
 
     immutable_data::create(&client, encoded_version_list, None)
-        .map(move |version_list_data| {
-            (version_list_data, curr_version_data)
-        })
+        .map(move |version_list_data| (version_list_data, curr_version_data))
         .and_then(move |(version_list_data, curr_version_data)| {
             let info = VersionsInfo {
                 version_list_name: *version_list_data.name(),
@@ -209,9 +214,7 @@ fn build(type_tag: u64,
          -> Result<StructuredData, CoreError> {
     let encoded = try!(serialise(&info));
 
-    match try!(super::can_data_fit(&encoded,
-                                   curr_owner_keys.clone(),
-                                   prev_owner_keys.clone())) {
+    match try!(super::can_data_fit(&encoded, curr_owner_keys.clone(), prev_owner_keys.clone())) {
 
         DataFitResult::DataFits => {
             Ok(try!(StructuredData::new(type_tag,
@@ -232,7 +235,7 @@ fn build(type_tag: u64,
 #[cfg(test)]
 mod tests {
     use core::utility;
-    use core::utility::test_utils;
+    use core::utility::test_utils::{self, finish, random_client};
     use futures::Future;
     use rand;
     use super::*;
@@ -248,7 +251,7 @@ mod tests {
         let owner_keys = test_utils::get_max_sized_public_keys(1);
         let sign_key = test_utils::get_max_sized_secret_keys(1).remove(0);
 
-        test_utils::register_and_run(move |client| {
+        random_client(move |client| {
             let client2 = client.clone();
             let client3 = client.clone();
             let client4 = client.clone();
@@ -260,29 +263,27 @@ mod tests {
                    owner_keys.clone(),
                    sign_key.clone(),
                    None)
-                .and_then(move |data| {
+                .then(move |res| {
+                    let data = unwrap!(res);
                     assert_eq!(unwrap!(version_count(&data)), 1);
-                    extract_current_value(&client2, &data, None)
-                        .map(move |value| (data, value))
+                    extract_current_value(&client2, &data, None).map(move |value| (data, value))
                 })
-                .and_then(move |(data, value_after)| {
+                .then(move |res| {
+                    let (data, value_after) = unwrap!(res);
                     assert_eq!(value_after, value0);
 
-                    update(&client3,
-                           data,
-                           value1,
-                           owner_keys,
-                           sign_key,
-                           None)
+                    update(&client3, data, value1, owner_keys, sign_key, None)
                 })
-                .and_then(move |data| {
+                .then(move |res| {
+                    let data = unwrap!(res);
                     assert_eq!(unwrap!(version_count(&data)), 2);
                     extract_current_value(&client4, &data, None)
                 })
-                .map(move |value_after| {
+                .then(move |res| {
+                    let value_after = unwrap!(res);
                     assert_eq!(value_after, value1_2);
+                    finish()
                 })
-                .map_err(|err| panic!("Unexpected {:?}", err))
         })
     }
 }

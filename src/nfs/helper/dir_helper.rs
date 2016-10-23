@@ -1,24 +1,31 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences".to_string()).
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
+// licence you accepted on initial access to the Software (the
+// "Licences".to_string()).
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
 
-use core::Client;
-use core::errors::CoreError;
-use core::futures::FutureExt;
+use core::{Client, CoreError, FutureExt};
 use core::structured_data::unversioned;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -55,7 +62,8 @@ pub fn create(client: Client,
 }
 
 /// Adds a sub directory to a parent.
-/// Parent directory is updated and the sub directory metadata returned as a result.
+/// Parent directory is updated and the sub directory metadata returned as a
+/// result.
 pub fn add_sub_dir(client: Client,
                    name: String,
                    dir_id: &DirId,
@@ -339,7 +347,7 @@ fn get_immutable_data(client: Client, id: XorName) -> Box<NfsFuture<ImmutableDat
 
 #[cfg(test)]
 mod tests {
-    use core::utility::test_utils;
+    use core::utility::test_utils::{finish, random_client};
     use futures::Future;
     use nfs::{Dir, DirMetadata};
     use nfs::helper::dir_helper;
@@ -349,7 +357,7 @@ mod tests {
 
     #[test]
     fn create_dir() {
-        test_utils::register_and_run(|client| {
+        random_client(|client| {
             // Create a Directory
             let mut dir = Dir::new();
             let c2 = client.clone();
@@ -362,10 +370,12 @@ mod tests {
             dir.sub_dirs_mut().push(sub_dir);
 
             dir_helper::create(client.clone(), &dir, None)
-                .and_then(move |dir_id| {
+                .then(move |res| {
+                    let dir_id = unwrap!(res);
                     dir_helper::get(c2, &(dir_id, None)).map(move |new_dir| (dir_id, new_dir))
                 })
-                .and_then(move |(dir_id, new_dir)| {
+                .then(move |res| {
+                    let (dir_id, new_dir) = unwrap!(res);
                     assert_eq!(new_dir, dir);
 
                     // Create a Child directory and update the parent_dir
@@ -374,7 +384,8 @@ mod tests {
                     dir_helper::create(c3, &child_dir, None)
                         .map(move |child_id| (dir_id, child_id, child_dir))
                 })
-                .and_then(move |(dir_id, child_id, mut new_dir)| {
+                .then(move |res| {
+                    let (dir_id, child_id, mut new_dir) = unwrap!(res);
                     dir_helper::add_sub_dir(c4,
                                             "Child".to_string(),
                                             &(child_id, None),
@@ -383,7 +394,8 @@ mod tests {
                                             &(dir_id, None))
                         .map(move |dir_meta| (dir_meta, new_dir))
                 })
-                .and_then(move |(dir_meta, new_dir)| {
+                .then(move |res| {
+                    let (dir_meta, new_dir) = unwrap!(res);
                     assert_eq!(dir_meta.name(), "Child");
                     assert_eq!(dir_meta.user_metadata(), b"test");
                     assert!(new_dir.find_sub_dir("Child").is_some());
@@ -398,7 +410,8 @@ mod tests {
                             (dir_meta, parent_dir, grand_child_meta)
                         })
                 })
-                .and_then(move |(parent_dir_meta, parent_dir, grand_child_meta)| {
+                .then(move |res| {
+                    let (parent_dir_meta, parent_dir, grand_child_meta) = unwrap!(res);
                     assert_eq!(grand_child_meta.name(), "Grand Child");
 
                     // We expect result to be an error if we try to create a dir with the same name
@@ -408,14 +421,11 @@ mod tests {
                                                Vec::new(),
                                                &parent_dir,
                                                &parent_dir_meta.id())
-                        .then(|r| {
-                            match r {
-                                Ok(_) => panic!("Created dir with the same name"),
-                                Err(_) => Ok(()),
-                            }
-                        })
                 })
-                .map_err(|e| panic!("dir_helper::create returned error: {:?}", e))
+                .then(|res| {
+                    assert!(res.is_err());
+                    finish()
+                })
         });
     }
 
@@ -428,28 +438,31 @@ mod tests {
         let (tx, rx) = mpsc::channel::<DataIdentifier>();
 
         let pd = public_dir.clone();
-        test_utils::register_and_run(move |client| {
-            dir_helper::create(client.clone(), &pd, None).map(move |dir_id| tx.send(dir_id))
+        random_client(move |client| {
+            dir_helper::create(client.clone(), &pd, None)
+                .map(move |dir_id| unwrap!(tx.send(dir_id)))
         });
 
         let public_dir_id = rx.recv().unwrap();
 
-        test_utils::register_and_run(move |client| {
-            dir_helper::get(client.clone(), &(public_dir_id, None))
-                .map(move |retrieved_public_dir| {
-                    assert_eq!(retrieved_public_dir, public_dir);
-                })
+        random_client(move |client| {
+            dir_helper::get(client.clone(), &(public_dir_id, None)).then(move |res| {
+                let retrieved_pub_dir = unwrap!(res);
+                assert_eq!(retrieved_pub_dir, public_dir);
+                finish()
+            })
         });
     }
 
     #[test]
     fn user_root_configuration() {
-        test_utils::register_and_run(move |client| {
+        random_client(move |client| {
             let c2 = client.clone();
             let c3 = client.clone();
 
             dir_helper::user_root_dir(client.clone())
-                .and_then(move |mut root_dir| {
+                .then(move |res| {
+                    let mut root_dir = unwrap!(res);
                     dir_helper::create_sub_dir(c2.clone(),
                                                "DirName".to_string(),
                                                None,
@@ -457,36 +470,43 @@ mod tests {
                                                &mut root_dir,
                                                &unwrap!(c2.user_root_dir_id()))
                 })
-                .and_then(move |(updated_parent, _, metadata)| {
-                    dir_helper::user_root_dir(c3).map(move |root_dir| {
-                        assert_eq!(updated_parent, root_dir);
-                        assert!(root_dir.find_sub_dir(metadata.name()).is_some());
+                .then(move |res| {
+                    let (updated_parent, _, metadata) = unwrap!(res);
+                    dir_helper::user_root_dir(c3).map(move |dir| {
+                        (dir, updated_parent, metadata)
                     })
                 })
+                .then(move |res| {
+                    let (root_dir, updated_parent, metadata) = unwrap!(res);
+                    assert_eq!(updated_parent, root_dir);
+                    assert!(root_dir.find_sub_dir(metadata.name()).is_some());
+                    finish()
+                })
+
         });
     }
 
     #[test]
     fn configuration_directory() {
-        test_utils::register_and_run(move |client| {
+        random_client(move |client| {
             let c2 = client.clone();
 
-            dir_helper::configuration_dir(client.clone(), "DNS".to_string())
-                .and_then(move |(_, metadata)| {
-                    assert_eq!(metadata.name().clone(), "DNS".to_string());
+            dir_helper::configuration_dir(client.clone(), "DNS".to_string()).then(move |res| {
+                let (_, metadata) = unwrap!(res);
+                assert_eq!(metadata.name().clone(), "DNS".to_string());
 
-                    let id = metadata.id();
+                let id = metadata.id();
 
-                    dir_helper::configuration_dir(c2, "DNS".to_string()).map(move |(_, metadata)| {
-                        assert_eq!(metadata.id(), id);
-                    })
+                dir_helper::configuration_dir(c2, "DNS".to_string()).map(move |(_, metadata)| {
+                    assert_eq!(metadata.id(), id);
                 })
+            })
         });
     }
 
     #[test]
     fn delete_directory() {
-        test_utils::register_and_run(move |client| {
+        random_client(move |client| {
             // Create a Directory
             let mut parent = Dir::new();
             parent.sub_dirs_mut()
@@ -498,11 +518,13 @@ mod tests {
             let c5 = client.clone();
 
             dir_helper::create(client.clone(), &parent, None)
-                .and_then(move |parent_id| {
+                .then(move |res| {
+                    let parent_id = unwrap!(res);
                     dir_helper::get(c2, &(parent_id, None))
                         .map(move |get_result| (get_result, parent_id))
                 })
-                .and_then(move |(get_result, parent_id)| {
+                .then(move |res| {
+                    let (get_result, parent_id) = unwrap!(res);
                     assert_eq!(parent, get_result);
 
                     // Create a Child directory and update the parent_dir
@@ -513,7 +535,8 @@ mod tests {
                                                &parent,
                                                &(parent_id, None))
                 })
-                .and_then(move |(parent_dir, _, metadata)| {
+                .then(move |res| {
+                    let (parent_dir, _, metadata) = unwrap!(res);
                     // Assert whether parent is updated
                     assert!(parent_dir.find_sub_dir(metadata.name()).is_some());
 
@@ -524,7 +547,8 @@ mod tests {
                                                &parent_dir,
                                                &metadata.id())
                 })
-                .and_then(move |(mut parent_dir, _, metadata)| {
+                .then(move |res| {
+                    let (mut parent_dir, _, metadata) = unwrap!(res);
                     dir_helper::delete(c5, &mut parent_dir, metadata.name()).map(move |_| {
                         assert!(parent_dir.find_sub_dir("Grand Child").is_none());
                     })

@@ -1,21 +1,29 @@
 // Copyright 2015 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
+// This, along with the
+// Licenses can be found in the root directory of this project at LICENSE,
+// COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY
 // KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
+// Please review the Licences for the specific language governing permissions
+// and limitations
 // relating to use of the SAFE Network Software.
 
-use core::{Client, CoreError, CoreFuture, immutable_data, SelfEncryptionStorage, utility};
+use core::{Client, CoreError, CoreFuture, SelfEncryptionStorage, immutable_data, utility};
 use core::futures::FutureExt;
 use futures::{Future, IntoFuture};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -31,7 +39,8 @@ enum DataTypeEncoding {
     MapName(XorName),
 }
 
-/// Create StructuredData in accordance with data-encoding rules abstracted from user.
+/// Create StructuredData in accordance with data-encoding rules abstracted
+/// from user.
 pub fn create(client: &Client,
               type_tag: u64,
               id: XorName,
@@ -105,7 +114,8 @@ pub fn update(client: &Client,
 /// Delete structured data from the network.
 pub fn delete(client: &Client,
               data: StructuredData,
-              signing_key: &sign::SecretKey) -> Box<CoreFuture<()>> {
+              signing_key: &sign::SecretKey)
+              -> Box<CoreFuture<()>> {
     let data = fry!(create_for_deletion(data, signing_key));
     client.delete(Data::Structured(data), None)
 }
@@ -113,13 +123,15 @@ pub fn delete(client: &Client,
 /// Delete structured data from the network, with recovery
 pub fn delete_recover(client: &Client,
                       data: StructuredData,
-                      signing_key: &sign::SecretKey) -> Box<CoreFuture<()>> {
+                      signing_key: &sign::SecretKey)
+                      -> Box<CoreFuture<()>> {
     let data = fry!(create_for_deletion(data, signing_key));
     client.delete_recover(Data::Structured(data), None)
 }
 
 
-/// Get the raw bytes from StructuredData created via `create()` function in this module.
+/// Get the raw bytes from StructuredData created via `create()` function in
+/// this module.
 pub fn extract_value(client: &Client,
                      data: &StructuredData,
                      decryption_key: Option<secretbox::Key>)
@@ -140,8 +152,7 @@ pub fn extract_value(client: &Client,
                     match fry!(decode(immutable_data.value(), decryption_key.as_ref())) {
                         DataTypeEncoding::Map(data_map) => {
                             let storage = SelfEncryptionStorage::new(client2);
-                            let self_encryptor = fry!(SelfEncryptor::new(storage,
-                                                                         data_map));
+                            let self_encryptor = fry!(SelfEncryptor::new(storage, data_map));
                             let length = self_encryptor.len();
                             self_encryptor.read(0, length)
                                 .map_err(From::from)
@@ -230,7 +241,8 @@ fn create_with_data_map(client: Client,
         .into_box()
 }
 
-// Create strucutred data contaning the name of the immutable data contianing the
+// Create strucutred data contaning the name of the immutable data contianing
+// the
 // given value.
 fn create_with_immutable_data(client: Client,
                               type_tag: u64,
@@ -295,7 +307,8 @@ fn encode(data: DataTypeEncoding,
     }
 }
 
-fn decode(raw_data: &[u8], decryption_key: Option<&secretbox::Key>)
+fn decode(raw_data: &[u8],
+          decryption_key: Option<&secretbox::Key>)
           -> Result<DataTypeEncoding, CoreError> {
     if let Some(key) = decryption_key {
         let decrypted = try!(utility::symmetric_decrypt(raw_data, key));
@@ -308,7 +321,8 @@ fn decode(raw_data: &[u8], decryption_key: Option<&secretbox::Key>)
 #[cfg(test)]
 mod tests {
     use core::MAIDSAFE_TAG;
-    use core::utility::{self, test_utils};
+    use core::utility;
+    use core::utility::test_utils::{self, finish, random_client};
     use futures::Future;
     use rand;
     use rust_sodium::crypto::secretbox;
@@ -359,7 +373,7 @@ mod tests {
         let prev_owners = Vec::new();
         let sign_key = test_utils::get_max_sized_secret_keys(1).remove(0);
 
-        test_utils::register_and_run(move |client| {
+        random_client(move |client| {
             create(client,
                    TAG,
                    id,
@@ -369,7 +383,10 @@ mod tests {
                    prev_owners.clone(),
                    sign_key,
                    None)
-                .map(|_| panic!("create should fail"))
+                .then(|res| {
+                    assert!(res.is_err());
+                    finish()
+                })
         });
     }
 
@@ -390,7 +407,7 @@ mod tests {
         let prev_owners = Vec::new();
         let sign_key = test_utils::get_max_sized_secret_keys(1).remove(0);
 
-        test_utils::register_and_run(move |client| {
+        random_client(move |client| {
             let client2 = client.clone();
 
             create(client,
@@ -402,11 +419,15 @@ mod tests {
                    prev_owners.clone(),
                    sign_key,
                    key.clone())
-                .and_then(move |data| extract_value(&client2, &data, key))
-                .map(move |value_after| {
-                    assert_eq!(value_after, value);
+                .then(move |res| {
+                    let data = unwrap!(res);
+                    extract_value(&client2, &data, key)
                 })
-                .map_err(|err| panic!("Unexpected {:?}", err))
+                .then(move |res| {
+                    let value_after = unwrap!(res);
+                    assert_eq!(value_after, value);
+                    finish()
+                })
         });
     }
 }
