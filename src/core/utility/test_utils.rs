@@ -14,15 +14,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use el::client::Client;
-use el::core_el::{self, CoreMsg, CoreMsgRx, CoreMsgTx, NetworkTx};
-use el::errors::CoreError;
-use el::futures::FutureExt;
-use el::utility;
-use futures::Future;
+use core::{self, Client, CoreError, CoreMsg, CoreMsgRx, CoreMsgTx, FutureExt, NetworkEvent,
+           NetworkTx, core_el, utility};
+use futures::{Future, IntoFuture};
+use futures::stream::Stream;
 use rust_sodium::crypto::sign;
-use std::iter;
-use std::u8;
+use std::{iter, u8};
+use std::fmt::Debug;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
 
@@ -46,77 +44,81 @@ pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
     iter::repeat(sign::SecretKey([u8::MAX; sign::SECRETKEYBYTES])).take(len).collect()
 }
 
-// Create random registered client and run it inside an event loop.
-pub fn register_and_run<F, R>(f: F)
-    where F: FnOnce(&Client) -> R + Send + 'static,
-          R: Future + 'static
+// Create random registered client and run it inside an event loop. Use this to create Client
+// automatically and randomly,
+pub fn random_client<Run, I, E>(r: Run)
+    where Run: FnOnce(&Client) -> I + Send + 'static,
+          I: IntoFuture<Item = (), Error = E> + 'static,
+          E: Debug
 {
-    setup_client(|core_tx, net_tx| {
-            let acc_locator = unwrap!(utility::generate_random_string(10));
-            let acc_password = unwrap!(utility::generate_random_string(10));
-            Client::registered(&acc_locator, &acc_password, core_tx, net_tx)
-        })
-        .run(f)
+    let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
+    random_client_with_net_obs(n, r)
 }
 
-// TODO Expand this to take a callback when ffi is coded - that way disconnections can be tested.
-// Helper to create a client and run it inside an event loop.
-pub fn setup_client<F>(f: F) -> Env
-    where F: FnOnce(CoreMsgTx, NetworkTx) -> Result<Client, CoreError>
+// Create random registered client and run it inside an event loop. Use this to create Client
+// automatically and randomly,
+pub fn random_client_with_net_obs<NetObs, Run, I, E>(mut n: NetObs, r: Run)
+    where NetObs: FnMut(NetworkEvent) + 'static,
+          Run: FnOnce(&Client) -> I + Send + 'static,
+          I: IntoFuture<Item = (), Error = E> + 'static,
+          E: Debug
+{
+    let c = |core_tx, net_tx| {
+        let acc_locator = unwrap!(utility::generate_random_string(10));
+        let acc_password = unwrap!(utility::generate_random_string(10));
+        Client::registered(&acc_locator, &acc_password, core_tx, net_tx)
+    };
+    setup_client_with_net_obs(c, n, r)
+}
+
+// Helper to create a client and run it in an event loop. Useful when we need to supply credentials
+// explicitly or when Client is to be constructed as unregistered or as a result of successful
+// login. Use this to create Client manually,
+pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
+    where Create: FnOnce(CoreMsgTx, NetworkTx) -> Result<Client, CoreError>,
+          Run: FnOnce(&Client) -> I + Send + 'static,
+          I: IntoFuture<Item = (), Error = E> + 'static,
+          E: Debug
+{
+    let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
+    setup_client_with_net_obs(c, n, r)
+}
+
+// Helper to create a client and run it in an event loop. Useful when we need to supply credentials
+// explicitly or when Client is to be constructed as unregistered or as a result of successful
+// login. Use this to create Client manually,
+pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: NetObs, r: Run)
+    where Create: FnOnce(CoreMsgTx, NetworkTx) -> Result<Client, CoreError>,
+          NetObs: FnMut(NetworkEvent) + 'static,
+          Run: FnOnce(&Client) -> I + Send + 'static,
+          I: IntoFuture<Item = (), Error = E> + 'static,
+          E: Debug
 {
     let el = unwrap!(Core::new());
     let el_h = el.handle();
-    let (core_tx, core_rx) = unwrap!(channel::channel(&el_handle));
-    let (net_tx, net_rx) = unwrap!(channel::channel(&el_handle));
-    let net_fut = net_rx.for_each(|net_event| {
-            debug!("Network event encountered: {:?}", net_event);
-            Ok(())
-        })
-        .map_err(|e| debug!("Network event stream error: {:?}", e));
+
+    let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
+    let (net_tx, net_rx) = unwrap!(channel::channel(&el_h));
+    let client = unwrap!(c(core_tx.clone(), net_tx));
+
+    let net_fut = net_rx.for_each(move |net_event| Ok(n(net_event)))
+        .map_err(|e| panic!("Network event stream error: {:?}", e));
     el_h.spawn(net_fut);
 
-    Env {
-        client: unwrap!(f(core_tx.clone(), net_tx)),
-        el: el,
-        core_tx: core_tx,
-        core_rx: core_rx,
-    }
+    let core_tx_clone = core_tx.clone();
+    unwrap!(core_tx.send(CoreMsg::new(move |client| {
+        let fut = r(client).into_future()
+            .map_err(|e| panic!("{:?}", e))
+            .map(move |()| unwrap!(core_tx_clone.send(CoreMsg::build_terminator())))
+            .into_box();
+
+        Some(fut)
+    })));
+
+    core::run(el, client, core_rx);
 }
 
-pub struct Env {
-    client: Client,
-    el: Core,
-    core_tx: CoreMsgTx,
-    core_rx: CoreMsgRx,
-}
-
-impl Env {
-    // Spin up an event loop and execute the given closure on it. The closure
-    // must return a future which will then be driven to completion.
-    pub fn run<F, R>(self, f: F)
-        where F: FnOnce(&Client) -> R + Send + 'static,
-              R: Future + 'static
-    {
-        let core_tx = self.core_tx.clone();
-
-        unwrap!(self.core_tx.send(CoreMsg::new(move |client| {
-            let future = f(client)
-                .then(move |_| {
-                    // When the future completes, send terminator to the event loop
-                    // to stop it.
-                    unwrap!(core_tx.send(CoreMsg::build_terminator()));
-                    Ok(())
-                })
-                .into_box();
-
-            Some(future)
-        })));
-
-        core_el::run(self.el, self.client, self.core_rx);
-    }
-
-    // Return the client stored in this Env.
-    pub fn unwrap(self) -> Client {
-        self.client
-    }
+/// Convenience for creating a blank runner.
+pub fn finish() -> Result<(), ()> {
+    Ok(())
 }

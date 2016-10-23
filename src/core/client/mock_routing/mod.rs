@@ -609,6 +609,12 @@ impl MockRouting {
         self.max_ops_countdown = max_ops_count.map(Cell::new)
     }
 
+    #[cfg(test)]
+    pub fn simulate_disconnect(&self) {
+        let sender = self.sender.clone();
+        let _ = std::thread::spawn(move || unwrap!(sender.send(Event::RestartRequired)));
+    }
+
     fn network_limits_reached(&self) -> bool {
         self.max_ops_countdown.as_ref().map_or(false, |count| count.get() == 0)
     }

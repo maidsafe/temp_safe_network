@@ -118,11 +118,7 @@ pub fn parse_mutation_err(reason_raw: &[u8]) -> MutationError {
 /// signifies if the firing was successful.
 fn fire(core_tx: &CoreMsgTx, id: MessageId, event: CoreEvent) -> bool {
     let msg = CoreMsg::new(move |client| {
-        // Using in `if` keeps borrow alive. Do not try to combine the 2 lines into one.
-        let opt_head = client.remove_head(&id);
-        if let Some(head) = opt_head {
-            head.complete(event);
-        }
+        client.fire_hook(&id, event);
         None
     });
 

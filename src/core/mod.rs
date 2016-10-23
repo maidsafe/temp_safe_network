@@ -24,19 +24,17 @@ pub mod futures;
 
 /// Public and Private Id types
 pub mod id;
-/// Safe-Core Errors
-pub mod errors;
 /// Utility functions
 pub mod utility;
 /// Implements the Self Encryption storage trait
 pub mod self_encryption_storage;
-/// Helper functions to handle ImmutableData related operations
-pub mod immutable_data;
-/// Helper functions to handle StructuredData related operations
-pub mod structured_data;
+// /// Helper functions to handle ImmutableData related operations
+// pub mod immutable_data;
+// /// Helper functions to handle StructuredData related operations
+// pub mod structured_data;
 
 pub use self::client::Client;
-pub use self::core_el::{CoreMsg, CoreMsgTx, TailFuture, run};
+pub use self::core_el::{CoreMsg, CoreMsgRx, CoreMsgTx, TailFuture, run};
 pub use self::errors::CoreError;
 pub use self::event::NetworkEvent;
 pub use self::futures::FutureExt;
@@ -57,4 +55,5 @@ pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;
 
 mod client;
 mod core_el;
+mod errors;
 mod event;

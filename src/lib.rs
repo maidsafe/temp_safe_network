@@ -43,6 +43,9 @@
                                    option_unwrap_used))]
 #![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))] // TODO: Fix doc_markdown errors.
 
+// TODO
+#![allow(unused, unused_extern_crates)]
+
 // extern crate config_file_handler;
 extern crate futures;
 #[cfg(feature = "use-mock-routing")]
@@ -67,10 +70,10 @@ extern crate unwrap;
 /// Core module
 #[macro_use]
 pub mod core;
-/// Nfs module;
-pub mod nfs;
-/// Dns module;
-pub mod dns;
+// /// Nfs module;
+// pub mod nfs;
+// /// Dns module;
+// pub mod dns;
 // /// Ffi module;
 // pub mod ffi;
 
