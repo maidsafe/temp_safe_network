@@ -42,7 +42,7 @@ pub fn app(client: &Client,
     let c2 = client.clone();
 
     launcher_global_config_and_dir(&client)
-        .and_then(move |(configs, _, metadata)| {
+        .and_then(move |(configs, _, _metadata)| {
             match configs.get(&app_id) {
                 Some(config) => ok!(config.clone()),
                 None => {
@@ -54,7 +54,7 @@ pub fn app(client: &Client,
                     let c2 = c2.clone();
 
                     dir_helper::user_root_dir(c2.clone())
-                        .and_then(move |root_dir| {
+                        .and_then(move |(root_dir, dir_id)| {
                             let app_dir_name = app_dir_name(&app_name, &root_dir);
 
                             dir_helper::create_sub_dir(client.clone(),
@@ -62,12 +62,12 @@ pub fn app(client: &Client,
                                                        None,
                                                        Vec::new(),
                                                        &root_dir,
-                                                       &metadata.id())
+                                                       &dir_id)
                         })
                         .map_err(FfiError::from)
-                        .and_then(move |(_, dir, _metadata)| {
+                        .and_then(move |(_, _dir, metadata)| {
                             let app = App::Registered {
-                                app_dir: dir,
+                                app_dir_id: metadata.id(),
                                 asym_enc_keys: box_::gen_keypair(),
                                 sym_key: secretbox::gen_key(),
                                 safe_drive_access: safe_drive_access,

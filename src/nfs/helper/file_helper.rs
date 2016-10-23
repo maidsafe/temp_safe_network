@@ -1,7 +1,9 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3,
+// depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project
@@ -283,6 +285,7 @@ mod tests {
                 file_helper::delete(c2, "hello.txt", &metadata, &mut dir).map(move |_| {
                     assert!(dir.find_file("hello.txt").is_none());
                 })
+            })
         })
     }
 }

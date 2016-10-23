@@ -16,22 +16,17 @@
 // relating to use of the SAFE Network Software.
 
 
-use core::client::Client;
-use ffi::app::App;
+use core::Client;
+use core::futures::FutureExt;
+use ffi::{App, FfiError, FfiFuture};
 use ffi::config::SAFE_DRIVE_DIR_NAME;
-use ffi::errors::FfiError;
+use futures::{Future, stream};
+use futures::stream::Stream;
 use libc::{int32_t, int64_t};
-use nfs::AccessLevel;
-use nfs::directory_listing::DirectoryListing;
-use nfs::helper::directory_helper::DirectoryHelper;
-use nfs::metadata::directory_key::DirectoryKey;
-use std;
+use nfs::{Dir, DirId, DirMetadata};
+use nfs::helper::dir_helper;
+use std::{self, mem, panic, ptr, slice};
 use std::error::Error;
-use std::mem;
-use std::panic;
-use std::ptr;
-use std::slice;
-use std::sync::{Arc, Mutex};
 
 pub unsafe fn c_utf8_to_string(ptr: *const u8, len: usize) -> Result<String, FfiError> {
     c_utf8_to_str(ptr, len).map(|v| v.to_owned())
@@ -103,81 +98,108 @@ pub fn tokenise_path(path: &str, keep_empty_splits: bool) -> Vec<String> {
         .collect()
 }
 
-pub fn get_safe_drive_key(client: Arc<Mutex<Client>>) -> Result<DirectoryKey, FfiError> {
-    trace!("Obtain directory key for SAFEDrive - This can be cached for efficiency. So if this \
-            is seen many times, check for missed optimisation opportunity.");
+pub fn safe_drive_metadata(client: Client) -> Box<FfiFuture<DirMetadata>> {
+    trace!("Obtain directory metadata for SAFEDrive - This can be cached for efficiency. So if \
+            this is seen many times, check for missed optimisation opportunity.");
 
     let safe_drive_dir_name = SAFE_DRIVE_DIR_NAME.to_string();
-    let dir_helper = DirectoryHelper::new(client);
-    let mut root_dir = try!(dir_helper.get_user_root_directory_listing());
-    let dir_metadata = match root_dir.find_sub_directory(&safe_drive_dir_name).cloned() {
-        Some(metadata) => metadata,
-        None => {
-            trace!("SAFEDrive does not exist - creating one.");
-            let (created_dir, _) = try!(dir_helper.create(safe_drive_dir_name,
-                                                          Vec::new(),
-                                                          false,
-                                                          AccessLevel::Private,
-                                                          Some(&mut root_dir)));
-            created_dir.get_metadata().clone()
-        }
-    };
 
-    let key = dir_metadata.get_key().clone();
-    Ok(key)
+    let c2 = client.clone();
+
+    dir_helper::user_root_dir(client)
+        .map_err(FfiError::from)
+        .and_then(move |(mut root_dir, _dir_id)| {
+            match root_dir.find_sub_dir(&safe_drive_dir_name).cloned() {
+                Some(metadata) => ok!(metadata),
+                None => {
+                    trace!("SAFEDrive does not exist - creating one.");
+
+                    dir_helper::create_sub_dir(c2.clone(),
+                                               safe_drive_dir_name,
+                                               None,
+                                               Vec::new(),
+                                               &mut root_dir,
+                                               &unwrap!(c2.user_root_dir_id(),
+                                                        "Logic error: user root dir should exist \
+                                                         at this point"))
+                        .map_err(FfiError::from)
+                        .map(move |(_, _, metadata)| metadata)
+                        .into_box()
+                }
+            }
+        })
+        .into_box()
 }
 
-pub fn get_final_subdirectory(client: Arc<Mutex<Client>>,
-                              tokens: &[String],
-                              starting_directory: Option<&DirectoryKey>)
-                              -> Result<DirectoryListing, FfiError> {
+pub fn final_sub_dir(client: &Client,
+                     tokens: &[String],
+                     starting_directory: Option<&DirId>)
+                     -> Box<FfiFuture<(Dir, DirMetadata)>> {
     trace!("Traverse directory tree to get the final subdirectory.");
 
-    let dir_helper = DirectoryHelper::new(client);
-
-    let mut current_dir_listing = match starting_directory {
-        Some(directory_key) => {
+    let dir_fut = match starting_directory {
+        Some(dir_id) => {
             trace!("Traversal begins at given starting directory.");
-            try!(dir_helper.get(directory_key))
+            let dir_id = dir_id.clone();
+            dir_helper::get(client.clone(), &dir_id).map(move |dir| (dir, dir_id)).into_box()
         }
         None => {
             trace!("Traversal begins at user-root-directory.");
-            try!(dir_helper.get_user_root_directory_listing())
+            dir_helper::user_root_dir(client.clone())
         }
     };
 
-    for it in tokens.iter() {
-        trace!("Traversing to dir with name: {}", *it);
+    let tokens_iter = tokens.to_owned().into_iter().map(|el| Ok(el));
+    let c2 = client.clone();
 
-        current_dir_listing = {
-            let current_dir_metadata = try!(current_dir_listing.get_sub_directories()
-                .iter()
-                .find(|a| *a.get_name() == *it)
-                .ok_or(FfiError::PathNotFound));
-            try!(dir_helper.get(current_dir_metadata.get_key()))
-        };
-    }
+    dir_fut.map_err(FfiError::from)
+        .and_then(move |(current_dir, start_dir_id)| {
+            let (dir_id, key) = start_dir_id;
+            let meta = DirMetadata::new(*dir_id.name(), "root", Vec::new(), key);
 
-    Ok(current_dir_listing)
+            stream::iter(tokens_iter).fold((current_dir, meta), move |(dir, _metadata), token| {
+                trace!("Traversing to dir with name: {}", token);
+
+                let metadata = fry!(dir.find_sub_dir(&token)
+                        .ok_or(FfiError::PathNotFound))
+                    .clone();
+
+                dir_helper::get(c2.clone(), &metadata.id())
+                    .map(move |dir| (dir, metadata))
+                    .map_err(FfiError::from)
+                    .into_box()
+            })
+        })
+        .into_box()
 }
 
-// Return a DirectoryListing corresponding to the path.
-pub fn get_directory(app: &App, path: &str, is_shared: bool) -> Result<DirectoryListing, FfiError> {
-    let start_dir_key = try!(app.get_root_dir_key(is_shared));
+// Return a Dir corresponding to the path.
+pub fn dir(client: &Client,
+           app: &App,
+           path: &str,
+           is_shared: bool)
+           -> Box<FfiFuture<(Dir, DirMetadata)>> {
+    let c2 = client.clone();
     let tokens = tokenise_path(path, false);
-    get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key))
+
+    app.root_dir(client.clone(), is_shared)
+        .and_then(move |start_dir| final_sub_dir(&c2, &tokens, Some(&start_dir)))
+        .into_box()
 }
 
-pub fn get_directory_and_file(app: &App,
-                              path: &str,
-                              is_shared: bool)
-                              -> Result<(DirectoryListing, String), FfiError> {
-    let start_dir_key = try!(app.get_root_dir_key(is_shared));
+pub fn dir_and_file(client: &Client,
+                    app: &App,
+                    path: &str,
+                    is_shared: bool)
+                    -> Box<FfiFuture<(Dir, DirMetadata, String)>> {
     let mut tokens = tokenise_path(path, false);
-    let file_name = try!(tokens.pop().ok_or(FfiError::PathNotFound));
-    let directory_listing =
-        try!(get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key)));
-    Ok((directory_listing, file_name))
+    let file_name = fry!(tokens.pop().ok_or(FfiError::PathNotFound));
+    let c2 = client.clone();
+
+    app.root_dir(client.clone(), is_shared)
+        .and_then(move |start_dir| final_sub_dir(&c2, &tokens, Some(&start_dir)))
+        .map(move |(dir_listing, dir_meta)| (dir_listing, dir_meta, file_name))
+        .into_box()
 }
 
 #[cfg(test)]

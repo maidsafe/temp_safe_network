@@ -18,17 +18,18 @@
 //! FFI-enabled types containing details (content and metadata) about a file.
 
 
-use core::client::Client;
-use ffi::errors::FfiError;
+use core::Client;
+use core::futures::FutureExt;
+use ffi::{FfiError, FfiFuture};
 use ffi::low_level_api::misc::misc_u8_ptr_free;
-use nfs::file::File;
-use nfs::helper::file_helper::FileHelper;
-use nfs::metadata::file_metadata::FileMetadata as NfsFileMetadata;
+use futures::Future;
+use nfs::File;
+use nfs::FileMetadata as NfsFileMetadata;
+use nfs::helper::file_helper;
 use std::ptr;
-use std::sync::{Arc, Mutex};
 use super::helper;
 
-/// Details of a file and its content.
+/// Details of a single file version or an unversioned file and its contents.
 #[derive(Debug)]
 #[repr(C)]
 pub struct FileDetails {
@@ -44,35 +45,40 @@ pub struct FileDetails {
 
 impl FileDetails {
     /// Obtain `FileDetails` for the given file.
-    pub fn new(file: &File,
-               client: Arc<Mutex<Client>>,
+    /// If file is versioned, then the latest version is returned.
+    pub fn new(file: File,
+               client: Client,
                offset: i64,
                length: i64,
                include_metadata: bool)
-               -> Result<Self, FfiError> {
+               -> Box<FfiFuture<Self>> {
         let start_position = offset as u64;
-        let mut file_helper = FileHelper::new(client);
-        let mut reader = try!(file_helper.read(&file));
+
+        let reader = fry!(file_helper::read(client, &file).map_err(FfiError::from));
         let mut size = length as u64;
         if size == 0 {
             size = reader.size() - start_position;
         };
 
-        let content = try!(reader.read(start_position, size));
-        let (content, content_len, content_cap) = helper::u8_vec_to_ptr(content);
+        reader.read(start_position, size)
+            .map_err(FfiError::from)
+            .and_then(move |content| {
+                let (content, content_len, content_cap) = helper::u8_vec_to_ptr(content);
 
-        let file_metadata_ptr = if include_metadata {
-            Box::into_raw(Box::new(try!(FileMetadata::new(file.get_metadata()))))
-        } else {
-            ptr::null_mut()
-        };
+                let file_metadata_ptr = if include_metadata {
+                    Box::into_raw(Box::new(try!(FileMetadata::new(file.metadata()))))
+                } else {
+                    ptr::null_mut()
+                };
 
-        Ok(FileDetails {
-            content: content,
-            content_len: content_len,
-            content_cap: content_cap,
-            metadata: file_metadata_ptr,
-        })
+                Ok(FileDetails {
+                    content: content,
+                    content_len: content_len,
+                    content_cap: content_cap,
+                    metadata: file_metadata_ptr,
+                })
+            })
+            .into_box()
     }
 
     // TODO: when drop-flag removal lands in stable, we should turn this into
@@ -111,13 +117,13 @@ pub struct FileMetadata {
 impl FileMetadata {
     /// Create new FFI file metadata wrapper.
     pub fn new(file_metadata: &NfsFileMetadata) -> Result<Self, FfiError> {
-        let created_time = file_metadata.get_created_time().to_timespec();
-        let modified_time = file_metadata.get_modified_time().to_timespec();
+        let created_time = file_metadata.created_time().to_timespec();
+        let modified_time = file_metadata.modified_time().to_timespec();
 
-        let (name, name_len, name_cap) = helper::string_to_c_utf8(file_metadata.get_name()
+        let (name, name_len, name_cap) = helper::string_to_c_utf8(file_metadata.name()
             .to_string());
 
-        let user_metadata = file_metadata.get_user_metadata().to_owned();
+        let user_metadata = file_metadata.user_metadata().to_owned();
         let (user_metadata, user_metadata_len, user_metadata_cap) =
             helper::u8_vec_to_ptr(user_metadata);
 
@@ -125,7 +131,7 @@ impl FileMetadata {
             name: name,
             name_len: name_len,
             name_cap: name_cap,
-            size: file_metadata.get_size(),
+            size: file_metadata.size(),
             user_metadata: user_metadata,
             user_metadata_len: user_metadata_len,
             user_metadata_cap: user_metadata_cap,

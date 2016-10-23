@@ -26,6 +26,15 @@ macro_rules! ffi_error_code {
     }}
 }
 
+macro_rules! ffi_result_code {
+    ($result:expr) => {
+        match $result {
+            Ok(_) => 0,
+            Err(error) => ffi_error_code!(error),
+        }
+    }
+}
+
 macro_rules! ffi_try {
     ($result:expr) => {
         match $result {

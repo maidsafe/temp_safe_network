@@ -42,10 +42,10 @@ mod app;
 pub mod dir_details;
 // pub mod dns;
 pub mod errors;
-// pub mod file_details;
+pub mod file_details;
 // pub mod logging;
 pub mod low_level_api;
-// pub mod nfs;
+pub mod nfs;
 mod session;
 // pub mod string_list;
 
@@ -66,5 +66,5 @@ pub type FfiFuture<T> = Future<Item = T, Error = FfiError>;
 
 /// Type that holds opaque user data handed into FFI functions
 #[derive(Clone, Copy)]
-pub struct OpaqueCtx(*const ::libc::c_void);
+pub struct OpaqueCtx(*mut ::libc::c_void);
 unsafe impl Send for OpaqueCtx {}

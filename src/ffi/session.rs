@@ -22,7 +22,7 @@ use core::futures::FutureExt;
 use ffi::{FfiError, OpaqueCtx};
 use ffi::object_cache::ObjectCache;
 use futures::Future;
-use libc::{int32_t, int64_t, uint64_t};
+use libc::{c_void, int32_t, int64_t, uint64_t};
 use maidsafe_utilities::thread::{self, Joiner};
 use std::sync::{Arc, LockResult, Mutex, MutexGuard, mpsc};
 use super::helper;
@@ -185,13 +185,13 @@ impl Session {
 
     fn account_info(&self,
                     user_data: OpaqueCtx,
-                    callback: extern "C" fn(int32_t, OpaqueCtx, uint64_t, uint64_t))
+                    callback: extern "C" fn(int32_t, *mut c_void, uint64_t, uint64_t))
                     -> Result<(), FfiError> {
         self.send(CoreMsg::new(move |client| {
             Some(client.get_account_info(None)
-                .map_err(move |e| callback(ffi_error_code!(e), user_data, 0, 0))
+                .map_err(move |e| callback(ffi_error_code!(e), user_data.0, 0, 0))
                 .map(move |(data_stored, space_available)| {
-                    callback(0, user_data, data_stored, space_available);
+                    callback(0, user_data.0, data_stored, space_available);
                 })
                 .into_box())
         }))
@@ -283,13 +283,14 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
 /// Return the amount of calls that were done to `get`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_gets(session: *const Session,
-                                            user_data: OpaqueCtx,
-                                            o_cb: extern "C" fn(int32_t, OpaqueCtx, int64_t))
+                                            user_data: *mut c_void,
+                                            o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
                                             -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued GETs.");
+        let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data, client.issued_gets() as int64_t);
+            o_cb(0, user_data.0, client.issued_gets() as int64_t);
             None
         })));
         0
@@ -299,13 +300,14 @@ pub unsafe extern "C" fn client_issued_gets(session: *const Session,
 /// Return the amount of calls that were done to `put`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_puts(session: *const Session,
-                                            user_data: OpaqueCtx,
-                                            o_cb: extern "C" fn(int32_t, OpaqueCtx, int64_t))
+                                            user_data: *mut c_void,
+                                            o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
                                             -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued PUTs.");
+        let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data, client.issued_puts() as int64_t);
+            o_cb(0, user_data.0, client.issued_puts() as int64_t);
             None
         })));
         0
@@ -315,13 +317,14 @@ pub unsafe extern "C" fn client_issued_puts(session: *const Session,
 /// Return the amount of calls that were done to `post`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_posts(session: *const Session,
-                                             user_data: OpaqueCtx,
-                                             o_cb: extern "C" fn(int32_t, OpaqueCtx, int64_t))
+                                             user_data: *mut c_void,
+                                             o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
                                              -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued POSTs.");
+        let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data, client.issued_posts() as int64_t);
+            o_cb(0, user_data.0, client.issued_posts() as int64_t);
             None
         })));
         0
@@ -331,13 +334,14 @@ pub unsafe extern "C" fn client_issued_posts(session: *const Session,
 /// Return the amount of calls that were done to `delete`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_deletes(session: *const Session,
-                                               user_data: OpaqueCtx,
-                                               o_cb: extern "C" fn(int32_t, OpaqueCtx, int64_t))
+                                               user_data: *mut c_void,
+                                               o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
                                                -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued DELETEs.");
+        let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data, client.issued_deletes() as int64_t);
+            o_cb(0, user_data.0, client.issued_deletes() as int64_t);
             None
         })));
         0
@@ -347,13 +351,14 @@ pub unsafe extern "C" fn client_issued_deletes(session: *const Session,
 /// Return the amount of calls that were done to `append`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_appends(session: *const Session,
-                                               user_data: OpaqueCtx,
-                                               o_cb: extern "C" fn(int32_t, OpaqueCtx, int64_t))
+                                               user_data: *mut c_void,
+                                               o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
                                                -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued APPENDs.");
+        let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data, client.issued_appends() as int64_t);
+            o_cb(0, user_data.0, client.issued_appends() as int64_t);
             None
         })));
         0
@@ -365,14 +370,15 @@ pub unsafe extern "C" fn client_issued_appends(session: *const Session,
 /// Put.
 #[no_mangle]
 pub unsafe extern "C" fn get_account_info(session: *const Session,
-                                          user_data: OpaqueCtx,
+                                          user_data: *mut c_void,
                                           o_cb: extern "C" fn(int32_t,
-                                                              OpaqueCtx,
+                                                              *mut c_void,
                                                               uint64_t,
                                                               uint64_t))
                                           -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI get account information.");
+        let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).account_info(user_data, o_cb));
         0
     })

@@ -17,86 +17,161 @@
 
 //! Directory operations.
 
-use ffi::app::App;
-use ffi::directory_details::DirectoryDetails;
-use ffi::errors::FfiError;
-use ffi::helper;
-use libc::int32_t;
-use nfs::AccessLevel;
-use nfs::errors::NfsError;
-use nfs::helper::directory_helper::DirectoryHelper;
-use std::slice;
+use core::{Client, CoreMsg};
+use core::futures::FutureExt;
+use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session, helper};
+use ffi::dir_details::DirDetails;
+use ffi::object_cache::AppHandle;
+use futures::Future;
+use libc::{c_void, int32_t};
+use nfs::helper::dir_helper;
+use std::{ptr, slice};
 use time;
 
 /// Create a new directory.
 #[no_mangle]
-pub unsafe extern "C" fn nfs_create_dir(app_handle: *const App,
+pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
+                                        app_handle: AppHandle,
                                         dir_path: *const u8,
                                         dir_path_len: usize,
                                         user_metadata: *const u8,
                                         user_metadata_len: usize,
                                         is_private: bool,
-                                        is_versioned: bool,
-                                        is_shared: bool)
+                                        is_shared: bool,
+                                        user_data: *mut c_void,
+                                        o_cb: extern "C" fn(int32_t, *mut c_void))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI create directory, given the path.");
 
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let user_metadata = slice::from_raw_parts(user_metadata, user_metadata_len);
+        let session = (*session).clone();
+        let s2 = session.clone();
+        let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(create_dir(&*app_handle,
-                            dir_path,
-                            user_metadata,
-                            is_private,
-                            is_versioned,
-                            is_shared));
+        ffi_try!(session.send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(s2.object_cache());
+            match obj_cache.get_app(app_handle) {
+                Ok(app) => {
+                    let fut = create_dir(&client,
+                                         &app,
+                                         dir_path,
+                                         user_metadata,
+                                         is_private,
+                                         is_shared)
+                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .into_box();
+                    Some(fut)
+                }
+                Err(e) => {
+                    o_cb(ffi_error_code!(e), user_data.0);
+                    None
+                }
+            }
+        })));
+
         0
     })
 }
 
 /// Delete a directory.
 #[no_mangle]
-pub unsafe extern "C" fn nfs_delete_dir(app_handle: *const App,
+pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
+                                        app_handle: AppHandle,
                                         dir_path: *const u8,
                                         dir_path_len: usize,
-                                        is_shared: bool)
+                                        is_shared: bool,
+                                        user_data: *mut c_void,
+                                        o_cb: extern "C" fn(int32_t, *mut c_void))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI delete dir, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
-        ffi_try!(delete_dir(&*app_handle, dir_path, is_shared));
+
+        let session = (*session).clone();
+        let s2 = session.clone();
+        let user_data = OpaqueCtx(user_data);
+
+        ffi_try!(session.send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(s2.object_cache());
+            match obj_cache.get_app(app_handle) {
+                Ok(app) => {
+                    let fut = delete_dir(&client, &app, dir_path, is_shared)
+                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .into_box();
+                    Some(fut)
+                }
+                Err(e) => {
+                    o_cb(ffi_error_code!(e), user_data.0);
+                    None
+                }
+            }
+        })));
+
         0
     })
 }
 
 /// Get directory
 #[no_mangle]
-pub unsafe extern "C" fn nfs_get_dir(app_handle: *const App,
+pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
+                                     app_handle: AppHandle,
                                      dir_path: *const u8,
                                      dir_path_len: usize,
                                      is_shared: bool,
-                                     details_handle: *mut *mut DirectoryDetails)
+                                     user_data: *mut c_void,
+                                     o_cb: extern "C" fn(int32_t,
+                                                         *mut c_void,
+                                                         details_handle: *mut DirDetails))
                                      -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI get dir, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
-        let details = ffi_try!(get_dir(&*app_handle, dir_path, is_shared));
-        *details_handle = Box::into_raw(Box::new(details));
+
+        let session = (*session).clone();
+        let s2 = session.clone();
+        let user_data = OpaqueCtx(user_data);
+
+        ffi_try!(session.send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(s2.object_cache());
+            match obj_cache.get_app(app_handle) {
+                Ok(app) => {
+                    let fut = get_dir(&client, &app, dir_path, is_shared)
+                        .map(move |details| {
+                            let details_handle = Box::into_raw(Box::new(details));
+                            o_cb(0, user_data.0, details_handle);
+                        })
+                        .map_err(move |err| {
+                            o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut())
+                        })
+                        .into_box();
+                    Some(fut)
+                }
+                Err(e) => {
+                    o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                    None
+                }
+            }
+        })));
+
         0
     })
 }
 
 /// Modify name and/or metadata of a directory.
 #[no_mangle]
-pub unsafe extern "C" fn nfs_modify_dir(app_handle: *const App,
+pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
+                                        app_handle: AppHandle,
                                         dir_path: *const u8,
                                         dir_path_len: usize,
                                         is_shared: bool,
                                         new_name: *const u8,
                                         new_name_len: usize,
                                         new_user_metadata: *const u8,
-                                        new_user_metadata_len: usize)
+                                        new_user_metadata_len: usize,
+                                        user_data: *mut c_void,
+                                        o_cb: extern "C" fn(int32_t, *mut c_void))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI modify directory, given the path.");
@@ -104,383 +179,595 @@ pub unsafe extern "C" fn nfs_modify_dir(app_handle: *const App,
         let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
         let new_user_metadata = helper::u8_ptr_to_opt_vec(new_user_metadata, new_user_metadata_len);
 
-        ffi_try!(modify_dir(&*app_handle,
-                            dir_path,
-                            is_shared,
-                            new_name,
-                            new_user_metadata));
+        let session = (*session).clone();
+        let s2 = session.clone();
+        let user_data = OpaqueCtx(user_data);
+
+        ffi_try!(session.send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(s2.object_cache());
+            match obj_cache.get_app(app_handle) {
+                Ok(app) => {
+                    let fut = modify_dir(&client,
+                                         &app,
+                                         dir_path,
+                                         is_shared,
+                                         new_name,
+                                         new_user_metadata)
+                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .into_box();
+                    Some(fut)
+                }
+                Err(e) => {
+                    o_cb(ffi_error_code!(e), user_data.0);
+                    None
+                }
+            }
+        })));
         0
     })
 }
 
-/// Move or copy a directory.
-#[no_mangle]
-pub unsafe extern "C" fn nfs_move_dir(app_handle: *const App,
-                                      src_path: *const u8,
-                                      src_path_len: usize,
-                                      is_src_path_shared: bool,
-                                      dst_path: *const u8,
-                                      dst_path_len: usize,
-                                      is_dst_path_shared: bool,
-                                      retain_src: bool)
-                                      -> int32_t {
-    helper::catch_unwind_i32(|| {
-        trace!("FFI move directory, from {:?} to {:?}.", src_path, dst_path);
+// /// Move or copy a directory.
+// #[no_mangle]
+// pub unsafe extern "C" fn nfs_move_dir(session: *const Session,
+//                                       app_handle: AppHandle,
+//                                       src_path: *const u8,
+//                                       src_path_len: usize,
+//                                       is_src_path_shared: bool,
+//                                       dst_path: *const u8,
+//                                       dst_path_len: usize,
+//                                       is_dst_path_shared: bool,
+//                                       retain_src: bool,
+//                                       user_data: *mut c_void,
+//                                       o_cb: extern "C" fn(int32_t, *mut c_void))
+//                                       -> int32_t {
+//     helper::catch_unwind_i32(|| {
+//         trace!("FFI move directory, from {:?} to {:?}.", src_path, dst_path);
 
-        let src_path = ffi_try!(helper::c_utf8_to_str(src_path, src_path_len));
-        let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path, dst_path_len));
+//         let src_path = ffi_try!(helper::c_utf8_to_str(src_path, src_path_len));
+//         let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path, dst_path_len));
+//         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(move_dir(&*app_handle,
-                          src_path,
-                          is_src_path_shared,
-                          dst_path,
-                          is_dst_path_shared,
-                          retain_src));
-        0
-    })
-}
+//         ffi_try!((*session).send(CoreMsg::new(move |client| {
+//             let fut = move_dir(&client,
+//                                app_handle,
+//                                src_path,
+//                                is_src_path_shared,
+//                                dst_path,
+//                                is_dst_path_shared,
+//                                retain_src)
+//                 .then(|result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+//                 .into_box();
+//             Some(fut)
+//         })));
+//         0
+//     })
+// }
 
 
-
-fn create_dir(app: &App,
+fn create_dir(client: &Client,
+              app: &App,
               dir_path: &str,
               user_metadata: &[u8],
-              is_private: bool,
-              is_versioned: bool,
+              _is_private: bool,
               is_shared: bool)
-              -> Result<(), FfiError> {
+              -> Box<FfiFuture<()>> {
     let mut tokens = helper::tokenise_path(dir_path, false);
-    let dir_to_create = try!(tokens.pop().ok_or(FfiError::InvalidPath));
+    let dir_to_create = fry!(tokens.pop().ok_or(FfiError::InvalidPath));
+    let user_metadata = user_metadata.to_owned();
 
-    let start_dir_key = try!(app.get_root_dir_key(is_shared));
-    let mut parent_sub_dir =
-        try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key)));
+    let c2 = client.clone();
+    let c3 = client.clone();
 
-    let dir_helper = DirectoryHelper::new(app.get_client());
-
-    let access_level = if is_private {
-        AccessLevel::Private
-    } else {
-        AccessLevel::Public
-    };
-
-    let _ = try!(dir_helper.create(dir_to_create,
-                                   user_metadata.to_owned(),
-                                   is_versioned,
-                                   access_level,
-                                   Some(&mut parent_sub_dir)));
-
-    Ok(())
+    app.root_dir(client.clone(), is_shared)
+        .map_err(FfiError::from)
+        .and_then(move |start_dir_id| helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id)))
+        .and_then(move |(parent, metadata)| {
+            // let access_level = if is_private {
+            //     AccessLevel::Private
+            // } else {
+            //     AccessLevel::Public
+            // };
+            dir_helper::create_sub_dir(c3,
+                                       dir_to_create,
+                                       None,
+                                       user_metadata,
+                                       &parent,
+                                       &metadata.id())
+                .map_err(FfiError::from)
+        })
+        .map(move |_| ())
+        .into_box()
 }
 
-fn delete_dir(app: &App, dir_path: &str, is_shared: bool) -> Result<(), FfiError> {
+fn delete_dir(client: &Client, app: &App, dir_path: &str, is_shared: bool) -> Box<FfiFuture<()>> {
     let mut tokens = helper::tokenise_path(dir_path, false);
-    let dir_helper = DirectoryHelper::new(app.get_client());
-    let dir_to_delete = try!(tokens.pop().ok_or(FfiError::InvalidPath));
+    let dir_to_delete = fry!(tokens.pop().ok_or(FfiError::InvalidPath));
 
-    let root_dir_key = try!(app.get_root_dir_key(is_shared));
-    let root_dir = try!(dir_helper.get(&root_dir_key));
-    let mut parent_dir = if tokens.is_empty() {
-        root_dir
-    } else {
-        try!(helper::get_final_subdirectory(app.get_client(),
-                                            &tokens,
-                                            Some(root_dir.get_metadata().get_key())))
-    };
+    let c2 = client.clone();
+    let c3 = client.clone();
+    let c4 = client.clone();
 
-    let _ = try!(dir_helper.delete(&mut parent_dir, &dir_to_delete));
-    Ok(())
+    app.root_dir(client.clone(), is_shared)
+        .map_err(FfiError::from)
+        .and_then(move |root_dir_id| {
+            dir_helper::get(c2, &root_dir_id)
+                .map(move |dir| (dir, root_dir_id))
+                .map_err(FfiError::from)
+        })
+        .and_then(move |(root_dir, dir_id)| {
+            if tokens.is_empty() {
+                ok!((root_dir, dir_id))
+            } else {
+                helper::final_sub_dir(&c3, &tokens, Some(&dir_id))
+                    .map(|(dir, dir_meta)| (dir, dir_meta.id()))
+                    .into_box()
+            }
+        })
+        .and_then(move |(mut parent, parent_id)| {
+            dir_helper::delete(c4, &mut parent, &parent_id, &dir_to_delete).map_err(FfiError::from)
+        })
+        .map(|_| ())
+        .into_box()
 }
 
-fn get_dir(app: &App, dir_path: &str, is_shared: bool) -> Result<DirectoryDetails, FfiError> {
-    let directory = try!(helper::get_directory(app, dir_path, is_shared));
-    DirectoryDetails::from_directory_listing(directory)
+fn get_dir(client: &Client,
+           app: &App,
+           dir_path: &str,
+           is_shared: bool)
+           -> Box<FfiFuture<DirDetails>> {
+    helper::dir(client, app, dir_path, is_shared)
+        .and_then(move |(dir, dir_metadata)| DirDetails::from_dir(dir, dir_metadata))
+        .into_box()
 }
 
-fn modify_dir(app: &App,
+fn modify_dir(client: &Client,
+              app: &App,
               dir_path: &str,
               is_shared: bool,
               new_name: Option<String>,
               new_metadata: Option<Vec<u8>>)
-              -> Result<(), FfiError> {
+              -> Box<FfiFuture<()>> {
+    let mut tokens = helper::tokenise_path(dir_path, false);
+    let dir_to_modify = fry!(tokens.pop().ok_or(FfiError::InvalidPath));
+
     if new_name.is_none() && new_metadata.is_none() {
-        return Err(FfiError::from("Optional parameters could not be parsed"));
+        return err!(FfiError::from("Optional parameters could not be parsed"));
     }
 
-    let mut dir_to_modify = try!(helper::get_directory(app, dir_path, is_shared));
-    let directory_helper = DirectoryHelper::new(app.get_client());
-    if let Some(name) = new_name {
-        dir_to_modify.get_mut_metadata().set_name(name);
-    }
+    let c2 = client.clone();
+    let c3 = client.clone();
 
-    if let Some(metadata) = new_metadata {
-        dir_to_modify.get_mut_metadata().set_user_metadata(metadata);
-    }
+    app.root_dir(client.clone(), is_shared)
+        .map_err(FfiError::from)
+        .and_then(move |start_dir_id| helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id)))
+        .and_then(move |(mut parent, parent_meta)| {
+            let mut dir_meta =
+                fry!(parent.find_sub_dir(&dir_to_modify).ok_or(FfiError::InvalidPath)).clone();
 
-    dir_to_modify.get_mut_metadata().set_modified_time(time::now_utc());
-    let _ = try!(directory_helper.update(&dir_to_modify));
+            if let Some(name) = new_name {
+                dir_meta.set_name(name);
+            }
+            if let Some(metadata) = new_metadata {
+                dir_meta.set_user_metadata(metadata);
+            }
+            dir_meta.set_modified_time(time::now_utc());
 
-    Ok(())
+            parent.upsert_sub_dir(dir_meta);
+
+            dir_helper::update(c3, &parent_meta.id(), &parent)
+                .map_err(FfiError::from)
+                .into_box()
+        })
+        .into_box()
 }
 
-fn move_dir(app: &App,
-            src_path: &str,
-            is_src_path_shared: bool,
-            dst_path: &str,
-            is_dst_path_shared: bool,
-            retain_src: bool)
-            -> Result<(), FfiError> {
-    let directory_helper = DirectoryHelper::new(app.get_client());
-    let mut src_dir = try!(helper::get_directory(app, src_path, is_src_path_shared));
-    let mut dst_dir = try!(helper::get_directory(app, dst_path, is_dst_path_shared));
+// fn move_dir(client: &Client,
+//             app: AppHandle,
+//             src_path: &str,
+//             is_src_path_shared: bool,
+//             dst_path: &str,
+//             is_dst_path_shared: bool,
+//             retain_src: bool)
+//             -> Box<FfiFuture<()>> {
+//     let mut src_dir = try!(helper::dir(app, src_path, is_src_path_shared));
+//     let mut dst_dir = try!(helper::dir(app, dst_path, is_dst_path_shared));
 
-    if dst_dir.find_sub_directory(src_dir.get_metadata().get_name()).is_some() {
-        return Err(FfiError::from(NfsError::DirectoryAlreadyExistsWithSameName));
-    }
+//     if dst_dir.find_sub_directory(src_dir.metadata().name()).is_some() {
+//         return Err(FfiError::from(NfsError::DirectoryAlreadyExistsWithSameName));
+//     }
 
-    let org_parent_of_src_dir = try!(src_dir.get_metadata()
-        .get_parent_dir_key()
-        .cloned()
-        .ok_or(FfiError::from("Parent directory not found")));
+//     let org_parent_of_src_dir = try!(src_dir.metadata()
+//         .parent_dir_key()
+//         .cloned()
+//         .ok_or(FfiError::from("Parent directory not found")));
 
-    if retain_src {
-        let name = src_dir.get_metadata().get_name().to_owned();
-        let user_metadata = src_dir.get_metadata().get_user_metadata().to_owned();
-        let access_level = src_dir.get_metadata().get_access_level().clone();
-        let created_time = *src_dir.get_metadata().get_created_time();
-        let modified_time = *src_dir.get_metadata().get_modified_time();
-        let (mut dir, _) = try!(directory_helper.create(name,
-                                                        user_metadata,
-                                                        src_dir.get_metadata()
-                                                            .get_key()
-                                                            .is_versioned(),
-                                                        access_level,
-                                                        Some(&mut dst_dir)));
-        src_dir.get_files().iter().all(|file| {
-            dir.get_mut_files().push(file.clone());
-            true
-        });
-        src_dir.get_sub_directories()
-            .iter()
-            .all(|sub_dir| {
-                dir.get_mut_sub_directories().push(sub_dir.clone());
-                true
-            });
-        dir.get_mut_metadata().set_created_time(created_time);
-        dir.get_mut_metadata().set_modified_time(modified_time);
-        let _ = try!(directory_helper.update(&dir));
-    } else {
-        src_dir.get_mut_metadata()
-            .set_parent_dir_key(Some(dst_dir.get_metadata().get_key().clone()));
-        dst_dir.upsert_sub_directory(src_dir.get_metadata().clone());
-        let _ = try!(directory_helper.update(&dst_dir));
-        let _ = try!(directory_helper.update(&src_dir));
-        let mut parent_of_src_dir = try!(directory_helper.get(&org_parent_of_src_dir));
-        // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
-        let _dir_meta = try!(parent_of_src_dir.remove_sub_directory(src_dir.get_metadata()
-            .get_name()));
-        let _ = try!(directory_helper.update(&parent_of_src_dir));
-    }
+//     if retain_src {
+//         let name = src_dir.metadata().name().to_owned();
+//         let user_metadata = src_dir.metadata().user_metadata().to_owned();
+//         let access_level = src_dir.metadata().access_level().clone();
+//         let created_time = *src_dir.metadata().created_time();
+//         let modified_time = *src_dir.metadata().modified_time();
+//         let (mut dir, _) = try!(dir_helper::create(name,
+//                                                    user_metadata,
+//                                                    src_dir.metadata()
+//                                                        .key()
+//                                                        .is_versioned(),
+//                                                    access_level,
+//                                                    Some(&mut dst_dir)));
+//         src_dir.files().iter().all(|file| {
+//             dir.mut_files().push(file.clone());
+//             true
+//         });
+//         src_dir.sub_directories()
+//             .iter()
+//             .all(|sub_dir| {
+//                 dir.mut_sub_directories().push(sub_dir.clone());
+//                 true
+//             });
+//         dir.mut_metadata().set_created_time(created_time);
+//         dir.mut_metadata().set_modified_time(modified_time);
+//         let _ = try!(dir_helper::update(&dir));
+//     } else {
+//         src_dir.mut_metadata()
+//             .set_parent_dir_key(Some(dst_dir.metadata().key().clone()));
+//         dst_dir.upsert_sub_directory(src_dir.metadata().clone());
+//         let _ = try!(dir_helper::update(&dst_dir));
+//         let _ = try!(dir_helper::update(&src_dir));
+//         let mut parent_of_src_dir = try!(dir_helper::get(&org_parent_of_src_dir));
+//         // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
+//         let _dir_meta = try!(parent_of_src_dir.remove_sub_directory(src_dir.metadata()
+//             .name()));
+//         let _ = try!(dir_helper::update(&parent_of_src_dir));
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[cfg(test)]
 mod tests {
-    use ffi::app::App;
-    use ffi::test_utils;
-    use nfs::AccessLevel;
-    use nfs::helper::directory_helper::DirectoryHelper;
+    use core::{Client, CoreMsg};
+    use core::futures::FutureExt;
+    use ffi::{App, FfiError, FfiFuture, test_utils};
+    use futures::Future;
+    // use nfs::AccessLevel;
+    use nfs::helper::dir_helper;
     use std::slice;
+    use std::sync::mpsc;
+    use std::time::Duration;
 
-    fn create_test_dir(app: &App, name: &str) {
-        let app_dir_key = unwrap!(app.get_app_dir_key());
-        let dir_helper = DirectoryHelper::new(app.get_client());
-        let mut app_root_dir = unwrap!(dir_helper.get(&app_dir_key));
-        let _ = unwrap!(dir_helper.create(name.to_string(),
-                                          Vec::new(),
-                                          false,
-                                          AccessLevel::Private,
-                                          Some(&mut app_root_dir)));
+    extern crate env_logger;
+
+    fn create_test_dir(client: Client, app: &App, name: &str) -> Box<FfiFuture<()>> {
+        let app_dir_id = unwrap!(app.app_dir());
+        let name = name.to_owned();
+
+        dir_helper::get(client.clone(), &app_dir_id)
+            .and_then(move |app_root_dir| {
+                dir_helper::create_sub_dir(client,
+                                           name,
+                                           None,
+                                           Vec::new(),
+                                           &app_root_dir,
+                                           &app_dir_id)
+                    .map(|_| ())
+            })
+            .map_err(FfiError::from)
+            .into_box()
     }
 
     #[test]
     fn create_dir() {
-        let app = test_utils::create_app(false);
-        let user_metadata = "user metadata".as_bytes().to_vec();
+        env_logger::init().unwrap();
 
-        assert!(super::create_dir(&app, "/", &user_metadata, true, false, false).is_err());
-        assert!(super::create_dir(&app,
-                                  "/test_dir/secondlevel",
-                                  &user_metadata,
-                                  true,
-                                  false,
-                                  false)
-            .is_err());
-        assert!(super::create_dir(&app, "/test_dir", &user_metadata, true, false, false).is_ok());
-        assert!(super::create_dir(&app, "/test_dir2", &user_metadata, true, false, false).is_ok());
-        assert!(super::create_dir(&app,
-                                  "/test_dir/secondlevel",
-                                  &user_metadata,
-                                  true,
-                                  false,
-                                  false)
-            .is_ok());
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
 
-        let dir_helper = DirectoryHelper::new(app.get_client());
-        let app_dir = unwrap!(dir_helper.get(&unwrap!(app.get_app_dir_key())));
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
 
-        assert!(app_dir.find_sub_directory("test_dir").is_some());
-        assert!(app_dir.find_sub_directory("test_dir2").is_some());
-        assert_eq!(app_dir.get_sub_directories().len(), 2);
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+            let c6 = client.clone();
+            let c7 = client.clone();
 
-        let test_dir_key = unwrap!(app_dir.find_sub_directory("test_dir")).get_key();
-        let test_dir = unwrap!(dir_helper.get(test_dir_key));
-        assert!(test_dir.find_sub_directory("secondlevel").is_some());
+            let app2 = app.clone();
+            let app3 = app.clone();
+            let app4 = app.clone();
+            let app5 = app.clone();
+            let app6 = app.clone();
+
+            let user_metadata = "user metadata".as_bytes().to_vec();
+
+            let fut = super::create_dir(client, &app, "/", &user_metadata, true, false)
+                .then(move |result| {
+                    assert!(result.is_err(), "creating / should fail");
+                    super::create_dir(&c2,
+                                      &app2,
+                                      "/test_dir/secondlevel",
+                                      &"user metadata".as_bytes().to_vec(),
+                                      true,
+                                      false)
+                })
+                .then(move |result| {
+                    assert!(result.is_err(),
+                            "creating /test_dir/secondlevel should fail");
+                    let user_metadata = "user metadata".as_bytes().to_vec();
+                    super::create_dir(&c3, &app3, "/test_dir", &user_metadata, true, false)
+                })
+                .then(move |result| {
+                    if let Err(e) = result {
+                        panic!("failed creating /test_dir: {:?}", e);
+                    }
+                    let user_metadata = "user metadata".as_bytes().to_vec();
+                    super::create_dir(&c4, &app4, "/test_dir2", &user_metadata, true, false)
+                })
+                .then(move |result| {
+                    if let Err(e) = result {
+                        panic!("failed creating /test_dir2: {:?}", e);
+                    }
+                    super::create_dir(&c5,
+                                      &app5,
+                                      "/test_dir/secondlevel",
+                                      &user_metadata,
+                                      true,
+                                      false)
+                })
+                .then(move |result| {
+                    if let Err(e) = result {
+                        panic!("failed creating /test_dir/second_level: {:?}", e);
+                    }
+                    dir_helper::get(c6, &unwrap!(app6.app_dir()))
+                })
+                .then(move |result| {
+                    let app_dir = unwrap!(result, "failed getting app6.app_dir");
+                    assert!(app_dir.find_sub_dir("test_dir").is_some());
+                    assert!(app_dir.find_sub_dir("test_dir2").is_some());
+                    assert_eq!(app_dir.sub_dirs().len(), 2);
+
+                    let test_dir_meta = unwrap!(app_dir.find_sub_dir("test_dir"));
+                    dir_helper::get(c7, &test_dir_meta.id())
+                })
+                .then(move |result| {
+                    let test_dir = unwrap!(result, "failed getting test_dir");
+
+                    assert!(test_dir.find_sub_dir("secondlevel").is_some());
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
+        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
     fn delete_dir() {
-        let app = test_utils::create_app(false);
-        let app_dir_key = unwrap!(app.get_app_dir_key());
-        let dir_helper = DirectoryHelper::new(app.get_client());
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
 
-        create_test_dir(&app, "test_dir");
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
 
-        assert!(super::delete_dir(&app, "/test_dir2", false).is_err());
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+            let c6 = client.clone();
 
-        let app_root_dir = unwrap!(dir_helper.get(&app_dir_key));
-        assert_eq!(app_root_dir.get_sub_directories().len(), 1);
-        assert!(app_root_dir.find_sub_directory("test_dir").is_some());
+            let app2 = app.clone();
+            let app3 = app.clone();
 
-        assert!(super::delete_dir(&app, "/test_dir", false).is_ok());
+            let app_dir_id = unwrap!(app.app_dir());
+            let app_dir_id2 = app_dir_id.clone();
 
-        let app_root_dir = unwrap!(dir_helper.get(&app_dir_key));
-        assert_eq!(app_root_dir.get_sub_directories().len(), 0);
+            let fut = create_test_dir(client.clone(), &app, "test_dir")
+                .then(move |result| {
+                    let _ = unwrap!(result);
+                    super::delete_dir(&c2, &app, "/test_dir2", false)
+                })
+                .then(move |delete_result| {
+                    assert!(delete_result.is_err());
+                    dir_helper::get(c3, &app_dir_id)
+                })
+                .then(move |result| {
+                    let app_root_dir = unwrap!(result);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 1);
+                    assert!(app_root_dir.find_sub_dir("test_dir").is_some());
 
-        assert!(super::delete_dir(&app, "/test_dir", false).is_err());
+                    super::delete_dir(&c4, &app2, "/test_dir", false)
+                })
+                .then(move |result| {
+                    let _ = unwrap!(result);
+                    dir_helper::get(c5, &app_dir_id2)
+                })
+                .then(move |result| {
+                    let app_root_dir = unwrap!(result);
+                    assert_eq!(app_root_dir.sub_dirs().len(),
+                               0,
+                               "directory /test_dir hasn't been deleted");
+
+                    super::delete_dir(&c6, &app3, "/test_dir", false)
+                })
+                .then(move |result| {
+                    assert!(result.is_err());
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
+        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
     fn get_dir() {
-        let app = test_utils::create_app(false);
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
 
-        create_test_dir(&app, "test_dir");
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
 
-        let details = unwrap!(super::get_dir(&app, "/test_dir", false));
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-        unsafe {
-            let name = slice::from_raw_parts(details.metadata.name, details.metadata.name_len);
-            let name = String::from_utf8(name.to_owned()).unwrap();
-            assert_eq!(name, "test_dir");
-        }
+            let app2 = app.clone();
+            let app3 = app.clone();
 
-        assert_eq!(details.files.len(), 0);
-        assert_eq!(details.sub_directories.len(), 0);
+            let fut = create_test_dir(client.clone(), &app, "test_dir")
+                .then(move |result| {
+                    let _ = unwrap!(result);
 
-        assert!(super::get_dir(&app, "/does_not_exist", false).is_err());
+                    super::get_dir(&c2, &app2, "/test_dir", false)
+                })
+                .then(move |result| {
+                    let details = unwrap!(result);
+                    unsafe {
+                        let name = slice::from_raw_parts(details.metadata.name,
+                                                         details.metadata.name_len);
+                        let name = String::from_utf8(name.to_owned()).unwrap();
+                        assert_eq!(name, "test_dir");
+                    }
+                    assert_eq!(details.files.len(), 0);
+                    assert_eq!(details.sub_dirs.len(), 0);
+
+                    super::get_dir(&c3, &app3, "/does_not_exist", false)
+                })
+                .then(move |result| {
+                    assert!(result.is_err());
+
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
+        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
     fn rename_dir() {
-        let app = test_utils::create_app(false);
-        let dir_helper = DirectoryHelper::new(app.get_client());
-        let app_root_dir_key = unwrap!(app.get_app_dir_key());
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
 
-        create_test_dir(&app, "test_dir");
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
 
-        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        assert_eq!(app_root_dir.get_sub_directories().len(), 1);
-        assert!(app_root_dir.find_sub_directory("test_dir").is_some());
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
 
-        assert!(super::modify_dir(&app,
-                                  "/test_dir",
-                                  false,
-                                  Some("new_test_dir".to_string()),
-                                  None)
-            .is_ok());
+            let app2 = app.clone();
+            let app_dir_id = unwrap!(app.app_dir());
+            let app_dir_id2 = app_dir_id.clone();
 
-        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        assert_eq!(app_root_dir.get_sub_directories().len(), 1);
-        assert!(app_root_dir.find_sub_directory("test_dir").is_none());
-        assert!(app_root_dir.find_sub_directory("new_test_dir").is_some());
+            let fut = create_test_dir(client.clone(), &app, "test_dir")
+                .then(move |result| {
+                    let _ = unwrap!(result);
+                    dir_helper::get(c2, &app_dir_id)
+                })
+                .then(move |result| {
+                    let app_root_dir = unwrap!(result);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 1);
+                    assert!(app_root_dir.find_sub_dir("test_dir").is_some());
+
+                    super::modify_dir(&c3,
+                                      &app2,
+                                      "/test_dir",
+                                      false,
+                                      Some("new_test_dir".to_string()),
+                                      None)
+                })
+                .then(move |result| {
+                    let _ = unwrap!(result);
+                    dir_helper::get(c4, &app_dir_id2)
+                })
+                .then(move |result| {
+                    let app_root_dir = unwrap!(result);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 1);
+                    assert!(app_root_dir.find_sub_dir("test_dir").is_none());
+                    assert!(app_root_dir.find_sub_dir("new_test_dir").is_some());
+
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
+            Some(fut)
+        })));
+
+        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
     fn dir_update_user_metadata() {
         const METADATA: &'static str = "user metadata";
 
-        let app = test_utils::create_app(false);
-        let dir_helper = DirectoryHelper::new(app.get_client());
-        let app_root_dir_key = unwrap!(app.get_app_dir_key());
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
 
-        create_test_dir(&app, "test_dir");
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
 
-        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        let dir_key = unwrap!(app_root_dir.find_sub_directory("test_dir")).get_key();
-        let dir_to_modify = unwrap!(dir_helper.get(dir_key));
-        assert_eq!(dir_to_modify.get_metadata().get_user_metadata().len(), 0);
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
 
-        assert!(super::modify_dir(&app,
-                                  "/test_dir",
-                                  false,
-                                  None,
-                                  Some(METADATA.as_bytes().to_vec()))
-            .is_ok());
+            let app_dir_id = unwrap!(app.app_dir());
+            let app_dir_id2 = app_dir_id.clone();
 
-        let dir_to_modify = unwrap!(dir_helper.get(dir_key));
-        assert!(dir_to_modify.get_metadata().get_user_metadata().len() > 0);
-        assert_eq!(dir_to_modify.get_metadata().get_user_metadata(),
-                   METADATA.as_bytes());
-    }
+            let fut = create_test_dir(client.clone(), &app, "test_dir")
+                .then(move |result| {
+                    let _ = unwrap!(result);
+                    dir_helper::get(c2, &app_dir_id)
+                })
+                .then(move |result| {
+                    let app_root = unwrap!(result);
+                    let dir_meta = unwrap!(app_root.find_sub_dir("test_dir"));
+                    assert_eq!(dir_meta.user_metadata().len(), 0);
 
-    #[test]
-    fn move_dir() {
-        let app = test_utils::create_app(false);
-        let dir_helper = DirectoryHelper::new(app.get_client());
-        let app_root_dir_key = unwrap!(app.get_app_dir_key());
+                    super::modify_dir(&c3,
+                                      &app,
+                                      "/test_dir",
+                                      false,
+                                      None,
+                                      Some(METADATA.as_bytes().to_vec()))
+                })
+                .then(move |result| {
+                    let _ = unwrap!(result);
+                    dir_helper::get(c4, &app_dir_id2)
+                })
+                .then(move |result| {
+                    let root_dir = unwrap!(result);
+                    let dir_to_modify = unwrap!(root_dir.find_sub_dir("test_dir"));
+                    assert!(dir_to_modify.user_metadata().len() > 0);
+                    assert_eq!(dir_to_modify.user_metadata(), METADATA.as_bytes());
 
-        create_test_dir(&app, "test_dir_a");
-        create_test_dir(&app, "test_dir_b");
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
 
-        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        assert_eq!(app_root_dir.get_sub_directories().len(), 2);
+            Some(fut)
+        })));
 
-        let dst_dir_key = unwrap!(app_root_dir.find_sub_directory("test_dir_b")).get_key();
-        let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
-        assert_eq!(dst_dir.get_sub_directories().len(), 0);
-
-        assert!(super::move_dir(&app, "/test_dir_a", false, "/test_dir_b", false, false).is_ok());
-
-        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        assert_eq!(app_root_dir.get_sub_directories().len(), 1);
-
-        let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
-        assert_eq!(dst_dir.get_sub_directories().len(), 1);
-    }
-
-    #[test]
-    fn copy_dir() {
-        let app = test_utils::create_app(false);
-        let dir_helper = DirectoryHelper::new(app.get_client());
-        let app_root_dir_key = unwrap!(app.get_app_dir_key());
-
-        create_test_dir(&app, "test_dir_a");
-        create_test_dir(&app, "test_dir_b");
-
-        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        assert_eq!(app_root_dir.get_sub_directories().len(), 2);
-
-        let dst_dir_key = unwrap!(app_root_dir.find_sub_directory("test_dir_b")).get_key();
-        let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
-        assert_eq!(dst_dir.get_sub_directories().len(), 0);
-
-        assert!(super::move_dir(&app, "/test_dir_a", false, "/test_dir_b", false, true).is_ok());
-
-        let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
-        assert_eq!(app_root_dir.get_sub_directories().len(), 2);
-
-        let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
-        assert_eq!(dst_dir.get_sub_directories().len(), 1);
+        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 }

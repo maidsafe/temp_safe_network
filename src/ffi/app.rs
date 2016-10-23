@@ -21,12 +21,12 @@
 // TODO(Spandan) - Run through this and make interfaces efficient (return references instead of
 // copies etc.) and uniform (i.e. not use get_ prefix for mem functions.
 
-use core::CoreMsg;
+use core::{Client, CoreMsg};
 use core::futures::FutureExt;
-use ffi::OpaqueCtx;
-use futures::Future;
+use ffi::{FfiFuture, OpaqueCtx};
+use futures::{self, Future};
 use libc::int32_t;
-use nfs::Dir;
+use nfs::DirId;
 use rust_sodium::crypto::{box_, secretbox};
 use super::Session;
 use super::errors::FfiError;
@@ -42,7 +42,7 @@ pub enum App {
     /// Authorised application
     Registered {
         /// Application directory
-        app_dir: Dir,
+        app_dir_id: DirId,
         /// Defines whether the application has access to SAFE Drive
         safe_drive_access: bool,
         /// Asymmetric encryption keys of the app
@@ -71,36 +71,36 @@ impl App {
         }
     }
 
-    /// Get app root directory
-    pub fn app_dir(&self) -> Result<&Dir, FfiError> {
-        if let App::Registered { ref app_dir, .. } = *self {
-            Ok(app_dir)
+    /// Get app root directory ID
+    pub fn app_dir(&self) -> Result<DirId, FfiError> {
+        if let App::Registered { ref app_dir_id, .. } = *self {
+            Ok(app_dir_id.clone())
         } else {
             Err(FfiError::OperationForbiddenForApp)
         }
     }
+
+    /// Get root directory: for shared paths, this is the SAFEdrive directory,
+    /// otherwise it's the app directory.
+    pub fn root_dir(&self, client: Client, is_shared: bool) -> Box<FfiFuture<DirId>> {
+        if is_shared {
+            if let App::Registered { ref safe_drive_access, .. } = *self {
+                if !safe_drive_access {
+                    return err!(FfiError::PermissionDenied);
+                }
+                helper::safe_drive_metadata(client.clone())
+                    .map(move |dir_meta| dir_meta.id())
+                    .into_box()
+            } else {
+                err!(FfiError::from("Safe Drive directory key is not present"))
+            }
+        } else {
+            futures::done(self.app_dir()
+                    .map_err(move |_| FfiError::from("Application directory is not present")))
+                .into_box()
+        }
+    }
 }
-
-// /// Get SAFEdrive directory key.
-// pub fn safe_drive_dir(&self) -> Option<Dir> {
-//     self.session.safe_drive_dir()
-// }
-
-// /// Get root directory: for shared paths, this is the SAFEdrive directory,
-// /// otherwise it's the app directory.
-// pub fn root_dir(&self, is_shared: bool) -> Result<Dir, FfiError> {
-//     if is_shared {
-//         if !self.has_safe_drive_access() {
-//             return Err(FfiError::PermissionDenied);
-//         }
-
-//         self.safe_drive_dir()
-//             .ok_or(FfiError::from("Safe Drive directory key is not present"))
-//     } else {
-//         self.app_dir()
-//             .ok_or(FfiError::from("Application directory is not present"))
-//     }
-// }
 
 /// Register an app with the launcher. The returned app handle must be disposed
 /// of by calling `drop_app` once no longer needed.
