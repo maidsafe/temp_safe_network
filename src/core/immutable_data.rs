@@ -154,7 +154,7 @@ fn unpack(client: Client, data: ImmutableData) -> Box<CoreFuture<Vec<u8>>> {
 #[cfg(test)]
 mod tests {
     use core::utility;
-    use core::utility::test_utils;
+    use core::utility::test_utils::{finish, random_client};
     use futures::Future;
     use routing::Data;
     use rust_sodium::crypto::secretbox;
@@ -189,21 +189,26 @@ mod tests {
         {
             let value_before = value.clone();
 
-            test_utils::register_and_run(move |client| {
+            random_client(move |client| {
                 let client2 = client.clone();
                 let client3 = client.clone();
 
                 create(client, value_before.clone(), None)
-                    .and_then(move |data_before| {
+                    .then(move |res| {
+                        let data_before = unwrap!(res);
                         let data_name = *data_before.name();
                         client2.put(Data::Immutable(data_before), None)
                             .map(move |_| data_name)
                     })
-                    .and_then(move |data_name| get_value(&client3, &data_name, None))
-                    .map(move |value_after| {
-                        assert_eq!(value_after, value_before);
+                    .then(move |res| {
+                        let data_name = unwrap!(res);
+                        get_value(&client3, &data_name, None)
                     })
-                    .map_err(|error| panic!("Unexpected {:?}", error))
+                    .then(move |res| {
+                        let value_after = unwrap!(res);
+                        assert_eq!(value_after, value_before);
+                        finish()
+                    })
             })
         }
 
@@ -212,21 +217,26 @@ mod tests {
             let value_before = value.clone();
             let key = secretbox::gen_key();
 
-            test_utils::register_and_run(move |client| {
+            random_client(move |client| {
                 let client2 = client.clone();
                 let client3 = client.clone();
 
                 create(client, value_before.clone(), Some(key.clone()))
-                    .and_then(move |data_before| {
+                    .then(move |res| {
+                        let data_before = unwrap!(res);
                         let data_name = *data_before.name();
                         client2.put(Data::Immutable(data_before), None)
                             .map(move |_| data_name)
                     })
-                    .and_then(move |data_name| get_value(&client3, &data_name, Some(key)))
-                    .map(move |value_after| {
-                        assert_eq!(value_after, value_before);
+                    .then(move |res| {
+                        let data_name = unwrap!(res);
+                        get_value(&client3, &data_name, Some(key))
                     })
-                    .map_err(|error| panic!("Unexpected {:?}", error))
+                    .then(move |res| {
+                        let value_after = unwrap!(res);
+                        assert_eq!(value_after, value_before);
+                        finish()
+                    })
             })
         }
 
@@ -235,18 +245,25 @@ mod tests {
             let value = value.clone();
             let key = secretbox::gen_key();
 
-            test_utils::register_and_run(move |client| {
+            random_client(move |client| {
                 let client2 = client.clone();
                 let client3 = client.clone();
 
                 create(client, value, None)
-                    .and_then(move |data| {
+                    .then(move |res| {
+                        let data = unwrap!(res);
                         let data_name = *data.name();
                         client2.put(Data::Immutable(data), None)
                             .map(move |_| data_name)
                     })
-                    .and_then(move |data_name| get_value(&client3, &data_name, Some(key)))
-                    .map(|_| panic!("get_value should fail"))
+                    .then(move |res| {
+                        let data_name = unwrap!(res);
+                        get_value(&client3, &data_name, Some(key))
+                    })
+                    .then(|res| {
+                        assert!(res.is_err());
+                        finish()
+                    })
             })
         }
 
@@ -255,18 +272,25 @@ mod tests {
             let value = value.clone();
             let key = secretbox::gen_key();
 
-            test_utils::register_and_run(move |client| {
+            random_client(move |client| {
                 let client2 = client.clone();
                 let client3 = client.clone();
 
                 create(client, value, Some(key))
-                    .and_then(move |data| {
+                    .then(move |res| {
+                        let data = unwrap!(res);
                         let data_name = *data.name();
                         client2.put(Data::Immutable(data), None)
                             .map(move |_| data_name)
                     })
-                    .and_then(move |data_name| get_value(&client3, &data_name, None))
-                    .map(|_| panic!("get_value should fail"))
+                    .then(move |res| {
+                        let data_name = unwrap!(res);
+                        get_value(&client3, &data_name, None)
+                    })
+                    .then(|res| {
+                        assert!(res.is_err());
+                        finish()
+                    })
 
             })
         }
