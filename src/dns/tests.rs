@@ -23,6 +23,8 @@
 // and limitations
 // relating to use of the SAFE Network Software.
 
+#![cfg(feature = "use-mock-routing")]
+
 use core::{CoreError, utility};
 use core::utility::test_utils::random_client;
 use futures::Future;

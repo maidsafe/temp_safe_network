@@ -29,6 +29,7 @@ pub mod config;
 pub mod operations;
 
 mod errors;
+#[cfg(test)]
 mod tests;
 
 pub use self::errors::DnsError;
