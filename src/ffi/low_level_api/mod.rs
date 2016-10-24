@@ -23,8 +23,8 @@
 
 // /// Low level manipulation of {Pub|Priv}AppendableData
 // pub mod appendable_data;
-// /// Cipher Options
-// pub mod cipher_opt;
+/// Cipher Options
+pub mod cipher_opt;
 /// DataIdentifier constructions and freeing
 pub mod data_id;
 // /// Low level manipulation of ImmutableData

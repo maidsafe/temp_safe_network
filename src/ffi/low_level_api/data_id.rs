@@ -157,25 +157,20 @@ mod tests {
 
         unsafe {
             let (tx, rx) = mpsc::channel::<DataIdHandle>();
-            assert_eq!(data_id_new_struct_data(sess_ptr,
-                                               type_tag,
-                                               &struct_id_arr,
-                                               Box::into_raw(Box::new(tx.clone())) as *mut _,
-                                               data_id_cb),
+            let tx = Box::into_raw(Box::new(tx)) as *mut c_void;
+
+            assert_eq!(data_id_new_struct_data(sess_ptr, type_tag, &struct_id_arr, tx, data_id_cb),
                        0);
             data_id_handle_struct = unwrap!(rx.recv());
 
-            assert_eq!(data_id_new_immut_data(sess_ptr,
-                                              &immut_id_arr,
-                                              Box::into_raw(Box::new(tx.clone())) as *mut _,
-                                              data_id_cb),
+            assert_eq!(data_id_new_immut_data(sess_ptr, &immut_id_arr, tx, data_id_cb),
                        0);
             data_id_handle_immut = unwrap!(rx.recv());
 
             assert_eq!(data_id_new_appendable_data(sess_ptr,
                                                    &priv_app_id_arr,
                                                    true,
-                                                   Box::into_raw(Box::new(tx.clone())) as *mut _,
+                                                   tx,
                                                    data_id_cb),
                        0);
             data_id_handle_priv_appendable = unwrap!(rx.recv());
@@ -183,7 +178,7 @@ mod tests {
             assert_eq!(data_id_new_appendable_data(sess_ptr,
                                                    &pub_app_id_arr,
                                                    false,
-                                                   Box::into_raw(Box::new(tx.clone())) as *mut _,
+                                                   tx,
                                                    data_id_cb),
                        0);
             data_id_handle_pub_appendable = unwrap!(rx.recv());
