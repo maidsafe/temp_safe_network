@@ -1,26 +1,23 @@
-// Copyright 2015 MaidSafe.net limited.
+// Copyright 2016 MaidSafe.net limited.
+//
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net
-// Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3,
-// depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project
-// generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
-// This, along with the
-// Licenses can be found in the root directory of this project at LICENSE,
-// COPYING and CONTRIBUTOR.
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0.
+// This, along with the Licenses can be found in the root directory of this
+// project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network
-// Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
-// OR CONDITIONS OF ANY
-// KIND, either express or implied.
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 //
 // Please review the Licences for the specific language governing permissions
-// and limitations
-// relating to use of the SAFE Network Software.
+// and limitations relating to use of the SAFE Network Software.
 
 use core::{self, Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
            utility};
@@ -53,8 +50,7 @@ pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
 }
 
 // Create random registered client and run it inside an event loop. Use this to
-// create Client
-// automatically and randomly,
+// create Client automatically and randomly,
 pub fn random_client<Run, I, E>(r: Run)
     where Run: FnOnce(&Client) -> I + Send + 'static,
           I: IntoFuture<Item = (), Error = E> + 'static,
@@ -65,8 +61,7 @@ pub fn random_client<Run, I, E>(r: Run)
 }
 
 // Create random registered client and run it inside an event loop. Use this to
-// create Client
-// automatically and randomly,
+// create Client automatically and randomly,
 pub fn random_client_with_net_obs<NetObs, Run, I, E>(n: NetObs, r: Run)
     where NetObs: FnMut(NetworkEvent) + 'static,
           Run: FnOnce(&Client) -> I + Send + 'static,
@@ -82,10 +77,9 @@ pub fn random_client_with_net_obs<NetObs, Run, I, E>(n: NetObs, r: Run)
 }
 
 // Helper to create a client and run it in an event loop. Useful when we need
-// to supply credentials
-// explicitly or when Client is to be constructed as unregistered or as a
-// result of successful
-// login. Use this to create Client manually,
+// to supply credentials explicitly or when Client is to be constructed as
+// unregistered or as a result of successful login. Use this to create Client
+// manually,
 pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
     where Create: FnOnce(CoreMsgTx, NetworkTx) -> Result<Client, CoreError>,
           Run: FnOnce(&Client) -> I + Send + 'static,
@@ -97,10 +91,9 @@ pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
 }
 
 // Helper to create a client and run it in an event loop. Useful when we need
-// to supply credentials
-// explicitly or when Client is to be constructed as unregistered or as a
-// result of successful
-// login. Use this to create Client manually,
+// to supply credentials explicitly or when Client is to be constructed as
+// unregistered or as a result of successful login. Use this to create Client
+// manually,
 pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: NetObs, r: Run)
     where Create: FnOnce(CoreMsgTx, NetworkTx) -> Result<Client, CoreError>,
           NetObs: FnMut(NetworkEvent) + 'static,

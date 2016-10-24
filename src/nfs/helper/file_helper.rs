@@ -1,27 +1,23 @@
 // Copyright 2016 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net
-// Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3,
-// depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project
-// generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
-// This, along with the
-// Licenses can be found in the root directory of this project at LICENSE,
-// COPYING and CONTRIBUTOR.
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0.
+// This, along with the Licenses can be found in the root directory of this
+// project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network
-// Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
-// OR CONDITIONS OF ANY
-// KIND, either express or implied.
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 //
 // Please review the Licences for the specific language governing permissions
-// and limitations
-// relating to use of the SAFE Network Software.
+// and limitations relating to use of the SAFE Network Software.
 
 use core::Client;
 use core::SelfEncryptionStorage;
@@ -35,9 +31,8 @@ use routing::DataIdentifier;
 use rust_sodium::crypto::secretbox;
 use self_encryption::DataMap;
 
-/// Helper function to create a file in a directory listing
-/// A writer object is returned, through which the data for the file
-/// can be written to the network
+/// Helper function to create a file in a directory listing A writer object is
+/// returned, through which the data for the file can be written to the network
 /// The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
 pub fn create<S>(client: Client,
@@ -97,10 +92,9 @@ pub fn update_metadata(client: Client,
     dir_helper::update(client.clone(), parent_id, parent_dir)
 }
 
-/// Helper function to Update content of a file in a directory listing
-/// A writer object is returned, through which the data for the file
-/// can be written to the network
-/// The file is actually saved in the directory listing only after
+/// Helper function to Update content of a file in a directory listing A writer
+/// object is returned, through which the data for the file can be written to
+/// the network The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
 pub fn update_content(client: Client,
                       file: File,
@@ -126,7 +120,6 @@ pub fn update_content(client: Client,
                 parent_dir,
                 file)
 }
-
 
 /// Returns a reader for reading the file contents
 pub fn read(client: Client, file: &File) -> Result<Reader, NfsError> {

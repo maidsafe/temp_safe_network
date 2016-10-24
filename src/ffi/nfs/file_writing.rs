@@ -25,7 +25,6 @@
 
 //! Operations on file writer
 
-
 use core::{Client, CoreMsg, FutureExt, SelfEncryptionStorage};
 use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use ffi::object_cache::AppHandle;

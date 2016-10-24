@@ -1,19 +1,23 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0.
+// This, along with the Licenses can be found in the root directory of this
+// project at LICENSE, COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.
+// Please review the Licences for the specific language governing permissions
+// and limitations relating to use of the SAFE Network Software.
 
 use core::errors::CoreError;
 use ffi::app::App;
@@ -550,7 +554,8 @@ unsafe fn appendable_data_nth_sign_key_impl(app: *const App,
     Ok(())
 }
 
-/// Remove the n-th data item from the appendable data. The data has to be POST'd afterwards for the
+/// Remove the n-th data item from the appendable data. The data has to be
+/// POST'd afterwards for the
 /// change to be registered by the network. The data is moved to deleted data.
 #[no_mangle]
 pub extern "C" fn appendable_data_remove_nth_data(ad_h: AppendableDataHandle, n: usize) -> i32 {
@@ -558,7 +563,8 @@ pub extern "C" fn appendable_data_remove_nth_data(ad_h: AppendableDataHandle, n:
         let mut object_cache = unwrap!(object_cache());
         match *ffi_try!(object_cache.get_ad(ad_h)) {
             AppendableData::Pub(ref mut elt) => {
-                // TODO Isn't there Entry::Occupied::remove() like HashMap etc to prevent clone ?
+                // TODO Isn't there Entry::Occupied::remove() like HashMap etc to prevent clone
+                // ?
                 //      If there is refactor in other places too here.
                 let item = ffi_try!(nth(&elt.data, n)).clone();
                 if elt.data.remove(&item) {
@@ -577,7 +583,8 @@ pub extern "C" fn appendable_data_remove_nth_data(ad_h: AppendableDataHandle, n:
     })
 }
 
-/// Restore the n-th delete data item to data field back. The data has to be POST'd afterwards for
+/// Restore the n-th delete data item to data field back. The data has to be
+/// POST'd afterwards for
 /// the change to be registered by the network.
 #[no_mangle]
 pub extern "C" fn appendable_data_restore_nth_deleted_data(ad_h: AppendableDataHandle,
@@ -587,7 +594,8 @@ pub extern "C" fn appendable_data_restore_nth_deleted_data(ad_h: AppendableDataH
         let mut object_cache = unwrap!(object_cache());
         match *ffi_try!(object_cache.get_ad(ad_h)) {
             AppendableData::Pub(ref mut elt) => {
-                // TODO Isn't there Entry::Occupied::remove() like HashMap etc to prevent clone ?
+                // TODO Isn't there Entry::Occupied::remove() like HashMap etc to prevent clone
+                // ?
                 //      If there is refactor in other places too here.
                 let item = ffi_try!(nth(&elt.deleted_data, n)).clone();
                 if elt.deleted_data.remove(&item) {
@@ -626,7 +634,8 @@ pub extern "C" fn appendable_data_clear_data(ad_h: AppendableDataHandle) -> i32 
     })
 }
 
-/// Remove the n-th data item from the deleted data. The data has to be POST'd afterwards for the
+/// Remove the n-th data item from the deleted data. The data has to be POST'd
+/// afterwards for the
 /// change to be registered by the network. The data is removed permanently.
 #[no_mangle]
 pub extern "C" fn appendable_data_remove_nth_deleted_data(ad_h: AppendableDataHandle,
@@ -765,7 +774,8 @@ pub extern "C" fn appendable_data_free(handle: AppendableDataHandle) -> i32 {
     })
 }
 
-// Convenience function to access n-th item from the given set, returning FfiError::InvalidIndex
+// Convenience function to access n-th item from the given set, returning
+// FfiError::InvalidIndex
 // if not found.
 fn nth<T>(items: &BTreeSet<T>, n: usize) -> Result<&T, FfiError> {
     items.iter().nth(n).ok_or(FfiError::InvalidIndex)

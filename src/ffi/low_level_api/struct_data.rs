@@ -1,19 +1,23 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0.
+// This, along with the Licenses can be found in the root directory of this
+// project at LICENSE, COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.
+// Please review the Licences for the specific language governing permissions
+// and limitations relating to use of the SAFE Network Software.
 
 use core::{CLIENT_STRUCTURED_DATA_TAG, immut_data_operations};
 use core::client::Client;
@@ -26,7 +30,8 @@ use ffi::low_level_api::{CipherOptHandle, DataIdHandle, StructDataHandle};
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use ffi::low_level_api::object_cache::object_cache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Data, DataIdentifier, ImmutableData, NO_OWNER_PUB_KEY, StructuredData, XOR_NAME_LEN, XorName};
+use routing::{Data, DataIdentifier, ImmutableData, NO_OWNER_PUB_KEY, StructuredData, XOR_NAME_LEN,
+              XorName};
 use std::{mem, ptr, slice};
 use std::sync::{Arc, Mutex};
 
@@ -57,8 +62,8 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
         let sd = match type_tag {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                                                     .get_cipher_opt(cipher_opt_h))
-                                        .encrypt(app, &plain_text));
+                        .get_cipher_opt(cipher_opt_h))
+                    .encrypt(app, &plain_text));
 
                 unversioned::create(client,
                                     type_tag,
@@ -73,9 +78,9 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let immut_data =
                     ffi_try!(immut_data_operations::create(client.clone(), plain_text, None));
-                // TODO The above data could be exactly 1 MiB and ideally should not be touched any
-                // more. For this however we will require CipherOpt to be in core module. Until
-                // that we need to live with this.
+                // TODO The above data could be exactly 1 MiB and ideally should not be touched
+                // any more. For this however we will require CipherOpt to be in core module.
+                // Until that we need to live with this.
                 let ser_immut_data = ffi_try!(serialise(&immut_data).map_err(FfiError::from));
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
                         .get_cipher_opt(cipher_opt_h))
@@ -160,7 +165,8 @@ pub unsafe extern "C" fn struct_data_extract_data_id(sd_h: StructDataHandle,
 }
 
 // TODO See if we can extract common functionality and merge with new() above
-/// Put new data into StructuredData. Version is not updated. It will be updated on POST.
+/// Put new data into StructuredData. Version is not updated. It will be
+/// updated on POST.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                               sd_h: StructDataHandle,
@@ -247,8 +253,8 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
         let app = &*app;
         let client = app.get_client();
 
-        // Note: Order of locking is object_cache followed by client - ensure this order
-        // everywhere.
+        // Note: Order of locking is object_cache followed by client - ensure this
+        // order everywhere.
         let mut obj_cache = unwrap!(object_cache());
 
         let mut plain_text = match ffi_try!(obj_cache.get_sd(sd_h)).get_type_tag() {
@@ -330,7 +336,8 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
             ffi_try!(Err(FfiError::InvalidVersionNumber));
         }
 
-        // TODO Try to combine this code with above (extract_data) if it makes it smaller
+        // TODO Try to combine this code with above (extract_data) if it makes it
+        // smaller
         let immut_data_final_name = versions.remove(n);
         let resp_getter = ffi_try!(unwrap!(client.lock())
             .get(DataIdentifier::Immutable(immut_data_final_name), None));
@@ -388,7 +395,8 @@ fn struct_data_post_impl(client: Arc<Mutex<Client>>,
                          sd: &StructuredData)
                          -> Result<StructuredData, FfiError> {
     let sign_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    // TODO Ask routing to remove this inefficiency of requiring to clone data and all
+    // TODO Ask routing to remove this inefficiency of requiring to clone data and
+    // all
     let new_sd = try!(StructuredData::new(sd.get_type_tag(),
                                           *sd.name(),
                                           sd.get_version() + 1,
@@ -425,7 +433,8 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
                            sd: &StructuredData)
                            -> Result<StructuredData, FfiError> {
     let sign_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    // TODO Ask routing to remove this inefficiency of requiring to clone data and all
+    // TODO Ask routing to remove this inefficiency of requiring to clone data and
+    // all
     let new_sd = try!(StructuredData::new(sd.get_type_tag(),
                                           *sd.name(),
                                           sd.get_version() + 1,
@@ -433,7 +442,7 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
                                           vec![],
                                           sd.get_owner_keys().clone(),
                                           Some(&sign_key))
-                          .map_err(CoreError::from));
+        .map_err(CoreError::from));
 
     let data = Data::Structured(new_sd.clone());
 
@@ -454,8 +463,7 @@ pub unsafe extern "C" fn struct_data_validate_size(handle: StructDataHandle,
 
 /// Get the current version of StructuredData by its handle
 #[no_mangle]
-pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle,
-                                             o_version: *mut u64) -> i32 {
+pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle, o_version: *mut u64) -> i32 {
     helper::catch_unwind_i32(|| {
         *o_version = ffi_try!(unwrap!(object_cache()).get_sd(handle)).get_version();
         0
