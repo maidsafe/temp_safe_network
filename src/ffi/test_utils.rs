@@ -15,11 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use core::utility;
-use ffi::app::App;
-use ffi::session::Session;
+use core::{CoreMsg, utility};
+use core::futures::FutureExt;
+use ffi::{App, Session};
+use ffi::launcher_config;
+use futures::Future;
 use std::ffi::CString;
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
 
 pub fn generate_random_cstring(len: usize) -> CString {
     let mut cstring_vec = unwrap!(utility::generate_random_vector::<u8>(len));
@@ -36,23 +38,29 @@ pub fn generate_random_cstring(len: usize) -> CString {
     unwrap!(CString::new(cstring_vec))
 }
 
-pub fn create_app(has_safe_drive_access: bool) -> App {
+pub fn create_session() -> Session {
     let acc_locator = unwrap!(utility::generate_random_string(10));
     let acc_password = unwrap!(utility::generate_random_string(10));
 
-    let session = unwrap!(Session::create_account(&acc_locator, &acc_password));
+    Session::create_account(acc_locator, acc_password)
+}
+
+pub fn create_app(session: &Session, has_safe_drive_access: bool) -> App {
     let app_name = "Test App".to_string();
     let app_id = unwrap!(utility::generate_random_string(10));
     let vendor = "Test Vendor".to_string();
 
-    unwrap!(App::registered(Arc::new(Mutex::new(session)),
-                            app_name,
-                            app_id,
-                            vendor,
-                            has_safe_drive_access))
-}
+    let (tx, rx) = mpsc::channel();
 
-pub fn create_unregistered_app() -> App {
-    let session = unwrap!(Session::create_unregistered_client());
-    App::unregistered(Arc::new(Mutex::new(session)))
+    unwrap!(session.send(CoreMsg::new(move |client| {
+        let fut = launcher_config::app(client, app_name, app_id, vendor, has_safe_drive_access)
+            .map(move |app| {
+                unwrap!(tx.send(app));
+            })
+            .map_err(move |_| ())
+            .into_box();
+        Some(fut)
+    })));
+
+    unwrap!(rx.recv())
 }

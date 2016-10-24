@@ -17,55 +17,51 @@
 
 //! Details about directory and its content.
 
-
-use core::client::Client;
-use ffi::errors::FfiError;
+use core::Client;
+use core::futures::FutureExt;
+use ffi::{FfiError, FfiFuture};
 use ffi::file_details::FileMetadata;
-use ffi::low_level_api::misc::misc_u8_ptr_free;
-use nfs::directory_listing::DirectoryListing;
-use nfs::helper::directory_helper::DirectoryHelper;
-use nfs::metadata::directory_key::DirectoryKey;
-use nfs::metadata::directory_metadata::DirectoryMetadata as NfsDirectoryMetadata;
+use futures::Future;
+use nfs::Dir;
+use nfs::DirMetadata as NfsDirMetadata;
+use nfs::helper::dir_helper;
 use std::ptr;
-use std::sync::{Arc, Mutex};
 use super::helper;
 
 /// Details about a directory and its content.
 #[derive(Debug)]
-pub struct DirectoryDetails {
+pub struct DirDetails {
     /// Metadata of this directory.
-    pub metadata: DirectoryMetadata,
+    pub metadata: DirMetadata,
     /// Metadata of every file of this directory.
     pub files: Vec<FileMetadata>,
     /// Metadata of every sub-directory of this directory.
-    pub sub_directories: Vec<DirectoryMetadata>,
+    pub sub_dirs: Vec<DirMetadata>,
 }
 
-impl DirectoryDetails {
-    /// Obtain `DirectoryDetails` from the given directory key.
-    pub fn from_directory_key(client: Arc<Mutex<Client>>,
-                              directory_key: DirectoryKey)
-                              -> Result<Self, FfiError> {
-        let dir_helper = DirectoryHelper::new(client);
-        let dir_listing = try!(dir_helper.get(&directory_key));
-
-        Self::from_directory_listing(dir_listing)
+impl DirDetails {
+    /// Obtain `DirDetails` from the given directory metadata.
+    pub fn from_dir_metadata(client: Client, metadata: NfsDirMetadata) -> Box<FfiFuture<Self>> {
+        dir_helper::get(client, &metadata.id())
+            .map_err(FfiError::from)
+            .and_then(move |dir| Self::from_dir(dir, metadata))
+            .into_box()
     }
 
-    /// Obtain `DirectoryDetails` from the given directory listing.
-    pub fn from_directory_listing(listing: DirectoryListing) -> Result<Self, FfiError> {
-        let mut details = DirectoryDetails {
-            metadata: try!(DirectoryMetadata::new(listing.get_metadata())),
-            files: Vec::with_capacity(listing.get_files().len()),
-            sub_directories: Vec::with_capacity(listing.get_sub_directories().len()),
+    /// Obtain `DirDetails` from the given directory and metadata.
+    pub fn from_dir(dir: Dir, metadata: NfsDirMetadata) -> Result<Self, FfiError> {
+        let mut details = DirDetails {
+            metadata: try!(DirMetadata::new(&metadata)),
+            files: Vec::with_capacity(dir.files().len()),
+            sub_dirs: Vec::with_capacity(dir.sub_dirs().len()),
         };
 
-        for file in listing.get_files() {
-            details.files.push(try!(FileMetadata::new(file.get_metadata())));
+        for file in dir.files() {
+            details.files.push(try!(FileMetadata::new(file.metadata())));
         }
 
-        for metadata in listing.get_sub_directories() {
-            details.sub_directories.push(try!(DirectoryMetadata::new(metadata)));
+        for metadata in dir.sub_dirs() {
+            details.sub_dirs.push(try!(DirMetadata::new(metadata)));
         }
 
         Ok(details)
@@ -73,8 +69,8 @@ impl DirectoryDetails {
 }
 
 // TODO: when drop-flags removal lands in stable, we should implement Drop for
-// DirectoryMetadata and FileMetadata and remove this whole impl.
-impl Drop for DirectoryDetails {
+// DirMetadata and FileMetadata and remove this whole impl.
+impl Drop for DirDetails {
     fn drop(&mut self) {
         self.metadata.deallocate();
 
@@ -82,7 +78,7 @@ impl Drop for DirectoryDetails {
             metadata.deallocate();
         }
 
-        for mut metadata in self.sub_directories.drain(..) {
+        for mut metadata in self.sub_dirs.drain(..) {
             metadata.deallocate();
         }
     }
@@ -91,7 +87,7 @@ impl Drop for DirectoryDetails {
 #[allow(missing_docs)]
 #[derive(Debug)]
 #[repr(C)]
-pub struct DirectoryMetadata {
+pub struct DirMetadata {
     pub name: *mut u8,
     pub name_len: usize,
     pub name_cap: usize,
@@ -99,34 +95,31 @@ pub struct DirectoryMetadata {
     pub user_metadata_len: usize,
     pub user_metadata_cap: usize,
     pub is_private: bool,
-    pub is_versioned: bool,
     pub creation_time_sec: i64,
     pub creation_time_nsec: i64,
     pub modification_time_sec: i64,
     pub modification_time_nsec: i64,
 }
 
-impl DirectoryMetadata {
-    fn new(dir_metadata: &NfsDirectoryMetadata) -> Result<Self, FfiError> {
-        let dir_key = dir_metadata.get_key();
-        let created_time = dir_metadata.get_created_time().to_timespec();
-        let modified_time = dir_metadata.get_modified_time().to_timespec();
+impl DirMetadata {
+    fn new(dir_metadata: &NfsDirMetadata) -> Result<Self, FfiError> {
+        let created_time = dir_metadata.created_time().to_timespec();
+        let modified_time = dir_metadata.modified_time().to_timespec();
 
-        let (name, name_len, name_cap) = helper::string_to_c_utf8(dir_metadata.get_name()
+        let (name, name_len, name_cap) = helper::string_to_c_utf8(dir_metadata.name()
             .to_string());
-        let user_metadata = dir_metadata.get_user_metadata().to_owned();
+        let user_metadata = dir_metadata.user_metadata().to_owned();
         let (user_metadata, user_metadata_len, user_metadata_cap) =
             helper::u8_vec_to_ptr(user_metadata);
 
-        Ok(DirectoryMetadata {
+        Ok(DirMetadata {
             name: name,
             name_len: name_len,
             name_cap: name_cap,
             user_metadata: user_metadata,
             user_metadata_len: user_metadata_len,
             user_metadata_cap: user_metadata_cap,
-            is_private: *dir_key.get_access_level() == ::nfs::AccessLevel::Private,
-            is_versioned: dir_key.is_versioned(),
+            is_private: dir_metadata.encrypt_key().is_some(),
             creation_time_sec: created_time.sec,
             creation_time_nsec: created_time.nsec as i64,
             modification_time_sec: modified_time.sec,
@@ -138,31 +131,30 @@ impl DirectoryMetadata {
     // a proper impl Drop.
     fn deallocate(&mut self) {
         unsafe {
-            let _ = misc_u8_ptr_free(self.name, self.name_len, self.name_cap);
-            let _ = misc_u8_ptr_free(self.user_metadata,
-                                     self.user_metadata_len,
-                                     self.user_metadata_cap);
+            let _ = Vec::from_raw_parts(self.name, self.name_len, self.name_cap);
+            let _ = Vec::from_raw_parts(self.user_metadata,
+                                        self.user_metadata_len,
+                                        self.user_metadata_cap);
         }
     }
 }
 
 /// Get non-owning pointer to the directory metadata.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_metadata(details: *const DirectoryDetails)
-                                                        -> *const DirectoryMetadata {
+pub unsafe extern "C" fn directory_details_get_metadata(details: *const DirDetails)
+                                                        -> *const DirMetadata {
     &(*details).metadata
 }
 
 /// Get the number of files in the directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirectoryDetails)
-                                                         -> usize {
+pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirDetails) -> usize {
     (*details).files.len()
 }
 
 /// Get a non-owning pointer to the metadata of the i-th file in the directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_file_at(details: *const DirectoryDetails,
+pub unsafe extern "C" fn directory_details_get_file_at(details: *const DirDetails,
                                                        index: usize)
                                                        -> *const FileMetadata {
     let details = &*details;
@@ -176,28 +168,28 @@ pub unsafe extern "C" fn directory_details_get_file_at(details: *const Directory
 
 /// Get the number of sub-directories in the directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_sub_directories_len(
-    details: *const DirectoryDetails) -> usize {
-    (*details).sub_directories.len()
+pub unsafe extern "C" fn directory_details_get_sub_directories_len(details: *const DirDetails)
+                                                                   -> usize {
+    (*details).sub_dirs.len()
 }
 
 /// Get a non-owning pointer to the metadata of the i-th sub-directory of the
 /// directory.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_get_sub_directory_at(details: *const DirectoryDetails,
+pub unsafe extern "C" fn directory_details_get_sub_directory_at(details: *const DirDetails,
                                                                 index: usize)
-                                                                -> *const DirectoryMetadata {
+                                                                -> *const DirMetadata {
     let details = &*details;
 
-    if index < details.sub_directories.len() {
-        &details.sub_directories[index]
+    if index < details.sub_dirs.len() {
+        &details.sub_dirs[index]
     } else {
         ptr::null()
     }
 }
 
-/// Dispose of the DirectoryDetails instance.
+/// Dispose of the DirDetails instance.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_drop(details: *mut DirectoryDetails) {
+pub unsafe extern "C" fn directory_details_drop(details: *mut DirDetails) {
     let _ = Box::from_raw(details);
 }

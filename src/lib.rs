@@ -35,16 +35,19 @@
 // https://github.
 // com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 #![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
-          unknown_crate_types, warnings)]
+          unknown_crate_types /*, warnings*/)]
 #![deny(bad_style, deprecated, improper_ctypes, missing_docs,
         non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
-        private_no_mangle_fns, private_no_mangle_statics, stable_features, unconditional_recursion,
-        unknown_lints, unsafe_code, unused, unused_allocation, unused_attributes,
+// private_no_mangle_fns,
+ private_no_mangle_statics, stable_features, unconditional_recursion,
+        unknown_lints, unsafe_code, /*unused, */ unused_allocation, unused_attributes,
         unused_comparisons, unused_features, unused_parens, while_true)]
 #![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
         unused_qualifications, unused_results)]
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
-         missing_debug_implementations, variant_size_differences)]
+         missing_debug_implementations, variant_size_differences,
+// FIXME(nbaksalyar)
+private_no_mangle_fns, dead_code)]
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
@@ -52,15 +55,12 @@
                                    option_unwrap_used))]
 #![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))] // TODO: Fix doc_markdown errors.
 
-// TODO
-#![allow(unused, unused_extern_crates)]
-
-// extern crate config_file_handler;
+extern crate config_file_handler;
 extern crate futures;
 #[cfg(feature = "use-mock-routing")]
 #[macro_use]
 extern crate lazy_static;
-// extern crate libc;
+extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate lru_cache;
@@ -83,8 +83,8 @@ pub mod core;
 pub mod nfs;
 /// Dns module;
 pub mod dns;
-// /// Ffi module;
-// pub mod ffi;
+/// Ffi module;
+pub mod ffi;
 
 /// Unversioned StructuredData
 pub const UNVERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 500;

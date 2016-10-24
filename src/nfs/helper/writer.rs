@@ -29,7 +29,7 @@ use core::futures::FutureExt;
 use core::immutable_data;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{Dir, File, FileMetadata, NfsFuture};
+use nfs::{Dir, DirId, File, FileMetadata, NfsFuture};
 use nfs::helper::dir_helper;
 use routing::DataIdentifier;
 use rust_sodium::crypto::secretbox;
@@ -59,7 +59,7 @@ impl Writer {
     pub fn new(client: Client,
                storage: SelfEncryptionStorage,
                mode: Mode,
-               parent_dir_id: (DataIdentifier, Option<secretbox::Key>),
+               parent_dir_id: DirId,
                parent_dir: Dir,
                file: File)
                -> Box<NfsFuture<Writer>> {

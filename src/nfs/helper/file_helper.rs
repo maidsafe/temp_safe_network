@@ -25,7 +25,7 @@
 
 use core::Client;
 use core::SelfEncryptionStorage;
-use nfs::{Dir, File, NfsFuture};
+use nfs::{Dir, DirId, File, NfsFuture};
 use nfs::errors::NfsError;
 use nfs::helper::dir_helper;
 use nfs::helper::reader::Reader;
@@ -43,7 +43,7 @@ use self_encryption::DataMap;
 pub fn create<S>(client: Client,
                  name: S,
                  user_metadata: Vec<u8>,
-                 parent_id: (DataIdentifier, Option<secretbox::Key>),
+                 parent_id: DirId,
                  parent_dir: Dir)
                  -> Box<NfsFuture<Writer>>
     where S: Into<String>
@@ -69,7 +69,7 @@ pub fn create<S>(client: Client,
 /// Returns Option<parent_directory's parent>
 pub fn delete(client: Client,
               file_name: &str,
-              parent_id: &(DataIdentifier, Option<secretbox::Key>),
+              parent_id: &DirId,
               parent_dir: &mut Dir)
               -> Box<NfsFuture<()>> {
     trace!("Deleting file with name {}.", file_name);
@@ -105,7 +105,7 @@ pub fn update_metadata(client: Client,
 pub fn update_content(client: Client,
                       file: File,
                       mode: Mode,
-                      parent_id: (DataIdentifier, Option<secretbox::Key>),
+                      parent_id: DirId,
                       parent_dir: Dir)
                       -> Box<NfsFuture<Writer>> {
     trace!("Updating content in file with name {}", file.name());
@@ -153,11 +153,13 @@ mod tests {
         let dir = Dir::new();
 
         dir_helper::create(client, &dir, None)
-            .and_then(move |dir_id| {
+            .then(move |dir_id| {
+                let dir_id = unwrap!(dir_id);
                 file_helper::create(c2, "hello.txt", Vec::new(), (dir_id, None), dir)
                     .map(move |writer| (writer, (dir_id, None)))
             })
-            .and_then(move |(writer, dir_id)| {
+            .then(move |result| {
+                let (writer, dir_id) = unwrap!(result);
                 writer.write(&[0u8; ORIG_SIZE])
                     .and_then(move |_| writer.close())
                     .map(move |updated_dir| (updated_dir, dir_id))

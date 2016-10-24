@@ -32,7 +32,7 @@ mod errors;
 #[cfg(test)]
 mod tests;
 
-pub use self::errors::DnsError;
+pub use self::errors::{DNS_ERROR_START_RANGE, DnsError};
 
 /// Future returned from DNS operations.
 pub type DnsFuture<T> = Future<Item = T, Error = DnsError>;

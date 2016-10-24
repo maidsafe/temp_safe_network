@@ -16,14 +16,11 @@
 // relating to use of the SAFE Network Software.
 
 use core::errors::CoreError;
-use ffi::app::App;
-use ffi::errors::FfiError;
-use ffi::helper;
+use ffi::{App, FfiError, Session, helper};
+use ffi::object_cache::{CipherOptHandle, EncryptKeyHandle};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
 use std::ptr;
-use super::{CipherOptHandle, EncryptKeyHandle};
-use super::object_cache::object_cache;
 
 /// Cipher Options
 #[derive(Debug)]
@@ -57,7 +54,7 @@ impl CipherOpt {
             CipherOpt::Symmetric => {
                 let sym_key = try!(app.sym_key());
                 let nonce = secretbox::gen_nonce();
-                let cipher_text = secretbox::seal(plain_text, &nonce, sym_key);
+                let cipher_text = secretbox::seal(plain_text, &nonce, &sym_key);
                 let wire_format = WireFormat::Symmetric {
                     nonce: nonce,
                     cipher_text: cipher_text,
@@ -78,12 +75,12 @@ impl CipherOpt {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {
                 let sym_key = try!(app.sym_key());
-                Ok(try!(secretbox::open(&cipher_text, &nonce, sym_key)
+                Ok(try!(secretbox::open(&cipher_text, &nonce, &sym_key)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)))
             }
             WireFormat::Asymmetric(cipher_text) => {
-                let &(ref pk, ref sk) = try!(app.asym_keys());
-                Ok(try!(sealedbox::open(&cipher_text, pk, sk)
+                let (pk, sk) = try!(app.asym_enc_keys());
+                Ok(try!(sealedbox::open(&cipher_text, &pk, &sk)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)))
             }
         }
@@ -92,9 +89,11 @@ impl CipherOpt {
 
 /// Construct CipherOpt::PlainText handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_new_plaintext(o_handle: *mut CipherOptHandle) -> i32 {
+pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
+                                                  o_handle: *mut CipherOptHandle)
+                                                  -> i32 {
     helper::catch_unwind_i32(|| {
-        let handle = unwrap!(object_cache()).insert_cipher_opt(CipherOpt::PlainText);
+        let handle = unwrap!((*session).object_cache()).insert_cipher_opt(CipherOpt::PlainText);
         ptr::write(o_handle, handle);
 
         0
@@ -103,9 +102,11 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(o_handle: *mut CipherOptHandle
 
 /// Construct CipherOpt::Symmetric handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_new_symmetric(o_handle: *mut CipherOptHandle) -> i32 {
+pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
+                                                  o_handle: *mut CipherOptHandle)
+                                                  -> i32 {
     helper::catch_unwind_i32(|| {
-        let handle = unwrap!(object_cache()).insert_cipher_opt(CipherOpt::Symmetric);
+        let handle = unwrap!((*session).object_cache()).insert_cipher_opt(CipherOpt::Symmetric);
         ptr::write(o_handle, handle);
 
         0
@@ -114,13 +115,14 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(o_handle: *mut CipherOptHandle
 
 /// Construct CipherOpt::Asymmetric handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_new_asymmetric(peer_encrypt_key_h: EncryptKeyHandle,
+pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
+                                                   peer_encrypt_key_h: EncryptKeyHandle,
                                                    o_handle: *mut CipherOptHandle)
                                                    -> i32 {
     helper::catch_unwind_i32(|| {
-        let mut obj_cache = unwrap!(object_cache());
-        let pk = *ffi_try!(obj_cache.get_encrypt_key(peer_encrypt_key_h));
-        let handle = obj_cache.insert_cipher_opt(CipherOpt::Asymmetric { peer_encrypt_key: pk });
+        let pk = *ffi_try!(unwrap!((*session).object_cache()).get_encrypt_key(peer_encrypt_key_h));
+        let handle = unwrap!((*session).object_cache())
+            .insert_cipher_opt(CipherOpt::Asymmetric { peer_encrypt_key: pk });
         ptr::write(o_handle, handle);
 
         0
@@ -129,9 +131,9 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(peer_encrypt_key_h: EncryptKe
 
 /// Free CipherOpt handle
 #[no_mangle]
-pub extern "C" fn cipher_opt_free(handle: CipherOptHandle) -> i32 {
+pub unsafe extern "C" fn cipher_opt_free(session: *const Session, handle: CipherOptHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache()).remove_cipher_opt(handle));
+        let _ = ffi_try!(unwrap!((*session).object_cache()).remove_cipher_opt(handle));
         0
     })
 }
@@ -141,8 +143,7 @@ mod tests {
     use core::utility;
     use ffi::app::App;
     use ffi::errors::FfiError;
-    use ffi::low_level_api::CipherOptHandle;
-    use ffi::low_level_api::object_cache::object_cache;
+    use ffi::object_cache::CipherOptHandle;
     use ffi::test_utils;
     use rust_sodium::crypto::box_;
     use super::*;
@@ -157,19 +158,26 @@ mod tests {
 
     #[test]
     fn app_0_to_app_0_plain() {
-        let app_0 = test_utils::create_app(false);
+        let sess = test_utils::create_session();
+        let sess_ptr = Box::into_raw(Box::new(sess.clone()));
+
+        let app_0 = test_utils::create_app(&sess, false);
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let mut cipher_opt_handle: CipherOptHandle = 0;
         unsafe {
-            assert_eq!(cipher_opt_new_plaintext(&mut cipher_opt_handle), 0);
+            assert_eq!(cipher_opt_new_plaintext(sess_ptr, &mut cipher_opt_handle),
+                       0);
         }
         let raw_data = {
-            let mut obj_cache = unwrap!(object_cache());
+            let mut obj_cache = unwrap!(sess.object_cache());
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
-        assert_eq!(cipher_opt_free(cipher_opt_handle), 0);
-        assert!(unwrap!(object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
+        unsafe {
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle), 0);
+        }
+
+        assert!(unwrap!(sess.object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
         assert!(raw_data != plain_text);
 
         assert!(decrypt_and_check(&app_0, &raw_data, &plain_text));
@@ -177,19 +185,26 @@ mod tests {
 
     #[test]
     fn app_0_to_app_0_sym() {
-        let app_0 = test_utils::create_app(false);
+        let sess = test_utils::create_session();
+        let sess_ptr = Box::into_raw(Box::new(sess.clone()));
+
+        let app_0 = test_utils::create_app(&sess, false);
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let mut cipher_opt_handle: CipherOptHandle = 0;
         unsafe {
-            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_handle), 0);
+            assert_eq!(cipher_opt_new_symmetric(sess_ptr, &mut cipher_opt_handle),
+                       0);
         }
         let raw_data = {
-            let mut obj_cache = unwrap!(object_cache());
+            let mut obj_cache = unwrap!(sess.object_cache());
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
-        assert_eq!(cipher_opt_free(cipher_opt_handle), 0);
-        assert!(unwrap!(object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
+        unsafe {
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle), 0);
+        }
+
+        assert!(unwrap!(sess.object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
         assert!(raw_data != plain_text);
 
         assert!(decrypt_and_check(&app_0, &raw_data, &plain_text));
@@ -198,13 +213,15 @@ mod tests {
     #[test]
     fn app_0_to_app_1_asym() {
         // Setup
-        let app_0 = test_utils::create_app(false);
-        let app_1 = test_utils::create_app(false);
+        let sess = test_utils::create_session();
+        let sess_ptr = Box::into_raw(Box::new(sess.clone()));
+
+        let app_0 = test_utils::create_app(&sess, false);
+        let app_1 = test_utils::create_app(&sess, false);
 
         let app_1_encrypt_key_handle = {
-            let mut obj_cache = unwrap!(object_cache());
-            let app_1_pub_encrypt_key = unwrap!(app_1.asym_keys()).0;
-            obj_cache.insert_encrypt_key(app_1_pub_encrypt_key)
+            let app_1_pub_encrypt_key = unwrap!(app_1.asym_enc_keys()).0;
+            unwrap!(sess.object_cache()).insert_encrypt_key(app_1_pub_encrypt_key)
         };
 
         // Test
@@ -212,17 +229,22 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let mut cipher_opt_handle: CipherOptHandle = 0;
         unsafe {
-            assert_eq!(cipher_opt_new_asymmetric(app_1_encrypt_key_handle, &mut cipher_opt_handle),
+            assert_eq!(cipher_opt_new_asymmetric(sess_ptr,
+                                                 app_1_encrypt_key_handle,
+                                                 &mut cipher_opt_handle),
                        0);
         }
 
         let raw_data = {
-            let mut obj_cache = unwrap!(object_cache());
+            let mut obj_cache = unwrap!(sess.object_cache());
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
-        assert_eq!(cipher_opt_free(cipher_opt_handle), 0);
-        assert!(unwrap!(object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
+        unsafe {
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle), 0);
+        }
+
+        assert!(unwrap!(sess.object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
         assert!(raw_data != plain_text);
 
         assert!(!decrypt_and_check(&app_0, &raw_data, &plain_text));
@@ -231,9 +253,12 @@ mod tests {
 
     #[test]
     fn create_and_free() {
+        let sess = test_utils::create_session();
+        let sess_ptr = Box::into_raw(Box::new(sess.clone()));
+
         let peer_encrypt_key_handle = {
             let (pk, _) = box_::gen_keypair();
-            unwrap!(object_cache()).insert_encrypt_key(pk)
+            unwrap!(sess.object_cache()).insert_encrypt_key(pk)
         };
 
         let mut cipher_opt_handle_pt = 0;
@@ -241,35 +266,42 @@ mod tests {
         let mut cipher_opt_handle_asym = 0;
 
         unsafe {
-            assert_eq!(cipher_opt_new_plaintext(&mut cipher_opt_handle_pt), 0);
-            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_handle_sym), 0);
+            assert_eq!(cipher_opt_new_plaintext(sess_ptr, &mut cipher_opt_handle_pt),
+                       0);
+            assert_eq!(cipher_opt_new_symmetric(sess_ptr, &mut cipher_opt_handle_sym),
+                       0);
 
             let err_code = FfiError::InvalidEncryptKeyHandle.into();
-            assert_eq!(cipher_opt_new_asymmetric(29293290, &mut cipher_opt_handle_asym),
+            assert_eq!(cipher_opt_new_asymmetric(sess_ptr, 29293290, &mut cipher_opt_handle_asym),
                        err_code);
-            assert_eq!(cipher_opt_new_asymmetric(peer_encrypt_key_handle,
+            assert_eq!(cipher_opt_new_asymmetric(sess_ptr,
+                                                 peer_encrypt_key_handle,
                                                  &mut cipher_opt_handle_asym),
                        0);
         }
 
         {
-            let mut obj_cache = unwrap!(object_cache());
+            let mut obj_cache = unwrap!(sess.object_cache());
             let _ = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle_pt));
             let _ = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle_sym));
             let _ = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle_asym));
         }
 
-        assert_eq!(cipher_opt_free(cipher_opt_handle_pt), 0);
-        assert_eq!(cipher_opt_free(cipher_opt_handle_sym), 0);
-        assert_eq!(cipher_opt_free(cipher_opt_handle_asym), 0);
+        unsafe {
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle_pt), 0);
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle_sym), 0);
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle_asym), 0);
+        }
 
         let err_code = FfiError::InvalidCipherOptHandle.into();
-        assert_eq!(cipher_opt_free(cipher_opt_handle_pt), err_code);
-        assert_eq!(cipher_opt_free(cipher_opt_handle_sym), err_code);
-        assert_eq!(cipher_opt_free(cipher_opt_handle_asym), err_code);
+        unsafe {
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle_pt), err_code);
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle_sym), err_code);
+            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_handle_asym), err_code);
+        }
 
         {
-            let mut obj_cache = unwrap!(object_cache());
+            let mut obj_cache = unwrap!(sess.object_cache());
             assert!(obj_cache.get_cipher_opt(cipher_opt_handle_pt).is_err());
             assert!(obj_cache.get_cipher_opt(cipher_opt_handle_sym).is_err());
             assert!(obj_cache.get_cipher_opt(cipher_opt_handle_asym).is_err());

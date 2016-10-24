@@ -29,9 +29,7 @@ use core::{Client, CoreError, FutureExt};
 use core::structured_data::unversioned;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{Dir, DirId, NfsFuture};
-use nfs::errors::NfsError;
-use nfs::metadata::DirMetadata;
+use nfs::{Dir, DirId, DirMetadata, NfsError, NfsFuture};
 use rand;
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 use rust_sodium::crypto::secretbox;
@@ -117,12 +115,39 @@ pub fn create_sub_dir(client: Client,
 }
 
 /// Deletes a sub directory
-pub fn delete(client: Client, parent: &mut Dir, dir_to_delete: &str) -> Box<NfsFuture<()>> {
+pub fn delete(client: Client,
+              parent: &mut Dir,
+              parent_id: &DirId,
+              dir_to_delete: &str)
+              -> Box<NfsFuture<()>> {
     trace!("Deleting directory with name: {}", dir_to_delete);
 
-    // TODO (Spandan) - Fetch and issue a DELETE on the removed directory.
-    let _dir_meta = fry!(parent.remove_sub_dir(dir_to_delete));
-    update(client.clone(), &_dir_meta.id(), parent)
+    let dir_meta = fry!(parent.remove_sub_dir(dir_to_delete));
+
+    let c2 = client.clone();
+    let c3 = client.clone();
+    let parent = parent.clone();
+    let parent_id = parent_id.clone();
+
+    get_structured_data(client.clone(), &dir_meta.id().0)
+        .and_then(move |sd| {
+            let sign_key = fry!(c2.secret_signing_key()).clone();
+
+            let delete_sd = fry!(StructuredData::new(sd.get_type_tag(),
+                                                     *sd.name(),
+                                                     sd.get_version() + 1,
+                                                     vec![],
+                                                     vec![],
+                                                     sd.get_owner_keys().clone(),
+                                                     Some(&sign_key))
+                .map_err(CoreError::from));
+
+            c2.delete_recover(Data::Structured(delete_sd), None)
+                .map_err(NfsError::from)
+                .into_box()
+        })
+        .and_then(move |_| update(c3, &parent_id, &parent))
+        .into_box()
 }
 
 /// Updates an existing Directory in the network.
@@ -184,25 +209,29 @@ pub fn get(client: Client, dir_id: &DirId) -> Box<NfsFuture<Dir>> {
 }
 
 /// Returns the Root Directory
-pub fn user_root_dir(client: Client) -> Box<NfsFuture<Dir>> {
+pub fn user_root_dir(client: Client) -> Box<NfsFuture<(Dir, DirId)>> {
     trace!("Getting the user root directory listing.");
 
     let root_directory_id = client.user_root_dir_id();
 
     let fut = match root_directory_id {
-        Some((id, key)) => get(client.clone(), &(id, key)).into_box(),
+        Some((id, key)) => {
+            get(client.clone(), &(id, key.clone()))
+                .map(move |dir| (dir, (id, key)))
+                .into_box()
+        }
         None => {
             debug!("Root directory does not exist - creating one.");
             let c2 = client.clone();
             let key = None;
             let dir = Dir::new();
 
-            create(client.clone(), &dir, key)
-                .and_then(move |data_id| {
+            create(client.clone(), &dir, key.clone())
+                .and_then(move |dir_id| {
                     // ::nfs::ROOT_DIRECTORY_NAME.to_string(),
-                    c2.set_user_root_dir_id((data_id, None))
+                    c2.set_user_root_dir_id((dir_id.clone(), None))
                         .map_err(NfsError::from)
-                        .map(move |_| dir)
+                        .map(move |_| (dir, (dir_id, None)))
                 })
                 .into_box()
         }
@@ -461,20 +490,19 @@ mod tests {
             let c3 = client.clone();
 
             dir_helper::user_root_dir(client.clone())
-                .then(move |res| {
-                    let mut root_dir = unwrap!(res);
+                .then(move |result| {
+                    let (mut root_dir, dir_id) = unwrap!(result);
                     dir_helper::create_sub_dir(c2.clone(),
                                                "DirName".to_string(),
                                                None,
                                                Vec::new(),
                                                &mut root_dir,
-                                               &unwrap!(c2.user_root_dir_id()))
+                                               &dir_id)
                 })
                 .then(move |res| {
                     let (updated_parent, _, metadata) = unwrap!(res);
-                    dir_helper::user_root_dir(c3).map(move |dir| {
-                        (dir, updated_parent, metadata)
-                    })
+                    dir_helper::user_root_dir(c3)
+                        .map(move |(dir, _dir_id)| (dir, updated_parent, metadata))
                 })
                 .then(move |res| {
                     let (root_dir, updated_parent, metadata) = unwrap!(res);
@@ -516,6 +544,7 @@ mod tests {
             let c3 = client.clone();
             let c4 = client.clone();
             let c5 = client.clone();
+            let c6 = client.clone();
 
             dir_helper::create(client.clone(), &parent, None)
                 .then(move |res| {
@@ -540,18 +569,28 @@ mod tests {
                     // Assert whether parent is updated
                     assert!(parent_dir.find_sub_dir(metadata.name()).is_some());
 
+                    let dir_id = metadata.id();
+
                     dir_helper::create_sub_dir(c4,
                                                "Grand Child".to_string(),
                                                None,
                                                Vec::new(),
                                                &parent_dir,
-                                               &metadata.id())
+                                               &dir_id)
+                        .map(move |(parent_dir, _created_dir, metadata)| {
+                            (parent_dir, dir_id, metadata)
+                        })
                 })
+                .then(move |result| {
+                    let (mut parent_dir, parent_id, metadata) = unwrap!(result);
+                    dir_helper::delete(c5, &mut parent_dir, &parent_id, metadata.name())
+                        .map(move |_| parent_id)
+                })
+                .then(move |parent_id| dir_helper::get(c6, &unwrap!(parent_id)))
                 .then(move |res| {
-                    let (mut parent_dir, _, metadata) = unwrap!(res);
-                    dir_helper::delete(c5, &mut parent_dir, metadata.name()).map(move |_| {
-                        assert!(parent_dir.find_sub_dir("Grand Child").is_none());
-                    })
+                    let parent_dir = unwrap!(res);
+                    assert!(parent_dir.find_sub_dir("Grand Child").is_none());
+                    finish()
                 })
         });
     }
