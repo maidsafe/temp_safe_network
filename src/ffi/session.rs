@@ -28,14 +28,13 @@ use ffi::object_cache::ObjectCache;
 use futures::Future;
 use libc::{c_void, int32_t, int64_t, uint64_t};
 use maidsafe_utilities::thread::{self, Joiner};
-use std::sync::{Arc, LockResult, Mutex, MutexGuard, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use super::helper;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
 
 /// Represents user session on the SAFE network. There should be one session
 /// per launcher.
-#[derive(Clone)]
 pub struct Session {
     inner: Arc<Inner>,
 }
@@ -50,12 +49,13 @@ struct Inner {
 impl Session {
     /// Send a message to the core event loop
     pub fn send(&self, msg: CoreMsg) -> Result<(), FfiError> {
-        unwrap!(self.inner.core_tx.lock()).send(msg).map_err(FfiError::from)
+        let core_tx = unwrap!(self.inner.core_tx.lock());
+        core_tx.send(msg).map_err(FfiError::from)
     }
 
     /// Returns an object cache tied to the session
-    pub fn object_cache(&self) -> LockResult<MutexGuard<ObjectCache>> {
-        self.inner.object_cache.lock()
+    pub fn object_cache(&self) -> Arc<Mutex<ObjectCache>> {
+        self.inner.object_cache.clone()
     }
 
     /// Create unregistered client.

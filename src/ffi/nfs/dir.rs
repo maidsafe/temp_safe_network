@@ -50,12 +50,11 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
 
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let user_metadata = slice::from_raw_parts(user_metadata, user_metadata_len);
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = create_dir(&client,
@@ -93,12 +92,11 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
         trace!("FFI delete dir, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = delete_dir(&client, &app, dir_path, is_shared)
@@ -133,12 +131,11 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
         trace!("FFI get dir, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = get_dir(&client, &app, dir_path, is_shared)
@@ -183,12 +180,11 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
         let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
         let new_user_metadata = helper::u8_ptr_to_opt_vec(new_user_metadata, new_user_metadata_len);
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = modify_dir(&client,

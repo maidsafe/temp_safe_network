@@ -30,7 +30,7 @@ use core::{Client, CoreMsg};
 use core::futures::FutureExt;
 use ffi::{FfiFuture, OpaqueCtx};
 use futures::{self, Future};
-use libc::int32_t;
+use libc::{c_void, int32_t};
 use nfs::DirId;
 use rust_sodium::crypto::{box_, secretbox};
 use super::Session;
@@ -118,24 +118,25 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                                       vendor: *const u8,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
-                                      user_data: OpaqueCtx,
-                                      o_cb: extern "C" fn(int32_t, OpaqueCtx, AppHandle))
+                                      user_data: *mut c_void,
+                                      o_cb: extern "C" fn(*mut c_void, int32_t, AppHandle))
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let app_name = ffi_try!(helper::c_utf8_to_string(app_name, app_name_len));
         let unique_token = ffi_try!(helper::c_utf8_to_string(unique_token, token_len));
         let vendor = ffi_try!(helper::c_utf8_to_string(vendor, vendor_len));
+        let user_data = OpaqueCtx(user_data);
 
-        let s2 = (*session).clone();
+        let obj_cache = (*session).object_cache();
 
         ffi_try!((*session)
             .send(CoreMsg::new(move |client| {
                 let fut =
                     launcher_config::app(client, app_name, unique_token, vendor, safe_drive_access)
-                        .map_err(move |e| o_cb(ffi_error_code!(e), user_data, 0))
+                        .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
                         .map(move |app| {
-                            let app_handle = unwrap!(s2.object_cache()).insert_app(app);
-                            o_cb(0, user_data, app_handle);
+                            let app_handle = unwrap!(obj_cache.lock()).insert_app(app);
+                            o_cb(user_data.0, 0, app_handle);
                         })
                         .into_box();
                 Some(fut)
@@ -149,16 +150,22 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
 /// Register an annonymous app with the launcher. Can access only public data
 #[no_mangle]
 pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
-                                                 o_app_handle: *mut AppHandle)
+                                                 user_data: *mut c_void,
+                                                 o_cb: extern "C" fn(*mut c_void,
+                                                                     int32_t,
+                                                                     AppHandle))
                                                  -> int32_t {
     helper::catch_unwind_i32(|| {
-        *o_app_handle = unwrap!((*session).object_cache()).insert_app(App::Unauthorised);
+        let obj_cache = (*session).object_cache();
+        let user_data = OpaqueCtx(user_data);
+
+        ffi_try!((*session).send(CoreMsg::new(move |_| {
+            let app_handle = unwrap!(obj_cache.lock()).insert_app(App::Unauthorised);
+            o_cb(user_data.0, 0, app_handle);
+            None
+        })));
+
         0
     })
 }
 
-/// Discard and clean up the previously allocated app.
-#[no_mangle]
-pub unsafe extern "C" fn drop_app(app_handle: *mut App) {
-    let _ = Box::from_raw(app_handle);
-}
