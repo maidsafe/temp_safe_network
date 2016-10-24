@@ -1,27 +1,23 @@
-// Copyright 2015 MaidSafe.net limited.
+// Copyright 2016 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net
-// Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3,
-// depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project
-// generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
-// This, along with the
-// Licenses can be found in the root directory of this project at LICENSE,
-// COPYING and CONTRIBUTOR.
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0.
+// This, along with the Licenses can be found in the root directory of this
+// project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network
-// Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
-// OR CONDITIONS OF ANY
-// KIND, either express or implied.
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 //
 // Please review the Licences for the specific language governing permissions
-// and limitations
-// relating to use of the SAFE Network Software.
+// and limitations relating to use of the SAFE Network Software.
 
 use core::{Client, CoreError, CoreFuture, SelfEncryptionStorage, immutable_data, utility};
 use core::futures::FutureExt;
@@ -166,10 +162,9 @@ pub fn extract_value(client: &Client,
     }
 }
 
-/// Get structured data from the network and extract its value, decrypting it in
-/// the process (if keys provided).
-/// This is a convenience function combining `get` and `extract_value` into one
-/// function.
+/// Get structured data from the network and extract its value, decrypting it
+/// in the process (if keys provided).  This is a convenience function
+/// combining `get` and `extract_value` into one function.
 pub fn get_value(client: &Client,
                  type_tag: u64,
                  id: &XorName,
@@ -242,8 +237,7 @@ fn create_with_data_map(client: Client,
 }
 
 // Create strucutred data contaning the name of the immutable data contianing
-// the
-// given value.
+// the given value.
 fn create_with_immutable_data(client: Client,
                               type_tag: u64,
                               id: XorName,

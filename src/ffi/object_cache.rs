@@ -1,40 +1,46 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0.
+// This, along with the Licenses can be found in the root directory of this
+// project at LICENSE, COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.
+// Please review the Licences for the specific language governing permissions
+// and limitations relating to use of the SAFE Network Software.
 
 use ffi::App;
 use ffi::errors::FfiError;
 // use ffi::low_level_api::appendable_data::AppendableData;
 // use ffi::low_level_api::cipher_opt::CipherOpt;
-// use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWriterWrapper};
+// use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper,
+// SelfEncryptorWriterWrapper};
 use lru_cache::LruCache;
 use routing::DataIdentifier;
 use rust_sodium::crypto::{box_, sign};
 use std::u64;
 
-
-/// Object handle associated with objects. In normal C API one would expect rust code to pass
-/// pointers to opaque object to C. C code would then need to pass these pointers back each time
-/// they needed rust code to execute something on those objects. However our code base deals with
-/// communication over Web framework (like WebServers for instance). Hence it is not possible to
-/// pass pointers to remote apps interfacing with us. Pointers represent handle to actual object.
-/// Using similar concept, we instead pass ObjectHandle type over Web interface and manage the
-/// objects ourselves. This leads to extra type and memory safety and no chance of Undefined
-/// Behaviour. Passing of pointer handles to C is replaced by passing of ObjectHandle to remote
-/// apps which they will use to do RPC's.
+/// Object handle associated with objects. In normal C API one would expect
+/// rust code to pass pointers to opaque object to C. C code would then need to
+/// pass these pointers back each time they needed rust code to execute
+/// something on those objects. However our code base deals with communication
+/// over Web framework (like WebServers for instance). Hence it is not possible
+/// to pass pointers to remote apps interfacing with us. Pointers represent
+/// handle to actual object.  Using similar concept, we instead pass
+/// ObjectHandle type over Web interface and manage the objects ourselves. This
+/// leads to extra type and memory safety and no chance of Undefined Behaviour.
+/// Passing of pointer handles to C is replaced by passing of ObjectHandle to
+/// remote apps which they will use to do RPC's.
 pub type ObjectHandle = u64;
 
 /// Disambiguating ObjectHandle
@@ -100,9 +106,7 @@ impl ObjectCache {
         handle
     }
 
-    pub fn get_app(&mut self,
-                  handle: AppHandle)
-                  -> Result<&mut App, FfiError> {
+    pub fn get_app(&mut self, handle: AppHandle) -> Result<&mut App, FfiError> {
         self.app.get_mut(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
     }
 
@@ -123,15 +127,19 @@ impl ObjectCache {
     // pub fn get_ad(&mut self,
     //               handle: AppendableDataHandle)
     //               -> Result<&mut AppendableData, FfiError> {
-    //     self.appendable_data.get_mut(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
+    // self.appendable_data.get_mut(&handle).ok_or(FfiError::
+    // InvalidAppendableDataHandle)
     // }
 
-    // pub fn remove_ad(&mut self, handle: AppendableDataHandle) -> Result<AppendableData, FfiError> {
-    //     self.appendable_data.remove(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
+    // pub fn remove_ad(&mut self, handle: AppendableDataHandle) ->
+    // Result<AppendableData, FfiError> {
+    // self.appendable_data.remove(&handle).ok_or(FfiError::
+    // InvalidAppendableDataHandle)
     // }
 
     // ----------------------------------------------------------
-    // pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) -> CipherOptHandle {
+    // pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) ->
+    // CipherOptHandle {
     //     let handle = self.new_handle();
     //     if let Some(prev) = self.cipher_opt.insert(handle, cipher_opt) {
     //         debug!("Displaced CipherOpt from ObjectCache: {:?}", prev);
@@ -140,11 +148,13 @@ impl ObjectCache {
     //     handle
     // }
 
-    // pub fn get_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<&mut CipherOpt, FfiError> {
+    // pub fn get_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<&mut
+    // CipherOpt, FfiError> {
     //     self.cipher_opt.get_mut(&handle).ok_or(FfiError::InvalidCipherOptHandle)
     // }
 
-    // pub fn remove_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<CipherOpt, FfiError> {
+    // pub fn remove_cipher_opt(&mut self, handle: CipherOptHandle) ->
+    // Result<CipherOpt, FfiError> {
     //     self.cipher_opt.remove(&handle).ok_or(FfiError::InvalidCipherOptHandle)
     // }
 
@@ -181,13 +191,15 @@ impl ObjectCache {
     // pub fn get_se_reader(&mut self,
     //                      handle: SelfEncryptorReaderHandle)
     //                      -> Result<&mut SelfEncryptorReaderWrapper, FfiError> {
-    //     self.se_reader.get_mut(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    // self.se_reader.get_mut(&handle).ok_or(FfiError::
+    // InvalidSelfEncryptorHandle)
     // }
 
     // pub fn remove_se_reader(&mut self,
     //                         handle: SelfEncryptorReaderHandle)
     //                         -> Result<SelfEncryptorReaderWrapper, FfiError> {
-    //     self.se_reader.remove(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    // self.se_reader.remove(&handle).ok_or(FfiError::
+    // InvalidSelfEncryptorHandle)
     // }
 
     // ----------------------------------------------------------
@@ -205,13 +217,15 @@ impl ObjectCache {
     // pub fn get_se_writer(&mut self,
     //                      handle: SelfEncryptorWriterHandle)
     //                      -> Result<&mut SelfEncryptorWriterWrapper, FfiError> {
-    //     self.se_writer.get_mut(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    // self.se_writer.get_mut(&handle).ok_or(FfiError::
+    // InvalidSelfEncryptorHandle)
     // }
 
     // pub fn remove_se_writer(&mut self,
     //                         handle: SelfEncryptorWriterHandle)
     //                         -> Result<SelfEncryptorWriterWrapper, FfiError> {
-    //     self.se_writer.remove(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    // self.se_writer.remove(&handle).ok_or(FfiError::
+    // InvalidSelfEncryptorHandle)
     // }
 
     // ----------------------------------------------------------
@@ -266,11 +280,14 @@ impl ObjectCache {
     //     handle
     // }
 
-    // pub fn get_sd(&mut self, handle: StructDataHandle) -> Result<&mut StructuredData, FfiError> {
-    //     self.struct_data.get_mut(&handle).ok_or(FfiError::InvalidStructDataHandle)
+    // pub fn get_sd(&mut self, handle: StructDataHandle) -> Result<&mut
+    // StructuredData, FfiError> {
+    // self.struct_data.get_mut(&handle).ok_or(FfiError::
+    // InvalidStructDataHandle)
     // }
 
-    // pub fn remove_sd(&mut self, handle: StructDataHandle) -> Result<StructuredData, FfiError> {
+    // pub fn remove_sd(&mut self, handle: StructDataHandle) ->
+    // Result<StructuredData, FfiError> {
     //     self.struct_data.remove(&handle).ok_or(FfiError::InvalidStructDataHandle)
     // }
 }

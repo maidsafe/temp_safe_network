@@ -1,27 +1,23 @@
 // Copyright 2016 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net
-// Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3,
-// depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project
-// generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.
-// This, along with the
-// Licenses can be found in the root directory of this project at LICENSE,
-// COPYING and CONTRIBUTOR.
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0.
+// This, along with the Licenses can be found in the root directory of this
+// project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network
-// Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
-// OR CONDITIONS OF ANY
-// KIND, either express or implied.
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 //
 // Please review the Licences for the specific language governing permissions
-// and limitations
-// relating to use of the SAFE Network Software.
+// and limitations relating to use of the SAFE Network Software.
 
 //! Session management
 
@@ -225,9 +221,8 @@ impl Drop for Session {
 }
 
 /// Create a session as an unregistered client. This or any one of the other
-/// companion functions to
-/// get a session must be called before initiating any operation allowed by
-/// this crate.
+/// companion functions to get a session must be called before initiating any
+/// operation allowed by this crate.
 #[no_mangle]
 pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut Session) -> int32_t {
     helper::catch_unwind_i32(|| {
@@ -240,12 +235,9 @@ pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut Se
 }
 
 /// Create a registered client. This or any one of the other companion
-/// functions to get a
-/// session must be called before initiating any operation allowed by this
-/// crate. `session_handle`
-/// is a pointer to a pointer and must point to a valid pointer not junk, else
-/// the consequences are
-/// undefined.
+/// functions to get a session must be called before initiating any operation
+/// allowed by this crate. `session_handle` is a pointer to a pointer and must
+/// point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
 pub unsafe extern "C" fn create_account(account_locator: *const u8,
                                         account_locator_len: usize,
@@ -266,12 +258,9 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
 }
 
 /// Log into a registered client. This or any one of the other companion
-/// functions to get a
-/// session must be called before initiating any operation allowed by this
-/// crate. `session_handle`
-/// is a pointer to a pointer and must point to a valid pointer not junk, else
-/// the consequences are
-/// undefined.
+/// functions to get a session must be called before initiating any operation
+/// allowed by this crate. `session_handle` is a pointer to a pointer and must
+/// point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
 pub unsafe extern "C" fn log_in(account_locator: *const u8,
                                 account_locator_len: usize,
@@ -413,12 +402,9 @@ pub unsafe extern "C" fn get_account_info(session: *const Session,
 }
 
 /// Discard and clean up the previously allocated session. Use this only if the
-/// session is obtained
-/// from one of the session obtainment functions in this crate
-/// (`create_account`, `log_in`,
-/// `create_unregistered_client`). Using `session` after a call to this
-/// functions is
-/// undefined behaviour.
+/// session is obtained from one of the session obtainment functions in this
+/// crate (`create_account`, `log_in`, `create_unregistered_client`). Using
+/// `session` after a call to this functions is undefined behaviour.
 #[no_mangle]
 pub unsafe extern "C" fn drop_session(session: *mut Session) {
     let _ = Box::from_raw(session);
