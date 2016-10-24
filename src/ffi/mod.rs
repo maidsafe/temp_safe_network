@@ -48,7 +48,7 @@ mod macros;
 
 mod app;
 pub mod dir_details;
-// pub mod dns;
+pub mod dns;
 pub mod errors;
 pub mod file_details;
 pub mod logging;

@@ -21,16 +21,20 @@
 
 //! File operations
 
-use dns::dns_operations::DnsOperations;
-use ffi::app::App;
-use ffi::errors::FfiError;
+use core::CoreMsg;
+use core::futures::FutureExt;
+use dns::operations;
+use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::file_details::{FileDetails, FileMetadata};
 use ffi::helper;
-use libc::int32_t;
+use futures::Future;
+use libc::{c_void, int32_t};
+use nfs::helper::dir_helper;
+use std::ptr;
 
 /// Get file.
 #[no_mangle]
-pub unsafe extern "C" fn dns_get_file(app_handle: *const App,
+pub unsafe extern "C" fn dns_get_file(session: *const Session,
                                       long_name: *const u8,
                                       long_name_len: usize,
                                       service_name: *const u8,
@@ -40,7 +44,8 @@ pub unsafe extern "C" fn dns_get_file(app_handle: *const App,
                                       offset: i64,
                                       length: i64,
                                       include_metadata: bool,
-                                      details_handle: *mut *mut FileDetails)
+                                      user_data: *mut c_void,
+                                      o_cb: extern "C" fn(int32_t, *mut c_void, *mut FileDetails))
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
@@ -51,29 +56,58 @@ pub unsafe extern "C" fn dns_get_file(app_handle: *const App,
                service_name,
                long_name);
 
-        let response = ffi_try!(get_file(&*app_handle,
-                                         &long_name,
-                                         &service_name,
-                                         &file_path,
-                                         offset,
-                                         length,
-                                         include_metadata));
+        let session = (*session).clone();
+        let user_data = OpaqueCtx(user_data);
 
-        *details_handle = Box::into_raw(Box::new(response));
+        ffi_try!(session.send(CoreMsg::new(move |client| {
+            let client2 = client.clone();
+            let client3 = client.clone();
+
+            let fut = operations::get_service_home_dir_id(client,
+                                                          &long_name,
+                                                          service_name,
+                                                          None)
+                .map_err(FfiError::from)
+                .and_then(move |dir_id| {
+                    dir_helper::get_file_by_path(&client2,
+                                                 Some(&dir_id),
+                                                 &file_path)
+                        .map_err(FfiError::from)
+                })
+                .and_then(move |file| {
+                    FileDetails::new(file,
+                                     client3,
+                                     offset,
+                                     length,
+                                     include_metadata)
+                })
+                .map(move |details| {
+                    let details = Box::into_raw(Box::new(details));
+                    o_cb(0, user_data.0, details);
+                })
+                .map_err(move |err| {
+                    o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut());
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
         0
     })
 }
 
 /// Get file metadata.
 #[no_mangle]
-pub unsafe extern "C" fn dns_get_file_metadata(app_handle: *const App,
+pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                                                long_name: *const u8,
                                                long_name_len: usize,
                                                service_name: *const u8,
                                                service_name_len: usize,
                                                file_path: *const u8,
                                                file_path_len: usize,
-                                               metadata_handle: *mut *mut FileMetadata)
+                                               user_data: *mut c_void,
+                                               o_cb: extern "C" fn(int32_t, *mut c_void, *mut FileMetadata))
                                                -> int32_t {
     helper::catch_unwind_i32(|| {
         let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
@@ -85,63 +119,44 @@ pub unsafe extern "C" fn dns_get_file_metadata(app_handle: *const App,
                service_name,
                long_name);
 
-        let metadata =
-            ffi_try!(get_file_metadata(&*app_handle, &long_name, &service_name, &file_path));
+        let session = (*session).clone();
+        let user_data = OpaqueCtx(user_data);
 
-        *metadata_handle = Box::into_raw(Box::new(metadata));
+        ffi_try!(session.send(CoreMsg::new(move |client| {
+            let client2 = client.clone();
+
+            let fut = operations::get_service_home_dir_id(client,
+                                                          &long_name,
+                                                          service_name,
+                                                          None)
+                .map_err(FfiError::from)
+                .and_then(move |dir_id| {
+                    dir_helper::get_file_by_path(&client2,
+                                                 Some(&dir_id),
+                                                 &file_path)
+                        .map_err(FfiError::from)
+                })
+                .and_then(move |file| {
+                    let metadata = try!(FileMetadata::new(file.metadata()));
+                    let metadata = Box::into_raw(Box::new(metadata));
+                    o_cb(0, user_data.0, metadata);
+                    Ok(())
+                })
+                .map_err(move |err| {
+                    o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut());
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
         0
     })
 }
 
-
-
-fn get_file(app: &App,
-            long_name: &str,
-            service_name: &str,
-            file_path: &str,
-            offset: i64,
-            length: i64,
-            include_metadata: bool)
-            -> Result<FileDetails, FfiError> {
-    let dns_operations = match app.get_app_dir_key() {
-        Some(_) => try!(DnsOperations::new(app.get_client())),
-        None => DnsOperations::new_unregistered(app.get_client()),
-    };
-    let directory_key =
-        try!(dns_operations.get_service_home_directory_key(long_name, service_name, None));
-    let mut tokens = helper::tokenise_path(file_path, false);
-    let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
-    let file_dir =
-        try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key)));
-    let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
-
-    FileDetails::new(file, app.get_client(), offset, length, include_metadata)
-}
-
-fn get_file_metadata(app: &App,
-                     long_name: &str,
-                     service_name: &str,
-                     file_path: &str)
-                     -> Result<FileMetadata, FfiError> {
-    let dns_operations = match app.get_app_dir_key() {
-        Some(_) => try!(DnsOperations::new(app.get_client())),
-        None => DnsOperations::new_unregistered(app.get_client()),
-    };
-
-    let directory_key =
-        try!(dns_operations.get_service_home_directory_key(long_name, service_name, None));
-    let mut tokens = helper::tokenise_path(file_path, false);
-    let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
-    let file_dir =
-        try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key)));
-    let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
-
-    FileMetadata::new(&file.get_metadata().clone())
-}
-
 #[cfg(test)]
 mod tests {
-
+    /*
     use core::utility;
     use dns::dns_operations::DnsOperations;
     use ffi::app::App;
@@ -225,4 +240,5 @@ mod tests {
 
         let _ = unwrap!(super::get_file(&app3, &public_name, service_name, file_name, 0, 0, false));
     }
+    */
 }

@@ -264,7 +264,7 @@ fn create_dir(client: &Client,
               _is_private: bool,
               is_shared: bool)
               -> Box<FfiFuture<()>> {
-    let mut tokens = helper::tokenise_path(dir_path, false);
+    let mut tokens = dir_helper::tokenise_path(dir_path);
     let dir_to_create = fry!(tokens.pop().ok_or(FfiError::InvalidPath));
     let user_metadata = user_metadata.to_owned();
 
@@ -272,8 +272,10 @@ fn create_dir(client: &Client,
     let c3 = client.clone();
 
     app.root_dir(client.clone(), is_shared)
-        .map_err(FfiError::from)
-        .and_then(move |start_dir_id| helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id)))
+        .and_then(move |start_dir_id| {
+            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id))
+                .map_err(FfiError::from)
+        })
         .and_then(move |(parent, metadata)| {
             // let access_level = if is_private {
             //     AccessLevel::Private
@@ -293,7 +295,7 @@ fn create_dir(client: &Client,
 }
 
 fn delete_dir(client: &Client, app: &App, dir_path: &str, is_shared: bool) -> Box<FfiFuture<()>> {
-    let mut tokens = helper::tokenise_path(dir_path, false);
+    let mut tokens = dir_helper::tokenise_path(dir_path);
     let dir_to_delete = fry!(tokens.pop().ok_or(FfiError::InvalidPath));
 
     let c2 = client.clone();
@@ -301,7 +303,6 @@ fn delete_dir(client: &Client, app: &App, dir_path: &str, is_shared: bool) -> Bo
     let c4 = client.clone();
 
     app.root_dir(client.clone(), is_shared)
-        .map_err(FfiError::from)
         .and_then(move |root_dir_id| {
             dir_helper::get(c2, &root_dir_id)
                 .map(move |dir| (dir, root_dir_id))
@@ -311,8 +312,9 @@ fn delete_dir(client: &Client, app: &App, dir_path: &str, is_shared: bool) -> Bo
             if tokens.is_empty() {
                 ok!((root_dir, dir_id))
             } else {
-                helper::final_sub_dir(&c3, &tokens, Some(&dir_id))
+                dir_helper::final_sub_dir(&c3, &tokens, Some(&dir_id))
                     .map(|(dir, dir_meta)| (dir, dir_meta.id()))
+                    .map_err(FfiError::from)
                     .into_box()
             }
         })
@@ -340,7 +342,7 @@ fn modify_dir(client: &Client,
               new_name: Option<String>,
               new_metadata: Option<Vec<u8>>)
               -> Box<FfiFuture<()>> {
-    let mut tokens = helper::tokenise_path(dir_path, false);
+    let mut tokens = dir_helper::tokenise_path(dir_path);
     let dir_to_modify = fry!(tokens.pop().ok_or(FfiError::InvalidPath));
 
     if new_name.is_none() && new_metadata.is_none() {
@@ -351,8 +353,10 @@ fn modify_dir(client: &Client,
     let c3 = client.clone();
 
     app.root_dir(client.clone(), is_shared)
-        .map_err(FfiError::from)
-        .and_then(move |start_dir_id| helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id)))
+        .and_then(move |start_dir_id| {
+            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id))
+                .map_err(FfiError::from)
+        })
         .and_then(move |(mut parent, parent_meta)| {
             let mut dir_meta =
                 fry!(parent.find_sub_dir(&dir_to_modify).ok_or(FfiError::InvalidPath)).clone();
