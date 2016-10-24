@@ -26,8 +26,8 @@ pub mod test_utils;
 use core::errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::Rng;
-use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::hash::sha512::{self, DIGESTBYTES, Digest};
+use rust_sodium::crypto::secretbox;
 
 /// Symmetric encryption
 pub fn symmetric_encrypt(plain_text: &[u8],
@@ -81,7 +81,6 @@ pub fn derive_secrets(acc_locator: &str, acc_password: &str) -> (Vec<u8>, Vec<u8
 
 #[cfg(test)]
 mod tests {
-    use rust_sodium::crypto::box_;
     use super::*;
 
     const SIZE: usize = 10;
