@@ -134,7 +134,6 @@ mod tests {
     use rand;
     use routing::XOR_NAME_LEN;
     use std::sync::mpsc;
-    use std::time::Duration;
     use super::*;
 
     #[test]
@@ -164,33 +163,30 @@ mod tests {
                                                Box::into_raw(Box::new(tx.clone())) as *mut _,
                                                data_id_cb),
                        0);
-            data_id_handle_struct = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            data_id_handle_struct = unwrap!(rx.recv());
 
-            let (tx, rx) = mpsc::channel::<DataIdHandle>();
             assert_eq!(data_id_new_immut_data(sess_ptr,
                                               &immut_id_arr,
                                               Box::into_raw(Box::new(tx.clone())) as *mut _,
                                               data_id_cb),
                        0);
-            data_id_handle_immut = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            data_id_handle_immut = unwrap!(rx.recv());
 
-            let (tx, rx) = mpsc::channel::<DataIdHandle>();
             assert_eq!(data_id_new_appendable_data(sess_ptr,
                                                    &priv_app_id_arr,
                                                    true,
                                                    Box::into_raw(Box::new(tx.clone())) as *mut _,
                                                    data_id_cb),
                        0);
-            data_id_handle_priv_appendable = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            data_id_handle_priv_appendable = unwrap!(rx.recv());
 
-            let (tx, rx) = mpsc::channel::<DataIdHandle>();
             assert_eq!(data_id_new_appendable_data(sess_ptr,
                                                    &pub_app_id_arr,
                                                    false,
                                                    Box::into_raw(Box::new(tx.clone())) as *mut _,
                                                    data_id_cb),
                        0);
-            data_id_handle_pub_appendable = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            data_id_handle_pub_appendable = unwrap!(rx.recv());
         }
 
         {
@@ -227,7 +223,7 @@ mod tests {
         unsafe extern "C" fn data_id_cb(tx: *mut c_void, errcode: i32, handle: DataIdHandle) {
             assert_eq!(errcode, 0);
 
-            let tx: *mut mpsc::Sender<DataIdHandle> = tx as *mut _;
+            let tx = tx as *mut mpsc::Sender<DataIdHandle>;
             unwrap!((*tx).send(handle));
         }
 
@@ -235,16 +231,16 @@ mod tests {
             let (tx, rx) = mpsc::channel::<i32>();
             assert_eq!(data_id_free(sess_ptr,
                                     handle,
-                                    Box::into_raw(Box::new(tx.clone())) as *mut _,
+                                    Box::into_raw(Box::new(tx)) as *mut _,
                                     free_cb),
                        0);
-            let err_code = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let err_code = unwrap!(rx.recv());
 
             assert_eq!(err_code, expected);
         }
 
         unsafe extern "C" fn free_cb(tx: *mut c_void, err_code: i32) {
-            let tx: *mut mpsc::Sender<i32> = tx as *mut _;
+            let tx = tx as *mut mpsc::Sender<i32>;
             unwrap!((*tx).send(err_code));
         }
     }

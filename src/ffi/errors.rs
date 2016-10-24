@@ -25,6 +25,7 @@ use core::CoreError;
 use dns::{DNS_ERROR_START_RANGE, DnsError};
 use maidsafe_utilities::serialisation::SerialisationError;
 use nfs::errors::NfsError;
+use std::error::Error;
 use std::ffi::NulError;
 use std::fmt;
 
@@ -97,6 +98,12 @@ impl From<SerialisationError> for FfiError {
 impl<'a> From<&'a str> for FfiError {
     fn from(error: &'a str) -> FfiError {
         FfiError::Unexpected(error.to_string())
+    }
+}
+
+impl From<::std::sync::mpsc::RecvError> for FfiError {
+    fn from(error: ::std::sync::mpsc::RecvError) -> FfiError {
+        FfiError::Unexpected(error.description().to_owned())
     }
 }
 

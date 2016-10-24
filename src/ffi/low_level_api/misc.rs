@@ -187,7 +187,6 @@ mod tests {
     use routing::DataIdentifier;
     use std::hash::{Hash, Hasher, SipHasher};
     use std::sync::mpsc;
-    use std::time::Duration;
     use super::*;
 
     #[test]
@@ -218,7 +217,7 @@ mod tests {
                                               Box::into_raw(Box::new(tx.clone())) as *mut _,
                                               serialise_cb),
                        0);
-            let (data_ptr, data_size, capacity) = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let (data_ptr, data_size, capacity) = unwrap!(rx.recv());
 
             let (tx, rx) = mpsc::channel::<DataIdHandle>();
             assert_eq!(misc_deserialise_data_id(sess_ptr,
@@ -227,7 +226,7 @@ mod tests {
                                                 Box::into_raw(Box::new(tx.clone())) as *mut _,
                                                 deserialise_cb),
                        0);
-            let data_id_h = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let data_id_h = unwrap!(rx.recv());
             assert!(data_id_h != sd_data_id_h);
 
             {
@@ -245,7 +244,7 @@ mod tests {
                                     Box::into_raw(Box::new(tx.clone())) as *mut _,
                                     free_cb),
                        0);
-            let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let _ = unwrap!(rx.recv());
 
             misc_u8_ptr_free(data_ptr, data_size, capacity);
         }
@@ -257,7 +256,7 @@ mod tests {
                                               Box::into_raw(Box::new(tx.clone())) as *mut _,
                                               serialise_cb),
                        0);
-            let (data_ptr, data_size, capacity) = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let (data_ptr, data_size, capacity) = unwrap!(rx.recv());
 
             let (tx, rx) = mpsc::channel::<DataIdHandle>();
             assert_eq!(misc_deserialise_data_id(sess_ptr,
@@ -266,7 +265,7 @@ mod tests {
                                                 Box::into_raw(Box::new(tx.clone())) as *mut _,
                                                 deserialise_cb),
                        0);
-            let data_id_h = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let data_id_h = unwrap!(rx.recv());
             assert!(data_id_h != id_data_id_h);
 
             {
@@ -284,7 +283,7 @@ mod tests {
                                     Box::into_raw(Box::new(tx.clone())) as *mut _,
                                     free_cb),
                        0);
-            let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let _ = unwrap!(rx.recv());
 
             misc_u8_ptr_free(data_ptr, data_size, capacity);
         }
@@ -296,7 +295,7 @@ mod tests {
                                               Box::into_raw(Box::new(tx.clone())) as *mut _,
                                               serialise_cb),
                        0);
-            let (data_ptr, data_size, capacity) = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let (data_ptr, data_size, capacity) = unwrap!(rx.recv());
 
             let (tx, rx) = mpsc::channel::<DataIdHandle>();
             assert_eq!(misc_deserialise_data_id(sess_ptr,
@@ -305,7 +304,7 @@ mod tests {
                                                 Box::into_raw(Box::new(tx.clone())) as *mut _,
                                                 deserialise_cb),
                        0);
-            let data_id_h = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let data_id_h = unwrap!(rx.recv());
             assert!(data_id_h != ad_data_id_h);
 
             {
@@ -323,7 +322,7 @@ mod tests {
                                     Box::into_raw(Box::new(tx.clone())) as *mut _,
                                     free_cb),
                        0);
-            let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let _ = unwrap!(rx.recv());
 
             misc_u8_ptr_free(data_ptr, data_size, capacity);
         }
@@ -333,13 +332,13 @@ mod tests {
             let tx_ptr = Box::into_raw(Box::new(tx.clone())) as *mut _;
 
             assert_eq!(data_id_free(sess_ptr, sd_data_id_h, tx_ptr, free_cb), 0);
-            let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let _ = unwrap!(rx.recv());
 
             assert_eq!(data_id_free(sess_ptr, id_data_id_h, tx_ptr, free_cb), 0);
-            let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let _ = unwrap!(rx.recv());
 
             assert_eq!(data_id_free(sess_ptr, ad_data_id_h, tx_ptr, free_cb), 0);
-            let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+            let _ = unwrap!(rx.recv());
         }
 
         unsafe extern "C" fn serialise_cb(tx: *mut c_void,
@@ -349,21 +348,21 @@ mod tests {
                                           cap: usize) {
             assert_eq!(err_code, 0);
 
-            let tx: *mut mpsc::Sender<(*mut u8, usize, usize)> = tx as *mut _;
+            let tx = tx as *mut mpsc::Sender<(*mut u8, usize, usize)>;
             unwrap!((*tx).send((data, size, cap)));
         }
 
         unsafe extern "C" fn deserialise_cb(tx: *mut c_void, err_code: i32, handle: DataIdHandle) {
             assert_eq!(err_code, 0);
 
-            let tx: *mut mpsc::Sender<DataIdHandle> = tx as *mut _;
+            let tx = tx as *mut mpsc::Sender<DataIdHandle>;
             unwrap!((*tx).send(handle));
         }
 
         unsafe extern "C" fn free_cb(tx: *mut c_void, err_code: i32) {
             assert_eq!(err_code, 0);
 
-            let tx: *mut mpsc::Sender<()> = tx as *mut _;
+            let tx = tx as *mut mpsc::Sender<()>;
             unwrap!((*tx).send(()));
         }
     }
