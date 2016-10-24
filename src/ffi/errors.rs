@@ -26,7 +26,7 @@
 //! Errors thrown by the FFI operations
 
 use core::CoreError;
-use dns::errors::{DNS_ERROR_START_RANGE, DnsError};
+use dns::{DNS_ERROR_START_RANGE, DnsError};
 use maidsafe_utilities::serialisation::SerialisationError;
 use nfs::errors::NfsError;
 use std::ffi::NulError;

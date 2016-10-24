@@ -21,7 +21,6 @@
 use core::Client;
 use core::futures::FutureExt;
 use ffi::{FfiError, FfiFuture};
-use ffi::low_level_api::misc::misc_u8_ptr_free;
 use futures::Future;
 use nfs::File;
 use nfs::FileMetadata as NfsFileMetadata;
@@ -85,7 +84,7 @@ impl FileDetails {
     // a proper impl Drop.
     fn deallocate(self) {
         unsafe {
-            misc_u8_ptr_free(self.content, self.content_len, self.content_cap);
+            let _ = Vec::from_raw_parts(self.content, self.content_len, self.content_cap);
         }
 
         if !self.metadata.is_null() {
@@ -147,10 +146,10 @@ impl FileMetadata {
     // a proper impl Drop.
     pub fn deallocate(&mut self) {
         unsafe {
-            misc_u8_ptr_free(self.name, self.name_len, self.name_cap);
-            misc_u8_ptr_free(self.user_metadata,
-                             self.user_metadata_len,
-                             self.user_metadata_cap);
+            let _ = Vec::from_raw_parts(self.name, self.name_len, self.name_cap);
+            let _ = Vec::from_raw_parts(self.user_metadata,
+                                        self.user_metadata_len,
+                                        self.user_metadata_cap);
         }
     }
 }

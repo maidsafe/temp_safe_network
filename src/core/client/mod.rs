@@ -971,7 +971,7 @@ mod tests {
     use core::utility::test_utils::{finish, random_client, random_client_with_net_obs,
                                     setup_client};
     use futures::{self, Future};
-    use maidsafe_utilities::thread::{self, Joiner};
+    use maidsafe_utilities::thread;
     use rand;
     use routing::{Data, DataIdentifier, ImmutableData, StructuredData};
     use routing::client_errors::MutationError;

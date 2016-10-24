@@ -21,7 +21,6 @@ use core::Client;
 use core::futures::FutureExt;
 use ffi::{FfiError, FfiFuture};
 use ffi::file_details::FileMetadata;
-use ffi::low_level_api::misc::misc_u8_ptr_free;
 use futures::Future;
 use nfs::Dir;
 use nfs::DirMetadata as NfsDirMetadata;
@@ -132,10 +131,10 @@ impl DirMetadata {
     // a proper impl Drop.
     fn deallocate(&mut self) {
         unsafe {
-            let _ = misc_u8_ptr_free(self.name, self.name_len, self.name_cap);
-            let _ = misc_u8_ptr_free(self.user_metadata,
-                                     self.user_metadata_len,
-                                     self.user_metadata_cap);
+            let _ = Vec::from_raw_parts(self.name, self.name_len, self.name_cap);
+            let _ = Vec::from_raw_parts(self.user_metadata,
+                                        self.user_metadata_len,
+                                        self.user_metadata_cap);
         }
     }
 }

@@ -18,7 +18,7 @@
 use ffi::App;
 use ffi::errors::FfiError;
 // use ffi::low_level_api::appendable_data::AppendableData;
-use ffi::low_level_api::cipher_opt::CipherOpt;
+// use ffi::low_level_api::cipher_opt::CipherOpt;
 // use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWriterWrapper};
 use lru_cache::LruCache;
 use routing::DataIdentifier;
@@ -66,7 +66,7 @@ pub struct ObjectCache {
     // appendable_data: LruCache<AppendableDataHandle, AppendableData>,
     // se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
     // se_writer: LruCache<SelfEncryptorWriterHandle, SelfEncryptorWriterWrapper>,
-    cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
+    // cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
     encrypt_key: LruCache<EncryptKeyHandle, box_::PublicKey>,
     sign_key: LruCache<SignKeyHandle, sign::PublicKey>,
 }
@@ -86,7 +86,7 @@ impl ObjectCache {
         // self.appendable_data.clear();
         // self.se_reader.clear();
         // self.se_writer.clear();
-        self.cipher_opt.clear();
+        // self.cipher_opt.clear();
         self.encrypt_key.clear();
         self.sign_key.clear();
     }
@@ -131,22 +131,22 @@ impl ObjectCache {
     // }
 
     // ----------------------------------------------------------
-    pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) -> CipherOptHandle {
-        let handle = self.new_handle();
-        if let Some(prev) = self.cipher_opt.insert(handle, cipher_opt) {
-            debug!("Displaced CipherOpt from ObjectCache: {:?}", prev);
-        }
+    // pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) -> CipherOptHandle {
+    //     let handle = self.new_handle();
+    //     if let Some(prev) = self.cipher_opt.insert(handle, cipher_opt) {
+    //         debug!("Displaced CipherOpt from ObjectCache: {:?}", prev);
+    //     }
 
-        handle
-    }
+    //     handle
+    // }
 
-    pub fn get_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<&mut CipherOpt, FfiError> {
-        self.cipher_opt.get_mut(&handle).ok_or(FfiError::InvalidCipherOptHandle)
-    }
+    // pub fn get_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<&mut CipherOpt, FfiError> {
+    //     self.cipher_opt.get_mut(&handle).ok_or(FfiError::InvalidCipherOptHandle)
+    // }
 
-    pub fn remove_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<CipherOpt, FfiError> {
-        self.cipher_opt.remove(&handle).ok_or(FfiError::InvalidCipherOptHandle)
-    }
+    // pub fn remove_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<CipherOpt, FfiError> {
+    //     self.cipher_opt.remove(&handle).ok_or(FfiError::InvalidCipherOptHandle)
+    // }
 
     // ----------------------------------------------------------
     pub fn insert_data_id(&mut self, data_id: DataIdentifier) -> DataIdHandle {
@@ -285,7 +285,7 @@ impl Default for ObjectCache {
             // appendable_data: LruCache::new(DEFAULT_CAPACITY),
             // se_reader: LruCache::new(DEFAULT_CAPACITY),
             // se_writer: LruCache::new(DEFAULT_CAPACITY),
-            cipher_opt: LruCache::new(DEFAULT_CAPACITY),
+            // cipher_opt: LruCache::new(DEFAULT_CAPACITY),
             encrypt_key: LruCache::new(DEFAULT_CAPACITY),
             sign_key: LruCache::new(DEFAULT_CAPACITY),
         }

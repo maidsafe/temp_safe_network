@@ -22,8 +22,8 @@
 // and limitations
 // relating to use of the SAFE Network Software.
 
-use core::{self, Client, CoreError, CoreMsg, CoreMsgRx, CoreMsgTx, FutureExt, NetworkEvent,
-           NetworkTx, core_el, utility};
+use core::{self, Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx,
+           utility};
 use futures::{Future, IntoFuture};
 use futures::stream::Stream;
 use rust_sodium::crypto::sign;
@@ -67,7 +67,7 @@ pub fn random_client<Run, I, E>(r: Run)
 // Create random registered client and run it inside an event loop. Use this to
 // create Client
 // automatically and randomly,
-pub fn random_client_with_net_obs<NetObs, Run, I, E>(mut n: NetObs, r: Run)
+pub fn random_client_with_net_obs<NetObs, Run, I, E>(n: NetObs, r: Run)
     where NetObs: FnMut(NetworkEvent) + 'static,
           Run: FnOnce(&Client) -> I + Send + 'static,
           I: IntoFuture<Item = (), Error = E> + 'static,
