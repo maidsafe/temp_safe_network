@@ -22,7 +22,8 @@
 
 use core::{Client, CoreError, FutureExt};
 use core::structured_data::unversioned;
-use futures::Future;
+use futures::{Future, stream};
+use futures::stream::Stream;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::{Dir, DirId, DirMetadata, NfsError, NfsFuture};
 use rand;
@@ -331,6 +332,61 @@ fn save_as_immutable_data(client: Client, data: Vec<u8>) -> Box<NfsFuture<XorNam
         .map(move |_| name)
         .map_err(NfsError::from)
         .into_box()
+}
+
+/// Performs a shallow copy of a provided directory (sub directories aren't
+/// copied)
+pub fn shallow_copy(client: Client,
+                    dir: Dir,
+                    meta: DirMetadata)
+                    -> Box<NfsFuture<(Dir, DirMetadata)>> {
+    create(client, &dir, meta.encrypt_key())
+        .and_then(move |dir_id| {
+            let mut new_meta = DirMetadata::new(*dir_id.name(),
+                                                meta.name(),
+                                                meta.user_metadata().to_owned(),
+                                                meta.encrypt_key().map(|k| k.clone()));
+            new_meta.set_created_time(*meta.created_time());
+
+            Ok((dir, new_meta))
+        })
+        .into_box()
+}
+
+/// Performs a full copy of a provided directory
+pub fn deep_copy(client: Client,
+                 src: &Dir,
+                 src_meta: &DirMetadata)
+                 -> Box<NfsFuture<(Dir, DirMetadata)>> {
+    let parent_meta = src_meta.clone();
+
+    if src.sub_dirs().len() == 0 {
+        shallow_copy(client.clone(), src.clone(), parent_meta)
+    } else {
+        let c2 = client.clone();
+        let c3 = client.clone();
+
+        let mut start_dir = Dir::new();
+        for f in src.files() {
+            let _ = start_dir.upsert_file(f.clone());
+        }
+
+        let sub_dirs = src.sub_dirs().to_owned().into_iter().map(Ok);
+
+        stream::iter(sub_dirs)
+            .fold(start_dir, move |mut parent, sub_dir| {
+                let c3 = c2.clone();
+
+                get(c2.clone(), &sub_dir.id())
+                    .and_then(move |dir| deep_copy(c3, &dir, &sub_dir))
+                    .map(move |(_dir_copy, dir_meta)| {
+                        parent.upsert_sub_dir(dir_meta);
+                        parent
+                    })
+            })
+            .and_then(move |parent| shallow_copy(c3, parent, parent_meta))
+            .into_box()
+    }
 }
 
 /// Get StructuredData from the Network
