@@ -51,7 +51,11 @@ pub fn create_session() -> Session {
     let acc_locator = unwrap!(utility::generate_random_string(10));
     let acc_password = unwrap!(utility::generate_random_string(10));
 
-    unwrap!(Session::create_account(acc_locator, acc_password, move |_net_evt| ()))
+    unwrap!(Session::create_account(acc_locator, acc_password, |_net_evt| ()))
+}
+
+pub fn create_unregistered_session() -> Session {
+    unwrap!(Session::unregistered(|_| ()))
 }
 
 // Run the given closure inside the session event loop.

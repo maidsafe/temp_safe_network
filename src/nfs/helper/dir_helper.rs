@@ -316,10 +316,9 @@ pub fn get_file_by_path(client: &Client,
         .into_box()
 }
 
-/// Get the directory at the given tokenised path. The path is taken relative to
-/// `starting_directory`, unless it is `None`, in which case it is taken
-/// relative
-/// to the user root directory.
+/// Get the directory at the given tokenised path. The path is taken relative
+/// to `starting_directory`, unless it is `None`, in which case it is taken
+/// relative to the user root directory.
 pub fn final_sub_dir(client: &Client,
                      tokens: &[String],
                      starting_directory: Option<&DirId>)

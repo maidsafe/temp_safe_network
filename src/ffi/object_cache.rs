@@ -69,9 +69,9 @@ pub struct ObjectCache {
     // struct_data: LruCache<StructDataHandle, StructuredData>,
     data_id: LruCache<DataIdHandle, DataIdentifier>,
     // appendable_data: LruCache<AppendableDataHandle, AppendableData>,
-    // se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
-    // se_writer: LruCache<SelfEncryptorWriterHandle, SelfEncryptorWriterWrapper>,
-    // cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
+    se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
+    se_writer: LruCache<SelfEncryptorWriterHandle, SelfEncryptorWriterWrapper>,
+    cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
     encrypt_key: LruCache<EncryptKeyHandle, box_::PublicKey>,
     sign_key: LruCache<SignKeyHandle, sign::PublicKey>,
 }

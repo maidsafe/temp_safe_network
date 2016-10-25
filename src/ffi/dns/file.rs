@@ -153,7 +153,6 @@ mod tests {
     use nfs::helper::{dir_helper, file_helper};
     use rust_sodium::crypto::box_;
     use std::sync::mpsc;
-    use std::time::Duration;
     use super::*;
 
     fn create_public_file(session: &Session, file_name: String, file_content: Vec<u8>) -> DirId {
@@ -204,7 +203,6 @@ mod tests {
 
     #[test]
     fn get_public_file() {
-        let timeout = Duration::from_millis(10_000);
         let session = test_utils::create_session();
 
         let file_name = "index.html".to_string();
@@ -249,7 +247,7 @@ mod tests {
                                       test_utils::sender_as_user_data(&tx),
                                       callback);
             assert_eq!(result, 0);
-            let _ = unwrap!(rx.recv_timeout(timeout));
+            let _ = unwrap!(rx.recv());
         };
 
         // Fetch the file using a new client
@@ -269,11 +267,11 @@ mod tests {
                                       test_utils::sender_as_user_data(&tx),
                                       callback);
             assert_eq!(result, 0);
-            let _ = unwrap!(rx.recv_timeout(timeout));
+            let _ = unwrap!(rx.recv());
         };
 
         // Fetch the file using an unregisterd client
-        let session3 = Session::unregistered();
+        let session3 = test_utils::create_unregistered_session();
 
         unsafe {
             let result = dns_get_file(&session3,
@@ -289,7 +287,7 @@ mod tests {
                                       test_utils::sender_as_user_data(&tx),
                                       callback);
             assert_eq!(result, 0);
-            let _ = unwrap!(rx.recv_timeout(timeout));
+            let _ = unwrap!(rx.recv());
         };
     }
 }
