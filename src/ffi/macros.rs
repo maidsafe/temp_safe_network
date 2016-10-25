@@ -20,10 +20,10 @@
 // and limitations relating to use of the SAFE Network Software.
 
 macro_rules! ffi_error_code {
-    ($result:expr) => {{
+    ($err:expr) => {{
         let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-        let err_str = format!("{:?}", $result);
-        let err_code: i32 = $result.into();
+        let err_str = format!("{:?}", $err);
+        let err_code: i32 = $err.into();
         info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
               decorator, err_code, err_str, decorator);
         err_code

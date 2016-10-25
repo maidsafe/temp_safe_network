@@ -156,8 +156,9 @@ mod tests {
         let data_id_handle_pub_appendable;
 
         unsafe {
-            let (tx, rx) = mpsc::channel::<DataIdHandle>();
-            let tx = Box::into_raw(Box::new(tx)) as *mut c_void;
+            let (mut tx, rx) = mpsc::channel::<DataIdHandle>();
+            let tx: *mut _ = &mut tx;
+            let tx = tx as *mut c_void;
 
             assert_eq!(data_id_new_struct_data(sess_ptr, type_tag, &struct_id_arr, tx, data_id_cb),
                        0);

@@ -43,7 +43,7 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
                                         is_private: bool,
                                         is_shared: bool,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(int32_t, *mut c_void))
+                                        o_cb: extern "C" fn(*mut c_void, int32_t))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI create directory, given the path.");
@@ -63,12 +63,12 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
                                          user_metadata,
                                          is_private,
                                          is_shared)
-                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
                                         dir_path_len: usize,
                                         is_shared: bool,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(int32_t, *mut c_void))
+                                        o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI delete dir, given the path.");
@@ -100,12 +100,12 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = delete_dir(&client, &app, dir_path, is_shared)
-                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
@@ -123,8 +123,8 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
                                      dir_path_len: usize,
                                      is_shared: bool,
                                      user_data: *mut c_void,
-                                     o_cb: extern "C" fn(int32_t,
-                                                         *mut c_void,
+                                     o_cb: extern "C" fn(*mut c_void,
+                                                         int32_t,
                                                          details_handle: *mut DirDetails))
                                      -> int32_t {
     helper::catch_unwind_i32(|| {
@@ -141,16 +141,16 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
                     let fut = get_dir(&client, &app, dir_path, is_shared)
                         .map(move |details| {
                             let details_handle = Box::into_raw(Box::new(details));
-                            o_cb(0, user_data.0, details_handle);
+                            o_cb(user_data.0, 0, details_handle);
                         })
                         .map_err(move |err| {
-                            o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut())
+                            o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut())
                         })
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                    o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                     None
                 }
             }
@@ -172,7 +172,7 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
                                         new_user_metadata: *const u8,
                                         new_user_metadata_len: usize,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(int32_t, *mut c_void))
+                                        o_cb: extern "C" fn(*mut c_void, int32_t))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI modify directory, given the path.");
