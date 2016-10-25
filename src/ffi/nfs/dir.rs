@@ -193,16 +193,17 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
                                          is_shared,
                                          new_name,
                                          new_user_metadata)
-                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
         })));
+
         0
     })
 }
