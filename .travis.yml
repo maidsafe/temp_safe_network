@@ -23,7 +23,7 @@ cache:
     - $HOME/elfutils
 script:
   - curl -sSLO https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/build_and_run_tests.sh
-  - travis_wait . build_and_run_tests.sh
+  - travis_wait 30 . build_and_run_tests.sh
 before_cache:
   - curl -sSLO https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/install_elfutils.sh
   - . install_elfutils.sh
