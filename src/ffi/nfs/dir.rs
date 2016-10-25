@@ -439,7 +439,6 @@ mod tests {
     use nfs::helper::dir_helper;
     use std::slice;
     use std::sync::mpsc;
-    use std::time::Duration;
 
     fn create_test_dir(client: Client, app: &App, name: &str) -> Box<FfiFuture<()>> {
         let app_dir_id = unwrap!(app.app_dir());
@@ -544,7 +543,7 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
@@ -607,7 +606,7 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
@@ -656,7 +655,7 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
@@ -711,7 +710,7 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
@@ -768,7 +767,143 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
+        unwrap!(sess.send(CoreMsg::build_terminator()));
+    }
+
+    #[test]
+    fn move_dir() {
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
+        let app2 = app.clone();
+
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
+
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let app_dir_id = unwrap!(app.app_dir());
+            let app_dir_id2 = app_dir_id.clone();
+
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+            let c6 = client.clone();
+
+            let fut = create_test_dir(client.clone(), &app, "test_dir_a")
+                .then(move |res| {
+                    let _ = unwrap!(res);
+                    create_test_dir(c2, &app, "test_dir_b")
+                })
+                .then(move |res| {
+                    let _ = unwrap!(res);
+                    dir_helper::get(c3, &app_dir_id)
+                })
+                .then(move |app_root_dir| {
+                    let app_root_dir = unwrap!(app_root_dir);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 2);
+
+                    let dst_meta = unwrap!(app_root_dir.find_sub_dir("test_dir_b"));
+                    let dst_id = dst_meta.id();
+
+                    dir_helper::get(c4, &dst_id).map(move |dst_dir| (dst_dir, dst_id))
+                })
+                .then(move |res| {
+                    let (dst_dir, dst_id) = unwrap!(res);
+                    assert_eq!(dst_dir.sub_dirs().len(), 0);
+
+                    super::move_dir(&c5,
+                                    &app2,
+                                    "/test_dir_a",
+                                    false,
+                                    "/test_dir_b",
+                                    false,
+                                    false)
+                        .map(move |_| dst_id)
+                })
+                .then(move |res| {
+                    let dst_id = unwrap!(res);
+                    dir_helper::get(c6.clone(), &app_dir_id2).join(dir_helper::get(c6, &dst_id))
+                })
+                .then(move |res| {
+                    let (app_root_dir, dst_dir) = unwrap!(res);
+
+                    assert_eq!(app_root_dir.sub_dirs().len(), 1);
+                    assert_eq!(dst_dir.sub_dirs().len(), 1);
+
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
+        let _ = unwrap!(rx.recv());
+        unwrap!(sess.send(CoreMsg::build_terminator()));
+    }
+
+    #[test]
+    fn copy_dir() {
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
+        let app2 = app.clone();
+
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
+
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let app_dir_id = unwrap!(app.app_dir());
+            let app_dir_id2 = app_dir_id.clone();
+
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+            let c6 = client.clone();
+
+            let fut = create_test_dir(client.clone(), &app, "test_dir_a")
+                .then(move |res| {
+                    let _ = unwrap!(res);
+                    create_test_dir(c2, &app, "test_dir_b")
+                })
+                .then(move |res| {
+                    let _ = unwrap!(res);
+                    dir_helper::get(c3, &app_dir_id)
+                })
+                .then(move |res| {
+                    let app_root_dir = unwrap!(res);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 2);
+
+                    let dst_meta = unwrap!(app_root_dir.find_sub_dir("test_dir_b"));
+                    let dst_id = dst_meta.id();
+                    dir_helper::get(c4, &dst_id).map(|dst_dir| (dst_dir, dst_id))
+                })
+                .then(move |res| {
+                    let (dst_dir, dst_id) = unwrap!(res);
+                    assert_eq!(dst_dir.sub_dirs().len(), 0);
+
+                    super::move_dir(&c5, &app2, "/test_dir_a", false, "/test_dir_b", false, true)
+                        .map(move |_| dst_id)
+                })
+                .then(move |res| {
+                    let dst_id = unwrap!(res);
+                    dir_helper::get(c6.clone(), &app_dir_id2).join(dir_helper::get(c6, &dst_id))
+                })
+                .then(move |res| {
+                    let (app_root_dir, dst_dir) = unwrap!(res);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 2);
+                    assert_eq!(dst_dir.sub_dirs().len(), 1);
+
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 }
