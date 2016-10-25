@@ -152,7 +152,7 @@ pub fn final_sub_dir(client: &Client,
         }
     };
 
-    let tokens_iter = tokens.to_owned().into_iter().map(|el| Ok(el));
+    let tokens_iter = tokens.to_owned().into_iter().map(Ok);
     let c2 = client.clone();
 
     dir_fut.map_err(FfiError::from)
