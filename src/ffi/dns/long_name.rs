@@ -21,7 +21,7 @@
 
 //! DNS Long name operations
 
-
+/*
 use dns::dns_operations::DnsOperations;
 use ffi::app::App;
 use ffi::errors::FfiError;
@@ -111,20 +111,21 @@ fn get_long_names(app: &App) -> Result<Vec<String>, FfiError> {
     let list = try!(dns_ops.get_all_registered_names());
     Ok(list)
 }
+*/
 
 #[cfg(test)]
 mod tests {
-    use core::utility;
-    use ffi::test_utils;
+    // use core::utility;
+    // use ffi::test_utils;
 
     #[test]
     fn register_long_name() {
-        let app = test_utils::create_app(false);
-        let public_name = unwrap!(utility::generate_random_string(10));
+        // let app = test_utils::create_app(false);
+        // let public_name = unwrap!(utility::generate_random_string(10));
 
-        assert!(super::register_long_name(&app, public_name.clone()).is_ok());
+        // assert!(super::register_long_name(&app, public_name.clone()).is_ok());
 
-        let app2 = test_utils::create_app(false);
-        assert!(super::register_long_name(&app2, public_name).is_err());
+        // let app2 = test_utils::create_app(false);
+        // assert!(super::register_long_name(&app2, public_name).is_err());
     }
 }

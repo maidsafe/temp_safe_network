@@ -56,30 +56,20 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
                service_name,
                long_name);
 
-        let session = (*session).clone();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
             let client2 = client.clone();
             let client3 = client.clone();
 
-            let fut = operations::get_service_home_dir_id(client,
-                                                          &long_name,
-                                                          service_name,
-                                                          None)
+            let fut = operations::get_service_home_dir_id(client, &long_name, service_name, None)
                 .map_err(FfiError::from)
                 .and_then(move |dir_id| {
-                    dir_helper::get_file_by_path(&client2,
-                                                 Some(&dir_id),
-                                                 &file_path)
+                    dir_helper::get_file_by_path(&client2, Some(&dir_id), &file_path)
                         .map_err(FfiError::from)
                 })
                 .and_then(move |file| {
-                    FileDetails::new(file,
-                                     client3,
-                                     offset,
-                                     length,
-                                     include_metadata)
+                    FileDetails::new(file, client3, offset, length, include_metadata)
                 })
                 .map(move |details| {
                     let details = Box::into_raw(Box::new(details));
@@ -107,7 +97,9 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                                                file_path: *const u8,
                                                file_path_len: usize,
                                                user_data: *mut c_void,
-                                               o_cb: extern "C" fn(int32_t, *mut c_void, *mut FileMetadata))
+                                               o_cb: extern "C" fn(int32_t,
+                                                                   *mut c_void,
+                                                                   *mut FileMetadata))
                                                -> int32_t {
     helper::catch_unwind_i32(|| {
         let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
@@ -119,21 +111,15 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                service_name,
                long_name);
 
-        let session = (*session).clone();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
             let client2 = client.clone();
 
-            let fut = operations::get_service_home_dir_id(client,
-                                                          &long_name,
-                                                          service_name,
-                                                          None)
+            let fut = operations::get_service_home_dir_id(client, &long_name, service_name, None)
                 .map_err(FfiError::from)
                 .and_then(move |dir_id| {
-                    dir_helper::get_file_by_path(&client2,
-                                                 Some(&dir_id),
-                                                 &file_path)
+                    dir_helper::get_file_by_path(&client2, Some(&dir_id), &file_path)
                         .map_err(FfiError::from)
                 })
                 .and_then(move |file| {
@@ -156,89 +142,154 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
 
 #[cfg(test)]
 mod tests {
-    /*
     use core::utility;
-    use dns::dns_operations::DnsOperations;
-    use ffi::app::App;
+    use dns::operations;
+    use ffi::Session;
+    use ffi::file_details::FileDetails;
     use ffi::test_utils;
-    use nfs::AccessLevel;
-    use nfs::helper::directory_helper::DirectoryHelper;
-    use nfs::helper::file_helper::FileHelper;
-    use nfs::metadata::directory_key::DirectoryKey;
+    use futures::Future;
+    use libc::{c_void, int32_t};
+    use nfs::{Dir, DirId};
+    use nfs::helper::{dir_helper, file_helper};
     use rust_sodium::crypto::box_;
+    use std::sync::mpsc;
+    use std::time::Duration;
+    use super::*;
 
-    fn create_public_file(app: &App, file_name: String, file_content: Vec<u8>) -> DirectoryKey {
-        let dir_helper = DirectoryHelper::new(app.get_client());
-        let mut file_helper = FileHelper::new(app.get_client());
+    fn create_public_file(session: &Session, file_name: String, file_content: Vec<u8>) -> DirId {
+        test_utils::run(session, |client| {
+            let client2 = client.clone();
 
-        let app_dir_key = unwrap!(app.get_app_dir_key());
-        let mut app_dir = unwrap!(dir_helper.get(&app_dir_key));
+            let dir = Dir::new();
+            dir_helper::create(client.clone(), &dir, None)
+                .then(move |result| {
+                    let dir_data_id = unwrap!(result);
+                    let dir_id = (dir_data_id, None);
 
-        let (file_dir, _) = unwrap!(dir_helper.create("public-dir".to_string(),
-                                                      vec![0u8; 0],
-                                                      false,
-                                                      AccessLevel::Public,
-                                                      Some(&mut app_dir)));
-        let dir_key = file_dir.get_key().clone();
-
-        let bin_metadata = vec![0u8; 0];
-        let mut writer = unwrap!(file_helper.create(file_name, bin_metadata, file_dir));
-        unwrap!(writer.write(&file_content));
-        let _ = unwrap!(writer.close());
-
-        dir_key
+                    file_helper::create(client2, file_name, Vec::new(), dir_id.clone(), dir)
+                        .map(move |writer| (writer, dir_id))
+                })
+                .then(move |result| {
+                    let (writer, dir_id) = unwrap!(result);
+                    writer.write(&file_content).map(move |_| (writer, dir_id))
+                })
+                .then(move |result| {
+                    let (writer, dir_id) = unwrap!(result);
+                    writer.close().map(move |_| dir_id)
+                })
+        })
     }
 
-    fn register_service(app: &App,
+    fn register_service(session: &Session,
+                        long_name: String,
                         service_name: String,
-                        public_name: String,
-                        dir_key: DirectoryKey) {
-        let (msg_public_key, msg_secret_key) = box_::gen_keypair();
-        let services = vec![(service_name, dir_key)];
-        let client = app.get_client();
+                        service_dir_id: DirId) {
+        test_utils::run(session, move |client| {
+            let (msg_pk, msg_sk) = box_::gen_keypair();
+            let services = vec![(service_name, service_dir_id)];
 
-        let public_signing_key = *unwrap!(unwrap!(client.lock()).get_public_signing_key());
-        let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-        let dns_operation = unwrap!(DnsOperations::new(client));
+            let sign_pk = unwrap!(client.public_signing_key());
+            let sign_sk = unwrap!(client.secret_signing_key()).clone();
 
-        unwrap!(dns_operation.register_dns(public_name,
-                                           &msg_public_key,
-                                           &msg_secret_key,
-                                           &services,
-                                           vec![public_signing_key],
-                                           &secret_signing_key,
-                                           None));
+            operations::register_dns(client,
+                                     long_name,
+                                     msg_pk,
+                                     msg_sk,
+                                     &services,
+                                     vec![sign_pk],
+                                     sign_sk,
+                                     None)
+        })
     }
 
     #[test]
     fn get_public_file() {
-        let app = test_utils::create_app(false);
+        let timeout = Duration::from_millis(10_000);
+        let session = test_utils::create_session();
 
-        let file_name = "index.html";
+        let file_name = "index.html".to_string();
         let file_content = "<html><title>Home</title></html>";
 
-        let public_directory_key = create_public_file(&app,
-                                                      file_name.to_string(),
-                                                      file_content.as_bytes().to_vec());
-        let service_name = "www";
-        let public_name = unwrap!(utility::generate_random_string(10));
+        let public_dir_id = create_public_file(&session,
+                                               file_name.clone(),
+                                               file_content.as_bytes().to_vec());
 
-        register_service(&app,
-                         service_name.to_string(),
-                         public_name.clone(),
-                         public_directory_key);
+        let long_name = unwrap!(utility::generate_random_string(10));
+        let service_name = "www".to_string();
 
-        let _ = unwrap!(super::get_file(&app, &public_name, service_name, file_name, 0, 0, false));
+        register_service(&session,
+                         long_name.clone(),
+                         service_name.clone(),
+                         public_dir_id);
+
+        let (tx, rx) = mpsc::channel::<()>();
+
+        let long_name = test_utils::string_to_c_utf8(long_name);
+        let service_name = test_utils::string_to_c_utf8(service_name);
+        let file_name = test_utils::string_to_c_utf8(file_name);
+
+        extern "C" fn callback(error: int32_t,
+                               user_data: *mut c_void,
+                               _file_details_ptr: *mut FileDetails) {
+            assert_eq!(error, 0);
+            unsafe { test_utils::send_via_user_data(user_data) }
+        }
+
+        unsafe {
+            let result = dns_get_file(&session,
+                                      long_name.ptr(),
+                                      long_name.len(),
+                                      service_name.ptr(),
+                                      service_name.len(),
+                                      file_name.ptr(),
+                                      file_name.len(),
+                                      0,
+                                      0,
+                                      false,
+                                      test_utils::sender_as_user_data(&tx),
+                                      callback);
+            assert_eq!(result, 0);
+            let _ = unwrap!(rx.recv_timeout(timeout));
+        };
 
         // Fetch the file using a new client
-        let app2 = test_utils::create_app(false);
+        let session2 = test_utils::create_session();
 
-        let _ = unwrap!(super::get_file(&app2, &public_name, service_name, file_name, 0, 0, false));
+        unsafe {
+            let result = dns_get_file(&session2,
+                                      long_name.ptr(),
+                                      long_name.len(),
+                                      service_name.ptr(),
+                                      service_name.len(),
+                                      file_name.ptr(),
+                                      file_name.len(),
+                                      0,
+                                      0,
+                                      false,
+                                      test_utils::sender_as_user_data(&tx),
+                                      callback);
+            assert_eq!(result, 0);
+            let _ = unwrap!(rx.recv_timeout(timeout));
+        };
 
         // Fetch the file using an unregisterd client
-        let app3 = test_utils::create_unregistered_app();
+        let session3 = Session::unregistered();
 
-        let _ = unwrap!(super::get_file(&app3, &public_name, service_name, file_name, 0, 0, false));
+        unsafe {
+            let result = dns_get_file(&session3,
+                                      long_name.ptr(),
+                                      long_name.len(),
+                                      service_name.ptr(),
+                                      service_name.len(),
+                                      file_name.ptr(),
+                                      file_name.len(),
+                                      0,
+                                      0,
+                                      false,
+                                      test_utils::sender_as_user_data(&tx),
+                                      callback);
+            assert_eq!(result, 0);
+            let _ = unwrap!(rx.recv_timeout(timeout));
+        };
     }
-    */
 }

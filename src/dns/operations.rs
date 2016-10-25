@@ -37,15 +37,19 @@ use super::config::{self, DnsConfig};
 
 /// Register one's own Dns - eg., pepsico.com, spandansharma.com,
 /// krishnakumar.in etc
-pub fn register_dns(client: &Client,
-                    long_name: String,
-                    public_messaging_encryption_key: box_::PublicKey,
-                    secret_messaging_encryption_key: box_::SecretKey,
-                    services: &[(String, DirId)],
-                    owners: Vec<sign::PublicKey>,
-                    sign_sk: sign::SecretKey,
-                    encryption_key: Option<secretbox::Key>)
-                    -> Box<DnsFuture<()>> {
+pub fn register_dns<S>(client: &Client,
+                       long_name: S,
+                       public_messaging_encryption_key: box_::PublicKey,
+                       secret_messaging_encryption_key: box_::SecretKey,
+                       services: &[(String, DirId)],
+                       owners: Vec<sign::PublicKey>,
+                       sign_sk: sign::SecretKey,
+                       encryption_key: Option<secretbox::Key>)
+                       -> Box<DnsFuture<()>>
+    where S: Into<String>
+{
+    let long_name = long_name.into();
+
     trace!("Registering dns with name: {}", long_name);
 
     let client2 = client.clone();
@@ -111,10 +115,12 @@ pub fn register_dns(client: &Client,
 
 
 /// Delete the Dns-Record
-pub fn delete_dns(client: &Client,
-                  long_name: String,
-                  sign_sk: sign::SecretKey)
-                  -> Box<DnsFuture<()>> {
+pub fn delete_dns<S>(client: &Client, long_name: S, sign_sk: sign::SecretKey)
+                     -> Box<DnsFuture<()>>
+    where S: Into<String>
+{
+    let long_name = long_name.into();
+
     trace!("Deleting dns with name: {}", long_name);
 
     let client2 = client.clone();

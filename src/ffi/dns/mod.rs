@@ -22,5 +22,5 @@
 //! DNS operations.
 
 pub mod file;
-// pub mod long_name;
+pub mod long_name;
 // pub mod service;
