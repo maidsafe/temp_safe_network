@@ -21,8 +21,6 @@
 
 //! File operations
 
-use core::CoreMsg;
-use core::futures::FutureExt;
 use dns::operations;
 use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::file_details::{FileDetails, FileMetadata};
@@ -45,12 +43,12 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
                                       length: i64,
                                       include_metadata: bool,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(int32_t, *mut c_void, *mut FileDetails))
+                                      o_cb: extern "C" fn(*mut c_void, int32_t, *mut FileDetails))
                                       -> int32_t {
-    helper::catch_unwind_i32(|| {
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
-        let service_name = ffi_try!(helper::c_utf8_to_string(service_name, service_name_len));
-        let file_path = ffi_try!(helper::c_utf8_to_string(file_path, file_path_len));
+    helper::catch_unwind_cb(|| {
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
+        let file_path = try!(helper::c_utf8_to_string(file_path, file_path_len));
 
         trace!("FFI get file located at given path starting from home directory of \"//{}.{}\".",
                service_name,
@@ -58,7 +56,7 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send_fn(move |client| {
             let client2 = client.clone();
             let client3 = client.clone();
 
@@ -73,18 +71,15 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
                 })
                 .map(move |details| {
                     let details = Box::into_raw(Box::new(details));
-                    o_cb(0, user_data.0, details);
+                    o_cb(user_data.0, 0, details);
                 })
                 .map_err(move |err| {
-                    o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut());
-                })
-                .into_box();
+                    o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut());
+                });
 
             Some(fut)
-        })));
-
-        0
-    })
+        })
+    }, move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
 /// Get file metadata.
@@ -97,14 +92,14 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                                                file_path: *const u8,
                                                file_path_len: usize,
                                                user_data: *mut c_void,
-                                               o_cb: extern "C" fn(int32_t,
-                                                                   *mut c_void,
+                                               o_cb: extern "C" fn(*mut c_void,
+                                                                   int32_t,
                                                                    *mut FileMetadata))
                                                -> int32_t {
-    helper::catch_unwind_i32(|| {
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
-        let service_name = ffi_try!(helper::c_utf8_to_string(service_name, service_name_len));
-        let file_path = ffi_try!(helper::c_utf8_to_string(file_path, file_path_len));
+    helper::catch_unwind_cb(|| {
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
+        let file_path = try!(helper::c_utf8_to_string(file_path, file_path_len));
 
         trace!("FFI get file metadata for file located at given path starting from home \
                 directory of \"//{}.{}\".",
@@ -113,7 +108,7 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send_fn(move |client| {
             let client2 = client.clone();
 
             let fut = operations::get_service_home_dir_id(client, &long_name, service_name, None)
@@ -125,19 +120,16 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                 .and_then(move |file| {
                     let metadata = try!(FileMetadata::new(file.metadata()));
                     let metadata = Box::into_raw(Box::new(metadata));
-                    o_cb(0, user_data.0, metadata);
+                    o_cb(user_data.0, 0, metadata);
                     Ok(())
                 })
                 .map_err(move |err| {
-                    o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut());
-                })
-                .into_box();
+                    o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut());
+                });
 
             Some(fut)
-        })));
-
-        0
-    })
+        })
+    }, move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
 #[cfg(test)]
@@ -224,8 +216,8 @@ mod tests {
         let service_name = test_utils::as_raw_parts(&service_name);
         let file_name = test_utils::as_raw_parts(&file_name);
 
-        extern "C" fn callback(error: int32_t,
-                               user_data: *mut c_void,
+        extern "C" fn callback(user_data: *mut c_void,
+                               error: int32_t,
                                _file_details_ptr: *mut FileDetails) {
             assert_eq!(error, 0);
             unsafe { test_utils::send_via_user_data(user_data) }

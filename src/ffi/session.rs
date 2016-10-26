@@ -25,7 +25,7 @@ use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
 use core::futures::FutureExt;
 use ffi::{FfiError, OpaqueCtx};
 use ffi::object_cache::ObjectCache;
-use futures::Future;
+use futures::{Future, IntoFuture};
 use futures::stream::Stream;
 use libc::{c_void, int32_t, int64_t, uint64_t};
 use maidsafe_utilities::thread::{self, Joiner};
@@ -61,6 +61,16 @@ impl Session {
     pub fn send(&self, msg: CoreMsg) -> Result<(), FfiError> {
         let core_tx = unwrap!(self.inner.core_tx.lock());
         core_tx.send(msg).map_err(FfiError::from)
+    }
+
+    /// Send the given closure to be executed on the core event loop.
+    pub fn send_fn<F, I>(&self, f: F) -> Result<(), FfiError>
+        where F: FnOnce(&Client) -> Option<I> + Send + 'static,
+              I: IntoFuture<Item=(), Error=()> + 'static
+    {
+        self.send(CoreMsg::new(move |client| {
+            f(client).map(|i| i.into_future().into_box())
+        }))
     }
 
     /// Returns an object cache tied to the session

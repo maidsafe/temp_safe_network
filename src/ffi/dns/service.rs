@@ -21,8 +21,6 @@
 
 //! DNS service operations
 
-use core::CoreMsg;
-use core::futures::FutureExt;
 use dns::operations;
 use ffi::{FfiError, OpaqueCtx, Session};
 // use ffi::dir_details::DirDetails;
@@ -45,28 +43,28 @@ pub unsafe extern "C" fn dns_add_service(session: *const Session,
                                          service_home_dir_path_len: usize,
                                          is_path_shared: bool,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(int32_t, *mut c_void))
+                                         o_cb: extern "C" fn(*mut c_void, int32_t))
                                          -> int32_t {
-    helper::catch_unwind_i32(|| {
+    helper::catch_unwind_cb(|| {
         trace!("FFI add service.");
 
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
-        let service_name = ffi_try!(helper::c_utf8_to_string(service_name, service_name_len));
-        let service_home_dir_path = ffi_try!(helper::c_utf8_to_string(service_home_dir_path,
-                                                                      service_home_dir_path_len));
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
+        let service_home_dir_path = try!(helper::c_utf8_to_string(service_home_dir_path,
+                                                                  service_home_dir_path_len));
 
 
         let user_data = OpaqueCtx(user_data);
         let session = &*session;
         let object_cache = session.object_cache();
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
+        session.send_fn(move |client| {
             let client2 = client.clone();
 
             let sign_sk = match client.secret_signing_key() {
                 Ok(key) => key,
                 Err(err) => {
-                    o_cb(ffi_error_code!(err), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(err));
                     return None;
                 }
             };
@@ -83,21 +81,18 @@ pub unsafe extern "C" fn dns_add_service(session: *const Session,
                                                     None)
                                 .map_err(FfiError::from)
                         })
-                        .map(move |_| o_cb(0, user_data.0))
-                        .map_err(move |err| o_cb(ffi_error_code!(err), user_data.0))
-                        .into_box();
+                        .map(move |_| o_cb(user_data.0, 0))
+                        .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)));
 
                     Some(fut)
                 }
                 Err(err) => {
-                    o_cb(ffi_error_code!(err), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(err));
                     None
                 }
             }
-        })));
-
-        0
-    })
+        })
+    }, move |error| o_cb(user_data, error))
 }
 
 /// Delete DNS service.
@@ -108,35 +103,32 @@ pub unsafe extern "C" fn dns_delete_service(session: *const Session,
                                             service_name: *const u8,
                                             service_name_len: usize,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(int32_t, *mut c_void))
+                                            o_cb: extern "C" fn(*mut c_void, int32_t))
                                             -> int32_t {
-    helper::catch_unwind_i32(|| {
+    helper::catch_unwind_cb(|| {
         trace!("FFI delete service.");
 
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
-        let service_name = ffi_try!(helper::c_utf8_to_string(service_name, service_name_len));
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send_fn(move |client| {
             let sign_sk = match client.secret_signing_key() {
                 Ok(key) => key,
                 Err(err) => {
-                    o_cb(ffi_error_code!(err), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(err));
                     return None;
                 }
             };
 
             let fut = operations::remove_service(client, long_name, service_name, sign_sk, None)
-                .map(move |_| o_cb(0, user_data.0))
-                .map_err(move |err| o_cb(ffi_error_code!(err), user_data.0))
-                .into_box();
+                .map(move |_| o_cb(user_data.0, 0))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)));
 
             Some(fut)
-        })));
-
-        0
-    })
+        })
+    }, move |error| o_cb(user_data, error))
 }
 
 /// Get all registered long names.
@@ -145,34 +137,31 @@ pub unsafe extern "C" fn dns_get_services(session: *const Session,
                                           long_name: *const u8,
                                           long_name_len: usize,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(int32_t,
-                                                              *mut c_void,
+                                          o_cb: extern "C" fn(*mut c_void,
+                                                              int32_t,
                                                               *mut StringList))
                                           -> int32_t {
-    helper::catch_unwind_i32(|| {
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
+    helper::catch_unwind_cb(|| {
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
 
         trace!("FFI Get all services for dns with name: {}", long_name);
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send_fn(move |client| {
             let fut = operations::get_all_services(client, long_name, None)
                 .map_err(FfiError::from)
                 .and_then(|services| string_list::from_vec(services))
                 .map(move |list| {
-                    o_cb(0, user_data.0, list);
+                    o_cb(user_data.0, 0, list);
                 })
                 .map_err(move |err| {
-                    o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut());
-                })
-                .into_box();
+                    o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut());
+                });
 
             Some(fut)
-        })));
-
-        0
-    })
+        })
+    }, move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
 // TODO: Commenting out, because currently there is no way to get DirDetails
@@ -267,7 +256,7 @@ mod tests {
         let service_name = test_utils::as_raw_parts("www");
         let service_home_dir_path = test_utils::as_raw_parts("test-dir");
 
-        extern "C" fn callback(error: int32_t, user_data: *mut c_void) {
+        extern "C" fn callback(user_data: *mut c_void, error: int32_t) {
             assert_eq!(error, 0);
             unsafe { test_utils::send_via_user_data(user_data) }
         }

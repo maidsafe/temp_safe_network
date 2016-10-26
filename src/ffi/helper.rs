@@ -27,8 +27,9 @@ use futures::Future;
 use libc::int32_t;
 use nfs::{Dir, DirMetadata};
 use nfs::helper::dir_helper;
-use std::{self, mem, panic, ptr, slice};
+use std::{self, mem, ptr, slice};
 use std::error::Error;
+use std::panic::{self, AssertUnwindSafe};
 
 pub unsafe fn c_utf8_to_string(ptr: *const u8, len: usize) -> Result<String, FfiError> {
     c_utf8_to_str(ptr, len).map(|v| v.to_owned())
@@ -81,11 +82,32 @@ pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
 
 pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
     let errno: i32 = FfiError::Unexpected(String::new()).into();
-    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(errno)
+    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(errno)
 }
 
 pub fn catch_unwind_ptr<T, F: FnOnce() -> *const T>(f: F) -> *const T {
-    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(ptr::null())
+    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(ptr::null())
+}
+
+// Every FFI function which uses result callback should have its body wrapped
+// in this.
+pub fn catch_unwind_cb<F, G>(body: F, on_error: G) -> i32
+    where F: FnOnce() -> Result<(), FfiError>,
+          G: FnOnce(i32),
+{
+    match panic::catch_unwind(AssertUnwindSafe(body)) {
+        Err(_) => {
+            let code: i32 = FfiError::from("panic").into();
+            on_error(code);
+            code
+        }
+        Ok(Err(err)) => {
+            let code: i32 = err.into();
+            on_error(code);
+            code
+        }
+        Ok(Ok(_)) => 0,
+    }
 }
 
 pub fn safe_drive_metadata(client: Client) -> Box<FfiFuture<DirMetadata>> {

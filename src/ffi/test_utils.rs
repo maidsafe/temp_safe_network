@@ -19,8 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, CoreMsg, utility};
-use core::futures::FutureExt;
+use core::{Client, utility};
 use ffi::{App, Session};
 use ffi::launcher_config;
 use futures::{Future, IntoFuture};
@@ -67,14 +66,13 @@ pub fn run<F, I, R, E>(session: &Session, f: F) -> R
 {
     let (tx, rx) = mpsc::channel();
 
-    unwrap!(session.send(CoreMsg::new(move |client| {
+    unwrap!(session.send_fn(move |client| {
         let future = f(client).into_future()
             .map_err(|err| panic!("{:?}", err))
-            .map(move |result| unwrap!(tx.send(result)))
-            .into_box();
+            .map(move |result| unwrap!(tx.send(result)));
 
         Some(future)
-    })));
+    }));
 
     unwrap!(rx.recv_timeout(Duration::from_millis(RUN_TIMEOUT_MS)))
 }

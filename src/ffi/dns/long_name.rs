@@ -38,10 +38,10 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
                                                 long_name: *const u8,
                                                 long_name_len: usize,
                                                 user_data: *mut c_void,
-                                                o_cb: extern "C" fn(int32_t, *mut c_void))
+                                                o_cb: extern "C" fn(*mut c_void, int32_t))
                                                 -> int32_t {
-    helper::catch_unwind_i32(|| {
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
+    helper::catch_unwind_cb(|| {
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
 
         trace!("FFI register public-id with name: {}. This means to register dns without a \
                 given service.",
@@ -50,11 +50,11 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
         let (msg_pk, msg_sk) = box_::gen_keypair();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send(CoreMsg::new(move |client| {
             let (sign_pk, sign_sk) = match client.signing_keypair() {
                 Ok((pk, sk)) => (pk, sk),
                 Err(err) => {
-                    o_cb(ffi_error_code!(err), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(err));
                     return None;
                 }
             };
@@ -67,15 +67,13 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
                                                vec![sign_pk],
                                                sign_sk,
                                                None)
-                .map(move |_| o_cb(0, user_data.0))
-                .map_err(move |err| o_cb(ffi_error_code!(err), user_data.0))
+                .map(move |_| o_cb(user_data.0, 0))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)))
                 .into_box();
 
             Some(fut)
-        })));
-
-        0
-    })
+        }))
+    }, move |error| o_cb(user_data, error))
 }
 
 /// Delete DNS.
@@ -84,60 +82,54 @@ pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
                                               long_name: *const u8,
                                               long_name_len: usize,
                                               user_data: *mut c_void,
-                                              o_cb: extern "C" fn(int32_t, *mut c_void))
+                                              o_cb: extern "C" fn(*mut c_void, int32_t))
                                               -> int32_t {
-    helper::catch_unwind_i32(|| {
+    helper::catch_unwind_cb(|| {
         trace!("FFI delete DNS.");
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send_fn(move |client| {
             let sign_sk = match client.secret_signing_key() {
                 Ok(sk) => sk,
                 Err(err) => {
-                    o_cb(ffi_error_code!(err), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(err));
                     return None;
                 }
             };
 
             let fut = operations::delete_dns(client, long_name, sign_sk)
-                .map(move |_| o_cb(0, user_data.0))
-                .map_err(move |err| o_cb(ffi_error_code!(err), user_data.0))
-                .into_box();
+                .map(move |_| o_cb(user_data.0, 0))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)));
 
             Some(fut)
-        })));
-
-        0
-    })
+        })
+    }, move |error| o_cb(user_data, error))
 }
 
 /// Get all registered long names.
 #[no_mangle]
 pub unsafe extern "C" fn dns_get_long_names(session: *const Session,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(int32_t,
-                                                                *mut c_void,
+                                            o_cb: extern "C" fn(*mut c_void,
+                                                                int32_t,
                                                                 *mut StringList))
                                             -> int32_t {
-    helper::catch_unwind_i32(|| {
+    helper::catch_unwind_cb(|| {
         trace!("FFI Get all dns long names.");
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send_fn(move |client| {
             let fut = operations::get_all_registered_names(client)
                 .map_err(FfiError::from)
                 .and_then(|names| string_list::from_vec(names))
-                .map(move |list| o_cb(0, user_data.0, list))
-                .map_err(move |err| o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut()))
-                .into_box();
+                .map(move |list| o_cb(user_data.0, 0, list))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut()));
 
             Some(fut)
-        })));
-
-        0
-    })
+        })
+    }, move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
 #[cfg(test)]
@@ -161,12 +153,12 @@ mod tests {
         {
             let session = test_utils::create_session();
 
-            extern "C" fn register_cb(error: int32_t, user_data: *mut c_void) {
+            extern "C" fn register_cb(user_data: *mut c_void, error: int32_t) {
                 assert_eq!(error, 0);
                 unsafe { test_utils::send_via_user_data(user_data) }
             }
 
-            extern "C" fn get_cb(error: int32_t, user_data: *mut c_void, list: *mut StringList) {
+            extern "C" fn get_cb(user_data: *mut c_void, error: int32_t, list: *mut StringList) {
                 assert_eq!(error, 0);
 
                 unsafe {
@@ -200,7 +192,7 @@ mod tests {
         {
             let session = test_utils::create_session();
 
-            extern "C" fn callback(error: int32_t, user_data: *mut c_void) {
+            extern "C" fn callback(user_data: *mut c_void, error: int32_t) {
                 assert_eq!(error, DnsError::DnsNameAlreadyRegistered.into());
                 unsafe { test_utils::send_via_user_data(user_data) }
             }
