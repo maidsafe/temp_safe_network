@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn register_long_name() {
         let long_name = unwrap!(utility::generate_random_string(10));
-        let long_name = test_utils::string_to_c_utf8(long_name);
+        let long_name = test_utils::as_raw_parts(&long_name);
 
         let (tx, rx) = mpsc::channel();
 
@@ -178,8 +178,8 @@ mod tests {
 
             unsafe {
                 let result = dns_register_long_name(&session,
-                                                    long_name.ptr(),
-                                                    long_name.len(),
+                                                    long_name.ptr,
+                                                    long_name.len,
                                                     test_utils::sender_as_user_data(&tx),
                                                     register_cb);
                 assert_eq!(result, 0);
@@ -207,8 +207,8 @@ mod tests {
 
             unsafe {
                 let result = dns_register_long_name(&session,
-                                                    long_name.ptr(),
-                                                    long_name.len(),
+                                                    long_name.ptr,
+                                                    long_name.len,
                                                     test_utils::sender_as_user_data(&tx),
                                                     callback);
                 assert_eq!(result, 0);

@@ -393,7 +393,7 @@ fn move_dir(client: &Client,
     let dst_path = dst_path.to_string();
 
     helper::dir_and_file(client, app, src_path, is_src_path_shared)
-        .join(helper::dir(client, app, &dst_path, is_dst_path_shared))
+        .join(helper::dir(client, app, dst_path.clone(), is_dst_path_shared))
         .and_then(move |((mut src_parent_dir, src_parent_meta, dir_to_move),
                          (mut dst_dir, dst_meta))| {
             if retain_src {

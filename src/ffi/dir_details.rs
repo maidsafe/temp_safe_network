@@ -194,6 +194,6 @@ pub unsafe extern "C" fn directory_details_get_sub_directory_at(details: *const 
 
 /// Dispose of the DirDetails instance.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_drop(details: *mut DirDetails) {
+pub unsafe extern "C" fn directory_details_free(details: *mut DirDetails) {
     let _ = Box::from_raw(details);
 }

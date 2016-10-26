@@ -23,4 +23,4 @@
 
 pub mod file;
 pub mod long_name;
-// pub mod service;
+pub mod service;

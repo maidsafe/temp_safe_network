@@ -185,10 +185,8 @@ mod tests {
                         service_dir_id: DirId) {
         test_utils::run(session, move |client| {
             let (msg_pk, msg_sk) = box_::gen_keypair();
+            let (sign_pk, sign_sk) = unwrap!(client.signing_keypair());
             let services = vec![(service_name, service_dir_id)];
-
-            let sign_pk = unwrap!(client.public_signing_key());
-            let sign_sk = unwrap!(client.secret_signing_key()).clone();
 
             operations::register_dns(client,
                                      long_name,
@@ -222,9 +220,9 @@ mod tests {
 
         let (tx, rx) = mpsc::channel::<()>();
 
-        let long_name = test_utils::string_to_c_utf8(long_name);
-        let service_name = test_utils::string_to_c_utf8(service_name);
-        let file_name = test_utils::string_to_c_utf8(file_name);
+        let long_name = test_utils::as_raw_parts(&long_name);
+        let service_name = test_utils::as_raw_parts(&service_name);
+        let file_name = test_utils::as_raw_parts(&file_name);
 
         extern "C" fn callback(error: int32_t,
                                user_data: *mut c_void,
@@ -235,12 +233,12 @@ mod tests {
 
         unsafe {
             let result = dns_get_file(&session,
-                                      long_name.ptr(),
-                                      long_name.len(),
-                                      service_name.ptr(),
-                                      service_name.len(),
-                                      file_name.ptr(),
-                                      file_name.len(),
+                                      long_name.ptr,
+                                      long_name.len,
+                                      service_name.ptr,
+                                      service_name.len,
+                                      file_name.ptr,
+                                      file_name.len,
                                       0,
                                       0,
                                       false,
@@ -255,12 +253,12 @@ mod tests {
 
         unsafe {
             let result = dns_get_file(&session2,
-                                      long_name.ptr(),
-                                      long_name.len(),
-                                      service_name.ptr(),
-                                      service_name.len(),
-                                      file_name.ptr(),
-                                      file_name.len(),
+                                      long_name.ptr,
+                                      long_name.len,
+                                      service_name.ptr,
+                                      service_name.len,
+                                      file_name.ptr,
+                                      file_name.len,
                                       0,
                                       0,
                                       false,
@@ -275,12 +273,12 @@ mod tests {
 
         unsafe {
             let result = dns_get_file(&session3,
-                                      long_name.ptr(),
-                                      long_name.len(),
-                                      service_name.ptr(),
-                                      service_name.len(),
-                                      file_name.ptr(),
-                                      file_name.len(),
+                                      long_name.ptr,
+                                      long_name.len,
+                                      service_name.ptr,
+                                      service_name.len,
+                                      file_name.ptr,
+                                      file_name.len,
                                       0,
                                       0,
                                       false,

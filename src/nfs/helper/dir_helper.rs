@@ -91,15 +91,18 @@ pub fn add_sub_dir(client: Client,
 
 /// Creates and adds a child directory
 /// Returns (updated_parent_dir, created_dir, created_dir_metadata)
-pub fn create_sub_dir(client: Client,
-                      name: String,
-                      encrypt_key: Option<secretbox::Key>,
-                      user_metadata: Vec<u8>,
-                      parent: &Dir,
-                      parent_id: &DirId)
-                      -> Box<NfsFuture<(Dir, Dir, DirMetadata)>> {
+pub fn create_sub_dir<S>(client: Client,
+                         name: S,
+                         encrypt_key: Option<secretbox::Key>,
+                         user_metadata: Vec<u8>,
+                         parent: &Dir,
+                         parent_id: &DirId)
+                         -> Box<NfsFuture<(Dir, Dir, DirMetadata)>>
+    where S: Into<String>
+{
     let dir = Dir::new();
     let c2 = client.clone();
+    let name = name.into();
     let mut parent = parent.clone();
     let parent_id = parent_id.clone();
     create(client.clone(), &dir, encrypt_key.as_ref())
@@ -314,6 +317,15 @@ pub fn get_file_by_path(client: &Client,
                 .ok_or(NfsError::FileNotFound)
         })
         .into_box()
+}
+
+/// Get directory by path relative to `root_dir`.
+pub fn get_dir_by_path(client: &Client,
+                       root_dir: Option<&DirId>,
+                       path: &str)
+                       -> Box<NfsFuture<(Dir, DirMetadata)>> {
+    let tokens = tokenise_path(path);
+    final_sub_dir(client, &tokens, root_dir)
 }
 
 /// Get the directory at the given tokenised path. The path is taken relative

@@ -24,7 +24,7 @@ use core::futures::FutureExt;
 use ffi::{App, FfiError, FfiFuture};
 use ffi::config::SAFE_DRIVE_DIR_NAME;
 use futures::Future;
-use libc::{int32_t, int64_t};
+use libc::int32_t;
 use nfs::{Dir, DirMetadata};
 use nfs::helper::dir_helper;
 use std::{self, mem, panic, ptr, slice};
@@ -84,11 +84,6 @@ pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
     panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(errno)
 }
 
-pub fn catch_unwind_i64<F: FnOnce() -> int64_t>(f: F) -> int64_t {
-    let errno: i32 = FfiError::Unexpected(String::new()).into();
-    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(errno as i64)
-}
-
 pub fn catch_unwind_ptr<T, F: FnOnce() -> *const T>(f: F) -> *const T {
     panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(ptr::null())
 }
@@ -126,20 +121,16 @@ pub fn safe_drive_metadata(client: Client) -> Box<FfiFuture<DirMetadata>> {
         .into_box()
 }
 
-// TODO: figure a way to move these two function over to the nfs module.
-
 // Return a Dir corresponding to the path.
-pub fn dir(client: &Client,
-           app: &App,
-           path: &str,
-           is_shared: bool)
-           -> Box<FfiFuture<(Dir, DirMetadata)>> {
-    let c2 = client.clone();
-    let tokens = dir_helper::tokenise_path(path);
+pub fn dir<S>(client: &Client, app: &App, path: S, is_shared: bool) -> Box<FfiFuture<(Dir, DirMetadata)>>
+    where S: Into<String>
+{
+    let client2 = client.clone();
+    let path = path.into();
 
     app.root_dir(client.clone(), is_shared)
-        .and_then(move |start_dir| {
-            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir))
+        .and_then(move |root_dir| {
+            dir_helper::get_dir_by_path(&client2, Some(&root_dir), &path)
                 .map_err(FfiError::from)
         })
         .into_box()

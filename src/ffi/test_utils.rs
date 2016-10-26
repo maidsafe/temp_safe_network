@@ -22,7 +22,7 @@
 use core::{Client, CoreMsg, utility};
 use core::futures::FutureExt;
 use ffi::{App, Session};
-use ffi::{helper, launcher_config};
+use ffi::launcher_config;
 use futures::{Future, IntoFuture};
 use libc::c_void;
 use std::ffi::CString;
@@ -84,19 +84,9 @@ pub fn create_app(session: &Session, has_safe_drive_access: bool) -> App {
     let app_id = unwrap!(utility::generate_random_string(10));
     let vendor = "Test Vendor".to_string();
 
-    let (tx, rx) = mpsc::channel();
-
-    unwrap!(session.send(CoreMsg::new(move |client| {
-        let fut = launcher_config::app(client, app_name, app_id, vendor, has_safe_drive_access)
-            .map(move |app| {
-                unwrap!(tx.send(app));
-            })
-            .map_err(move |_| ())
-            .into_box();
-        Some(fut)
-    })));
-
-    unwrap!(rx.recv())
+    run(session, move |client| {
+        launcher_config::app(client, app_name, app_id, vendor, has_safe_drive_access)
+    })
 }
 
 // Convert a `mpsc::Sender<()>` to a void ptr which can be passed as user data to
@@ -112,38 +102,14 @@ pub unsafe fn send_via_user_data(user_data: *mut c_void) {
     unwrap!((*tx).send(()));
 }
 
-// RAII-style wrapper for a (pointer, length, capacity) tripple. Useful when we
-// need to pass a String to a FFI function without giving up its ownership.
-pub struct CUtf8 {
-    ptr: *mut u8,
-    len: usize,
-    cap: usize,
+pub struct FfiStr {
+    pub ptr: *const u8,
+    pub len: usize,
 }
 
-impl CUtf8 {
-    pub fn ptr(&self) -> *mut u8 {
-        self.ptr
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
-    }
-}
-
-impl Drop for CUtf8 {
-    fn drop(&mut self) {
-        unsafe {
-            let _ = String::from_raw_parts(self.ptr, self.len, self.cap);
-        }
-    }
-}
-
-// Convert `String` to `CUtf8` wrapper.
-pub fn string_to_c_utf8(s: String) -> CUtf8 {
-    let (ptr, len, cap) = helper::string_to_c_utf8(s);
-    CUtf8 {
-        ptr: ptr,
-        len: len,
-        cap: cap,
+pub fn as_raw_parts(s: &str) -> FfiStr {
+    FfiStr {
+        ptr: s.as_ptr(),
+        len: s.len(),
     }
 }
