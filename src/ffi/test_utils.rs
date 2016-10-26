@@ -46,7 +46,7 @@ pub fn create_session() -> Session {
     let acc_locator = unwrap!(utility::generate_random_string(10));
     let acc_password = unwrap!(utility::generate_random_string(10));
 
-    Session::create_account(acc_locator, acc_password)
+    unwrap!(Session::create_account(acc_locator, acc_password, move |_net_evt| ()))
 }
 
 pub fn create_app(session: &Session, has_safe_drive_access: bool) -> App {

@@ -21,21 +21,30 @@
 
 //! Session management
 
-use core::{self, Client, CoreMsg, CoreMsgTx};
+use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
 use core::futures::FutureExt;
 use ffi::{FfiError, OpaqueCtx};
 use ffi::object_cache::ObjectCache;
 use futures::Future;
+use futures::stream::Stream;
 use libc::{c_void, int32_t, int64_t, uint64_t};
 use maidsafe_utilities::thread::{self, Joiner};
-use std::sync::{Arc, LockResult, Mutex, MutexGuard, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use super::helper;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
 
+macro_rules! try_tx {
+    ($result:expr, $tx:ident) => {
+        match $result {
+            Ok(res) => res,
+            Err(e) => { return unwrap!($tx.send(Err(FfiError::from(e)))); }
+        }
+    }
+}
+
 /// Represents user session on the SAFE network. There should be one session
 /// per launcher.
-#[derive(Clone)]
 pub struct Session {
     inner: Arc<Inner>,
 }
@@ -50,47 +59,62 @@ struct Inner {
 impl Session {
     /// Send a message to the core event loop
     pub fn send(&self, msg: CoreMsg) -> Result<(), FfiError> {
-        unwrap!(self.inner.core_tx.lock()).send(msg).map_err(FfiError::from)
+        let core_tx = unwrap!(self.inner.core_tx.lock());
+        core_tx.send(msg).map_err(FfiError::from)
     }
 
     /// Returns an object cache tied to the session
-    pub fn object_cache(&self) -> LockResult<MutexGuard<ObjectCache>> {
-        self.inner.object_cache.lock()
+    pub fn object_cache(&self) -> Arc<Mutex<ObjectCache>> {
+        self.inner.object_cache.clone()
     }
 
     /// Create unregistered client.
-    pub fn unregistered() -> Self {
+    pub fn unregistered<NetObs>(mut network_observer: NetObs) -> Result<Self, FfiError>
+        where NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
+    {
         let (tx, rx) = mpsc::sync_channel(0);
 
         let joiner = thread::named("Core Event Loop", move || {
-            let el = unwrap!(Core::new(), "Failed to create the event loop");
+            let el = try_tx!(Core::new(), tx);
             let el_h = el.handle();
 
-            let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
-            let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
+            let (core_tx, core_rx) = try_tx!(channel::channel(&el_h), tx);
+            let (net_tx, net_rx) = try_tx!(channel::channel(&el_h), tx);
+
+            let net_obs_fut =
+                net_rx.then(move |net_event| {
+                        Ok(network_observer(net_event.map_err(FfiError::from)))
+                    })
+                    .for_each(|_| Ok(()));
+
+            el_h.spawn(net_obs_fut);
+
             let core_tx_clone = core_tx.clone();
 
-            tx.send(core_tx).unwrap();
+            let client = try_tx!(Client::unregistered(core_tx_clone, net_tx), tx);
+            unwrap!(tx.send(Ok(core_tx)));
 
-            let client = unwrap!(Client::unregistered(core_tx_clone, net_tx),
-                                 "Failed to create client");
             core::run(el, client, core_rx);
         });
 
-        let tx = unwrap!(rx.recv());
+        let core_tx = try!(try!(rx.recv()));
 
-        Session {
+        Ok(Session {
             inner: Arc::new(Inner {
-                core_tx: Mutex::new(tx),
+                core_tx: Mutex::new(core_tx),
                 _core_joiner: joiner,
                 object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
-        }
+        })
     }
 
     /// Create new account.
-    pub fn create_account<S>(locator: S, password: S) -> Self
-        where S: Into<String>
+    pub fn create_account<S, NetObs>(locator: S,
+                                     password: S,
+                                     mut network_observer: NetObs)
+                                     -> Result<Self, FfiError>
+        where S: Into<String>,
+              NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
     {
         let (tx, rx) = mpsc::sync_channel(0);
 
@@ -98,34 +122,46 @@ impl Session {
         let password = password.into();
 
         let joiner = thread::named("Core Event Loop", move || {
-            let el = unwrap!(Core::new(), "Failed to create the event loop");
+            let el = try_tx!(Core::new(), tx);
             let el_h = el.handle();
 
-            let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
-            let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
+            let (core_tx, core_rx) = try_tx!(channel::channel(&el_h), tx);
+            let (net_tx, net_rx) = try_tx!(channel::channel(&el_h), tx);
             let core_tx_clone = core_tx.clone();
 
-            tx.send(core_tx).unwrap();
+            let net_obs_fut =
+                net_rx.then(move |net_event| {
+                        Ok(network_observer(net_event.map_err(FfiError::from)))
+                    })
+                    .for_each(|_| Ok(()));
+            el_h.spawn(net_obs_fut);
 
-            let client = unwrap!(Client::registered(&locator, &password, core_tx_clone, net_tx),
-                                 "Failed to create client");
+            let client = try_tx!(Client::registered(&locator, &password, core_tx_clone, net_tx),
+                                 tx);
+
+            unwrap!(tx.send(Ok(core_tx)));
+
             core::run(el, client, core_rx);
         });
 
-        let tx = unwrap!(rx.recv());
+        let core_tx = try!(try!(rx.recv()));
 
-        Session {
+        Ok(Session {
             inner: Arc::new(Inner {
-                core_tx: Mutex::new(tx),
+                core_tx: Mutex::new(core_tx),
                 _core_joiner: joiner,
                 object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
-        }
+        })
     }
 
     /// Log in to existing account.
-    pub fn log_in<S>(locator: S, password: S) -> Self
-        where S: Into<String>
+    pub fn log_in<S, NetObs>(locator: S,
+                             password: S,
+                             mut network_observer: NetObs)
+                             -> Result<Self, FfiError>
+        where S: Into<String>,
+              NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
     {
         let (tx, rx) = mpsc::sync_channel(0);
 
@@ -133,28 +169,37 @@ impl Session {
         let password = password.into();
 
         let joiner = thread::named("Core Event Loop", move || {
-            let el = unwrap!(Core::new(), "Failed to create the event loop");
+            let el = try_tx!(Core::new(), tx);
             let el_h = el.handle();
 
-            let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
-            let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
+            let (core_tx, core_rx) = try_tx!(channel::channel(&el_h), tx);
+            let (net_tx, net_rx) = try_tx!(channel::channel(&el_h), tx);
             let core_tx_clone = core_tx.clone();
-            tx.send(core_tx).unwrap();
 
-            let client = unwrap!(Client::login(&locator, &password, core_tx_clone, net_tx),
-                                 "Failed to create client");
+            let net_obs_fut =
+                net_rx.then(move |net_event| {
+                        Ok(network_observer(net_event.map_err(FfiError::from)))
+                    })
+                    .for_each(|_| Ok(()));
+            el_h.spawn(net_obs_fut);
+
+            let client = try_tx!(Client::login(&locator, &password, core_tx_clone, net_tx),
+                                 tx);
+
+            unwrap!(tx.send(Ok(core_tx)));
+
             core::run(el, client, core_rx);
         });
 
-        let tx = unwrap!(rx.recv());
+        let core_tx = try!(try!(rx.recv()));
 
-        Session {
+        Ok(Session {
             inner: Arc::new(Inner {
-                core_tx: Mutex::new(tx),
+                core_tx: Mutex::new(core_tx),
                 _core_joiner: joiner,
                 object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
-        }
+        })
     }
 
     // /// Get SAFEdrive directory key.
@@ -162,49 +207,15 @@ impl Session {
     //     &self.safe_drive_dir
     // }
 
-    // TODO(nbaksalyar): uncomment after implemented in Core
-    // fn register_network_event_observer(&mut self, callback: extern "C" fn(i32)) {
-    //     unwrap!(self.network_event_observers.lock()).push(callback);
-
-    //     if self.network_thread.is_none() {
-    //         let callbacks = self.network_event_observers.clone();
-
-    //         let (tx, rx) = mpsc::channel();
-    //         let cloned_tx = tx.clone();
-    //         self.client.borrow_mut().add_network_event_observer(tx);
-
-    //         let joiner = thread::named("FfiNetworkEventObserver", move || {
-    //             while let Ok(event) = rx.recv() {
-    //                 if let NetworkEvent::Terminated = event {
-    //                     trace!("FFI exiting the network event notifier thread.");
-    //                     break;
-    //                 }
-
-    //                 let callbacks = &*unwrap!(callbacks.lock());
-    //                 info!("Informing {:?} to {} FFI network event observers.",
-    //                       event,
-    //                       callbacks.len());
-    //                 let event_ffi_val = event.into();
-
-    //                 for cb in callbacks {
-    //                     cb(event_ffi_val);
-    //                 }
-    //             }
-    //         });
-
-    //         self.network_thread = Some((cloned_tx, joiner));
-    //     }
-    // }
-
     fn account_info(&self,
                     user_data: OpaqueCtx,
-                    callback: extern "C" fn(int32_t, *mut c_void, uint64_t, uint64_t))
+                    callback: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t, uint64_t))
                     -> Result<(), FfiError> {
         self.send(CoreMsg::new(move |client| {
             Some(client.get_account_info(None)
-                .map_err(move |e| callback(ffi_error_code!(e), user_data.0, 0, 0))
+                .map_err(move |e| unsafe { callback(user_data.0, ffi_error_code!(e), 0, 0) })
                 .map(move |(data_stored, space_available)| {
-                    callback(0, user_data.0, data_stored, space_available);
+                    unsafe { callback(user_data.0, 0, data_stored, space_available) }
                 })
                 .into_box())
         }))
@@ -224,11 +235,21 @@ impl Drop for Session {
 /// companion functions to get a session must be called before initiating any
 /// operation allowed by this crate.
 #[no_mangle]
-pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut Session) -> int32_t {
+pub unsafe extern "C" fn create_unregistered_client(user_data: *mut c_void,
+                                                    obs_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                 int32_t,
+                                                                                 int32_t),
+                                                    session_handle: *mut *mut Session)
+                                                    -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI create unregistered client.");
-
-        let session = Session::unregistered();
+        let user_data = OpaqueCtx(user_data);
+        let session = ffi_try!(Session::unregistered(move |net_event| {
+            match net_event {
+                Ok(event) => obs_cb(user_data.0, 0, event.into()),
+                Err(e) => obs_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+        }));
         *session_handle = Box::into_raw(Box::new(session));
         0
     })
@@ -243,14 +264,25 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
                                         account_locator_len: usize,
                                         account_password: *const u8,
                                         account_password_len: usize,
-                                        session_handle: *mut *mut Session)
+                                        session_handle: *mut *mut Session,
+                                        user_data: *mut c_void,
+                                        o_network_obs_cb: unsafe extern "C" fn(*mut c_void,
+                                                                               int32_t,
+                                                                               int32_t))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI create a client account.");
 
         let acc_locator = ffi_try!(helper::c_utf8_to_str(account_locator, account_locator_len));
         let acc_password = ffi_try!(helper::c_utf8_to_str(account_password, account_password_len));
-        let session = Session::create_account(acc_locator, acc_password);
+        let user_data = OpaqueCtx(user_data);
+        let session =
+            ffi_try!(Session::create_account(acc_locator, acc_password, move |net_event| {
+                match net_event {
+                    Ok(event) => o_network_obs_cb(user_data.0, 0, event.into()),
+                    Err(e) => o_network_obs_cb(user_data.0, ffi_error_code!(e), 0),
+                }
+            }));
 
         *session_handle = Box::into_raw(Box::new(session));
         0
@@ -266,48 +298,43 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
                                 account_locator_len: usize,
                                 account_password: *const u8,
                                 account_password_len: usize,
-                                session_handle: *mut *mut Session)
+                                session_handle: *mut *mut Session,
+                                user_data: *mut c_void,
+                                o_network_obs_cb: unsafe extern "C" fn(*mut c_void,
+                                                                       int32_t,
+                                                                       int32_t))
                                 -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI login a registered client.");
 
         let acc_locator = ffi_try!(helper::c_utf8_to_str(account_locator, account_locator_len));
         let acc_password = ffi_try!(helper::c_utf8_to_str(account_password, account_password_len));
-        let session = Session::log_in(acc_locator, acc_password);
+        let user_data = OpaqueCtx(user_data);
+        let session = ffi_try!(Session::log_in(acc_locator, acc_password, move |net_event| {
+            match net_event {
+                Ok(event) => o_network_obs_cb(user_data.0, 0, event.into()),
+                Err(e) => o_network_obs_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+        }));
 
         *session_handle = Box::into_raw(Box::new(session));
         0
     })
 }
 
-// /// Register an observer to network events like Connected, Disconnected etc.
-// as provided by the
-// /// core module
-// #[no_mangle]
-// pub unsafe extern "C" fn register_network_event_observer(session: *mut
-// Session,
-// callback: extern
-// "C" fn(i32))
-//                                                          -> int32_t {
-//     helper::catch_unwind_i32(|| {
-//         trace!("FFI register a network event observer.");
-//         unwrap!(*session.register_network_event_observer(callback));
-//         0
-//     })
-// }
-
-
 /// Return the amount of calls that were done to `get`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_gets(session: *const Session,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
+                                            o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                       int32_t,
+                                                                       int64_t))
                                             -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued GETs.");
         let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data.0, client.issued_gets() as int64_t);
+            o_cb(user_data.0, 0, client.issued_gets() as int64_t);
             None
         })));
         0
@@ -318,13 +345,15 @@ pub unsafe extern "C" fn client_issued_gets(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_puts(session: *const Session,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
+                                            o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                       int32_t,
+                                                                       int64_t))
                                             -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued PUTs.");
         let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data.0, client.issued_puts() as int64_t);
+            o_cb(user_data.0, 0, client.issued_puts() as int64_t);
             None
         })));
         0
@@ -335,7 +364,9 @@ pub unsafe extern "C" fn client_issued_puts(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_posts(session: *const Session,
                                              user_data: *mut c_void,
-                                             o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
+                                             o_cb: unsafe extern "C" fn(int32_t,
+                                                                        *mut c_void,
+                                                                        int64_t))
                                              -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued POSTs.");
@@ -352,13 +383,15 @@ pub unsafe extern "C" fn client_issued_posts(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_deletes(session: *const Session,
                                                user_data: *mut c_void,
-                                               o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
+                                               o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                          int32_t,
+                                                                          int64_t))
                                                -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued DELETEs.");
         let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data.0, client.issued_deletes() as int64_t);
+            o_cb(user_data.0, 0, client.issued_deletes() as int64_t);
             None
         })));
         0
@@ -369,13 +402,15 @@ pub unsafe extern "C" fn client_issued_deletes(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_appends(session: *const Session,
                                                user_data: *mut c_void,
-                                               o_cb: extern "C" fn(int32_t, *mut c_void, int64_t))
+                                               o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                          int32_t,
+                                                                          int64_t))
                                                -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued APPENDs.");
         let user_data = OpaqueCtx(user_data);
         ffi_try!((*session).send(CoreMsg::new(move |client| {
-            o_cb(0, user_data.0, client.issued_appends() as int64_t);
+            o_cb(user_data.0, 0, client.issued_appends() as int64_t);
             None
         })));
         0
@@ -388,10 +423,10 @@ pub unsafe extern "C" fn client_issued_appends(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn get_account_info(session: *const Session,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(int32_t,
-                                                              *mut c_void,
-                                                              uint64_t,
-                                                              uint64_t))
+                                          o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                     int32_t,
+                                                                     uint64_t,
+                                                                     uint64_t))
                                           -> i32 {
     helper::catch_unwind_i32(|| {
         trace!("FFI get account information.");
@@ -413,6 +448,7 @@ pub unsafe extern "C" fn drop_session(session: *mut Session) {
 #[cfg(test)]
 mod tests {
     use ffi::test_utils;
+    use libc::c_void;
     use std::ptr;
     use super::*;
 
@@ -431,7 +467,9 @@ mod tests {
                                           10,
                                           acc_password.as_ptr() as *const u8,
                                           10,
-                                          session_handle_ptr),
+                                          session_handle_ptr,
+                                          ptr::null_mut(),
+                                          net_event_cb),
                            0);
             }
 
@@ -449,12 +487,18 @@ mod tests {
                                   10,
                                   acc_password.as_ptr() as *const u8,
                                   10,
-                                  session_handle_ptr),
+                                  session_handle_ptr,
+                                  ptr::null_mut(),
+                                  net_event_cb),
                            0);
             }
 
             assert!(!session_handle.is_null());
             unsafe { drop_session(session_handle) };
+        }
+
+        unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
+            assert_eq!(err_code, 0);
         }
     }
 }

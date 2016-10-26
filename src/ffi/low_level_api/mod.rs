@@ -27,8 +27,8 @@
 pub mod cipher_opt;
 /// DataIdentifier constructions and freeing
 pub mod data_id;
-// /// Low level manipulation of ImmutableData
-// pub mod immut_data;
+/// Low level manipulation of ImmutableData
+pub mod immut_data;
 /// Miscellaneous routines
 pub mod misc;
 // /// Low level manipulation of StructuredData

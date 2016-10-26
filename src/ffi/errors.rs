@@ -25,8 +25,11 @@ use core::CoreError;
 use dns::{DNS_ERROR_START_RANGE, DnsError};
 use maidsafe_utilities::serialisation::SerialisationError;
 use nfs::errors::NfsError;
+use std::error::Error;
 use std::ffi::NulError;
 use std::fmt;
+use std::io::Error as IoError;
+use std::sync::mpsc::RecvError;
 
 /// Intended for converting Launcher Errors into numeric codes for propagating
 /// some error information across FFI boundaries and specially to C.
@@ -100,8 +103,14 @@ impl<'a> From<&'a str> for FfiError {
     }
 }
 
-impl From<::std::io::Error> for FfiError {
-    fn from(error: ::std::io::Error) -> FfiError {
+impl From<RecvError> for FfiError {
+    fn from(error: RecvError) -> FfiError {
+        FfiError::Unexpected(error.description().to_owned())
+    }
+}
+
+impl From<IoError> for FfiError {
+    fn from(error: IoError) -> FfiError {
         FfiError::IoError(error)
     }
 }

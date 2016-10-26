@@ -67,12 +67,11 @@ pub unsafe extern "C" fn nfs_create_file(session: *const Session,
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
         let user_metadata = helper::u8_ptr_to_vec(user_metadata, user_metadata_len);
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = create_file(&client, &app, file_path, user_metadata, is_path_shared)
@@ -110,12 +109,11 @@ pub unsafe extern "C" fn nfs_writer_open(session: *const Session,
         trace!("FFI get nfs writer for modification of existing file.");
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = writer_open(&client, &app, file_path, is_path_shared)
@@ -154,11 +152,10 @@ pub unsafe extern "C" fn nfs_writer_write(session: *const Session,
 
         let data = slice::from_raw_parts(data, len);
 
-        let session = (*session).clone();
         let user_data = OpaqueCtx(user_data);
         let writer_handle = OpaqueCtx(writer_handle as *mut _);
 
-        ffi_try!(session.send(CoreMsg::new(move |_| {
+        ffi_try!((*session).send(CoreMsg::new(move |_| {
             let writer_handle: *mut Writer = writer_handle.0 as *mut _;
             Some((*writer_handle)
                 .inner
@@ -185,10 +182,9 @@ pub unsafe extern "C" fn nfs_writer_close(session: *const Session,
 
         let writer = *Box::from_raw(writer_handle);
 
-        let session = (*session).clone();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |_| {
+        ffi_try!((*session).send(CoreMsg::new(move |_| {
             Some(writer.close()
                 .then(move |res| {
                     o_cb(ffi_result_code!(res), user_data.0);

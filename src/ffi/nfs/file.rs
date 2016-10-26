@@ -48,12 +48,11 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
         trace!("FFI delete file, given the path.");
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = delete_file(&client, &app, file_path, is_shared)
@@ -94,12 +93,11 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
 
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = get_file(&client,
@@ -154,12 +152,11 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
         let new_metadata = helper::u8_ptr_to_opt_vec(new_metadata, new_metadata_len);
         let new_content = helper::u8_ptr_to_opt_vec(new_content, new_content_len);
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = modify_file(&client,
@@ -207,12 +204,11 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
         let src_path = ffi_try!(helper::c_utf8_to_str(src_path, src_path_len));
         let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path, dst_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = move_file(&client,
@@ -257,12 +253,11 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
         trace!("FFI get file metadata, given the path.");
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = get_file_metadata(&client, &app, file_path, is_path_shared)

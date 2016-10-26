@@ -19,27 +19,34 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use core::CoreMsg;
 use ffi::{OpaqueCtx, Session, helper};
 use ffi::object_cache::DataIdHandle;
-use libc::int32_t;
+use libc::{c_void, int32_t};
 use routing::{DataIdentifier, XOR_NAME_LEN, XorName};
-use std::ptr;
 
 /// Construct DataIdentifier for StructuredData.
 #[no_mangle]
 pub unsafe extern "C" fn data_id_new_struct_data(session: *const Session,
-                                                 user_data: OpaqueCtx,
                                                  type_tag: u64,
                                                  id: *const [u8; XOR_NAME_LEN],
-                                                 o_cb: extern "C" fn(int32_t,
-                                                                     OpaqueCtx,
-                                                                     DataIdHandle))
+                                                 user_data: *mut c_void,
+                                                 o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                            int32_t,
+                                                                            DataIdHandle))
                                                  -> i32 {
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Structured(xor_id, type_tag);
-        let handle = unwrap!((*session).object_cache()).insert_data_id(data_id);
-        o_cb(0, user_data, handle);
+
+        let obj_cache = (*session).object_cache();
+        let user_data = OpaqueCtx(user_data);
+
+        ffi_try!((*session).send(CoreMsg::new(move |_| {
+            let handle = unwrap!(obj_cache.lock()).insert_data_id(data_id);
+            o_cb(user_data.0, 0, handle);
+            None
+        })));
         0
     })
 }
@@ -48,13 +55,23 @@ pub unsafe extern "C" fn data_id_new_struct_data(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn data_id_new_immut_data(session: *const Session,
                                                 id: *const [u8; XOR_NAME_LEN],
-                                                o_handle: *mut DataIdHandle)
+                                                user_data: *mut c_void,
+                                                o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                           int32_t,
+                                                                           DataIdHandle))
                                                 -> i32 {
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Immutable(xor_id);
-        let handle = unwrap!((*session).object_cache()).insert_data_id(data_id);
-        ptr::write(o_handle, handle);
+
+        let obj_cache = (*session).object_cache();
+        let user_data = OpaqueCtx(user_data);
+
+        ffi_try!((*session).send(CoreMsg::new(move |_| {
+            let handle = unwrap!(obj_cache.lock()).insert_data_id(data_id);
+            o_cb(user_data.0, 0, handle);
+            None
+        })));
         0
     })
 }
@@ -64,7 +81,10 @@ pub unsafe extern "C" fn data_id_new_immut_data(session: *const Session,
 pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
                                                      id: *const [u8; XOR_NAME_LEN],
                                                      is_private: bool,
-                                                     o_handle: *mut DataIdHandle)
+                                                     user_data: *mut c_void,
+                                                     o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                int32_t,
+                                                                                DataIdHandle))
                                                      -> i32 {
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
@@ -73,33 +93,54 @@ pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
         } else {
             DataIdentifier::PubAppendable(xor_id)
         };
-        let handle = unwrap!((*session).object_cache()).insert_data_id(data_id);
-        ptr::write(o_handle, handle);
+
+        let obj_cache = (*session).object_cache();
+        let user_data = OpaqueCtx(user_data);
+
+        ffi_try!((*session).send(CoreMsg::new(move |_| {
+            let handle = unwrap!(obj_cache.lock()).insert_data_id(data_id);
+            o_cb(user_data.0, 0, handle);
+            None
+        })));
         0
     })
 }
 
 /// Free DataIdentifier handle
 #[no_mangle]
-pub unsafe extern "C" fn data_id_free(session: *const Session, handle: DataIdHandle) -> i32 {
+pub unsafe extern "C" fn data_id_free(session: *const Session,
+                                      handle: DataIdHandle,
+                                      user_data: *mut c_void,
+                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
+                                      -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!((*session).object_cache()).remove_data_id(handle));
+        let user_data = OpaqueCtx(user_data);
+        let obj_cache = (*session).object_cache();
+
+        ffi_try!((*session).send(CoreMsg::new(move |_| {
+            let res = unwrap!(obj_cache.lock()).remove_data_id(handle);
+            o_cb(user_data.0, ffi_result_code!(res));
+            None
+        })));
         0
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use ffi::{FfiError, OpaqueCtx, test_utils};
+    use ffi::{FfiError, Session, test_utils};
+    use ffi::object_cache::DataIdHandle;
+    use libc::c_void;
     use rand;
     use routing::XOR_NAME_LEN;
-    use std::ptr;
+    use std::sync::mpsc;
     use super::*;
 
     #[test]
     fn create_and_free() {
         let sess = test_utils::create_session();
-        let sess_ptr = Box::into_raw(Box::new(sess.clone()));
+        let obj_cache = sess.object_cache();
+        let sess_ptr = Box::into_raw(Box::new(sess));
 
         let type_tag = rand::random();
         let struct_id_arr: [u8; XOR_NAME_LEN] = rand::random();
@@ -109,39 +150,43 @@ mod tests {
         let priv_app_id_arr: [u8; XOR_NAME_LEN] = rand::random();
         let pub_app_id_arr: [u8; XOR_NAME_LEN] = rand::random();
 
-        let mut data_id_handle_immut = 0;
-        let data_id_handle_struct = 0;
-        let mut data_id_handle_priv_appendable = 0;
-        let mut data_id_handle_pub_appendable = 0;
+        let data_id_handle_immut;
+        let data_id_handle_struct;
+        let data_id_handle_priv_appendable;
+        let data_id_handle_pub_appendable;
 
         unsafe {
-            assert_eq!(data_id_new_struct_data(sess_ptr,
-                                               OpaqueCtx(ptr::null_mut()),
-                                               type_tag,
-                                               &struct_id_arr,
-                                               handle_struct_data),
-                       0);
+            let (mut tx, rx) = mpsc::channel::<DataIdHandle>();
+            let tx: *mut _ = &mut tx;
+            let tx = tx as *mut c_void;
 
-            extern "C" fn handle_struct_data(errcode: i32, _: OpaqueCtx, _: u64) {
-                assert_eq!(errcode, 0);
-            }
-
-            assert_eq!(data_id_new_immut_data(sess_ptr, &immut_id_arr, &mut data_id_handle_immut),
+            assert_eq!(data_id_new_struct_data(sess_ptr, type_tag, &struct_id_arr, tx, data_id_cb),
                        0);
+            data_id_handle_struct = unwrap!(rx.recv());
+
+            assert_eq!(data_id_new_immut_data(sess_ptr, &immut_id_arr, tx, data_id_cb),
+                       0);
+            data_id_handle_immut = unwrap!(rx.recv());
+
             assert_eq!(data_id_new_appendable_data(sess_ptr,
                                                    &priv_app_id_arr,
                                                    true,
-                                                   &mut data_id_handle_priv_appendable),
+                                                   tx,
+                                                   data_id_cb),
                        0);
+            data_id_handle_priv_appendable = unwrap!(rx.recv());
+
             assert_eq!(data_id_new_appendable_data(sess_ptr,
                                                    &pub_app_id_arr,
                                                    false,
-                                                   &mut data_id_handle_pub_appendable),
+                                                   tx,
+                                                   data_id_cb),
                        0);
+            data_id_handle_pub_appendable = unwrap!(rx.recv());
         }
 
         {
-            let mut obj_cache = unwrap!(sess.object_cache());
+            let mut obj_cache = unwrap!(obj_cache.lock());
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_struct));
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_immut));
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_priv_appendable));
@@ -149,28 +194,50 @@ mod tests {
         }
 
         unsafe {
-            assert_eq!(data_id_free(sess_ptr, data_id_handle_struct), 0);
-            assert_eq!(data_id_free(sess_ptr, data_id_handle_immut), 0);
-            assert_eq!(data_id_free(sess_ptr, data_id_handle_priv_appendable), 0);
-            assert_eq!(data_id_free(sess_ptr, data_id_handle_pub_appendable), 0);
+            assert_free(sess_ptr, data_id_handle_struct, 0);
+            assert_free(sess_ptr, data_id_handle_immut, 0);
+            assert_free(sess_ptr, data_id_handle_priv_appendable, 0);
+            assert_free(sess_ptr, data_id_handle_pub_appendable, 0);
         }
 
         let err_code = FfiError::InvalidDataIdHandle.into();
         unsafe {
-            assert_eq!(data_id_free(sess_ptr, data_id_handle_struct), err_code);
-            assert_eq!(data_id_free(sess_ptr, data_id_handle_immut), err_code);
-            assert_eq!(data_id_free(sess_ptr, data_id_handle_priv_appendable),
-                       err_code);
-            assert_eq!(data_id_free(sess_ptr, data_id_handle_pub_appendable),
-                       err_code);
+            assert_free(sess_ptr, data_id_handle_struct, err_code);
+            assert_free(sess_ptr, data_id_handle_immut, err_code);
+            assert_free(sess_ptr, data_id_handle_priv_appendable, err_code);
+            assert_free(sess_ptr, data_id_handle_pub_appendable, err_code);
         }
 
         {
-            let mut obj_cache = unwrap!(sess.object_cache());
+            let mut obj_cache = unwrap!(obj_cache.lock());
             assert!(obj_cache.get_data_id(data_id_handle_struct).is_err());
             assert!(obj_cache.get_data_id(data_id_handle_immut).is_err());
             assert!(obj_cache.get_data_id(data_id_handle_priv_appendable).is_err());
             assert!(obj_cache.get_data_id(data_id_handle_pub_appendable).is_err());
+        }
+
+        unsafe extern "C" fn data_id_cb(tx: *mut c_void, errcode: i32, handle: DataIdHandle) {
+            assert_eq!(errcode, 0);
+
+            let tx = tx as *mut mpsc::Sender<DataIdHandle>;
+            unwrap!((*tx).send(handle));
+        }
+
+        unsafe fn assert_free(sess_ptr: *const Session, handle: DataIdHandle, expected: i32) {
+            let (tx, rx) = mpsc::channel::<i32>();
+            assert_eq!(data_id_free(sess_ptr,
+                                    handle,
+                                    Box::into_raw(Box::new(tx)) as *mut _,
+                                    free_cb),
+                       0);
+            let err_code = unwrap!(rx.recv());
+
+            assert_eq!(err_code, expected);
+        }
+
+        unsafe extern "C" fn free_cb(tx: *mut c_void, err_code: i32) {
+            let tx = tx as *mut mpsc::Sender<i32>;
+            unwrap!((*tx).send(err_code));
         }
     }
 }

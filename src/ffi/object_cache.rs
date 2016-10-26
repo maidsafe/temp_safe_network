@@ -22,9 +22,8 @@
 use ffi::App;
 use ffi::errors::FfiError;
 // use ffi::low_level_api::appendable_data::AppendableData;
-// use ffi::low_level_api::cipher_opt::CipherOpt;
-// use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper,
-// SelfEncryptorWriterWrapper};
+use ffi::low_level_api::cipher_opt::CipherOpt;
+use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWriterWrapper};
 use lru_cache::LruCache;
 use routing::DataIdentifier;
 use rust_sodium::crypto::{box_, sign};
@@ -70,9 +69,9 @@ pub struct ObjectCache {
     // struct_data: LruCache<StructDataHandle, StructuredData>,
     data_id: LruCache<DataIdHandle, DataIdentifier>,
     // appendable_data: LruCache<AppendableDataHandle, AppendableData>,
-    // se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
-    // se_writer: LruCache<SelfEncryptorWriterHandle, SelfEncryptorWriterWrapper>,
-    // cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
+    se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
+    se_writer: LruCache<SelfEncryptorWriterHandle, SelfEncryptorWriterWrapper>,
+    cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
     encrypt_key: LruCache<EncryptKeyHandle, box_::PublicKey>,
     sign_key: LruCache<SignKeyHandle, sign::PublicKey>,
 }
@@ -90,9 +89,9 @@ impl ObjectCache {
         // self.struct_data.clear();
         self.data_id.clear();
         // self.appendable_data.clear();
-        // self.se_reader.clear();
-        // self.se_writer.clear();
-        // self.cipher_opt.clear();
+        self.se_reader.clear();
+        self.se_writer.clear();
+        self.cipher_opt.clear();
         self.encrypt_key.clear();
         self.sign_key.clear();
     }
@@ -138,25 +137,22 @@ impl ObjectCache {
     // }
 
     // ----------------------------------------------------------
-    // pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) ->
-    // CipherOptHandle {
-    //     let handle = self.new_handle();
-    //     if let Some(prev) = self.cipher_opt.insert(handle, cipher_opt) {
-    //         debug!("Displaced CipherOpt from ObjectCache: {:?}", prev);
-    //     }
+    pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) -> CipherOptHandle {
+        let handle = self.new_handle();
+        if let Some(prev) = self.cipher_opt.insert(handle, cipher_opt) {
+            debug!("Displaced CipherOpt from ObjectCache: {:?}", prev);
+        }
 
-    //     handle
-    // }
+        handle
+    }
 
-    // pub fn get_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<&mut
-    // CipherOpt, FfiError> {
-    //     self.cipher_opt.get_mut(&handle).ok_or(FfiError::InvalidCipherOptHandle)
-    // }
+    pub fn get_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<&mut CipherOpt, FfiError> {
+        self.cipher_opt.get_mut(&handle).ok_or(FfiError::InvalidCipherOptHandle)
+    }
 
-    // pub fn remove_cipher_opt(&mut self, handle: CipherOptHandle) ->
-    // Result<CipherOpt, FfiError> {
-    //     self.cipher_opt.remove(&handle).ok_or(FfiError::InvalidCipherOptHandle)
-    // }
+    pub fn remove_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<CipherOpt, FfiError> {
+        self.cipher_opt.remove(&handle).ok_or(FfiError::InvalidCipherOptHandle)
+    }
 
     // ----------------------------------------------------------
     pub fn insert_data_id(&mut self, data_id: DataIdentifier) -> DataIdHandle {
@@ -177,56 +173,52 @@ impl ObjectCache {
     }
 
     // ----------------------------------------------------------
-    // pub fn insert_se_reader(&mut self,
-    //                         se_reader: SelfEncryptorReaderWrapper)
-    //                         -> SelfEncryptorReaderHandle {
-    //     let handle = self.new_handle();
-    //     if let Some(_) = self.se_reader.insert(handle, se_reader) {
-    //         debug!("Displaced SelfEncryptorReaderWrapper from ObjectCache");
-    //     }
+    pub fn insert_se_reader(&mut self,
+                            se_reader: SelfEncryptorReaderWrapper)
+                            -> SelfEncryptorReaderHandle {
+        let handle = self.new_handle();
+        if let Some(_) = self.se_reader.insert(handle, se_reader) {
+            debug!("Displaced SelfEncryptorReaderWrapper from ObjectCache");
+        }
 
-    //     handle
-    // }
+        handle
+    }
 
-    // pub fn get_se_reader(&mut self,
-    //                      handle: SelfEncryptorReaderHandle)
-    //                      -> Result<&mut SelfEncryptorReaderWrapper, FfiError> {
-    // self.se_reader.get_mut(&handle).ok_or(FfiError::
-    // InvalidSelfEncryptorHandle)
-    // }
+    pub fn get_se_reader(&mut self,
+                         handle: SelfEncryptorReaderHandle)
+                         -> Result<&mut SelfEncryptorReaderWrapper, FfiError> {
+        self.se_reader.get_mut(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    }
 
-    // pub fn remove_se_reader(&mut self,
-    //                         handle: SelfEncryptorReaderHandle)
-    //                         -> Result<SelfEncryptorReaderWrapper, FfiError> {
-    // self.se_reader.remove(&handle).ok_or(FfiError::
-    // InvalidSelfEncryptorHandle)
-    // }
+    pub fn remove_se_reader(&mut self,
+                            handle: SelfEncryptorReaderHandle)
+                            -> Result<SelfEncryptorReaderWrapper, FfiError> {
+        self.se_reader.remove(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    }
 
     // ----------------------------------------------------------
-    // pub fn insert_se_writer(&mut self,
-    //                         se_reader: SelfEncryptorWriterWrapper)
-    //                         -> SelfEncryptorWriterHandle {
-    //     let handle = self.new_handle();
-    //     if let Some(_) = self.se_writer.insert(handle, se_reader) {
-    //         debug!("Displaced SelfEncryptorWriterWrapper from ObjectCache");
-    //     }
+    pub fn insert_se_writer(&mut self,
+                            se_reader: SelfEncryptorWriterWrapper)
+                            -> SelfEncryptorWriterHandle {
+        let handle = self.new_handle();
+        if let Some(_) = self.se_writer.insert(handle, se_reader) {
+            debug!("Displaced SelfEncryptorWriterWrapper from ObjectCache");
+        }
 
-    //     handle
-    // }
+        handle
+    }
 
-    // pub fn get_se_writer(&mut self,
-    //                      handle: SelfEncryptorWriterHandle)
-    //                      -> Result<&mut SelfEncryptorWriterWrapper, FfiError> {
-    // self.se_writer.get_mut(&handle).ok_or(FfiError::
-    // InvalidSelfEncryptorHandle)
-    // }
+    pub fn get_se_writer(&mut self,
+                         handle: SelfEncryptorWriterHandle)
+                         -> Result<&mut SelfEncryptorWriterWrapper, FfiError> {
+        self.se_writer.get_mut(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    }
 
-    // pub fn remove_se_writer(&mut self,
-    //                         handle: SelfEncryptorWriterHandle)
-    //                         -> Result<SelfEncryptorWriterWrapper, FfiError> {
-    // self.se_writer.remove(&handle).ok_or(FfiError::
-    // InvalidSelfEncryptorHandle)
-    // }
+    pub fn remove_se_writer(&mut self,
+                            handle: SelfEncryptorWriterHandle)
+                            -> Result<SelfEncryptorWriterWrapper, FfiError> {
+        self.se_writer.remove(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
+    }
 
     // ----------------------------------------------------------
     pub fn insert_sign_key(&mut self, key: sign::PublicKey) -> SignKeyHandle {
@@ -300,9 +292,9 @@ impl Default for ObjectCache {
             // struct_data: LruCache::new(DEFAULT_CAPACITY),
             data_id: LruCache::new(DEFAULT_CAPACITY),
             // appendable_data: LruCache::new(DEFAULT_CAPACITY),
-            // se_reader: LruCache::new(DEFAULT_CAPACITY),
-            // se_writer: LruCache::new(DEFAULT_CAPACITY),
-            // cipher_opt: LruCache::new(DEFAULT_CAPACITY),
+            se_reader: LruCache::new(DEFAULT_CAPACITY),
+            se_writer: LruCache::new(DEFAULT_CAPACITY),
+            cipher_opt: LruCache::new(DEFAULT_CAPACITY),
             encrypt_key: LruCache::new(DEFAULT_CAPACITY),
             sign_key: LruCache::new(DEFAULT_CAPACITY),
         }

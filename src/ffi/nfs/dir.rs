@@ -43,19 +43,18 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
                                         is_private: bool,
                                         is_shared: bool,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(int32_t, *mut c_void))
+                                        o_cb: extern "C" fn(*mut c_void, int32_t))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI create directory, given the path.");
 
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let user_metadata = slice::from_raw_parts(user_metadata, user_metadata_len);
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = create_dir(&client,
@@ -64,12 +63,12 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
                                          user_metadata,
                                          is_private,
                                          is_shared)
-                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
@@ -87,27 +86,26 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
                                         dir_path_len: usize,
                                         is_shared: bool,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(int32_t, *mut c_void))
+                                        o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI delete dir, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = delete_dir(&client, &app, dir_path, is_shared)
-                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
@@ -125,35 +123,34 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
                                      dir_path_len: usize,
                                      is_shared: bool,
                                      user_data: *mut c_void,
-                                     o_cb: extern "C" fn(int32_t,
-                                                         *mut c_void,
+                                     o_cb: extern "C" fn(*mut c_void,
+                                                         int32_t,
                                                          details_handle: *mut DirDetails))
                                      -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI get dir, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = get_dir(&client, &app, dir_path, is_shared)
                         .map(move |details| {
                             let details_handle = Box::into_raw(Box::new(details));
-                            o_cb(0, user_data.0, details_handle);
+                            o_cb(user_data.0, 0, details_handle);
                         })
                         .map_err(move |err| {
-                            o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut())
+                            o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut())
                         })
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                    o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                     None
                 }
             }
@@ -175,7 +172,7 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
                                         new_user_metadata: *const u8,
                                         new_user_metadata_len: usize,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(int32_t, *mut c_void))
+                                        o_cb: extern "C" fn(*mut c_void, int32_t))
                                         -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI modify directory, given the path.");
@@ -183,12 +180,11 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
         let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
         let new_user_metadata = helper::u8_ptr_to_opt_vec(new_user_metadata, new_user_metadata_len);
 
-        let session = (*session).clone();
-        let s2 = session.clone();
+        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!(session.send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(s2.object_cache());
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = modify_dir(&client,
@@ -197,12 +193,61 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
                                          is_shared,
                                          new_name,
                                          new_user_metadata)
-                        .then(move |result| Ok(o_cb(ffi_result_code!(result), user_data.0)))
+                        .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
+                    None
+                }
+            }
+        })));
+
+        0
+    })
+}
+
+/// Move or copy a directory.
+#[no_mangle]
+pub unsafe extern "C" fn nfs_move_dir(session: *const Session,
+                                      app_handle: AppHandle,
+                                      src_path: *const u8,
+                                      src_path_len: usize,
+                                      is_src_path_shared: bool,
+                                      dst_path: *const u8,
+                                      dst_path_len: usize,
+                                      is_dst_path_shared: bool,
+                                      retain_src: bool,
+                                      user_data: *mut c_void,
+                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
+                                      -> int32_t {
+    helper::catch_unwind_i32(|| {
+        trace!("FFI move directory, from {:?} to {:?}.", src_path, dst_path);
+
+        let src_path = ffi_try!(helper::c_utf8_to_str(src_path, src_path_len));
+        let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path, dst_path_len));
+        let user_data = OpaqueCtx(user_data);
+        let obj_cache = (*session).object_cache();
+
+        ffi_try!((*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
+
+            match obj_cache.get_app(app_handle) {
+                Ok(app) => {
+                    let fut = move_dir(&client,
+                                       app,
+                                       src_path,
+                                       is_src_path_shared,
+                                       dst_path,
+                                       is_dst_path_shared,
+                                       retain_src)
+                        .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
+                        .into_box();
+                    Some(fut)
+                }
+                Err(e) => {
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
@@ -210,47 +255,6 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
         0
     })
 }
-
-// /// Move or copy a directory.
-// #[no_mangle]
-// pub unsafe extern "C" fn nfs_move_dir(session: *const Session,
-//                                       app_handle: AppHandle,
-//                                       src_path: *const u8,
-//                                       src_path_len: usize,
-//                                       is_src_path_shared: bool,
-//                                       dst_path: *const u8,
-//                                       dst_path_len: usize,
-//                                       is_dst_path_shared: bool,
-//                                       retain_src: bool,
-//                                       user_data: *mut c_void,
-// o_cb: extern "C" fn(int32_t, *mut
-// c_void))
-//                                       -> int32_t {
-//     helper::catch_unwind_i32(|| {
-//         trace!("FFI move directory, from {:?} to {:?}.", src_path, dst_path);
-
-// let src_path = ffi_try!(helper::c_utf8_to_str(src_path,
-// src_path_len));
-// let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path,
-// dst_path_len));
-//         let user_data = OpaqueCtx(user_data);
-
-//         ffi_try!((*session).send(CoreMsg::new(move |client| {
-//             let fut = move_dir(&client,
-//                                app_handle,
-//                                src_path,
-//                                is_src_path_shared,
-//                                dst_path,
-//                                is_dst_path_shared,
-//                                retain_src)
-// .then(|result| Ok(o_cb(ffi_result_code!(result),
-// user_data.0)))
-//                 .into_box();
-//             Some(fut)
-//         })));
-//         0
-//     })
-// }
 
 
 fn create_dir(client: &Client,
@@ -370,71 +374,60 @@ fn modify_dir(client: &Client,
         .into_box()
 }
 
-// fn move_dir(client: &Client,
-//             app: AppHandle,
-//             src_path: &str,
-//             is_src_path_shared: bool,
-//             dst_path: &str,
-//             is_dst_path_shared: bool,
-//             retain_src: bool)
-//             -> Box<FfiFuture<()>> {
-//     let mut src_dir = try!(helper::dir(app, src_path, is_src_path_shared));
-//     let mut dst_dir = try!(helper::dir(app, dst_path, is_dst_path_shared));
+fn move_dir(client: &Client,
+            app: &App,
+            src_path: &str,
+            is_src_path_shared: bool,
+            dst_path: &str,
+            is_dst_path_shared: bool,
+            retain_src: bool)
+            -> Box<FfiFuture<()>> {
+    let c2 = client.clone();
+    let c3 = client.clone();
+    let c4 = c2.clone();
 
-//     if dst_dir.find_sub_directory(src_dir.metadata().name()).is_some() {
-// return
-// Err(FfiError::from(NfsError::DirectoryAlreadyExistsWithSameName));
-//     }
+    let dst_path = dst_path.to_string();
 
-//     let org_parent_of_src_dir = try!(src_dir.metadata()
-//         .parent_dir_key()
-//         .cloned()
-//         .ok_or(FfiError::from("Parent directory not found")));
+    helper::dir_and_file(client, app, src_path, is_src_path_shared)
+        .join(helper::dir(client, app, &dst_path, is_dst_path_shared))
+        .and_then(move |((mut src_parent_dir, src_parent_meta, dir_to_move),
+                         (mut dst_dir, dst_meta))| {
+            if retain_src {
+                // Copy
+                let src_meta = fry!(src_parent_dir.find_sub_dir(&dir_to_move)
+                    .cloned()
+                    .ok_or(FfiError::PathNotFound));
 
-//     if retain_src {
-//         let name = src_dir.metadata().name().to_owned();
-//         let user_metadata = src_dir.metadata().user_metadata().to_owned();
-//         let access_level = src_dir.metadata().access_level().clone();
-//         let created_time = *src_dir.metadata().created_time();
-//         let modified_time = *src_dir.metadata().modified_time();
-//         let (mut dir, _) = try!(dir_helper::create(name,
-//                                                    user_metadata,
-//                                                    src_dir.metadata()
-//                                                        .key()
-//                                                        .is_versioned(),
-//                                                    access_level,
-//                                                    Some(&mut dst_dir)));
-//         src_dir.files().iter().all(|file| {
-//             dir.mut_files().push(file.clone());
-//             true
-//         });
-//         src_dir.sub_directories()
-//             .iter()
-//             .all(|sub_dir| {
-//                 dir.mut_sub_directories().push(sub_dir.clone());
-//                 true
-//             });
-//         dir.mut_metadata().set_created_time(created_time);
-//         dir.mut_metadata().set_modified_time(modified_time);
-//         let _ = try!(dir_helper::update(&dir));
-//     } else {
-//         src_dir.mut_metadata()
-//             .set_parent_dir_key(Some(dst_dir.metadata().key().clone()));
-//         dst_dir.upsert_sub_directory(src_dir.metadata().clone());
-//         let _ = try!(dir_helper::update(&dst_dir));
-//         let _ = try!(dir_helper::update(&src_dir));
-// let mut parent_of_src_dir =
-// try!(dir_helper::get(&org_parent_of_src_dir));
-// // TODO (Spandan) - Fetch and issue a DELETE on the removed
-// directory.
-// let _dir_meta =
-// try!(parent_of_src_dir.remove_sub_directory(src_dir.metadata()
-//             .name()));
-//         let _ = try!(dir_helper::update(&parent_of_src_dir));
-//     }
+                dir_helper::get(c2, &src_meta.id())
+                    .map_err(FfiError::from)
+                    .and_then(move |src_dir| {
+                        dir_helper::deep_copy(c3, &src_dir, &src_meta).map_err(FfiError::from)
+                    })
+                    .and_then(move |(_copy, mut copy_meta)| {
+                        copy_meta.set_name(dst_path);
+                        dst_dir.upsert_sub_dir(copy_meta);
 
-//     Ok(())
-// }
+                        dir_helper::update(c4, &dst_meta.id(), &dst_dir).map_err(FfiError::from)
+                    })
+                    .into_box()
+            } else {
+                // Move
+                let moved_meta = fry!(src_parent_dir.remove_sub_dir(&dir_to_move)
+                    .map_err(FfiError::from));
+
+                dst_dir.upsert_sub_dir(moved_meta);
+
+                dir_helper::update(c2, &dst_meta.id(), &dst_dir)
+                    .map_err(FfiError::from)
+                    .and_then(move |_| {
+                        dir_helper::update(c3, &src_parent_meta.id(), &src_parent_dir)
+                            .map_err(FfiError::from)
+                    })
+                    .into_box()
+            }
+        })
+        .into_box()
+}
 
 #[cfg(test)]
 mod tests {
@@ -446,7 +439,6 @@ mod tests {
     use nfs::helper::dir_helper;
     use std::slice;
     use std::sync::mpsc;
-    use std::time::Duration;
 
     fn create_test_dir(client: Client, app: &App, name: &str) -> Box<FfiFuture<()>> {
         let app_dir_id = unwrap!(app.app_dir());
@@ -551,7 +543,7 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
@@ -614,7 +606,7 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
@@ -663,7 +655,7 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
@@ -718,7 +710,7 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
@@ -775,7 +767,143 @@ mod tests {
             Some(fut)
         })));
 
-        let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
+        let _ = unwrap!(rx.recv());
+        unwrap!(sess.send(CoreMsg::build_terminator()));
+    }
+
+    #[test]
+    fn move_dir() {
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
+        let app2 = app.clone();
+
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
+
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let app_dir_id = unwrap!(app.app_dir());
+            let app_dir_id2 = app_dir_id.clone();
+
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+            let c6 = client.clone();
+
+            let fut = create_test_dir(client.clone(), &app, "test_dir_a")
+                .then(move |res| {
+                    let _ = unwrap!(res);
+                    create_test_dir(c2, &app, "test_dir_b")
+                })
+                .then(move |res| {
+                    let _ = unwrap!(res);
+                    dir_helper::get(c3, &app_dir_id)
+                })
+                .then(move |app_root_dir| {
+                    let app_root_dir = unwrap!(app_root_dir);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 2);
+
+                    let dst_meta = unwrap!(app_root_dir.find_sub_dir("test_dir_b"));
+                    let dst_id = dst_meta.id();
+
+                    dir_helper::get(c4, &dst_id).map(move |dst_dir| (dst_dir, dst_id))
+                })
+                .then(move |res| {
+                    let (dst_dir, dst_id) = unwrap!(res);
+                    assert_eq!(dst_dir.sub_dirs().len(), 0);
+
+                    super::move_dir(&c5,
+                                    &app2,
+                                    "/test_dir_a",
+                                    false,
+                                    "/test_dir_b",
+                                    false,
+                                    false)
+                        .map(move |_| dst_id)
+                })
+                .then(move |res| {
+                    let dst_id = unwrap!(res);
+                    dir_helper::get(c6.clone(), &app_dir_id2).join(dir_helper::get(c6, &dst_id))
+                })
+                .then(move |res| {
+                    let (app_root_dir, dst_dir) = unwrap!(res);
+
+                    assert_eq!(app_root_dir.sub_dirs().len(), 1);
+                    assert_eq!(dst_dir.sub_dirs().len(), 1);
+
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
+        let _ = unwrap!(rx.recv());
+        unwrap!(sess.send(CoreMsg::build_terminator()));
+    }
+
+    #[test]
+    fn copy_dir() {
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
+        let app2 = app.clone();
+
+        let (tx, rx) = mpsc::channel::<()>();
+        let tx2 = tx.clone();
+
+        unwrap!(sess.send(CoreMsg::new(move |client| {
+            let app_dir_id = unwrap!(app.app_dir());
+            let app_dir_id2 = app_dir_id.clone();
+
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+            let c6 = client.clone();
+
+            let fut = create_test_dir(client.clone(), &app, "test_dir_a")
+                .then(move |res| {
+                    let _ = unwrap!(res);
+                    create_test_dir(c2, &app, "test_dir_b")
+                })
+                .then(move |res| {
+                    let _ = unwrap!(res);
+                    dir_helper::get(c3, &app_dir_id)
+                })
+                .then(move |res| {
+                    let app_root_dir = unwrap!(res);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 2);
+
+                    let dst_meta = unwrap!(app_root_dir.find_sub_dir("test_dir_b"));
+                    let dst_id = dst_meta.id();
+                    dir_helper::get(c4, &dst_id).map(|dst_dir| (dst_dir, dst_id))
+                })
+                .then(move |res| {
+                    let (dst_dir, dst_id) = unwrap!(res);
+                    assert_eq!(dst_dir.sub_dirs().len(), 0);
+
+                    super::move_dir(&c5, &app2, "/test_dir_a", false, "/test_dir_b", false, true)
+                        .map(move |_| dst_id)
+                })
+                .then(move |res| {
+                    let dst_id = unwrap!(res);
+                    dir_helper::get(c6.clone(), &app_dir_id2).join(dir_helper::get(c6, &dst_id))
+                })
+                .then(move |res| {
+                    let (app_root_dir, dst_dir) = unwrap!(res);
+                    assert_eq!(app_root_dir.sub_dirs().len(), 2);
+                    assert_eq!(dst_dir.sub_dirs().len(), 1);
+
+                    unwrap!(tx2.send(()));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        })));
+
+        let _ = unwrap!(rx.recv());
         unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 }
