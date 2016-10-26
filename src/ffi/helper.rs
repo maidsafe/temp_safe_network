@@ -91,22 +91,17 @@ pub fn catch_unwind_ptr<T, F: FnOnce() -> *const T>(f: F) -> *const T {
 
 // Every FFI function which uses result callback should have its body wrapped
 // in this.
-pub fn catch_unwind_cb<F, G>(body: F, on_error: G) -> i32
+pub fn catch_unwind_cb<F, G>(body: F, on_error: G)
     where F: FnOnce() -> Result<(), FfiError>,
           G: FnOnce(i32),
 {
-    match panic::catch_unwind(AssertUnwindSafe(body)) {
-        Err(_) => {
-            let code: i32 = FfiError::from("panic").into();
-            on_error(code);
-            code
-        }
-        Ok(Err(err)) => {
-            let code: i32 = err.into();
-            on_error(code);
-            code
-        }
-        Ok(Ok(_)) => 0,
+    let result = match panic::catch_unwind(AssertUnwindSafe(body)) {
+        Err(_) => Err(FfiError::from("panic")),
+        Ok(result) => result,
+    };
+
+    if let Err(err) = result {
+        on_error(ffi_error_code!(err));
     }
 }
 

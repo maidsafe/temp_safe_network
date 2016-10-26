@@ -331,7 +331,7 @@ fn get_dir(client: &Client,
            is_shared: bool)
            -> Box<FfiFuture<DirDetails>> {
     helper::dir(client, app, dir_path, is_shared)
-        .and_then(move |(dir, dir_metadata)| DirDetails::from_dir(dir, dir_metadata))
+        .and_then(move |(dir, dir_metadata)| DirDetails::from_dir_and_metadata(dir, dir_metadata))
         .into_box()
 }
 
@@ -637,9 +637,10 @@ mod tests {
                 })
                 .then(move |result| {
                     let details = unwrap!(result);
+                    let metadata = unwrap!(details.metadata.as_ref());
                     unsafe {
-                        let name = slice::from_raw_parts(details.metadata.name,
-                                                         details.metadata.name_len);
+                        let name = slice::from_raw_parts(metadata.name,
+                                                         metadata.name_len);
                         let name = unwrap!(String::from_utf8(name.to_owned()));
                         assert_eq!(name, "test_dir");
                     }

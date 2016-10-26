@@ -23,12 +23,13 @@
 
 use dns::operations;
 use ffi::{FfiError, OpaqueCtx, Session};
-// use ffi::dir_details::DirDetails;
+use ffi::dir_details::DirDetails;
 use ffi::helper;
 use ffi::object_cache::AppHandle;
 use ffi::string_list::{self, StringList};
 use futures::Future;
 use libc::{c_void, int32_t};
+use nfs::helper::dir_helper;
 use std::ptr;
 
 /// Add service.
@@ -43,8 +44,7 @@ pub unsafe extern "C" fn dns_add_service(session: *const Session,
                                          service_home_dir_path_len: usize,
                                          is_path_shared: bool,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, int32_t))
-                                         -> int32_t {
+                                         o_cb: extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         trace!("FFI add service.");
 
@@ -92,7 +92,8 @@ pub unsafe extern "C" fn dns_add_service(session: *const Session,
                 }
             }
         })
-    }, move |error| o_cb(user_data, error))
+    },
+                            move |error| o_cb(user_data, error))
 }
 
 /// Delete DNS service.
@@ -103,8 +104,7 @@ pub unsafe extern "C" fn dns_delete_service(session: *const Session,
                                             service_name: *const u8,
                                             service_name_len: usize,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(*mut c_void, int32_t))
-                                            -> int32_t {
+                                            o_cb: extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         trace!("FFI delete service.");
 
@@ -128,7 +128,8 @@ pub unsafe extern "C" fn dns_delete_service(session: *const Session,
 
             Some(fut)
         })
-    }, move |error| o_cb(user_data, error))
+    },
+                            move |error| o_cb(user_data, error))
 }
 
 /// Get all registered long names.
@@ -139,8 +140,7 @@ pub unsafe extern "C" fn dns_get_services(session: *const Session,
                                           user_data: *mut c_void,
                                           o_cb: extern "C" fn(*mut c_void,
                                                               int32_t,
-                                                              *mut StringList))
-                                          -> int32_t {
+                                                              *mut StringList)) {
     helper::catch_unwind_cb(|| {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
 
@@ -161,57 +161,53 @@ pub unsafe extern "C" fn dns_get_services(session: *const Session,
 
             Some(fut)
         })
-    }, move |error| o_cb(user_data, error, ptr::null_mut()))
+    },
+                            move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
-// TODO: Commenting out, because currently there is no way to get DirDetails
-// given DirId. This needs discussion.
-
-// Get home directory of the given service.
+/// Get home directory of the given service.
 #[no_mangle]
-// pub unsafe extern "C" fn dns_get_service_dir(session: *const Session,
-//                                              long_name: *const u8,
-//                                              long_name_len: usize,
-//                                              service_name: *const u8,
-//                                              service_name_len: usize,
-//                                              user_data: *mut c_void,
-//                                              o_cb: extern "C" fn(int32_t,
-//                                                                  *mut c_void,
-//                                                                  *mut DirDetails))
-//                                              -> int32_t {
-//     helper::catch_unwind_i32(|| {
-//         let long_name =
-//             ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
-//         let service_name =
-//             ffi_try!(helper::c_utf8_to_string(service_name, service_name_len));
+pub unsafe extern "C" fn dns_get_service_dir(session: *const Session,
+                                             long_name: *const u8,
+                                             long_name_len: usize,
+                                             service_name: *const u8,
+                                             service_name_len: usize,
+                                             user_data: *mut c_void,
+                                             o_cb: extern "C" fn(*mut c_void,
+                                                                 int32_t,
+                                                                 *mut DirDetails)) {
+    helper::catch_unwind_cb(|| {
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
 
-//         trace!("FFI Get service home directory for \"//{}.{}\".",
-//                service_name,
-//                long_name);
+        trace!("FFI Get service home directory for \"//{}.{}\".",
+               service_name,
+               long_name);
 
-//         let user_data = OpaqueCtx(user_data);
+        let user_data = OpaqueCtx(user_data);
 
-//         ffi_try!((*session).send(CoreMsg::new(move |client| {
-//             let client2 = client.clone();
+        (*session).send_fn(move |client| {
+            let client2 = client.clone();
 
-//             let fut = operations::get_service_home_dir_id(client, long_name, service_name, None)
-//                 .map_err(FfiError::from)
-//                 .and_then(move |dir_id| DirDetails::from_dir_id(&client2, dir_id))
-//                 .map(move |details| {
-//                     let details = Box::into_raw(Box::new(details));
-//                     o_cb(0, user_data.0, details);
-//                 })
-//                 .map_err(move |err| {
-//                     o_cb(ffi_error_code!(err), user_data.0, ptr::null_mut());
-//                 })
-//                 .into_box();
+            let fut = operations::get_service_home_dir_id(client, long_name, service_name, None)
+                .map_err(FfiError::from)
+                .and_then(move |dir_id| {
+                    dir_helper::get(client2, &dir_id).map_err(FfiError::from)
+                })
+                .and_then(|dir| DirDetails::from_dir(dir))
+                .map(move |details| {
+                    let details = Box::into_raw(Box::new(details));
+                    o_cb(user_data.0, 0, details);
+                })
+                .map_err(move |err| {
+                    o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut());
+                });
 
-//             Some(fut)
-//         })));
-
-//         0
-//     })
-// }
+            Some(fut)
+        })
+    },
+                            move |error| o_cb(user_data, error, ptr::null_mut()))
+}
 
 
 #[cfg(test)]
@@ -220,8 +216,10 @@ mod tests {
     use core::futures::FutureExt;
     use dns::operations;
     use ffi::{App, FfiError, FfiFuture, helper, test_utils};
+    use ffi::dir_details::DirDetails;
     use futures::Future;
     use libc::{c_void, int32_t};
+    use nfs::DirId;
     use nfs::helper::dir_helper;
     use rust_sodium::crypto::box_;
     use std::sync::mpsc;
@@ -238,8 +236,8 @@ mod tests {
         // Register the DNS long name and create the home directory for the new
         // service.
         let app = test_utils::run(&session, move |client| {
-            let fut1 = create_dir(client, &app, "test-dir");
-            let fut2 = register_dns(client, long_name);
+            let fut1 = create_dir(client, &app, "www-dir");
+            let fut2 = register_dns(client, long_name, &[]);
 
             fut1.join(fut2).map(move |_| app)
         });
@@ -254,7 +252,7 @@ mod tests {
 
         let long_name = test_utils::as_raw_parts(&long_name2);
         let service_name = test_utils::as_raw_parts("www");
-        let service_home_dir_path = test_utils::as_raw_parts("test-dir");
+        let service_home_dir_path = test_utils::as_raw_parts("www-dir");
 
         extern "C" fn callback(user_data: *mut c_void, error: int32_t) {
             assert_eq!(error, 0);
@@ -262,57 +260,70 @@ mod tests {
         }
 
         unsafe {
-            assert_eq!(dns_add_service(&session,
-                                       app_handle,
-                                       long_name.ptr,
-                                       long_name.len,
-                                       service_name.ptr,
-                                       service_name.len,
-                                       service_home_dir_path.ptr,
-                                       service_home_dir_path.len,
-                                       false,
-                                       test_utils::sender_as_user_data(&tx),
-                                       callback),
-                       0);
+            dns_add_service(&session,
+                            app_handle,
+                            long_name.ptr,
+                            long_name.len,
+                            service_name.ptr,
+                            service_name.len,
+                            service_home_dir_path.ptr,
+                            service_home_dir_path.len,
+                            false,
+                            test_utils::sender_as_user_data(&tx),
+                            callback);
         }
 
         unwrap!(rx.recv());
     }
 
 
-    // #[test]
-    // fn get_service_dir() {
-    //     let app = test_utils::create_app(false);
-    //     let dir_helper = DirectoryHelper::new(app.get_client());
-    //     let app_root_dir_key = unwrap!(app.get_app_dir_key());
-    //     let mut app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+    #[test]
+    fn get_service_dir() {
+        let session1 = test_utils::create_session();
+        let app = test_utils::create_app(&session1, false);
 
-    //     let _ = unwrap!(dir_helper.create("test_dir".to_string(),
-    //                                       Vec::new(),
-    //                                       false,
-    //                                       AccessLevel::Public,
-    //                                       Some(&mut app_root_dir)));
+        let long_name = unwrap!(utility::generate_random_string(10));
+        let long_name2 = long_name.clone();
 
-    //     let public_name = unwrap!(utility::generate_random_string(10));
+        test_utils::run(&session1, move |client| {
+            let client2 = client.clone();
 
-    //     unwrap!(long_name::register_long_name(&app, public_name.clone()));
-    //     unwrap!(super::add_service(&app,
-    //                                public_name.clone(),
-    //                                "www".to_string(),
-    //                                "/test_dir",
-    //                                false));
-    //     unwrap!(super::add_service(&app,
-    //                                public_name.clone(),
-    //                                "bloq".to_string(),
-    //                                "/test_dir",
-    //                                false));
+            create_dir(client, &app, "www-dir").then(move |result| {
+                let dir_id = unwrap!(result);
+                let service = ("www".to_string(), dir_id);
+                register_dns(&client2, long_name, &[service])
+            })
+        });
 
-    //     let app2 = test_utils::create_unregistered_app();
-    //     assert!(super::get_service_dir(&app2, &public_name, "www").is_ok());
-    // }
+        let session2 = test_utils::create_unregistered_session();
 
+        let (tx, rx) = mpsc::channel();
 
-    fn create_dir<S: Into<String>>(client: &Client, app: &App, name: S) -> Box<FfiFuture<()>> {
+        let long_name = test_utils::as_raw_parts(&long_name2);
+        let service_name = test_utils::as_raw_parts("www");
+
+        extern "C" fn callback(user_data: *mut c_void,
+                               error: int32_t,
+                               dir_details: *mut DirDetails) {
+            assert_eq!(error, 0);
+            assert!(!dir_details.is_null());
+            unsafe { test_utils::send_via_user_data(user_data) }
+        }
+
+        unsafe {
+            dns_get_service_dir(&session2,
+                                long_name.ptr,
+                                long_name.len,
+                                service_name.ptr,
+                                service_name.len,
+                                test_utils::sender_as_user_data(&tx),
+                                callback);
+        }
+
+        unwrap!(rx.recv());
+    }
+
+    fn create_dir<S: Into<String>>(client: &Client, app: &App, name: S) -> Box<FfiFuture<DirId>> {
         let client2 = client.clone();
         let name = name.into();
 
@@ -325,13 +336,16 @@ mod tests {
                                            vec![],
                                            &root_dir,
                                            &root_dir_meta.id())
-                    .map(|_| ())
+                    .map(|(_, _, meta)| meta.id())
                     .map_err(FfiError::from)
             })
             .into_box()
     }
 
-    fn register_dns<S: Into<String>>(client: &Client, long_name: S) -> Box<FfiFuture<()>> {
+    fn register_dns<S: Into<String>>(client: &Client,
+                                     long_name: S,
+                                     services: &[(String, DirId)])
+                                     -> Box<FfiFuture<()>> {
         let (sign_pk, sign_sk) = unwrap!(client.signing_keypair());
         let (msg_pk, msg_sk) = box_::gen_keypair();
 
@@ -339,7 +353,7 @@ mod tests {
                                  long_name,
                                  msg_pk,
                                  msg_sk,
-                                 &vec![],
+                                 services,
                                  vec![sign_pk],
                                  sign_sk,
                                  None)

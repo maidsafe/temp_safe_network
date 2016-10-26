@@ -43,8 +43,7 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
                                       length: i64,
                                       include_metadata: bool,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void, int32_t, *mut FileDetails))
-                                      -> int32_t {
+                                      o_cb: extern "C" fn(*mut c_void, int32_t, *mut FileDetails)) {
     helper::catch_unwind_cb(|| {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
@@ -94,8 +93,7 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
                                                                    int32_t,
-                                                                   *mut FileMetadata))
-                                               -> int32_t {
+                                                                   *mut FileMetadata)) {
     helper::catch_unwind_cb(|| {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
@@ -224,60 +222,57 @@ mod tests {
         }
 
         unsafe {
-            let result = dns_get_file(&session,
-                                      long_name.ptr,
-                                      long_name.len,
-                                      service_name.ptr,
-                                      service_name.len,
-                                      file_name.ptr,
-                                      file_name.len,
-                                      0,
-                                      0,
-                                      false,
-                                      test_utils::sender_as_user_data(&tx),
-                                      callback);
-            assert_eq!(result, 0);
-            let _ = unwrap!(rx.recv());
+            dns_get_file(&session,
+                         long_name.ptr,
+                         long_name.len,
+                         service_name.ptr,
+                         service_name.len,
+                         file_name.ptr,
+                         file_name.len,
+                         0,
+                         0,
+                         false,
+                         test_utils::sender_as_user_data(&tx),
+                         callback);
         };
+        let _ = unwrap!(rx.recv());
 
         // Fetch the file using a new client
         let session2 = test_utils::create_session();
 
         unsafe {
-            let result = dns_get_file(&session2,
-                                      long_name.ptr,
-                                      long_name.len,
-                                      service_name.ptr,
-                                      service_name.len,
-                                      file_name.ptr,
-                                      file_name.len,
-                                      0,
-                                      0,
-                                      false,
-                                      test_utils::sender_as_user_data(&tx),
-                                      callback);
-            assert_eq!(result, 0);
-            let _ = unwrap!(rx.recv());
+            dns_get_file(&session2,
+                         long_name.ptr,
+                         long_name.len,
+                         service_name.ptr,
+                         service_name.len,
+                         file_name.ptr,
+                         file_name.len,
+                         0,
+                         0,
+                         false,
+                         test_utils::sender_as_user_data(&tx),
+                         callback);
         };
+        let _ = unwrap!(rx.recv());
 
         // Fetch the file using an unregisterd client
         let session3 = test_utils::create_unregistered_session();
 
         unsafe {
-            let result = dns_get_file(&session3,
-                                      long_name.ptr,
-                                      long_name.len,
-                                      service_name.ptr,
-                                      service_name.len,
-                                      file_name.ptr,
-                                      file_name.len,
-                                      0,
-                                      0,
-                                      false,
-                                      test_utils::sender_as_user_data(&tx),
-                                      callback);
-            assert_eq!(result, 0);
-            let _ = unwrap!(rx.recv());
+            dns_get_file(&session3,
+                         long_name.ptr,
+                         long_name.len,
+                         service_name.ptr,
+                         service_name.len,
+                         file_name.ptr,
+                         file_name.len,
+                         0,
+                         0,
+                         false,
+                         test_utils::sender_as_user_data(&tx),
+                         callback);
         };
+        let _ = unwrap!(rx.recv());
     }
 }

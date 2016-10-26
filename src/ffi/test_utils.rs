@@ -27,9 +27,6 @@ use libc::c_void;
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::sync::mpsc::{self, Sender};
-use std::time::Duration;
-
-const RUN_TIMEOUT_MS: u64 = 10_000;
 
 pub fn generate_random_cstring(len: usize) -> CString {
     let mut cstring_vec = unwrap!(utility::generate_random_vector::<u8>(len));
@@ -74,7 +71,7 @@ pub fn run<F, I, R, E>(session: &Session, f: F) -> R
         Some(future)
     }));
 
-    unwrap!(rx.recv_timeout(Duration::from_millis(RUN_TIMEOUT_MS)))
+    unwrap!(rx.recv())
 }
 
 pub fn create_app(session: &Session, has_safe_drive_access: bool) -> App {

@@ -38,8 +38,7 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
                                                 long_name: *const u8,
                                                 long_name_len: usize,
                                                 user_data: *mut c_void,
-                                                o_cb: extern "C" fn(*mut c_void, int32_t))
-                                                -> int32_t {
+                                                o_cb: extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
 
@@ -82,8 +81,7 @@ pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
                                               long_name: *const u8,
                                               long_name_len: usize,
                                               user_data: *mut c_void,
-                                              o_cb: extern "C" fn(*mut c_void, int32_t))
-                                              -> int32_t {
+                                              o_cb: extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         trace!("FFI delete DNS.");
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
@@ -113,8 +111,7 @@ pub unsafe extern "C" fn dns_get_long_names(session: *const Session,
                                             user_data: *mut c_void,
                                             o_cb: extern "C" fn(*mut c_void,
                                                                 int32_t,
-                                                                *mut StringList))
-                                            -> int32_t {
+                                                                *mut StringList)) {
     helper::catch_unwind_cb(|| {
         trace!("FFI Get all dns long names.");
 
@@ -169,20 +166,17 @@ mod tests {
             }
 
             unsafe {
-                let result = dns_register_long_name(&session,
-                                                    long_name.ptr,
-                                                    long_name.len,
-                                                    test_utils::sender_as_user_data(&tx),
-                                                    register_cb);
-                assert_eq!(result, 0);
+                dns_register_long_name(&session,
+                                       long_name.ptr,
+                                       long_name.len,
+                                       test_utils::sender_as_user_data(&tx),
+                                       register_cb);
             }
 
             unwrap!(rx.recv());
 
             unsafe {
-                let result =
-                    dns_get_long_names(&session, test_utils::sender_as_user_data(&tx), get_cb);
-                assert_eq!(result, 0);
+                dns_get_long_names(&session, test_utils::sender_as_user_data(&tx), get_cb);
             }
 
             unwrap!(rx.recv());
@@ -198,12 +192,11 @@ mod tests {
             }
 
             unsafe {
-                let result = dns_register_long_name(&session,
-                                                    long_name.ptr,
-                                                    long_name.len,
-                                                    test_utils::sender_as_user_data(&tx),
-                                                    callback);
-                assert_eq!(result, 0);
+                dns_register_long_name(&session,
+                                       long_name.ptr,
+                                       long_name.len,
+                                       test_utils::sender_as_user_data(&tx),
+                                       callback);
             }
 
             unwrap!(rx.recv());
