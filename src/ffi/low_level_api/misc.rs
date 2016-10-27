@@ -20,30 +20,34 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::CoreMsg;
-use ffi::{FfiError, OpaqueCtx, Session, helper};
-use ffi::object_cache::{DataIdHandle, EncryptKeyHandle, SignKeyHandle};
+use ffi::{FfiError, FfiResult, ObjectCacheRef, OpaqueCtx, Session, helper};
+use ffi::low_level_api::appendable_data::AppendableData;
+use ffi::object_cache::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle};
 use libc::{c_void, int32_t, size_t, uint8_t};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use std::{mem, ptr, slice};
 
+type ADHandle = AppendableDataHandle;
+
 /// Free Encrypt Key handle
 #[no_mangle]
 pub unsafe extern "C" fn misc_encrypt_key_free(session: *const Session,
-                                               user_data: *mut c_void,
                                                handle: EncryptKeyHandle,
-                                               o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
-                                               -> i32 {
-    helper::catch_unwind_i32(|| {
+                                               user_data: *mut c_void,
+                                               o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    helper::catch_unwind_cb(|| {
         let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+
+        (*session).send(CoreMsg::new(move |_| {
             let mut obj_cache = unwrap!(obj_cache.lock());
             let res = obj_cache.remove_encrypt_key(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
-        })));
-        0
-    })
+        }))
+    },
+                            move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
 
 /// Free Sign Key handle
@@ -149,6 +153,87 @@ pub unsafe extern "C" fn misc_deserialise_data_id(session: *const Session,
     })
 }
 
+/// Serialise AppendableData
+#[no_mangle]
+pub unsafe extern "C" fn misc_serialise_appendable_data(session: *const Session,
+                                                        ad_h: ADHandle,
+                                                        user_data: *mut c_void,
+                                                        o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                   int32_t,
+                                                                                   *mut u8,
+                                                                                   size_t,
+                                                                                   size_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    helper::catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            let _ = serialise_appendable_data_impl(obj_cache, ad_h)
+                .map(move |mut ser_ad| {
+                    let data = ser_ad.as_mut_ptr();
+                    let size = ser_ad.len();
+                    let capacity = ser_ad.capacity();
+                    o_cb(user_data.0, 0, data, size, capacity);
+                    mem::forget(ser_ad);
+                })
+                .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0));
+            None
+        }))
+    },
+                            move |e| {
+                                o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0)
+                            });
+}
+
+fn serialise_appendable_data_impl(object_cache: ObjectCacheRef,
+                                  ad_h: ADHandle)
+                                  -> FfiResult<Vec<u8>> {
+    Ok(match *try!(unwrap!(object_cache.lock()).get_ad(ad_h)) {
+        AppendableData::Pub(ref ad) => try!(serialise(ad).map_err(FfiError::from)),
+        AppendableData::Priv(ref ad) => try!(serialise(ad).map_err(FfiError::from)),
+    })
+}
+
+/// Deserialise AppendableData
+#[no_mangle]
+pub unsafe extern "C" fn misc_deserialise_appendable_data(session: *const Session,
+                                                          data: *const u8,
+                                                          size: usize,
+                                                          user_data: *mut c_void,
+                                                          o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                     int32_t,
+                                                                                     ADHandle)) {
+    let user_data = OpaqueCtx(user_data);
+
+    helper::catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+        let data = OpaqueCtx(data as *mut _);
+
+        (*session).send(CoreMsg::new(move |_| {
+            let ser_ad = slice::from_raw_parts(data.0 as *mut u8, size);
+            let _ = deserialise_appendable_data_impl(obj_cache, ser_ad)
+                .map(move |handle| o_cb(user_data.0, 0, handle))
+                .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
+            None
+        }))
+    },
+                            move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+}
+
+fn deserialise_appendable_data_impl(obj_cache: ObjectCacheRef,
+                                    ser_ad: &[u8])
+                                    -> FfiResult<ADHandle> {
+    let ad = {
+        if let Ok(elt) = deserialise(ser_ad) {
+            AppendableData::Priv(elt)
+        } else {
+            AppendableData::Pub(try!(deserialise(ser_ad).map_err(FfiError::from)))
+        }
+    };
+    Ok(unwrap!(obj_cache.lock()).insert_ad(ad))
+}
+
 /// Deallocate pointer obtained via FFI and allocated by safe_core
 #[no_mangle]
 pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: usize, capacity: usize) {
@@ -193,7 +278,7 @@ mod tests {
     fn data_id_serialisation() {
         let sess = test_utils::create_session();
         let obj_cache = sess.object_cache();
-        let sess_ptr = Box::into_raw(Box::new(sess));
+        let sess_ptr: *const _ = &sess;
 
         let data_id_sd = DataIdentifier::Structured(rand::random(), rand::random());
         let data_id_id = DataIdentifier::Immutable(rand::random());

@@ -21,8 +21,8 @@
 
 //! Low Level APIs
 
-// /// Low level manipulation of {Pub|Priv}AppendableData
-// pub mod appendable_data;
+/// Low level manipulation of {Pub|Priv}AppendableData
+pub mod appendable_data;
 /// Cipher Options
 pub mod cipher_opt;
 /// DataIdentifier constructions and freeing

@@ -210,7 +210,6 @@ mod tests {
         let sess = test_utils::create_session();
         let obj_cache = sess.object_cache();
         let app_0 = test_utils::create_app(&sess, false);
-        let sess_ptr = Box::into_raw(Box::new(sess));
 
         let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
         let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
@@ -218,7 +217,7 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let cipher_opt_handle: CipherOptHandle;
         unsafe {
-            assert_eq!(cipher_opt_new_plaintext(sess_ptr, tx, handle_cb), 0);
+            assert_eq!(cipher_opt_new_plaintext(&sess, tx, handle_cb), 0);
             cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
         }
         let raw_data = {
@@ -226,7 +225,7 @@ mod tests {
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
-        assert_free(sess_ptr, cipher_opt_handle, 0);
+        assert_free(&sess, cipher_opt_handle, 0);
 
         assert!(unwrap!(obj_cache.lock()).get_cipher_opt(cipher_opt_handle).is_err());
         assert!(raw_data != plain_text);
@@ -239,7 +238,6 @@ mod tests {
         let sess = test_utils::create_session();
         let obj_cache = sess.object_cache();
         let app_0 = test_utils::create_app(&sess, false);
-        let sess_ptr = Box::into_raw(Box::new(sess));
 
         let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
         let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
@@ -247,7 +245,7 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let cipher_opt_handle: CipherOptHandle;
         unsafe {
-            assert_eq!(cipher_opt_new_symmetric(sess_ptr, tx, handle_cb), 0);
+            assert_eq!(cipher_opt_new_symmetric(&sess, tx, handle_cb), 0);
             cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
         }
         let raw_data = {
@@ -255,7 +253,7 @@ mod tests {
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
-        assert_free(sess_ptr, cipher_opt_handle, 0);
+        assert_free(&sess, cipher_opt_handle, 0);
 
         assert!(unwrap!(obj_cache.lock()).get_cipher_opt(cipher_opt_handle).is_err());
         assert!(raw_data != plain_text);
@@ -271,7 +269,6 @@ mod tests {
         let app_1 = test_utils::create_app(&sess, false);
 
         let obj_cache = sess.object_cache();
-        let sess_ptr = Box::into_raw(Box::new(sess));
 
         let app_1_encrypt_key_handle = {
             let app_1_pub_encrypt_key = unwrap!(app_1.asym_enc_keys()).0;
@@ -286,10 +283,7 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let cipher_opt_handle: CipherOptHandle;
         unsafe {
-            assert_eq!(cipher_opt_new_asymmetric(sess_ptr,
-                                                 app_1_encrypt_key_handle,
-                                                 tx,
-                                                 handle_cb),
+            assert_eq!(cipher_opt_new_asymmetric(&sess, app_1_encrypt_key_handle, tx, handle_cb),
                        0);
             cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
         }
@@ -299,7 +293,7 @@ mod tests {
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
-        assert_free(sess_ptr, cipher_opt_handle, 0);
+        assert_free(&sess, cipher_opt_handle, 0);
 
         assert!(unwrap!(obj_cache.lock()).get_cipher_opt(cipher_opt_handle).is_err());
         assert!(raw_data != plain_text);
@@ -312,7 +306,6 @@ mod tests {
     fn create_and_free() {
         let sess = test_utils::create_session();
         let obj_cache = sess.object_cache();
-        let sess_ptr = Box::into_raw(Box::new(sess));
 
         let peer_encrypt_key_handle = {
             let (pk, _) = box_::gen_keypair();
@@ -327,20 +320,19 @@ mod tests {
         let cipher_opt_handle_asym;
 
         unsafe {
-            assert_eq!(cipher_opt_new_plaintext(sess_ptr, tx, handle_cb), 0);
+            assert_eq!(cipher_opt_new_plaintext(&sess, tx, handle_cb), 0);
             cipher_opt_handle_pt = unwrap!(unwrap!(rx.recv()));
 
-            assert_eq!(cipher_opt_new_symmetric(sess_ptr, tx, handle_cb), 0);
+            assert_eq!(cipher_opt_new_symmetric(&sess, tx, handle_cb), 0);
             cipher_opt_handle_sym = unwrap!(unwrap!(rx.recv()));
 
             let err_code = FfiError::InvalidEncryptKeyHandle.into();
-            assert_eq!(cipher_opt_new_asymmetric(sess_ptr, 29293290, tx, handle_cb),
-                       0);
+            assert_eq!(cipher_opt_new_asymmetric(&sess, 29293290, tx, handle_cb), 0);
             let res = unwrap!(rx.recv());
             assert!(res.is_err());
             assert_eq!(unwrap!(res.err()), err_code);
 
-            assert_eq!(cipher_opt_new_asymmetric(sess_ptr, peer_encrypt_key_handle, tx, handle_cb),
+            assert_eq!(cipher_opt_new_asymmetric(&sess, peer_encrypt_key_handle, tx, handle_cb),
                        0);
             cipher_opt_handle_asym = unwrap!(unwrap!(rx.recv()));
         }
@@ -352,14 +344,14 @@ mod tests {
             let _ = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle_asym));
         }
 
-        assert_free(sess_ptr, cipher_opt_handle_pt, 0);
-        assert_free(sess_ptr, cipher_opt_handle_sym, 0);
-        assert_free(sess_ptr, cipher_opt_handle_asym, 0);
+        assert_free(&sess, cipher_opt_handle_pt, 0);
+        assert_free(&sess, cipher_opt_handle_sym, 0);
+        assert_free(&sess, cipher_opt_handle_asym, 0);
 
         let err_code = FfiError::InvalidCipherOptHandle.into();
-        assert_free(sess_ptr, cipher_opt_handle_pt, err_code);
-        assert_free(sess_ptr, cipher_opt_handle_sym, err_code);
-        assert_free(sess_ptr, cipher_opt_handle_asym, err_code);
+        assert_free(&sess, cipher_opt_handle_pt, err_code);
+        assert_free(&sess, cipher_opt_handle_sym, err_code);
+        assert_free(&sess, cipher_opt_handle_asym, err_code);
 
         {
             let mut obj_cache = unwrap!(obj_cache.lock());

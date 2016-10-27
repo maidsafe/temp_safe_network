@@ -119,32 +119,29 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void, int32_t, AppHandle))
-                                      -> int32_t {
-    helper::catch_unwind_i32(|| {
-        let app_name = ffi_try!(helper::c_utf8_to_string(app_name, app_name_len));
-        let unique_token = ffi_try!(helper::c_utf8_to_string(unique_token, token_len));
-        let vendor = ffi_try!(helper::c_utf8_to_string(vendor, vendor_len));
-        let user_data = OpaqueCtx(user_data);
+                                      o_cb: extern "C" fn(*mut c_void, int32_t, AppHandle)) {
+    let user_data = OpaqueCtx(user_data);
 
+    let _ = helper::catch_unwind_cb(|| {
         let obj_cache = (*session).object_cache();
 
-        ffi_try!((*session)
-            .send(CoreMsg::new(move |client| {
-                let fut =
-                    launcher_config::app(client, app_name, unique_token, vendor, safe_drive_access)
-                        .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
-                        .map(move |app| {
-                            let app_handle = unwrap!(obj_cache.lock()).insert_app(app);
-                            o_cb(user_data.0, 0, app_handle);
-                        })
-                        .into_box();
-                Some(fut)
-            }))
-            .map_err(FfiError::from));
+        let app_name = try!(helper::c_utf8_to_string(app_name, app_name_len));
+        let unique_token = try!(helper::c_utf8_to_string(unique_token, token_len));
+        let vendor = try!(helper::c_utf8_to_string(vendor, vendor_len));
 
-        0
-    })
+        (*session).send(CoreMsg::new(move |client| {
+            let fut =
+                launcher_config::app(client, app_name, unique_token, vendor, safe_drive_access)
+                    .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
+                    .map(move |app| {
+                        let app_handle = unwrap!(obj_cache.lock()).insert_app(app);
+                        o_cb(user_data.0, 0, app_handle);
+                    })
+                    .into_box();
+            Some(fut)
+        }))
+    },
+                                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
 
 /// Register an annonymous app with the launcher. Can access only public data
@@ -168,4 +165,3 @@ pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
         0
     })
 }
-
