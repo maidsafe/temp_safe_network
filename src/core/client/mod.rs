@@ -717,6 +717,14 @@ impl Client {
         Ok(account.get_maid().secret_keys().0.clone())
     }
 
+    /// Returns the public and secret signing keys.
+    pub fn signing_keypair(&self) -> Result<(sign::PublicKey, sign::SecretKey), CoreError> {
+        let inner = self.inner();
+        let account = try!(inner.client_type.acc());
+        Ok((account.get_maid().public_keys().0,
+            account.get_maid().secret_keys().0.clone()))
+    }
+
     /// Return the amount of calls that were done to `get`
     pub fn issued_gets(&self) -> u64 {
         self.inner().stats.issued_gets

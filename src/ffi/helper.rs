@@ -23,13 +23,13 @@ use core::Client;
 use core::futures::FutureExt;
 use ffi::{App, FfiError, FfiFuture};
 use ffi::config::SAFE_DRIVE_DIR_NAME;
-use futures::{Future, stream};
-use futures::stream::Stream;
-use libc::{int32_t, int64_t};
-use nfs::{Dir, DirId, DirMetadata};
+use futures::Future;
+use libc::int32_t;
+use nfs::{Dir, DirMetadata};
 use nfs::helper::dir_helper;
-use std::{self, mem, panic, ptr, slice};
+use std::{self, mem, ptr, slice};
 use std::error::Error;
+use std::panic::{self, AssertUnwindSafe};
 
 pub unsafe fn c_utf8_to_string(ptr: *const u8, len: usize) -> Result<String, FfiError> {
     c_utf8_to_str(ptr, len).map(|v| v.to_owned())
@@ -82,23 +82,27 @@ pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
 
 pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
     let errno: i32 = FfiError::Unexpected(String::new()).into();
-    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(errno)
-}
-
-pub fn catch_unwind_i64<F: FnOnce() -> int64_t>(f: F) -> int64_t {
-    let errno: i32 = FfiError::Unexpected(String::new()).into();
-    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(errno as i64)
+    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(errno)
 }
 
 pub fn catch_unwind_ptr<T, F: FnOnce() -> *const T>(f: F) -> *const T {
-    panic::catch_unwind(panic::AssertUnwindSafe(f)).unwrap_or(ptr::null())
+    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(ptr::null())
 }
 
-pub fn tokenise_path(path: &str, keep_empty_splits: bool) -> Vec<String> {
-    path.split(|element| element == '/')
-        .filter(|token| keep_empty_splits || !token.is_empty())
-        .map(|token| token.to_string())
-        .collect()
+// Every FFI function which uses result callback should have its body wrapped
+// in this.
+pub fn catch_unwind_cb<F, G>(body: F, on_error: G)
+    where F: FnOnce() -> Result<(), FfiError>,
+          G: FnOnce(i32),
+{
+    let result = match panic::catch_unwind(AssertUnwindSafe(body)) {
+        Err(_) => Err(FfiError::from("panic")),
+        Ok(result) => result,
+    };
+
+    if let Err(err) = result {
+        on_error(ffi_error_code!(err));
+    }
 }
 
 pub fn safe_drive_metadata(client: Client) -> Box<FfiFuture<DirMetadata>> {
@@ -134,59 +138,18 @@ pub fn safe_drive_metadata(client: Client) -> Box<FfiFuture<DirMetadata>> {
         .into_box()
 }
 
-pub fn final_sub_dir(client: &Client,
-                     tokens: &[String],
-                     starting_directory: Option<&DirId>)
-                     -> Box<FfiFuture<(Dir, DirMetadata)>> {
-    trace!("Traverse directory tree to get the final subdirectory.");
-
-    let dir_fut = match starting_directory {
-        Some(dir_id) => {
-            trace!("Traversal begins at given starting directory.");
-            let dir_id = dir_id.clone();
-            dir_helper::get(client.clone(), &dir_id).map(move |dir| (dir, dir_id)).into_box()
-        }
-        None => {
-            trace!("Traversal begins at user-root-directory.");
-            dir_helper::user_root_dir(client.clone())
-        }
-    };
-
-    let tokens_iter = tokens.to_owned().into_iter().map(Ok);
-    let c2 = client.clone();
-
-    dir_fut.map_err(FfiError::from)
-        .and_then(move |(current_dir, start_dir_id)| {
-            let (dir_id, key) = start_dir_id;
-            let meta = DirMetadata::new(*dir_id.name(), "root", Vec::new(), key);
-
-            stream::iter(tokens_iter).fold((current_dir, meta), move |(dir, _metadata), token| {
-                trace!("Traversing to dir with name: {}", token);
-
-                let metadata = fry!(dir.find_sub_dir(&token)
-                        .ok_or(FfiError::PathNotFound))
-                    .clone();
-
-                dir_helper::get(c2.clone(), &metadata.id())
-                    .map(move |dir| (dir, metadata))
-                    .map_err(FfiError::from)
-                    .into_box()
-            })
-        })
-        .into_box()
-}
-
 // Return a Dir corresponding to the path.
-pub fn dir(client: &Client,
-           app: &App,
-           path: &str,
-           is_shared: bool)
-           -> Box<FfiFuture<(Dir, DirMetadata)>> {
-    let c2 = client.clone();
-    let tokens = tokenise_path(path, false);
+pub fn dir<S>(client: &Client, app: &App, path: S, is_shared: bool) -> Box<FfiFuture<(Dir, DirMetadata)>>
+    where S: Into<String>
+{
+    let client2 = client.clone();
+    let path = path.into();
 
     app.root_dir(client.clone(), is_shared)
-        .and_then(move |start_dir| final_sub_dir(&c2, &tokens, Some(&start_dir)))
+        .and_then(move |root_dir| {
+            dir_helper::get_dir_by_path(&client2, Some(&root_dir), &path)
+                .map_err(FfiError::from)
+        })
         .into_box()
 }
 
@@ -195,12 +158,15 @@ pub fn dir_and_file(client: &Client,
                     path: &str,
                     is_shared: bool)
                     -> Box<FfiFuture<(Dir, DirMetadata, String)>> {
-    let mut tokens = tokenise_path(path, false);
+    let mut tokens = dir_helper::tokenise_path(path);
     let file_name = fry!(tokens.pop().ok_or(FfiError::PathNotFound));
     let c2 = client.clone();
 
     app.root_dir(client.clone(), is_shared)
-        .and_then(move |start_dir| final_sub_dir(&c2, &tokens, Some(&start_dir)))
+        .and_then(move |start_dir| {
+            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir))
+                .map_err(FfiError::from)
+        })
         .map(move |(dir_listing, dir_meta)| (dir_listing, dir_meta, file_name))
         .into_box()
 }

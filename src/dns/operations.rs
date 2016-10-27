@@ -37,15 +37,19 @@ use super::config::{self, DnsConfig};
 
 /// Register one's own Dns - eg., pepsico.com, spandansharma.com,
 /// krishnakumar.in etc
-pub fn register_dns(client: &Client,
-                    long_name: String,
-                    public_messaging_encryption_key: box_::PublicKey,
-                    secret_messaging_encryption_key: box_::SecretKey,
-                    services: &[(String, DirId)],
-                    owners: Vec<sign::PublicKey>,
-                    sign_sk: sign::SecretKey,
-                    encryption_key: Option<secretbox::Key>)
-                    -> Box<DnsFuture<()>> {
+pub fn register_dns<S>(client: &Client,
+                       long_name: S,
+                       public_messaging_encryption_key: box_::PublicKey,
+                       secret_messaging_encryption_key: box_::SecretKey,
+                       services: &[(String, DirId)],
+                       owners: Vec<sign::PublicKey>,
+                       sign_sk: sign::SecretKey,
+                       encryption_key: Option<secretbox::Key>)
+                       -> Box<DnsFuture<()>>
+    where S: Into<String>
+{
+    let long_name = long_name.into();
+
     trace!("Registering dns with name: {}", long_name);
 
     let client2 = client.clone();
@@ -111,10 +115,11 @@ pub fn register_dns(client: &Client,
 
 
 /// Delete the Dns-Record
-pub fn delete_dns(client: &Client,
-                  long_name: String,
-                  sign_sk: sign::SecretKey)
-                  -> Box<DnsFuture<()>> {
+pub fn delete_dns<S>(client: &Client, long_name: S, sign_sk: sign::SecretKey) -> Box<DnsFuture<()>>
+    where S: Into<String>
+{
+    let long_name = long_name.into();
+
     trace!("Deleting dns with name: {}", long_name);
 
     let client2 = client.clone();
@@ -172,10 +177,14 @@ pub fn get_messaging_encryption_keys(client: &Client,
 
 /// Get all the services (www, blog, micro-blog etc) that user has associated
 /// with this Dns-name
-pub fn get_all_services(client: &Client,
-                        long_name: &str,
-                        decryption_key: Option<secretbox::Key>)
-                        -> Box<DnsFuture<Vec<String>>> {
+pub fn get_all_services<L>(client: &Client,
+                           long_name: L,
+                           decryption_key: Option<secretbox::Key>)
+                           -> Box<DnsFuture<Vec<String>>>
+    where L: AsRef<str>
+{
+    let long_name = long_name.as_ref();
+
     trace!("Get all services for the dns with name: {}", long_name);
 
     get_housing_structured_data_and_dns_record(client, long_name, decryption_key)
@@ -222,14 +231,20 @@ pub fn add_service(client: &Client,
 }
 
 /// Remove a service from the given Dns-name.
-pub fn remove_service(client: &Client,
-                      long_name: String,
-                      service: String,
-                      sign_sk: sign::SecretKey,
-                      encryption_key: Option<secretbox::Key>)
-                      -> Box<DnsFuture<()>> {
+pub fn remove_service<L, S>(client: &Client,
+                            long_name: L,
+                            service_name: S,
+                            sign_sk: sign::SecretKey,
+                            encryption_key: Option<secretbox::Key>)
+                            -> Box<DnsFuture<()>>
+    where L: Into<String>,
+          S: Into<String>
+{
+    let long_name = long_name.into();
+    let service_name = service_name.into();
+
     trace!("Remove service {:?} from dns with name: {}",
-           service,
+           service_name,
            long_name);
 
     let client2 = client.clone();
@@ -240,10 +255,10 @@ pub fn remove_service(client: &Client,
 
     future1.join(future2)
         .and_then(move |((prev_data, mut dns_record), _)| {
-            if !dns_record.services.contains_key(&service) {
+            if !dns_record.services.contains_key(&service_name) {
                 Err(DnsError::ServiceNotFound)
             } else {
-                let _ = dns_record.services.remove(&service);
+                let _ = dns_record.services.remove(&service_name);
                 let encoded_dns_record = try!(serialise(&dns_record));
                 Ok((prev_data, encoded_dns_record))
             }
@@ -261,11 +276,17 @@ pub fn remove_service(client: &Client,
 
 /// Get the home directory (eg., homepage containing HOME.html, INDEX.html) for
 /// the given service.
-pub fn get_service_home_dir_id(client: &Client,
-                               long_name: &str,
-                               service_name: String,
-                               decryption_key: Option<secretbox::Key>)
-                               -> Box<DnsFuture<DirId>> {
+pub fn get_service_home_dir_id<L, S>(client: &Client,
+                                     long_name: L,
+                                     service_name: S,
+                                     decryption_key: Option<secretbox::Key>)
+                                     -> Box<DnsFuture<DirId>>
+    where L: AsRef<str>,
+          S: Into<String>
+{
+    let service_name = service_name.into();
+    let long_name = long_name.as_ref();
+
     trace!("Get service home directory key (to locate the home directory on SAFE Network) \
             for \"//{}.{}\".",
            service_name,

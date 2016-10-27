@@ -21,14 +21,10 @@
 
 //! Details about directory and its content.
 
-use core::Client;
-use core::futures::FutureExt;
-use ffi::{FfiError, FfiFuture};
+use ffi::FfiError;
 use ffi::file_details::FileMetadata;
-use futures::Future;
 use nfs::Dir;
 use nfs::DirMetadata as NfsDirMetadata;
-use nfs::helper::dir_helper;
 use std::ptr;
 use super::helper;
 
@@ -36,7 +32,7 @@ use super::helper;
 #[derive(Debug)]
 pub struct DirDetails {
     /// Metadata of this directory.
-    pub metadata: DirMetadata,
+    pub metadata: Option<DirMetadata>,
     /// Metadata of every file of this directory.
     pub files: Vec<FileMetadata>,
     /// Metadata of every sub-directory of this directory.
@@ -44,18 +40,10 @@ pub struct DirDetails {
 }
 
 impl DirDetails {
-    /// Obtain `DirDetails` from the given directory metadata.
-    pub fn from_dir_metadata(client: Client, metadata: NfsDirMetadata) -> Box<FfiFuture<Self>> {
-        dir_helper::get(client, &metadata.id())
-            .map_err(FfiError::from)
-            .and_then(move |dir| Self::from_dir(dir, metadata))
-            .into_box()
-    }
-
-    /// Obtain `DirDetails` from the given directory and metadata.
-    pub fn from_dir(dir: Dir, metadata: NfsDirMetadata) -> Result<Self, FfiError> {
+    /// Obtain `DirDetails` without metadata from the given directory.
+    pub fn from_dir(dir: Dir) -> Result<Self, FfiError> {
         let mut details = DirDetails {
-            metadata: try!(DirMetadata::new(&metadata)),
+            metadata: None,
             files: Vec::with_capacity(dir.files().len()),
             sub_dirs: Vec::with_capacity(dir.sub_dirs().len()),
         };
@@ -70,13 +58,22 @@ impl DirDetails {
 
         Ok(details)
     }
+
+    /// Obtain `DirDetails` from the given directory and metadata.
+    pub fn from_dir_and_metadata(dir: Dir, metadata: NfsDirMetadata) -> Result<Self, FfiError> {
+        let mut details = try!(Self::from_dir(dir));
+        details.metadata = Some(try!(DirMetadata::new(&metadata)));
+        Ok(details)
+    }
 }
 
 // TODO: when drop-flags removal lands in stable, we should implement Drop for
 // DirMetadata and FileMetadata and remove this whole impl.
 impl Drop for DirDetails {
     fn drop(&mut self) {
-        self.metadata.deallocate();
+        if let Some(mut metadata) = self.metadata.take() {
+            metadata.deallocate();
+        }
 
         for mut metadata in self.files.drain(..) {
             metadata.deallocate();
@@ -147,7 +144,10 @@ impl DirMetadata {
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_get_metadata(details: *const DirDetails)
                                                         -> *const DirMetadata {
-    &(*details).metadata
+    match (*details).metadata {
+        Some(ref metadata) => metadata,
+        None => ptr::null(),
+    }
 }
 
 /// Get the number of files in the directory.
@@ -194,6 +194,6 @@ pub unsafe extern "C" fn directory_details_get_sub_directory_at(details: *const 
 
 /// Dispose of the DirDetails instance.
 #[no_mangle]
-pub unsafe extern "C" fn directory_details_drop(details: *mut DirDetails) {
+pub unsafe extern "C" fn directory_details_free(details: *mut DirDetails) {
     let _ = Box::from_raw(details);
 }

@@ -21,110 +21,185 @@
 
 //! DNS Long name operations
 
-
-use dns::dns_operations::DnsOperations;
-use ffi::app::App;
-use ffi::errors::FfiError;
+use core::CoreMsg;
+use core::futures::FutureExt;
+use dns::operations;
+use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::helper;
 use ffi::string_list::{self, StringList};
-use libc::int32_t;
+use futures::Future;
+use libc::{c_void, int32_t};
 use rust_sodium::crypto::box_;
+use std::ptr;
 
-/// Register DNS long name (for calling via FFI).
+/// Register DNS long name.
 #[no_mangle]
-pub unsafe extern "C" fn dns_register_long_name(app_handle: *const App,
+pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
                                                 long_name: *const u8,
-                                                long_name_len: usize)
-                                                -> int32_t {
-    helper::catch_unwind_i32(|| {
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
+                                                long_name_len: usize,
+                                                user_data: *mut c_void,
+                                                o_cb: extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(|| {
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
 
         trace!("FFI register public-id with name: {}. This means to register dns without a \
                 given service.",
                long_name);
 
-        ffi_try!(register_long_name(&*app_handle, long_name));
-        0
-    })
-}
+        let (msg_pk, msg_sk) = box_::gen_keypair();
+        let user_data = OpaqueCtx(user_data);
 
-/// Register DNS long name (for calling from rust).
-#[no_mangle]
-pub fn register_long_name(app: &App, long_name: String) -> Result<(), FfiError> {
-    let (msg_public_key, msg_secret_key) = box_::gen_keypair();
-    let services = vec![];
-    let client = app.get_client();
-    let public_signing_key = *try!(unwrap!(client.lock()).get_public_signing_key());
-    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    let dns_operation = try!(DnsOperations::new(client));
+        (*session).send(CoreMsg::new(move |client| {
+            let (sign_pk, sign_sk) = match client.signing_keypair() {
+                Ok((pk, sk)) => (pk, sk),
+                Err(err) => {
+                    o_cb(user_data.0, ffi_error_code!(err));
+                    return None;
+                }
+            };
 
-    try!(dns_operation.register_dns(long_name,
-                                    &msg_public_key,
-                                    &msg_secret_key,
-                                    &services,
-                                    vec![public_signing_key],
-                                    &secret_signing_key,
-                                    None));
+            let fut = operations::register_dns(client,
+                                               long_name,
+                                               msg_pk,
+                                               msg_sk,
+                                               &vec![],
+                                               vec![sign_pk],
+                                               sign_sk,
+                                               None)
+                .map(move |_| o_cb(user_data.0, 0))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)))
+                .into_box();
 
-    Ok(())
+            Some(fut)
+        }))
+    }, move |error| o_cb(user_data, error))
 }
 
 /// Delete DNS.
 #[no_mangle]
-pub unsafe extern "C" fn dns_delete_long_name(app_handle: *const App,
+pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
                                               long_name: *const u8,
-                                              long_name_len: usize)
-                                              -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                              long_name_len: usize,
+                                              user_data: *mut c_void,
+                                              o_cb: extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(|| {
         trace!("FFI delete DNS.");
-        let long_name = ffi_try!(helper::c_utf8_to_string(long_name, long_name_len));
-        ffi_try!(delete_long_name(&*app_handle, &long_name));
-        0
-    })
+        let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
+        let user_data = OpaqueCtx(user_data);
+
+        (*session).send_fn(move |client| {
+            let sign_sk = match client.secret_signing_key() {
+                Ok(sk) => sk,
+                Err(err) => {
+                    o_cb(user_data.0, ffi_error_code!(err));
+                    return None;
+                }
+            };
+
+            let fut = operations::delete_dns(client, long_name, sign_sk)
+                .map(move |_| o_cb(user_data.0, 0))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)));
+
+            Some(fut)
+        })
+    }, move |error| o_cb(user_data, error))
 }
 
 /// Get all registered long names.
 #[no_mangle]
-pub unsafe extern "C" fn dns_get_long_names(app_handle: *const App,
-                                            list_handle: *mut *mut StringList)
-                                            -> int32_t {
-    helper::catch_unwind_i32(|| {
+pub unsafe extern "C" fn dns_get_long_names(session: *const Session,
+                                            user_data: *mut c_void,
+                                            o_cb: extern "C" fn(*mut c_void,
+                                                                int32_t,
+                                                                *mut StringList)) {
+    helper::catch_unwind_cb(|| {
         trace!("FFI Get all dns long names.");
 
-        let list = ffi_try!(get_long_names(&*app_handle));
-        *list_handle = ffi_try!(string_list::into_ptr(list));
-        0
-    })
-}
+        let user_data = OpaqueCtx(user_data);
 
-fn delete_long_name(app: &App, long_name: &str) -> Result<(), FfiError> {
-    let client = app.get_client();
-    let signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    let dns_ops = try!(DnsOperations::new(client));
-    try!(dns_ops.delete_dns(long_name, &signing_key));
+        (*session).send_fn(move |client| {
+            let fut = operations::get_all_registered_names(client)
+                .map_err(FfiError::from)
+                .and_then(|names| string_list::from_vec(names))
+                .map(move |list| o_cb(user_data.0, 0, list))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut()));
 
-    Ok(())
-}
-
-fn get_long_names(app: &App) -> Result<Vec<String>, FfiError> {
-    let dns_ops = try!(DnsOperations::new(app.get_client()));
-    let list = try!(dns_ops.get_all_registered_names());
-    Ok(list)
+            Some(fut)
+        })
+    }, move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
 #[cfg(test)]
 mod tests {
     use core::utility;
+    use dns::DnsError;
     use ffi::test_utils;
+    use ffi::string_list::*;
+    use libc::{c_void, int32_t};
+    use std::sync::mpsc;
+    use super::*;
 
     #[test]
     fn register_long_name() {
-        let app = test_utils::create_app(false);
-        let public_name = unwrap!(utility::generate_random_string(10));
+        let long_name = unwrap!(utility::generate_random_string(10));
+        let long_name = test_utils::as_raw_parts(&long_name);
 
-        assert!(super::register_long_name(&app, public_name.clone()).is_ok());
+        let (tx, rx) = mpsc::channel();
 
-        let app2 = test_utils::create_app(false);
-        assert!(super::register_long_name(&app2, public_name).is_err());
+        // Register
+        {
+            let session = test_utils::create_session();
+
+            extern "C" fn register_cb(user_data: *mut c_void, error: int32_t) {
+                assert_eq!(error, 0);
+                unsafe { test_utils::send_via_user_data(user_data) }
+            }
+
+            extern "C" fn get_cb(user_data: *mut c_void, error: int32_t, list: *mut StringList) {
+                assert_eq!(error, 0);
+
+                unsafe {
+                    assert_eq!(string_list_len(list), 1);
+                    string_list_free(list);
+                    test_utils::send_via_user_data(user_data)
+                }
+            }
+
+            unsafe {
+                dns_register_long_name(&session,
+                                       long_name.ptr,
+                                       long_name.len,
+                                       test_utils::sender_as_user_data(&tx),
+                                       register_cb);
+            }
+
+            unwrap!(rx.recv());
+
+            unsafe {
+                dns_get_long_names(&session, test_utils::sender_as_user_data(&tx), get_cb);
+            }
+
+            unwrap!(rx.recv());
+        }
+
+        // Reregister is not allowed
+        {
+            let session = test_utils::create_session();
+
+            extern "C" fn callback(user_data: *mut c_void, error: int32_t) {
+                assert_eq!(error, DnsError::DnsNameAlreadyRegistered.into());
+                unsafe { test_utils::send_via_user_data(user_data) }
+            }
+
+            unsafe {
+                dns_register_long_name(&session,
+                                       long_name.ptr,
+                                       long_name.len,
+                                       test_utils::sender_as_user_data(&tx),
+                                       callback);
+            }
+
+            unwrap!(rx.recv());
+        }
     }
 }

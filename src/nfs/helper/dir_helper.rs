@@ -25,10 +25,18 @@ use core::structured_data::unversioned;
 use futures::{Future, stream};
 use futures::stream::Stream;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{Dir, DirId, DirMetadata, NfsError, NfsFuture};
+use nfs::{Dir, DirId, DirMetadata, File, NfsError, NfsFuture};
 use rand;
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 use rust_sodium::crypto::secretbox;
+
+/// Split path into tokens.
+pub fn tokenise_path(path: &str) -> Vec<String> {
+    path.split(|element| element == '/')
+        .filter(|token| !token.is_empty())
+        .map(|token| token.to_string())
+        .collect()
+}
 
 /// Creates a Dir in the network. Returns DataIdentifier for the created dir.
 pub fn create(client: Client,
@@ -83,15 +91,18 @@ pub fn add_sub_dir(client: Client,
 
 /// Creates and adds a child directory
 /// Returns (updated_parent_dir, created_dir, created_dir_metadata)
-pub fn create_sub_dir(client: Client,
-                      name: String,
-                      encrypt_key: Option<secretbox::Key>,
-                      user_metadata: Vec<u8>,
-                      parent: &Dir,
-                      parent_id: &DirId)
-                      -> Box<NfsFuture<(Dir, Dir, DirMetadata)>> {
+pub fn create_sub_dir<S>(client: Client,
+                         name: S,
+                         encrypt_key: Option<secretbox::Key>,
+                         user_metadata: Vec<u8>,
+                         parent: &Dir,
+                         parent_id: &DirId)
+                         -> Box<NfsFuture<(Dir, Dir, DirMetadata)>>
+    where S: Into<String>
+{
     let dir = Dir::new();
     let c2 = client.clone();
+    let name = name.into();
     let mut parent = parent.clone();
     let parent_id = parent_id.clone();
     create(client.clone(), &dir, encrypt_key.as_ref())
@@ -287,6 +298,75 @@ pub fn configuration_dir(client: Client, dir_name: String) -> Box<NfsFuture<(Dir
                         .into_box()
                 }
             }
+        })
+        .into_box()
+}
+
+/// Get file by path relative to `root_dir`.
+pub fn get_file_by_path(client: &Client,
+                        root_dir: Option<&DirId>,
+                        path: &str)
+                        -> Box<NfsFuture<File>> {
+    let mut tokens = tokenise_path(path);
+    let file_name = fry!(tokens.pop().ok_or(NfsError::FileNotFound));
+
+    final_sub_dir(client, &tokens, root_dir)
+        .and_then(move |(dir, _)| {
+            dir.find_file(&file_name)
+                .map(|file| file.clone())
+                .ok_or(NfsError::FileNotFound)
+        })
+        .into_box()
+}
+
+/// Get directory by path relative to `root_dir`.
+pub fn get_dir_by_path(client: &Client,
+                       root_dir: Option<&DirId>,
+                       path: &str)
+                       -> Box<NfsFuture<(Dir, DirMetadata)>> {
+    let tokens = tokenise_path(path);
+    final_sub_dir(client, &tokens, root_dir)
+}
+
+/// Get the directory at the given tokenised path. The path is taken relative
+/// to `starting_directory`, unless it is `None`, in which case it is taken
+/// relative to the user root directory.
+pub fn final_sub_dir(client: &Client,
+                     tokens: &[String],
+                     starting_directory: Option<&DirId>)
+                     -> Box<NfsFuture<(Dir, DirMetadata)>> {
+    trace!("Traverse directory tree to get the final subdirectory.");
+
+    let dir_fut = match starting_directory {
+        Some(dir_id) => {
+            trace!("Traversal begins at given starting directory.");
+            let dir_id = dir_id.clone();
+            get(client.clone(), &dir_id).map(move |dir| (dir, dir_id)).into_box()
+        }
+        None => {
+            trace!("Traversal begins at user-root-directory.");
+            user_root_dir(client.clone())
+        }
+    };
+
+    let tokens_iter = tokens.to_owned().into_iter().map(|el| Ok(el));
+    let c2 = client.clone();
+
+    dir_fut.and_then(move |(current_dir, start_dir_id)| {
+            let (dir_id, key) = start_dir_id;
+            let meta = DirMetadata::new(*dir_id.name(), "root", Vec::new(), key);
+
+            stream::iter(tokens_iter).fold((current_dir, meta), move |(dir, _metadata), token| {
+                trace!("Traversing to dir with name: {}", token);
+
+                let metadata = fry!(dir.find_sub_dir(&token)
+                        .ok_or(NfsError::DirectoryNotFound))
+                    .clone();
+
+                get(c2.clone(), &metadata.id())
+                    .map(move |dir| (dir, metadata))
+                    .into_box()
+            })
         })
         .into_box()
 }

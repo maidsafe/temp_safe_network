@@ -28,24 +28,38 @@ use std::ffi::CString;
 use std::ptr;
 
 /// List of strings.
-pub type StringList = Vec<CString>;
+pub struct StringList(Vec<CString>);
 
 /// Convert vec of strings to an owning raw pointer to StringList. Consumes the
 /// vector.
-pub fn into_ptr(strings: Vec<String>) -> Result<*mut StringList, FfiError> {
+pub fn from_vec(strings: Vec<String>) -> Result<*mut StringList, FfiError> {
     let mut result = Vec::with_capacity(strings.len());
 
     for string in strings {
         result.push(try!(CString::new(string)));
     }
 
-    Ok(Box::into_raw(Box::new(result)))
+    Ok(Box::into_raw(Box::new(StringList(result))))
+}
+
+/// Conver a pointer to StringList back to vector of strings.
+pub unsafe fn into_vec(list: *mut StringList) -> Result<Vec<String>, FfiError> {
+    let cstrings = Box::from_raw(list).0;
+    let mut result = Vec::with_capacity(cstrings.len());
+
+    for cstring in cstrings {
+        result.push(try!(cstring.into_string().map_err(|err| {
+            FfiError::Unexpected(format!("{:?}", err))
+        })));
+    }
+
+    Ok(result)
 }
 
 /// Get number of elements in the string list.
 #[no_mangle]
 pub unsafe extern "C" fn string_list_len(list: *const StringList) -> usize {
-    (*list).len()
+    (*list).0.len()
 }
 
 /// Get the string at the given index, or NULL if the index is out of range.
@@ -53,8 +67,8 @@ pub unsafe extern "C" fn string_list_len(list: *const StringList) -> usize {
 pub unsafe extern "C" fn string_list_at(list: *const StringList, index: usize) -> *const c_char {
     let list = &*list;
 
-    if index < list.len() {
-        list[index].as_ptr()
+    if index < list.0.len() {
+        list.0[index].as_ptr()
     } else {
         ptr::null()
     }
@@ -62,7 +76,7 @@ pub unsafe extern "C" fn string_list_at(list: *const StringList, index: usize) -
 
 /// Dispose of the string list.
 #[no_mangle]
-pub unsafe extern "C" fn string_list_drop(list: *mut StringList) {
+pub unsafe extern "C" fn string_list_free(list: *mut StringList) {
     let _ = Box::from_raw(list);
 }
 
@@ -76,14 +90,14 @@ mod tests {
         let strings = vec!["one".to_string(), "two".to_string()];
 
         unsafe {
-            let list = unwrap!(super::into_ptr(strings));
+            let list = unwrap!(super::from_vec(strings));
             assert_eq!(super::string_list_len(list), 2);
 
             let item = unwrap!(CStr::from_ptr(super::string_list_at(list, 0)).to_str());
             assert_eq!(item, "one");
             assert_eq!(super::string_list_at(list, 2), ptr::null());
 
-            super::string_list_drop(list);
+            super::string_list_free(list);
         }
     }
 }
