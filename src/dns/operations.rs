@@ -135,7 +135,7 @@ pub fn delete_dns<S>(client: &Client, long_name: S, sign_sk: sign::SecretKey) ->
         .and_then(move |(saved_configs, pos, long_name)| {
             get_housing_structured_data(&client2, &long_name)
                 .and_then(move |struct_data| {
-                    unversioned::delete_recover(&client2, struct_data, &sign_sk)
+                    structured_data::delete_recover(&client2, struct_data, &sign_sk)
                         .map_err(DnsError::from)
                 })
                 .or_else(|err| match err {

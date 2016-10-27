@@ -64,12 +64,27 @@ impl Session {
     }
 
     /// Send the given closure to be executed on the core event loop.
+    // TODO: remove this in favor of `send_cb`.
     pub fn send_fn<F, I>(&self, f: F) -> Result<(), FfiError>
         where F: FnOnce(&Client) -> Option<I> + Send + 'static,
               I: IntoFuture<Item=(), Error=()> + 'static
     {
         self.send(CoreMsg::new(move |client| {
             f(client).map(|i| i.into_future().into_box())
+        }))
+    }
+
+    // WIP
+    #[allow(missing_docs)]
+    pub fn send_cb<F, I>(&self, user_data: *mut c_void, f: F) -> Result<(), FfiError>
+        where F: FnOnce(&Client, Arc<Mutex<ObjectCache>>, *mut c_void) -> Option<I> + Send + 'static,
+              I: IntoFuture<Item=(), Error=()> + 'static
+    {
+        let object_cache = self.object_cache();
+        let user_data = OpaqueCtx(user_data);
+
+        self.send(CoreMsg::new(move |client| {
+            f(client, object_cache, user_data.0).map(|i| i.into_future().into_box())
         }))
     }
 

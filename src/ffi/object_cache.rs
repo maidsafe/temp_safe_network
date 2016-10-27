@@ -25,7 +25,7 @@ use ffi::low_level_api::appendable_data::AppendableData;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWriterWrapper};
 use lru_cache::LruCache;
-use routing::DataIdentifier;
+use routing::{DataIdentifier, StructuredData};
 use rust_sodium::crypto::{box_, sign};
 use std::u64;
 
@@ -67,7 +67,7 @@ const DEFAULT_CAPACITY: usize = 100;
 pub struct ObjectCache {
     new_handle: ObjectHandle,
     app: LruCache<AppHandle, App>,
-    // struct_data: LruCache<StructDataHandle, StructuredData>,
+    struct_data: LruCache<StructDataHandle, StructuredData>,
     data_id: LruCache<DataIdHandle, DataIdentifier>,
     appendable_data: LruCache<AppendableDataHandle, AppendableData>,
     se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
@@ -107,11 +107,11 @@ impl ObjectCache {
     }
 
     pub fn get_app(&mut self, handle: AppHandle) -> Result<&mut App, FfiError> {
-        self.app.get_mut(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
+        self.app.get_mut(&handle).ok_or(FfiError::InvalidAppHandle)
     }
 
     pub fn remove_app(&mut self, handle: AppHandle) -> Result<App, FfiError> {
-        self.app.remove(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
+        self.app.remove(&handle).ok_or(FfiError::InvalidAppHandle)
     }
 
     // ----------------------------------------------------------
@@ -150,6 +150,17 @@ impl ObjectCache {
 
     pub fn remove_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<CipherOpt, FfiError> {
         self.cipher_opt.remove(&handle).ok_or(FfiError::InvalidCipherOptHandle)
+    }
+
+    // ----------------------------------------------------------
+    pub fn get_app_and_cipher_opt(&mut self,
+                                  app_h: AppHandle,
+                                  cipher_opt_h: CipherOptHandle)
+                                  -> Result<(&mut App, &mut CipherOpt), FfiError> {
+        let app = try!(self.app.get_mut(&app_h).ok_or(FfiError::InvalidAppHandle));
+        let cipher_opt = try!(self.cipher_opt.get_mut(&cipher_opt_h).ok_or(FfiError::InvalidCipherOptHandle));
+
+        Ok((app, cipher_opt))
     }
 
     // ----------------------------------------------------------
@@ -261,25 +272,26 @@ impl ObjectCache {
     }
 
     // ----------------------------------------------------------
-    // pub fn insert_sd(&mut self, data: StructuredData) -> StructDataHandle {
-    //     let handle = self.new_handle();
-    //     if let Some(prev) = self.struct_data.insert(handle, data) {
-    //         debug!("Displaced StructuredData from ObjectCache: {:?}", prev);
-    //     }
+    pub fn insert_sd(&mut self, data: StructuredData) -> StructDataHandle {
+        let handle = self.new_handle();
+        if let Some(prev) = self.struct_data.insert(handle, data) {
+            debug!("Displaced StructuredData from ObjectCache: {:?}", prev);
+        }
 
-    //     handle
-    // }
+        handle
+    }
 
-    // pub fn get_sd(&mut self, handle: StructDataHandle) -> Result<&mut
-    // StructuredData, FfiError> {
-    // self.struct_data.get_mut(&handle).ok_or(FfiError::
-    // InvalidStructDataHandle)
-    // }
+    pub fn insert_sd_at(&mut self, handle: StructDataHandle, data: StructuredData) {
+        let _ = self.struct_data.insert(handle, data);
+    }
 
-    // pub fn remove_sd(&mut self, handle: StructDataHandle) ->
-    // Result<StructuredData, FfiError> {
-    //     self.struct_data.remove(&handle).ok_or(FfiError::InvalidStructDataHandle)
-    // }
+    pub fn get_sd(&mut self, handle: StructDataHandle) -> Result<&mut StructuredData, FfiError> {
+        self.struct_data.get_mut(&handle).ok_or(FfiError::InvalidStructDataHandle)
+    }
+
+    pub fn remove_sd(&mut self, handle: StructDataHandle) -> Result<StructuredData, FfiError> {
+        self.struct_data.remove(&handle).ok_or(FfiError::InvalidStructDataHandle)
+    }
 }
 
 impl Default for ObjectCache {
@@ -287,7 +299,7 @@ impl Default for ObjectCache {
         ObjectCache {
             new_handle: u64::MAX,
             app: LruCache::new(DEFAULT_CAPACITY),
-            // struct_data: LruCache::new(DEFAULT_CAPACITY),
+            struct_data: LruCache::new(DEFAULT_CAPACITY),
             data_id: LruCache::new(DEFAULT_CAPACITY),
             appendable_data: LruCache::new(DEFAULT_CAPACITY),
             se_reader: LruCache::new(DEFAULT_CAPACITY),

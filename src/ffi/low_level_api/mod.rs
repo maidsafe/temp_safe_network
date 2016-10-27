@@ -31,5 +31,5 @@ pub mod data_id;
 pub mod immut_data;
 /// Miscellaneous routines
 pub mod misc;
-// /// Low level manipulation of StructuredData
-// pub mod struct_data;
+/// Low level manipulation of StructuredData
+pub mod struct_data;

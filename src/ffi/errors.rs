@@ -61,6 +61,8 @@ pub enum FfiError {
     /// Could not convert String to nul-terminated string because it contains
     /// internal nuls.
     NulError(NulError),
+    /// Invalid App handle
+    InvalidAppHandle,
     /// Invalid StructuredData handle
     InvalidStructDataHandle,
     /// Invalid DataIdentifier handle
@@ -162,6 +164,7 @@ impl Into<i32> for FfiError {
             FfiError::Unexpected(_) => FFI_ERROR_START_RANGE - 9,
             FfiError::UnsuccessfulEncodeDecode(_) => FFI_ERROR_START_RANGE - 10,
             FfiError::NulError(_) => FFI_ERROR_START_RANGE - 11,
+            FfiError::InvalidAppHandle => FFI_ERROR_START_RANGE - 26,
             FfiError::InvalidStructDataHandle => FFI_ERROR_START_RANGE - 12,
             FfiError::InvalidDataIdHandle => FFI_ERROR_START_RANGE - 13,
             FfiError::InvalidAppendableDataHandle => FFI_ERROR_START_RANGE - 14,
@@ -197,6 +200,7 @@ impl fmt::Debug for FfiError {
                 write!(f, "FfiError::UnsuccessfulEncodeDecode -> {:?}", error)
             }
             FfiError::NulError(ref error) => write!(f, "FfiError::NulError -> {:?}", error),
+            FfiError::InvalidAppHandle => write!(f, "FfiError::InvalidAppHandle"),
             FfiError::InvalidStructDataHandle => write!(f, "FfiError::InvalidStructDataHandle"),
             FfiError::InvalidDataIdHandle => write!(f, "FfiError::InvalidDataIdHandle"),
             FfiError::InvalidAppendableDataHandle => {

@@ -182,8 +182,8 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                         .map_err(FfiError::from)
                         .map(move |_| {
                             let data_id = DataIdentifier::Immutable(raw_immut_data_name);
-                            let handle = unwrap!(obj_cache.lock()).insert_data_id(data_id);
-                            handle
+                            let mut obj_cache = unwrap!(obj_cache.lock());
+                            obj_cache.insert_data_id(data_id)
                         })
                         .into_box()
                 })
