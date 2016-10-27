@@ -19,6 +19,9 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+#[cfg(test)]
+mod tests;
+
 use core::{CLIENT_STRUCTURED_DATA_TAG, CoreError};
 use core::futures::FutureExt;
 use core::structured_data::{self, unversioned, versioned};
@@ -29,15 +32,6 @@ use libc::{c_void, int32_t, uint64_t};
 use routing::{Data, StructuredData, XorName, XOR_NAME_LEN};
 use std::{ptr, slice};
 use super::cipher_opt::CipherOpt;
-
-
-// use core::immut_data_operations;
-// use core::client::Client;
-// use ffi::low_level_api::object_cache::object_cache;
-// use maidsafe_utilities::serialisation::{deserialise, serialise};
-// use routing::{DataIdentifier, ImmutableData, NO_OWNER_PUB_KEY};
-// use std::mem;
-// use std::sync::{Arc, Mutex};
 
 // TOOD: consider moving this macro to ffi::macros as it might be useful elsewhere.
 macro_rules! try_cb {
@@ -63,7 +57,7 @@ pub unsafe extern "C" fn struct_data_new(session: *const Session,
                                          data: *const u8,
                                          data_len: usize,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
     helper::catch_unwind_cb(|| {
         let id = XorName(*id);
         let data = slice::from_raw_parts(data, data_len);
@@ -134,7 +128,7 @@ pub unsafe extern "C" fn struct_data_new(session: *const Session,
 pub unsafe extern "C" fn struct_data_fetch(session: *const Session,
                                            data_id_h: DataIdHandle,
                                            user_data: *mut c_void,
-                                           o_cb: extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
+                                           o_cb: unsafe extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |client, object_cache, user_data| {
             let data_id = {
@@ -168,7 +162,7 @@ pub unsafe extern "C" fn struct_data_fetch(session: *const Session,
 pub unsafe extern "C" fn struct_data_extract_data_id(session: *const Session,
                                                      sd_h: StructDataHandle,
                                                      user_data: *mut c_void,
-                                                     o_cb: extern "C" fn(*mut c_void, int32_t, DataIdHandle)) {
+                                                     o_cb: unsafe extern "C" fn(*mut c_void, int32_t, DataIdHandle)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
             let mut object_cache = unwrap!(object_cache.lock());
@@ -195,7 +189,7 @@ pub unsafe extern "C" fn struct_data_update(session: *const Session,
                                             data: *const u8,
                                             data_len: usize,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                            o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         let data = slice::from_raw_parts(data, data_len);
 
@@ -275,7 +269,7 @@ pub unsafe extern "C" fn struct_data_extract_data(session: *const Session,
                                                   app_h: AppHandle,
                                                   sd_h: StructDataHandle,
                                                   user_data: *mut c_void,
-                                                  o_cb: extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize)) {
+                                                  o_cb: unsafe extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |client, object_cache, user_data| {
             let fut = {
@@ -321,7 +315,7 @@ pub unsafe extern "C" fn struct_data_extract_data(session: *const Session,
 pub unsafe extern "C" fn struct_data_num_of_versions(session: *const Session,
                                                      sd_h: StructDataHandle,
                                                      user_data: *mut c_void,
-                                                     o_cb: extern "C" fn(*mut c_void, int32_t, uint64_t)) {
+                                                     o_cb: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
             let mut object_cache = unwrap!(object_cache.lock());
@@ -345,7 +339,7 @@ pub unsafe extern "C" fn struct_data_nth_version(session: *const Session,
                                                  sd_h: StructDataHandle,
                                                  n: uint64_t,
                                                  user_data: *mut c_void,
-                                                 o_cb: extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize)) {
+                                                 o_cb: unsafe extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |client, object_cache, user_data| {
             let fut = {
@@ -385,7 +379,7 @@ pub unsafe extern "C" fn struct_data_nth_version(session: *const Session,
 pub unsafe extern "C" fn struct_data_version(session: *const Session,
                                              handle: StructDataHandle,
                                              user_data: *mut c_void,
-                                             o_cb: extern "C" fn(*mut c_void, int32_t, uint64_t)) {
+                                             o_cb: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
             let mut object_cache = unwrap!(object_cache.lock());
@@ -402,7 +396,7 @@ pub unsafe extern "C" fn struct_data_version(session: *const Session,
 pub unsafe extern "C" fn struct_data_put(session: *const Session,
                                          sd_h: StructDataHandle,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |client, object_cache, user_data| {
             let sd = {
@@ -411,8 +405,12 @@ pub unsafe extern "C" fn struct_data_put(session: *const Session,
                         |error| o_cb(user_data, error)).clone()
             };
 
+            // TODO: use put_recover
             client.put(Data::Structured(sd), None)
-                .map(move |_| o_cb(user_data, 0))
+                .map(move |_| {
+                    // TODO update the version of the data stored in the object cache
+                    o_cb(user_data, 0)
+                })
                 .map_err(move |err| {
                     let err = FfiError::from(err);
                     o_cb(user_data, ffi_error_code!(err));
@@ -427,7 +425,7 @@ pub unsafe extern "C" fn struct_data_put(session: *const Session,
 pub unsafe extern "C" fn struct_data_post(session: *const Session,
                                           sd_h: StructDataHandle,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |client, object_cache, user_data| {
             let sd = {
@@ -452,7 +450,7 @@ pub unsafe extern "C" fn struct_data_post(session: *const Session,
 pub unsafe extern "C" fn struct_data_delete(session: *const Session,
                                             sd_h: StructDataHandle,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                            o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |client, object_cache, user_data| {
             let sd = {
@@ -497,7 +495,7 @@ pub unsafe extern "C" fn struct_data_validate_size(session: *const Session,
 pub unsafe extern "C" fn struct_data_is_owned(session: *const Session,
                                               sd_h: StructDataHandle,
                                               user_data: *mut c_void,
-                                              o_cb: extern "C" fn(*mut c_void, int32_t, bool)) {
+                                              o_cb: unsafe extern "C" fn(*mut c_void, int32_t, bool)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |client, object_cache, user_data| -> Option<Result<_, _>> {
             let mut object_cache = unwrap!(object_cache.lock());
@@ -517,335 +515,14 @@ pub unsafe extern "C" fn struct_data_is_owned(session: *const Session,
 pub unsafe extern "C" fn struct_data_free(session: *const Session,
                                           handle: StructDataHandle,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
             let mut object_cache = unwrap!(object_cache.lock());
             let _ = try_cb!(object_cache.remove_sd(handle), |error| o_cb(user_data, error));
+
+            o_cb(user_data, 0);
             None
         })
     }, move |error| o_cb(user_data, error))
-}
-
-#[cfg(test)]
-mod tests {
-    /*
-    use core::{CLIENT_STRUCTURED_DATA_TAG, utility};
-    use ffi::app::App;
-    use ffi::errors::FfiError;
-    use ffi::low_level_api::{CipherOptHandle, DataIdHandle, StructDataHandle};
-    use ffi::low_level_api::cipher_opt::*;
-    use ffi::low_level_api::object_cache::object_cache;
-    use ffi::test_utils;
-    use rand;
-    use std::ptr;
-    use super::*;
-
-    #[test]
-    fn unversioned_struct_data_crud() {
-        let app = test_utils::create_app(false);
-
-        let mut cipher_opt_h: CipherOptHandle = 0;
-        let mut sd_h: StructDataHandle = 0;
-        let mut data_id_h: DataIdHandle = 0;
-        let id = rand::random();
-        let mut plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
-        unsafe {
-            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_h), 0);
-
-            // Create
-            assert_eq!(struct_data_new(&app,
-                                       ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
-                                       &id,
-                                       0,
-                                       cipher_opt_h,
-                                       plain_text.as_ptr(),
-                                       plain_text.len(),
-                                       &mut sd_h),
-                       0);
-            assert_eq!(struct_data_extract_data_id(sd_h, &mut data_id_h), 0);
-
-            // Put
-            assert_eq!(struct_data_put(&app, sd_h), 0);
-            let _ = unwrap!(object_cache()).get_sd(sd_h);
-            assert_eq!(struct_data_free(sd_h), 0);
-            assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
-
-            // Fetch
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-            let _ = unwrap!(object_cache()).get_sd(sd_h);
-
-            // Extract Data
-            let rx_plain_text_0 = extract_data(&app, sd_h);
-            assert_eq!(rx_plain_text_0, plain_text);
-
-            // New Data
-            plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
-            assert_eq!(struct_data_new_data(&app,
-                                            sd_h,
-                                            cipher_opt_h,
-                                            plain_text.as_ptr(),
-                                            plain_text.len()),
-                       0);
-
-            // Post
-            assert_eq!(struct_data_post(&app, sd_h), 0);
-            let _ = unwrap!(object_cache()).get_sd(sd_h);
-            assert_eq!(struct_data_free(sd_h), 0);
-            assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
-
-            // Fetch
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-            let _ = unwrap!(object_cache()).get_sd(sd_h);
-
-            // Extract Data
-            let rx_plain_text_1 = extract_data(&app, sd_h);
-            assert_eq!(rx_plain_text_1, plain_text);
-            assert!(rx_plain_text_1 != rx_plain_text_0);
-
-
-            // Perform Invalid Operations - should error out
-            let mut versions = 0;
-            assert_eq!(struct_data_num_of_versions(sd_h, &mut versions),
-                       FfiError::InvalidStructuredDataTypeTag.into());
-            {
-                let mut data_ptr: *mut u8 = ptr::null_mut();
-                let mut data_size = 0;
-                let mut capacity = 0;
-                assert_eq!(struct_data_nth_version(&app,
-                                                   sd_h,
-                                                   0,
-                                                   &mut data_ptr,
-                                                   &mut data_size,
-                                                   &mut capacity),
-                           FfiError::InvalidStructuredDataTypeTag.into());
-            }
-
-            // Check StructData owners
-            let mut is_owned = false;
-            assert_eq!(struct_data_is_owned(&app, sd_h, &mut is_owned), 0);
-            assert_eq!(is_owned, true);
-
-            let app_fake = test_utils::create_app(false);
-            assert_eq!(struct_data_is_owned(&app_fake, sd_h, &mut is_owned), 0);
-            assert_eq!(is_owned, false);
-
-            // Delete
-            assert_eq!(struct_data_delete(&app, sd_h), 0);
-            let _ = unwrap!(object_cache()).get_sd(sd_h);
-
-            // Re-delete shold fail - MutationError::NoSuchData; Fetch should be successful
-            assert_eq!(struct_data_delete(&app, sd_h), -22);
-            assert_eq!(struct_data_free(sd_h), 0);
-            assert_eq!(struct_data_free(sd_h),
-                       FfiError::InvalidStructDataHandle.into());
-            assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
-
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-            assert_eq!(struct_data_free(sd_h), 0);
-            assert_eq!(struct_data_free(sd_h),
-                       FfiError::InvalidStructDataHandle.into());
-
-            // Re-claim via PUT
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-            let mut version = 0;
-            assert_eq!(struct_data_version(sd_h, &mut version), 0);
-            assert_eq!(struct_data_free(sd_h), 0);
-            // Create
-            assert_eq!(struct_data_new(&app,
-                                       ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
-                                       &id,
-                                       version + 1,
-                                       cipher_opt_h,
-                                       plain_text.as_ptr(),
-                                       plain_text.len(),
-                                       &mut sd_h),
-                       0);
-            // Put - Reclaim
-            assert_eq!(struct_data_put(&app, sd_h), 0);
-        }
-    }
-
-    #[test]
-    fn versioned_struct_data_crud() {
-        let app = test_utils::create_app(false);
-
-        let mut cipher_opt_h: CipherOptHandle = 0;
-        let mut sd_h: StructDataHandle = 0;
-        let mut data_id_h: DataIdHandle = 0;
-
-        let name = rand::random();
-        let data0 = unwrap!(utility::generate_random_vector(10));
-        let data1 = unwrap!(utility::generate_random_vector(10));
-
-        unsafe {
-            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_h), 0);
-
-            // Create
-            assert_eq!(struct_data_new(&app,
-                                       ::VERSIONED_STRUCT_DATA_TYPE_TAG,
-                                       &name,
-                                       0,
-                                       cipher_opt_h,
-                                       data0.as_ptr(),
-                                       data0.len(),
-                                       &mut sd_h),
-                       0);
-            assert_eq!(struct_data_extract_data_id(sd_h, &mut data_id_h), 0);
-
-            // Put and re-fetch
-            assert_eq!(struct_data_put(&app, sd_h), 0);
-            assert_eq!(struct_data_free(sd_h), 0);
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-
-            // Check content
-            let mut num_versions = 0usize;
-            assert_eq!(struct_data_num_of_versions(sd_h, &mut num_versions), 0);
-            assert_eq!(num_versions, 1);
-            assert_eq!(nth_version(&app, sd_h, 0), data0);
-
-            let mut version = 0;
-            assert_eq!(struct_data_version(sd_h, &mut version), 0);
-            assert_eq!(version, 0);
-
-            assert_eq!(extract_data(&app, sd_h), data0);
-
-            // Update the content
-            assert_eq!(struct_data_new_data(&app, sd_h, cipher_opt_h, data1.as_ptr(), data1.len()),
-                       0);
-
-            // Post and re-fetch
-            assert_eq!(struct_data_post(&app, sd_h), 0);
-            assert_eq!(struct_data_free(sd_h), 0);
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-
-            // Check content
-            assert_eq!(struct_data_num_of_versions(sd_h, &mut num_versions), 0);
-            assert_eq!(num_versions, 2);
-            assert_eq!(nth_version(&app, sd_h, 0), data0);
-            assert_eq!(nth_version(&app, sd_h, 1), data1);
-
-            assert_eq!(extract_data(&app, sd_h), data1);
-
-            let mut version = 0;
-            assert_eq!(struct_data_version(sd_h, &mut version), 0);
-            assert_eq!(version, 1);
-
-            // Delete
-            assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -26 is CoreError::MutationFailure { reason: MutationError::InvalidOperation }
-            assert_eq!(struct_data_delete(&app, sd_h), -26);
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-        }
-    }
-
-    #[test]
-    fn client_struct_data_crud() {
-        let app = test_utils::create_app(false);
-
-        let mut cipher_opt_h: CipherOptHandle = 0;
-        let mut sd_h: StructDataHandle = 0;
-        let mut data_id_h: DataIdHandle = 0;
-
-        let name = rand::random();
-        let data0 = unwrap!(utility::generate_random_vector(10));
-        let data1 = unwrap!(utility::generate_random_vector(10));
-
-        unsafe {
-            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_h), 0);
-
-            // Invalid client tag
-            assert_eq!(struct_data_new(&app,
-                                       CLIENT_STRUCTURED_DATA_TAG - 1,
-                                       &name,
-                                       0,
-                                       cipher_opt_h,
-                                       data0.as_ptr(),
-                                       data0.len(),
-                                       &mut sd_h),
-                       FfiError::InvalidStructuredDataTypeTag.into());
-
-            // Create
-            assert_eq!(struct_data_new(&app,
-                                       CLIENT_STRUCTURED_DATA_TAG + 1,
-                                       &name,
-                                       0,
-                                       cipher_opt_h,
-                                       data0.as_ptr(),
-                                       data0.len(),
-                                       &mut sd_h),
-                       0);
-            assert_eq!(struct_data_extract_data_id(sd_h, &mut data_id_h), 0);
-
-            // Put and re-fetch
-            assert_eq!(struct_data_put(&app, sd_h), 0);
-            assert_eq!(struct_data_free(sd_h), 0);
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-
-            // Check content
-            assert_eq!(extract_data(&app, sd_h), data0);
-
-            // Update the content
-            assert_eq!(struct_data_new_data(&app, sd_h, cipher_opt_h, data1.as_ptr(), data1.len()),
-                       0);
-
-            // Post and re-fetch
-            assert_eq!(struct_data_post(&app, sd_h), 0);
-            assert_eq!(struct_data_free(sd_h), 0);
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-
-            // Check content
-            assert_eq!(extract_data(&app, sd_h), data1);
-
-            // Invalid operations
-            let mut num_versions = 0;
-            assert_eq!(struct_data_num_of_versions(sd_h, &mut num_versions),
-                       FfiError::InvalidStructuredDataTypeTag.into());
-
-            // Delete
-            assert_eq!(struct_data_delete(&app, sd_h), 0);
-            // -26 is CoreError::MutationFailure { reason: MutationError::InvalidOperation }
-            assert_eq!(struct_data_delete(&app, sd_h), -26);
-            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
-        }
-    }
-
-    // Helper function to fetch the current data from the structured data using FFI.
-    fn extract_data(app: &App, sd_h: StructDataHandle) -> Vec<u8> {
-        let mut data_ptr = ptr::null_mut();
-        let mut data_size = 0usize;
-        let mut data_cap = 0usize;
-
-        unsafe {
-            assert_eq!(struct_data_extract_data(app,
-                                                sd_h,
-                                                &mut data_ptr,
-                                                &mut data_size,
-                                                &mut data_cap),
-                       0);
-
-            Vec::from_raw_parts(data_ptr, data_size, data_cap)
-        }
-    }
-
-    // Helper function to fetch the nth version from the structured data using FFI.
-    fn nth_version(app: &App, sd_h: StructDataHandle, n: usize) -> Vec<u8> {
-        let mut data_ptr = ptr::null_mut();
-        let mut data_size = 0usize;
-        let mut data_cap = 0usize;
-
-        unsafe {
-            assert_eq!(struct_data_nth_version(app,
-                                               sd_h,
-                                               n,
-                                               &mut data_ptr,
-                                               &mut data_size,
-                                               &mut data_cap),
-                       0);
-
-            Vec::from_raw_parts(data_ptr, data_size, data_cap)
-        }
-    }
-
-    */
 }

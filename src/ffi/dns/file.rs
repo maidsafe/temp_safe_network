@@ -222,7 +222,7 @@ mod tests {
                                error: int32_t,
                                _file_details_ptr: *mut FileDetails) {
             assert_eq!(error, 0);
-            unsafe { test_utils::send_via_user_data(user_data) }
+            unsafe { test_utils::send_via_user_data(user_data, ()) }
         }
 
         unsafe {

@@ -119,20 +119,17 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
                                                                              int32_t,
-                                                                             CipherOptHandle))
-                                                  -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                             CipherOptHandle)) {
+    helper::catch_unwind_cb(|| {
         let user_data = OpaqueCtx(user_data);
         let obj_cache = (*session).object_cache();
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+        (*session).send(CoreMsg::new(move |_| {
             let handle = unwrap!(obj_cache.lock()).insert_cipher_opt(CipherOpt::Symmetric);
             o_cb(user_data.0, 0, handle);
             None
-        })));
-
-        0
-    })
+        }))
+    }, |error| o_cb(user_data, error, 0))
 }
 
 /// Construct CipherOpt::Asymmetric handle
@@ -245,7 +242,7 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let cipher_opt_handle: CipherOptHandle;
         unsafe {
-            assert_eq!(cipher_opt_new_symmetric(&sess, tx, handle_cb), 0);
+            cipher_opt_new_symmetric(&sess, tx, handle_cb);
             cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
         }
         let raw_data = {
@@ -323,7 +320,7 @@ mod tests {
             assert_eq!(cipher_opt_new_plaintext(&sess, tx, handle_cb), 0);
             cipher_opt_handle_pt = unwrap!(unwrap!(rx.recv()));
 
-            assert_eq!(cipher_opt_new_symmetric(&sess, tx, handle_cb), 0);
+            cipher_opt_new_symmetric(&sess, tx, handle_cb);
             cipher_opt_handle_sym = unwrap!(unwrap!(rx.recv()));
 
             let err_code = FfiError::InvalidEncryptKeyHandle.into();

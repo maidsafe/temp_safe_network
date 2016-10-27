@@ -79,8 +79,6 @@ pub enum FfiError {
     InvalidSignKeyHandle,
     /// The requested operation is forbidded for the given app.
     OperationForbiddenForApp,
-    /// Invalid type tag for StructuredData
-    InvalidStructuredDataTypeTag,
     /// Invalid version number requested for a versioned StructuredData
     InvalidVersionNumber,
     /// Invalid offsets (from-position and lenght combination) provided for
@@ -126,10 +124,7 @@ impl From<IoError> for FfiError {
 
 impl From<CoreError> for FfiError {
     fn from(error: CoreError) -> FfiError {
-        match error {
-            CoreError::InvalidStructuredDataTypeTag => FfiError::InvalidStructuredDataTypeTag,
-            _ => FfiError::CoreError(Box::new(error)),
-        }
+        FfiError::CoreError(Box::new(error))
     }
 }
 
@@ -173,7 +168,6 @@ impl Into<i32> for FfiError {
             FfiError::InvalidEncryptKeyHandle => FFI_ERROR_START_RANGE - 17,
             FfiError::InvalidSignKeyHandle => FFI_ERROR_START_RANGE - 18,
             FfiError::OperationForbiddenForApp => FFI_ERROR_START_RANGE - 19,
-            FfiError::InvalidStructuredDataTypeTag => FFI_ERROR_START_RANGE - 20,
             FfiError::InvalidVersionNumber => FFI_ERROR_START_RANGE - 21,
             FfiError::InvalidSelfEncryptorReadOffsets => FFI_ERROR_START_RANGE - 22,
             FfiError::InvalidIndex => FFI_ERROR_START_RANGE - 23,
@@ -213,9 +207,6 @@ impl fmt::Debug for FfiError {
             FfiError::InvalidEncryptKeyHandle => write!(f, "FfiError::InvalidEncryptKeyHandle"),
             FfiError::InvalidSignKeyHandle => write!(f, "FfiError::InvalidSignKeyHandle"),
             FfiError::OperationForbiddenForApp => write!(f, "FfiError::OperationForbiddenForApp"),
-            FfiError::InvalidStructuredDataTypeTag => {
-                write!(f, "FfiError::InvalidStructuredDataTypeTag")
-            }
             FfiError::InvalidVersionNumber => write!(f, "FfiError::InvalidVersionNumber"),
             FfiError::InvalidSelfEncryptorReadOffsets => {
                 write!(f, "FfiError::InvalidSelfEncryptorReadOffsets")
