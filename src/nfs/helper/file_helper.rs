@@ -143,13 +143,17 @@ mod tests {
 
     fn create_test_file(client: Client) -> Box<NfsFuture<(Dir, DirId)>> {
         let c2 = client.clone();
-        let dir = Dir::new();
+        let c3 = client.clone();
 
-        dir_helper::create(client, &dir, None)
-            .then(move |dir_id| {
-                let dir_id = unwrap!(dir_id);
-                file_helper::create(c2, "hello.txt", Vec::new(), (dir_id, None), dir)
-                    .map(move |writer| (writer, (dir_id, None)))
+        dir_helper::user_root_dir(client.clone())
+            .then(move |res| {
+                let (parent, parent_id) = unwrap!(res);
+                dir_helper::create_sub_dir(c2, "dir", None, Vec::new(), &parent, &parent_id)
+            })
+            .then(move |res| {
+                let (_parent, dir, dir_meta) = unwrap!(res);
+                file_helper::create(c3, "hello.txt", Vec::new(), dir_meta.id(), dir)
+                    .map(move |writer| (writer, dir_meta.id()))
             })
             .then(move |result| {
                 let (writer, dir_id) = unwrap!(result);

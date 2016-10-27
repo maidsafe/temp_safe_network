@@ -36,21 +36,5 @@ pub use nfs::errors::NfsError;
 pub use nfs::file::File;
 pub use nfs::metadata::{DirMetadata, FileMetadata};
 
-/// Configuration directory Name stored in the session packet
-pub const CONFIGURATION_DIRECTORY_NAME: &'static str = "CONFIGURATION_ROOT";
-/// Root directory name
-pub const ROOT_DIRECTORY_NAME: &'static str = "USER_ROOT";
-
-/// AccessLevel indicates whether the container is Private or Public shared
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
-pub enum AccessLevel {
-    /// Private Directory where the directory is encrypted with users private
-    /// keys
-    Private,
-    /// Public Directory where the directory is not encrypted and anyone can
-    /// read the contents of it
-    Public,
-}
-
 /// Helper type for futures that can result in NfsError
 pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;

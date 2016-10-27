@@ -78,7 +78,8 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
 
             Some(fut)
         })
-    }, move |error| o_cb(user_data, error, ptr::null_mut()))
+    },
+                            move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
 /// Get file metadata.
@@ -127,7 +128,8 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
 
             Some(fut)
         })
-    }, move |error| o_cb(user_data, error, ptr::null_mut()))
+    },
+                            move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
 #[cfg(test)]
@@ -139,7 +141,7 @@ mod tests {
     use ffi::test_utils;
     use futures::Future;
     use libc::{c_void, int32_t};
-    use nfs::{Dir, DirId};
+    use nfs::DirId;
     use nfs::helper::{dir_helper, file_helper};
     use rust_sodium::crypto::box_;
     use std::sync::mpsc;
@@ -147,16 +149,18 @@ mod tests {
 
     fn create_public_file(session: &Session, file_name: String, file_content: Vec<u8>) -> DirId {
         test_utils::run(session, |client| {
-            let client2 = client.clone();
+            let c2 = client.clone();
+            let c3 = client.clone();
 
-            let dir = Dir::new();
-            dir_helper::create(client.clone(), &dir, None)
+            dir_helper::user_root_dir(client.clone())
+                .then(move |res| {
+                    let (parent, parent_id) = unwrap!(res);
+                    dir_helper::create_sub_dir(c2, "dir", None, Vec::new(), &parent, &parent_id)
+                })
                 .then(move |result| {
-                    let dir_data_id = unwrap!(result);
-                    let dir_id = (dir_data_id, None);
-
-                    file_helper::create(client2, file_name, Vec::new(), dir_id.clone(), dir)
-                        .map(move |writer| (writer, dir_id))
+                    let (_parent, dir, dir_meta) = unwrap!(result);
+                    file_helper::create(c3, file_name, Vec::new(), dir_meta.id(), dir)
+                        .map(move |writer| (writer, dir_meta.id()))
                 })
                 .then(move |result| {
                     let (writer, dir_id) = unwrap!(result);

@@ -59,10 +59,11 @@ pub fn app(client: &Client,
                     dir_helper::user_root_dir(c2.clone())
                         .and_then(move |(root_dir, dir_id)| {
                             let app_dir_name = app_dir_name(&app_name, &root_dir);
+                            let key = Some(secretbox::gen_key());
 
                             dir_helper::create_sub_dir(client.clone(),
                                                        app_dir_name,
-                                                       None,
+                                                       key,
                                                        Vec::new(),
                                                        &root_dir,
                                                        &dir_id)

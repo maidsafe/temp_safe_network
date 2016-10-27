@@ -1151,8 +1151,7 @@ pub unsafe extern "C" fn appendable_data_free(session: *const Session,
 }
 
 // Convenience function to access n-th item from the given set, returning
-// FfiError::InvalidIndex
-// if not found.
+// FfiError::InvalidIndex if not found.
 fn nth<T>(items: &BTreeSet<T>, n: usize) -> Result<&T, FfiError> {
     items.iter().nth(n).ok_or(FfiError::InvalidIndex)
 }
