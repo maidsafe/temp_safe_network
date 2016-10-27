@@ -20,7 +20,8 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::{CoreError, CoreMsg, FutureExt, SelfEncryptionStorage, immutable_data};
-use ffi::{FfiError, OpaqueCtx, Session, helper};
+use ffi::{FfiError, OpaqueCtx, Session};
+use ffi::helper::catch_unwind_cb;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use ffi::object_cache::{AppHandle, CipherOptHandle, DataIdHandle, SelfEncryptorReaderHandle,
                         SelfEncryptorWriterHandle};
@@ -49,19 +50,22 @@ pub struct SelfEncryptorReaderWrapper {
 unsafe impl Send for SelfEncryptorWriterWrapper {}
 unsafe impl Send for SelfEncryptorReaderWrapper {}
 
+type SEWriterHandle = SelfEncryptorWriterHandle;
+type SEReaderHandle = SelfEncryptorReaderHandle;
+
 /// Get a Self Encryptor
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_new_self_encryptor
-    (session: *const Session,
-     user_data: *mut c_void,
-     o_cb: unsafe extern "C" fn(*mut c_void,
-                                int32_t,
-                                SelfEncryptorWriterHandle)) -> i32 {
-    helper::catch_unwind_i32(|| {
-        let object_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
+pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
+                                                       user_data: *mut c_void,
+                                                       o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                  int32_t,
+                                                                                  SEWriterHandle)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |client| {
             let mut se_storage = Box::new(SelfEncryptionStorage::new(client.clone()));
 
             let fut = SequentialEncryptor::new(mem::transmute(&mut *se_storage), None)
@@ -71,7 +75,7 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor
                         se: se,
                         _storage: se_storage,
                     };
-                    let handle = unwrap!(object_cache.lock()).insert_se_writer(se_wrapper);
+                    let handle = unwrap!(obj_cache.lock()).insert_se_writer(se_wrapper);
                     o_cb(user_data.0, 0, handle);
                 })
                 .map_err(move |e| {
@@ -80,29 +84,27 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor
                 .into_box();
 
             Some(fut)
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
 
 /// Write to Self Encryptor
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Session,
-                                                            se_h: SelfEncryptorWriterHandle,
+                                                            se_h: SEWriterHandle,
                                                             data: *const u8,
                                                             size: usize,
                                                             user_data: *mut c_void,
                                                             o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                       int32_t))
-                                                            -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                                       int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
         let data_slice = slice::from_raw_parts(data, size);
 
-        let user_data = OpaqueCtx(user_data);
-        let obj_cache = (*session).object_cache();
-
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+        (*session).send(CoreMsg::new(move |_| {
             let fut = {
                 let mut object_cache = unwrap!(obj_cache.lock());
                 match object_cache.get_se_writer(se_h) {
@@ -120,28 +122,27 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
                 })
                 .into_box();
             Some(fut)
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
 }
 
 /// Close Self Encryptor
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session,
                                                          app: AppHandle,
-                                                         se_h: SelfEncryptorWriterHandle,
+                                                         se_h: SEWriterHandle,
                                                          cipher_opt_h: CipherOptHandle,
                                                          user_data: *mut c_void,
                                                          o_cb: unsafe extern "C" fn(*mut c_void,
                                                                                     int32_t,
-                                                                                    DataIdHandle))
-                                                         -> i32 {
-    helper::catch_unwind_i32(|| {
-        let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
+                                                                                    DataIdHandle)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |client| {
             let fut = {
                 let mut obj_cache = unwrap!(obj_cache.lock());
                 match obj_cache.remove_se_writer(se_h) {
@@ -196,10 +197,9 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                 .into_box();
 
             Some(fut)
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
 
 /// Fetch Self Encryptor
@@ -211,13 +211,13 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
                                                          o_cb: unsafe extern "C" fn(
                                                              *mut c_void,
                                                              int32_t,
-                                                             SelfEncryptorReaderHandle))
-                                                         -> i32 {
-    helper::catch_unwind_i32(|| {
-        let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
+                                                             SEReaderHandle)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |client| {
             let c2 = client.clone();
             let c3 = client.clone();
             let obj_cache2 = obj_cache.clone();
@@ -277,24 +277,23 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
                 })
                 .into_box();
             Some(fut)
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
 
 /// Get data size from Self Encryptor
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_size(session: *const Session,
-                                         se_h: SelfEncryptorReaderHandle,
+                                         se_h: SEReaderHandle,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t, u64))
-                                         -> i32 {
-    helper::catch_unwind_i32(|| {
-        let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t, u64)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
             match unwrap!(obj_cache.lock()).get_se_reader(se_h) {
                 Ok(se_wrapper) => {
                     o_cb(user_data.0, 0, se_wrapper.se.len());
@@ -304,17 +303,16 @@ pub unsafe extern "C" fn immut_data_size(session: *const Session,
                 }
             };
             None
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
 
 /// Read from Self Encryptor
 /// Callback parameters are: user_data, error_code, data, size, capacity
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Session,
-                                                             se_h: SelfEncryptorReaderHandle,
+                                                             se_h: SEReaderHandle,
                                                              from_pos: u64,
                                                              len: u64,
                                                              user_data: *mut c_void,
@@ -322,13 +320,13 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
                                                                                         int32_t,
                                                                                         *mut u8,
                                                                                         size_t,
-                                                                                        size_t))
-                                                             -> i32 {
-    helper::catch_unwind_i32(|| {
-        let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
+                                                                                        size_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
             let mut obj_cache = unwrap!(obj_cache.lock());
             let se_wrapper = match obj_cache.get_se_reader(se_h) {
                 Ok(r) => r,
@@ -363,56 +361,53 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
                 .into_box();
 
             Some(fut)
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0));
 }
 
 /// Free Self Encryptor Writer handle
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_self_encryptor_writer_free(session: *const Session,
-                                                               handle: SelfEncryptorWriterHandle,
+                                                               handle: SEWriterHandle,
                                                                user_data: *mut c_void,
                                                                o_cb: unsafe
                                                                extern "C" fn(*mut c_void,
-                                                                             int32_t))
-                                                               -> i32 {
-    helper::catch_unwind_i32(|| {
-        let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
+                                                                             int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
             let res = unwrap!(obj_cache.lock()).remove_se_writer(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)));
 }
 
 /// Free Self Encryptor Reader handle
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_self_encryptor_reader_free(session: *const Session,
-                                                               handle: SelfEncryptorReaderHandle,
+                                                               handle: SEReaderHandle,
                                                                user_data: *mut c_void,
                                                                o_cb: unsafe
                                                                extern "C" fn(*mut c_void,
-                                                                             int32_t))
-                                                               -> i32 {
-    helper::catch_unwind_i32(|| {
-        let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
+                                                                             int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
             let res = unwrap!(obj_cache.lock()).remove_se_reader(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
 
 #[cfg(test)]
@@ -438,8 +433,6 @@ mod tests {
 
         let obj_cache = sess.object_cache();
 
-        let sess_ptr = Box::into_raw(Box::new(sess));
-
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
 
         let app_1_encrypt_key_handle = {
@@ -452,17 +445,24 @@ mod tests {
 
         unsafe {
             // App-0
-            let (err_code_tx, err_code_rx) = mpsc::channel::<i32>();
-            let (handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
-            let (data_size_tx, data_size_rx) = mpsc::channel::<(i32, u64)>();
-            let (read_tx, read_rx) = mpsc::channel::<(i32, *mut u8, usize, usize)>();
+            let (mut err_code_tx, err_code_rx) = mpsc::channel::<i32>();
+            let (mut handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
+            let (mut data_size_tx, data_size_rx) = mpsc::channel::<(i32, u64)>();
+            let (mut read_tx, read_rx) = mpsc::channel::<(i32, *mut u8, usize, usize)>();
 
-            let err_code_tx = Box::into_raw(Box::new(err_code_tx)) as *mut c_void;
-            let handle_tx = Box::into_raw(Box::new(handle_tx)) as *mut c_void;
-            let data_size_tx = Box::into_raw(Box::new(data_size_tx)) as *mut c_void;
-            let read_tx = Box::into_raw(Box::new(read_tx)) as *mut c_void;
+            let err_code_tx: *mut _ = &mut err_code_tx;
+            let err_code_tx = err_code_tx as *mut c_void;
 
-            assert_eq!(cipher_opt_new_asymmetric(sess_ptr,
+            let handle_tx: *mut _ = &mut handle_tx;
+            let handle_tx = handle_tx as *mut c_void;
+
+            let data_size_tx: *mut _ = &mut data_size_tx;
+            let data_size_tx = data_size_tx as *mut c_void;
+
+            let read_tx: *mut _ = &mut read_tx;
+            let read_tx = read_tx as *mut c_void;
+
+            assert_eq!(cipher_opt_new_asymmetric(&sess,
                                                  app_1_encrypt_key_handle,
                                                  handle_tx,
                                                  handle_cb),
@@ -470,53 +470,41 @@ mod tests {
             let (err_code, cipher_opt_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
-            assert_eq!(immut_data_new_self_encryptor(sess_ptr, handle_tx, handle_cb),
-                       0);
+            immut_data_new_self_encryptor(&sess, handle_tx, handle_cb);
             let (err_code, se_writer_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
-            assert_eq!(immut_data_write_to_self_encryptor(sess_ptr,
-                                                          0,
-                                                          plain_text.as_ptr(),
-                                                          plain_text.len(),
-                                                          err_code_tx,
-                                                          err_code_cb),
-                       0);
+            immut_data_write_to_self_encryptor(&sess,
+                                               0,
+                                               plain_text.as_ptr(),
+                                               plain_text.len(),
+                                               err_code_tx,
+                                               err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            assert_eq!(immut_data_write_to_self_encryptor(sess_ptr,
-                                                          se_writer_h,
-                                                          plain_text.as_ptr(),
-                                                          plain_text.len(),
-                                                          err_code_tx,
-                                                          err_code_cb),
-                       0);
+            immut_data_write_to_self_encryptor(&sess,
+                                               se_writer_h,
+                                               plain_text.as_ptr(),
+                                               plain_text.len(),
+                                               err_code_tx,
+                                               err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(immut_data_close_self_encryptor(sess_ptr,
-                                                       app_0,
-                                                       se_writer_h,
-                                                       cipher_opt_h,
-                                                       handle_tx,
-                                                       handle_cb),
-                       0);
+            immut_data_close_self_encryptor(&sess,
+                                            app_0,
+                                            se_writer_h,
+                                            cipher_opt_h,
+                                            handle_tx,
+                                            handle_cb);
             let (err_code, data_id_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
-            assert_eq!(immut_data_self_encryptor_reader_free(sess_ptr,
-                                                             se_writer_h,
-                                                             err_code_tx,
-                                                             err_code_cb),
-                       0);
+            immut_data_self_encryptor_reader_free(&sess, se_writer_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            assert_eq!(immut_data_self_encryptor_writer_free(sess_ptr,
-                                                             se_writer_h,
-                                                             err_code_tx,
-                                                             err_code_cb),
-                       0);
+            immut_data_self_encryptor_writer_free(&sess, se_writer_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        // It should've been closed by immut_data_close_self_encryptor
                        FfiError::InvalidSelfEncryptorHandle.into());
@@ -524,91 +512,53 @@ mod tests {
             // App-1
             let se_reader_h = 0;
             let se_writer_h = 0;
-            assert_eq!(immut_data_size(sess_ptr, se_reader_h, data_size_tx, data_size_cb),
-                       0);
+            immut_data_size(&sess, se_reader_h, data_size_tx, data_size_cb);
             let (err_code, _) = unwrap!(data_size_rx.recv());
             assert_eq!(err_code, FfiError::InvalidSelfEncryptorHandle.into());
 
-            assert_eq!(immut_data_size(sess_ptr, se_writer_h, data_size_tx, data_size_cb),
-                       0);
+            immut_data_size(&sess, se_writer_h, data_size_tx, data_size_cb);
             let (err_code, _) = unwrap!(data_size_rx.recv());
             assert_eq!(err_code, FfiError::InvalidSelfEncryptorHandle.into());
 
-            assert_eq!(immut_data_fetch_self_encryptor(sess_ptr,
-                                                       app_0,
-                                                       data_id_h,
-                                                       handle_tx,
-                                                       handle_cb),
-                       0);
+            immut_data_fetch_self_encryptor(&sess, app_0, data_id_h, handle_tx, handle_cb);
             let (err_code, _) = unwrap!(handle_rx.recv());
             assert!(err_code != 0);
 
-            assert_eq!(immut_data_self_encryptor_reader_free(sess_ptr,
-                                                             se_reader_h,
-                                                             err_code_tx,
-                                                             err_code_cb),
-                       0);
+            immut_data_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            assert_eq!(immut_data_fetch_self_encryptor(sess_ptr,
-                                                       app_1,
-                                                       data_id_h,
-                                                       handle_tx,
-                                                       handle_cb),
-                       0);
+            immut_data_fetch_self_encryptor(&sess, app_1, data_id_h, handle_tx, handle_cb);
             let (err_code, se_reader_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
-            assert_eq!(immut_data_size(sess_ptr, se_reader_h, data_size_tx, data_size_cb),
-                       0);
+            immut_data_size(&sess, se_reader_h, data_size_tx, data_size_cb);
             let (err_code, size) = unwrap!(data_size_rx.recv());
             assert_eq!(err_code, 0);
             assert_eq!(size, plain_text.len() as u64);
 
-            assert_eq!(immut_data_read_from_self_encryptor(sess_ptr,
-                                                           se_reader_h,
-                                                           1,
-                                                           size,
-                                                           read_tx,
-                                                           read_cb),
-                       0);
+            immut_data_read_from_self_encryptor(&sess, se_reader_h, 1, size, read_tx, read_cb);
             let (err_code, _, _, _) = unwrap!(read_rx.recv());
             assert_eq!(err_code, FfiError::InvalidSelfEncryptorReadOffsets.into());
 
-            assert_eq!(immut_data_read_from_self_encryptor(sess_ptr,
-                                                           se_reader_h,
-                                                           0,
-                                                           size,
-                                                           read_tx,
-                                                           read_cb),
-                       0);
+            immut_data_read_from_self_encryptor(&sess, se_reader_h, 0, size, read_tx, read_cb);
             let (err_code, data_ptr, data_size, capacity) = unwrap!(read_rx.recv());
             assert_eq!(err_code, 0);
             let plain_text_rx = Vec::from_raw_parts(data_ptr, data_size, capacity);
             assert_eq!(plain_text, plain_text_rx);
 
-            assert_eq!(immut_data_self_encryptor_reader_free(sess_ptr,
-                                                             se_reader_h,
-                                                             err_code_tx,
-                                                             err_code_cb),
-                       0);
+            immut_data_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(immut_data_self_encryptor_reader_free(sess_ptr,
-                                                             se_reader_h,
-                                                             err_code_tx,
-                                                             err_code_cb),
-                       0);
+            immut_data_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            assert_eq!(cipher_opt_free(sess_ptr, cipher_opt_h, err_code_tx, err_code_cb),
+            assert_eq!(cipher_opt_free(&sess, cipher_opt_h, err_code_tx, err_code_cb),
                        0);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(data_id_free(sess_ptr, data_id_h, err_code_tx, err_code_cb),
-                       0);
+            assert_eq!(data_id_free(&sess, data_id_h, err_code_tx, err_code_cb), 0);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
         }
     }

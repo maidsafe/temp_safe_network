@@ -21,7 +21,7 @@
 
 use ffi::App;
 use ffi::errors::FfiError;
-// use ffi::low_level_api::appendable_data::AppendableData;
+use ffi::low_level_api::appendable_data::AppendableData;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWriterWrapper};
 use lru_cache::LruCache;
@@ -63,12 +63,13 @@ pub type SignKeyHandle = ObjectHandle;
 
 const DEFAULT_CAPACITY: usize = 100;
 
+/// Contains session object cache
 pub struct ObjectCache {
     new_handle: ObjectHandle,
     app: LruCache<AppHandle, App>,
     // struct_data: LruCache<StructDataHandle, StructuredData>,
     data_id: LruCache<DataIdHandle, DataIdentifier>,
-    // appendable_data: LruCache<AppendableDataHandle, AppendableData>,
+    appendable_data: LruCache<AppendableDataHandle, AppendableData>,
     se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
     se_writer: LruCache<SelfEncryptorWriterHandle, SelfEncryptorWriterWrapper>,
     cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
@@ -88,7 +89,7 @@ impl ObjectCache {
         self.app.clear();
         // self.struct_data.clear();
         self.data_id.clear();
-        // self.appendable_data.clear();
+        self.appendable_data.clear();
         self.se_reader.clear();
         self.se_writer.clear();
         self.cipher_opt.clear();
@@ -109,32 +110,29 @@ impl ObjectCache {
         self.app.get_mut(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
     }
 
-    pub fn remove_ad(&mut self, handle: AppHandle) -> Result<App, FfiError> {
+    pub fn remove_app(&mut self, handle: AppHandle) -> Result<App, FfiError> {
         self.app.remove(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
     }
 
     // ----------------------------------------------------------
-    // pub fn insert_ad(&mut self, data: AppendableData) -> AppendableDataHandle {
-    //     let handle = self.new_handle();
-    //     if let Some(prev) = self.appendable_data.insert(handle, data) {
-    //         debug!("Displaced AppendableData from ObjectCache: {:?}", prev);
-    //     }
+    pub fn insert_ad(&mut self, data: AppendableData) -> AppendableDataHandle {
+        let handle = self.new_handle();
+        if let Some(prev) = self.appendable_data.insert(handle, data) {
+            debug!("Displaced AppendableData from ObjectCache: {:?}", prev);
+        }
 
-    //     handle
-    // }
+        handle
+    }
 
-    // pub fn get_ad(&mut self,
-    //               handle: AppendableDataHandle)
-    //               -> Result<&mut AppendableData, FfiError> {
-    // self.appendable_data.get_mut(&handle).ok_or(FfiError::
-    // InvalidAppendableDataHandle)
-    // }
+    pub fn get_ad(&mut self,
+                  handle: AppendableDataHandle)
+                  -> Result<&mut AppendableData, FfiError> {
+        self.appendable_data.get_mut(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
+    }
 
-    // pub fn remove_ad(&mut self, handle: AppendableDataHandle) ->
-    // Result<AppendableData, FfiError> {
-    // self.appendable_data.remove(&handle).ok_or(FfiError::
-    // InvalidAppendableDataHandle)
-    // }
+    pub fn remove_ad(&mut self, handle: AppendableDataHandle) -> Result<AppendableData, FfiError> {
+        self.appendable_data.remove(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
+    }
 
     // ----------------------------------------------------------
     pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) -> CipherOptHandle {
@@ -291,7 +289,7 @@ impl Default for ObjectCache {
             app: LruCache::new(DEFAULT_CAPACITY),
             // struct_data: LruCache::new(DEFAULT_CAPACITY),
             data_id: LruCache::new(DEFAULT_CAPACITY),
-            // appendable_data: LruCache::new(DEFAULT_CAPACITY),
+            appendable_data: LruCache::new(DEFAULT_CAPACITY),
             se_reader: LruCache::new(DEFAULT_CAPACITY),
             se_writer: LruCache::new(DEFAULT_CAPACITY),
             cipher_opt: LruCache::new(DEFAULT_CAPACITY),

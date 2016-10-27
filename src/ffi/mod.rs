@@ -66,9 +66,12 @@ mod test_utils;
 
 pub use ffi::app::App;
 pub use ffi::errors::FfiError;
+use ffi::object_cache::ObjectCache;
 pub use ffi::session::Session;
 
 use futures::Future;
+use std::sync::{Arc, Mutex};
+
 /// Helper type to represent the FFI future result
 pub type FfiFuture<T> = Future<Item = T, Error = FfiError>;
 
@@ -76,3 +79,9 @@ pub type FfiFuture<T> = Future<Item = T, Error = FfiError>;
 #[derive(Clone, Copy)]
 pub struct OpaqueCtx(*mut ::libc::c_void);
 unsafe impl Send for OpaqueCtx {}
+
+/// Result that uses FfiError as error type
+pub type FfiResult<T> = Result<T, FfiError>;
+
+/// Reference type that holds object cache
+pub type ObjectCacheRef = Arc<Mutex<ObjectCache>>;

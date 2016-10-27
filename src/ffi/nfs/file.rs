@@ -42,7 +42,7 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
                                          file_path_len: usize,
                                          is_shared: bool,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(int32_t, *mut c_void))
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
                                          -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI delete file, given the path.");
@@ -57,14 +57,14 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
                 Ok(app) => {
                     let fut = delete_file(&client, &app, file_path, is_shared)
                         .then(move |res| {
-                            o_cb(ffi_result_code!(res), user_data.0);
+                            o_cb(user_data.0, ffi_result_code!(res));
                             Ok(())
                         })
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
@@ -86,7 +86,9 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
                                       is_path_shared: bool,
                                       include_metadata: bool,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(int32_t, *mut c_void, *mut FileDetails))
+                                      o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                 int32_t,
+                                                                 *mut FileDetails))
                                       -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI get file, given the path.");
@@ -109,16 +111,16 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
                                        include_metadata)
                         .map(move |response| {
                             let details_handle = Box::into_raw(Box::new(response));
-                            o_cb(0, user_data.0, details_handle);
+                            o_cb(user_data.0, 0, details_handle);
                         })
                         .map_err(move |e| {
-                            o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                            o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                         })
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                    o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                     None
                 }
             }
@@ -142,7 +144,7 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
                                          new_content: *const u8,
                                          new_content_len: usize,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(int32_t, *mut c_void))
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
                                          -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI modify file, given the path.");
@@ -167,7 +169,7 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
                                           new_metadata,
                                           new_content)
                         .then(move |res| {
-                            o_cb(ffi_result_code!(res), user_data.0);
+                            o_cb(user_data.0, ffi_result_code!(res));
                             Ok(())
                         })
                         .into_box();
@@ -175,7 +177,7 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
@@ -196,7 +198,7 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
                                        is_dst_path_shared: bool,
                                        retain_src: bool,
                                        user_data: *mut c_void,
-                                       o_cb: extern "C" fn(int32_t, *mut c_void))
+                                       o_cb: extern "C" fn(*mut c_void, int32_t))
                                        -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI move file, from {:?} to {:?}.", src_path, dst_path);
@@ -219,14 +221,14 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
                                         is_dst_path_shared,
                                         retain_src)
                         .then(move |res| {
-                            o_cb(ffi_result_code!(res), user_data.0);
+                            o_cb(user_data.0, ffi_result_code!(res));
                             Ok(())
                         })
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0);
+                    o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
@@ -245,8 +247,8 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
                                                file_path_len: usize,
                                                is_path_shared: bool,
                                                user_data: *mut c_void,
-                                               o_cb: extern "C" fn(int32_t,
-                                                                   *mut c_void,
+                                               o_cb: extern "C" fn(*mut c_void,
+                                                                   int32_t,
                                                                    *mut FileMetadata))
                                                -> int32_t {
     helper::catch_unwind_i32(|| {
@@ -263,16 +265,16 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
                     let fut = get_file_metadata(&client, &app, file_path, is_path_shared)
                         .map(move |metadata| {
                             let metadata_handle = Box::into_raw(Box::new(metadata));
-                            o_cb(0, user_data.0, metadata_handle);
+                            o_cb(user_data.0, 0, metadata_handle);
                         })
                         .map_err(move |e| {
-                            o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                            o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                         })
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                    o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                     None
                 }
             }

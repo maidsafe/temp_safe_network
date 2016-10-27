@@ -140,7 +140,7 @@ mod tests {
     fn create_and_free() {
         let sess = test_utils::create_session();
         let obj_cache = sess.object_cache();
-        let sess_ptr = Box::into_raw(Box::new(sess));
+        let sess_ptr: *const _ = &sess;
 
         let type_tag = rand::random();
         let struct_id_arr: [u8; XOR_NAME_LEN] = rand::random();

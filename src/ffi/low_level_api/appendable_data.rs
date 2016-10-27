@@ -19,17 +19,20 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::errors::CoreError;
-use ffi::app::App;
-use ffi::errors::FfiError;
-use ffi::helper;
-use ffi::low_level_api::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle};
-use ffi::low_level_api::object_cache::object_cache;
+use core::{Client, CoreError, CoreMsg, FutureExt};
+use ffi::{FfiError, FfiResult, ObjectCacheRef, OpaqueCtx, Session};
+use ffi::helper::catch_unwind_cb;
+use ffi::object_cache::{AppHandle, AppendableDataHandle, DataIdHandle, EncryptKeyHandle,
+                        SignKeyHandle};
+use futures::{self, Future};
+use libc::{c_void, int32_t, size_t, uint64_t};
 use routing::{AppendWrapper, AppendedData, Data, Filter, PrivAppendableData, PrivAppendedData,
               PubAppendableData, XOR_NAME_LEN, XorName};
-use std::{mem, ptr};
 use std::collections::BTreeSet;
 use std::iter;
+use std::mem;
+
+type ADHandle = AppendableDataHandle;
 
 /// Wrapper for PrivAppendableData and PubAppendableData.
 #[derive(Clone, Debug, Hash)]
@@ -70,346 +73,509 @@ pub enum FilterType {
 
 /// Create new PubAppendableData
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_new_pub(app: *const App,
+pub unsafe extern "C" fn appendable_data_new_pub(session: *const Session,
                                                  name: *const [u8; XOR_NAME_LEN],
-                                                 o_handle: *mut AppendableDataHandle)
-                                                 -> i32 {
-    helper::catch_unwind_i32(|| {
-        let client = (*app).get_client();
+                                                 user_data: *mut c_void,
+                                                 o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                            int32_t,
+                                                                            ADHandle)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
         let name = XorName(*name);
 
-        let (owner_key, sign_key) = {
-            let client = unwrap!(client.lock());
-            let owner_key = *ffi_try!(client.get_public_signing_key());
-            let sign_key = ffi_try!(client.get_secret_signing_key()).clone();
-            (owner_key, sign_key)
-        };
+        (*session).send(CoreMsg::new(move |client| {
+            match appendable_data_new_pub_impl(client, obj_cache, name) {
+                Ok(handle) => o_cb(user_data.0, 0, handle),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+}
 
-        let data = PubAppendableData::new(name,
-                                          0,
-                                          vec![owner_key],
-                                          Default::default(),
-                                          Default::default(),
-                                          Filter::black_list(iter::empty()),
-                                          Some(&sign_key));
-        let data = AppendableData::Pub(ffi_try!(data.map_err(CoreError::from)));
-        let handle = unwrap!(object_cache()).insert_ad(data);
+fn appendable_data_new_pub_impl(client: &Client,
+                                obj_cache: ObjectCacheRef,
+                                name: XorName)
+                                -> FfiResult<ADHandle> {
+    let owner_key = try!(client.public_signing_key());
+    let sign_key = try!(client.secret_signing_key()).clone();
 
-        ptr::write(o_handle, handle);
-        0
-    })
+    let data = PubAppendableData::new(name,
+                                      0,
+                                      vec![owner_key],
+                                      Default::default(),
+                                      Default::default(),
+                                      Filter::black_list(iter::empty()),
+                                      Some(&sign_key));
+    let data = AppendableData::Pub(try!(data.map_err(CoreError::from)));
+    Ok(unwrap!(obj_cache.lock()).insert_ad(data))
 }
 
 /// Create new PrivAppendableData
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_new_priv(app: *const App,
+pub unsafe extern "C" fn appendable_data_new_priv(session: *const Session,
+                                                  app: AppHandle,
                                                   name: *const [u8; XOR_NAME_LEN],
-                                                  o_handle: *mut AppendableDataHandle)
-                                                  -> i32 {
-    helper::catch_unwind_i32(|| {
-        let app = &*app;
-        let client = app.get_client();
+                                                  user_data: *mut c_void,
+                                                  o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                             int32_t,
+                                                                             ADHandle)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
         let name = XorName(*name);
 
-        let (owner_key, sign_key) = {
-            let client = unwrap!(client.lock());
-            let owner_key = *ffi_try!(client.get_public_signing_key());
-            let sign_key = ffi_try!(client.get_secret_signing_key()).clone();
-            (owner_key, sign_key)
-        };
+        (*session).send(CoreMsg::new(move |client| {
+            match appendable_data_new_priv_impl(client, obj_cache, name, app) {
+                Ok(handle) => o_cb(user_data.0, 0, handle),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+}
 
-        let data = PrivAppendableData::new(name,
-                                           0,
-                                           vec![owner_key],
-                                           Default::default(),
-                                           Default::default(),
-                                           Filter::black_list(iter::empty()),
-                                           ffi_try!(app.asym_keys()).0,
-                                           Some(&sign_key));
-        let data = AppendableData::Priv(ffi_try!(data.map_err(CoreError::from)));
-        let handle = unwrap!(object_cache()).insert_ad(data);
+fn appendable_data_new_priv_impl(client: &Client,
+                                 obj_cache: ObjectCacheRef,
+                                 name: XorName,
+                                 app_handle: AppHandle)
+                                 -> FfiResult<ADHandle> {
+    let owner_key = try!(client.public_signing_key());
+    let sign_key = try!(client.secret_signing_key());
 
-        ptr::write(o_handle, handle);
-        0
-    })
+    let data = {
+        let mut obj_cache = unwrap!(obj_cache.lock());
+        let app = try!(obj_cache.get_app(app_handle));
+        PrivAppendableData::new(name,
+                                0,
+                                vec![owner_key],
+                                Default::default(),
+                                Default::default(),
+                                Filter::black_list(iter::empty()),
+                                try!(app.asym_enc_keys()).0,
+                                Some(&sign_key))
+    };
+    let data = AppendableData::Priv(try!(data.map_err(CoreError::from)));
+
+    Ok(unwrap!(obj_cache.lock()).insert_ad(data))
 }
 
 /// Get existing appendable data from Network.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_get(app: *const App,
+pub unsafe extern "C" fn appendable_data_get(session: *const Session,
                                              data_id_h: DataIdHandle,
-                                             o_handle: *mut AppendableDataHandle)
-                                             -> i32 {
-    helper::catch_unwind_i32(|| {
-        let data_id = *ffi_try!(unwrap!(object_cache()).get_data_id(data_id_h));
+                                             user_data: *mut c_void,
+                                             o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                        int32_t,
+                                                                        ADHandle)) {
+    let user_data = OpaqueCtx(user_data);
 
-        let client = (*app).get_client();
-        let resp_getter = ffi_try!(unwrap!(client.lock()).get(data_id, None));
-        let data = match ffi_try!(resp_getter.get()) {
-            Data::PubAppendable(data) => AppendableData::Pub(data),
-            Data::PrivAppendable(data) => AppendableData::Priv(data),
-            _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
-        };
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
 
-        let handle = unwrap!(object_cache()).insert_ad(data);
+        (*session).send(CoreMsg::new(move |client| {
+            let c2 = client.clone();
 
-        ptr::write(o_handle, handle);
-        0
-    })
+            let data_id = unwrap!(obj_cache.lock()).get_data_id(data_id_h).map(|id| id.clone());
+
+            let fut = futures::done(data_id)
+                .map_err(FfiError::from)
+                .and_then(move |data_id| c2.get(data_id, None).map_err(FfiError::from))
+                .and_then(move |response| {
+                    let data = match response {
+                        Data::PubAppendable(data) => AppendableData::Pub(data),
+                        Data::PrivAppendable(data) => AppendableData::Priv(data),
+                        _ => {
+                            return Err(FfiError::from(CoreError::ReceivedUnexpectedData));
+                        }
+                    };
+                    let mut obj_cache = unwrap!(obj_cache.lock());
+                    Ok(obj_cache.insert_ad(data))
+                })
+                .map(move |handle| o_cb(user_data.0, 0, handle))
+                .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
+                .into_box();
+
+            Some(fut)
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
 
 /// Extract DataIdentifier from AppendableData.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_extract_data_id(ad_h: AppendableDataHandle,
-                                                         o_handle: *mut DataIdHandle)
-                                                         -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        let data_id = match *ffi_try!(object_cache.get_ad(ad_h)) {
-            AppendableData::Pub(ref elt) => elt.identifier(),
-            AppendableData::Priv(ref elt) => elt.identifier(),
-        };
-        let handle = object_cache.insert_data_id(data_id);
+pub unsafe extern "C" fn appendable_data_extract_data_id(session: *const Session,
+                                                         ad_h: ADHandle,
+                                                         user_data: *mut c_void,
+                                                         o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                    int32_t,
+                                                                                    DataIdHandle)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ptr::write(o_handle, handle);
-        0
-    })
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_extract_data_id_impl(obj_cache, ad_h) {
+                Ok(handle) => o_cb(user_data.0, 0, handle),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+}
+
+fn appendable_data_extract_data_id_impl(object_cache: ObjectCacheRef,
+                                        ad_h: ADHandle)
+                                        -> FfiResult<DataIdHandle> {
+    let mut object_cache = unwrap!(object_cache.lock());
+    let data_id = match *try!(object_cache.get_ad(ad_h)) {
+        AppendableData::Pub(ref elt) => elt.identifier(),
+        AppendableData::Priv(ref elt) => elt.identifier(),
+    };
+    Ok(object_cache.insert_data_id(data_id))
 }
 
 /// PUT appendable data.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_put(app: *const App, ad_h: AppendableDataHandle) -> i32 {
-    helper::catch_unwind_i32(|| {
-        let data = ffi_try!(unwrap!(object_cache()).get_ad(ad_h)).clone();
+pub unsafe extern "C" fn appendable_data_put(session: *const Session,
+                                             ad_h: ADHandle,
+                                             user_data: *mut c_void,
+                                             o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        let client = (*app).get_client();
-        let resp_getter = ffi_try!(unwrap!(client.lock()).put(data.into(), None));
-        ffi_try!(resp_getter.get());
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
 
-        0
-    })
+        (*session).send(CoreMsg::new(move |client| {
+            let data_res = unwrap!(obj_cache.lock()).get_ad(ad_h).map(|v| v.clone());
+            let c2 = client.clone();
+
+            let fut = futures::done(data_res)
+                .and_then(move |data| c2.put(data.into(), None).map_err(FfiError::from))
+                .then(move |res| {
+                    o_cb(user_data.0, ffi_result_code!(res));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
 }
 
 /// POST appendable data (bumps the version).
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_post(app: *const App,
-                                              ad_h: AppendableDataHandle,
-                                              include_data: bool)
-                                              -> i32 {
-    helper::catch_unwind_i32(|| {
-        let client = (*app).get_client();
+pub unsafe extern "C" fn appendable_data_post(session: *const Session,
+                                              ad_h: ADHandle,
+                                              include_data: bool,
+                                              user_data: *mut c_void,
+                                              o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        let new_ad = {
-            let mut object_cache = unwrap!(object_cache());
-            let ad = ffi_try!(object_cache.get_ad(ad_h));
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
 
-            match *ad {
-                AppendableData::Pub(ref old_data) => {
-                    let mut new_data = ffi_try!(PubAppendableData::new(old_data.name,
-                                                        old_data.version + 1,
-                                                        old_data.current_owner_keys.clone(),
-                                                        old_data.previous_owner_keys.clone(),
-                                                        old_data.deleted_data.clone(),
-                                                        old_data.filter.clone(),
-                                                        Some(ffi_try!(unwrap!(client.lock())
-                                                                      .get_secret_signing_key())))
-                            .map_err(CoreError::from));
-                    if include_data {
-                        new_data.data = old_data.data.clone();
-                    }
-                    AppendableData::Pub(new_data)
-                }
-                AppendableData::Priv(ref old_data) => {
-                    let mut new_data = ffi_try!(PrivAppendableData::new(old_data.name,
-                                                         old_data.version + 1,
-                                                         old_data.current_owner_keys.clone(),
-                                                         old_data.previous_owner_keys.clone(),
-                                                         old_data.deleted_data.clone(),
-                                                         old_data.filter.clone(),
-                                                         old_data.encrypt_key.clone(),
-                                                         Some(ffi_try!(unwrap!(client.lock())
-                                                                       .get_secret_signing_key())))
-                            .map_err(CoreError::from));
-                    if include_data {
-                        new_data.data = old_data.data.clone();
-                    }
-                    AppendableData::Priv(new_data)
-                }
+        (*session).send(CoreMsg::new(move |client| {
+            let c2 = client.clone();
+            let new_ad = appendable_data_post_impl(client, obj_cache, ad_h, include_data);
+
+            let fut = futures::done(new_ad)
+                .and_then(move |new_ad| {
+                    c2.post(new_ad.clone().into(), None).map_err(FfiError::from)
+                })
+                .then(move |res| {
+                    o_cb(user_data.0, ffi_result_code!(res));
+                    Ok(())
+                })
+                .into_box();
+
+            Some(fut)
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)));
+}
+
+fn appendable_data_post_impl(client: &Client,
+                             obj_cache: ObjectCacheRef,
+                             ad_h: ADHandle,
+                             include_data: bool)
+                             -> FfiResult<AppendableData> {
+    let mut obj_cache = unwrap!(obj_cache.lock());
+    match *try!(obj_cache.get_ad(ad_h)) {
+        AppendableData::Pub(ref old) => {
+            let sk = try!(client.secret_signing_key());
+            let new_data = PubAppendableData::new(old.name,
+                                                  old.version + 1,
+                                                  old.current_owner_keys
+                                                      .clone(),
+                                                  old.previous_owner_keys
+                                                      .clone(),
+                                                  old.deleted_data.clone(),
+                                                  old.filter.clone(),
+                                                  Some(&sk))
+                .map_err(CoreError::from);
+            let mut new_data = try!(new_data);
+            if include_data {
+                new_data.data = old.data.clone();
             }
-        };
-        let resp_getter = ffi_try!(unwrap!(client.lock()).post(new_ad.clone().into(), None));
-        ffi_try!(resp_getter.get());
-        *ffi_try!(unwrap!(object_cache()).get_ad(ad_h)) = new_ad;
+            Ok(AppendableData::Pub(new_data))
+        }
+        AppendableData::Priv(ref old_data) => {
+            let new_data = PrivAppendableData::new(old_data.name,
+                                                   old_data.version + 1,
+                                                   old_data.current_owner_keys.clone(),
+                                                   old_data.previous_owner_keys.clone(),
+                                                   old_data.deleted_data.clone(),
+                                                   old_data.filter.clone(),
+                                                   old_data.encrypt_key.clone(),
+                                                   Some(&try!(client.secret_signing_key())))
+                .map_err(CoreError::from);
+            let mut new_data = try!(new_data);
 
-        0
-    })
+            if include_data {
+                new_data.data = old_data.data.clone();
+            }
+            Ok(AppendableData::Priv(new_data))
+        }
+    }
 }
 
 // TODO: DELETE (disabled for now)
 
 /// Get the filter type
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_filter_type(ad_h: AppendableDataHandle,
-                                                     o_type: *mut FilterType)
-                                                     -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        let ad = ffi_try!(object_cache.get_ad(ad_h));
-        let filter = ad.filter_mut();
-        let filter_type = match *filter {
-            Filter::BlackList(_) => FilterType::BlackList,
-            Filter::WhiteList(_) => FilterType::WhiteList,
-        };
+pub unsafe extern "C" fn appendable_data_filter_type(session: *const Session,
+                                                     ad_h: ADHandle,
+                                                     user_data: *mut c_void,
+                                                     o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                int32_t,
+                                                                                FilterType)) {
+    let user_data = OpaqueCtx(user_data);
 
-        ptr::write(o_type, filter_type);
-        0
-    })
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match unwrap!(obj_cache.lock()).get_ad(ad_h) {
+                Ok(ad) => {
+                    let filter = ad.filter_mut();
+                    let filter_type = match *filter {
+                        Filter::BlackList(_) => FilterType::BlackList,
+                        Filter::WhiteList(_) => FilterType::WhiteList,
+                    };
+                    o_cb(user_data.0, 0, filter_type);
+                }
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), FilterType::BlackList),
+            }
+            None
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), FilterType::BlackList))
 }
 
 /// Switch the filter of the appendable data.
 #[no_mangle]
-pub extern "C" fn appendable_data_toggle_filter(ad_h: AppendableDataHandle) -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        let ad = ffi_try!(object_cache.get_ad(ad_h));
+pub unsafe extern "C" fn appendable_data_toggle_filter(session: *const Session,
+                                                       ad_h: ADHandle,
+                                                       user_data: *mut c_void,
+                                                       o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                  int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        let filter = ad.filter_mut();
-        match *filter {
-            Filter::BlackList(_) => *filter = Filter::white_list(iter::empty()),
-            Filter::WhiteList(_) => *filter = Filter::black_list(iter::empty()),
-        }
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
 
-        0
-    })
+        (*session).send(CoreMsg::new(move |_| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
+            match obj_cache.get_ad(ad_h) {
+                Ok(ad) => {
+                    let filter = ad.filter_mut();
+                    match *filter {
+                        Filter::BlackList(_) => *filter = Filter::white_list(iter::empty()),
+                        Filter::WhiteList(_) => *filter = Filter::black_list(iter::empty()),
+                    }
+                    o_cb(user_data.0, 0);
+                }
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e)),
+            }
+            None
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
 
 /// Insert a new entry to the (whitelist or blacklist) filter. If the key was
 /// already present in the filter, this is a no-op.
 #[no_mangle]
-pub extern "C" fn appendable_data_insert_to_filter(ad_h: AppendableDataHandle,
-                                                   sign_key_h: SignKeyHandle)
-                                                   -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        let sign_key = *ffi_try!(object_cache.get_sign_key(sign_key_h));
-        let ad = ffi_try!(object_cache.get_ad(ad_h));
+pub unsafe extern "C" fn appendable_data_insert_to_filter(session: *const Session,
+                                                          ad_h: ADHandle,
+                                                          sign_key_h: SignKeyHandle,
+                                                          user_data: *mut c_void,
+                                                          o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                     int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        let _ = match *ad.filter_mut() {
-            Filter::WhiteList(ref mut list) |
-            Filter::BlackList(ref mut list) => list.insert(sign_key),
-        };
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
 
-        0
-    })
+        (*session).send(CoreMsg::new(move |_| {
+            let res = appendable_data_insert_to_filter_impl(obj_cache, ad_h, sign_key_h);
+            o_cb(user_data.0, ffi_result_code!(res));
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+}
+
+fn appendable_data_insert_to_filter_impl(obj_cache: ObjectCacheRef,
+                                         ad_h: ADHandle,
+                                         sign_key_h: SignKeyHandle)
+                                         -> FfiResult<()> {
+    let mut obj_cache = unwrap!(obj_cache.lock());
+    let sign_key = *try!(obj_cache.get_sign_key(sign_key_h));
+    let ad = try!(obj_cache.get_ad(ad_h));
+    let _ = match *ad.filter_mut() {
+        Filter::WhiteList(ref mut list) |
+        Filter::BlackList(ref mut list) => list.insert(sign_key),
+    };
+    Ok(())
 }
 
 /// Remove the given key from the (whitelist or blacklist) filter. If the key
 /// isn't present in the filter, this is a no-op.
 #[no_mangle]
-pub extern "C" fn appendable_data_remove_from_filter(ad_h: AppendableDataHandle,
-                                                     sign_key_h: SignKeyHandle)
-                                                     -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        let sign_key = *ffi_try!(object_cache.get_sign_key(sign_key_h));
-        let ad = ffi_try!(object_cache.get_ad(ad_h));
+pub unsafe extern "C" fn appendable_data_remove_from_filter(session: *const Session,
+                                                            ad_h: ADHandle,
+                                                            sign_key_h: SignKeyHandle,
+                                                            user_data: *mut c_void,
+                                                            o_cb: unsafe extern "C"
+                                                            fn(*mut c_void,
+                                                               int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        let _ = match *ad.filter_mut() {
-            Filter::WhiteList(ref mut list) |
-            Filter::BlackList(ref mut list) => list.remove(&sign_key),
-        };
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
 
-        0
-    })
+        (*session).send(CoreMsg::new(move |_| {
+            let res = appendable_data_remove_from_filter_impl(obj_cache, ad_h, sign_key_h);
+            o_cb(user_data.0, ffi_result_code!(res));
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
 }
 
-/// Get the number of filtered keys.
-#[no_mangle]
-pub unsafe extern "C" fn appendable_data_num_of_filter_keys(ad_h: AppendableDataHandle,
-                                                            o_num: *mut usize)
-                                                            -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        let ad = ffi_try!(object_cache.get_ad(ad_h));
-
-        let num = match *ad.filter_mut() {
-            Filter::WhiteList(ref mut list) |
-            Filter::BlackList(ref mut list) => list.len(),
-        };
-
-        *o_num = num;
-        0
-    })
-}
-
-/// Get the nth filter key.
-#[no_mangle]
-pub unsafe extern "C" fn appendable_data_nth_filter_key(ad_h: AppendableDataHandle,
-                                                        n: usize,
-                                                        o_handle: *mut SignKeyHandle)
-                                                        -> i32 {
-    helper::catch_unwind_i32(|| {
-        let filter_key = {
-            let mut object_cache = unwrap!(object_cache());
-            let ad = ffi_try!(object_cache.get_ad(ad_h));
-
-            match *ad.filter_mut() {
-                Filter::WhiteList(ref mut list) |
-                Filter::BlackList(ref mut list) => *ffi_try!(nth(list, n)),
-            }
-        };
-
-        *o_handle = unwrap!(object_cache()).insert_sign_key(filter_key);
-        0
-    })
+fn appendable_data_remove_from_filter_impl(obj_cache: ObjectCacheRef,
+                                           ad_h: ADHandle,
+                                           sign_key_h: SignKeyHandle)
+                                           -> FfiResult<()> {
+    let mut obj_cache = unwrap!(obj_cache.lock());
+    let sign_key = *try!(obj_cache.get_sign_key(sign_key_h));
+    let ad = try!(obj_cache.get_ad(ad_h));
+    let _ = match *ad.filter_mut() {
+        Filter::WhiteList(ref mut list) |
+        Filter::BlackList(ref mut list) => list.remove(&sign_key),
+    };
+    Ok(())
 }
 
 /// Get the owner's encrypt key
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_encrypt_key(ad_h: AppendableDataHandle,
-                                                     o_handle: *mut EncryptKeyHandle)
-                                                     -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        let pk = match *ffi_try!(object_cache.get_ad(ad_h)) {
-            AppendableData::Priv(ref elt) => elt.encrypt_key.clone(),
-            _ => ffi_try!(Err(FfiError::UnsupportedOperation)),
-        };
-        let handle = object_cache.insert_encrypt_key(pk);
-        ptr::write(o_handle, handle);
-        0
-    })
+pub unsafe extern "C" fn appendable_data_encrypt_key(session: *const Session,
+                                                     ad_h: ADHandle,
+                                                     user_data: *mut c_void,
+                                                     o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                int32_t,
+                                                                                EncryptKeyHandle)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_encrypt_key_impl(obj_cache, ad_h) {
+                Ok(handle) => o_cb(user_data.0, 0, handle),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+}
+
+fn appendable_data_encrypt_key_impl(object_cache: ObjectCacheRef,
+                                    ad_h: AppendableDataHandle)
+                                    -> FfiResult<EncryptKeyHandle> {
+    let mut object_cache = unwrap!(object_cache.lock());
+    let pk = match *try!(object_cache.get_ad(ad_h)) {
+        AppendableData::Priv(ref elt) => elt.encrypt_key.clone(),
+        _ => try!(Err(FfiError::UnsupportedOperation)),
+    };
+    Ok(object_cache.insert_encrypt_key(pk))
 }
 
 /// Get number of appended data items.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_num_of_data(ad_h: AppendableDataHandle,
-                                                     o_num: *mut usize)
-                                                     -> i32 {
-    helper::catch_unwind_i32(|| {
-        ffi_try!(appendable_data_num_of_data_impl(ad_h, false, o_num));
-        0
-    })
+pub unsafe extern "C" fn appendable_data_num_of_data(session: *const Session,
+                                                     ad_h: ADHandle,
+                                                     user_data: *mut c_void,
+                                                     o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                int32_t,
+                                                                                size_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_num_of_data_impl(obj_cache, ad_h, false) {
+                Ok(num_of_data) => o_cb(user_data.0, 0, num_of_data),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
 
 /// Get number of appended deleted data items.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_num_of_deleted_data(ad_h: AppendableDataHandle,
-                                                             o_num: *mut usize)
-                                                             -> i32 {
-    helper::catch_unwind_i32(|| {
-        ffi_try!(appendable_data_num_of_data_impl(ad_h, true, o_num));
-        0
-    })
+pub unsafe extern "C" fn appendable_data_num_of_deleted_data(session: *const Session,
+                                                             ad_h: ADHandle,
+                                                             user_data: *mut c_void,
+                                                             o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                        int32_t,
+                                                                                        size_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_num_of_data_impl(obj_cache, ad_h, true) {
+                Ok(num) => o_cb(user_data.0, 0, num),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
 
-unsafe fn appendable_data_num_of_data_impl(ad_h: AppendableDataHandle,
-                                           is_deleted_data: bool,
-                                           o_num: *mut usize)
-                                           -> Result<(), FfiError> {
-    let mut object_cache = unwrap!(object_cache());
-    let ad = try!(object_cache.get_ad(ad_h));
-    let num = match *ad {
+fn appendable_data_num_of_data_impl(obj_cache: ObjectCacheRef,
+                                    ad_h: ADHandle,
+                                    is_deleted_data: bool)
+                                    -> FfiResult<usize> {
+    let mut obj_cache = unwrap!(obj_cache.lock());
+    let num = match *try!(obj_cache.get_ad(ad_h)) {
         AppendableData::Pub(ref elt) => {
             if is_deleted_data {
                 elt.deleted_data.len()
@@ -425,55 +591,82 @@ unsafe fn appendable_data_num_of_data_impl(ad_h: AppendableDataHandle,
             }
         }
     };
-
-    ptr::write(o_num, num);
-    Ok(())
+    Ok(num)
 }
 
 /// Get nth appended DataIdentifier from data.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_nth_data_id(app: *const App,
-                                                     ad_h: AppendableDataHandle,
+pub unsafe extern "C" fn appendable_data_nth_data_id(session: *const Session,
+                                                     app: AppHandle,
+                                                     ad_h: ADHandle,
                                                      n: usize,
-                                                     o_handle: *mut DataIdHandle)
-                                                     -> i32 {
-    helper::catch_unwind_i32(|| {
-        ffi_try!(appendable_data_nth_data_id_impl(app, ad_h, n, false, o_handle));
-        0
-    })
+                                                     user_data: *mut c_void,
+                                                     o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                int32_t,
+                                                                                DataIdHandle)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_nth_data_id_impl(obj_cache, app, ad_h, n, false) {
+                Ok(handle) => o_cb(user_data.0, 0, handle),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
 
 /// Get nth appended DataIdentifier from deleted data.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_nth_deleted_data_id(app: *const App,
-                                                             ad_h: AppendableDataHandle,
+pub unsafe extern "C" fn appendable_data_nth_deleted_data_id(session: *const Session,
+                                                             app: AppHandle,
+                                                             ad_h: ADHandle,
                                                              n: usize,
-                                                             o_handle: *mut DataIdHandle)
-                                                             -> i32 {
-    helper::catch_unwind_i32(|| {
-        ffi_try!(appendable_data_nth_data_id_impl(app, ad_h, n, true, o_handle));
-        0
-    })
+                                                             user_data: *mut c_void,
+                                                             o_cb: unsafe extern "C"
+                                                             fn(*mut c_void,
+                                                                int32_t,
+                                                                DataIdHandle)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_nth_data_id_impl(obj_cache, app, ad_h, n, true) {
+                Ok(handle) => {
+                    o_cb(user_data.0, 0, handle);
+                }
+                Err(e) => {
+                    o_cb(user_data.0, ffi_error_code!(e), 0);
+                }
+            }
+            None
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
 
-unsafe fn appendable_data_nth_data_id_impl(app: *const App,
-                                           ad_h: AppendableDataHandle,
-                                           n: usize,
-                                           is_deleted_data: bool,
-                                           o_handle: *mut DataIdHandle)
-                                           -> Result<(), FfiError> {
-    let app = &*app;
-
-    let mut object_cache = unwrap!(object_cache());
-
-    let data_id = match *try!(object_cache.get_ad(ad_h)) {
+fn appendable_data_nth_data_id_impl(obj_cache: ObjectCacheRef,
+                                    app: AppHandle,
+                                    ad_h: ADHandle,
+                                    n: usize,
+                                    is_deleted_data: bool)
+                                    -> Result<DataIdHandle, FfiError> {
+    let mut obj_cache = unwrap!(obj_cache.lock());
+    let app_keys = try!(obj_cache.get_app(app)).asym_enc_keys();
+    let data_id = match *try!(obj_cache.get_ad(ad_h)) {
         AppendableData::Priv(ref elt) => {
             let priv_data = if is_deleted_data {
                 try!(nth(&elt.deleted_data, n))
             } else {
                 try!(nth(&elt.data, n))
             };
-            let &(ref pk, ref sk) = try!(app.asym_keys());
+            let (ref pk, ref sk) = try!(app_keys);
             try!(priv_data.open(pk, sk).map_err(CoreError::from)).pointer
 
         }
@@ -485,49 +678,72 @@ unsafe fn appendable_data_nth_data_id_impl(app: *const App,
             }
         }
     };
-
-    let handle = object_cache.insert_data_id(data_id);
-
-    ptr::write(o_handle, handle);
-    Ok(())
+    let handle = obj_cache.insert_data_id(data_id);
+    Ok(handle)
 }
 
 /// Get nth sign key from data
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_nth_data_sign_key(app: *const App,
-                                                           ad_h: AppendableDataHandle,
+pub unsafe extern "C" fn appendable_data_nth_data_sign_key(session: *const Session,
+                                                           app: AppHandle,
+                                                           ad_h: ADHandle,
                                                            n: usize,
-                                                           o_handle: *mut SignKeyHandle)
-                                                           -> i32 {
-    helper::catch_unwind_i32(|| {
-        ffi_try!(appendable_data_nth_sign_key_impl(app, ad_h, n, false, o_handle));
-        0
-    })
+                                                           user_data: *mut c_void,
+                                                           o_cb: unsafe extern "C"
+                                                           fn(*mut c_void,
+                                                              int32_t,
+                                                              SignKeyHandle)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_nth_sign_key_impl(obj_cache, app, ad_h, n, false) {
+                Ok(handle) => o_cb(user_data.0, 0, handle),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
 }
 
 /// Get nth sign key from deleted data
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_nth_deleted_data_sign_key(app: *const App,
-                                                                   ad_h: AppendableDataHandle,
+pub unsafe extern "C" fn appendable_data_nth_deleted_data_sign_key(session: *const Session,
+                                                                   app: AppHandle,
+                                                                   ad_h: ADHandle,
                                                                    n: usize,
-                                                                   o_handle: *mut SignKeyHandle)
-                                                                   -> i32 {
-    helper::catch_unwind_i32(|| {
-        ffi_try!(appendable_data_nth_sign_key_impl(app, ad_h, n, true, o_handle));
-        0
-    })
+                                                                   user_data: *mut c_void,
+                                                                   o_cb: unsafe extern "C"
+                                                                   fn(*mut c_void,
+                                                                      int32_t,
+                                                                      SignKeyHandle)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_nth_sign_key_impl(obj_cache, app, ad_h, n, true) {
+                Ok(handle) => o_cb(user_data.0, 0, handle),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
 
-unsafe fn appendable_data_nth_sign_key_impl(app: *const App,
-                                            ad_h: AppendableDataHandle,
+unsafe fn appendable_data_nth_sign_key_impl(obj_cache: ObjectCacheRef,
+                                            app: AppHandle,
+                                            ad_h: ADHandle,
                                             n: usize,
-                                            is_deleted_data: bool,
-                                            o_handle: *mut SignKeyHandle)
-                                            -> Result<(), FfiError> {
-    let app = &*app;
-
-    let mut object_cache = unwrap!(object_cache());
-
+                                            is_deleted_data: bool)
+                                            -> Result<SignKeyHandle, FfiError> {
+    let mut object_cache = unwrap!(obj_cache.lock());
+    let app_enc_keys = try!(try!(object_cache.get_app(app)).asym_enc_keys());
     let sign_key = match *try!(object_cache.get_ad(ad_h)) {
         AppendableData::Priv(ref elt) => {
             let priv_data = if is_deleted_data {
@@ -535,9 +751,8 @@ unsafe fn appendable_data_nth_sign_key_impl(app: *const App,
             } else {
                 try!(nth(&elt.data, n))
             };
-            let &(ref pk, ref sk) = try!(app.asym_keys());
+            let (ref pk, ref sk) = app_enc_keys;
             try!(priv_data.open(pk, sk).map_err(CoreError::from)).sign_key
-
         }
         AppendableData::Pub(ref elt) => {
             if is_deleted_data {
@@ -549,229 +764,390 @@ unsafe fn appendable_data_nth_sign_key_impl(app: *const App,
     };
 
     let handle = object_cache.insert_sign_key(sign_key);
-
-    ptr::write(o_handle, handle);
-    Ok(())
+    Ok(handle)
 }
 
 /// Remove the n-th data item from the appendable data. The data has to be
 /// POST'd afterwards for the
 /// change to be registered by the network. The data is moved to deleted data.
 #[no_mangle]
-pub extern "C" fn appendable_data_remove_nth_data(ad_h: AppendableDataHandle, n: usize) -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        match *ffi_try!(object_cache.get_ad(ad_h)) {
-            AppendableData::Pub(ref mut elt) => {
-                // TODO Isn't there Entry::Occupied::remove() like HashMap etc to prevent clone
-                // ?
-                //      If there is refactor in other places too here.
-                let item = ffi_try!(nth(&elt.data, n)).clone();
-                if elt.data.remove(&item) {
-                    let _ = elt.deleted_data.insert(item);
-                }
-            }
-            AppendableData::Priv(ref mut elt) => {
-                let item = ffi_try!(nth(&elt.data, n)).clone();
-                if elt.data.remove(&item) {
-                    let _ = elt.deleted_data.insert(item);
-                }
+pub unsafe extern "C" fn appendable_data_remove_nth_data(session: *const Session,
+                                                         ad_h: ADHandle,
+                                                         n: usize,
+                                                         user_data: *mut c_void,
+                                                         o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                    int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            let res = appendable_data_remove_nth_data_impl(obj_cache, ad_h, n);
+            o_cb(user_data.0, ffi_result_code!(res));
+            None
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
+}
+
+fn appendable_data_remove_nth_data_impl(obj_cache: ObjectCacheRef,
+                                        ad_h: ADHandle,
+                                        n: usize)
+                                        -> FfiResult<()> {
+    match *try!(unwrap!(obj_cache.lock()).get_ad(ad_h)) {
+        AppendableData::Pub(ref mut elt) => {
+            // TODO Isn't there Entry::Occupied::remove() like HashMap etc to prevent
+            // clone? If there is refactor in other places too here.
+            let item = try!(nth(&elt.data, n)).clone();
+            if elt.data.remove(&item) {
+                let _ = elt.deleted_data.insert(item);
             }
         }
-
-        0
-    })
+        AppendableData::Priv(ref mut elt) => {
+            let item = try!(nth(&elt.data, n)).clone();
+            if elt.data.remove(&item) {
+                let _ = elt.deleted_data.insert(item);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Restore the n-th delete data item to data field back. The data has to be
-/// POST'd afterwards for
-/// the change to be registered by the network.
+/// POST'd afterwards for the change to be registered by the network.
 #[no_mangle]
-pub extern "C" fn appendable_data_restore_nth_deleted_data(ad_h: AppendableDataHandle,
-                                                           n: usize)
-                                                           -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        match *ffi_try!(object_cache.get_ad(ad_h)) {
-            AppendableData::Pub(ref mut elt) => {
-                // TODO Isn't there Entry::Occupied::remove() like HashMap etc to prevent clone
-                // ?
-                //      If there is refactor in other places too here.
-                let item = ffi_try!(nth(&elt.deleted_data, n)).clone();
-                if elt.deleted_data.remove(&item) {
-                    let _ = elt.data.insert(item);
-                }
-            }
-            AppendableData::Priv(ref mut elt) => {
-                let item = ffi_try!(nth(&elt.deleted_data, n)).clone();
-                if elt.deleted_data.remove(&item) {
-                    let _ = elt.data.insert(item);
-                }
+pub unsafe extern "C" fn appendable_data_restore_nth_deleted_data(session: *const Session,
+                                                                  ad_h: ADHandle,
+                                                                  n: usize,
+                                                                  user_data: *mut c_void,
+                                                                  o_cb: unsafe extern "C"
+                                                                  fn(*mut c_void,
+                                                                     int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            let res = appendable_data_restore_nth_deleted_data_impl(obj_cache, ad_h, n);
+            o_cb(user_data.0, ffi_result_code!(res));
+            None
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)));
+}
+
+fn appendable_data_restore_nth_deleted_data_impl(obj_cache: ObjectCacheRef,
+                                                 ad_h: ADHandle,
+                                                 n: usize)
+                                                 -> FfiResult<()> {
+    match *try!(unwrap!(obj_cache.lock()).get_ad(ad_h)) {
+        AppendableData::Pub(ref mut elt) => {
+            // TODO Isn't there Entry::Occupied::remove() like HashMap etc to prevent
+            // clone? If there is refactor in other places too here.
+            let item = try!(nth(&elt.deleted_data, n)).clone();
+            if elt.deleted_data.remove(&item) {
+                let _ = elt.data.insert(item);
             }
         }
-
-        0
-    })
+        AppendableData::Priv(ref mut elt) => {
+            let item = try!(nth(&elt.deleted_data, n)).clone();
+            if elt.deleted_data.remove(&item) {
+                let _ = elt.data.insert(item);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Clear all data - moves it to deleted data.
 #[no_mangle]
-pub extern "C" fn appendable_data_clear_data(ad_h: AppendableDataHandle) -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        match *ffi_try!(object_cache.get_ad(ad_h)) {
-            AppendableData::Pub(ref mut elt) => {
-                let tmp = mem::replace(&mut elt.data, Default::default());
-                elt.deleted_data.extend(tmp);
-            }
-            AppendableData::Priv(ref mut elt) => {
-                let tmp = mem::replace(&mut elt.data, Default::default());
-                elt.deleted_data.extend(tmp);
-            }
-        };
+pub unsafe extern "C" fn appendable_data_clear_data(session: *const Session,
+                                                    ad_h: ADHandle,
+                                                    user_data: *mut c_void,
+                                                    o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                               int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        0
-    })
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            let res = appendable_data_clear_data_impl(obj_cache, ad_h);
+            o_cb(user_data.0, ffi_result_code!(res));
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+}
+
+fn appendable_data_clear_data_impl(obj_cache: ObjectCacheRef, ad_h: ADHandle) -> FfiResult<()> {
+    match *try!(unwrap!(obj_cache.lock()).get_ad(ad_h)) {
+        AppendableData::Pub(ref mut elt) => {
+            let tmp = mem::replace(&mut elt.data, Default::default());
+            elt.deleted_data.extend(tmp);
+        }
+        AppendableData::Priv(ref mut elt) => {
+            let tmp = mem::replace(&mut elt.data, Default::default());
+            elt.deleted_data.extend(tmp);
+        }
+    };
+    Ok(())
 }
 
 /// Remove the n-th data item from the deleted data. The data has to be POST'd
 /// afterwards for the
 /// change to be registered by the network. The data is removed permanently.
 #[no_mangle]
-pub extern "C" fn appendable_data_remove_nth_deleted_data(ad_h: AppendableDataHandle,
-                                                          n: usize)
-                                                          -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        match *ffi_try!(object_cache.get_ad(ad_h)) {
-            AppendableData::Pub(ref mut elt) => {
-                let item = ffi_try!(nth(&elt.deleted_data, n)).clone();
-                let _ = elt.deleted_data.remove(&item);
-            }
-            AppendableData::Priv(ref mut elt) => {
-                let item = ffi_try!(nth(&elt.deleted_data, n)).clone();
-                let _ = elt.deleted_data.remove(&item);
-            }
-        }
+pub unsafe extern "C" fn appendable_data_remove_nth_deleted_data(session: *const Session,
+                                                                 ad_h: ADHandle,
+                                                                 n: usize,
+                                                                 user_data: *mut c_void,
+                                                                 o_cb: unsafe extern "C"
+                                                                 fn(*mut c_void,
+                                                                    int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        0
-    })
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            let res = appendable_data_remove_nth_deleted_data_impl(obj_cache, ad_h, n);
+            o_cb(user_data.0, ffi_result_code!(res));
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+}
+
+fn appendable_data_remove_nth_deleted_data_impl(obj_cache: ObjectCacheRef,
+                                                ad_h: ADHandle,
+                                                n: usize)
+                                                -> FfiResult<()> {
+    match *try!(unwrap!(obj_cache.lock()).get_ad(ad_h)) {
+        AppendableData::Pub(ref mut elt) => {
+            let item = try!(nth(&elt.deleted_data, n)).clone();
+            let _ = elt.deleted_data.remove(&item);
+        }
+        AppendableData::Priv(ref mut elt) => {
+            let item = try!(nth(&elt.deleted_data, n)).clone();
+            let _ = elt.deleted_data.remove(&item);
+        }
+    }
+    Ok(())
 }
 
 /// Clear all deleted data - data will be actually be removed.
 #[no_mangle]
-pub extern "C" fn appendable_data_clear_deleted_data(ad_h: AppendableDataHandle) -> i32 {
-    helper::catch_unwind_i32(|| {
-        let mut object_cache = unwrap!(object_cache());
-        match *ffi_try!(object_cache.get_ad(ad_h)) {
-            AppendableData::Pub(ref mut elt) => elt.deleted_data.clear(),
-            AppendableData::Priv(ref mut elt) => elt.deleted_data.clear(),
-        };
+pub unsafe extern "C" fn appendable_data_clear_deleted_data(session: *const Session,
+                                                            ad_h: ADHandle,
+                                                            user_data: *mut c_void,
+                                                            o_cb: unsafe extern "C"
+                                                            fn(*mut c_void,
+                                                               int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        0
-    })
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            let res = appendable_data_clear_deleted_data_impl(obj_cache, ad_h);
+            o_cb(user_data.0, ffi_result_code!(res));
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+}
+
+fn appendable_data_clear_deleted_data_impl(obj_cache: ObjectCacheRef,
+                                           ad_h: ADHandle)
+                                           -> FfiResult<()> {
+    match *try!(unwrap!(obj_cache.lock()).get_ad(ad_h)) {
+        AppendableData::Pub(ref mut elt) => elt.deleted_data.clear(),
+        AppendableData::Priv(ref mut elt) => elt.deleted_data.clear(),
+    }
+    Ok(())
 }
 
 /// Append data.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_append(app: *const App,
-                                                ad_h: AppendableDataHandle,
-                                                data_id_h: DataIdHandle)
-                                                -> i32 {
-    helper::catch_unwind_i32(|| {
-        let client = (*app).get_client();
+pub unsafe extern "C" fn appendable_data_append(session: *const Session,
+                                                ad_h: ADHandle,
+                                                data_id_h: DataIdHandle,
+                                                user_data: *mut c_void,
+                                                o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        let append_wrapper = {
-            let mut object_cache = unwrap!(object_cache());
-            let data_id = *ffi_try!(object_cache.get_data_id(data_id_h));
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
 
-            let client = unwrap!(client.lock());
-            let sign_pk = ffi_try!(client.get_public_signing_key());
-            let sign_sk = ffi_try!(client.get_secret_signing_key());
+        (*session).send(CoreMsg::new(move |client| {
+            let c2 = client.clone();
 
-            let appended_data = ffi_try!(AppendedData::new(data_id, *sign_pk, sign_sk)
-                .map_err(CoreError::from));
+            let fut =
+                futures::done(appendable_data_append_impl(client, obj_cache, ad_h, data_id_h))
+                    .and_then(move |append_wrapper| {
+                        c2.append(append_wrapper, None).map_err(FfiError::from)
+                    })
+                    .map(move |_| o_cb(user_data.0, 0))
+                    .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e)))
+                    .into_box();
 
-            match *ffi_try!(object_cache.get_ad(ad_h)) {
-                AppendableData::Priv(ref elt) => {
-                    let priv_appended_data = ffi_try!(PrivAppendedData::new(&appended_data,
-                                                                            &elt.encrypt_key)
-                        .map_err(CoreError::from));
-                    ffi_try!(AppendWrapper::new_priv(elt.name,
-                                                     priv_appended_data,
-                                                     (sign_pk, sign_sk),
-                                                     elt.version)
-                        .map_err(CoreError::from))
-                }
-                AppendableData::Pub(ref elt) => {
-                    AppendWrapper::new_pub(elt.name, appended_data, elt.version)
-                }
-            }
-        };
+            Some(fut)
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+}
 
-        let resp_getter = ffi_try!(unwrap!(client.lock()).append(append_wrapper, None));
-        ffi_try!(resp_getter.get());
+fn appendable_data_append_impl(client: &Client,
+                               obj_cache: ObjectCacheRef,
+                               ad_h: ADHandle,
+                               data_id_h: DataIdHandle)
+                               -> FfiResult<AppendWrapper> {
+    let data_id = *try!(unwrap!(obj_cache.lock()).get_data_id(data_id_h));
 
-        0
-    })
+    let sign_pk = try!(client.public_signing_key());
+    let sign_sk = try!(client.secret_signing_key());
+
+    let appended_data = try!(AppendedData::new(data_id, sign_pk, &sign_sk)
+        .map_err(CoreError::from));
+
+    match *try!(unwrap!(obj_cache.lock()).get_ad(ad_h)) {
+        AppendableData::Priv(ref elt) => {
+            let priv_appended_data = try!(PrivAppendedData::new(&appended_data, &elt.encrypt_key)
+                .map_err(FfiError::from));
+            AppendWrapper::new_priv(elt.name,
+                                    priv_appended_data,
+                                    (&sign_pk, &sign_sk),
+                                    elt.version)
+                .map_err(FfiError::from)
+        }
+        AppendableData::Pub(ref elt) => {
+            Ok(AppendWrapper::new_pub(elt.name, appended_data, elt.version))
+        }
+    }
 }
 
 /// Get the current version of AppendableData by its handle
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_version(handle: AppendableDataHandle,
-                                                 o_version: *mut u64)
-                                                 -> i32 {
-    helper::catch_unwind_i32(|| {
-        *o_version = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
-            AppendableData::Pub(ref mut elt) => elt.get_version(),
-            AppendableData::Priv(ref mut elt) => elt.get_version(),
-        };
+pub unsafe extern "C" fn appendable_data_version(session: *const Session,
+                                                 handle: ADHandle,
+                                                 user_data: *mut c_void,
+                                                 o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                            int32_t,
+                                                                            uint64_t)) {
+    let user_data = OpaqueCtx(user_data);
 
-        0
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_version_impl(obj_cache, handle) {
+                Ok(ver) => o_cb(user_data.0, 0, ver),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+}
+
+fn appendable_data_version_impl(obj_cache: ObjectCacheRef, handle: ADHandle) -> FfiResult<u64> {
+    Ok(match *try!(unwrap!(obj_cache.lock()).get_ad(handle)) {
+        AppendableData::Pub(ref mut elt) => elt.get_version(),
+        AppendableData::Priv(ref mut elt) => elt.get_version(),
     })
 }
 
 /// Returns true if the app is one of the owners of the provided AppendableData.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_is_owned(app: *const App,
-                                                  handle: AppendableDataHandle,
-                                                  o_is_owned: *mut bool)
-                                                  -> i32 {
-    helper::catch_unwind_i32(|| {
-        let client = (*app).get_client();
-        let my_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
+pub unsafe extern "C" fn appendable_data_is_owned(session: *const Session,
+                                                  handle: ADHandle,
+                                                  user_data: *mut c_void,
+                                                  o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                             int32_t,
+                                                                             bool)) {
+    let user_data = OpaqueCtx(user_data);
 
-        *o_is_owned = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
-            AppendableData::Pub(ref mut elt) => elt.get_owner_keys().contains(&my_key),
-            AppendableData::Priv(ref mut elt) => elt.get_owner_keys().contains(&my_key),
-        };
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
 
-        0
+        (*session).send(CoreMsg::new(move |client| {
+            match appendable_data_is_owned_impl(client, obj_cache, handle) {
+                Ok(is_owned) => o_cb(user_data.0, 0, is_owned),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), false),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), false));
+}
+
+fn appendable_data_is_owned_impl(client: &Client,
+                                 obj_cache: ObjectCacheRef,
+                                 handle: ADHandle)
+                                 -> FfiResult<bool> {
+    let my_key = try!(client.public_signing_key());
+    Ok(match *try!(unwrap!(obj_cache.lock()).get_ad(handle)) {
+        AppendableData::Pub(ref mut elt) => elt.get_owner_keys().contains(&my_key),
+        AppendableData::Priv(ref mut elt) => elt.get_owner_keys().contains(&my_key),
     })
 }
 
 /// See if AppendableData size is valid.
 #[no_mangle]
-pub unsafe extern "C" fn appendable_data_validate_size(handle: AppendableDataHandle,
-                                                       o_valid: *mut bool)
-                                                       -> i32 {
-    helper::catch_unwind_i32(|| {
-        *o_valid = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
-            AppendableData::Pub(ref elt) => elt.validate_size(),
-            AppendableData::Priv(ref elt) => elt.validate_size(),
-        };
+pub unsafe extern "C" fn appendable_data_validate_size(session: *const Session,
+                                                       handle: ADHandle,
+                                                       user_data: *mut c_void,
+                                                       o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                  int32_t,
+                                                                                  bool)) {
+    let user_data = OpaqueCtx(user_data);
 
-        0
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match appendable_data_validate_size_impl(obj_cache, handle) {
+                Ok(is_valid) => o_cb(user_data.0, 0, is_valid),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e), false),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), false));
+}
+
+fn appendable_data_validate_size_impl(obj_cache: ObjectCacheRef,
+                                      handle: ADHandle)
+                                      -> FfiResult<bool> {
+    Ok(match *try!(unwrap!(obj_cache.lock()).get_ad(handle)) {
+        AppendableData::Pub(ref elt) => elt.validate_size(),
+        AppendableData::Priv(ref elt) => elt.validate_size(),
     })
 }
 
 /// Free AppendableData handle
 #[no_mangle]
-pub extern "C" fn appendable_data_free(handle: AppendableDataHandle) -> i32 {
-    helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache()).remove_ad(handle));
-        0
-    })
+pub unsafe extern "C" fn appendable_data_free(session: *const Session,
+                                              handle: ADHandle,
+                                              user_data: *mut c_void,
+                                              o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        let obj_cache = (*session).object_cache();
+
+        (*session).send(CoreMsg::new(move |_| {
+            match unwrap!(obj_cache.lock()).remove_ad(handle) {
+                Ok(_) => o_cb(user_data.0, 0),
+                Err(e) => o_cb(user_data.0, ffi_error_code!(e)),
+            }
+            None
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
 }
 
 // Convenience function to access n-th item from the given set, returning
@@ -783,87 +1159,129 @@ fn nth<T>(items: &BTreeSet<T>, n: usize) -> Result<&T, FfiError> {
 
 #[cfg(test)]
 mod tests {
-    use ffi::app::App;
-    use ffi::errors::FfiError;
-    use ffi::low_level_api::{AppendableDataHandle, DataIdHandle};
+    use core::CoreMsg;
+    use ffi::{FfiError, ObjectCacheRef, Session, test_utils};
     use ffi::low_level_api::misc::*;
-    use ffi::low_level_api::object_cache::object_cache;
-    use ffi::test_utils;
+    use ffi::object_cache::{AppHandle, AppendableDataHandle, DataIdHandle, ObjectHandle};
+    use libc::c_void;
     use rand;
     use routing::DataIdentifier;
     use rust_sodium::crypto::sign;
+    use std::{panic, process};
     use std::collections::HashSet;
+    use std::sync::mpsc;
     use super::*;
 
+    type ADHandle = AppendableDataHandle;
+
     macro_rules! assert_num_of_data {
-        ($ad_h:ident, $expected:expr) => {
-            let mut num: usize = 0;
-            assert_eq!(appendable_data_num_of_data($ad_h, &mut num), 0);
+        ($sess:ident, $ad_h:ident, $expected:expr) => {
+            let (mut num_tx, num_rx) = mpsc::channel::<(i32, usize)>();
+            let num_tx: *mut _ = &mut num_tx;
+            appendable_data_num_of_data(&$sess, $ad_h, num_tx as *mut c_void, num_cb);
+            let (err_code, num) = unwrap!(num_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(num, $expected);
         }
     }
 
     macro_rules! assert_num_of_deleted_data {
-        ($ad_h:ident, $expected:expr) => {
-            let mut num: usize = 0;
-            assert_eq!(appendable_data_num_of_deleted_data($ad_h, &mut num), 0);
+        ($sess:ident, $ad_h:ident, $expected:expr) => {
+            let (mut num_tx, num_rx) = mpsc::channel::<(i32, usize)>();
+            let num_tx: *mut _ = &mut num_tx;
+            appendable_data_num_of_deleted_data(&$sess, $ad_h, num_tx as *mut c_void, num_cb);
+            let (err_code, num) = unwrap!(num_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(num, $expected);
         }
     }
 
     #[test]
     fn put_append_and_get() {
-        let app = test_utils::create_app(false);
-
+        let (sess, app_h, object_cache, _sign_key_h) = create_test_client();
         let ad_name = rand::random();
-        let mut ad_h: AppendableDataHandle = 0;
-        let mut ad_id_h: DataIdHandle = 0;
 
         // Data to append
-        let (_, immut_id_0_h) = generate_random_immutable_data_id();
-        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+        let immut_id_0_h = generate_random_immutable_data_id(&sess);
+        let immut_id_1_h = generate_random_immutable_data_id(&sess);
 
-        let mut got_immut_id_0_h: DataIdHandle = 0;
-        let mut got_immut_id_1_h: DataIdHandle = 0;
+        let (mut handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
+        let handle_tx: *mut _ = &mut handle_tx;
+        let handle_tx = handle_tx as *mut c_void;
 
-        unsafe {
+        let (mut err_code_tx, err_code_rx) = mpsc::channel::<i32>();
+        let err_code_tx: *mut _ = &mut err_code_tx;
+        let err_code_tx = err_code_tx as *mut c_void;
+
+        let (mut bool_tx, bool_rx) = mpsc::channel::<(i32, bool)>();
+        let bool_tx: *mut _ = &mut bool_tx;
+        let bool_tx = bool_tx as *mut c_void;
+
+        let (got_immut_id_0_h, got_immut_id_1_h) = unsafe {
             // Create
-            assert_eq!(appendable_data_new_pub(&app, &ad_name, &mut ad_h), 0);
+            appendable_data_new_pub(&sess, &ad_name, handle_tx, handle_cb);
+            let (err_code, ad_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
-            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
+            appendable_data_extract_data_id(&sess, ad_h, handle_tx, handle_cb);
+            let (err_code, ad_id_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
             // PUT to the network
-            assert_eq!(appendable_data_put(&app, ad_h), 0);
+            appendable_data_put(&sess, ad_h, err_code_tx, err_code_cb);
+            let err_code = unwrap!(err_code_rx.recv());
+            assert_eq!(err_code, 0);
 
             // APPEND
-            assert_eq!(appendable_data_append(&app, ad_h, immut_id_0_h), 0);
-            assert_eq!(appendable_data_append(&app, ad_h, immut_id_1_h), 0);
+            appendable_data_append(&sess, ad_h, immut_id_0_h, err_code_tx, err_code_cb);
+            let err_code = unwrap!(err_code_rx.recv());
+            assert_eq!(err_code, 0);
+
+            appendable_data_append(&sess, ad_h, immut_id_1_h, err_code_tx, err_code_cb);
+            let err_code = unwrap!(err_code_rx.recv());
+            assert_eq!(err_code, 0);
 
             // GET back
-            reload_ad(&app, ad_id_h, &mut ad_h);
-            assert_num_of_data!(ad_h, 2);
+            let (err_code, ad_h) = reload_ad(&sess, ad_id_h, ad_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_data!(sess, ad_h, 2);
 
-            assert_eq!(appendable_data_nth_data_id(&app, ad_h, 0, &mut got_immut_id_0_h),
-                       0);
-            assert_eq!(appendable_data_nth_data_id(&app, ad_h, 1, &mut got_immut_id_1_h),
-                       0);
+            appendable_data_nth_data_id(&sess, app_h, ad_h, 0, handle_tx, handle_cb);
+            let (err_code, got_immut_id_0_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
-            let mut is_owner = false;
+            appendable_data_nth_data_id(&sess, app_h, ad_h, 1, handle_tx, handle_cb);
+            let (err_code, got_immut_id_1_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
             // Check owners
-            assert_eq!(appendable_data_is_owned(&app, ad_h, &mut is_owner), 0);
+            appendable_data_is_owned(&sess, ad_h, bool_tx, bool_cb);
+            let (err_code, is_owner) = unwrap!(bool_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(is_owner, true);
 
-            let app_fake = test_utils::create_app(false);
-            assert_eq!(appendable_data_is_owned(&app_fake, ad_h, &mut is_owner), 0);
+            let sess_fake = test_utils::create_session();
+            let ad_id_h2 = copy_data_id(&sess, &sess_fake, ad_id_h);
+            let (err_code, got_ad_h) = reload_ad(&sess_fake, ad_id_h2, 0);
+            assert_eq!(err_code, 0);
+
+            appendable_data_is_owned(&sess_fake, got_ad_h, bool_tx, bool_cb);
+            let (err_code, is_owner) = unwrap!(bool_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(is_owner, false);
 
-            assert_eq!(appendable_data_free(ad_h), 0);
-        }
+            appendable_data_free(&sess_fake, got_ad_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_free(&sess, ad_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            (got_immut_id_0_h, got_immut_id_1_h)
+        };
 
         // Verify the data items we got back are the same we put in.
         {
-            let mut object_cache = unwrap!(object_cache());
+            let mut object_cache = unwrap!(object_cache.lock());
 
             let mut orig = HashSet::with_capacity(2);
             let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_0_h)));
@@ -879,378 +1297,692 @@ mod tests {
 
     #[test]
     fn filter() {
-        let app0 = test_utils::create_app(false);
-        let app1 = test_utils::create_app(false);
-        let app2 = test_utils::create_app(false);
-
-        let (sign_key1_h, _sign_key2_h) = {
-            let mut object_cache = unwrap!(object_cache());
-            (object_cache.insert_sign_key(get_sign_pk(&app1)),
-             object_cache.insert_sign_key(get_sign_pk(&app2)))
-        };
+        let (sess0, _app0, obj_cache0, _) = create_test_client();
+        let (sess1, _app1, _obj_cache1, sign_key1) = create_test_client();
+        let (sess2, _app2, _obj_cache2, _) = create_test_client();
+        let sign_key1_h = unwrap!(obj_cache0.lock()).insert_sign_key(sign_key1);
 
         let ad_name = rand::random();
-        let mut ad_h: AppendableDataHandle = 0;
-        let mut ad_id_h: DataIdHandle = 0;
-        let mut filter_type = FilterType::BlackList;
 
-        let (_, immut_id_1_h) = generate_random_immutable_data_id();
-        let (_, immut_id_2_h) = generate_random_immutable_data_id();
+        let (mut handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
+        let handle_tx: *mut _ = &mut handle_tx;
+        let handle_tx = handle_tx as *mut c_void;
+
+        let (mut err_code_tx, err_code_rx) = mpsc::channel::<i32>();
+        let err_code_tx: *mut _ = &mut err_code_tx;
+        let err_code_tx = err_code_tx as *mut c_void;
+
+        let (mut filter_type_tx, filter_type_rx) = mpsc::channel::<(i32, FilterType)>();
+        let filter_type_tx: *mut _ = &mut filter_type_tx;
+        let filter_type_tx = filter_type_tx as *mut c_void;
 
         unsafe {
-            assert_eq!(appendable_data_new_pub(&app0, &ad_name, &mut ad_h), 0);
-            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
-            assert_eq!(appendable_data_put(&app0, ad_h), 0);
+            appendable_data_new_pub(&sess0, &ad_name, handle_tx, handle_cb);
+            let (err_code, ad0_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            appendable_data_extract_data_id(&sess0, ad0_h, handle_tx, handle_cb);
+            let (err_code, ad_id_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            appendable_data_put(&sess0, ad0_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            // Copy AD to other app sessions
+            let ad_id1_h = copy_data_id(&sess0, &sess1, ad_id_h);
+            let ad_id2_h = copy_data_id(&sess0, &sess2, ad_id_h);
+
+            let (err_code, ad1_h) = reload_ad(&sess1, ad_id1_h, 0);
+            assert_eq!(err_code, 0);
+
+            let (err_code, ad2_h) = reload_ad(&sess2, ad_id2_h, 0);
+            assert_eq!(err_code, 0);
 
             // Anyone can append by default
-            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
-            assert_eq!(appendable_data_append(&app2, ad_h, immut_id_2_h), 0);
-        }
+            let immut_id_1_h = generate_random_immutable_data_id(&sess1);
+            let immut_id_2_h = generate_random_immutable_data_id(&sess2);
 
-        // Set blacklist
-        let (_, immut_id_1_h) = generate_random_immutable_data_id();
-        let (_, immut_id_2_h) = generate_random_immutable_data_id();
+            appendable_data_append(&sess1, ad1_h, immut_id_1_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
+            appendable_data_append(&sess2, ad2_h, immut_id_2_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-        unsafe {
-            assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
+            // Set blacklist
+            let immut_id_1_h = generate_random_immutable_data_id(&sess1);
+            let immut_id_2_h = generate_random_immutable_data_id(&sess2);
+
+            appendable_data_filter_type(&sess0, ad0_h, filter_type_tx, filter_type_cb);
+            let (err_code, filter_type) = unwrap!(filter_type_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(filter_type, FilterType::BlackList);
 
-            assert_eq!(appendable_data_insert_to_filter(ad_h, sign_key1_h), 0);
-            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
+            appendable_data_insert_to_filter(&sess0, ad0_h, sign_key1_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
-            assert_eq!(appendable_data_append(&app2, ad_h, immut_id_2_h), 0);
+            appendable_data_post(&sess0, ad0_h, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(appendable_data_remove_from_filter(ad_h, sign_key1_h), 0);
-            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
-            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
-        }
+            let (err_code, ad1_h) = reload_ad(&sess1, ad_id1_h, ad1_h);
+            assert_eq!(err_code, 0);
+            let (err_code, ad2_h) = reload_ad(&sess2, ad_id2_h, ad2_h);
+            assert_eq!(err_code, 0);
 
-        // Set whitelist
-        let (_, immut_id_1_h) = generate_random_immutable_data_id();
-        let (_, immut_id_2_h) = generate_random_immutable_data_id();
+            appendable_data_append(&sess1, ad1_h, immut_id_1_h, err_code_tx, err_code_cb);
+            assert!(unwrap!(err_code_rx.recv()) != 0);
+            appendable_data_append(&sess2, ad2_h, immut_id_2_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-        unsafe {
-            assert_eq!(appendable_data_toggle_filter(ad_h), 0);
-            assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
+            let (err_code, ad0_h) = reload_ad(&sess0, ad_id_h, ad0_h);
+            assert_eq!(err_code, 0);
+            appendable_data_remove_from_filter(&sess0,
+                                               ad0_h,
+                                               sign_key1_h,
+                                               err_code_tx,
+                                               err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
+            appendable_data_post(&sess0, ad0_h, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad1_h) = reload_ad(&sess1, ad_id1_h, ad1_h);
+            assert_eq!(err_code, 0);
+            appendable_data_append(&sess1, ad1_h, immut_id_1_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            // Set whitelist
+            let immut_id_1_h = generate_random_immutable_data_id(&sess1);
+            let immut_id_2_h = generate_random_immutable_data_id(&sess2);
+
+            let (err_code, ad0_h) = reload_ad(&sess0, ad_id_h, ad0_h);
+            assert_eq!(err_code, 0);
+            appendable_data_toggle_filter(&sess0, ad0_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_filter_type(&sess0, ad0_h, filter_type_tx, filter_type_cb);
+            let (err_code, filter_type) = unwrap!(filter_type_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(filter_type, FilterType::WhiteList);
-            assert_eq!(appendable_data_insert_to_filter(ad_h, sign_key1_h), 0);
-            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
 
-            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_1_h), 0);
-            assert!(appendable_data_append(&app2, ad_h, immut_id_2_h) != 0);
+            appendable_data_insert_to_filter(&sess0, ad0_h, sign_key1_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(appendable_data_remove_from_filter(ad_h, sign_key1_h), 0);
-            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
-            assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
+            appendable_data_post(&sess0, ad0_h, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad1_h) = reload_ad(&sess1, ad_id1_h, ad1_h);
+            assert_eq!(err_code, 0);
+            let (err_code, ad2_h) = reload_ad(&sess2, ad_id2_h, ad2_h);
+            assert_eq!(err_code, 0);
+
+            appendable_data_append(&sess1, ad1_h, immut_id_1_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+            appendable_data_append(&sess2, ad2_h, immut_id_2_h, err_code_tx, err_code_cb);
+            assert!(unwrap!(err_code_rx.recv()) != 0);
+
+            let (err_code, ad0_h) = reload_ad(&sess0, ad_id_h, ad0_h);
+            assert_eq!(err_code, 0);
+            appendable_data_remove_from_filter(&sess0,
+                                               ad0_h,
+                                               sign_key1_h,
+                                               err_code_tx,
+                                               err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_post(&sess0, ad0_h, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad1_h) = reload_ad(&sess1, ad_id1_h, ad1_h);
+            assert_eq!(err_code, 0);
+            appendable_data_append(&sess1, ad1_h, immut_id_1_h, err_code_tx, err_code_cb);
+            assert!(unwrap!(err_code_rx.recv()) != 0);
 
             // Toggle filter and ensure it's blacklist again
-            assert_eq!(appendable_data_toggle_filter(ad_h), 0);
-            assert_eq!(appendable_data_filter_type(ad_h, &mut filter_type), 0);
+            appendable_data_toggle_filter(&sess0, ad0_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_filter_type(&sess0, ad0_h, filter_type_tx, filter_type_cb);
+            let (err_code, filter_type) = unwrap!(filter_type_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(filter_type, FilterType::BlackList);
         }
     }
 
     #[test]
     fn priv_appendable_data() {
-        let app0 = test_utils::create_app(false);
-        let app1 = test_utils::create_app(false);
-        let app2 = test_utils::create_app(false);
+        let (sess0, app0, obj_cache0, _sign_key0) = create_test_client();
+        let (sess1, _app1, _obj_cache1, sign_key1) = create_test_client();
+        let (sess2, _app2, _obj_cache2, sign_key2) = create_test_client();
 
         let ad_name = rand::random();
-        let mut ad_priv_h: AppendableDataHandle = 0;
-        let mut ad_id_h: DataIdHandle = 0;
 
-        // Data to append
-        let (_, immut_id_0_h) = generate_random_immutable_data_id();
-        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+        let (mut handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
+        let handle_tx: *mut _ = &mut handle_tx;
+        let handle_tx = handle_tx as *mut c_void;
 
-        // Generate keys for extra test apps
-        let (sign_key1_h, sign_key2_h) = {
-            let mut object_cache = unwrap!(object_cache());
-            (object_cache.insert_sign_key(get_sign_pk(&app1)),
-             object_cache.insert_sign_key(get_sign_pk(&app2)))
-        };
+        let (mut err_code_tx, err_code_rx) = mpsc::channel::<i32>();
+        let err_code_tx: *mut _ = &mut err_code_tx;
+        let err_code_tx = err_code_tx as *mut c_void;
 
-        let mut got_immut_id_0_h: DataIdHandle = 0;
-        let mut got_immut_id_1_h: DataIdHandle = 0;
+        let (mut bool_tx, bool_rx) = mpsc::channel::<(i32, bool)>();
+        let bool_tx: *mut _ = &mut bool_tx;
+        let bool_tx = bool_tx as *mut c_void;
+
+        let (mut filter_type_tx, filter_type_rx) = mpsc::channel::<(i32, FilterType)>();
+        let filter_type_tx: *mut _ = &mut filter_type_tx;
+        let filter_type_tx = filter_type_tx as *mut c_void;
 
         unsafe {
             // Create
-            assert_eq!(appendable_data_new_priv(&app0, &ad_name, &mut ad_priv_h), 0);
-            assert_eq!(appendable_data_extract_data_id(ad_priv_h, &mut ad_id_h), 0);
+            appendable_data_new_priv(&sess0, app0, &ad_name, handle_tx, handle_cb);
+            let (err_code, ad_priv_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            appendable_data_extract_data_id(&sess0, ad_priv_h, handle_tx, handle_cb);
+            let (err_code, ad_id_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            let ad_id_h1 = copy_data_id(&sess0, &sess1, ad_id_h);
+            let ad_id_h2 = copy_data_id(&sess0, &sess2, ad_id_h);
 
             // Test PUT requests for private data
-            assert_eq!(appendable_data_put(&app0, ad_priv_h), 0);
-            assert_eq!(appendable_data_append(&app0, ad_priv_h, immut_id_0_h), 0);
-            assert_eq!(appendable_data_append(&app0, ad_priv_h, immut_id_1_h), 0);
+            appendable_data_put(&sess0, ad_priv_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
-            assert_num_of_data!(ad_priv_h, 2);
+            let immut_id_a_h = generate_random_immutable_data_id(&sess0);
+            let immut_id_b_h = generate_random_immutable_data_id(&sess0);
 
-            assert_eq!(appendable_data_nth_data_id(&app0, ad_priv_h, 0, &mut got_immut_id_0_h),
-                       0);
-            assert_eq!(appendable_data_nth_data_id(&app0, ad_priv_h, 1, &mut got_immut_id_1_h),
-                       0);
+            let immut_id_h1 = generate_random_immutable_data_id(&sess1);
+            let immut_id_h2 = generate_random_immutable_data_id(&sess2);
 
-            // Check owners of appendable data
-            let mut is_owner = false;
+            appendable_data_append(&sess0, ad_priv_h, immut_id_a_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(appendable_data_is_owned(&app0, ad_priv_h, &mut is_owner), 0);
-            assert_eq!(is_owner, true);
+            appendable_data_append(&sess0, ad_priv_h, immut_id_b_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(appendable_data_is_owned(&app1, ad_priv_h, &mut is_owner), 0);
-            assert_eq!(is_owner, false);
+            let (err_code, ad_priv_h) = reload_ad(&sess0, ad_id_h, ad_priv_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_data!(sess0, ad_priv_h, 2);
+
+            appendable_data_nth_data_id(&sess0, app0, ad_priv_h, 0, handle_tx, handle_cb);
+            let (err_code, got_immut_id_a_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            appendable_data_nth_data_id(&sess0, app0, ad_priv_h, 1, handle_tx, handle_cb);
+            let (err_code, got_immut_id_b_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
             // Delete and restore private appendable data
-            assert_eq!(appendable_data_remove_nth_data(ad_priv_h, 0), 0);
-            assert_eq!(appendable_data_post(&app0, ad_priv_h, true), 0);
+            appendable_data_remove_nth_data(&sess0, ad_priv_h, 0, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
-            assert_num_of_data!(ad_priv_h, 1);
-            assert_num_of_deleted_data!(ad_priv_h, 1);
+            appendable_data_post(&sess0, ad_priv_h, true, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            let mut deleted_data_h = 0;
-            assert_eq!(appendable_data_nth_deleted_data_id(&app0,
-                                                           ad_priv_h,
-                                                           0,
-                                                           &mut deleted_data_h),
-                       0);
+            let (err_code, ad_priv_h) = reload_ad(&sess0, ad_id_h, ad_priv_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_data!(sess0, ad_priv_h, 1);
+            assert_num_of_deleted_data!(sess0, ad_priv_h, 1);
 
-            assert_eq!(appendable_data_restore_nth_deleted_data(ad_priv_h, 0), 0);
-            assert_eq!(appendable_data_post(&app0, ad_priv_h, true), 0);
+            appendable_data_nth_deleted_data_id(&sess0, app0, ad_priv_h, 0, handle_tx, handle_cb);
+            let (err_code, _deleted_data_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
-            reload_ad(&app0, ad_id_h, &mut ad_priv_h);
-            assert_num_of_data!(ad_priv_h, 2);
-            assert_num_of_deleted_data!(ad_priv_h, 0);
+            appendable_data_restore_nth_deleted_data(&sess0,
+                                                     ad_priv_h,
+                                                     0,
+                                                     err_code_tx,
+                                                     err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_post(&sess0, ad_priv_h, true, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_priv_h) = reload_ad(&sess0, ad_id_h, ad_priv_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_data!(sess0, ad_priv_h, 2);
+            assert_num_of_deleted_data!(sess0, ad_priv_h, 0);
+
+            // Check owners of appendable data
+            appendable_data_is_owned(&sess0, ad_priv_h, bool_tx, bool_cb);
+            let (err_code, is_owner) = unwrap!(bool_rx.recv());
+            assert_eq!(err_code, 0);
+            assert_eq!(is_owner, true);
+
+            let (err_code, ad_priv_h1) = reload_ad(&sess1, ad_id_h1, 0);
+            assert_eq!(err_code, 0);
+
+            appendable_data_is_owned(&sess1, ad_priv_h1, bool_tx, bool_cb);
+            let (err_code, is_owner) = unwrap!(bool_rx.recv());
+            assert_eq!(err_code, 0);
+            assert_eq!(is_owner, false);
 
             // Other apps can append new data
-            assert_eq!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h), 0);
-            assert_eq!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h), 0);
+            appendable_data_append(&sess1, ad_priv_h1, immut_id_h1, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_priv_h2) = reload_ad(&sess2, ad_id_h2, 0);
+            assert_eq!(err_code, 0);
+            appendable_data_append(&sess2, ad_priv_h2, immut_id_h2, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
             // Check blacklist filter for private appendable data
-            let mut filter_type = FilterType::BlackList;
+            let (err_code, ad_priv_h) = reload_ad(&sess0, ad_id_h, 0);
+            assert_eq!(err_code, 0);
 
-            assert_eq!(appendable_data_filter_type(ad_priv_h, &mut filter_type), 0);
+            appendable_data_filter_type(&sess0, ad_priv_h, filter_type_tx, filter_type_cb);
+            let (err_code, filter_type) = unwrap!(filter_type_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(filter_type, FilterType::BlackList);
 
-            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sign_key1_h), 0);
-            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sign_key2_h), 0);
-            assert_eq!(appendable_data_post(&app0, ad_priv_h, false), 0);
+            let sign_key1_h = unwrap!(obj_cache0.lock()).insert_sign_key(sign_key1);
+            let sign_key2_h = unwrap!(obj_cache0.lock()).insert_sign_key(sign_key2);
 
-            assert!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h) != 0);
-            assert!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h) != 0);
+            appendable_data_insert_to_filter(&sess0,
+                                             ad_priv_h,
+                                             sign_key1_h,
+                                             err_code_tx,
+                                             err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_insert_to_filter(&sess0,
+                                             ad_priv_h,
+                                             sign_key2_h,
+                                             err_code_tx,
+                                             err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_post(&sess0, ad_priv_h, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_priv_h1) = reload_ad(&sess1, ad_id_h1, ad_priv_h1);
+            assert_eq!(err_code, 0);
+            appendable_data_append(&sess1, ad_priv_h, immut_id_h1, err_code_tx, err_code_cb);
+            assert!(unwrap!(err_code_rx.recv()) != 0);
+
+            let (err_code, ad_priv_h2) = reload_ad(&sess2, ad_id_h2, ad_priv_h2);
+            assert_eq!(err_code, 0);
+            appendable_data_append(&sess2, ad_priv_h, immut_id_h2, err_code_tx, err_code_cb);
+            assert!(unwrap!(err_code_rx.recv()) != 0);
 
             // Check whitelist filter for private data
-            assert_eq!(appendable_data_toggle_filter(ad_priv_h), 0);
-            assert_eq!(appendable_data_filter_type(ad_priv_h, &mut filter_type), 0);
+            let (err_code, ad_priv_h) = reload_ad(&sess0, ad_id_h, ad_priv_h);
+            assert_eq!(err_code, 0);
+            appendable_data_toggle_filter(&sess0, ad_priv_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
+            appendable_data_filter_type(&sess0, ad_priv_h, filter_type_tx, filter_type_cb);
+            let (err_code, filter_type) = unwrap!(filter_type_rx.recv());
+            assert_eq!(err_code, 0);
             assert_eq!(filter_type, FilterType::WhiteList);
-            assert_eq!(appendable_data_insert_to_filter(ad_priv_h, sign_key2_h), 0);
-            assert_eq!(appendable_data_post(&app0, ad_priv_h, false), 0);
 
-            assert_eq!(appendable_data_append(&app2, ad_priv_h, immut_id_1_h), 0);
-            assert!(appendable_data_append(&app1, ad_priv_h, immut_id_0_h) != 0);
+            appendable_data_insert_to_filter(&sess0,
+                                             ad_priv_h,
+                                             sign_key2_h,
+                                             err_code_tx,
+                                             err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(appendable_data_free(ad_priv_h), 0);
+            appendable_data_post(&sess0, ad_priv_h, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_priv_h2) = reload_ad(&sess2, ad_id_h2, ad_priv_h2);
+            assert_eq!(err_code, 0);
+            appendable_data_append(&sess2, ad_priv_h2, immut_id_h2, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_priv_h1) = reload_ad(&sess1, ad_id_h1, ad_priv_h1);
+            assert_eq!(err_code, 0);
+            appendable_data_append(&sess1, ad_priv_h1, immut_id_h1, err_code_tx, err_code_cb);
+            assert!(unwrap!(err_code_rx.recv()) != 0);
+
+            // Verify the data items we got back are the same we put in.
+            {
+                let mut object_cache = unwrap!(obj_cache0.lock());
+
+                let mut orig = HashSet::with_capacity(2);
+                let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_a_h)));
+                let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_b_h)));
+
+                let mut got = HashSet::with_capacity(2);
+                let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_a_h)));
+                let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_b_h)));
+
+                assert_eq!(orig, got);
+            }
         }
-
-        // Verify the data items we got back are the same we put in.
-        {
-            let mut object_cache = unwrap!(object_cache());
-
-            let mut orig = HashSet::with_capacity(2);
-            let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_0_h)));
-            let _ = orig.insert(*unwrap!(object_cache.get_data_id(immut_id_1_h)));
-
-            let mut got = HashSet::with_capacity(2);
-            let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_0_h)));
-            let _ = got.insert(*unwrap!(object_cache.get_data_id(got_immut_id_1_h)));
-
-            assert_eq!(orig, got);
-        }
-
-        assert_eq!(misc_sign_key_free(sign_key1_h), 0);
-        assert_eq!(misc_sign_key_free(sign_key2_h), 0);
     }
 
     #[test]
     fn delete_data() {
-        let app = test_utils::create_app(false);
+        let (sess, _app, _obj_cache, _sign_key) = create_test_client();
 
         let ad_name = rand::random();
-        let mut ad_h: AppendableDataHandle = 0;
-        let mut ad_id_h: DataIdHandle = 0;
 
-        let (_, immut_id_0_h) = generate_random_immutable_data_id();
-        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+        let (mut handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
+        let handle_tx: *mut _ = &mut handle_tx;
+        let handle_tx = handle_tx as *mut c_void;
+
+        let (mut err_code_tx, err_code_rx) = mpsc::channel::<i32>();
+        let err_code_tx: *mut _ = &mut err_code_tx;
+        let err_code_tx = err_code_tx as *mut c_void;
+
+        let immut_id_0_h = generate_random_immutable_data_id(&sess);
+        let immut_id_1_h = generate_random_immutable_data_id(&sess);
 
         unsafe {
             // Create AD and PUT it to the network.
-            assert_eq!(appendable_data_new_pub(&app, &ad_name, &mut ad_h), 0);
-            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
-            assert_eq!(appendable_data_put(&app, ad_h), 0);
+            appendable_data_new_pub(&sess, &ad_name, handle_tx, handle_cb);
+            let (err_code, ad_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            appendable_data_extract_data_id(&sess, ad_h, handle_tx, handle_cb);
+            let (err_code, ad_id_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            appendable_data_put(&sess, ad_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
             // Append stuff to it.
-            assert_eq!(appendable_data_append(&app, ad_h, immut_id_0_h), 0);
-            assert_eq!(appendable_data_append(&app, ad_h, immut_id_1_h), 0);
+            appendable_data_append(&sess, ad_h, immut_id_0_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_append(&sess, ad_h, immut_id_1_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
             // GET it back.
-            reload_ad(&app, ad_id_h, &mut ad_h);
-            assert_num_of_data!(ad_h, 2);
+            let (err_code, ad_h) = reload_ad(&sess, ad_id_h, ad_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_data!(sess, ad_h, 2);
 
             // Try to remove one of available versions first
-            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
-            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+            appendable_data_remove_nth_data(&sess, ad_h, 0, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            reload_ad(&app, ad_id_h, &mut ad_h);
-            assert_num_of_data!(ad_h, 1);
-            assert_num_of_deleted_data!(ad_h, 1);
+            appendable_data_post(&sess, ad_h, true, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_h) = reload_ad(&sess, ad_id_h, ad_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_data!(sess, ad_h, 1);
+            assert_num_of_deleted_data!(sess, ad_h, 1);
 
             // Try restoring deleted data
-            assert_eq!(appendable_data_restore_nth_deleted_data(ad_h, 0), 0);
-            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+            appendable_data_restore_nth_deleted_data(&sess, ad_h, 0, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            reload_ad(&app, ad_id_h, &mut ad_h);
-            assert_num_of_data!(ad_h, 2);
+            appendable_data_post(&sess, ad_h, true, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_h) = reload_ad(&sess, ad_id_h, ad_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_data!(sess, ad_h, 2);
 
             // Permanently delete data
-            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
-            assert_eq!(appendable_data_remove_nth_deleted_data(ad_h, 0), 0);
-            assert_eq!(appendable_data_post(&app, ad_h, true), 0);
+            appendable_data_remove_nth_data(&sess, ad_h, 0, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            reload_ad(&app, ad_id_h, &mut ad_h);
-            assert_num_of_deleted_data!(ad_h, 0);
+            appendable_data_remove_nth_deleted_data(&sess, ad_h, 0, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_post(&sess, ad_h, true, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_h) = reload_ad(&sess, ad_id_h, ad_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_deleted_data!(sess, ad_h, 0);
 
             // clear the data and POST it.
-            assert_eq!(appendable_data_clear_data(ad_h), 0);
-            assert_eq!(appendable_data_post(&app, ad_h, false), 0);
+            appendable_data_clear_data(&sess, ad_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            appendable_data_post(&sess, ad_h, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
             // GET it back.
-            reload_ad(&app, ad_id_h, &mut ad_h);
-            assert_num_of_data!(ad_h, 0);
-            assert_num_of_deleted_data!(ad_h, 2);
+            let (err_code, ad_h) = reload_ad(&sess, ad_id_h, ad_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_data!(sess, ad_h, 0);
+            assert_num_of_deleted_data!(sess, ad_h, 2);
 
             // Permanently clear deleted data
-            assert_eq!(appendable_data_clear_deleted_data(ad_h), 0);
-            assert_eq!(appendable_data_post(&app, ad_h, false), 0);
+            appendable_data_clear_deleted_data(&sess, ad_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            reload_ad(&app, ad_id_h, &mut ad_h);
-            assert_num_of_deleted_data!(ad_h, 0);
+            appendable_data_post(&sess, ad_h, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(appendable_data_free(ad_h), 0);
+            let (err_code, ad_h) = reload_ad(&sess, ad_id_h, ad_h);
+            assert_eq!(err_code, 0);
+            assert_num_of_deleted_data!(sess, ad_h, 0);
+
+            appendable_data_free(&sess, ad_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
         }
     }
 
     #[test]
     fn data_encrypt_key() {
-        let app = test_utils::create_app(false);
+        let (sess, app, _obj_cache, _sign_key) = create_test_client();
 
-        let mut encrypt_key_h = 0;
+        let (mut handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
+        let handle_tx: *mut _ = &mut handle_tx;
+        let handle_tx = handle_tx as *mut c_void;
+
+        let (mut err_code_tx, err_code_rx) = mpsc::channel::<i32>();
+        let err_code_tx: *mut _ = &mut err_code_tx;
+        let err_code_tx = err_code_tx as *mut c_void;
 
         unsafe {
             // Initialise public appendable data
-            let mut ad_h = 0;
-            assert_eq!(appendable_data_new_pub(&app, &rand::random(), &mut ad_h), 0);
+            appendable_data_new_pub(&sess, &rand::random(), handle_tx, handle_cb);
+            let (err_code, ad_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
             // Public appendable data doens't have a private owner key
-            assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h),
-                       FfiError::UnsupportedOperation.into());
+            appendable_data_encrypt_key(&sess, ad_h, handle_tx, handle_cb);
+            let (err_code, _) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, FfiError::UnsupportedOperation.into());
 
-            assert_eq!(appendable_data_free(ad_h), 0);
+            appendable_data_free(&sess, ad_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
             // Initialise private appendable data
-            let mut ad_h = 0;
-            assert_eq!(appendable_data_new_priv(&app, &rand::random(), &mut ad_h),
-                       0);
+            appendable_data_new_priv(&sess, app, &rand::random(), handle_tx, handle_cb);
+            let (err_code, ad_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
-            assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h), 0);
+            appendable_data_encrypt_key(&sess, ad_h, handle_tx, handle_cb);
+            let (err_code, encrypt_key_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
-            assert_eq!(misc_encrypt_key_free(encrypt_key_h), 0);
+            misc_encrypt_key_free(&sess, encrypt_key_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
         }
     }
 
     #[test]
     fn data_sign_key() {
-        let app0 = test_utils::create_app(false);
-        let app1 = test_utils::create_app(false);
+        let (sess0, app0, obj_cache0, _sign_key0) = create_test_client();
+        let (sess1, _app1, _obj_cache1, sign_key1) = create_test_client();
 
-        let sign_key1 = get_sign_pk(&app1);
-        let sign_key1_h = unwrap!(object_cache()).insert_sign_key(sign_key1);
+        let (mut handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
+        let handle_tx: *mut _ = &mut handle_tx;
+        let handle_tx = handle_tx as *mut c_void;
 
-        let mut ad_h = 0;
-        let mut ad_id_h: DataIdHandle = 0;
+        let (mut err_code_tx, err_code_rx) = mpsc::channel::<i32>();
+        let err_code_tx: *mut _ = &mut err_code_tx;
+        let err_code_tx = err_code_tx as *mut c_void;
 
         // Data to append
-        let (_, immut_id_0_h) = generate_random_immutable_data_id();
-        let (_, immut_id_1_h) = generate_random_immutable_data_id();
+        let immut_id_0_h = generate_random_immutable_data_id(&sess1);
+        let immut_id_1_h = generate_random_immutable_data_id(&sess1);
 
         unsafe {
             // Create test data
-            assert_eq!(appendable_data_new_pub(&app0, &rand::random(), &mut ad_h),
-                       0);
-            assert_eq!(appendable_data_extract_data_id(ad_h, &mut ad_id_h), 0);
+            appendable_data_new_pub(&sess0, &rand::random(), handle_tx, handle_cb);
+            let (err_code, ad_h0) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
-            assert_eq!(appendable_data_put(&app0, ad_h), 0);
-            assert_eq!(appendable_data_append(&app1, ad_h, immut_id_0_h), 0);
+            appendable_data_extract_data_id(&sess0, ad_h0, handle_tx, handle_cb);
+            let (err_code, ad_id_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
 
-            reload_ad(&app0, ad_id_h, &mut ad_h);
+            appendable_data_put(&sess0, ad_h0, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let ad_id_h1 = copy_data_id(&sess0, &sess1, ad_id_h);
+            let (err_code, ad_h1) = reload_ad(&sess1, ad_id_h1, 0);
+            assert_eq!(err_code, 0);
+
+            appendable_data_append(&sess1, ad_h1, immut_id_0_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_h0) = reload_ad(&sess0, ad_id_h, ad_h0);
+            assert_eq!(err_code, 0);
 
             // Get a data key of app1
-            let mut sign_key_h = 0;
-            assert_eq!(appendable_data_nth_data_sign_key(&app0, ad_h, 0, &mut sign_key_h),
-                       0);
-            assert_eq!(*unwrap!(unwrap!(object_cache()).get_sign_key(sign_key_h)),
+            appendable_data_nth_data_sign_key(&sess0, app0, ad_h0, 0, handle_tx, handle_cb);
+            let (err_code, sign_key_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            assert_eq!(*unwrap!(unwrap!(obj_cache0.lock()).get_sign_key(sign_key_h)),
                        sign_key1);
 
             // Now try to get a data key from deleted data
-            assert_eq!(appendable_data_remove_nth_data(ad_h, 0), 0);
-            assert_eq!(appendable_data_post(&app0, ad_h, true), 0);
-            reload_ad(&app0, ad_id_h, &mut ad_h);
+            appendable_data_remove_nth_data(&sess0, ad_h0, 0, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            let mut deleted_sk_h = 0;
-            assert_eq!(appendable_data_nth_deleted_data_sign_key(&app0,
-                                                                 ad_h,
-                                                                 0,
-                                                                 &mut deleted_sk_h),
-                       0);
-            assert_eq!(*unwrap!(unwrap!(object_cache()).get_sign_key(deleted_sk_h)),
+            appendable_data_post(&sess0, ad_h0, true, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
+
+            let (err_code, ad_h0) = reload_ad(&sess0, ad_id_h, ad_h0);
+            assert_eq!(err_code, 0);
+
+            appendable_data_nth_deleted_data_sign_key(&sess0, app0, ad_h0, 0, handle_tx, handle_cb);
+            let (err_code, deleted_sk_h) = unwrap!(handle_rx.recv());
+            assert_eq!(err_code, 0);
+
+            assert_eq!(*unwrap!(unwrap!(obj_cache0.lock()).get_sign_key(deleted_sk_h)),
                        sign_key1);
 
             // Filter out the key that we've got for an app1
-            assert_eq!(appendable_data_insert_to_filter(ad_h, deleted_sk_h), 0);
-            assert_eq!(appendable_data_post(&app0, ad_h, false), 0);
+            appendable_data_insert_to_filter(&sess0, ad_h0, deleted_sk_h, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert!(appendable_data_append(&app1, ad_h, immut_id_1_h) != 0);
+            appendable_data_post(&sess0, ad_h0, false, err_code_tx, err_code_cb);
+            assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(appendable_data_free(ad_h), 0);
+            appendable_data_append(&sess1, ad_h1, immut_id_1_h, err_code_tx, err_code_cb);
+            assert!(unwrap!(err_code_rx.recv()) != 0);
         }
-
-        assert_eq!(misc_sign_key_free(sign_key1_h), 0);
     }
 
-    fn generate_random_immutable_data_id() -> (DataIdentifier, DataIdHandle) {
+    unsafe extern "C" fn err_code_cb(tx: *mut c_void, error_code: i32) {
+        let res = panic::catch_unwind(|| {
+            let tx = tx as *mut mpsc::Sender<i32>;
+            unwrap!((*tx).send(error_code));
+        });
+        if res.is_err() {
+            process::exit(-1);
+        }
+    }
+
+    unsafe extern "C" fn bool_cb(tx: *mut c_void, error_code: i32, result: bool) {
+        let res = panic::catch_unwind(|| {
+            let tx = tx as *mut mpsc::Sender<(i32, bool)>;
+            unwrap!((*tx).send((error_code, result)));
+        });
+        if res.is_err() {
+            process::exit(-1);
+        }
+    }
+
+    unsafe extern "C" fn num_cb(tx: *mut c_void, error_code: i32, result: usize) {
+        let res = panic::catch_unwind(|| {
+            let tx = tx as *mut mpsc::Sender<(i32, usize)>;
+            unwrap!((*tx).send((error_code, result)));
+        });
+        if res.is_err() {
+            process::exit(-1);
+        }
+    }
+
+    unsafe extern "C" fn filter_type_cb(tx: *mut c_void, error_code: i32, result: FilterType) {
+        let res = panic::catch_unwind(|| {
+            let tx = tx as *mut mpsc::Sender<(i32, FilterType)>;
+            unwrap!((*tx).send((error_code, result)));
+        });
+        if res.is_err() {
+            process::exit(-1);
+        }
+    }
+
+    unsafe extern "C" fn handle_cb(tx: *mut c_void, error_code: i32, handle: ObjectHandle) {
+        let res = panic::catch_unwind(|| {
+            let tx = tx as *mut mpsc::Sender<(i32, ObjectHandle)>;
+            unwrap!((*tx).send((error_code, handle)));
+        });
+        if res.is_err() {
+            process::exit(-1);
+        }
+    }
+
+    // Copy data id to another session
+    fn copy_data_id(src_sess: &Session, dst_sess: &Session, ad_id_h: DataIdHandle) -> DataIdHandle {
+        let obj_cache1 = src_sess.object_cache();
+        let obj_cache2 = dst_sess.object_cache();
+
+        let mut obj_cache1 = unwrap!(obj_cache1.lock());
+        let mut obj_cache2 = unwrap!(obj_cache2.lock());
+
+        let data_id = obj_cache1.get_data_id(ad_id_h);
+        obj_cache2.insert_data_id(unwrap!(data_id).clone())
+    }
+
+    fn generate_random_immutable_data_id(session: &Session) -> DataIdHandle {
         let name = rand::random();
         let id = DataIdentifier::Immutable(name);
-
-        let mut obj_cache = unwrap!(object_cache());
-        let id_h = obj_cache.insert_data_id(id);
-
-        (id, id_h)
+        let obj_cache = session.object_cache();
+        let mut obj_cache = unwrap!(obj_cache.lock());
+        obj_cache.insert_data_id(id)
     }
 
-    fn get_sign_pk(app: &App) -> sign::PublicKey {
-        let client = app.get_client();
-        let client = unwrap!(client.lock());
-        unwrap!(client.get_public_signing_key()).clone()
-    }
+    unsafe fn reload_ad(sess: *const Session,
+                        ad_id_h: DataIdHandle,
+                        ad_h: ADHandle)
+                        -> (i32, ADHandle) {
+        if ad_h != 0 {
+            let (mut err_code_tx, err_code_rx) = mpsc::channel::<i32>();
+            let err_code_tx: *mut _ = &mut err_code_tx;
 
-    fn reload_ad(app: &App, ad_id_h: DataIdHandle, ad_h: &mut AppendableDataHandle) {
-        assert_eq!(appendable_data_free(*ad_h), 0);
-        unsafe {
-            assert_eq!(appendable_data_get(app, ad_id_h, ad_h), 0);
+            appendable_data_free(sess, ad_h, err_code_tx as *mut c_void, err_code_cb);
+            let err_code = unwrap!(err_code_rx.recv());
+            assert_eq!(err_code, 0);
         }
+
+        let (mut handle_tx, handle_rx) = mpsc::channel::<(i32, ObjectHandle)>();
+        let handle_tx: *mut _ = &mut handle_tx;
+
+        appendable_data_get(sess, ad_id_h, handle_tx as *mut c_void, handle_cb);
+        unwrap!(handle_rx.recv())
+    }
+
+    fn create_test_client() -> (Session, AppHandle, ObjectCacheRef, sign::PublicKey) {
+        let sess = test_utils::create_session();
+        let app = test_utils::create_app(&sess, false);
+        let obj_cache = sess.object_cache();
+        let app_h = unwrap!(obj_cache.lock()).insert_app(app);
+
+        let (tx, rx) = mpsc::channel::<sign::PublicKey>();
+        let _ = unwrap!(sess.send(CoreMsg::new(move |client| {
+            let sign_key = unwrap!(client.public_signing_key());
+            unwrap!(tx.send(sign_key));
+            None
+        })));
+
+        let sign_key = unwrap!(rx.recv());
+        (sess, app_h, obj_cache, sign_key)
     }
 }
