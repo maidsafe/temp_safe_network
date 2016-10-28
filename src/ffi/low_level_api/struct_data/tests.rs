@@ -561,6 +561,70 @@ fn client_struct_data_crud() {
     }
 }
 
+#[test]
+fn reclaim() {
+    let (session, object_cache, app_h, cipher_opt_h) = setup_session();
+
+    // Create SD
+    let id: [u8; XOR_NAME_LEN] = rand::random();
+    let content_0 = unwrap!(utility::generate_random_vector(10));
+
+    let sd_h = unsafe {
+        unwrap!(test_utils::call_1(|user_data, cb| {
+            struct_data_new(&session,
+                            app_h,
+                            ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
+                            &id,
+                            0,
+                            cipher_opt_h,
+                            content_0.as_ptr(),
+                            content_0.len(),
+                            user_data,
+                            cb)
+        }))
+    };
+
+    let sd_clone_h = {
+        let mut object_cache = unwrap!(object_cache.lock());
+        let sd_clone = unwrap!(object_cache.get_sd(sd_h)).clone();
+        object_cache.insert_sd(sd_clone)
+    };
+
+    // PUT the original SD
+    unsafe {
+        unwrap!(test_utils::call_0(|user_data, cb| {
+            struct_data_put(&session, sd_h, user_data, cb)
+        }))
+    }
+
+    {
+        let mut object_cache = unwrap!(object_cache.lock());
+        let sd = unwrap!(object_cache.get_sd(sd_h));
+        assert_eq!(sd.get_version(), 0);
+    }
+
+    // DELETE it
+    unsafe {
+        unwrap!(test_utils::call_0(|user_data, cb| {
+            struct_data_delete(&session, sd_h, user_data, cb)
+        }))
+    }
+
+    // Now PUT the cloned one. This should reclaim the deleted data and
+    // update the version number properly.
+    unsafe {
+        unwrap!(test_utils::call_0(|user_data, cb| {
+            struct_data_put(&session, sd_clone_h, user_data, cb)
+        }))
+    }
+
+    {
+        let mut object_cache = unwrap!(object_cache.lock());
+        let sd = unwrap!(object_cache.get_sd(sd_clone_h));
+        assert_eq!(sd.get_version(), 2);
+    }
+}
+
 fn setup_session() -> (Session, Arc<Mutex<ObjectCache>>, AppHandle, CipherOptHandle) {
     let session = test_utils::create_session();
     let object_cache = session.object_cache();

@@ -399,22 +399,34 @@ pub unsafe extern "C" fn struct_data_put(session: *const Session,
                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let sign_sk = try_cb!(client.secret_signing_key(), |code| o_cb(user_data, code));
+
             let sd = {
                 let mut object_cache = unwrap!(object_cache.lock());
                 try_cb!(object_cache.get_sd(sd_h),
                         |error| o_cb(user_data, error)).clone()
             };
 
-            // TODO: use put_recover
-            client.put(Data::Structured(sd), None)
-                .map(move |_| {
-                    // TODO update the version of the data stored in the object cache
-                    o_cb(user_data, 0)
+            client.put_recover(Data::Structured(sd), None, sign_sk.clone())
+                .map_err(FfiError::from)
+                .and_then(move |version| {
+                    // Update the SD version in the object cache.
+                    let mut object_cache = unwrap!(object_cache.lock());
+                    let old_sd = try!(object_cache.remove_sd(sd_h));
+                    let new_sd = try!(StructuredData::new(
+                                    old_sd.get_type_tag(),
+                                    *old_sd.name(),
+                                    version,
+                                    old_sd.get_data().clone(),
+                                    old_sd.get_owner_keys().clone(),
+                                    old_sd.get_previous_owner_keys().clone(),
+                                    Some(&sign_sk)));
+
+                    let _ = object_cache.insert_sd_at(sd_h, new_sd);
+                    Ok(())
                 })
-                .map_err(move |err| {
-                    let err = FfiError::from(err);
-                    o_cb(user_data, ffi_error_code!(err));
-                })
+                .map(move |_| o_cb(user_data, 0))
+                .map_err(move |err| o_cb(user_data, ffi_error_code!(err)))
                 .into()
         })
     }, |error| o_cb(user_data, error))
