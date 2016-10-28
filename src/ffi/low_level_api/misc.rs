@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use ffi::app::App;
 use ffi::errors::FfiError;
 use ffi::helper;
 use ffi::low_level_api::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle,
@@ -75,6 +76,21 @@ pub unsafe extern "C" fn misc_deserialise_sign_key(data: *mut u8,
 
         let handle = unwrap!(object_cache()).insert_sign_key(sign_key);
         ptr::write(o_handle, handle);
+
+        0
+    })
+}
+
+/// Get MAID-sign::PubKey
+#[no_mangle]
+pub unsafe extern "C" fn misc_maid_sign_key(app: *const App, o_handle: *mut SignKeyHandle) -> i32 {
+    helper::catch_unwind_i32(|| {
+        let sign_key = {
+            let client = (*app).get_client();
+            let guard = unwrap!(client.lock());
+            *ffi_try!(guard.get_public_signing_key())
+        };
+        *o_handle = unwrap!(object_cache()).insert_sign_key(sign_key);
 
         0
     })
