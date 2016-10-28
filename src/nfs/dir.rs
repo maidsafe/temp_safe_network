@@ -127,14 +127,22 @@ impl Dir {
 
     /// If DirMetadata is present in the sub_dirs of this Directory
     /// then replace it else insert it
-    pub fn upsert_sub_dir(&mut self, dir_metadata: DirMetadata) {
+    pub fn upsert_sub_dir(&mut self, dir_metadata: DirMetadata) -> Result<(), NfsError> {
         if let Some(index) = self.sub_dirs()
             .iter()
             .position(|entry| *entry.locator() == *dir_metadata.locator()) {
+            if self.sub_dirs()[index].name() != dir_metadata.name() &&
+               self.find_sub_dir(dir_metadata.name()).is_some() {
+                return Err(NfsError::DirectoryAlreadyExistsWithSameName);
+            }
             self.sub_dirs_mut()[index] = dir_metadata;
         } else {
+            if self.find_sub_dir(dir_metadata.name()).is_some() {
+                return Err(NfsError::DirectoryAlreadyExistsWithSameName);
+            }
             self.sub_dirs_mut().push(dir_metadata);
         }
+        Ok(())
     }
 
     /// Remove a sub_directory
@@ -221,16 +229,16 @@ mod tests {
         let mut sub_dir = create_directory("Child one", Vec::new());
         assert!(dir.find_sub_dir(sub_dir.name())
             .is_none());
-        dir.upsert_sub_dir(sub_dir.clone());
+        unwrap!(dir.upsert_sub_dir(sub_dir.clone()));
         assert!(dir.find_sub_dir(sub_dir.name())
             .is_some());
 
         sub_dir.set_name("Child_1".to_string());
-        dir.upsert_sub_dir(sub_dir.clone());
+        unwrap!(dir.upsert_sub_dir(sub_dir.clone()));
         assert_eq!(dir.sub_dirs().len(), 1);
 
         let sub_dir_two = create_directory("Child Two", Vec::new());
-        dir.upsert_sub_dir(sub_dir_two.clone());
+        unwrap!(dir.upsert_sub_dir(sub_dir_two.clone()));
         assert_eq!(dir.sub_dirs().len(), 2);
 
         let _ = unwrap!(dir.find_sub_dir(sub_dir.name()), "Directory not found");

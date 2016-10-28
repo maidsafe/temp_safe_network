@@ -39,10 +39,10 @@ pub fn tokenise_path(path: &str) -> Vec<String> {
 }
 
 /// Creates a Dir in the network. Returns DataIdentifier for the created dir.
-pub fn create(client: Client,
-              dir: &Dir,
-              encryption_key: Option<&secretbox::Key>)
-              -> Box<NfsFuture<DataIdentifier>> {
+fn create(client: Client,
+          dir: &Dir,
+          encryption_key: Option<&secretbox::Key>)
+          -> Box<NfsFuture<DataIdentifier>> {
     trace!("Creating directory");
 
     let id = rand::random();
@@ -73,14 +73,9 @@ pub fn add_sub_dir(client: Client,
                    -> Box<NfsFuture<DirMetadata>> {
     trace!("Creating directory with name: {}", name);
 
-    if parent.find_sub_dir(&name)
-        .is_some() {
-        return err!(NfsError::DirectoryAlreadyExistsWithSameName);
-    }
-
     let (dir_id, secret_key) = dir_id.clone();
     let metadata = DirMetadata::new(dir_id.name().clone(), name, user_metadata, secret_key);
-    parent.upsert_sub_dir(metadata.clone());
+    fry!(parent.upsert_sub_dir(metadata.clone()));
 
     let parent = parent.clone();
 
@@ -228,15 +223,15 @@ pub fn user_root_dir(client: Client) -> Box<NfsFuture<(Dir, DirId)>> {
         None => {
             debug!("Root directory does not exist - creating one.");
             let c2 = client.clone();
-            let key = None;
+            let key = Some(secretbox::gen_key());
             let dir = Dir::new();
 
-            create(client.clone(), &dir, key.clone())
-                .and_then(move |dir_id| {
-                    // ::nfs::ROOT_DIRECTORY_NAME.to_string(),
-                    c2.set_user_root_dir_id((dir_id.clone(), None))
+            create(client.clone(), &dir, key.as_ref())
+                .and_then(move |data_id| {
+                    let dir_id = (data_id.clone(), key);
+                    c2.set_user_root_dir_id(dir_id.clone())
                         .map_err(NfsError::from)
-                        .map(move |_| (dir, (dir_id, None)))
+                        .map(move |_| (dir, dir_id))
                 })
                 .into_box()
         }
@@ -290,7 +285,7 @@ pub fn configuration_dir(client: Client, dir_name: String) -> Box<NfsFuture<(Dir
 
                     create_sub_dir(client.clone(),
                                    dir_name,
-                                   None,
+                                   Some(secretbox::gen_key()),
                                    Vec::new(),
                                    &cdir,
                                    &config_dir_id)
@@ -416,28 +411,34 @@ fn save_as_immutable_data(client: Client, data: Vec<u8>) -> Box<NfsFuture<XorNam
 
 /// Performs a shallow copy of a provided directory (sub directories aren't
 /// copied)
-pub fn shallow_copy(client: Client,
-                    dir: Dir,
-                    meta: DirMetadata)
-                    -> Box<NfsFuture<(Dir, DirMetadata)>> {
-    create(client, &dir, meta.encrypt_key())
+fn shallow_copy(client: Client,
+                src: Dir,
+                src_meta: DirMetadata)
+                -> Box<NfsFuture<(Dir, DirMetadata)>> {
+    let sk = if src_meta.encrypt_key().is_some() {
+        Some(secretbox::gen_key())
+    } else {
+        None
+    };
+    create(client, &src, sk.as_ref())
         .and_then(move |dir_id| {
-            let mut new_meta = DirMetadata::new(*dir_id.name(),
-                                                meta.name(),
-                                                meta.user_metadata().to_owned(),
-                                                meta.encrypt_key().map(|k| k.clone()));
-            new_meta.set_created_time(*meta.created_time());
+            let mut dst_meta = DirMetadata::new(*dir_id.name(),
+                                                src_meta.name(),
+                                                src_meta.user_metadata().to_owned(),
+                                                sk);
 
-            Ok((dir, new_meta))
+            dst_meta.set_created_time(*src_meta.created_time());
+
+            Ok((src, dst_meta))
         })
         .into_box()
 }
 
 /// Performs a full copy of a provided directory
-pub fn deep_copy(client: Client,
-                 src: &Dir,
-                 src_meta: &DirMetadata)
-                 -> Box<NfsFuture<(Dir, DirMetadata)>> {
+fn deep_copy(client: Client,
+             src: &Dir,
+             src_meta: &DirMetadata)
+             -> Box<NfsFuture<(Dir, DirMetadata)>> {
     let parent_meta = src_meta.clone();
 
     if src.sub_dirs().len() == 0 {
@@ -459,14 +460,60 @@ pub fn deep_copy(client: Client,
 
                 get(c2.clone(), &sub_dir.id())
                     .and_then(move |dir| deep_copy(c3, &dir, &sub_dir))
-                    .map(move |(_dir_copy, dir_meta)| {
-                        parent.upsert_sub_dir(dir_meta);
-                        parent
+                    .and_then(move |(_dir_copy, dir_meta)| {
+                        parent.upsert_sub_dir(dir_meta)
+                            .map(move |_| parent)
                     })
             })
             .and_then(move |parent| shallow_copy(c3, parent, parent_meta))
             .into_box()
     }
+}
+
+/// Move or copy source directory to the provided destination dir
+pub fn move_dir<S>(client: &Client,
+                   retain_src: bool,
+                   mut src_parent_dir: Dir,
+                   src_parent_meta: DirMetadata,
+                   dir_to_move: &str,
+                   mut dst_dir: Dir,
+                   dst_meta: DirMetadata,
+                   dst_path: S)
+                   -> Box<NfsFuture<()>>
+    where S: Into<String>
+{
+    let c2 = client.clone();
+    let c3 = client.clone();
+    let c4 = client.clone();
+
+    let dst_path = dst_path.into();
+
+    if retain_src {
+        // Copy
+        let src_meta = fry!(src_parent_dir.find_sub_dir(dir_to_move)
+            .cloned()
+            .ok_or(NfsError::DirectoryNotFound));
+
+        get(c2, &src_meta.id())
+            .and_then(move |src_dir| deep_copy(c3, &src_dir, &src_meta))
+            .and_then(move |(_copy, mut copy_meta)| {
+                copy_meta.set_name(dst_path);
+                fry!(dst_dir.upsert_sub_dir(copy_meta));
+                update(c4, &dst_meta.id(), &dst_dir).into_box()
+            })
+            .into_box()
+    } else {
+        // Move
+        let mut moved_meta = fry!(src_parent_dir.remove_sub_dir(dir_to_move));
+        moved_meta.set_name(dst_path);
+
+        fry!(dst_dir.upsert_sub_dir(moved_meta));
+
+        update(c2, &dst_meta.id(), &dst_dir)
+            .and_then(move |_| update(c3, &src_parent_meta.id(), &src_parent_dir))
+            .into_box()
+    }
+
 }
 
 /// Get StructuredData from the Network

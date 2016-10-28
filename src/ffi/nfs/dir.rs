@@ -29,6 +29,7 @@ use ffi::object_cache::AppHandle;
 use futures::Future;
 use libc::{c_void, int32_t};
 use nfs::helper::dir_helper;
+use rust_sodium::crypto::secretbox;
 use std::{ptr, slice};
 use time;
 
@@ -99,10 +100,10 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = delete_dir(&client, &app, dir_path, is_shared)
+                    delete_dir(&client, &app, dir_path, is_shared)
                         .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
-                        .into_box();
-                    Some(fut)
+                        .into_box()
+                        .into()
                 }
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e));
@@ -138,7 +139,7 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = get_dir(&client, &app, dir_path, is_shared)
+                    get_dir(&client, &app, dir_path, is_shared)
                         .map(move |details| {
                             let details_handle = Box::into_raw(Box::new(details));
                             o_cb(user_data.0, 0, details_handle);
@@ -146,8 +147,8 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
                         .map_err(move |err| {
                             o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut())
                         })
-                        .into_box();
-                    Some(fut)
+                        .into_box()
+                        .into()
                 }
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
@@ -187,15 +188,15 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = modify_dir(&client,
-                                         &app,
-                                         dir_path,
-                                         is_shared,
-                                         new_name,
-                                         new_user_metadata)
+                    modify_dir(&client,
+                               &app,
+                               dir_path,
+                               is_shared,
+                               new_name,
+                               new_user_metadata)
                         .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
-                        .into_box();
-                    Some(fut)
+                        .into_box()
+                        .into()
                 }
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e));
@@ -235,16 +236,16 @@ pub unsafe extern "C" fn nfs_move_dir(session: *const Session,
 
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = move_dir(&client,
-                                       app,
-                                       src_path,
-                                       is_src_path_shared,
-                                       dst_path,
-                                       is_dst_path_shared,
-                                       retain_src)
+                    move_dir(&client,
+                             app,
+                             src_path,
+                             is_src_path_shared,
+                             dst_path,
+                             is_dst_path_shared,
+                             retain_src)
                         .then(move |result| Ok(o_cb(user_data.0, ffi_result_code!(result))))
-                        .into_box();
-                    Some(fut)
+                        .into_box()
+                        .into()
                 }
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e));
@@ -261,7 +262,7 @@ fn create_dir(client: &Client,
               app: &App,
               dir_path: &str,
               user_metadata: &[u8],
-              _is_private: bool,
+              is_private: bool,
               is_shared: bool)
               -> Box<FfiFuture<()>> {
     let mut tokens = dir_helper::tokenise_path(dir_path);
@@ -273,18 +274,17 @@ fn create_dir(client: &Client,
 
     app.root_dir(client.clone(), is_shared)
         .and_then(move |start_dir_id| {
-            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id))
-                .map_err(FfiError::from)
+            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id)).map_err(FfiError::from)
         })
         .and_then(move |(parent, metadata)| {
-            // let access_level = if is_private {
-            //     AccessLevel::Private
-            // } else {
-            //     AccessLevel::Public
-            // };
+            let key = if is_private {
+                Some(secretbox::gen_key())
+            } else {
+                None
+            };
             dir_helper::create_sub_dir(c3,
                                        dir_to_create,
-                                       None,
+                                       key,
                                        user_metadata,
                                        &parent,
                                        &metadata.id())
@@ -331,7 +331,9 @@ fn get_dir(client: &Client,
            is_shared: bool)
            -> Box<FfiFuture<DirDetails>> {
     helper::dir(client, app, dir_path, is_shared)
-        .and_then(move |(dir, dir_metadata)| DirDetails::from_dir_and_metadata(dir, dir_metadata))
+        .and_then(move |(dir, dir_metadata)| {
+            DirDetails::from_dir_and_metadata(dir, dir_metadata)
+        })
         .into_box()
 }
 
@@ -354,8 +356,7 @@ fn modify_dir(client: &Client,
 
     app.root_dir(client.clone(), is_shared)
         .and_then(move |start_dir_id| {
-            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id))
-                .map_err(FfiError::from)
+            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir_id)).map_err(FfiError::from)
         })
         .and_then(move |(mut parent, parent_meta)| {
             let mut dir_meta =
@@ -369,7 +370,7 @@ fn modify_dir(client: &Client,
             }
             dir_meta.set_modified_time(time::now_utc());
 
-            parent.upsert_sub_dir(dir_meta);
+            fry!(parent.upsert_sub_dir(dir_meta));
 
             dir_helper::update(c3, &parent_meta.id(), &parent)
                 .map_err(FfiError::from)
@@ -387,48 +388,21 @@ fn move_dir(client: &Client,
             retain_src: bool)
             -> Box<FfiFuture<()>> {
     let c2 = client.clone();
-    let c3 = client.clone();
-    let c4 = c2.clone();
 
     let dst_path = dst_path.to_string();
 
     helper::dir_and_file(client, app, src_path, is_src_path_shared)
         .join(helper::dir(client, app, dst_path.clone(), is_dst_path_shared))
-        .and_then(move |((mut src_parent_dir, src_parent_meta, dir_to_move),
-                         (mut dst_dir, dst_meta))| {
-            if retain_src {
-                // Copy
-                let src_meta = fry!(src_parent_dir.find_sub_dir(&dir_to_move)
-                    .cloned()
-                    .ok_or(FfiError::PathNotFound));
-
-                dir_helper::get(c2, &src_meta.id())
-                    .map_err(FfiError::from)
-                    .and_then(move |src_dir| {
-                        dir_helper::deep_copy(c3, &src_dir, &src_meta).map_err(FfiError::from)
-                    })
-                    .and_then(move |(_copy, mut copy_meta)| {
-                        copy_meta.set_name(dst_path);
-                        dst_dir.upsert_sub_dir(copy_meta);
-
-                        dir_helper::update(c4, &dst_meta.id(), &dst_dir).map_err(FfiError::from)
-                    })
-                    .into_box()
-            } else {
-                // Move
-                let moved_meta = fry!(src_parent_dir.remove_sub_dir(&dir_to_move)
-                    .map_err(FfiError::from));
-
-                dst_dir.upsert_sub_dir(moved_meta);
-
-                dir_helper::update(c2, &dst_meta.id(), &dst_dir)
-                    .map_err(FfiError::from)
-                    .and_then(move |_| {
-                        dir_helper::update(c3, &src_parent_meta.id(), &src_parent_dir)
-                            .map_err(FfiError::from)
-                    })
-                    .into_box()
-            }
+        .and_then(move |((src_parent_dir, src_parent_meta, dir_to_move), (dst_dir, dst_meta))| {
+            dir_helper::move_dir(&c2,
+                                 retain_src,
+                                 src_parent_dir,
+                                 src_parent_meta,
+                                 &dir_to_move,
+                                 dst_dir,
+                                 dst_meta,
+                                 dst_path)
+                .map_err(FfiError::from)
         })
         .into_box()
 }
@@ -439,7 +413,6 @@ mod tests {
     use core::futures::FutureExt;
     use ffi::{App, FfiError, FfiFuture, test_utils};
     use futures::Future;
-    // use nfs::AccessLevel;
     use nfs::helper::dir_helper;
     use std::slice;
     use std::sync::mpsc;
@@ -639,8 +612,7 @@ mod tests {
                     let details = unwrap!(result);
                     let metadata = unwrap!(details.metadata.as_ref());
                     unsafe {
-                        let name = slice::from_raw_parts(metadata.name,
-                                                         metadata.name_len);
+                        let name = slice::from_raw_parts(metadata.name, metadata.name_len);
                         let name = unwrap!(String::from_utf8(name.to_owned()));
                         assert_eq!(name, "test_dir");
                     }
