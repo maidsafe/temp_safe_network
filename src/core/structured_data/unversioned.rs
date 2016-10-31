@@ -113,6 +113,10 @@ pub fn extract_value(client: &Client,
                      data: &StructuredData,
                      decryption_key: Option<secretbox::Key>)
                      -> Box<CoreFuture<Vec<u8>>> {
+    if data.is_deleted() {
+        return ok!(Vec::new());
+    }
+
     match fry!(decode(data.get_data(), decryption_key.as_ref())) {
         DataTypeEncoding::Data(data) => ok!(data),
         DataTypeEncoding::Map(data_map) => {

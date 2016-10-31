@@ -75,6 +75,10 @@ impl CipherOpt {
 
     /// Decrypt something encrypted by CipherOpt::encrypt()
     pub fn decrypt(app: &App, raw_data: &[u8]) -> Result<Vec<u8>, FfiError> {
+        if raw_data.is_empty() {
+            return Ok(Vec::new());
+        }
+
         match try!(deserialise::<WireFormat>(raw_data)) {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {

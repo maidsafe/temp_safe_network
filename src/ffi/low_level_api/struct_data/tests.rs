@@ -263,6 +263,14 @@ fn unversioned_struct_data_crud() {
         assert_eq!(sd.get_version(), 2);
     }
 
+    // Deleted data should be empty
+    let retrieved_content = unsafe {
+        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
+            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
+        }))
+    };
+    assert!(retrieved_content.is_empty());
+
     // Re-claim via PUT
     let content_2 = unwrap!(utility::generate_random_vector(10));
     unsafe {
@@ -430,6 +438,21 @@ fn versioned_struct_data_crud() {
             struct_data_delete(&session, sd_h, user_data, cb)
         }))
     }
+
+    // Fetch deleted data is OK
+    let sd_h = unsafe {
+        unwrap!(test_utils::call_1(|user_data, cb| {
+            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
+        }))
+    };
+
+    // Deleted data should be empty
+    let retrieved_content = unsafe {
+        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
+            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
+        }))
+    };
+    assert!(retrieved_content.is_empty());
 }
 
 #[test]

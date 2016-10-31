@@ -104,6 +104,10 @@ pub fn extract_value(client: &Client,
                      version: u64,
                      decryption_key: Option<secretbox::Key>)
                      -> Box<CoreFuture<Vec<u8>>> {
+    if data.is_deleted() {
+        return ok!(Vec::new());
+    }
+
     let client2 = client.clone();
 
     extract_all_version_names(client, data)
@@ -121,6 +125,10 @@ pub fn extract_current_value(client: &Client,
                              data: &StructuredData,
                              decryption_key: Option<secretbox::Key>)
                              -> Box<CoreFuture<Vec<u8>>> {
+    if data.is_deleted() {
+        return ok!(Vec::new());
+    }
+
     let name = fry!(current_version_name(data));
     immutable_data::get_value(client, &name, decryption_key)
 }
