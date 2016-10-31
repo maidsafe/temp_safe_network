@@ -453,6 +453,7 @@ mod tests {
     use rand;
     use routing::DataIdentifier;
     use rust_sodium::crypto::sign;
+    #[allow(deprecated)]
     use std::hash::{Hash, Hasher, SipHasher};
     use std::sync::mpsc;
     use super::*;
@@ -716,6 +717,8 @@ mod tests {
         }
     }
 
+    // SipHasher is deprecated on nigthly.
+    #[allow(deprecated)]
     fn hash<T: Hash>(t: &T) -> u64 {
         let mut s = SipHasher::new();
         t.hash(&mut s);
