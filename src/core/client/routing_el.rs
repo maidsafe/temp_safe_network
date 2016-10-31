@@ -41,10 +41,16 @@ pub fn run(routing_rx: Receiver<Event>, core_tx: CoreMsgTx, net_tx: NetworkTx) {
                 if net_tx.send(NetworkEvent::Disconnected).is_err() {
                     break;
                 }
-                let msg = CoreMsg::new(|client| {
-                    client.restart_routing();
-                    None
-                });
+
+                let msg = {
+                    let core_tx = core_tx.clone();
+                    let net_tx = net_tx.clone();
+                    CoreMsg::new(move |client| {
+                        client.restart_routing(core_tx, net_tx);
+                        None
+                    })
+                };
+
                 if core_tx.send(msg).is_err() {
                     break;
                 }

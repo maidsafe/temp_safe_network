@@ -66,8 +66,6 @@ pub struct Client {
 struct Inner {
     routing: Routing,
     hooks: HashMap<MessageId, Complete<CoreEvent>>,
-    core_tx: CoreMsgTx,
-    net_tx: NetworkTx,
     cache: LruCache<XorName, Data>,
     client_type: ClientType,
     stats: Stats,
@@ -89,8 +87,6 @@ impl Client {
         Ok(Self::new(Inner {
             routing: routing,
             hooks: HashMap::with_capacity(10),
-            core_tx: core_tx,
-            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::Unregistered,
             stats: Default::default(),
@@ -158,8 +154,6 @@ impl Client {
         Ok(Self::new(Inner {
             routing: routing,
             hooks: HashMap::with_capacity(10),
-            core_tx: core_tx,
-            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
@@ -233,8 +227,6 @@ impl Client {
         Ok(Self::new(Inner {
             routing: routing,
             hooks: HashMap::with_capacity(10),
-            core_tx: core_tx,
-            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
@@ -247,7 +239,7 @@ impl Client {
     }
 
     #[doc(hidden)]
-    pub fn restart_routing(&self) {
+    pub fn restart_routing(&self, core_tx: CoreMsgTx, net_tx: NetworkTx) {
         let opt_id = if let ClientType::Registered { ref acc, .. } = self.inner().client_type {
             Some(FullId::with_keys((acc.get_maid().public_keys().1,
                                     acc.get_maid().secret_keys().1.clone()),
@@ -257,22 +249,24 @@ impl Client {
             None
         };
 
-        let core_tx = self.inner().core_tx.clone();
         let (routing, routing_rx) = match setup_routing(opt_id) {
             Ok(elt) => elt,
             Err(e) => {
                 info!("Could not restart routing (will re-attempt, unless dropped): {:?}",
                       e);
-                let msg = CoreMsg::new(|client| {
-                    client.restart_routing();
-                    None
-                });
+                let msg = {
+                    let core_tx = core_tx.clone();
+                    let net_tx = net_tx.clone();
+                    CoreMsg::new(move |client| {
+                        client.restart_routing(core_tx, net_tx);
+                        None
+                    })
+                };
                 let _ = core_tx.send(msg);
                 return;
             }
         };
 
-        let net_tx = self.inner().net_tx.clone();
         let _ = net_tx.send(NetworkEvent::Connected);
 
         let joiner = spawn_routing_thread(routing_rx, core_tx, net_tx);
