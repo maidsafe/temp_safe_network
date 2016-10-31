@@ -77,7 +77,6 @@ pub unsafe extern "C" fn output_log_path(c_output_file_name: *const u8,
 
 #[cfg(test)]
 mod tests {
-
     use std::env;
     use std::fs::File;
     use std::io::Read;

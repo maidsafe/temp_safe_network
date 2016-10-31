@@ -46,7 +46,7 @@
 #[macro_use]
 mod macros;
 
-mod app;
+pub mod app;
 pub mod dir_details;
 pub mod dns;
 pub mod errors;
@@ -54,7 +54,7 @@ pub mod file_details;
 pub mod logging;
 pub mod low_level_api;
 pub mod nfs;
-mod session;
+pub mod session;
 pub mod string_list;
 
 mod config;

@@ -209,7 +209,6 @@ pub unsafe extern "C" fn dns_get_service_dir(session: *const Session,
                             move |error| o_cb(user_data, error, ptr::null_mut()))
 }
 
-
 #[cfg(test)]
 mod tests {
     use core::{Client, utility};
@@ -248,7 +247,7 @@ mod tests {
             object_cache.insert_app(app)
         };
 
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel::<()>();
 
         let long_name = test_utils::as_raw_parts(&long_name2);
         let service_name = test_utils::as_raw_parts("www");
@@ -256,7 +255,7 @@ mod tests {
 
         extern "C" fn callback(user_data: *mut c_void, error: int32_t) {
             assert_eq!(error, 0);
-            unsafe { test_utils::send_via_user_data(user_data) }
+            unsafe { test_utils::send_via_user_data(user_data, ()) }
         }
 
         unsafe {
@@ -297,7 +296,7 @@ mod tests {
 
         let session2 = test_utils::create_unregistered_session();
 
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel::<()>();
 
         let long_name = test_utils::as_raw_parts(&long_name2);
         let service_name = test_utils::as_raw_parts("www");
@@ -307,7 +306,7 @@ mod tests {
                                dir_details: *mut DirDetails) {
             assert_eq!(error, 0);
             assert!(!dir_details.is_null());
-            unsafe { test_utils::send_via_user_data(user_data) }
+            unsafe { test_utils::send_via_user_data(user_data, ()) }
         }
 
         unsafe {

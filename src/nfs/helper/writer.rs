@@ -24,10 +24,10 @@ use core::SelfEncryptionStorage;
 use core::futures::FutureExt;
 use core::immutable_data;
 use futures::Future;
-use maidsafe_utilities::serialisation::{deserialise, serialise};
+use maidsafe_utilities::serialisation::serialise;
 use nfs::{Dir, DirId, File, FileMetadata, NfsFuture};
-use nfs::helper::dir_helper;
-use routing::DataIdentifier;
+use nfs::helper::{dir_helper, file_helper};
+use routing::{Data, DataIdentifier};
 use rust_sodium::crypto::secretbox;
 use self_encryption::SequentialEncryptor;
 
@@ -95,7 +95,8 @@ impl Writer {
         trace!("Writer induced self-encryptor close.");
 
         let mut dir = self.dir;
-        let dir_id = self.dir_id;
+        let (dir_id, sk) = self.dir_id;
+        let sk2 = sk.clone();
         let file = self.file;
         let size = self.self_encryptor.len();
         let client = self.client;
@@ -123,30 +124,41 @@ impl Writer {
                                                             data_map);
 
                         let c2 = client.clone();
+                        let c3 = client.clone();
 
-                        immutable_data::get_value(&client.clone(), &ptr_versions.name(), None)
-                            .and_then(move |versions| {
-                                let mut versions =
-                                    fry!(deserialise::<Vec<FileMetadata>>(&versions));
+                        let previous_versions_fut = if num_of_versions > 0 {
+                            file_helper::get_versions(&client, &ptr_versions, sk.clone())
+                        } else {
+                            // ptr_versions is null, create a new list of versions
+                            ok!(Vec::<FileMetadata>::new())
+                        };
+
+                        previous_versions_fut.and_then(move |mut versions| {
                                 versions.push(latest_version);
-                                immutable_data::create(&c2, fry!(serialise(&versions)), None)
+                                immutable_data::create(&c2, fry!(serialise(&versions)), sk)
+                                    .map_err(From::from)
+                                    .into_box()
+                            })
+                            .and_then(move |immut_data| {
+                                let immut_id = immut_data.identifier();
+                                c3.put(Data::Immutable(immut_data), None)
+                                    .map_err(From::from)
+                                    .map(move |_| immut_id)
                             })
                             .and_then(move |ptr_versions| {
-                                dir.update_file(&new_version.name().to_owned(),
-                                                File::Versioned {
-                                                    ptr_versions: ptr_versions.identifier(),
-                                                    latest_version: new_version,
-                                                    num_of_versions: num_of_versions + 1,
-                                                });
+                                let _ = try!(dir.upsert_file(File::Versioned {
+                                    ptr_versions: ptr_versions,
+                                    latest_version: new_version,
+                                    num_of_versions: num_of_versions + 1,
+                                }));
                                 Ok(dir)
                             })
-                            .map_err(From::from)
                             .into_box()
                     }
                 }
             })
             .and_then(move |updated_dir| {
-                dir_helper::update(c2, &dir_id, &updated_dir).map(move |_| updated_dir)
+                dir_helper::update(c2, &(dir_id, sk2), &updated_dir).map(move |_| updated_dir)
             })
             .into_box()
     }

@@ -111,19 +111,19 @@ pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
 pub unsafe extern "C" fn data_id_free(session: *const Session,
                                       handle: DataIdHandle,
                                       user_data: *mut c_void,
-                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
-                                      -> i32 {
-    helper::catch_unwind_i32(|| {
-        let user_data = OpaqueCtx(user_data);
+                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    helper::catch_unwind_cb(|| {
         let obj_cache = (*session).object_cache();
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+        (*session).send(CoreMsg::new(move |_| {
             let res = unwrap!(obj_cache.lock()).remove_data_id(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
-        })));
-        0
-    })
+        }))
+    },
+                            move |err| o_cb(user_data.0, ffi_error_code!(err)));
 }
 
 #[cfg(test)]
@@ -223,21 +223,12 @@ mod tests {
             unwrap!((*tx).send(handle));
         }
 
-        unsafe fn assert_free(sess_ptr: *const Session, handle: DataIdHandle, expected: i32) {
-            let (tx, rx) = mpsc::channel::<i32>();
-            assert_eq!(data_id_free(sess_ptr,
-                                    handle,
-                                    Box::into_raw(Box::new(tx)) as *mut _,
-                                    free_cb),
-                       0);
-            let err_code = unwrap!(rx.recv());
-
-            assert_eq!(err_code, expected);
-        }
-
-        unsafe extern "C" fn free_cb(tx: *mut c_void, err_code: i32) {
-            let tx = tx as *mut mpsc::Sender<i32>;
-            unwrap!((*tx).send(err_code));
+        unsafe fn assert_free(sess: *const Session, handle: DataIdHandle, expected: i32) {
+            let res = test_utils::call_0(|user_data, cb| data_id_free(sess, handle, user_data, cb));
+            match res {
+                Ok(()) => assert_eq!(expected, 0),
+                Err(code) => assert_eq!(expected, code),
+            }
         }
     }
 }

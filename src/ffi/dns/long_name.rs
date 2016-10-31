@@ -144,7 +144,7 @@ mod tests {
         let long_name = unwrap!(utility::generate_random_string(10));
         let long_name = test_utils::as_raw_parts(&long_name);
 
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel::<()>();
 
         // Register
         {
@@ -152,7 +152,7 @@ mod tests {
 
             extern "C" fn register_cb(user_data: *mut c_void, error: int32_t) {
                 assert_eq!(error, 0);
-                unsafe { test_utils::send_via_user_data(user_data) }
+                unsafe { test_utils::send_via_user_data(user_data, ()) }
             }
 
             extern "C" fn get_cb(user_data: *mut c_void, error: int32_t, list: *mut StringList) {
@@ -161,7 +161,7 @@ mod tests {
                 unsafe {
                     assert_eq!(string_list_len(list), 1);
                     string_list_free(list);
-                    test_utils::send_via_user_data(user_data)
+                    test_utils::send_via_user_data(user_data, ())
                 }
             }
 
@@ -188,7 +188,7 @@ mod tests {
 
             extern "C" fn callback(user_data: *mut c_void, error: int32_t) {
                 assert_eq!(error, DnsError::DnsNameAlreadyRegistered.into());
-                unsafe { test_utils::send_via_user_data(user_data) }
+                unsafe { test_utils::send_via_user_data(user_data, ()) }
             }
 
             unsafe {

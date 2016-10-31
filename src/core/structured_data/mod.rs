@@ -109,6 +109,36 @@ pub fn get(client: &Client, type_tag: u64, id: &XorName) -> Box<CoreFuture<Struc
         .into_box()
 }
 
+/// Delete structured data from the network.
+pub fn delete(client: &Client,
+              data: StructuredData,
+              signing_key: &sign::SecretKey)
+              -> Box<CoreFuture<()>> {
+    let data = fry!(create_for_deletion(data, signing_key));
+    client.delete(Data::Structured(data), None)
+}
+
+/// Delete structured data from the network, with recovery
+pub fn delete_recover(client: &Client,
+                      data: StructuredData,
+                      signing_key: &sign::SecretKey)
+                      -> Box<CoreFuture<()>> {
+    let data = fry!(create_for_deletion(data, signing_key));
+    client.delete_recover(Data::Structured(data), None)
+}
+
+fn create_for_deletion(data: StructuredData,
+                       signing_key: &sign::SecretKey)
+                       -> Result<StructuredData, CoreError> {
+    Ok(try!(StructuredData::new(data.get_type_tag(),
+                                *data.name(),
+                                data.get_version() + 1,
+                                vec![],
+                                vec![],
+                                data.get_owner_keys().clone(),
+                                Some(signing_key))))
+}
+
 #[cfg(test)]
 mod tests {
     use core::utility::test_utils;

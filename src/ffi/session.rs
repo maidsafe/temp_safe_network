@@ -64,12 +64,27 @@ impl Session {
     }
 
     /// Send the given closure to be executed on the core event loop.
+    // TODO: remove this in favor of `send_cb`.
     pub fn send_fn<F, I>(&self, f: F) -> Result<(), FfiError>
         where F: FnOnce(&Client) -> Option<I> + Send + 'static,
               I: IntoFuture<Item=(), Error=()> + 'static
     {
         self.send(CoreMsg::new(move |client| {
             f(client).map(|i| i.into_future().into_box())
+        }))
+    }
+
+    // WIP
+    #[allow(missing_docs)]
+    pub fn send_cb<F, I>(&self, user_data: *mut c_void, f: F) -> Result<(), FfiError>
+        where F: FnOnce(&Client, Arc<Mutex<ObjectCache>>, *mut c_void) -> Option<I> + Send + 'static,
+              I: IntoFuture<Item=(), Error=()> + 'static
+    {
+        let object_cache = self.object_cache();
+        let user_data = OpaqueCtx(user_data);
+
+        self.send(CoreMsg::new(move |client| {
+            f(client, object_cache, user_data.0).map(|i| i.into_future().into_box())
         }))
     }
 
@@ -451,7 +466,7 @@ pub unsafe extern "C" fn get_account_info(session: *const Session,
 /// crate (`create_account`, `log_in`, `create_unregistered_client`). Using
 /// `session` after a call to this functions is undefined behaviour.
 #[no_mangle]
-pub unsafe extern "C" fn drop_session(session: *mut Session) {
+pub unsafe extern "C" fn session_free(session: *mut Session) {
     let _ = Box::from_raw(session);
 }
 
@@ -484,7 +499,7 @@ mod tests {
             }
 
             assert!(!session_handle.is_null());
-            unsafe { drop_session(session_handle) };
+            unsafe { session_free(session_handle) };
         }
 
         {
@@ -504,7 +519,7 @@ mod tests {
             }
 
             assert!(!session_handle.is_null());
-            unsafe { drop_session(session_handle) };
+            unsafe { session_free(session_handle) };
         }
 
         unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {

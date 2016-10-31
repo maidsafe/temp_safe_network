@@ -182,8 +182,8 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                         .map_err(FfiError::from)
                         .map(move |_| {
                             let data_id = DataIdentifier::Immutable(raw_immut_data_name);
-                            let handle = unwrap!(obj_cache.lock()).insert_data_id(data_id);
-                            handle
+                            let mut obj_cache = unwrap!(obj_cache.lock());
+                            obj_cache.insert_data_id(data_id)
                         })
                         .into_box()
                 })
@@ -462,11 +462,7 @@ mod tests {
             let read_tx: *mut _ = &mut read_tx;
             let read_tx = read_tx as *mut c_void;
 
-            assert_eq!(cipher_opt_new_asymmetric(&sess,
-                                                 app_1_encrypt_key_handle,
-                                                 handle_tx,
-                                                 handle_cb),
-                       0);
+            cipher_opt_new_asymmetric(&sess, app_1_encrypt_key_handle, handle_tx, handle_cb);
             let (err_code, cipher_opt_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
@@ -554,11 +550,10 @@ mod tests {
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            assert_eq!(cipher_opt_free(&sess, cipher_opt_h, err_code_tx, err_code_cb),
-                       0);
+            cipher_opt_free(&sess, cipher_opt_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            assert_eq!(data_id_free(&sess, data_id_h, err_code_tx, err_code_cb), 0);
+            data_id_free(&sess, data_id_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
         }
     }

@@ -159,7 +159,7 @@ mod tests {
                 })
                 .then(move |result| {
                     let (_parent, dir, dir_meta) = unwrap!(result);
-                    file_helper::create(c3, file_name, Vec::new(), dir_meta.id(), dir)
+                    file_helper::create(c3, file_name, Vec::new(), dir_meta.id(), dir, false)
                         .map(move |writer| (writer, dir_meta.id()))
                 })
                 .then(move |result| {
@@ -222,7 +222,7 @@ mod tests {
                                error: int32_t,
                                _file_details_ptr: *mut FileDetails) {
             assert_eq!(error, 0);
-            unsafe { test_utils::send_via_user_data(user_data) }
+            unsafe { test_utils::send_via_user_data(user_data, ()) }
         }
 
         unsafe {

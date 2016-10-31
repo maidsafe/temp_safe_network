@@ -25,10 +25,11 @@ use core::{Client, CoreMsg, FutureExt};
 use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session};
 use ffi::file_details::{FileDetails, FileMetadata};
 use ffi::helper;
+use ffi::helper::catch_unwind_cb;
 use ffi::object_cache::AppHandle;
-use futures::Future;
-use libc::{c_void, int32_t};
-use nfs::NfsError;
+use futures::{self, Future};
+use libc::{c_void, int32_t, uint64_t};
+use nfs::{File, NfsError};
 use nfs::helper::{dir_helper, file_helper};
 use nfs::helper::writer::Mode;
 use std::ptr;
@@ -42,36 +43,35 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
                                          file_path_len: usize,
                                          is_shared: bool,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
-                                         -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
         trace!("FFI delete file, given the path.");
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
+        let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
 
         let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send(CoreMsg::new(move |client| {
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = delete_file(&client, &app, file_path, is_shared)
+                    delete_file(&client, &app, file_path, is_shared)
                         .then(move |res| {
                             o_cb(user_data.0, ffi_result_code!(res));
                             Ok(())
                         })
-                        .into_box();
-                    Some(fut)
+                        .into_box()
+                        .into()
                 }
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
 
 /// Get file. The returned FileDetails pointer must be disposed of by calling
@@ -88,17 +88,16 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
                                       user_data: *mut c_void,
                                       o_cb: unsafe extern "C" fn(*mut c_void,
                                                                  int32_t,
-                                                                 *mut FileDetails))
-                                      -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                                                 *mut FileDetails)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
         trace!("FFI get file, given the path.");
 
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
-
+        let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
         let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send(CoreMsg::new(move |client| {
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
@@ -124,10 +123,9 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
                     None
                 }
             }
-        })));
-
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut()))
 }
 
 /// Modify name, metadata or content of the file.
@@ -144,46 +142,44 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
                                          new_content: *const u8,
                                          new_content_len: usize,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
-                                         -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
         trace!("FFI modify file, given the path.");
 
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
-        let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
+        let obj_cache = (*session).object_cache();
+        let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
+        let new_name = try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
         let new_metadata = helper::u8_ptr_to_opt_vec(new_metadata, new_metadata_len);
         let new_content = helper::u8_ptr_to_opt_vec(new_content, new_content_len);
 
-        let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
-
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send(CoreMsg::new(move |client| {
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = modify_file(&client,
-                                          &app,
-                                          file_path,
-                                          is_shared,
-                                          new_name,
-                                          new_metadata,
-                                          new_content)
+                    modify_file(&client,
+                                &app,
+                                file_path,
+                                is_shared,
+                                new_name,
+                                new_metadata,
+                                new_content)
                         .then(move |res| {
                             o_cb(user_data.0, ffi_result_code!(res));
                             Ok(())
                         })
-                        .into_box();
-
-                    Some(fut)
+                        .into_box()
+                        .into()
                 }
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
-        })));
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
 
 /// Move or copy a file.
@@ -198,44 +194,97 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
                                        is_dst_path_shared: bool,
                                        retain_src: bool,
                                        user_data: *mut c_void,
-                                       o_cb: extern "C" fn(*mut c_void, int32_t))
-                                       -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                       o_cb: extern "C" fn(*mut c_void, int32_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
         trace!("FFI move file, from {:?} to {:?}.", src_path, dst_path);
 
-        let src_path = ffi_try!(helper::c_utf8_to_str(src_path, src_path_len));
-        let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path, dst_path_len));
-
         let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
+        let src_path = try!(helper::c_utf8_to_str(src_path, src_path_len));
+        let dst_path = try!(helper::c_utf8_to_str(dst_path, dst_path_len));
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send(CoreMsg::new(move |client| {
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = move_file(&client,
-                                        &app,
-                                        src_path,
-                                        is_src_path_shared,
-                                        dst_path,
-                                        is_dst_path_shared,
-                                        retain_src)
+                    move_file(&client,
+                              &app,
+                              src_path,
+                              is_src_path_shared,
+                              dst_path,
+                              is_dst_path_shared,
+                              retain_src)
                         .then(move |res| {
                             o_cb(user_data.0, ffi_result_code!(res));
                             Ok(())
                         })
-                        .into_box();
-                    Some(fut)
+                        .into_box()
+                        .into()
                 }
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e));
                     None
                 }
             }
-        })));
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
+}
 
-        0
-    })
+/// Get a number of file versions
+#[no_mangle]
+pub unsafe extern "C" fn nfs_get_file_num_of_versions(session: *const Session,
+                                                      app_handle: AppHandle,
+                                                      file_path: *const u8,
+                                                      file_path_len: usize,
+                                                      is_path_shared: bool,
+                                                      user_data: *mut c_void,
+                                                      o_cb: extern "C" fn(*mut c_void,
+                                                                          int32_t,
+                                                                          uint64_t)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(|| {
+        trace!("FFI get number of file versions, given the path.");
+
+        let obj_cache = (*session).object_cache();
+        let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
+
+        (*session).send(CoreMsg::new(move |client| {
+            let mut obj_cache = unwrap!(obj_cache.lock());
+            match obj_cache.get_app(app_handle) {
+                Ok(app) => {
+                    get_num_of_versions(client, app, &file_path, is_path_shared)
+                        .map(move |num_of_versions| o_cb(user_data.0, 0, num_of_versions))
+                        .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
+                        .into_box()
+                        .into()
+                }
+                Err(e) => {
+                    o_cb(user_data.0, ffi_error_code!(e), 0);
+                    None
+                }
+            }
+        }))
+    },
+                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+}
+
+fn get_num_of_versions(client: &Client,
+                       app: &App,
+                       file_path: &str,
+                       is_path_shared: bool)
+                       -> Box<FfiFuture<u64>> {
+    helper::dir_and_file(&client, app, file_path, is_path_shared)
+        .and_then(move |(dir, _dir_meta, filename)| {
+            let file = try!(dir.find_file(&filename).ok_or(FfiError::InvalidPath));
+            match *file {
+                File::Versioned { ref num_of_versions, .. } => Ok(*num_of_versions),
+                File::Unversioned(_) => Err(FfiError::UnsupportedOperation),
+            }
+        })
+        .into_box()
 }
 
 /// Get file metadata. The returned pointer must be disposed of by calling
@@ -246,23 +295,23 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
                                                file_path: *const u8,
                                                file_path_len: usize,
                                                is_path_shared: bool,
+                                               version: u64,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
                                                                    int32_t,
-                                                                   *mut FileMetadata))
-                                               -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                                                   *mut FileMetadata)) {
+    let user_data = OpaqueCtx(user_data);
+    catch_unwind_cb(|| {
         trace!("FFI get file metadata, given the path.");
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
 
+        let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
         let obj_cache = (*session).object_cache();
-        let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        (*session).send(CoreMsg::new(move |client| {
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = get_file_metadata(&client, &app, file_path, is_path_shared)
+                    let fut = get_file_metadata(&client, &app, file_path, is_path_shared, version)
                         .map(move |metadata| {
                             let metadata_handle = Box::into_raw(Box::new(metadata));
                             o_cb(user_data.0, 0, metadata_handle);
@@ -278,9 +327,9 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
                     None
                 }
             }
-        })));
-        0
-    })
+        }))
+    },
+                    move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut()))
 }
 
 fn delete_file(client: &Client, app: &App, file_path: &str, is_shared: bool) -> Box<FfiFuture<()>> {
@@ -324,30 +373,29 @@ fn modify_file(client: &Client,
     let c2 = client.clone();
 
     let fut = helper::dir_and_file(client, app, file_path, is_shared)
-        .and_then(move |(mut dir, dir_metadata, filename)| {
-            let mut file = fry!(dir.find_file(&filename)
+        .and_then(move |(dir, dir_metadata, filename)| {
+            let file = fry!(dir.find_file(&filename)
                 .cloned()
                 .ok_or(FfiError::InvalidPath));
 
+            let mut metadata = file.metadata().clone();
             let mut metadata_updated = false;
+
             if let Some(name) = new_name {
-                file.metadata_mut().set_name(name);
+                metadata.set_name(name);
                 metadata_updated = true;
             }
-            if let Some(metadata) = new_metadata {
-                file.metadata_mut().set_user_metadata(metadata);
+            if let Some(user_metadata) = new_metadata {
+                metadata.set_user_metadata(user_metadata);
                 metadata_updated = true;
             }
 
             if metadata_updated {
-                file.metadata_mut().set_modified_time(time::now_utc());
-                file_helper::update_metadata(c2,
-                                             &filename,
-                                             file.clone(),
-                                             &dir_metadata.id(),
-                                             &mut dir)
+                metadata.set_modified_time(time::now_utc());
+
+                file_helper::update_metadata(c2, filename, metadata, dir_metadata.id(), dir)
                     .map_err(FfiError::from)
-                    .map(move |_| (file, dir_metadata, dir))
+                    .map(move |dir| (file, dir_metadata, dir))
                     .into_box()
             } else {
                 ok!((file, dir_metadata, dir))
@@ -422,12 +470,37 @@ fn move_file(client: &Client,
 fn get_file_metadata(client: &Client,
                      app: &App,
                      file_path: &str,
-                     is_path_shared: bool)
+                     is_path_shared: bool,
+                     version: u64)
                      -> Box<FfiFuture<FileMetadata>> {
+    let c2 = client.clone();
+
     helper::dir_and_file(client, app, file_path, is_path_shared)
-        .and_then(move |(dir, _dir_meta, filename)| {
-            let file = try!(dir.find_file(&filename).ok_or(FfiError::InvalidPath));
-            FileMetadata::new(file.metadata())
+        .and_then(move |(dir, dir_meta, filename)| {
+            let file = fry!(dir.find_file(&filename).ok_or(FfiError::InvalidPath));
+            match *file {
+                File::Versioned { ref ptr_versions, ref latest_version, ref num_of_versions } => {
+                    if version == *num_of_versions {
+                        // Just get the latest available version
+                        futures::done(FileMetadata::new(latest_version)).into_box()
+                    } else {
+                        // Get a specified version
+                        file_helper::get_versions(&c2,
+                                                  ptr_versions,
+                                                  dir_meta.encrypt_key().cloned())
+                            .map_err(FfiError::from)
+                            .and_then(move |versions| {
+                                let metadata = try!(versions.get(version as usize)
+                                    .ok_or(FfiError::InvalidIndex));
+                                FileMetadata::new(metadata)
+                            })
+                            .into_box()
+                    }
+                }
+                File::Unversioned(ref metadata) => {
+                    futures::done(FileMetadata::new(metadata)).into_box()
+                }
+            }
         })
         .into_box()
 }
@@ -442,7 +515,11 @@ mod tests {
     use std::sync::mpsc;
     use std::time::Duration;
 
-    fn create_test_file(client: &Client, app: &App, name: &str) -> Box<FfiFuture<()>> {
+    fn create_test_file(client: &Client,
+                        app: &App,
+                        name: &str,
+                        is_versioned: bool)
+                        -> Box<FfiFuture<()>> {
         let app_root_dir_id = unwrap!(app.app_dir());
         let c2 = client.clone();
 
@@ -451,7 +528,12 @@ mod tests {
         dir_helper::get(client.clone(), &app_root_dir_id)
             .then(move |res| {
                 let app_root_dir = unwrap!(res);
-                file_helper::create(c2, name, Vec::new(), app_root_dir_id, app_root_dir)
+                file_helper::create(c2,
+                                    name,
+                                    Vec::new(),
+                                    app_root_dir_id,
+                                    app_root_dir,
+                                    is_versioned)
             })
             .then(move |res| {
                 let writer = unwrap!(res);
@@ -484,7 +566,7 @@ mod tests {
             let c4 = client.clone();
             let c5 = client.clone();
 
-            let fut = create_test_file(&client, &app, "test_file.txt")
+            create_test_file(&client, &app, "test_file.txt", false)
                 .then(move |res| {
                     let _ = unwrap!(res, "can't create file test_file.txt");
                     dir_helper::get(c2, &app_dir_id)
@@ -510,8 +592,8 @@ mod tests {
                     unwrap!(tx2.send(()));
                     Ok(())
                 })
-                .into_box();
-            Some(fut)
+                .into_box()
+                .into()
         })));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
@@ -531,7 +613,7 @@ mod tests {
             let c2 = client.clone();
             let c3 = client.clone();
 
-            let fut = create_test_file(&client.clone(), &app, "test_file.txt")
+            create_test_file(&client.clone(), &app, "test_file.txt", false)
                 .then(move |res| {
                     let _ = unwrap!(res);
 
@@ -553,8 +635,8 @@ mod tests {
                     unwrap!(tx2.send(()));
                     Ok(())
                 })
-                .into_box();
-            Some(fut)
+                .into_box()
+                .into()
         })));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
@@ -576,7 +658,7 @@ mod tests {
             let c3 = client.clone();
             let c4 = client.clone();
 
-            let fut = create_test_file(&client.clone(), &app, "test_file.txt")
+            let fut = create_test_file(&client.clone(), &app, "test_file.txt", false)
                 .then(move |res| {
                     let _ = unwrap!(res, "can't create test_file.txt");
                     dir_helper::get(c2, &app_dir_id)
@@ -632,8 +714,13 @@ mod tests {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
+            let c5 = client.clone();
+            let c6 = client.clone();
 
-            let fut = create_test_file(&client.clone(), &app, "test_file.txt")
+            let app2 = app.clone();
+            let app3 = app.clone();
+
+            create_test_file(&client.clone(), &app, "test_file.txt", true)
                 .then(move |res| {
                     let _ = unwrap!(res, "can't create test_file.txt");
                     dir_helper::get(c2, &app_dir_id)
@@ -652,7 +739,7 @@ mod tests {
                                        None)
                 })
                 .then(move |res| {
-                    assert!(res.is_ok());
+                    assert!(res.is_ok(), "can't modify /test_file.txt");
                     dir_helper::get(c4, &app_dir_id2)
                 })
                 .then(move |res| {
@@ -661,11 +748,23 @@ mod tests {
                     assert!(file.metadata().user_metadata().len() > 0);
                     assert_eq!(file.metadata().user_metadata(), METADATA.as_bytes());
 
+                    super::get_num_of_versions(&c5, &app2, "/test_file.txt", false)
+                })
+                .then(move |res| {
+                    let versions = unwrap!(res);
+                    assert_eq!(versions, 2);
+
+                    super::get_file_metadata(&c6, &app3, "/test_file.txt", false, 0)
+                })
+                .then(move |res| {
+                    let metadata = unwrap!(res);
+                    assert_eq!(metadata.user_metadata_len, 0);
+
                     unwrap!(tx2.send(()));
                     Ok(())
                 })
-                .into_box();
-            Some(fut)
+                .into_box()
+                .into()
         })));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
@@ -677,6 +776,7 @@ mod tests {
         let sess = test_utils::create_session();
         let app = test_utils::create_app(&sess, false);
         let app2 = app.clone();
+        let app3 = app.clone();
         let app_dir_id = unwrap!(app.app_dir());
         let app_dir_id2 = app_dir_id.clone();
 
@@ -690,8 +790,9 @@ mod tests {
             let c5 = client.clone();
             let c6 = client.clone();
             let c7 = client.clone();
+            let c8 = client.clone();
 
-            let fut = create_test_file(&client.clone(), &app, "test_file.txt")
+            let fut = create_test_file(&client.clone(), &app, "test_file.txt", true)
                 .then(move |res| {
                     let _ = unwrap!(res, "can't create file /test_file.txt");
                     let content = "first".as_bytes().to_vec();
@@ -746,6 +847,12 @@ mod tests {
                     let content = unwrap!(res);
                     let content = unwrap!(str::from_utf8(&content));
                     assert_eq!(content, "second");
+
+                    super::get_num_of_versions(&c8, &app3, "/test_file.txt", false)
+                })
+                .then(move |res| {
+                    let versions = unwrap!(res);
+                    assert_eq!(versions, 3);
 
                     unwrap!(tx2.send(()));
                     Ok(())

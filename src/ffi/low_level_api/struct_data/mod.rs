@@ -1,0 +1,540 @@
+// Copyright 2016 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
+//
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0.
+// This, along with the Licenses can be found in the root directory of this
+// project at LICENSE, COPYING and CONTRIBUTOR.
+//
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+//
+// Please review the Licences for the specific language governing permissions
+// and limitations relating to use of the SAFE Network Software.
+
+#[cfg(test)]
+mod tests;
+
+use core::{CLIENT_STRUCTURED_DATA_TAG, CoreError};
+use core::futures::FutureExt;
+use core::structured_data::{self, unversioned, versioned};
+use ffi::{FfiError, helper, Session};
+use ffi::object_cache::{AppHandle, CipherOptHandle, DataIdHandle, StructDataHandle};
+use futures::{self, Future};
+use libc::{c_void, int32_t, uint64_t};
+use routing::{Data, StructuredData, XorName, XOR_NAME_LEN};
+use std::{ptr, slice};
+use super::cipher_opt::CipherOpt;
+
+// TOOD: consider moving this macro to ffi::macros as it might be useful elsewhere.
+macro_rules! try_cb {
+    ($result:expr, $cb:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(err) => {
+                $cb(ffi_error_code!(err));
+                return None;
+            }
+        }
+    }
+}
+
+/// Create new StructuredData
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_new(session: *const Session,
+                                         app_h: AppHandle,
+                                         type_tag: u64,
+                                         id: *const [u8; XOR_NAME_LEN],
+                                         version: u64,
+                                         cipher_opt_h: CipherOptHandle,
+                                         data: *const u8,
+                                         data_len: usize,
+                                         user_data: *mut c_void,
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
+    helper::catch_unwind_cb(|| {
+        let id = XorName(*id);
+        let data = slice::from_raw_parts(data, data_len);
+
+        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let (sign_pk, sign_sk) = try_cb!(client.signing_keypair(), |code| o_cb(user_data, code, 0));
+
+            let encrypted_data = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                let (app, cipher_opt) =
+                    try_cb!(object_cache.get_app_and_cipher_opt(app_h, cipher_opt_h),
+                            |code| o_cb(user_data, code, 0));
+
+                try_cb!(cipher_opt.encrypt(app, data), |code| o_cb(user_data, code, 0))
+            };
+
+            let fut = match type_tag {
+                ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
+                    unversioned::create(client,
+                                        type_tag,
+                                        id,
+                                        version,
+                                        encrypted_data,
+                                        vec![sign_pk],
+                                        vec![],
+                                        sign_sk,
+                                        None)
+                }
+                ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
+                    versioned::create(client,
+                                      type_tag,
+                                      id,
+                                      encrypted_data,
+                                      vec![sign_pk],
+                                      sign_sk,
+                                      None)
+                }
+                x if x >= CLIENT_STRUCTURED_DATA_TAG => {
+                    futures::done(StructuredData::new(type_tag,
+                                                      id,
+                                                      version,
+                                                      encrypted_data,
+                                                      vec![sign_pk],
+                                                      vec![],
+                                                      Some(&sign_sk)))
+                        .map_err(CoreError::from)
+                        .into_box()
+                }
+                _ => err!(CoreError::InvalidStructuredDataTypeTag),
+            };
+
+            fut.map(move |data| {
+                let mut object_cache = unwrap!(object_cache.lock());
+                let handle = object_cache.insert_sd(data);
+                o_cb(user_data, 0, handle);
+            })
+            .map_err(move |err| {
+                let err = FfiError::from(err);
+                o_cb(user_data, ffi_error_code!(err), 0);
+            })
+            .into()
+        })
+    }, move |error| o_cb(user_data, error, 0))
+}
+
+/// Fetch an existing StructuredData from Network.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_fetch(session: *const Session,
+                                           data_id_h: DataIdHandle,
+                                           user_data: *mut c_void,
+                                           o_cb: unsafe extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let data_id = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                *try_cb!(object_cache.get_data_id(data_id_h),
+                         |error| o_cb(user_data, error, 0))
+            };
+
+            client.get(data_id, None)
+                .and_then(|data| match data {
+                    Data::Structured(data) => Ok(data),
+                    _ => Err(CoreError::ReceivedUnexpectedData),
+                })
+                .map(move |data| {
+                    let mut object_cache = unwrap!(object_cache.lock());
+                    let handle = object_cache.insert_sd(data);
+
+                    o_cb(user_data, 0, handle);
+                })
+                .map_err(move |err| {
+                    let err = FfiError::from(err);
+                    o_cb(user_data, ffi_error_code!(err), 0);
+                })
+                .into()
+        })
+    }, move |error| o_cb(user_data, error, 0))
+}
+
+/// Extract DataIdentifier from StructuredData.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_extract_data_id(session: *const Session,
+                                                     sd_h: StructDataHandle,
+                                                     user_data: *mut c_void,
+                                                     o_cb: unsafe extern "C" fn(*mut c_void, int32_t, DataIdHandle)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
+            let mut object_cache = unwrap!(object_cache.lock());
+            let data_id = {
+                let data = try_cb!(object_cache.get_sd(sd_h),
+                                   |error| o_cb(user_data, error, 0));
+                data.identifier()
+            };
+
+            let handle = object_cache.insert_data_id(data_id);
+            o_cb(user_data, 0, handle);
+            None
+        })
+    }, move |error| o_cb(user_data, error, 0))
+}
+
+
+/// Put new data into StructuredData.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_update(session: *const Session,
+                                            app_h: AppHandle,
+                                            sd_h: StructDataHandle,
+                                            cipher_opt_h: CipherOptHandle,
+                                            data: *const u8,
+                                            data_len: usize,
+                                            user_data: *mut c_void,
+                                            o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(|| {
+        let data = slice::from_raw_parts(data, data_len);
+
+        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let sign_sk = try_cb!(client.secret_signing_key(),
+                                  |error| o_cb(user_data, error));
+
+            let encrypted_data = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                let (app, cipher_opt) =
+                    try_cb!(object_cache.get_app_and_cipher_opt(app_h, cipher_opt_h),
+                            |error| o_cb(user_data, error));
+                try_cb!(cipher_opt.encrypt(app, data),
+                        |error| o_cb(user_data, error))
+            };
+
+            let old_sd = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                try_cb!(object_cache.remove_sd(sd_h),
+                        |error| o_cb(user_data, error))
+            };
+
+            let fut = match old_sd.get_type_tag() {
+                ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
+                    unversioned::create(client,
+                                        old_sd.get_type_tag(),
+                                        *old_sd.name(),
+                                        old_sd.get_version() + 1,
+                                        encrypted_data,
+                                        old_sd.get_owner_keys().clone(),
+                                        old_sd.get_previous_owner_keys().clone(),
+                                        sign_sk,
+                                        None)
+                }
+                ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
+                    let owner_keys = old_sd.get_owner_keys().clone();
+                    versioned::update(client,
+                                      old_sd,
+                                      encrypted_data,
+                                      owner_keys,
+                                      sign_sk,
+                                      None)
+                }
+                x if x >= CLIENT_STRUCTURED_DATA_TAG => {
+                    futures::done(StructuredData::new(old_sd.get_type_tag(),
+                                                      *old_sd.name(),
+                                                      old_sd.get_version() + 1,
+                                                      encrypted_data,
+                                                      old_sd.get_owner_keys().clone(),
+                                                      old_sd.get_previous_owner_keys().clone(),
+                                                      Some(&sign_sk)))
+                        .map_err(CoreError::from)
+                        .into_box()
+                }
+                _ => err!(CoreError::InvalidStructuredDataTypeTag),
+            };
+
+            fut.map(move |new_sd| {
+                // Replace the SD in the object cache with the updated one.
+                let mut object_cache = unwrap!(object_cache.lock());
+                object_cache.insert_sd_at(sd_h, new_sd);
+                o_cb(user_data, 0);
+            })
+            .map_err(move |err| {
+                // TODO: should we put the old SD back to the object cache here?
+                // (it would require cloning the SD though)
+                o_cb(user_data, ffi_error_code!(err));
+            })
+            .into()
+        })
+    }, move |error| o_cb(user_data, error))
+}
+
+/// Extract data from StructuredData
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_extract_data(session: *const Session,
+                                                  app_h: AppHandle,
+                                                  sd_h: StructDataHandle,
+                                                  user_data: *mut c_void,
+                                                  o_cb: unsafe extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let fut = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                let sd = try_cb!(object_cache.get_sd(sd_h),
+                                 |error| o_cb(user_data, error, ptr::null_mut(), 0, 0));
+
+                match sd.get_type_tag() {
+                    ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
+                        unversioned::extract_value(client, sd, None)
+                    }
+                    ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
+                        versioned::extract_current_value(client, sd, None)
+                    }
+                    x if x >= CLIENT_STRUCTURED_DATA_TAG => {
+                        ok!(sd.get_data().clone())
+                    }
+                    _ => err!(CoreError::InvalidStructuredDataTypeTag),
+                }
+            };
+
+            fut.map_err(FfiError::from)
+                .and_then(move |encrypted_data| {
+                    let mut object_cache = unwrap!(object_cache.lock());
+                    let app = try!(object_cache.get_app(app_h));
+
+                    CipherOpt::decrypt(app, &encrypted_data)
+                })
+                .map(move |data| {
+                    let (ptr, size, capacity) = helper::u8_vec_to_ptr(data);
+                    o_cb(user_data, 0, ptr, size, capacity);
+                })
+                .map_err(move |err| {
+                    o_cb(user_data, ffi_error_code!(err), ptr::null_mut(), 0, 0);
+                })
+                .into()
+        })
+    }, move |error| o_cb(user_data, error, ptr::null_mut(), 0, 0))
+}
+
+/// Get number of versions from a versioned StructuredData
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_num_of_versions(session: *const Session,
+                                                     sd_h: StructDataHandle,
+                                                     user_data: *mut c_void,
+                                                     o_cb: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
+            let mut object_cache = unwrap!(object_cache.lock());
+
+            let sd = try_cb!(object_cache.get_sd(sd_h),
+                            |error| o_cb(user_data, error, 0));
+            let num = try_cb!(versioned::version_count(&sd),
+                              |error| o_cb(user_data, error, 0));
+
+            o_cb(user_data, 0, num);
+
+            None
+        })
+    }, move |error| o_cb(user_data, error, 0))
+}
+
+/// Get nth (starts from 0) version from a versioned StructuredData
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_nth_version(session: *const Session,
+                                                 app_h: AppHandle,
+                                                 sd_h: StructDataHandle,
+                                                 n: uint64_t,
+                                                 user_data: *mut c_void,
+                                                 o_cb: unsafe extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let fut = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                let sd = try_cb!(object_cache.get_sd(sd_h),
+                                 |error| o_cb(user_data, error, ptr::null_mut(), 0, 0));
+
+                if sd.get_type_tag() == ::VERSIONED_STRUCT_DATA_TYPE_TAG {
+                    versioned::extract_value(client, sd, n, None)
+                } else {
+                    err!(CoreError::InvalidStructuredDataTypeTag)
+                }
+            };
+
+            fut.map_err(FfiError::from)
+                .and_then(move |encrypted_data| {
+                    let mut object_cache = unwrap!(object_cache.lock());
+                    let app = try!(object_cache.get_app(app_h));
+
+                    CipherOpt::decrypt(app, &encrypted_data)
+                })
+                .map(move |data| {
+                    let (ptr, size, capacity) = helper::u8_vec_to_ptr(data);
+                    o_cb(user_data, 0, ptr, size, capacity);
+                })
+                .map_err(move |err| {
+                    o_cb(user_data, ffi_error_code!(err), ptr::null_mut(), 0, 0);
+                })
+                .into()
+
+        })
+    }, move |error| o_cb(user_data, error, ptr::null_mut(), 0, 0))
+}
+
+/// Get the current version of StructuredData by its handle
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_version(session: *const Session,
+                                             handle: StructDataHandle,
+                                             user_data: *mut c_void,
+                                             o_cb: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
+            let mut object_cache = unwrap!(object_cache.lock());
+            let sd = try_cb!(object_cache.get_sd(handle), |error| o_cb(user_data, error, 0));
+
+            o_cb(user_data, 0, sd.get_version());
+            None
+        })
+    }, |error| o_cb(user_data, error, 0))
+}
+
+/// PUT StructuredData
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_put(session: *const Session,
+                                         sd_h: StructDataHandle,
+                                         user_data: *mut c_void,
+                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let sign_sk = try_cb!(client.secret_signing_key(), |code| o_cb(user_data, code));
+
+            let sd = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                try_cb!(object_cache.get_sd(sd_h),
+                        |error| o_cb(user_data, error)).clone()
+            };
+
+            client.put_recover(Data::Structured(sd), None, sign_sk.clone())
+                .map_err(FfiError::from)
+                .and_then(move |version| {
+                    // Update the SD version in the object cache.
+                    let mut object_cache = unwrap!(object_cache.lock());
+                    let old_sd = try!(object_cache.remove_sd(sd_h));
+                    let new_sd = try!(StructuredData::new(
+                                    old_sd.get_type_tag(),
+                                    *old_sd.name(),
+                                    version,
+                                    old_sd.get_data().clone(),
+                                    old_sd.get_owner_keys().clone(),
+                                    old_sd.get_previous_owner_keys().clone(),
+                                    Some(&sign_sk)));
+
+                    let _ = object_cache.insert_sd_at(sd_h, new_sd);
+                    Ok(())
+                })
+                .map(move |_| o_cb(user_data, 0))
+                .map_err(move |err| o_cb(user_data, ffi_error_code!(err)))
+                .into()
+        })
+    }, |error| o_cb(user_data, error))
+}
+
+/// POST StructuredData
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_post(session: *const Session,
+                                          sd_h: StructDataHandle,
+                                          user_data: *mut c_void,
+                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let sd = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                try_cb!(object_cache.get_sd(sd_h),
+                        |error| o_cb(user_data, error)).clone()
+            };
+
+            client.post(Data::Structured(sd), None)
+                .map(move |_| o_cb(user_data, 0))
+                .map_err(move |err| {
+                    let err = FfiError::from(err);
+                    o_cb(user_data, ffi_error_code!(err));
+                })
+                .into()
+        })
+    }, |error| o_cb(user_data, error))
+}
+
+/// DELETE StructuredData. Version will be bumped.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_delete(session: *const Session,
+                                            sd_h: StructDataHandle,
+                                            user_data: *mut c_void,
+                                            o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+            let sd = {
+                let mut object_cache = unwrap!(object_cache.lock());
+                try_cb!(object_cache.remove_sd(sd_h),
+                        |error| o_cb(user_data, error))
+            };
+
+            let sign_sk = try_cb!(client.secret_signing_key(),
+                                  |error| o_cb(user_data, error));
+
+            structured_data::delete(client, sd, &sign_sk)
+                .map(move |_| o_cb(user_data, 0))
+                .map_err(move |err| {
+                    let err = FfiError::from(err);
+                    o_cb(user_data, ffi_error_code!(err));
+                })
+                .into()
+        })
+    }, |error| o_cb(user_data, error))
+}
+
+/// See if StructuredData size is valid.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_validate_size(session: *const Session,
+                                                   handle: StructDataHandle,
+                                                   user_data: *mut c_void,
+                                                   o_cb: extern "C" fn(*mut c_void, int32_t, bool)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
+            let mut object_cache = unwrap!(object_cache.lock());
+            let sd = try_cb!(object_cache.get_sd(handle), |error| o_cb(user_data, error, false));
+
+            o_cb(user_data, 0, sd.validate_size());
+            None
+        })
+    }, |error| o_cb(user_data, error, false))
+}
+
+/// Returns true if we are one of the owners of the provided StructuredData.
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_is_owned(session: *const Session,
+                                              sd_h: StructDataHandle,
+                                              user_data: *mut c_void,
+                                              o_cb: unsafe extern "C" fn(*mut c_void, int32_t, bool)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |client, object_cache, user_data| -> Option<Result<_, _>> {
+            let mut object_cache = unwrap!(object_cache.lock());
+            let sd = try_cb!(object_cache.get_sd(sd_h),
+                             |error| o_cb(user_data, error, false));
+            let my_key = try_cb!(client.public_signing_key(),
+                                 |error| o_cb(user_data, error, false));
+
+            o_cb(user_data, 0, sd.get_owner_keys().contains(&my_key));
+            None
+        })
+    }, |error| o_cb(user_data, error, false))
+}
+
+/// Free StructuredData handle
+#[no_mangle]
+pub unsafe extern "C" fn struct_data_free(session: *const Session,
+                                          handle: StructDataHandle,
+                                          user_data: *mut c_void,
+                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(|| {
+        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
+            let mut object_cache = unwrap!(object_cache.lock());
+            let _ = try_cb!(object_cache.remove_sd(handle), |error| o_cb(user_data, error));
+
+            o_cb(user_data, 0);
+            None
+        })
+    }, move |error| o_cb(user_data, error))
+}

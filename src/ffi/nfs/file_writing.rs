@@ -30,10 +30,9 @@ use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use ffi::object_cache::AppHandle;
 use futures::Future;
 use libc::{c_void, int32_t};
-use nfs::{File, FileMetadata, NfsError};
+use nfs::helper::file_helper;
 use nfs::helper::writer::Mode;
 use nfs::helper::writer::Writer as InnerWriter;
-use self_encryption::DataMap;
 use std::{ptr, slice};
 
 /// File writer.
@@ -58,6 +57,7 @@ pub unsafe extern "C" fn nfs_create_file(session: *const Session,
                                          user_metadata: *const u8,
                                          user_metadata_len: usize,
                                          is_path_shared: bool,
+                                         is_versioned: bool,
                                          user_data: *mut c_void,
                                          o_cb: extern "C" fn(int32_t, *mut c_void, *mut Writer))
                                          -> int32_t {
@@ -74,7 +74,12 @@ pub unsafe extern "C" fn nfs_create_file(session: *const Session,
             let mut obj_cache = unwrap!(obj_cache.lock());
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = create_file(&client, &app, file_path, user_metadata, is_path_shared)
+                    let fut = create_file(&client,
+                                          &app,
+                                          file_path,
+                                          user_metadata,
+                                          is_path_shared,
+                                          is_versioned)
                         .map(move |writer| {
                             let writer_handle = Box::into_raw(Box::new(writer));
                             o_cb(0, user_data.0, writer_handle);
@@ -201,24 +206,20 @@ fn create_file(client: &Client,
                app: &App,
                file_path: &str,
                user_metadata: Vec<u8>,
-               is_path_shared: bool)
+               is_path_shared: bool,
+               is_versioned: bool)
                -> Box<FfiFuture<Writer>> {
     let c2 = client.clone();
 
     helper::dir_and_file(&client, app, file_path, is_path_shared)
         .and_then(move |(dir, dir_meta, filename)| {
-            match dir.find_file(&filename) {
-                Some(_) => fry!(Err(NfsError::FileAlreadyExistsWithSameName)),
-                None => {
-                    let file = File::Unversioned(FileMetadata::new(filename,
-                                                                   user_metadata,
-                                                                   DataMap::None));
-                    let storage = SelfEncryptionStorage::new(c2.clone());
-                    InnerWriter::new(c2, storage, Mode::Overwrite, dir_meta.id(), dir, file)
-                        .map_err(FfiError::from)
-                        .into_box()
-                }
-            }
+            file_helper::create(c2,
+                                filename,
+                                user_metadata,
+                                dir_meta.id(),
+                                dir,
+                                is_versioned)
+                .map_err(FfiError::from)
         })
         .map(move |inner| Writer { inner: inner })
         .into_box()
@@ -273,6 +274,7 @@ mod tests {
                                          &app,
                                          "/test_file.txt",
                                          METADATA.as_bytes().to_vec(),
+                                         false,
                                          false)
                 .then(move |res| {
                     let writer = unwrap!(res, "can't create /test_file.txt");
