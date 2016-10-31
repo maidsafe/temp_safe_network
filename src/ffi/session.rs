@@ -21,7 +21,7 @@
 
 //! Session management
 
-use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
+use core::{self, Client, NetworkEvent};
 use core::futures::FutureExt;
 use ffi::{FfiError, OpaqueCtx};
 use ffi::object_cache::ObjectCache;
@@ -43,6 +43,9 @@ macro_rules! try_tx {
     }
 }
 
+type CoreMsg = core::CoreMsg<ObjectCache>;
+type CoreMsgTx = core::CoreMsgTx<ObjectCache>;
+
 /// Represents user session on the SAFE network. There should be one session
 /// per launcher.
 pub struct Session {
@@ -52,7 +55,6 @@ pub struct Session {
 struct Inner {
     // Channel to communicate with the core event loop
     pub core_tx: Mutex<CoreMsgTx>,
-    object_cache: Arc<Mutex<ObjectCache>>,
     _core_joiner: Joiner,
 }
 

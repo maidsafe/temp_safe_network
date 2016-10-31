@@ -27,25 +27,25 @@ use tokio_core::channel;
 use tokio_core::reactor::Core;
 
 /// Transmitter of messages to be run in the core event loop.
-pub type CoreMsgTx = channel::Sender<CoreMsg>;
+pub type CoreMsgTx<T> = channel::Sender<CoreMsg<T>>;
 /// Receiver of messages to be run in the core event loop.
-pub type CoreMsgRx = channel::Receiver<CoreMsg>;
+pub type CoreMsgRx<T> = channel::Receiver<CoreMsg<T>>;
 
 /// The final future which the event loop will run.
 pub type TailFuture = Box<Future<Item = (), Error = ()>>;
 /// The message format that core event loop understands.
-pub struct CoreMsg(Option<Box<FnMut(&Client) -> Option<TailFuture> + Send + 'static>>);
-impl CoreMsg {
+pub struct CoreMsg<T>(Option<Box<FnMut(&Client, &T) -> Option<TailFuture> + Send + 'static>>);
+impl<T> CoreMsg<T> {
     /// Construct a new message to ask core event loop to do something. If the
     /// return value of the given closure is optionally a future, it will be
     /// registered in the event loop.
     pub fn new<F>(f: F) -> Self
-        where F: FnOnce(&Client) -> Option<TailFuture> + Send + 'static
+        where F: FnOnce(&Client, &T) -> Option<TailFuture> + Send + 'static
     {
         let mut f = Some(f);
-        CoreMsg(Some(Box::new(move |cptr| -> Option<TailFuture> {
+        CoreMsg(Some(Box::new(move |client, context| -> Option<TailFuture> {
             let f = f.take().unwrap();
-            f(cptr)
+            f(client, context)
         })))
     }
 
@@ -58,12 +58,15 @@ impl CoreMsg {
 
 /// Run the core event loop. This will block until the event loop is alive.
 /// Hence must typically be called inside a spawned thread.
-pub fn run(mut el: Core, client: Client, el_rx: CoreMsgRx) {
+pub fn run<T>(mut el: Core,
+              client: Client,
+              context: T,
+              el_rx: CoreMsgRx<T>) {
     let el_h = el.handle();
 
     let keep_alive = el_rx.for_each(|core_msg| {
         if let Some(mut f) = core_msg.0 {
-            if let Some(tail) = f(&client) {
+            if let Some(tail) = f(&client, &context) {
                 el_h.spawn(tail);
             }
             Ok(())

@@ -27,7 +27,9 @@ use routing::client_errors::{GetError, MutationError};
 use std::sync::mpsc::Receiver;
 
 /// Run the routing event loop - this will receive messages from routing.
-pub fn run(routing_rx: Receiver<Event>, core_tx: CoreMsgTx, net_tx: NetworkTx) {
+pub fn run<T>(routing_rx: Receiver<Event>, core_tx: CoreMsgTx<T>, net_tx: NetworkTx)
+    where T: 'static
+{
     for it in routing_rx.iter() {
         trace!("Received Routing Event: {:?}", it);
         match it {
@@ -45,7 +47,7 @@ pub fn run(routing_rx: Receiver<Event>, core_tx: CoreMsgTx, net_tx: NetworkTx) {
                 let msg = {
                     let core_tx = core_tx.clone();
                     let net_tx = net_tx.clone();
-                    CoreMsg::new(move |client| {
+                    CoreMsg::new(move |client, _| {
                         client.restart_routing(core_tx, net_tx);
                         None
                     })
@@ -127,8 +129,8 @@ pub fn parse_mutation_err(reason_raw: &[u8]) -> MutationError {
 /// loop has hung up or sending fails for some other reason, treat it as an
 /// exit condition. The return value thus signifies if the firing was
 /// successful.
-fn fire(core_tx: &CoreMsgTx, id: MessageId, event: CoreEvent) -> bool {
-    let msg = CoreMsg::new(move |client| {
+fn fire<T>(core_tx: &CoreMsgTx<T>, id: MessageId, event: CoreEvent) -> bool {
+    let msg = CoreMsg::new(move |client, _| {
         client.fire_hook(&id, event);
         None
     });
