@@ -21,7 +21,6 @@
 
 //! DNS Long name operations
 
-use core::CoreMsg;
 use core::futures::FutureExt;
 use dns::operations;
 use ffi::{FfiError, OpaqueCtx, Session};
@@ -46,10 +45,10 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
                 given service.",
                long_name);
 
-        let (msg_pk, msg_sk) = box_::gen_keypair();
         let user_data = OpaqueCtx(user_data);
+        let (msg_pk, msg_sk) = box_::gen_keypair();
 
-        (*session).send(CoreMsg::new(move |client| {
+        (*session).send(move |client, _| {
             let (sign_pk, sign_sk) = match client.signing_keypair() {
                 Ok((pk, sk)) => (pk, sk),
                 Err(err) => {
@@ -71,7 +70,7 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
                 .into_box();
 
             Some(fut)
-        }))
+        })
     }, move |error| o_cb(user_data, error))
 }
 
@@ -87,7 +86,7 @@ pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let user_data = OpaqueCtx(user_data);
 
-        (*session).send_fn(move |client| {
+        (*session).send(move |client, _| {
             let sign_sk = match client.secret_signing_key() {
                 Ok(sk) => sk,
                 Err(err) => {
@@ -98,7 +97,8 @@ pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
 
             let fut = operations::delete_dns(client, long_name, sign_sk)
                 .map(move |_| o_cb(user_data.0, 0))
-                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)));
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)))
+                .into_box();
 
             Some(fut)
         })
@@ -114,15 +114,15 @@ pub unsafe extern "C" fn dns_get_long_names(session: *const Session,
                                                                 *mut StringList)) {
     helper::catch_unwind_cb(|| {
         trace!("FFI Get all dns long names.");
-
         let user_data = OpaqueCtx(user_data);
 
-        (*session).send_fn(move |client| {
+        (*session).send(move |client, _| {
             let fut = operations::get_all_registered_names(client)
                 .map_err(FfiError::from)
                 .and_then(|names| string_list::from_vec(names))
                 .map(move |list| o_cb(user_data.0, 0, list))
-                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut()));
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut()))
+                .into_box();
 
             Some(fut)
         })

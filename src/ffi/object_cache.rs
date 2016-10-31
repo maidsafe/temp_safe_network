@@ -27,6 +27,8 @@ use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWr
 use lru_cache::LruCache;
 use routing::{DataIdentifier, StructuredData};
 use rust_sodium::crypto::{box_, sign};
+use std::cell::{Cell, RefCell, RefMut};
+use std::rc::Rc;
 use std::u64;
 
 /// Object handle associated with objects. In normal C API one would expect
@@ -64,250 +66,204 @@ pub type SignKeyHandle = ObjectHandle;
 const DEFAULT_CAPACITY: usize = 100;
 
 /// Contains session object cache
+#[derive(Clone)]
 pub struct ObjectCache {
-    new_handle: ObjectHandle,
-    app: LruCache<AppHandle, App>,
-    struct_data: LruCache<StructDataHandle, StructuredData>,
-    data_id: LruCache<DataIdHandle, DataIdentifier>,
-    appendable_data: LruCache<AppendableDataHandle, AppendableData>,
-    se_reader: LruCache<SelfEncryptorReaderHandle, SelfEncryptorReaderWrapper>,
-    se_writer: LruCache<SelfEncryptorWriterHandle, SelfEncryptorWriterWrapper>,
-    cipher_opt: LruCache<CipherOptHandle, CipherOpt>,
-    encrypt_key: LruCache<EncryptKeyHandle, box_::PublicKey>,
-    sign_key: LruCache<SignKeyHandle, sign::PublicKey>,
+    inner: Rc<Inner>,
+}
+
+struct Inner {
+    handle_gen: HandleGenerator,
+    ad: Store<AppendableData>,
+    app: Store<App>,
+    cipher_opt: Store<CipherOpt>,
+    data_id: Store<DataIdentifier>,
+    encrypt_key: Store<box_::PublicKey>,
+    sd: Store<StructuredData>,
+    se_reader: Store<SelfEncryptorReaderWrapper>,
+    se_writer: Store<SelfEncryptorWriterWrapper>,
+    sign_key: Store<sign::PublicKey>,
 }
 
 impl ObjectCache {
-    pub fn new_handle(&mut self) -> ObjectHandle {
-        self.new_handle = self.new_handle.wrapping_add(1);
-        self.new_handle
-    }
-
-    pub fn reset(&mut self) {
-        self.new_handle = u64::MAX;
-
-        self.app.clear();
-        // self.struct_data.clear();
-        self.data_id.clear();
-        self.appendable_data.clear();
-        self.se_reader.clear();
-        self.se_writer.clear();
-        self.cipher_opt.clear();
-        self.encrypt_key.clear();
-        self.sign_key.clear();
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_app(&mut self, app: App) -> AppHandle {
-        let handle = self.new_handle();
-        if let Some(_) = self.app.insert(handle, app) {
-            debug!("Displaced App from ObjectCache");
+    pub fn new() -> Self {
+        ObjectCache {
+            inner: Rc::new(Inner {
+                handle_gen: HandleGenerator::new(),
+                ad: Store::new(),
+                app: Store::new(),
+                cipher_opt: Store::new(),
+                data_id: Store::new(),
+                encrypt_key: Store::new(),
+                sd: Store::new(),
+                se_reader: Store::new(),
+                se_writer: Store::new(),
+                sign_key: Store::new(),
+            }),
         }
-        handle
     }
 
-    pub fn get_app(&mut self, handle: AppHandle) -> Result<&mut App, FfiError> {
-        self.app.get_mut(&handle).ok_or(FfiError::InvalidAppHandle)
+    pub fn reset(&self) {
+        self.inner.handle_gen.reset();
+        self.inner.ad.clear();
+        self.inner.app.clear();
+        self.inner.cipher_opt.clear();
+        self.inner.data_id.clear();
+        self.inner.encrypt_key.clear();
+        self.inner.sd.clear();
+        self.inner.se_reader.clear();
+        self.inner.se_writer.clear();
+        self.inner.sign_key.clear();
     }
 
-    pub fn remove_app(&mut self, handle: AppHandle) -> Result<App, FfiError> {
-        self.app.remove(&handle).ok_or(FfiError::InvalidAppHandle)
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_ad(&mut self, data: AppendableData) -> AppendableDataHandle {
-        let handle = self.new_handle();
-        if let Some(prev) = self.appendable_data.insert(handle, data) {
-            debug!("Displaced AppendableData from ObjectCache: {:?}", prev);
-        }
-
-        handle
-    }
-
-    pub fn get_ad(&mut self,
-                  handle: AppendableDataHandle)
-                  -> Result<&mut AppendableData, FfiError> {
-        self.appendable_data.get_mut(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
-    }
-
-    pub fn remove_ad(&mut self, handle: AppendableDataHandle) -> Result<AppendableData, FfiError> {
-        self.appendable_data.remove(&handle).ok_or(FfiError::InvalidAppendableDataHandle)
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_cipher_opt(&mut self, cipher_opt: CipherOpt) -> CipherOptHandle {
-        let handle = self.new_handle();
-        if let Some(prev) = self.cipher_opt.insert(handle, cipher_opt) {
-            debug!("Displaced CipherOpt from ObjectCache: {:?}", prev);
-        }
-
-        handle
-    }
-
-    pub fn get_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<&mut CipherOpt, FfiError> {
-        self.cipher_opt.get_mut(&handle).ok_or(FfiError::InvalidCipherOptHandle)
-    }
-
-    pub fn remove_cipher_opt(&mut self, handle: CipherOptHandle) -> Result<CipherOpt, FfiError> {
-        self.cipher_opt.remove(&handle).ok_or(FfiError::InvalidCipherOptHandle)
-    }
-
-    // ----------------------------------------------------------
-    pub fn get_app_and_cipher_opt(&mut self,
-                                  app_h: AppHandle,
-                                  cipher_opt_h: CipherOptHandle)
-                                  -> Result<(&mut App, &mut CipherOpt), FfiError> {
-        let app = try!(self.app.get_mut(&app_h).ok_or(FfiError::InvalidAppHandle));
-        let cipher_opt = try!(self.cipher_opt.get_mut(&cipher_opt_h).ok_or(FfiError::InvalidCipherOptHandle));
-
-        Ok((app, cipher_opt))
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_data_id(&mut self, data_id: DataIdentifier) -> DataIdHandle {
-        let handle = self.new_handle();
-        if let Some(prev) = self.data_id.insert(handle, data_id) {
-            debug!("Displaced DataIdentifier from ObjectCache: {:?}", prev);
-        }
-
-        handle
-    }
-
-    pub fn get_data_id(&mut self, handle: DataIdHandle) -> Result<&mut DataIdentifier, FfiError> {
-        self.data_id.get_mut(&handle).ok_or(FfiError::InvalidDataIdHandle)
-    }
-
-    pub fn remove_data_id(&mut self, handle: DataIdHandle) -> Result<DataIdentifier, FfiError> {
-        self.data_id.remove(&handle).ok_or(FfiError::InvalidDataIdHandle)
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_se_reader(&mut self,
-                            se_reader: SelfEncryptorReaderWrapper)
-                            -> SelfEncryptorReaderHandle {
-        let handle = self.new_handle();
-        if let Some(_) = self.se_reader.insert(handle, se_reader) {
-            debug!("Displaced SelfEncryptorReaderWrapper from ObjectCache");
-        }
-
-        handle
-    }
-
-    pub fn get_se_reader(&mut self,
-                         handle: SelfEncryptorReaderHandle)
-                         -> Result<&mut SelfEncryptorReaderWrapper, FfiError> {
-        self.se_reader.get_mut(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
-    }
-
-    pub fn remove_se_reader(&mut self,
-                            handle: SelfEncryptorReaderHandle)
-                            -> Result<SelfEncryptorReaderWrapper, FfiError> {
-        self.se_reader.remove(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_se_writer(&mut self,
-                            se_reader: SelfEncryptorWriterWrapper)
-                            -> SelfEncryptorWriterHandle {
-        let handle = self.new_handle();
-        if let Some(_) = self.se_writer.insert(handle, se_reader) {
-            debug!("Displaced SelfEncryptorWriterWrapper from ObjectCache");
-        }
-
-        handle
-    }
-
-    pub fn get_se_writer(&mut self,
-                         handle: SelfEncryptorWriterHandle)
-                         -> Result<&mut SelfEncryptorWriterWrapper, FfiError> {
-        self.se_writer.get_mut(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
-    }
-
-    pub fn remove_se_writer(&mut self,
-                            handle: SelfEncryptorWriterHandle)
-                            -> Result<SelfEncryptorWriterWrapper, FfiError> {
-        self.se_writer.remove(&handle).ok_or(FfiError::InvalidSelfEncryptorHandle)
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_sign_key(&mut self, key: sign::PublicKey) -> SignKeyHandle {
-        let handle = self.new_handle();
-        if let Some(prev) = self.sign_key.insert(handle, key) {
-            debug!("Displaced Sign Key from ObjectCache: {:?}", prev);
-        }
-
-        handle
-    }
-
-    pub fn get_sign_key(&mut self,
-                        handle: SignKeyHandle)
-                        -> Result<&mut sign::PublicKey, FfiError> {
-        self.sign_key.get_mut(&handle).ok_or(FfiError::InvalidSignKeyHandle)
-    }
-
-    pub fn remove_sign_key(&mut self, handle: SignKeyHandle) -> Result<sign::PublicKey, FfiError> {
-        self.sign_key.remove(&handle).ok_or(FfiError::InvalidSignKeyHandle)
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_encrypt_key(&mut self, key: box_::PublicKey) -> EncryptKeyHandle {
-        let handle = self.new_handle();
-        if let Some(prev) = self.encrypt_key.insert(handle, key) {
-            debug!("Displaced Encrypt Key from ObjectCache: {:?}", prev);
-        }
-
-        handle
-    }
-
-    pub fn get_encrypt_key(&mut self,
-                           handle: EncryptKeyHandle)
-                           -> Result<&mut box_::PublicKey, FfiError> {
-        self.encrypt_key.get_mut(&handle).ok_or(FfiError::InvalidEncryptKeyHandle)
-    }
-
-    pub fn remove_encrypt_key(&mut self,
-                              handle: EncryptKeyHandle)
-                              -> Result<box_::PublicKey, FfiError> {
-        self.encrypt_key.remove(&handle).ok_or(FfiError::InvalidEncryptKeyHandle)
-    }
-
-    // ----------------------------------------------------------
-    pub fn insert_sd(&mut self, data: StructuredData) -> StructDataHandle {
-        let handle = self.new_handle();
-        if let Some(prev) = self.struct_data.insert(handle, data) {
-            debug!("Displaced StructuredData from ObjectCache: {:?}", prev);
-        }
-
-        handle
-    }
-
-    pub fn insert_sd_at(&mut self, handle: StructDataHandle, data: StructuredData) {
-        let _ = self.struct_data.insert(handle, data);
-    }
-
-    pub fn get_sd(&mut self, handle: StructDataHandle) -> Result<&mut StructuredData, FfiError> {
-        self.struct_data.get_mut(&handle).ok_or(FfiError::InvalidStructDataHandle)
-    }
-
-    pub fn remove_sd(&mut self, handle: StructDataHandle) -> Result<StructuredData, FfiError> {
-        self.struct_data.remove(&handle).ok_or(FfiError::InvalidStructDataHandle)
+    pub fn insert_sd_at(&self, handle: StructDataHandle, data: StructuredData) {
+        let _ = self.inner.sd.insert(handle, data);
     }
 }
 
+macro_rules! impl_cache {
+    ($name:ident,
+     $ty:ty,
+     $handle:ty,
+     $error:ident,
+     $get:ident,
+     $insert:ident,
+     $remove:ident) => {
+        impl ObjectCache {
+            pub fn $insert(&self, value: $ty) -> $handle {
+                let handle = self.inner.handle_gen.gen();
+                self.inner.$name.insert(handle, value);
+                handle
+            }
+
+            pub fn $get(&self, handle: $handle) -> Result<RefMut<$ty>, FfiError> {
+                self.inner.$name.get(handle).ok_or(FfiError::$error)
+            }
+
+            pub fn $remove(&self, handle: $handle) -> Result<$ty, FfiError> {
+                self.inner.$name.remove(handle).ok_or(FfiError::$error)
+            }
+        }
+    }
+}
+
+impl_cache!(app,
+            App,
+            AppHandle,
+            InvalidAppHandle,
+            get_app,
+            insert_app,
+            remove_app);
+impl_cache!(ad,
+            AppendableData,
+            AppendableDataHandle,
+            InvalidAppendableDataHandle,
+            get_ad,
+            insert_ad,
+            remove_ad);
+impl_cache!(cipher_opt,
+            CipherOpt,
+            CipherOptHandle,
+            InvalidCipherOptHandle,
+            get_cipher_opt,
+            insert_cipher_opt,
+            remove_cipher_opt);
+impl_cache!(data_id,
+            DataIdentifier,
+            DataIdHandle,
+            InvalidDataIdHandle,
+            get_data_id,
+            insert_data_id,
+            remove_data_id);
+impl_cache!(encrypt_key,
+            box_::PublicKey,
+            EncryptKeyHandle,
+            InvalidEncryptKeyHandle,
+            get_encrypt_key,
+            insert_encrypt_key,
+            remove_encrypt_key);
+impl_cache!(se_reader,
+            SelfEncryptorReaderWrapper,
+            SelfEncryptorReaderHandle,
+            InvalidSelfEncryptorHandle,
+            get_se_reader,
+            insert_se_reader,
+            remove_se_reader);
+impl_cache!(se_writer,
+            SelfEncryptorWriterWrapper,
+            SelfEncryptorWriterHandle,
+            InvalidSelfEncryptorHandle,
+            get_se_writer,
+            insert_se_writer,
+            remove_se_writer);
+impl_cache!(sign_key,
+            sign::PublicKey,
+            SignKeyHandle,
+            InvalidSignKeyHandle,
+            get_sign_key,
+            insert_sign_key,
+            remove_sign_key);
+impl_cache!(sd,
+            StructuredData,
+            StructDataHandle,
+            InvalidStructDataHandle,
+            get_sd,
+            insert_sd,
+            remove_sd);
+
 impl Default for ObjectCache {
     fn default() -> Self {
-        ObjectCache {
-            new_handle: u64::MAX,
-            app: LruCache::new(DEFAULT_CAPACITY),
-            struct_data: LruCache::new(DEFAULT_CAPACITY),
-            data_id: LruCache::new(DEFAULT_CAPACITY),
-            appendable_data: LruCache::new(DEFAULT_CAPACITY),
-            se_reader: LruCache::new(DEFAULT_CAPACITY),
-            se_writer: LruCache::new(DEFAULT_CAPACITY),
-            cipher_opt: LruCache::new(DEFAULT_CAPACITY),
-            encrypt_key: LruCache::new(DEFAULT_CAPACITY),
-            sign_key: LruCache::new(DEFAULT_CAPACITY),
+        Self::new()
+    }
+}
+
+// Generator of unique object handles.
+struct HandleGenerator(Cell<ObjectHandle>);
+
+impl HandleGenerator {
+    fn new() -> Self {
+        HandleGenerator(Cell::new(u64::MAX))
+    }
+
+    fn gen(&self) -> ObjectHandle {
+        let value = self.0.get().wrapping_add(1);
+        self.0.set(value);
+        value
+    }
+
+    fn reset(&self) {
+        self.0.set(u64::MAX)
+    }
+}
+
+struct Store<V> {
+    inner: RefCell<LruCache<ObjectHandle, V>>,
+}
+
+impl<V> Store<V> {
+    fn new() -> Self {
+        Store { inner: RefCell::new(LruCache::new(DEFAULT_CAPACITY)) }
+    }
+
+    fn get(&self, handle: ObjectHandle) -> Option<RefMut<V>> {
+        // TODO: find a way to avoid double lookup here.
+        let mut inner = self.inner.borrow_mut();
+        if inner.get_mut(&handle).is_some() {
+            Some(RefMut::map(inner, |i| i.get_mut(&handle).unwrap()))
+        } else {
+            None
         }
+    }
+
+    fn insert(&self, handle: ObjectHandle, value: V) {
+        let _ = self.inner.borrow_mut().insert(handle, value);
+    }
+
+    fn remove(&self, handle: ObjectHandle) -> Option<V> {
+        self.inner.borrow_mut().remove(&handle)
+    }
+
+    fn clear(&self) {
+        self.inner.borrow_mut().clear()
     }
 }
 
@@ -319,12 +275,12 @@ mod tests {
 
     #[test]
     fn reset() {
-        let mut object_cache = ObjectCache::default();
+        let object_cache = ObjectCache::new();
 
         let handle = object_cache.insert_data_id(DataIdentifier::Immutable(rand::random()));
         assert!(object_cache.get_data_id(handle).is_ok());
 
         object_cache.reset();
-        assert!(object_cache.data_id.is_empty());
+        assert!(object_cache.get_data_id(handle).is_err());
     }
 }

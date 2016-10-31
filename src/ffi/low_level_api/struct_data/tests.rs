@@ -23,15 +23,14 @@ use core::{CoreError, utility};
 use core::CLIENT_STRUCTURED_DATA_TAG;
 use ffi::{FfiError, Session, test_utils};
 use ffi::low_level_api::cipher_opt::*;
-use ffi::object_cache::{AppHandle, CipherOptHandle, ObjectCache};
+use ffi::object_cache::{AppHandle, CipherOptHandle};
 use rand;
 use routing::XOR_NAME_LEN;
-use std::sync::{Arc, Mutex};
 use super::*;
 
 #[test]
 fn unversioned_struct_data_crud() {
-    let (session, object_cache, app_h, cipher_opt_h) = setup_session();
+    let (session, app_h, cipher_opt_h) = setup_session();
 
     // Create SD
     let id: [u8; XOR_NAME_LEN] = rand::random();
@@ -60,28 +59,22 @@ fn unversioned_struct_data_crud() {
 
     // PUT
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_put(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)))
     }
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         let sd = unwrap!(object_cache.get_sd(sd_h));
         assert_eq!(sd.get_version(), 0);
-    }
+    });
 
     // Remove SD from the object cache.
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_free(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)))
     }
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         assert!(object_cache.get_sd(sd_h).is_err());
-    }
+    });
 
     // GET
     let sd_h = unsafe {
@@ -90,10 +83,9 @@ fn unversioned_struct_data_crud() {
         }))
     };
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         let _ = unwrap!(object_cache.get_sd(sd_h));
-    }
+    });
 
     // Extract Data
     let retrieved_content = unsafe {
@@ -121,28 +113,22 @@ fn unversioned_struct_data_crud() {
 
     // POST
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_post(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_post(&session, sd_h, user_data, cb)))
     }
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         let sd = unwrap!(object_cache.get_sd(sd_h));
         assert_eq!(sd.get_version(), 1);
-    }
+    });
 
     // Remove SD from the object cache.
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_free(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)))
     }
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         assert!(object_cache.get_sd(sd_h).is_err());
-    }
+    });
 
     // Fetch
     let sd_h = unsafe {
@@ -151,10 +137,9 @@ fn unversioned_struct_data_crud() {
         }))
     };
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         let _ = unwrap!(object_cache.get_sd(sd_h));
-    }
+    });
 
     // Extract Data
     let retrieved_content = unsafe {
@@ -172,7 +157,10 @@ fn unversioned_struct_data_crud() {
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
-        Err(error_code) => assert_eq!(error_code, FfiError::from(CoreError::InvalidStructuredDataTypeTag).into()),
+        Err(error_code) => {
+            assert_eq!(error_code,
+                       FfiError::from(CoreError::InvalidStructuredDataTypeTag).into())
+        }
     }
 
     let result = unsafe {
@@ -182,7 +170,10 @@ fn unversioned_struct_data_crud() {
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
-        Err(error_code) => assert_eq!(error_code, FfiError::from(CoreError::InvalidStructuredDataTypeTag).into()),
+        Err(error_code) => {
+            assert_eq!(error_code,
+                       FfiError::from(CoreError::InvalidStructuredDataTypeTag).into())
+        }
     }
 
     // Check SD owners
@@ -194,14 +185,14 @@ fn unversioned_struct_data_crud() {
     assert!(is_owned);
 
     let other_session = test_utils::create_session();
-    let other_sd_data_id_h = {
-        let mut object_cache = unwrap!(object_cache.lock());
-        let data_id = *unwrap!(object_cache.get_data_id(sd_data_id_h));
 
-        let object_cache = other_session.object_cache();
-        let mut object_cache = unwrap!(object_cache.lock());
-        object_cache.insert_data_id(data_id)
-    };
+    let sd_data_id = test_utils::run_now(&session, move |_, object_cache| {
+        *unwrap!(object_cache.get_data_id(sd_data_id_h))
+    });
+
+    let other_sd_data_id_h = test_utils::run_now(&other_session, move |_, object_cache| {
+        object_cache.insert_data_id(sd_data_id)
+    });
 
     let other_sd_h = unsafe {
         unwrap!(test_utils::call_1(|user_data, cb| {
@@ -217,29 +208,23 @@ fn unversioned_struct_data_crud() {
     assert!(!is_owned);
 
     // Clone the SD to simulate Re-deletion later
-    let sd_clone_h = {
-        let mut object_cache = unwrap!(object_cache.lock());
+    let sd_clone_h = test_utils::run_now(&session, move |_, object_cache| {
         let sd_clone = unwrap!(object_cache.get_sd(sd_h)).clone();
         object_cache.insert_sd(sd_clone)
-    };
+    });
 
     // DELETE
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_delete(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_h, user_data, cb)))
     }
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         assert!(object_cache.get_sd(sd_h).is_err());
-    }
+    });
 
     // Re-DELETE should fail
     let result = unsafe {
-        test_utils::call_0(|user_data, cb| {
-            struct_data_delete(&session, sd_clone_h, user_data, cb)
-        })
+        test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_clone_h, user_data, cb))
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
@@ -256,12 +241,11 @@ fn unversioned_struct_data_crud() {
         }))
     };
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         let sd = unwrap!(object_cache.get_sd(sd_h));
         assert!(sd.is_deleted());
         assert_eq!(sd.get_version(), 2);
-    }
+    });
 
     // Deleted data should be empty
     let retrieved_content = unsafe {
@@ -287,15 +271,13 @@ fn unversioned_struct_data_crud() {
                             cb)
         }));
 
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_put(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)));
     };
 }
 
 #[test]
 fn versioned_struct_data_crud() {
-    let (session, _, app_h, cipher_opt_h) = setup_session();
+    let (session, app_h, cipher_opt_h) = setup_session();
 
     // Create SD
     let id = rand::random();
@@ -324,13 +306,9 @@ fn versioned_struct_data_crud() {
 
     // PUT and Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_put(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)));
 
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_free(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)));
 
         unwrap!(test_utils::call_1(|user_data, cb| {
             struct_data_fetch(&session, sd_data_id_h, user_data, cb)
@@ -383,13 +361,9 @@ fn versioned_struct_data_crud() {
 
     // POST and Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_post(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_post(&session, sd_h, user_data, cb)));
 
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_free(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)));
 
         unwrap!(test_utils::call_1(|user_data, cb| {
             struct_data_fetch(&session, sd_data_id_h, user_data, cb)
@@ -434,9 +408,7 @@ fn versioned_struct_data_crud() {
 
     // DELETE
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_delete(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_h, user_data, cb)))
     }
 
     // Fetch deleted data is OK
@@ -457,7 +429,7 @@ fn versioned_struct_data_crud() {
 
 #[test]
 fn client_struct_data_crud() {
-    let (session, _, app_h, cipher_opt_h) = setup_session();
+    let (session, app_h, cipher_opt_h) = setup_session();
 
     let id = rand::random();
     let content_0 = unwrap!(utility::generate_random_vector(10));
@@ -479,7 +451,10 @@ fn client_struct_data_crud() {
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
-        Err(error_code) => assert_eq!(error_code, FfiError::from(CoreError::InvalidStructuredDataTypeTag).into()),
+        Err(error_code) => {
+            assert_eq!(error_code,
+                       FfiError::from(CoreError::InvalidStructuredDataTypeTag).into())
+        }
     }
 
     // Create
@@ -506,13 +481,9 @@ fn client_struct_data_crud() {
 
     // PUT and Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_put(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)));
 
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_free(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)));
 
         unwrap!(test_utils::call_1(|user_data, cb| {
             struct_data_fetch(&session, sd_data_id_h, user_data, cb)
@@ -544,13 +515,9 @@ fn client_struct_data_crud() {
 
     // POST and Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_post(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_post(&session, sd_h, user_data, cb)));
 
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_free(&session, sd_h, user_data, cb)
-        }));
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)));
 
         unwrap!(test_utils::call_1(|user_data, cb| {
             struct_data_fetch(&session, sd_data_id_h, user_data, cb)
@@ -573,20 +540,21 @@ fn client_struct_data_crud() {
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
-        Err(error_code) => assert_eq!(error_code, FfiError::from(CoreError::InvalidStructuredDataTypeTag).into()),
+        Err(error_code) => {
+            assert_eq!(error_code,
+                       FfiError::from(CoreError::InvalidStructuredDataTypeTag).into())
+        }
     }
 
     // DELETE
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_delete(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_h, user_data, cb)))
     }
 }
 
 #[test]
 fn reclaim() {
-    let (session, object_cache, app_h, cipher_opt_h) = setup_session();
+    let (session, app_h, cipher_opt_h) = setup_session();
 
     // Create SD
     let id: [u8; XOR_NAME_LEN] = rand::random();
@@ -607,30 +575,24 @@ fn reclaim() {
         }))
     };
 
-    let sd_clone_h = {
-        let mut object_cache = unwrap!(object_cache.lock());
+    let sd_clone_h = test_utils::run_now(&session, move |_, object_cache| {
         let sd_clone = unwrap!(object_cache.get_sd(sd_h)).clone();
         object_cache.insert_sd(sd_clone)
-    };
+    });
 
     // PUT the original SD
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_put(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)))
     }
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         let sd = unwrap!(object_cache.get_sd(sd_h));
         assert_eq!(sd.get_version(), 0);
-    }
+    });
 
     // DELETE it
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_delete(&session, sd_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_h, user_data, cb)))
     }
 
     // Now PUT the cloned one. This should reclaim the deleted data and
@@ -641,29 +603,23 @@ fn reclaim() {
         }))
     }
 
-    {
-        let mut object_cache = unwrap!(object_cache.lock());
+    test_utils::run_now(&session, move |_, object_cache| {
         let sd = unwrap!(object_cache.get_sd(sd_clone_h));
         assert_eq!(sd.get_version(), 2);
-    }
+    });
 }
 
-fn setup_session() -> (Session, Arc<Mutex<ObjectCache>>, AppHandle, CipherOptHandle) {
+fn setup_session() -> (Session, AppHandle, CipherOptHandle) {
     let session = test_utils::create_session();
-    let object_cache = session.object_cache();
 
     let app = test_utils::create_app(&session, false);
-    let app_h = {
-        let mut object_cache = unwrap!(object_cache.lock());
-        object_cache.insert_app(app)
-    };
+    let app_h = test_utils::run_now(&session,
+                                    move |_, object_cache| object_cache.insert_app(app));
 
     // Create cipher opt.
     let cipher_opt_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            cipher_opt_new_symmetric(&session, user_data, cb)
-        }))
+        unwrap!(test_utils::call_1(|user_data, cb| cipher_opt_new_symmetric(&session, user_data, cb)))
     };
 
-    (session, object_cache, app_h, cipher_opt_h)
+    (session, app_h, cipher_opt_h)
 }

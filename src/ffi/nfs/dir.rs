@@ -21,7 +21,7 @@
 
 //! Directory operations.
 
-use core::{Client, CoreMsg};
+use core::Client;
 use core::futures::FutureExt;
 use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use ffi::dir_details::DirDetails;
@@ -51,11 +51,9 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
 
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let user_metadata = slice::from_raw_parts(user_metadata, user_metadata_len);
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        ffi_try!((*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = create_dir(&client,
@@ -73,7 +71,7 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
                     None
                 }
             }
-        })));
+        }));
 
         0
     })
@@ -92,12 +90,9 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
     helper::catch_unwind_i32(|| {
         trace!("FFI delete dir, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
-
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        ffi_try!((*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     delete_dir(&client, &app, dir_path, is_shared)
@@ -110,7 +105,7 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
                     None
                 }
             }
-        })));
+        }));
 
         0
     })
@@ -131,12 +126,9 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
     helper::catch_unwind_i32(|| {
         trace!("FFI get dir, given the path.");
         let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
-
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        ffi_try!((*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     get_dir(&client, &app, dir_path, is_shared)
@@ -155,7 +147,7 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
                     None
                 }
             }
-        })));
+        }));
 
         0
     })
@@ -181,11 +173,9 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
         let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
         let new_user_metadata = helper::u8_ptr_to_opt_vec(new_user_metadata, new_user_metadata_len);
 
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        ffi_try!((*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     modify_dir(&client,
@@ -203,7 +193,7 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
                     None
                 }
             }
-        })));
+        }));
 
         0
     })
@@ -229,15 +219,12 @@ pub unsafe extern "C" fn nfs_move_dir(session: *const Session,
         let src_path = ffi_try!(helper::c_utf8_to_str(src_path, src_path_len));
         let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path, dst_path_len));
         let user_data = OpaqueCtx(user_data);
-        let obj_cache = (*session).object_cache();
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
-
+        ffi_try!((*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     move_dir(&client,
-                             app,
+                             &*app,
                              src_path,
                              is_src_path_shared,
                              dst_path,
@@ -252,7 +239,7 @@ pub unsafe extern "C" fn nfs_move_dir(session: *const Session,
                     None
                 }
             }
-        })));
+        }));
         0
     })
 }
@@ -409,7 +396,7 @@ fn move_dir(client: &Client,
 
 #[cfg(test)]
 mod tests {
-    use core::{Client, CoreMsg};
+    use core::Client;
     use core::futures::FutureExt;
     use ffi::{App, FfiError, FfiFuture, test_utils};
     use futures::Future;
@@ -443,7 +430,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
@@ -518,10 +505,9 @@ mod tests {
                 .into_box();
 
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv());
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -532,7 +518,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
@@ -581,10 +567,9 @@ mod tests {
                 .into_box();
 
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv());
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -595,7 +580,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
 
@@ -630,10 +615,9 @@ mod tests {
                 .into_box();
 
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv());
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -644,7 +628,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
@@ -685,10 +669,9 @@ mod tests {
                 })
                 .into_box();
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv());
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -701,7 +684,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
@@ -742,10 +725,9 @@ mod tests {
                 .into_box();
 
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv());
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -757,7 +739,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let app_dir_id = unwrap!(app.app_dir());
             let app_dir_id2 = app_dir_id.clone();
 
@@ -814,10 +796,9 @@ mod tests {
                 .into_box();
 
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv());
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -829,7 +810,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let app_dir_id = unwrap!(app.app_dir());
             let app_dir_id2 = app_dir_id.clone();
 
@@ -878,9 +859,8 @@ mod tests {
                 .into_box();
 
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv());
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 }

@@ -26,7 +26,7 @@
 // references instead of copies etc.) and uniform (i.e. not use get_ prefix for
 // mem functions.
 
-use core::{Client, CoreMsg};
+use core::Client;
 use core::futures::FutureExt;
 use ffi::{FfiFuture, OpaqueCtx};
 use futures::{self, Future};
@@ -123,23 +123,22 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
     let user_data = OpaqueCtx(user_data);
 
     let _ = helper::catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
         let app_name = try!(helper::c_utf8_to_string(app_name, app_name_len));
         let unique_token = try!(helper::c_utf8_to_string(unique_token, token_len));
         let vendor = try!(helper::c_utf8_to_string(vendor, vendor_len));
 
-        (*session).send(CoreMsg::new(move |client| {
+        (*session).send(move |client, object_cache| {
+            let object_cache = object_cache.clone();
             let fut =
                 launcher_config::app(client, app_name, unique_token, vendor, safe_drive_access)
                     .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
                     .map(move |app| {
-                        let app_handle = unwrap!(obj_cache.lock()).insert_app(app);
+                        let app_handle = object_cache.insert_app(app);
                         o_cb(user_data.0, 0, app_handle);
                     })
                     .into_box();
             Some(fut)
-        }))
+        })
     },
                                     move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
@@ -150,18 +149,13 @@ pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
                                                  user_data: *mut c_void,
                                                  o_cb: extern "C" fn(*mut c_void,
                                                                      int32_t,
-                                                                     AppHandle))
-                                                 -> int32_t {
-    helper::catch_unwind_i32(|| {
-        let obj_cache = (*session).object_cache();
+                                                                     AppHandle)) {
+    helper::catch_unwind_cb(|| {
         let user_data = OpaqueCtx(user_data);
-
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
-            let app_handle = unwrap!(obj_cache.lock()).insert_app(App::Unauthorised);
+        (*session).send(move |_, object_cache| {
+            let app_handle = object_cache.insert_app(App::Unauthorised);
             o_cb(user_data.0, 0, app_handle);
             None
-        })));
-
-        0
-    })
+        })
+    }, move |error| o_cb(user_data, error, 0))
 }

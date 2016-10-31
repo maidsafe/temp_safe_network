@@ -20,8 +20,10 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::{Client, utility};
+use core::futures::FutureExt;
 use ffi::{App, Session};
 use ffi::launcher_config;
+use ffi::object_cache::ObjectCache;
 use futures::{Future, IntoFuture};
 use libc::{c_void, int32_t};
 use std::ffi::CString;
@@ -54,21 +56,40 @@ pub fn create_unregistered_session() -> Session {
     unwrap!(Session::unregistered(|_| ()))
 }
 
-// Run the given closure inside the session event loop.
+// Run the given closure inside the session event loop. The closure should
+// return a future which will then be driven to completion and its result
+// returned.
 pub fn run<F, I, R, E>(session: &Session, f: F) -> R
-    where F: FnOnce(&Client) -> I + Send + 'static,
+    where F: FnOnce(&Client, &ObjectCache) -> I + Send + 'static,
           I: IntoFuture<Item=R, Error=E> + 'static,
           R: Send + 'static,
           E: Debug
 {
     let (tx, rx) = mpsc::channel();
 
-    unwrap!(session.send_fn(move |client| {
-        let future = f(client).into_future()
+    unwrap!(session.send(move |client, object_cache| {
+        let future = f(client, object_cache).into_future()
             .map_err(|err| panic!("{:?}", err))
-            .map(move |result| unwrap!(tx.send(result)));
+            .map(move |result| unwrap!(tx.send(result)))
+            .into_box();
 
         Some(future)
+    }));
+
+    unwrap!(rx.recv())
+}
+
+// Run the given closure inside the session event loop. The return value of
+// the closure is returned immediately.
+pub fn run_now<F, R>(session: &Session, f: F) -> R
+    where F: FnOnce(&Client, &ObjectCache) -> R + Send + 'static,
+          R: Send + 'static
+{
+    let (tx, rx) = mpsc::channel();
+
+    unwrap!(session.send(move |client, object_cache| {
+        unwrap!(tx.send(f(client, object_cache)));
+        None
     }));
 
     unwrap!(rx.recv())
@@ -79,7 +100,7 @@ pub fn create_app(session: &Session, has_safe_drive_access: bool) -> App {
     let app_id = unwrap!(utility::generate_random_string(10));
     let vendor = "Test Vendor".to_string();
 
-    run(session, move |client| {
+    run(session, move |client, _| {
         launcher_config::app(client, app_name, app_id, vendor, has_safe_drive_access)
     })
 }

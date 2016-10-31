@@ -1046,7 +1046,7 @@ mod tests {
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ = unwrap!(Client::registered(&sec_0, &sec_1, core_tx.clone(), net_tx.clone()));
+        let _ = unwrap!(Client::registered::<()>(&sec_0, &sec_1, core_tx.clone(), net_tx.clone()));
 
         // Account creation - same secrets - should fail
         match Client::registered(&sec_0, &sec_1, core_tx, net_tx) {

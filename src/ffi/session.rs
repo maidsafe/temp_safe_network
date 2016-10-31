@@ -21,11 +21,11 @@
 
 //! Session management
 
-use core::{self, Client, NetworkEvent};
+use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
 use core::futures::FutureExt;
 use ffi::{FfiError, OpaqueCtx};
 use ffi::object_cache::ObjectCache;
-use futures::{Future, IntoFuture};
+use futures::Future;
 use futures::stream::Stream;
 use libc::{c_void, int32_t, int64_t, uint64_t};
 use maidsafe_utilities::thread::{self, Joiner};
@@ -43,9 +43,6 @@ macro_rules! try_tx {
     }
 }
 
-type CoreMsg = core::CoreMsg<ObjectCache>;
-type CoreMsgTx = core::CoreMsgTx<ObjectCache>;
-
 /// Represents user session on the SAFE network. There should be one session
 /// per launcher.
 pub struct Session {
@@ -54,45 +51,18 @@ pub struct Session {
 
 struct Inner {
     // Channel to communicate with the core event loop
-    pub core_tx: Mutex<CoreMsgTx>,
+    pub core_tx: Mutex<CoreMsgTx<ObjectCache>>,
     _core_joiner: Joiner,
 }
 
 impl Session {
     /// Send a message to the core event loop
-    pub fn send(&self, msg: CoreMsg) -> Result<(), FfiError> {
+    pub fn send<F>(&self, f: F) -> Result<(), FfiError>
+        where F: FnOnce(&Client, &ObjectCache) -> Option<Box<Future<Item=(), Error=()>>> + Send + 'static
+    {
+        let msg = CoreMsg::new(f);
         let core_tx = unwrap!(self.inner.core_tx.lock());
         core_tx.send(msg).map_err(FfiError::from)
-    }
-
-    /// Send the given closure to be executed on the core event loop.
-    // TODO: remove this in favor of `send_cb`.
-    pub fn send_fn<F, I>(&self, f: F) -> Result<(), FfiError>
-        where F: FnOnce(&Client) -> Option<I> + Send + 'static,
-              I: IntoFuture<Item=(), Error=()> + 'static
-    {
-        self.send(CoreMsg::new(move |client| {
-            f(client).map(|i| i.into_future().into_box())
-        }))
-    }
-
-    // WIP
-    #[allow(missing_docs)]
-    pub fn send_cb<F, I>(&self, user_data: *mut c_void, f: F) -> Result<(), FfiError>
-        where F: FnOnce(&Client, Arc<Mutex<ObjectCache>>, *mut c_void) -> Option<I> + Send + 'static,
-              I: IntoFuture<Item=(), Error=()> + 'static
-    {
-        let object_cache = self.object_cache();
-        let user_data = OpaqueCtx(user_data);
-
-        self.send(CoreMsg::new(move |client| {
-            f(client, object_cache, user_data.0).map(|i| i.into_future().into_box())
-        }))
-    }
-
-    /// Returns an object cache tied to the session
-    pub fn object_cache(&self) -> Arc<Mutex<ObjectCache>> {
-        self.inner.object_cache.clone()
     }
 
     /// Create unregistered client.
@@ -119,9 +89,10 @@ impl Session {
             let core_tx_clone = core_tx.clone();
 
             let client = try_tx!(Client::unregistered(core_tx_clone, net_tx), tx);
+            let object_cache = ObjectCache::new();
             unwrap!(tx.send(Ok(core_tx)));
 
-            core::run(el, client, core_rx);
+            core::run(el, client, object_cache, core_rx);
         });
 
         let core_tx = try!(try!(rx.recv()));
@@ -130,7 +101,6 @@ impl Session {
             inner: Arc::new(Inner {
                 core_tx: Mutex::new(core_tx),
                 _core_joiner: joiner,
-                object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
         })
     }
@@ -165,10 +135,11 @@ impl Session {
 
             let client = try_tx!(Client::registered(&locator, &password, core_tx_clone, net_tx),
                                  tx);
+            let object_cache = ObjectCache::new();
 
             unwrap!(tx.send(Ok(core_tx)));
 
-            core::run(el, client, core_rx);
+            core::run(el, client, object_cache, core_rx);
         });
 
         let core_tx = try!(try!(rx.recv()));
@@ -177,7 +148,6 @@ impl Session {
             inner: Arc::new(Inner {
                 core_tx: Mutex::new(core_tx),
                 _core_joiner: joiner,
-                object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
         })
     }
@@ -212,10 +182,11 @@ impl Session {
 
             let client = try_tx!(Client::login(&locator, &password, core_tx_clone, net_tx),
                                  tx);
+            let object_cache = ObjectCache::new();
 
             unwrap!(tx.send(Ok(core_tx)));
 
-            core::run(el, client, core_rx);
+            core::run(el, client, object_cache, core_rx);
         });
 
         let core_tx = try!(try!(rx.recv()));
@@ -224,7 +195,6 @@ impl Session {
             inner: Arc::new(Inner {
                 core_tx: Mutex::new(core_tx),
                 _core_joiner: joiner,
-                object_cache: Arc::new(Mutex::new(ObjectCache::default())),
             }),
         })
     }
@@ -238,21 +208,25 @@ impl Session {
                     user_data: OpaqueCtx,
                     callback: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t, uint64_t))
                     -> Result<(), FfiError> {
-        self.send(CoreMsg::new(move |client| {
+        self.send(move |client, _| {
             Some(client.get_account_info(None)
                 .map_err(move |e| unsafe { callback(user_data.0, ffi_error_code!(e), 0, 0) })
                 .map(move |(data_stored, space_available)| {
                     unsafe { callback(user_data.0, 0, data_stored, space_available) }
                 })
                 .into_box())
-        }))
+        })
     }
 }
 
 impl Drop for Session {
     fn drop(&mut self) {
         debug!("Session is now being dropped.");
-        if let Err(e) = self.send(CoreMsg::build_terminator()) {
+
+        let core_tx = unwrap!(self.inner.core_tx.lock());
+        let msg = CoreMsg::build_terminator();
+
+        if let Err(e) = core_tx.send(msg) {
             info!("Unexpected error in drop: {:?}", e);
         }
     }
@@ -360,10 +334,10 @@ pub unsafe extern "C" fn client_issued_gets(session: *const Session,
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued GETs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        ffi_try!((*session).send(move |client, _| {
             o_cb(user_data.0, 0, client.issued_gets() as int64_t);
             None
-        })));
+        }));
         0
     })
 }
@@ -379,10 +353,10 @@ pub unsafe extern "C" fn client_issued_puts(session: *const Session,
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued PUTs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        ffi_try!((*session).send(move |client, _| {
             o_cb(user_data.0, 0, client.issued_puts() as int64_t);
             None
-        })));
+        }));
         0
     })
 }
@@ -398,10 +372,10 @@ pub unsafe extern "C" fn client_issued_posts(session: *const Session,
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued POSTs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        ffi_try!((*session).send(move |client, _| {
             o_cb(0, user_data.0, client.issued_posts() as int64_t);
             None
-        })));
+        }));
         0
     })
 }
@@ -417,10 +391,10 @@ pub unsafe extern "C" fn client_issued_deletes(session: *const Session,
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued DELETEs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        ffi_try!((*session).send(move |client, _| {
             o_cb(user_data.0, 0, client.issued_deletes() as int64_t);
             None
-        })));
+        }));
         0
     })
 }
@@ -436,10 +410,10 @@ pub unsafe extern "C" fn client_issued_appends(session: *const Session,
     helper::catch_unwind_i32(|| {
         trace!("FFI retrieve client issued APPENDs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
+        ffi_try!((*session).send(move |client, _| {
             o_cb(user_data.0, 0, client.issued_appends() as int64_t);
             None
-        })));
+        }));
         0
     })
 }

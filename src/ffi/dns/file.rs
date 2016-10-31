@@ -21,6 +21,7 @@
 
 //! File operations
 
+use core::futures::FutureExt;
 use dns::operations;
 use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::file_details::{FileDetails, FileMetadata};
@@ -55,7 +56,7 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
 
         let user_data = OpaqueCtx(user_data);
 
-        (*session).send_fn(move |client| {
+        (*session).send(move |client, _| {
             let client2 = client.clone();
             let client3 = client.clone();
 
@@ -74,7 +75,8 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
                 })
                 .map_err(move |err| {
                     o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut());
-                });
+                })
+                .into_box();
 
             Some(fut)
         })
@@ -107,7 +109,7 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
 
         let user_data = OpaqueCtx(user_data);
 
-        (*session).send_fn(move |client| {
+        (*session).send(move |client, _| {
             let client2 = client.clone();
 
             let fut = operations::get_service_home_dir_id(client, &long_name, service_name, None)
@@ -124,7 +126,8 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                 })
                 .map_err(move |err| {
                     o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut());
-                });
+                })
+                .into_box();
 
             Some(fut)
         })
@@ -148,7 +151,7 @@ mod tests {
     use super::*;
 
     fn create_public_file(session: &Session, file_name: String, file_content: Vec<u8>) -> DirId {
-        test_utils::run(session, |client| {
+        test_utils::run(session, |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
 
@@ -177,7 +180,7 @@ mod tests {
                         long_name: String,
                         service_name: String,
                         service_dir_id: DirId) {
-        test_utils::run(session, move |client| {
+        test_utils::run(session, move |client, _| {
             let (msg_pk, msg_sk) = box_::gen_keypair();
             let (sign_pk, sign_sk) = unwrap!(client.signing_keypair());
             let services = vec![(service_name, service_dir_id)];
