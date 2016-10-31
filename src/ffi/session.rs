@@ -466,7 +466,7 @@ pub unsafe extern "C" fn get_account_info(session: *const Session,
 /// crate (`create_account`, `log_in`, `create_unregistered_client`). Using
 /// `session` after a call to this functions is undefined behaviour.
 #[no_mangle]
-pub unsafe extern "C" fn drop_session(session: *mut Session) {
+pub unsafe extern "C" fn session_free(session: *mut Session) {
     let _ = Box::from_raw(session);
 }
 
@@ -499,7 +499,7 @@ mod tests {
             }
 
             assert!(!session_handle.is_null());
-            unsafe { drop_session(session_handle) };
+            unsafe { session_free(session_handle) };
         }
 
         {
@@ -519,7 +519,7 @@ mod tests {
             }
 
             assert!(!session_handle.is_null());
-            unsafe { drop_session(session_handle) };
+            unsafe { session_free(session_handle) };
         }
 
         unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
