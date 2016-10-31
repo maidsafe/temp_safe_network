@@ -955,18 +955,15 @@ fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<CoreFuture<()>> {
 
 #[cfg(test)]
 mod tests {
-    use core::{CoreError, NetworkEvent};
+    use core::CoreError;
     use core::utility;
-    use core::utility::test_utils::{finish, random_client, random_client_with_net_obs,
-                                    setup_client};
-    use futures::{self, Future};
-    use maidsafe_utilities::thread;
+    use core::utility::test_utils::{finish, random_client, setup_client};
+    use futures::Future;
     use rand;
     use routing::{Data, DataIdentifier, ImmutableData, StructuredData};
     use routing::client_errors::MutationError;
     use rust_sodium::crypto::secretbox;
     use std::panic;
-    use std::sync::mpsc;
     use super::*;
     use tokio_core::channel;
     use tokio_core::reactor::Core;
@@ -1206,6 +1203,12 @@ mod tests {
     #[cfg(feature = "use-mock-routing")]
     #[test]
     fn restart_routing() {
+        use core::NetworkEvent;
+        use core::utility::test_utils::random_client_with_net_obs;
+        use futures;
+        use maidsafe_utilities::thread;
+        use std::sync::mpsc;
+
         let (tx, rx) = mpsc::channel();
         let (hook, keep_alive) = futures::oneshot();
 
