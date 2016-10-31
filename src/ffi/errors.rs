@@ -87,10 +87,10 @@ pub enum FfiError {
     InvalidSelfEncryptorReadOffsets,
     /// Invalid indexing
     InvalidIndex,
-    /// Unsupported Operation (e.g. mixing Pub/PrivAppendableData operations
+    /// Unsupported Operation (e.g. mixing Pub/PrivAppendableData operations)
     UnsupportedOperation,
     /// Input/output Error
-    IoError(::std::io::Error),
+    IoError(IoError),
 }
 
 impl From<SerialisationError> for FfiError {
