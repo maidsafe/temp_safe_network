@@ -49,18 +49,11 @@ pub enum File {
 
 impl File {
     /// Get metadata associated with the file
+    /// For a versioned file the latest version is returned
     pub fn metadata(&self) -> &FileMetadata {
         match *self {
             File::Unversioned(ref metadata) => metadata,
             File::Versioned { ref latest_version, .. } => latest_version,
-        }
-    }
-
-    /// Get metadata associated with the file, with mutability to allow updation
-    pub fn metadata_mut(&mut self) -> &mut FileMetadata {
-        match *self {
-            File::Unversioned(ref mut id) => id,
-            File::Versioned { ref mut latest_version, .. } => latest_version,
         }
     }
 

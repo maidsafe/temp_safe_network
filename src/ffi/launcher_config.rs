@@ -161,7 +161,8 @@ fn launcher_global_config_and_dir(client: &Client)
                                         LAUNCHER_GLOBAL_CONFIG_FILE_NAME.to_string(),
                                         Vec::new(),
                                         metadata.id(),
-                                        dir.clone())
+                                        dir.clone(),
+                                        false)
                         .and_then(move |writer| writer.close())
                         .map_err(FfiError::from)
                         .map(move |updated_dir| {

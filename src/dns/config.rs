@@ -86,7 +86,8 @@ pub fn write(client: &Client, config: Vec<DnsConfig>) -> Box<DnsFuture<()>> {
                                     DNS_CONFIG_FILE_NAME.to_string(),
                                     vec![],
                                     dir_metadata.id(),
-                                    dir)
+                                    dir,
+                                    false)
             }
         })
         .and_then(move |writer| writer.write(&encoded_config).map(move |_| writer))

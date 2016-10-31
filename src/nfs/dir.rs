@@ -194,16 +194,18 @@ mod tests {
     #[test]
     fn find_add_update_remove_file() {
         let mut dir = Dir::new();
-        let mut file = File::Unversioned(FileMetadata::new("index.html".to_string(),
-                                                           Vec::new(),
-                                                           DataMap::None));
+        let file = File::Unversioned(FileMetadata::new("index.html".to_string(),
+                                                       Vec::new(),
+                                                       DataMap::None));
         assert!(dir.find_file(file.name()).is_none());
 
         unwrap!(dir.add_file(file.clone()));
         assert!(dir.find_file(file.name()).is_some());
 
-        file.metadata_mut().set_name("home.html".to_string());
-        dir.update_file("index.html", file.clone());
+        let mut metadata = file.metadata().clone();
+        metadata.set_name("home.html".to_string());
+
+        dir.update_file("index.html", File::Unversioned(metadata));
         assert_eq!(dir.files().len(), 1);
         let file2 = File::Unversioned(FileMetadata::new("demo.html".to_string(),
                                                         Vec::new(),
@@ -211,11 +213,11 @@ mod tests {
         unwrap!(dir.add_file(file2.clone()));
         assert_eq!(dir.files().len(), 2);
 
-        let _ = unwrap!(dir.find_file(file.name()), "File not found");
+        let _ = unwrap!(dir.find_file("home.html"), "File not found");
         let _ = unwrap!(dir.find_file(file2.name()), "File not found");
 
-        let _ = unwrap!(dir.remove_file(file.metadata().name()));
-        assert!(dir.find_file(file.name()).is_none());
+        let _ = unwrap!(dir.remove_file("home.html"));
+        assert!(dir.find_file("home.html").is_none());
         assert!(dir.find_file(file2.name()).is_some());
         assert_eq!(dir.files().len(), 1);
 

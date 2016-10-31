@@ -19,27 +19,30 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::Client;
-use core::SelfEncryptionStorage;
+use core::{Client, FutureExt, SelfEncryptionStorage, immutable_data};
+use futures::Future;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::{Dir, DirId, File, NfsFuture};
 use nfs::errors::NfsError;
 use nfs::helper::dir_helper;
 use nfs::helper::reader::Reader;
 use nfs::helper::writer::{Mode, Writer};
 use nfs::metadata::FileMetadata;
-use routing::DataIdentifier;
+use routing::{Data, DataIdentifier, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::secretbox;
 use self_encryption::DataMap;
 
-/// Helper function to create a file in a directory listing A writer object is
-/// returned, through which the data for the file can be written to the network
+/// Helper function to create a file in a directory listing.
+/// A writer object is returned, through which the data for the
+/// file can be written to the network.
 /// The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
 pub fn create<S>(client: Client,
                  name: S,
                  user_metadata: Vec<u8>,
                  parent_id: DirId,
-                 parent_dir: Dir)
+                 parent_dir: Dir,
+                 is_versioned: bool)
                  -> Box<NfsFuture<Writer>>
     where S: Into<String>
 {
@@ -50,7 +53,17 @@ pub fn create<S>(client: Client,
         return err!(NfsError::FileAlreadyExistsWithSameName);
     }
 
-    let file = File::Unversioned(FileMetadata::new(name, user_metadata, DataMap::None));
+    let v0 = FileMetadata::new(name, user_metadata, DataMap::None);
+
+    let file = if !is_versioned {
+        File::Unversioned(v0)
+    } else {
+        File::Versioned {
+            ptr_versions: DataIdentifier::Immutable(XorName([0u8; XOR_NAME_LEN])),
+            latest_version: v0,
+            num_of_versions: 0,
+        }
+    };
 
     Writer::new(client.clone(),
                 SelfEncryptionStorage::new(client),
@@ -72,29 +85,94 @@ pub fn delete(client: Client,
     dir_helper::update(client, parent_id, parent_dir)
 }
 
-/// Updates the file metadata.
-pub fn update_metadata(client: Client,
-                       prev_name: &str,
-                       file: File,
-                       parent_id: &(DataIdentifier, Option<secretbox::Key>),
-                       parent_dir: &mut Dir)
-                       -> Box<NfsFuture<()>> {
-    trace!("Updating metadata for file.");
-
-    {
-        let _ = fry!(parent_dir.find_file(prev_name).ok_or(NfsError::FileNotFound));
-
-        if prev_name != file.name() && parent_dir.find_file(file.name()).is_some() {
-            return err!(NfsError::FileAlreadyExistsWithSameName);
+/// Get a list of all file versions
+pub fn get_versions(client: &Client,
+                    ptr: &DataIdentifier,
+                    sk: Option<secretbox::Key>)
+                    -> Box<NfsFuture<Vec<FileMetadata>>> {
+    match *ptr {
+        DataIdentifier::Immutable(ref name) => {
+            immutable_data::get_value(client, name, sk)
+                .map_err(From::from)
+                .and_then(move |versions| Ok(try!(deserialise::<Vec<FileMetadata>>(&versions))))
+                .into_box()
         }
+        _ => err!(NfsError::ParameterIsNotValid),
     }
-    parent_dir.update_file(prev_name, file);
-    dir_helper::update(client.clone(), parent_id, parent_dir)
+
 }
 
-/// Helper function to Update content of a file in a directory listing A writer
+/// Updates the file metadata.
+/// For versioned files a new file version will be created.
+/// Returns the updated parent directory.
+pub fn update_metadata<S>(client: Client,
+                          prev_name: S,
+                          metadata: FileMetadata,
+                          parent_id: DirId,
+                          mut parent_dir: Dir)
+                          -> Box<NfsFuture<Dir>>
+    where S: Into<String>
+{
+    let prev_name = prev_name.into();
+    trace!("Updating metadata for file with name '{}'", prev_name);
+
+    let new_file_fut = {
+        let orig_file = fry!(parent_dir.find_file(&prev_name).ok_or(NfsError::FileNotFound));
+
+        if prev_name != metadata.name() && parent_dir.find_file(metadata.name()).is_some() {
+            return err!(NfsError::FileAlreadyExistsWithSameName);
+        }
+
+        match *orig_file {
+            File::Versioned { ref latest_version, ref ptr_versions, ref num_of_versions } => {
+                let sk = parent_id.1.clone();
+                let c2 = client.clone();
+                let c3 = client.clone();
+
+                let new_version_count = num_of_versions + 1;
+                let latest_version = latest_version.clone();
+
+                get_versions(&client, ptr_versions, sk.clone())
+                    .and_then(move |mut versions| {
+                        versions.push(latest_version);
+
+                        immutable_data::create(&c2, fry!(serialise(&versions)), sk)
+                            .map_err(From::from)
+                            .into_box()
+                    })
+                    .and_then(move |immut_data| {
+                        let immut_id = immut_data.identifier();
+                        c3.put(Data::Immutable(immut_data), None)
+                            .map_err(From::from)
+                            .map(move |_| immut_id)
+                    })
+                    .map(move |new_versions_ptr| {
+                        File::Versioned {
+                            ptr_versions: new_versions_ptr,
+                            num_of_versions: new_version_count,
+                            latest_version: metadata,
+                        }
+                    })
+                    .into_box()
+            }
+            File::Unversioned(_) => ok!(File::Unversioned(metadata)),
+        }
+    };
+
+    let c2 = client.clone();
+
+    new_file_fut.and_then(move |new_file| {
+            parent_dir.update_file(&prev_name, new_file);
+            dir_helper::update(c2, &parent_id, &parent_dir)
+                .map_err(NfsError::from)
+                .map(move |_| parent_dir)
+        })
+        .into_box()
+}
+
+/// Helper function to Update content of a file in a directory listing. A writer
 /// object is returned, through which the data for the file can be written to
-/// the network The file is actually saved in the directory listing only after
+/// the network. The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
 pub fn update_content(client: Client,
                       file: File,
@@ -152,7 +230,7 @@ mod tests {
             })
             .then(move |res| {
                 let (_parent, dir, dir_meta) = unwrap!(res);
-                file_helper::create(c3, "hello.txt", Vec::new(), dir_meta.id(), dir)
+                file_helper::create(c3, "hello.txt", Vec::new(), dir_meta.id(), dir, false)
                     .map(move |writer| (writer, dir_meta.id()))
             })
             .then(move |result| {
@@ -258,13 +336,14 @@ mod tests {
 
             create_test_file(client.clone())
                 .then(move |res| {
-                    let (mut dir, dir_metadata) = unwrap!(res);
+                    let (dir, dir_metadata) = unwrap!(res);
                     // Update Metadata
-                    let mut file = unwrap!(dir.find_file("hello.txt").cloned(), "File not found");
-                    file.metadata_mut().set_name("hello.jpg");
-                    file.metadata_mut().set_user_metadata(vec![12u8; 10]);
-                    file_helper::update_metadata(c2, "hello.txt", file, &dir_metadata, &mut dir)
-                        .map(|_| dir)
+                    let file = unwrap!(dir.find_file("hello.txt").cloned(), "File not found");
+                    let mut new_metadata = file.metadata().clone();
+                    new_metadata.set_name("hello.jpg");
+                    new_metadata.set_user_metadata(vec![12u8; 10]);
+                    file_helper::update_metadata(c2, "hello.txt", new_metadata, dir_metadata, dir)
+                        .map(move |dir| dir)
                 })
                 .map(|dir| {
                     let file = unwrap!(dir.find_file("hello.jpg").cloned(), "File not found");
