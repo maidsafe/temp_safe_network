@@ -48,10 +48,10 @@ use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 use tokio_core::reactor::{Handle, Timeout};
 
-const CONNECTION_TIMEOUT_SECS: u64 = 10;
-const REQUEST_TIMEOUT_SECS: u64 = 120;
 const ACC_PKT_TIMEOUT_SECS: u64 = 60;
+const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
+const REQUEST_TIMEOUT_SECS: u64 = 120;
 
 /// The main self-authentication client instance that will interface all the
 /// request from high level API's to the actual routing layer and manage all
@@ -72,6 +72,7 @@ struct Inner {
     cache: LruCache<XorName, Data>,
     client_type: ClientType,
     stats: Stats,
+    timeout: Duration,
     joiner: Joiner,
 }
 
@@ -79,7 +80,10 @@ impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will
     /// create an unregistered random client, which can do very limited set of
     /// operations - eg., a Network-Get
-    pub fn unregistered<T>(el_handle: Handle, core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Result<Self, CoreError>
+    pub fn unregistered<T>(el_handle: Handle,
+                           core_tx: CoreMsgTx<T>,
+                           net_tx: NetworkTx)
+                           -> Result<Self, CoreError>
         where T: 'static
     {
         trace!("Creating unregistered client.");
@@ -96,6 +100,7 @@ impl Client {
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::Unregistered,
             stats: Default::default(),
+            timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
             joiner: joiner,
         }))
     }
@@ -167,6 +172,7 @@ impl Client {
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
+            timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
             joiner: joiner,
         }))
     }
@@ -244,12 +250,18 @@ impl Client {
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
+            timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
             joiner: joiner,
         }))
     }
 
     fn new(inner: Inner) -> Self {
         Client { inner: Rc::new(RefCell::new(inner)) }
+    }
+
+    /// Set request timeout.
+    pub fn set_timeout(&self, duration: Duration) {
+        self.inner_mut().timeout = duration;
     }
 
     #[doc(hidden)]
@@ -350,9 +362,9 @@ impl Client {
                 data
             });
 
-            timeout(&self.inner().el_handle, rx)
+            timeout(&self.inner().el_handle, self.inner().timeout, rx)
         } else {
-            timeout(&self.inner().el_handle, rx)
+            timeout(&self.inner().el_handle, self.inner().timeout, rx)
         };
 
         let dst = match opt_dst {
@@ -380,7 +392,7 @@ impl Client {
         self.stats_mut().issued_puts += 1;
 
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(&self.inner().el_handle, oneshot);
+        let rx = build_mutation_future(&self.inner().el_handle, self.inner().timeout, oneshot);
 
         let dst = match dst {
             Some(a) => Ok(a),
@@ -507,7 +519,7 @@ impl Client {
         self.stats_mut().issued_posts += 1;
 
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(&self.inner().el_handle, oneshot);
+        let rx = build_mutation_future(&self.inner().el_handle, self.inner().timeout, oneshot);
 
         let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
         let msg_id = MessageId::new();
@@ -529,7 +541,7 @@ impl Client {
         self.stats_mut().issued_deletes += 1;
 
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(&self.inner().el_handle, oneshot);
+        let rx = build_mutation_future(&self.inner().el_handle, self.inner().timeout, oneshot);
 
         let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
         let msg_id = MessageId::new();
@@ -579,7 +591,7 @@ impl Client {
         self.stats_mut().issued_appends += 1;
 
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(&self.inner().el_handle, oneshot);
+        let rx = build_mutation_future(&self.inner().el_handle, self.inner().timeout, oneshot);
 
         let dst = match dst {
             Some(auth) => auth,
@@ -614,7 +626,7 @@ impl Client {
                 CoreEvent::AccountInfo(res) => res,
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             });
-        let rx = timeout(&self.inner().el_handle, rx);
+        let rx = timeout(&self.inner().el_handle, self.inner().timeout, rx);
 
         let dst = match dst {
             Some(a) => Ok(a),
@@ -732,8 +744,7 @@ impl Client {
     pub fn signing_keypair(&self) -> Result<(sign::PublicKey, sign::SecretKey), CoreError> {
         let inner = self.inner();
         let account = try!(inner.client_type.acc());
-        Ok((account.get_maid().public_keys().0,
-            account.get_maid().secret_keys().0.clone()))
+        Ok((account.get_maid().public_keys().0, account.get_maid().secret_keys().0.clone()))
     }
 
     /// Return the amount of calls that were done to `get`
@@ -759,18 +770,6 @@ impl Client {
     /// Return the amount of calls that were done to `append`
     pub fn issued_appends(&self) -> u64 {
         self.inner().stats.issued_appends
-    }
-
-    #[doc(hidden)]
-    #[cfg(all(test, feature = "use-mock-routing"))]
-    pub fn set_network_limits(&self, max_ops_count: Option<u64>) {
-        self.routing_mut().set_network_limits(max_ops_count);
-    }
-
-    #[doc(hidden)]
-    #[cfg(all(test, feature = "use-mock-routing"))]
-    pub fn simulate_network_disconnect(&self) {
-        self.routing_mut().simulate_disconnect();
     }
 
     fn update_session_packet(&self) -> Box<CoreFuture<()>> {
@@ -826,6 +825,24 @@ impl Client {
 
     fn inner_mut(&self) -> RefMut<Inner> {
         self.inner.borrow_mut()
+    }
+}
+
+#[cfg(all(test, feature = "use-mock-routing"))]
+impl Client {
+    #[doc(hidden)]
+    pub fn set_network_limits(&self, max_ops_count: Option<u64>) {
+        self.routing_mut().set_network_limits(max_ops_count);
+    }
+
+    #[doc(hidden)]
+    pub fn simulate_network_disconnect(&self) {
+        self.routing_mut().simulate_disconnect();
+    }
+
+    #[doc(hidden)]
+    pub fn set_simulate_timeout(&self, enabled: bool) {
+        self.routing_mut().set_simulate_timeout(enabled);
     }
 }
 
@@ -957,11 +974,10 @@ fn spawn_routing_thread<T>(routing_rx: Receiver<Event>,
                   move || routing_el::run(routing_rx, core_tx, net_tx))
 }
 
-fn timeout<F, T>(handle: &Handle, future: F) -> Box<CoreFuture<T>>
-    where F: Future<Item=T, Error=CoreError> + 'static,
+fn timeout<F, T>(handle: &Handle, duration: Duration, future: F) -> Box<CoreFuture<T>>
+    where F: Future<Item = T, Error = CoreError> + 'static,
           T: 'static
 {
-    let duration = Duration::from_secs(REQUEST_TIMEOUT_SECS);
     let timeout = match Timeout::new(duration, handle) {
         Ok(timeout) => timeout,
         Err(err) => return err!(CoreError::Unexpected(format!("Timeout create error: {:?}", err))),
@@ -970,24 +986,29 @@ fn timeout<F, T>(handle: &Handle, future: F) -> Box<CoreFuture<T>>
     let timeout = timeout.then(|result| -> Result<T, _> {
         match result {
             Ok(()) => Err(CoreError::RequestTimeout),
-            Err(err) => Err(CoreError::Unexpected(format!("Timeout fire error {:?}", err)))
+            Err(err) => Err(CoreError::Unexpected(format!("Timeout fire error {:?}", err))),
         }
     });
 
-    future.select(timeout).then(|result| match result {
-        Ok((a, _)) => Ok(a),
-        Err((a, _)) => Err(a),
-    }).into_box()
+    future.select(timeout)
+        .then(|result| match result {
+            Ok((a, _)) => Ok(a),
+            Err((a, _)) => Err(a),
+        })
+        .into_box()
 }
 
-fn build_mutation_future(handle: &Handle, oneshot: Oneshot<CoreEvent>) -> Box<CoreFuture<()>> {
+fn build_mutation_future(handle: &Handle,
+                         timeout_duration: Duration,
+                         oneshot: Oneshot<CoreEvent>)
+                         -> Box<CoreFuture<()>> {
     let fut = oneshot.map_err(|_| CoreError::OperationAborted)
         .and_then(|event| match event {
             CoreEvent::Mutation(res) => res,
             _ => Err(CoreError::ReceivedUnexpectedEvent),
         });
 
-    timeout(handle, fut)
+    timeout(handle, timeout_duration, fut)
 }
 
 #[cfg(test)]
@@ -1099,12 +1120,16 @@ mod tests {
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
         let res = panic::catch_unwind(|| {
-            setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
+            setup_client(|el_h, core_tx, net_tx| {
+                             Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx)
+                         },
                          |_| finish());
         });
         assert!(res.is_err());
 
-        setup_client(|el_h, core_tx, net_tx| Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| {
+                         Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
+                     },
                      |_| finish());
         setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      |_| finish());
@@ -1120,7 +1145,9 @@ mod tests {
                       Some(secretbox::gen_key()));
         let dir_id_clone = dir_id.clone();
 
-        setup_client(|el_h, core_tx, net_tx| Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| {
+                         Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
+                     },
                      move |client| {
                          assert!(client.user_root_dir_id().is_none());
                          client.set_user_root_dir_id(dir_id_clone)
@@ -1144,7 +1171,9 @@ mod tests {
                       Some(secretbox::gen_key()));
         let dir_id_clone = dir_id.clone();
 
-        setup_client(|el_h, core_tx, net_tx| Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| {
+                         Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
+                     },
                      move |client| {
                          assert!(client.config_root_dir_id().is_none());
                          client.set_config_root_dir_id(dir_id_clone)
@@ -1270,5 +1299,40 @@ mod tests {
                                        client.simulate_network_disconnect();
                                        keep_alive
                                    });
+    }
+
+    #[cfg(feature = "use-mock-routing")]
+    #[test]
+    fn timeout() {
+        use std::time::Duration;
+
+        // Get
+        random_client(|client| {
+            let client2 = client.clone();
+
+            client.set_simulate_timeout(true);
+            client.set_timeout(Duration::from_millis(250));
+
+            client.get(DataIdentifier::Immutable(rand::random()), None)
+                .then(|result| match result {
+                    Ok(_) => panic!("Unexpected success"),
+                    Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
+                    Err(err) => panic!("Unexpected {:?}", err),
+                })
+                .then(move |result| {
+                    unwrap!(result);
+
+                    let data = unwrap!(utility::generate_random_vector(4));
+                    let data = ImmutableData::new(data);
+                    let data = Data::Immutable(data);
+
+                    client2.put(data, None)
+                })
+                .then(|result| match result {
+                    Ok(_) => panic!("Unexpected success"),
+                    Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
+                    Err(err) => panic!("Unexpected {:?}", err),
+                })
+        })
     }
 }
