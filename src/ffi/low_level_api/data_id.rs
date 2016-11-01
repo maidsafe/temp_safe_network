@@ -19,7 +19,6 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::CoreMsg;
 use ffi::{OpaqueCtx, Session, helper};
 use ffi::object_cache::DataIdHandle;
 use libc::{c_void, int32_t};
@@ -38,15 +37,13 @@ pub unsafe extern "C" fn data_id_new_struct_data(session: *const Session,
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Structured(xor_id, type_tag);
-
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
-            let handle = unwrap!(obj_cache.lock()).insert_data_id(data_id);
+        ffi_try!((*session).send(move |_, obj_cache| {
+            let handle = obj_cache.insert_data_id(data_id);
             o_cb(user_data.0, 0, handle);
             None
-        })));
+        }));
         0
     })
 }
@@ -63,15 +60,13 @@ pub unsafe extern "C" fn data_id_new_immut_data(session: *const Session,
     helper::catch_unwind_i32(|| {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Immutable(xor_id);
-
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
-            let handle = unwrap!(obj_cache.lock()).insert_data_id(data_id);
+        ffi_try!((*session).send(move |_, obj_cache| {
+            let handle = obj_cache.insert_data_id(data_id);
             o_cb(user_data.0, 0, handle);
             None
-        })));
+        }));
         0
     })
 }
@@ -94,14 +89,13 @@ pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
             DataIdentifier::PubAppendable(xor_id)
         };
 
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
-            let handle = unwrap!(obj_cache.lock()).insert_data_id(data_id);
+        ffi_try!((*session).send(move |_, obj_cache| {
+            let handle = obj_cache.insert_data_id(data_id);
             o_cb(user_data.0, 0, handle);
             None
-        })));
+        }));
         0
     })
 }
@@ -115,13 +109,11 @@ pub unsafe extern "C" fn data_id_free(session: *const Session,
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            let res = unwrap!(obj_cache.lock()).remove_data_id(handle);
+        (*session).send(move |_, obj_cache| {
+            let res = obj_cache.remove_data_id(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
-        }))
+        })
     },
                             move |err| o_cb(user_data.0, ffi_error_code!(err)));
 }
@@ -139,7 +131,6 @@ mod tests {
     #[test]
     fn create_and_free() {
         let sess = test_utils::create_session();
-        let obj_cache = sess.object_cache();
         let sess_ptr: *const _ = &sess;
 
         let type_tag = rand::random();
@@ -185,13 +176,12 @@ mod tests {
             data_id_handle_pub_appendable = unwrap!(rx.recv());
         }
 
-        {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        test_utils::run_now(&sess, move |_, obj_cache| {
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_struct));
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_immut));
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_priv_appendable));
             let _ = unwrap!(obj_cache.get_data_id(data_id_handle_pub_appendable));
-        }
+        });
 
         unsafe {
             assert_free(sess_ptr, data_id_handle_struct, 0);
@@ -208,13 +198,12 @@ mod tests {
             assert_free(sess_ptr, data_id_handle_pub_appendable, err_code);
         }
 
-        {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        test_utils::run_now(&sess, move |_, obj_cache| {
             assert!(obj_cache.get_data_id(data_id_handle_struct).is_err());
             assert!(obj_cache.get_data_id(data_id_handle_immut).is_err());
             assert!(obj_cache.get_data_id(data_id_handle_priv_appendable).is_err());
             assert!(obj_cache.get_data_id(data_id_handle_pub_appendable).is_err());
-        }
+        });
 
         unsafe extern "C" fn data_id_cb(tx: *mut c_void, errcode: i32, handle: DataIdHandle) {
             assert_eq!(errcode, 0);

@@ -25,7 +25,7 @@ mod tests;
 use core::{CLIENT_STRUCTURED_DATA_TAG, CoreError};
 use core::futures::FutureExt;
 use core::structured_data::{self, unversioned, versioned};
-use ffi::{FfiError, helper, Session};
+use ffi::{FfiError, helper, OpaqueCtx, Session};
 use ffi::object_cache::{AppHandle, CipherOptHandle, DataIdHandle, StructDataHandle};
 use futures::{self, Future};
 use libc::{c_void, int32_t, uint64_t};
@@ -61,18 +61,23 @@ pub unsafe extern "C" fn struct_data_new(session: *const Session,
     helper::catch_unwind_cb(|| {
         let id = XorName(*id);
         let data = slice::from_raw_parts(data, data_len);
+        let user_data = OpaqueCtx(user_data);
 
-        (*session).send_cb(user_data, move |client, object_cache, user_data| {
-            let (sign_pk, sign_sk) = try_cb!(client.signing_keypair(), |code| o_cb(user_data, code, 0));
+        (*session).send(move |client, object_cache| {
+            let (sign_pk, sign_sk) = try_cb!(client.signing_keypair(),
+                                             |code| o_cb(user_data.0, code, 0));
 
             let encrypted_data = {
-                let mut object_cache = unwrap!(object_cache.lock());
-                let (app, cipher_opt) =
-                    try_cb!(object_cache.get_app_and_cipher_opt(app_h, cipher_opt_h),
-                            |code| o_cb(user_data, code, 0));
+                let app = try_cb!(object_cache.get_app(app_h),
+                                  |code| o_cb(user_data.0, code, 0));
 
-                try_cb!(cipher_opt.encrypt(app, data), |code| o_cb(user_data, code, 0))
+                let cipher_opt = try_cb!(object_cache.get_cipher_opt(cipher_opt_h),
+                                         |code| o_cb(user_data.0, code, 0));
+
+                try_cb!(cipher_opt.encrypt(&*app, data), |code| o_cb(user_data.0, code, 0))
             };
+
+            let object_cache = object_cache.clone();
 
             let fut = match type_tag {
                 ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
@@ -110,14 +115,14 @@ pub unsafe extern "C" fn struct_data_new(session: *const Session,
             };
 
             fut.map(move |data| {
-                let mut object_cache = unwrap!(object_cache.lock());
                 let handle = object_cache.insert_sd(data);
-                o_cb(user_data, 0, handle);
+                o_cb(user_data.0, 0, handle);
             })
             .map_err(move |err| {
                 let err = FfiError::from(err);
-                o_cb(user_data, ffi_error_code!(err), 0);
+                o_cb(user_data.0, ffi_error_code!(err), 0);
             })
+            .into_box()
             .into()
         })
     }, move |error| o_cb(user_data, error, 0))
@@ -130,12 +135,12 @@ pub unsafe extern "C" fn struct_data_fetch(session: *const Session,
                                            user_data: *mut c_void,
                                            o_cb: unsafe extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |client, object_cache, user_data| {
-            let data_id = {
-                let mut object_cache = unwrap!(object_cache.lock());
-                *try_cb!(object_cache.get_data_id(data_id_h),
-                         |error| o_cb(user_data, error, 0))
-            };
+        let user_data = OpaqueCtx(user_data);
+
+        (*session).send(move |client, object_cache| {
+            let object_cache = object_cache.clone();
+            let data_id = *try_cb!(object_cache.get_data_id(data_id_h),
+                                   |error| o_cb(user_data.0, error, 0));
 
             client.get(data_id, None)
                 .and_then(|data| match data {
@@ -143,15 +148,14 @@ pub unsafe extern "C" fn struct_data_fetch(session: *const Session,
                     _ => Err(CoreError::ReceivedUnexpectedData),
                 })
                 .map(move |data| {
-                    let mut object_cache = unwrap!(object_cache.lock());
                     let handle = object_cache.insert_sd(data);
-
-                    o_cb(user_data, 0, handle);
+                    o_cb(user_data.0, 0, handle);
                 })
                 .map_err(move |err| {
                     let err = FfiError::from(err);
-                    o_cb(user_data, ffi_error_code!(err), 0);
+                    o_cb(user_data.0, ffi_error_code!(err), 0);
                 })
+                .into_box()
                 .into()
         })
     }, move |error| o_cb(user_data, error, 0))
@@ -164,16 +168,17 @@ pub unsafe extern "C" fn struct_data_extract_data_id(session: *const Session,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t, DataIdHandle)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
-            let mut object_cache = unwrap!(object_cache.lock());
+        let user_data = OpaqueCtx(user_data);
+
+        (*session).send(move |_, object_cache| {
             let data_id = {
                 let data = try_cb!(object_cache.get_sd(sd_h),
-                                   |error| o_cb(user_data, error, 0));
+                                   |error| o_cb(user_data.0, error, 0));
                 data.identifier()
             };
 
             let handle = object_cache.insert_data_id(data_id);
-            o_cb(user_data, 0, handle);
+            o_cb(user_data.0, 0, handle);
             None
         })
     }, move |error| o_cb(user_data, error, 0))
@@ -192,25 +197,25 @@ pub unsafe extern "C" fn struct_data_update(session: *const Session,
                                             o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
         let data = slice::from_raw_parts(data, data_len);
+        let user_data = OpaqueCtx(user_data);
 
-        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+        (*session).send(move |client, object_cache| {
             let sign_sk = try_cb!(client.secret_signing_key(),
-                                  |error| o_cb(user_data, error));
+                                  |error| o_cb(user_data.0, error));
 
             let encrypted_data = {
-                let mut object_cache = unwrap!(object_cache.lock());
-                let (app, cipher_opt) =
-                    try_cb!(object_cache.get_app_and_cipher_opt(app_h, cipher_opt_h),
-                            |error| o_cb(user_data, error));
-                try_cb!(cipher_opt.encrypt(app, data),
-                        |error| o_cb(user_data, error))
+                let app = try_cb!(object_cache.get_app(app_h),
+                                  |error| o_cb(user_data.0, error));
+                let cipher_opt = try_cb!(object_cache.get_cipher_opt(cipher_opt_h),
+                                         |error| o_cb(user_data.0, error));
+                try_cb!(cipher_opt.encrypt(&*app, data),
+                        |error| o_cb(user_data.0, error))
             };
 
-            let old_sd = {
-                let mut object_cache = unwrap!(object_cache.lock());
-                try_cb!(object_cache.remove_sd(sd_h),
-                        |error| o_cb(user_data, error))
-            };
+            let old_sd = try_cb!(object_cache.remove_sd(sd_h),
+                                 |error| o_cb(user_data.0, error));
+
+            let object_cache = object_cache.clone();
 
             let fut = match old_sd.get_type_tag() {
                 ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
@@ -249,15 +254,15 @@ pub unsafe extern "C" fn struct_data_update(session: *const Session,
 
             fut.map(move |new_sd| {
                 // Replace the SD in the object cache with the updated one.
-                let mut object_cache = unwrap!(object_cache.lock());
                 object_cache.insert_sd_at(sd_h, new_sd);
-                o_cb(user_data, 0);
+                o_cb(user_data.0, 0);
             })
             .map_err(move |err| {
                 // TODO: should we put the old SD back to the object cache here?
                 // (it would require cloning the SD though)
-                o_cb(user_data, ffi_error_code!(err));
+                o_cb(user_data.0, ffi_error_code!(err));
             })
+            .into_box()
             .into()
         })
     }, move |error| o_cb(user_data, error))
@@ -271,18 +276,21 @@ pub unsafe extern "C" fn struct_data_extract_data(session: *const Session,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+        let user_data = OpaqueCtx(user_data);
+
+        (*session).send(move |client, object_cache| {
+            let object_cache = object_cache.clone();
+
             let fut = {
-                let mut object_cache = unwrap!(object_cache.lock());
                 let sd = try_cb!(object_cache.get_sd(sd_h),
-                                 |error| o_cb(user_data, error, ptr::null_mut(), 0, 0));
+                                 |error| o_cb(user_data.0, error, ptr::null_mut(), 0, 0));
 
                 match sd.get_type_tag() {
                     ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
-                        unversioned::extract_value(client, sd, None)
+                        unversioned::extract_value(client, &*sd, None)
                     }
                     ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
-                        versioned::extract_current_value(client, sd, None)
+                        versioned::extract_current_value(client, &*sd, None)
                     }
                     x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                         ok!(sd.get_data().clone())
@@ -293,18 +301,17 @@ pub unsafe extern "C" fn struct_data_extract_data(session: *const Session,
 
             fut.map_err(FfiError::from)
                 .and_then(move |encrypted_data| {
-                    let mut object_cache = unwrap!(object_cache.lock());
                     let app = try!(object_cache.get_app(app_h));
-
-                    CipherOpt::decrypt(app, &encrypted_data)
+                    CipherOpt::decrypt(&*app, &encrypted_data)
                 })
                 .map(move |data| {
                     let (ptr, size, capacity) = helper::u8_vec_to_ptr(data);
-                    o_cb(user_data, 0, ptr, size, capacity);
+                    o_cb(user_data.0, 0, ptr, size, capacity);
                 })
                 .map_err(move |err| {
-                    o_cb(user_data, ffi_error_code!(err), ptr::null_mut(), 0, 0);
+                    o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut(), 0, 0);
                 })
+                .into_box()
                 .into()
         })
     }, move |error| o_cb(user_data, error, ptr::null_mut(), 0, 0))
@@ -317,15 +324,15 @@ pub unsafe extern "C" fn struct_data_num_of_versions(session: *const Session,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
-            let mut object_cache = unwrap!(object_cache.lock());
+        let user_data = OpaqueCtx(user_data);
 
+        (*session).send(move |_, object_cache| {
             let sd = try_cb!(object_cache.get_sd(sd_h),
-                            |error| o_cb(user_data, error, 0));
+                            |error| o_cb(user_data.0, error, 0));
             let num = try_cb!(versioned::version_count(&sd),
-                              |error| o_cb(user_data, error, 0));
+                              |error| o_cb(user_data.0, error, 0));
 
-            o_cb(user_data, 0, num);
+            o_cb(user_data.0, 0, num);
 
             None
         })
@@ -341,14 +348,17 @@ pub unsafe extern "C" fn struct_data_nth_version(session: *const Session,
                                                  user_data: *mut c_void,
                                                  o_cb: unsafe extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |client, object_cache, user_data| {
+        let user_data = OpaqueCtx(user_data);
+
+        (*session).send(move |client, object_cache| {
+            let object_cache = object_cache.clone();
+
             let fut = {
-                let mut object_cache = unwrap!(object_cache.lock());
                 let sd = try_cb!(object_cache.get_sd(sd_h),
-                                 |error| o_cb(user_data, error, ptr::null_mut(), 0, 0));
+                                 |error| o_cb(user_data.0, error, ptr::null_mut(), 0, 0));
 
                 if sd.get_type_tag() == ::VERSIONED_STRUCT_DATA_TYPE_TAG {
-                    versioned::extract_value(client, sd, n, None)
+                    versioned::extract_value(client, &*sd, n, None)
                 } else {
                     err!(CoreError::InvalidStructuredDataTypeTag)
                 }
@@ -356,18 +366,17 @@ pub unsafe extern "C" fn struct_data_nth_version(session: *const Session,
 
             fut.map_err(FfiError::from)
                 .and_then(move |encrypted_data| {
-                    let mut object_cache = unwrap!(object_cache.lock());
                     let app = try!(object_cache.get_app(app_h));
-
-                    CipherOpt::decrypt(app, &encrypted_data)
+                    CipherOpt::decrypt(&*app, &encrypted_data)
                 })
                 .map(move |data| {
                     let (ptr, size, capacity) = helper::u8_vec_to_ptr(data);
-                    o_cb(user_data, 0, ptr, size, capacity);
+                    o_cb(user_data.0, 0, ptr, size, capacity);
                 })
                 .map_err(move |err| {
-                    o_cb(user_data, ffi_error_code!(err), ptr::null_mut(), 0, 0);
+                    o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut(), 0, 0);
                 })
+                .into_box()
                 .into()
 
         })
@@ -381,11 +390,13 @@ pub unsafe extern "C" fn struct_data_version(session: *const Session,
                                              user_data: *mut c_void,
                                              o_cb: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
-            let mut object_cache = unwrap!(object_cache.lock());
-            let sd = try_cb!(object_cache.get_sd(handle), |error| o_cb(user_data, error, 0));
+        let user_data = OpaqueCtx(user_data);
 
-            o_cb(user_data, 0, sd.get_version());
+        (*session).send(move |_, object_cache| {
+            let sd = try_cb!(object_cache.get_sd(handle),
+                             |error| o_cb(user_data.0, error, 0));
+
+            o_cb(user_data.0, 0, sd.get_version());
             None
         })
     }, |error| o_cb(user_data, error, 0))
@@ -398,20 +409,21 @@ pub unsafe extern "C" fn struct_data_put(session: *const Session,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |client, object_cache, user_data| {
-            let sign_sk = try_cb!(client.secret_signing_key(), |code| o_cb(user_data, code));
+        let user_data = OpaqueCtx(user_data);
 
-            let sd = {
-                let mut object_cache = unwrap!(object_cache.lock());
-                try_cb!(object_cache.get_sd(sd_h),
-                        |error| o_cb(user_data, error)).clone()
-            };
+        (*session).send(move |client, object_cache| {
+            let sign_sk = try_cb!(client.secret_signing_key(),
+                                  |code| o_cb(user_data.0, code));
+
+            let sd = try_cb!(object_cache.get_sd(sd_h),
+                             |error| o_cb(user_data.0, error)).clone();
+
+            let object_cache = object_cache.clone();
 
             client.put_recover(Data::Structured(sd), None, sign_sk.clone())
                 .map_err(FfiError::from)
                 .and_then(move |version| {
                     // Update the SD version in the object cache.
-                    let mut object_cache = unwrap!(object_cache.lock());
                     let old_sd = try!(object_cache.remove_sd(sd_h));
                     let new_sd = try!(StructuredData::new(
                                     old_sd.get_type_tag(),
@@ -425,8 +437,9 @@ pub unsafe extern "C" fn struct_data_put(session: *const Session,
                     let _ = object_cache.insert_sd_at(sd_h, new_sd);
                     Ok(())
                 })
-                .map(move |_| o_cb(user_data, 0))
-                .map_err(move |err| o_cb(user_data, ffi_error_code!(err)))
+                .map(move |_| o_cb(user_data.0, 0))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)))
+                .into_box()
                 .into()
         })
     }, |error| o_cb(user_data, error))
@@ -439,19 +452,19 @@ pub unsafe extern "C" fn struct_data_post(session: *const Session,
                                           user_data: *mut c_void,
                                           o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |client, object_cache, user_data| {
-            let sd = {
-                let mut object_cache = unwrap!(object_cache.lock());
-                try_cb!(object_cache.get_sd(sd_h),
-                        |error| o_cb(user_data, error)).clone()
-            };
+        let user_data = OpaqueCtx(user_data);
+
+        (*session).send(move |client, object_cache| {
+            let sd = try_cb!(object_cache.get_sd(sd_h),
+                             |error| o_cb(user_data.0, error)).clone();
 
             client.post(Data::Structured(sd), None)
-                .map(move |_| o_cb(user_data, 0))
+                .map(move |_| o_cb(user_data.0, 0))
                 .map_err(move |err| {
                     let err = FfiError::from(err);
-                    o_cb(user_data, ffi_error_code!(err));
+                    o_cb(user_data.0, ffi_error_code!(err));
                 })
+                .into_box()
                 .into()
         })
     }, |error| o_cb(user_data, error))
@@ -464,22 +477,22 @@ pub unsafe extern "C" fn struct_data_delete(session: *const Session,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |client, object_cache, user_data| {
-            let sd = {
-                let mut object_cache = unwrap!(object_cache.lock());
-                try_cb!(object_cache.remove_sd(sd_h),
-                        |error| o_cb(user_data, error))
-            };
+        let user_data = OpaqueCtx(user_data);
+
+        (*session).send(move |client, object_cache| {
+            let sd = try_cb!(object_cache.remove_sd(sd_h),
+                             |error| o_cb(user_data.0, error));
 
             let sign_sk = try_cb!(client.secret_signing_key(),
-                                  |error| o_cb(user_data, error));
+                                  |error| o_cb(user_data.0, error));
 
             structured_data::delete(client, sd, &sign_sk)
-                .map(move |_| o_cb(user_data, 0))
+                .map(move |_| o_cb(user_data.0, 0))
                 .map_err(move |err| {
                     let err = FfiError::from(err);
-                    o_cb(user_data, ffi_error_code!(err));
+                    o_cb(user_data.0, ffi_error_code!(err));
                 })
+                .into_box()
                 .into()
         })
     }, |error| o_cb(user_data, error))
@@ -492,11 +505,11 @@ pub unsafe extern "C" fn struct_data_validate_size(session: *const Session,
                                                    user_data: *mut c_void,
                                                    o_cb: extern "C" fn(*mut c_void, int32_t, bool)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
-            let mut object_cache = unwrap!(object_cache.lock());
-            let sd = try_cb!(object_cache.get_sd(handle), |error| o_cb(user_data, error, false));
+        let user_data = OpaqueCtx(user_data);
 
-            o_cb(user_data, 0, sd.validate_size());
+        (*session).send(move |_, object_cache| {
+            let sd = try_cb!(object_cache.get_sd(handle), |error| o_cb(user_data.0, error, false));
+            o_cb(user_data.0, 0, sd.validate_size());
             None
         })
     }, |error| o_cb(user_data, error, false))
@@ -509,14 +522,15 @@ pub unsafe extern "C" fn struct_data_is_owned(session: *const Session,
                                               user_data: *mut c_void,
                                               o_cb: unsafe extern "C" fn(*mut c_void, int32_t, bool)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |client, object_cache, user_data| -> Option<Result<_, _>> {
-            let mut object_cache = unwrap!(object_cache.lock());
-            let sd = try_cb!(object_cache.get_sd(sd_h),
-                             |error| o_cb(user_data, error, false));
-            let my_key = try_cb!(client.public_signing_key(),
-                                 |error| o_cb(user_data, error, false));
+        let user_data = OpaqueCtx(user_data);
 
-            o_cb(user_data, 0, sd.get_owner_keys().contains(&my_key));
+        (*session).send(move |client, object_cache| {
+            let sd = try_cb!(object_cache.get_sd(sd_h),
+                             |error| o_cb(user_data.0, error, false));
+            let my_key = try_cb!(client.public_signing_key(),
+                                 |error| o_cb(user_data.0, error, false));
+
+            o_cb(user_data.0, 0, sd.get_owner_keys().contains(&my_key));
             None
         })
     }, |error| o_cb(user_data, error, false))
@@ -529,11 +543,11 @@ pub unsafe extern "C" fn struct_data_free(session: *const Session,
                                           user_data: *mut c_void,
                                           o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     helper::catch_unwind_cb(|| {
-        (*session).send_cb(user_data, move |_, object_cache, user_data| -> Option<Result<_, _>> {
-            let mut object_cache = unwrap!(object_cache.lock());
-            let _ = try_cb!(object_cache.remove_sd(handle), |error| o_cb(user_data, error));
+        let user_data = OpaqueCtx(user_data);
 
-            o_cb(user_data, 0);
+        (*session).send(move |_, object_cache| {
+            let _ = try_cb!(object_cache.remove_sd(handle), |error| o_cb(user_data.0, error));
+            o_cb(user_data.0, 0);
             None
         })
     }, move |error| o_cb(user_data, error))

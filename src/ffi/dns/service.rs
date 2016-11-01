@@ -21,6 +21,7 @@
 
 //! DNS service operations
 
+use core::futures::FutureExt;
 use dns::operations;
 use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::dir_details::DirDetails;
@@ -53,12 +54,9 @@ pub unsafe extern "C" fn dns_add_service(session: *const Session,
         let service_home_dir_path = try!(helper::c_utf8_to_string(service_home_dir_path,
                                                                   service_home_dir_path_len));
 
-
         let user_data = OpaqueCtx(user_data);
-        let session = &*session;
-        let object_cache = session.object_cache();
 
-        session.send_fn(move |client| {
+        (*session).send(move |client, object_cache| {
             let client2 = client.clone();
 
             let sign_sk = match client.secret_signing_key() {
@@ -69,10 +67,9 @@ pub unsafe extern "C" fn dns_add_service(session: *const Session,
                 }
             };
 
-            let mut object_cache = unwrap!(object_cache.lock());
             match object_cache.get_app(app_handle) {
                 Ok(app) => {
-                    let fut = helper::dir(client, app, service_home_dir_path, is_path_shared)
+                    let fut = helper::dir(client, &*app, service_home_dir_path, is_path_shared)
                         .and_then(move |(_, dir_metadata)| {
                             operations::add_service(&client2,
                                                     long_name,
@@ -82,7 +79,8 @@ pub unsafe extern "C" fn dns_add_service(session: *const Session,
                                 .map_err(FfiError::from)
                         })
                         .map(move |_| o_cb(user_data.0, 0))
-                        .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)));
+                        .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)))
+                        .into_box();
 
                     Some(fut)
                 }
@@ -110,10 +108,9 @@ pub unsafe extern "C" fn dns_delete_service(session: *const Session,
 
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
-
         let user_data = OpaqueCtx(user_data);
 
-        (*session).send_fn(move |client| {
+        (*session).send(move |client, _| {
             let sign_sk = match client.secret_signing_key() {
                 Ok(key) => key,
                 Err(err) => {
@@ -124,7 +121,8 @@ pub unsafe extern "C" fn dns_delete_service(session: *const Session,
 
             let fut = operations::remove_service(client, long_name, service_name, sign_sk, None)
                 .map(move |_| o_cb(user_data.0, 0))
-                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)));
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err)))
+                .into_box();
 
             Some(fut)
         })
@@ -148,7 +146,7 @@ pub unsafe extern "C" fn dns_get_services(session: *const Session,
 
         let user_data = OpaqueCtx(user_data);
 
-        (*session).send_fn(move |client| {
+        (*session).send(move |client, _| {
             let fut = operations::get_all_services(client, long_name, None)
                 .map_err(FfiError::from)
                 .and_then(|services| string_list::from_vec(services))
@@ -157,7 +155,8 @@ pub unsafe extern "C" fn dns_get_services(session: *const Session,
                 })
                 .map_err(move |err| {
                     o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut());
-                });
+                })
+                .into_box();
 
             Some(fut)
         })
@@ -186,7 +185,7 @@ pub unsafe extern "C" fn dns_get_service_dir(session: *const Session,
 
         let user_data = OpaqueCtx(user_data);
 
-        (*session).send_fn(move |client| {
+        (*session).send(move |client, _| {
             let client2 = client.clone();
 
             let fut = operations::get_service_home_dir_id(client, long_name, service_name, None)
@@ -201,7 +200,8 @@ pub unsafe extern "C" fn dns_get_service_dir(session: *const Session,
                 })
                 .map_err(move |err| {
                     o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut());
-                });
+                })
+                .into_box();
 
             Some(fut)
         })
@@ -234,18 +234,13 @@ mod tests {
 
         // Register the DNS long name and create the home directory for the new
         // service.
-        let app = test_utils::run(&session, move |client| {
+        let app_h = test_utils::run(&session, move |client, object_cache| {
             let fut1 = create_dir(client, &app, "www-dir");
             let fut2 = register_dns(client, long_name, &[]);
+            let app_h = object_cache.insert_app(app);
 
-            fut1.join(fut2).map(move |_| app)
+            fut1.join(fut2).map(move |_| app_h)
         });
-
-        let app_handle = {
-            let object_cache = session.object_cache();
-            let mut object_cache = unwrap!(object_cache.lock());
-            object_cache.insert_app(app)
-        };
 
         let (tx, rx) = mpsc::channel::<()>();
 
@@ -260,7 +255,7 @@ mod tests {
 
         unsafe {
             dns_add_service(&session,
-                            app_handle,
+                            app_h,
                             long_name.ptr,
                             long_name.len,
                             service_name.ptr,
@@ -284,7 +279,7 @@ mod tests {
         let long_name = unwrap!(utility::generate_random_string(10));
         let long_name2 = long_name.clone();
 
-        test_utils::run(&session1, move |client| {
+        test_utils::run(&session1, move |client, _| {
             let client2 = client.clone();
 
             create_dir(client, &app, "www-dir").then(move |result| {

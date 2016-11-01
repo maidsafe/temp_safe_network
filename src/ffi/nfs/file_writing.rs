@@ -25,7 +25,7 @@
 
 //! Operations on file writer
 
-use core::{Client, CoreMsg, FutureExt, SelfEncryptionStorage};
+use core::{Client, FutureExt, SelfEncryptionStorage};
 use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use ffi::object_cache::AppHandle;
 use futures::Future;
@@ -67,11 +67,9 @@ pub unsafe extern "C" fn nfs_create_file(session: *const Session,
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
         let user_metadata = helper::u8_ptr_to_vec(user_metadata, user_metadata_len);
 
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        ffi_try!((*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = create_file(&client,
@@ -95,7 +93,7 @@ pub unsafe extern "C" fn nfs_create_file(session: *const Session,
                     None
                 }
             }
-        })));
+        }));
         0
     })
 }
@@ -114,11 +112,9 @@ pub unsafe extern "C" fn nfs_writer_open(session: *const Session,
         trace!("FFI get nfs writer for modification of existing file.");
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
 
-        let obj_cache = (*session).object_cache();
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        ffi_try!((*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = writer_open(&client, &app, file_path, is_path_shared)
@@ -137,7 +133,7 @@ pub unsafe extern "C" fn nfs_writer_open(session: *const Session,
                     None
                 }
             }
-        })));
+        }));
 
         0
     })
@@ -160,7 +156,7 @@ pub unsafe extern "C" fn nfs_writer_write(session: *const Session,
         let user_data = OpaqueCtx(user_data);
         let writer_handle = OpaqueCtx(writer_handle as *mut _);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+        ffi_try!((*session).send(move |_, _| {
             let writer_handle: *mut Writer = writer_handle.0 as *mut _;
             Some((*writer_handle)
                 .inner
@@ -170,7 +166,7 @@ pub unsafe extern "C" fn nfs_writer_write(session: *const Session,
                     Ok(())
                 })
                 .into_box())
-        })));
+        }));
         0
     })
 }
@@ -189,14 +185,14 @@ pub unsafe extern "C" fn nfs_writer_close(session: *const Session,
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(CoreMsg::new(move |_| {
+        ffi_try!((*session).send(move |_, _| {
             Some(writer.close()
                 .then(move |res| {
                     o_cb(ffi_result_code!(res), user_data.0);
                     Ok(())
                 })
                 .into_box())
-        })));
+        }));
 
         0
     })
@@ -246,8 +242,7 @@ fn writer_open(client: &Client,
 
 #[cfg(test)]
 mod tests {
-
-    use core::{CoreMsg, FutureExt};
+    use core::FutureExt;
     use ffi::test_utils;
     use futures::Future;
     use nfs::helper::{dir_helper, file_helper};
@@ -266,7 +261,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
 
@@ -306,9 +301,8 @@ mod tests {
                 })
                 .into_box();
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 }

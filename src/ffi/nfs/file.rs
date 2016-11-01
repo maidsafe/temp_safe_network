@@ -21,7 +21,7 @@
 
 //! File operations
 
-use core::{Client, CoreMsg, FutureExt};
+use core::{Client, FutureExt};
 use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session};
 use ffi::file_details::{FileDetails, FileMetadata};
 use ffi::helper;
@@ -50,10 +50,7 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
         trace!("FFI delete file, given the path.");
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
 
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     delete_file(&client, &app, file_path, is_shared)
@@ -69,7 +66,7 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
                     None
                 }
             }
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
@@ -95,10 +92,8 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
         trace!("FFI get file, given the path.");
 
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
-        let obj_cache = (*session).object_cache();
 
-        (*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = get_file(&client,
@@ -123,7 +118,7 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
                     None
                 }
             }
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut()))
 }
@@ -148,14 +143,12 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
     catch_unwind_cb(|| {
         trace!("FFI modify file, given the path.");
 
-        let obj_cache = (*session).object_cache();
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
         let new_name = try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
         let new_metadata = helper::u8_ptr_to_opt_vec(new_metadata, new_metadata_len);
         let new_content = helper::u8_ptr_to_opt_vec(new_content, new_content_len);
 
-        (*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     modify_file(&client,
@@ -177,7 +170,7 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
                     None
                 }
             }
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
@@ -200,12 +193,10 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
     catch_unwind_cb(|| {
         trace!("FFI move file, from {:?} to {:?}.", src_path, dst_path);
 
-        let obj_cache = (*session).object_cache();
         let src_path = try!(helper::c_utf8_to_str(src_path, src_path_len));
         let dst_path = try!(helper::c_utf8_to_str(dst_path, dst_path_len));
 
-        (*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     move_file(&client,
@@ -227,7 +218,7 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
                     None
                 }
             }
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
@@ -248,14 +239,12 @@ pub unsafe extern "C" fn nfs_get_file_num_of_versions(session: *const Session,
     catch_unwind_cb(|| {
         trace!("FFI get number of file versions, given the path.");
 
-        let obj_cache = (*session).object_cache();
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
 
-        (*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
-                    get_num_of_versions(client, app, &file_path, is_path_shared)
+                    get_num_of_versions(client, &*app, &file_path, is_path_shared)
                         .map(move |num_of_versions| o_cb(user_data.0, 0, num_of_versions))
                         .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
                         .into_box()
@@ -266,7 +255,7 @@ pub unsafe extern "C" fn nfs_get_file_num_of_versions(session: *const Session,
                     None
                 }
             }
-        }))
+        })
     },
                     move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
@@ -305,10 +294,8 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
         trace!("FFI get file metadata, given the path.");
 
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
-        let obj_cache = (*session).object_cache();
 
-        (*session).send(CoreMsg::new(move |client| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = get_file_metadata(&client, &app, file_path, is_path_shared, version)
@@ -327,7 +314,7 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
                     None
                 }
             }
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut()))
 }
@@ -507,7 +494,7 @@ fn get_file_metadata(client: &Client,
 
 #[cfg(test)]
 mod tests {
-    use core::{Client, CoreMsg, FutureExt};
+    use core::{Client, FutureExt};
     use ffi::{App, FfiError, FfiFuture, test_utils};
     use futures::Future;
     use nfs::helper::{dir_helper, file_helper};
@@ -560,7 +547,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
@@ -594,10 +581,9 @@ mod tests {
                 })
                 .into_box()
                 .into()
-        })));
+        }));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -609,7 +595,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
 
@@ -637,10 +623,9 @@ mod tests {
                 })
                 .into_box()
                 .into()
-        })));
+        }));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -653,7 +638,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
@@ -692,10 +677,9 @@ mod tests {
                 .into_box();
 
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -710,7 +694,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
@@ -765,10 +749,9 @@ mod tests {
                 })
                 .into_box()
                 .into()
-        })));
+        }));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 
     #[test]
@@ -783,7 +766,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let tx2 = tx.clone();
 
-        unwrap!(sess.send(CoreMsg::new(move |client| {
+        unwrap!(sess.send(move |client, _| {
             let c2 = client.clone();
             let c3 = client.clone();
             let c4 = client.clone();
@@ -859,9 +842,8 @@ mod tests {
                 })
                 .into_box();
             Some(fut)
-        })));
+        }));
 
         let _ = unwrap!(rx.recv_timeout(Duration::from_secs(15)));
-        unwrap!(sess.send(CoreMsg::build_terminator()));
     }
 }

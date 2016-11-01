@@ -66,8 +66,6 @@ pub struct Client {
 struct Inner {
     routing: Routing,
     hooks: HashMap<MessageId, Complete<CoreEvent>>,
-    core_tx: CoreMsgTx,
-    net_tx: NetworkTx,
     cache: LruCache<XorName, Data>,
     client_type: ClientType,
     stats: Stats,
@@ -78,7 +76,9 @@ impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will
     /// create an unregistered random client, which can do very limited set of
     /// operations - eg., a Network-Get
-    pub fn unregistered(core_tx: CoreMsgTx, net_tx: NetworkTx) -> Result<Self, CoreError> {
+    pub fn unregistered<T>(core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Result<Self, CoreError>
+        where T: 'static
+    {
         trace!("Creating unregistered client.");
 
         let (routing, routing_rx) = try!(setup_routing(None));
@@ -89,8 +89,6 @@ impl Client {
         Ok(Self::new(Inner {
             routing: routing,
             hooks: HashMap::with_capacity(10),
-            core_tx: core_tx,
-            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::Unregistered,
             stats: Default::default(),
@@ -100,11 +98,13 @@ impl Client {
 
     /// This is a Gateway function to the Maidsafe network. This will help
     /// create a fresh acc for the user in the SAFE-network.
-    pub fn registered(acc_locator: &str,
-                      acc_password: &str,
-                      core_tx: CoreMsgTx,
-                      net_tx: NetworkTx)
-                      -> Result<Client, CoreError> {
+    pub fn registered<T>(acc_locator: &str,
+                         acc_password: &str,
+                         core_tx: CoreMsgTx<T>,
+                         net_tx: NetworkTx)
+                         -> Result<Client, CoreError>
+        where T: 'static
+    {
         trace!("Creating an acc.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
@@ -158,8 +158,6 @@ impl Client {
         Ok(Self::new(Inner {
             routing: routing,
             hooks: HashMap::with_capacity(10),
-            core_tx: core_tx,
-            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
@@ -169,11 +167,13 @@ impl Client {
 
     /// This is a Gateway function to the Maidsafe network. This will help
     /// login to an already existing account of the user in the SAFE-network.
-    pub fn login(acc_locator: &str,
-                 acc_password: &str,
-                 core_tx: CoreMsgTx,
-                 net_tx: NetworkTx)
-                 -> Result<Client, CoreError> {
+    pub fn login<T>(acc_locator: &str,
+                    acc_password: &str,
+                    core_tx: CoreMsgTx<T>,
+                    net_tx: NetworkTx)
+                    -> Result<Client, CoreError>
+        where T: 'static
+    {
         trace!("Attempting to log into an acc.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
@@ -233,8 +233,6 @@ impl Client {
         Ok(Self::new(Inner {
             routing: routing,
             hooks: HashMap::with_capacity(10),
-            core_tx: core_tx,
-            net_tx: net_tx,
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             stats: Default::default(),
@@ -247,7 +245,9 @@ impl Client {
     }
 
     #[doc(hidden)]
-    pub fn restart_routing(&self) {
+    pub fn restart_routing<T>(&self, core_tx: CoreMsgTx<T>, net_tx: NetworkTx)
+        where T: 'static
+    {
         let opt_id = if let ClientType::Registered { ref acc, .. } = self.inner().client_type {
             Some(FullId::with_keys((acc.get_maid().public_keys().1,
                                     acc.get_maid().secret_keys().1.clone()),
@@ -257,22 +257,24 @@ impl Client {
             None
         };
 
-        let core_tx = self.inner().core_tx.clone();
         let (routing, routing_rx) = match setup_routing(opt_id) {
             Ok(elt) => elt,
             Err(e) => {
                 info!("Could not restart routing (will re-attempt, unless dropped): {:?}",
                       e);
-                let msg = CoreMsg::new(|client| {
-                    client.restart_routing();
-                    None
-                });
+                let msg = {
+                    let core_tx = core_tx.clone();
+                    let net_tx = net_tx.clone();
+                    CoreMsg::new(move |client, _| {
+                        client.restart_routing(core_tx, net_tx);
+                        None
+                    })
+                };
                 let _ = core_tx.send(msg);
                 return;
             }
         };
 
-        let net_tx = self.inner().net_tx.clone();
         let _ = net_tx.send(NetworkEvent::Connected);
 
         let joiner = spawn_routing_thread(routing_rx, core_tx, net_tx);
@@ -936,10 +938,12 @@ fn setup_routing(full_id: Option<FullId>) -> Result<(Routing, Receiver<Event>), 
     Ok((routing, routing_rx))
 }
 
-fn spawn_routing_thread(routing_rx: Receiver<Event>,
-                        core_tx: CoreMsgTx,
-                        net_tx: NetworkTx)
-                        -> Joiner {
+fn spawn_routing_thread<T>(routing_rx: Receiver<Event>,
+                           core_tx: CoreMsgTx<T>,
+                           net_tx: NetworkTx)
+                           -> Joiner
+    where T: 'static
+{
     thread::named("Routing Event Loop",
                   move || routing_el::run(routing_rx, core_tx, net_tx))
 }
@@ -1042,7 +1046,7 @@ mod tests {
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ = unwrap!(Client::registered(&sec_0, &sec_1, core_tx.clone(), net_tx.clone()));
+        let _ = unwrap!(Client::registered::<()>(&sec_0, &sec_1, core_tx.clone(), net_tx.clone()));
 
         // Account creation - same secrets - should fail
         match Client::registered(&sec_0, &sec_1, core_tx, net_tx) {

@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{CoreError, CoreMsg, FutureExt, SelfEncryptionStorage, immutable_data};
+use core::{CoreError, FutureExt, SelfEncryptionStorage, immutable_data};
 use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::helper::catch_unwind_cb;
 use ffi::low_level_api::cipher_opt::CipherOpt;
@@ -46,10 +46,6 @@ pub struct SelfEncryptorReaderWrapper {
     _storage: Box<SelfEncryptionStorage>,
 }
 
-// FIXME(nbaksalyar): temp workaround - see impl in self_encryption
-unsafe impl Send for SelfEncryptorWriterWrapper {}
-unsafe impl Send for SelfEncryptorReaderWrapper {}
-
 type SEWriterHandle = SelfEncryptorWriterHandle;
 type SEReaderHandle = SelfEncryptorReaderHandle;
 
@@ -63,10 +59,9 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |client| {
+        (*session).send(move |client, obj_cache| {
             let mut se_storage = Box::new(SelfEncryptionStorage::new(client.clone()));
+            let obj_cache = obj_cache.clone();
 
             let fut = SequentialEncryptor::new(mem::transmute(&mut *se_storage), None)
                 .map_err(CoreError::from)
@@ -75,7 +70,7 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
                         se: se,
                         _storage: se_storage,
                     };
-                    let handle = unwrap!(obj_cache.lock()).insert_se_writer(se_wrapper);
+                    let handle = obj_cache.insert_se_writer(se_wrapper);
                     o_cb(user_data.0, 0, handle);
                 })
                 .map_err(move |e| {
@@ -84,7 +79,7 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
                 .into_box();
 
             Some(fut)
-        }))
+        })
     },
                     move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
@@ -101,13 +96,11 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
         let data_slice = slice::from_raw_parts(data, size);
 
-        (*session).send(CoreMsg::new(move |_| {
+        (*session).send(move |_, obj_cache| {
             let fut = {
-                let mut object_cache = unwrap!(obj_cache.lock());
-                match object_cache.get_se_writer(se_h) {
+                match obj_cache.get_se_writer(se_h) {
                     Ok(writer) => writer.se.write(data_slice),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e));
@@ -122,7 +115,7 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
                 })
                 .into_box();
             Some(fut)
-        }))
+        })
     },
                     move |err| o_cb(user_data.0, ffi_error_code!(err)));
 }
@@ -140,11 +133,8 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |client| {
+        (*session).send(move |client, obj_cache| {
             let fut = {
-                let mut obj_cache = unwrap!(obj_cache.lock());
                 match obj_cache.remove_se_writer(se_h) {
                     Ok(se_wrapper) => se_wrapper.se.close().into_box(),
                     Err(e) => {
@@ -156,6 +146,8 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
 
             let c2 = client.clone();
             let c3 = client.clone();
+
+            let obj_cache = obj_cache.clone();
 
             let fut = fut.map_err(CoreError::from)
                 .map_err(FfiError::from)
@@ -169,9 +161,8 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                     let ser_final_immut_data = fry!(serialise(&final_immut_data));
 
                     let raw_data = {
-                        let mut object_cache = unwrap!(obj_cache.lock());
-                        let app = fry!(object_cache.get_app(app)).clone();
-                        let cipher_opt = fry!(object_cache.get_cipher_opt(cipher_opt_h));
+                        let app = fry!(obj_cache.get_app(app)).clone();
+                        let cipher_opt = fry!(obj_cache.get_cipher_opt(cipher_opt_h));
                         fry!(cipher_opt.encrypt(&app, &ser_final_immut_data))
                     };
 
@@ -182,7 +173,6 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                         .map_err(FfiError::from)
                         .map(move |_| {
                             let data_id = DataIdentifier::Immutable(raw_immut_data_name);
-                            let mut obj_cache = unwrap!(obj_cache.lock());
                             obj_cache.insert_data_id(data_id)
                         })
                         .into_box()
@@ -197,7 +187,7 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                 .into_box();
 
             Some(fut)
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
@@ -215,16 +205,15 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |client| {
+        (*session).send(move |client, obj_cache| {
             let c2 = client.clone();
             let c3 = client.clone();
+
             let obj_cache2 = obj_cache.clone();
+            let obj_cache3 = obj_cache.clone();
 
             let fut = {
-                let mut object_cache = unwrap!(obj_cache.lock());
-                match object_cache.get_data_id(data_id_h) {
+                match obj_cache.get_data_id(data_id_h) {
                     Ok(data_id) => client.get(*data_id, None),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e), 0);
@@ -241,8 +230,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
                     };
 
                     let ser_final_immut_data = {
-                        let mut object_cache = unwrap!(obj_cache.lock());
-                        let app = fry!(object_cache.get_app(app));
+                        let app = fry!(obj_cache2.get_app(app));
                         fry!(CipherOpt::decrypt(&app, raw_immut_data.value()))
                     };
 
@@ -269,7 +257,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
                         })
                 })
                 .map(move |se_wrapper| {
-                    let handle = unwrap!(obj_cache2.lock()).insert_se_reader(se_wrapper);
+                    let handle = obj_cache3.insert_se_reader(se_wrapper);
                     o_cb(user_data.0, 0, handle);
                 })
                 .map_err(move |e| {
@@ -277,7 +265,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
                 })
                 .into_box();
             Some(fut)
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
@@ -291,10 +279,8 @@ pub unsafe extern "C" fn immut_data_size(session: *const Session,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            match unwrap!(obj_cache.lock()).get_se_reader(se_h) {
+        (*session).send(move |_, obj_cache| {
+            match obj_cache.get_se_reader(se_h) {
                 Ok(se_wrapper) => {
                     o_cb(user_data.0, 0, se_wrapper.se.len());
                 }
@@ -303,7 +289,7 @@ pub unsafe extern "C" fn immut_data_size(session: *const Session,
                 }
             };
             None
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
 }
@@ -324,11 +310,8 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            let mut obj_cache = unwrap!(obj_cache.lock());
-            let se_wrapper = match obj_cache.get_se_reader(se_h) {
+        (*session).send(move |_, obj_cache| {
+            let mut se_wrapper = match obj_cache.get_se_reader(se_h) {
                 Ok(r) => r,
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0);
@@ -361,7 +344,7 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
                 .into_box();
 
             Some(fut)
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0));
 }
@@ -377,13 +360,11 @@ pub unsafe extern "C" fn immut_data_self_encryptor_writer_free(session: *const S
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            let res = unwrap!(obj_cache.lock()).remove_se_writer(handle);
+        (*session).send(move |_, obj_cache| {
+            let res = obj_cache.remove_se_writer(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e)));
 }
@@ -399,13 +380,11 @@ pub unsafe extern "C" fn immut_data_self_encryptor_reader_free(session: *const S
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            let res = unwrap!(obj_cache.lock()).remove_se_reader(handle);
+        (*session).send(move |_, obj_cache| {
+            let res = obj_cache.remove_se_reader(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
-        }))
+        })
     },
                     move |e| o_cb(user_data.0, ffi_error_code!(e)))
 }
@@ -423,25 +402,24 @@ mod tests {
     use std::sync::mpsc;
     use super::*;
 
-    // TODO Crashes on Win32 on SE::close
-    #[ignore]
     #[test]
     fn immut_data_operations() {
         let sess = test_utils::create_session();
         let app_0 = test_utils::create_app(&sess, false);
         let app_1 = test_utils::create_app(&sess, false);
 
-        let obj_cache = sess.object_cache();
-
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
 
-        let app_1_encrypt_key_handle = {
-            let app_1_pub_encrypt_key = unwrap!(app_1.asym_enc_keys()).0;
-            unwrap!(obj_cache.lock()).insert_encrypt_key(app_1_pub_encrypt_key)
-        };
+        let (app_1_encrypt_key_handle,
+             app_0,
+             app_1) = test_utils::run_now(&sess, |_, obj_cache| {
+                let app_1_pub_encrypt_key = unwrap!(app_1.asym_enc_keys()).0;
+                let encrypt_key_h = obj_cache.insert_encrypt_key(app_1_pub_encrypt_key);
+                let app_0_h = obj_cache.insert_app(app_0);
+                let app_1_h = obj_cache.insert_app(app_1);
 
-        let app_0 = unwrap!(obj_cache.lock()).insert_app(app_0);
-        let app_1 = unwrap!(obj_cache.lock()).insert_app(app_1);
+                (encrypt_key_h, app_0_h, app_1_h)
+            });
 
         unsafe {
             // App-0

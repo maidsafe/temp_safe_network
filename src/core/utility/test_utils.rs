@@ -81,7 +81,7 @@ pub fn random_client_with_net_obs<NetObs, Run, I, E>(n: NetObs, r: Run)
 // unregistered or as a result of successful login. Use this to create Client
 // manually,
 pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
-    where Create: FnOnce(CoreMsgTx, NetworkTx) -> Result<Client, CoreError>,
+    where Create: FnOnce(CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
           Run: FnOnce(&Client) -> I + Send + 'static,
           I: IntoFuture<Item = (), Error = E> + 'static,
           E: Debug
@@ -95,7 +95,7 @@ pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
 // unregistered or as a result of successful login. Use this to create Client
 // manually,
 pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: NetObs, r: Run)
-    where Create: FnOnce(CoreMsgTx, NetworkTx) -> Result<Client, CoreError>,
+    where Create: FnOnce(CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
           NetObs: FnMut(NetworkEvent) + 'static,
           Run: FnOnce(&Client) -> I + Send + 'static,
           I: IntoFuture<Item = (), Error = E> + 'static,
@@ -113,7 +113,7 @@ pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: Ne
     el_h.spawn(net_fut);
 
     let core_tx_clone = core_tx.clone();
-    unwrap!(core_tx.send(CoreMsg::new(move |client| {
+    unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
         let fut = r(client).into_future()
             .map_err(|e| panic!("{:?}", e))
             .map(move |()| unwrap!(core_tx_clone.send(CoreMsg::build_terminator())))
@@ -122,7 +122,7 @@ pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: Ne
         Some(fut)
     })));
 
-    core::run(el, client, core_rx);
+    core::run(el, client, (), core_rx);
 }
 
 /// Convenience for creating a blank runner.

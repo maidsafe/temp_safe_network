@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{CoreError, CoreMsg};
+use core::CoreError;
 use ffi::{App, FfiError, OpaqueCtx, Session, helper};
 use ffi::object_cache::{CipherOptHandle, EncryptKeyHandle};
 use libc::{c_void, int32_t};
@@ -105,13 +105,11 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            let handle = unwrap!(obj_cache.lock()).insert_cipher_opt(CipherOpt::PlainText);
+        (*session).send(move |_, obj_cache| {
+            let handle = obj_cache.insert_cipher_opt(CipherOpt::PlainText);
             o_cb(user_data.0, 0, handle);
             None
-        }))
+        })
     },
                             move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
@@ -125,13 +123,11 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
                                                                              CipherOptHandle)) {
     helper::catch_unwind_cb(|| {
         let user_data = OpaqueCtx(user_data);
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            let handle = unwrap!(obj_cache.lock()).insert_cipher_opt(CipherOpt::Symmetric);
+        (*session).send(move |_, obj_cache| {
+            let handle = obj_cache.insert_cipher_opt(CipherOpt::Symmetric);
             o_cb(user_data.0, 0, handle);
             None
-        }))
+        })
     },
                             |error| o_cb(user_data, ffi_error_code!(error), 0))
 }
@@ -147,21 +143,19 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            let pk = match unwrap!(obj_cache.lock()).get_encrypt_key(peer_encrypt_key_h) {
+        (*session).send(move |_, obj_cache| {
+            let pk = match obj_cache.get_encrypt_key(peer_encrypt_key_h) {
                 Ok(pk) => *pk,
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e), 0);
                     return None;
                 }
             };
-            let handle = unwrap!(obj_cache.lock())
+            let handle = obj_cache
                 .insert_cipher_opt(CipherOpt::Asymmetric { peer_encrypt_key: pk });
             o_cb(user_data.0, 0, handle);
             None
-        }))
+        })
     },
                             move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
 }
@@ -175,13 +169,11 @@ pub unsafe extern "C" fn cipher_opt_free(session: *const Session,
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(|| {
-        let obj_cache = (*session).object_cache();
-
-        (*session).send(CoreMsg::new(move |_| {
-            let res = unwrap!(obj_cache.lock()).remove_cipher_opt(handle);
+        (*session).send(move |_, obj_cache| {
+            let res = obj_cache.remove_cipher_opt(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
-        }))
+        })
     },
                             move |err| o_cb(user_data.0, ffi_error_code!(err)));
 }
@@ -208,7 +200,6 @@ mod tests {
     #[test]
     fn app_0_to_app_0_plain() {
         let sess = test_utils::create_session();
-        let obj_cache = sess.object_cache();
         let app_0 = test_utils::create_app(&sess, false);
 
         let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
@@ -220,23 +211,24 @@ mod tests {
             cipher_opt_new_plaintext(&sess, tx, handle_cb);
             cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
         }
-        let raw_data = {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        let (app_0, plain_text, cipher_text) = test_utils::run_now(&sess, move |_, obj_cache| {
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
-            unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
-        };
+            let cipher_text = unwrap!(cipher_opt.encrypt(&app_0, &plain_text));
+            (app_0, plain_text, cipher_text)
+        });
         assert_free(&sess, cipher_opt_handle, 0);
 
-        assert!(unwrap!(obj_cache.lock()).get_cipher_opt(cipher_opt_handle).is_err());
-        assert!(raw_data != plain_text);
+        test_utils::run_now(&sess, move |_, obj_cache| {
+            assert!(obj_cache.get_cipher_opt(cipher_opt_handle).is_err());
+        });
+        assert!(cipher_text != plain_text);
 
-        assert!(decrypt_and_check(&app_0, &raw_data, &plain_text));
+        assert!(decrypt_and_check(&app_0, &cipher_text, &plain_text));
     }
 
     #[test]
     fn app_0_to_app_0_sym() {
         let sess = test_utils::create_session();
-        let obj_cache = sess.object_cache();
         let app_0 = test_utils::create_app(&sess, false);
 
         let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
@@ -248,17 +240,19 @@ mod tests {
             cipher_opt_new_symmetric(&sess, tx, handle_cb);
             cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
         }
-        let raw_data = {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        let (app_0, plain_text, cipher_text) = test_utils::run_now(&sess, move |_, obj_cache| {
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
-            unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
-        };
+            let cipher_text = unwrap!(cipher_opt.encrypt(&app_0, &plain_text));
+            (app_0, plain_text, cipher_text)
+        });
         assert_free(&sess, cipher_opt_handle, 0);
 
-        assert!(unwrap!(obj_cache.lock()).get_cipher_opt(cipher_opt_handle).is_err());
-        assert!(raw_data != plain_text);
+        test_utils::run_now(&sess, move |_, obj_cache| {
+            assert!(obj_cache.get_cipher_opt(cipher_opt_handle).is_err());
+        });
+        assert!(cipher_text != plain_text);
 
-        assert!(decrypt_and_check(&app_0, &raw_data, &plain_text));
+        assert!(decrypt_and_check(&app_0, &cipher_text, &plain_text));
     }
 
     #[test]
@@ -268,12 +262,11 @@ mod tests {
         let app_0 = test_utils::create_app(&sess, false);
         let app_1 = test_utils::create_app(&sess, false);
 
-        let obj_cache = sess.object_cache();
-
-        let app_1_encrypt_key_handle = {
+        let (app_1, app_1_encrypt_key_handle) = test_utils::run_now(&sess, move |_, obj_cache| {
             let app_1_pub_encrypt_key = unwrap!(app_1.asym_enc_keys()).0;
-            unwrap!(obj_cache.lock()).insert_encrypt_key(app_1_pub_encrypt_key)
-        };
+            let encrypt_key_h = obj_cache.insert_encrypt_key(app_1_pub_encrypt_key);
+            (app_1, encrypt_key_h)
+        });
 
         let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
         let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
@@ -287,29 +280,30 @@ mod tests {
             cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
         }
 
-        let raw_data = {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        let (app_0, plain_text, cipher_text) = test_utils::run_now(&sess, move |_, obj_cache| {
             let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
-            unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
-        };
+            let cipher_text = unwrap!(cipher_opt.encrypt(&app_0, &plain_text));
+            (app_0, plain_text, cipher_text)
+        });
         assert_free(&sess, cipher_opt_handle, 0);
 
-        assert!(unwrap!(obj_cache.lock()).get_cipher_opt(cipher_opt_handle).is_err());
-        assert!(raw_data != plain_text);
+        test_utils::run_now(&sess, move |_, obj_cache| {
+            assert!(obj_cache.get_cipher_opt(cipher_opt_handle).is_err());
+        });
+        assert!(cipher_text != plain_text);
 
-        assert!(!decrypt_and_check(&app_0, &raw_data, &plain_text));
-        assert!(decrypt_and_check(&app_1, &raw_data, &plain_text));
+        assert!(!decrypt_and_check(&app_0, &cipher_text, &plain_text));
+        assert!(decrypt_and_check(&app_1, &cipher_text, &plain_text));
     }
 
     #[test]
     fn create_and_free() {
         let sess = test_utils::create_session();
-        let obj_cache = sess.object_cache();
 
-        let peer_encrypt_key_handle = {
+        let peer_encrypt_key_handle = test_utils::run_now(&sess, |_, obj_cache| {
             let (pk, _) = box_::gen_keypair();
-            unwrap!(obj_cache.lock()).insert_encrypt_key(pk)
-        };
+            obj_cache.insert_encrypt_key(pk)
+        });
 
         let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
         let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
@@ -335,12 +329,11 @@ mod tests {
             cipher_opt_handle_asym = unwrap!(unwrap!(rx.recv()));
         }
 
-        {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        test_utils::run_now(&sess, move |_, obj_cache| {
             let _ = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle_pt));
             let _ = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle_sym));
             let _ = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle_asym));
-        }
+        });
 
         assert_free(&sess, cipher_opt_handle_pt, 0);
         assert_free(&sess, cipher_opt_handle_sym, 0);
@@ -351,12 +344,11 @@ mod tests {
         assert_free(&sess, cipher_opt_handle_sym, err_code);
         assert_free(&sess, cipher_opt_handle_asym, err_code);
 
-        {
-            let mut obj_cache = unwrap!(obj_cache.lock());
+        test_utils::run_now(&sess, move |_, obj_cache| {
             assert!(obj_cache.get_cipher_opt(cipher_opt_handle_pt).is_err());
             assert!(obj_cache.get_cipher_opt(cipher_opt_handle_sym).is_err());
             assert!(obj_cache.get_cipher_opt(cipher_opt_handle_asym).is_err());
-        }
+        })
     }
 
     fn assert_free(sess_ptr: *const Session, cipher_opt_handle: CipherOptHandle, expected: i32) {
