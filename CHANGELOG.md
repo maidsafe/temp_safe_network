@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.22.1]
+- API to get MAID-Public signing key.
+
 ## [0.22.0]
 - New error type - MutationError::DataTooLarge.
 - New Delete handling and update of code and test cases.
