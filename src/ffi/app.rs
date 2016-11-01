@@ -122,7 +122,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                                       o_cb: extern "C" fn(*mut c_void, int32_t, AppHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    let _ = helper::catch_unwind_cb(|| {
+    let _ = helper::catch_unwind_cb(user_data, o_cb, || {
         let app_name = try!(helper::c_utf8_to_string(app_name, app_name_len));
         let unique_token = try!(helper::c_utf8_to_string(unique_token, token_len));
         let vendor = try!(helper::c_utf8_to_string(vendor, vendor_len));
@@ -139,8 +139,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                     .into_box();
             Some(fut)
         })
-    },
-                                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Register an annonymous app with the launcher. Can access only public data
@@ -150,12 +149,12 @@ pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
                                                  o_cb: extern "C" fn(*mut c_void,
                                                                      int32_t,
                                                                      AppHandle)) {
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |_, object_cache| {
             let app_handle = object_cache.insert_app(App::Unauthorised);
             o_cb(user_data.0, 0, app_handle);
             None
         })
-    }, move |error| o_cb(user_data, error, 0))
+    })
 }

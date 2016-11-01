@@ -61,3 +61,16 @@ macro_rules! ffi_ptr_try {
         }
     }
 }
+
+macro_rules! try_cb {
+    ($result:expr, $user_data:expr, $cb:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(err) => {
+                use $crate::ffi::callback::{Callback, CallbackArgs};
+                $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());
+                return None;
+            }
+        }
+    }
+}

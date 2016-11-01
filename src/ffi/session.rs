@@ -331,16 +331,14 @@ pub unsafe extern "C" fn client_issued_gets(session: *const Session,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void,
                                                                        int32_t,
-                                                                       int64_t))
-                                            -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                       int64_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued GETs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(move |client, _| {
+        (*session).send(move |client, _| {
             o_cb(user_data.0, 0, client.issued_gets() as int64_t);
             None
-        }));
-        0
+        })
     })
 }
 
@@ -350,16 +348,14 @@ pub unsafe extern "C" fn client_issued_puts(session: *const Session,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void,
                                                                        int32_t,
-                                                                       int64_t))
-                                            -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                       int64_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued PUTs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(move |client, _| {
+        (*session).send(move |client, _| {
             o_cb(user_data.0, 0, client.issued_puts() as int64_t);
             None
-        }));
-        0
+        })
     })
 }
 
@@ -367,18 +363,16 @@ pub unsafe extern "C" fn client_issued_puts(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_posts(session: *const Session,
                                              user_data: *mut c_void,
-                                             o_cb: unsafe extern "C" fn(int32_t,
-                                                                        *mut c_void,
-                                                                        int64_t))
-                                             -> i32 {
-    helper::catch_unwind_i32(|| {
+                                             o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                        int32_t,
+                                                                        int64_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued POSTs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(move |client, _| {
-            o_cb(0, user_data.0, client.issued_posts() as int64_t);
+        (*session).send(move |client, _| {
+            o_cb(user_data.0, 0, client.issued_posts() as int64_t);
             None
-        }));
-        0
+        })
     })
 }
 
@@ -388,16 +382,14 @@ pub unsafe extern "C" fn client_issued_deletes(session: *const Session,
                                                user_data: *mut c_void,
                                                o_cb: unsafe extern "C" fn(*mut c_void,
                                                                           int32_t,
-                                                                          int64_t))
-                                               -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                          int64_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued DELETEs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(move |client, _| {
+        (*session).send(move |client, _| {
             o_cb(user_data.0, 0, client.issued_deletes() as int64_t);
             None
-        }));
-        0
+        })
     })
 }
 
@@ -407,16 +399,14 @@ pub unsafe extern "C" fn client_issued_appends(session: *const Session,
                                                user_data: *mut c_void,
                                                o_cb: unsafe extern "C" fn(*mut c_void,
                                                                           int32_t,
-                                                                          int64_t))
-                                               -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                          int64_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued APPENDs.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).send(move |client, _| {
+        (*session).send(move |client, _| {
             o_cb(user_data.0, 0, client.issued_appends() as int64_t);
             None
-        }));
-        0
+        })
     })
 }
 
@@ -429,13 +419,11 @@ pub unsafe extern "C" fn get_account_info(session: *const Session,
                                           o_cb: unsafe extern "C" fn(*mut c_void,
                                                                      int32_t,
                                                                      uint64_t,
-                                                                     uint64_t))
-                                          -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                     uint64_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get account information.");
         let user_data = OpaqueCtx(user_data);
-        ffi_try!((*session).account_info(user_data, o_cb));
-        0
+        (*session).account_info(user_data, o_cb)
     })
 }
 

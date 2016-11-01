@@ -53,11 +53,6 @@ const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 const REQUEST_TIMEOUT_SECS: u64 = 120;
 
-#[cfg(test)]
-const REQUEST_TIMEOUT_SECS: u64 = 5;
-#[cfg(not(test))]
-const REQUEST_TIMEOUT_SECS: u64 = 120;
-
 /// The main self-authentication client instance that will interface all the
 /// request from high level API's to the actual routing layer and manage all
 /// interactions with it. This is essentially a non-blocking Client with upper

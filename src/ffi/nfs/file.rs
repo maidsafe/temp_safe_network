@@ -46,7 +46,7 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI delete file, given the path.");
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
 
@@ -67,8 +67,7 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
                 }
             }
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
+    })
 }
 
 /// Get file. The returned FileDetails pointer must be disposed of by calling
@@ -88,7 +87,7 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
                                                                  *mut FileDetails)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get file, given the path.");
 
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
@@ -119,8 +118,7 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
                 }
             }
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut()))
+    })
 }
 
 /// Modify name, metadata or content of the file.
@@ -140,7 +138,7 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI modify file, given the path.");
 
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
@@ -171,8 +169,7 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
                 }
             }
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
+    })
 }
 
 /// Move or copy a file.
@@ -190,7 +187,7 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
                                        o_cb: extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI move file, from {:?} to {:?}.", src_path, dst_path);
 
         let src_path = try!(helper::c_utf8_to_str(src_path, src_path_len));
@@ -219,8 +216,7 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
                 }
             }
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
+    })
 }
 
 /// Get a number of file versions
@@ -236,7 +232,7 @@ pub unsafe extern "C" fn nfs_get_file_num_of_versions(session: *const Session,
                                                                           uint64_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get number of file versions, given the path.");
 
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
@@ -256,8 +252,7 @@ pub unsafe extern "C" fn nfs_get_file_num_of_versions(session: *const Session,
                 }
             }
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 fn get_num_of_versions(client: &Client,
@@ -290,7 +285,7 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
                                                                    int32_t,
                                                                    *mut FileMetadata)) {
     let user_data = OpaqueCtx(user_data);
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get file metadata, given the path.");
 
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
@@ -315,8 +310,7 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
                 }
             }
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut()))
+    })
 }
 
 fn delete_file(client: &Client, app: &App, file_path: &str, is_shared: bool) -> Box<FfiFuture<()>> {

@@ -38,7 +38,7 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
                                                 long_name_len: usize,
                                                 user_data: *mut c_void,
                                                 o_cb: extern "C" fn(*mut c_void, int32_t)) {
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
 
         trace!("FFI register public-id with name: {}. This means to register dns without a \
@@ -49,13 +49,7 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
         let (msg_pk, msg_sk) = box_::gen_keypair();
 
         (*session).send(move |client, _| {
-            let (sign_pk, sign_sk) = match client.signing_keypair() {
-                Ok((pk, sk)) => (pk, sk),
-                Err(err) => {
-                    o_cb(user_data.0, ffi_error_code!(err));
-                    return None;
-                }
-            };
+            let (sign_pk, sign_sk) = try_cb!(client.signing_keypair(), user_data, o_cb);
 
             let fut = operations::register_dns(client,
                                                long_name,
@@ -71,7 +65,7 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
 
             Some(fut)
         })
-    }, move |error| o_cb(user_data, error))
+    })
 }
 
 /// Delete DNS.
@@ -81,19 +75,13 @@ pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
                                               long_name_len: usize,
                                               user_data: *mut c_void,
                                               o_cb: extern "C" fn(*mut c_void, int32_t)) {
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI delete DNS.");
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let user_data = OpaqueCtx(user_data);
 
         (*session).send(move |client, _| {
-            let sign_sk = match client.secret_signing_key() {
-                Ok(sk) => sk,
-                Err(err) => {
-                    o_cb(user_data.0, ffi_error_code!(err));
-                    return None;
-                }
-            };
+            let sign_sk = try_cb!(client.secret_signing_key(), user_data, o_cb);
 
             let fut = operations::delete_dns(client, long_name, sign_sk)
                 .map(move |_| o_cb(user_data.0, 0))
@@ -102,7 +90,7 @@ pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
 
             Some(fut)
         })
-    }, move |error| o_cb(user_data, error))
+    })
 }
 
 /// Get all registered long names.
@@ -112,7 +100,7 @@ pub unsafe extern "C" fn dns_get_long_names(session: *const Session,
                                             o_cb: extern "C" fn(*mut c_void,
                                                                 int32_t,
                                                                 *mut StringList)) {
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI Get all dns long names.");
         let user_data = OpaqueCtx(user_data);
 
@@ -126,7 +114,7 @@ pub unsafe extern "C" fn dns_get_long_names(session: *const Session,
 
             Some(fut)
         })
-    }, move |error| o_cb(user_data, error, ptr::null_mut()))
+    })
 }
 
 #[cfg(test)]

@@ -22,9 +22,10 @@
 use core::Client;
 use core::futures::FutureExt;
 use ffi::{App, FfiError, FfiFuture};
+use ffi::callback::{Callback, CallbackArgs};
 use ffi::config::SAFE_DRIVE_DIR_NAME;
 use futures::Future;
-use libc::int32_t;
+use libc::{c_void, int32_t};
 use nfs::{Dir, DirMetadata};
 use nfs::helper::dir_helper;
 use std::{self, mem, ptr, slice};
@@ -91,9 +92,10 @@ pub fn catch_unwind_ptr<T, F: FnOnce() -> *const T>(f: F) -> *const T {
 
 // Every FFI function which uses result callback should have its body wrapped
 // in this.
-pub fn catch_unwind_cb<F, G>(body: F, on_error: G)
-    where F: FnOnce() -> Result<(), FfiError>,
-          G: FnOnce(i32),
+pub fn catch_unwind_cb<U, C, F>(user_data: U, cb: C, body: F)
+    where U: Into<*mut c_void>,
+          C: Callback,
+          F: FnOnce() -> Result<(), FfiError>
 {
     let result = match panic::catch_unwind(AssertUnwindSafe(body)) {
         Err(_) => Err(FfiError::from("panic")),
@@ -101,7 +103,7 @@ pub fn catch_unwind_cb<F, G>(body: F, on_error: G)
     };
 
     if let Err(err) = result {
-        on_error(ffi_error_code!(err));
+        cb.call(user_data.into(), ffi_error_code!(err), CallbackArgs::default());
     }
 }
 

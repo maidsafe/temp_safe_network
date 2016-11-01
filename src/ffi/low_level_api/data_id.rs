@@ -32,19 +32,17 @@ pub unsafe extern "C" fn data_id_new_struct_data(session: *const Session,
                                                  user_data: *mut c_void,
                                                  o_cb: unsafe extern "C" fn(*mut c_void,
                                                                             int32_t,
-                                                                            DataIdHandle))
-                                                 -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                            DataIdHandle)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Structured(xor_id, type_tag);
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |_, obj_cache| {
+        (*session).send(move |_, obj_cache| {
             let handle = obj_cache.insert_data_id(data_id);
             o_cb(user_data.0, 0, handle);
             None
-        }));
-        0
+        })
     })
 }
 
@@ -108,14 +106,13 @@ pub unsafe extern "C" fn data_id_free(session: *const Session,
                                       o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = obj_cache.remove_data_id(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 #[cfg(test)]
@@ -151,8 +148,7 @@ mod tests {
             let tx: *mut _ = &mut tx;
             let tx = tx as *mut c_void;
 
-            assert_eq!(data_id_new_struct_data(sess_ptr, type_tag, &struct_id_arr, tx, data_id_cb),
-                       0);
+            data_id_new_struct_data(sess_ptr, type_tag, &struct_id_arr, tx, data_id_cb);
             data_id_handle_struct = unwrap!(rx.recv());
 
             assert_eq!(data_id_new_immut_data(sess_ptr, &immut_id_arr, tx, data_id_cb),

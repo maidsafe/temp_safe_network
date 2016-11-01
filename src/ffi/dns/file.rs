@@ -45,7 +45,7 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
                                       include_metadata: bool,
                                       user_data: *mut c_void,
                                       o_cb: extern "C" fn(*mut c_void, int32_t, *mut FileDetails)) {
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
         let file_path = try!(helper::c_utf8_to_string(file_path, file_path_len));
@@ -80,8 +80,7 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
 
             Some(fut)
         })
-    },
-                            move |error| o_cb(user_data, error, ptr::null_mut()))
+    })
 }
 
 /// Get file metadata.
@@ -97,7 +96,7 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                                                o_cb: extern "C" fn(*mut c_void,
                                                                    int32_t,
                                                                    *mut FileMetadata)) {
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
         let file_path = try!(helper::c_utf8_to_string(file_path, file_path_len));
@@ -131,8 +130,7 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
 
             Some(fut)
         })
-    },
-                            move |error| o_cb(user_data, error, ptr::null_mut()))
+    })
 }
 
 #[cfg(test)]

@@ -57,6 +57,7 @@ pub mod nfs;
 pub mod session;
 pub mod string_list;
 
+mod callback;
 mod config;
 mod helper;
 mod launcher_config;
@@ -69,14 +70,21 @@ pub use ffi::errors::FfiError;
 pub use ffi::session::Session;
 
 use futures::Future;
+use libc::c_void;
 
 /// Helper type to represent the FFI future result
 pub type FfiFuture<T> = Future<Item = T, Error = FfiError>;
 
 /// Type that holds opaque user data handed into FFI functions
 #[derive(Clone, Copy)]
-pub struct OpaqueCtx(*mut ::libc::c_void);
+pub struct OpaqueCtx(*mut c_void);
 unsafe impl Send for OpaqueCtx {}
+
+impl Into<*mut c_void> for OpaqueCtx {
+    fn into(self) -> *mut c_void {
+       self.0
+    }
+}
 
 /// Result that uses FfiError as error type
 pub type FfiResult<T> = Result<T, FfiError>;
