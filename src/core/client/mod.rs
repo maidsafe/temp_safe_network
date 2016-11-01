@@ -46,8 +46,10 @@ use std::fmt;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
+use tokio_core::reactor::{Handle, Timeout};
 
 const CONNECTION_TIMEOUT_SECS: u64 = 10;
+const REQUEST_TIMEOUT_SECS: u64 = 120;
 const ACC_PKT_TIMEOUT_SECS: u64 = 60;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 
@@ -64,6 +66,7 @@ pub struct Client {
 }
 
 struct Inner {
+    el_handle: Handle,
     routing: Routing,
     hooks: HashMap<MessageId, Complete<CoreEvent>>,
     cache: LruCache<XorName, Data>,
@@ -76,7 +79,7 @@ impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will
     /// create an unregistered random client, which can do very limited set of
     /// operations - eg., a Network-Get
-    pub fn unregistered<T>(core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Result<Self, CoreError>
+    pub fn unregistered<T>(el_handle: Handle, core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Result<Self, CoreError>
         where T: 'static
     {
         trace!("Creating unregistered client.");
@@ -87,6 +90,7 @@ impl Client {
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
+            el_handle: el_handle,
             routing: routing,
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
@@ -100,6 +104,7 @@ impl Client {
     /// create a fresh acc for the user in the SAFE-network.
     pub fn registered<T>(acc_locator: &str,
                          acc_password: &str,
+                         el_handle: Handle,
                          core_tx: CoreMsgTx<T>,
                          net_tx: NetworkTx)
                          -> Result<Client, CoreError>
@@ -156,6 +161,7 @@ impl Client {
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
+            el_handle: el_handle,
             routing: routing,
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
@@ -169,6 +175,7 @@ impl Client {
     /// login to an already existing account of the user in the SAFE-network.
     pub fn login<T>(acc_locator: &str,
                     acc_password: &str,
+                    el_handle: Handle,
                     core_tx: CoreMsgTx<T>,
                     net_tx: NetworkTx)
                     -> Result<Client, CoreError>
@@ -231,6 +238,7 @@ impl Client {
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
+            el_handle: el_handle,
             routing: routing,
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
@@ -330,20 +338,21 @@ impl Client {
             }
 
             let inner = self.inner.clone();
-            rx.map(move |data| {
-                    match data {
-                        ref data @ Data::Immutable(_) => {
-                            let _ = inner.borrow_mut()
-                                .cache
-                                .insert(*data.name(), data.clone());
-                        }
-                        _ => (),
+            let rx = rx.map(move |data| {
+                match data {
+                    ref data @ Data::Immutable(_) => {
+                        let _ = inner.borrow_mut()
+                            .cache
+                            .insert(*data.name(), data.clone());
                     }
-                    data
-                })
-                .into_box()
+                    _ => (),
+                }
+                data
+            });
+
+            timeout(&self.inner().el_handle, rx)
         } else {
-            rx.into_box()
+            timeout(&self.inner().el_handle, rx)
         };
 
         let dst = match opt_dst {
@@ -371,7 +380,7 @@ impl Client {
         self.stats_mut().issued_puts += 1;
 
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(oneshot);
+        let rx = build_mutation_future(&self.inner().el_handle, oneshot);
 
         let dst = match dst {
             Some(a) => Ok(a),
@@ -498,7 +507,7 @@ impl Client {
         self.stats_mut().issued_posts += 1;
 
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(oneshot);
+        let rx = build_mutation_future(&self.inner().el_handle, oneshot);
 
         let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
         let msg_id = MessageId::new();
@@ -520,7 +529,7 @@ impl Client {
         self.stats_mut().issued_deletes += 1;
 
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(oneshot);
+        let rx = build_mutation_future(&self.inner().el_handle, oneshot);
 
         let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
         let msg_id = MessageId::new();
@@ -570,7 +579,7 @@ impl Client {
         self.stats_mut().issued_appends += 1;
 
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(oneshot);
+        let rx = build_mutation_future(&self.inner().el_handle, oneshot);
 
         let dst = match dst {
             Some(auth) => auth,
@@ -604,8 +613,8 @@ impl Client {
             .and_then(|event| match event {
                 CoreEvent::AccountInfo(res) => res,
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
-            })
-            .into_box();
+            });
+        let rx = timeout(&self.inner().el_handle, rx);
 
         let dst = match dst {
             Some(a) => Ok(a),
@@ -948,13 +957,37 @@ fn spawn_routing_thread<T>(routing_rx: Receiver<Event>,
                   move || routing_el::run(routing_rx, core_tx, net_tx))
 }
 
-fn build_mutation_future(oneshot: Oneshot<CoreEvent>) -> Box<CoreFuture<()>> {
-    oneshot.map_err(|_| CoreError::OperationAborted)
+fn timeout<F, T>(handle: &Handle, future: F) -> Box<CoreFuture<T>>
+    where F: Future<Item=T, Error=CoreError> + 'static,
+          T: 'static
+{
+    let duration = Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    let timeout = match Timeout::new(duration, handle) {
+        Ok(timeout) => timeout,
+        Err(err) => return err!(CoreError::Unexpected(format!("Timeout create error: {:?}", err))),
+    };
+
+    let timeout = timeout.then(|result| -> Result<T, _> {
+        match result {
+            Ok(()) => Err(CoreError::RequestTimeout),
+            Err(err) => Err(CoreError::Unexpected(format!("Timeout fire error {:?}", err)))
+        }
+    });
+
+    future.select(timeout).then(|result| match result {
+        Ok((a, _)) => Ok(a),
+        Err((a, _)) => Err(a),
+    }).into_box()
+}
+
+fn build_mutation_future(handle: &Handle, oneshot: Oneshot<CoreEvent>) -> Box<CoreFuture<()>> {
+    let fut = oneshot.map_err(|_| CoreError::OperationAborted)
         .and_then(|event| match event {
             CoreEvent::Mutation(res) => res,
             _ => Err(CoreError::ReceivedUnexpectedEvent),
-        })
-        .into_box()
+        });
+
+    timeout(handle, fut)
 }
 
 #[cfg(test)]
@@ -986,7 +1019,7 @@ mod tests {
         // Unregistered Client should be able to retrieve the data
         let data_id = DataIdentifier::Immutable(*orig_data.name());
 
-        setup_client(|core_tx, net_tx| Client::unregistered(core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::unregistered(el_h, core_tx, net_tx),
                      move |client| {
             let client2 = client.clone();
             let client3 = client.clone();
@@ -1046,10 +1079,14 @@ mod tests {
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ = unwrap!(Client::registered::<()>(&sec_0, &sec_1, core_tx.clone(), net_tx.clone()));
+        let _ = unwrap!(Client::registered::<()>(&sec_0,
+                                                 &sec_1,
+                                                 el.handle(),
+                                                 core_tx.clone(),
+                                                 net_tx.clone()));
 
         // Account creation - same secrets - should fail
-        match Client::registered(&sec_0, &sec_1, core_tx, net_tx) {
+        match Client::registered(&sec_0, &sec_1, el.handle(), core_tx, net_tx) {
             Ok(_) => panic!("Account name hijacking should fail"),
             Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
             Err(err) => panic!("{:?}", err),
@@ -1062,14 +1099,14 @@ mod tests {
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
         let res = panic::catch_unwind(|| {
-            setup_client(|core_tx, net_tx| Client::login(&sec_0, &sec_1, core_tx, net_tx),
+            setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
                          |_| finish());
         });
         assert!(res.is_err());
 
-        setup_client(|core_tx, net_tx| Client::registered(&sec_0, &sec_1, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      |_| finish());
-        setup_client(|core_tx, net_tx| Client::login(&sec_0, &sec_1, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      |_| finish());
     }
 
@@ -1083,13 +1120,13 @@ mod tests {
                       Some(secretbox::gen_key()));
         let dir_id_clone = dir_id.clone();
 
-        setup_client(|core_tx, net_tx| Client::registered(&sec_0, &sec_1, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      move |client| {
                          assert!(client.user_root_dir_id().is_none());
                          client.set_user_root_dir_id(dir_id_clone)
                      });
 
-        setup_client(|core_tx, net_tx| Client::login(&sec_0, &sec_1, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      move |client| {
                          let got_dir_id = unwrap!(client.user_root_dir_id());
                          assert_eq!(got_dir_id, dir_id);
@@ -1107,13 +1144,13 @@ mod tests {
                       Some(secretbox::gen_key()));
         let dir_id_clone = dir_id.clone();
 
-        setup_client(|core_tx, net_tx| Client::registered(&sec_0, &sec_1, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      move |client| {
                          assert!(client.config_root_dir_id().is_none());
                          client.set_config_root_dir_id(dir_id_clone)
                      });
 
-        setup_client(|core_tx, net_tx| Client::login(&sec_0, &sec_1, core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      move |client| {
                          let got_dir_id = unwrap!(client.config_root_dir_id());
                          assert_eq!(got_dir_id, dir_id);

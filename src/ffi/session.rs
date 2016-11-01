@@ -58,7 +58,8 @@ struct Inner {
 impl Session {
     /// Send a message to the core event loop
     pub fn send<F>(&self, f: F) -> Result<(), FfiError>
-        where F: FnOnce(&Client, &ObjectCache) -> Option<Box<Future<Item=(), Error=()>>> + Send + 'static
+        where F: FnOnce(&Client, &ObjectCache) -> Option<Box<Future<Item=(), Error=()>>>
+                 + Send + 'static
     {
         let msg = CoreMsg::new(f);
         let core_tx = unwrap!(self.inner.core_tx.lock());
@@ -88,7 +89,7 @@ impl Session {
 
             let core_tx_clone = core_tx.clone();
 
-            let client = try_tx!(Client::unregistered(core_tx_clone, net_tx), tx);
+            let client = try_tx!(Client::unregistered(el_h, core_tx_clone, net_tx), tx);
             let object_cache = ObjectCache::new();
             unwrap!(tx.send(Ok(core_tx)));
 
@@ -133,8 +134,9 @@ impl Session {
                     .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
-            let client = try_tx!(Client::registered(&locator, &password, core_tx_clone, net_tx),
-                                 tx);
+            let client =
+                try_tx!(Client::registered(&locator, &password, el_h, core_tx_clone, net_tx),
+                        tx);
             let object_cache = ObjectCache::new();
 
             unwrap!(tx.send(Ok(core_tx)));
@@ -180,7 +182,7 @@ impl Session {
                     .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
-            let client = try_tx!(Client::login(&locator, &password, core_tx_clone, net_tx),
+            let client = try_tx!(Client::login(&locator, &password, el_h, core_tx_clone, net_tx),
                                  tx);
             let object_cache = ObjectCache::new();
 
