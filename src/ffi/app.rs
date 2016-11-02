@@ -26,18 +26,12 @@
 // references instead of copies etc.) and uniform (i.e. not use get_ prefix for
 // mem functions.
 
-use core::Client;
-use core::futures::FutureExt;
-use ffi::{FfiFuture, OpaqueCtx};
+use core::{Client, FutureExt};
+use ffi::{AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper, launcher_config};
 use futures::{self, Future};
 use libc::{c_void, int32_t};
 use nfs::DirId;
 use rust_sodium::crypto::{box_, secretbox};
-use super::Session;
-use super::errors::FfiError;
-use super::helper;
-use super::launcher_config;
-use super::object_cache::AppHandle;
 
 /// Represents an application connected to the launcher.
 #[derive(RustcEncodable, RustcDecodable, Debug, Clone)]
