@@ -104,14 +104,13 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
                                                                              CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let handle = obj_cache.insert_cipher_opt(CipherOpt::PlainText);
             o_cb(user_data.0, 0, handle);
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Construct CipherOpt::Symmetric handle
@@ -121,15 +120,14 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
                                                                              int32_t,
                                                                              CipherOptHandle)) {
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |_, obj_cache| {
             let handle = obj_cache.insert_cipher_opt(CipherOpt::Symmetric);
             o_cb(user_data.0, 0, handle);
             None
         })
-    },
-                            |error| o_cb(user_data, ffi_error_code!(error), 0))
+    })
 }
 
 /// Construct CipherOpt::Asymmetric handle
@@ -142,7 +140,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
                                                                               CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let pk = match obj_cache.get_encrypt_key(peer_encrypt_key_h) {
                 Ok(pk) => *pk,
@@ -156,8 +154,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
             o_cb(user_data.0, 0, handle);
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Free CipherOpt handle
@@ -168,14 +165,13 @@ pub unsafe extern "C" fn cipher_opt_free(session: *const Session,
                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = obj_cache.remove_cipher_opt(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 #[cfg(test)]

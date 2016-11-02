@@ -59,17 +59,16 @@ pub unsafe extern "C" fn nfs_create_file(session: *const Session,
                                          is_path_shared: bool,
                                          is_versioned: bool,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(int32_t, *mut c_void, *mut Writer))
-                                         -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                         o_cb: extern "C" fn(*mut c_void, int32_t, *mut Writer)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get nfs writer for creating a new file.");
 
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
+        let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
         let user_metadata = helper::u8_ptr_to_vec(user_metadata, user_metadata_len);
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |client, obj_cache| {
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = create_file(&client,
@@ -80,21 +79,20 @@ pub unsafe extern "C" fn nfs_create_file(session: *const Session,
                                           is_versioned)
                         .map(move |writer| {
                             let writer_handle = Box::into_raw(Box::new(writer));
-                            o_cb(0, user_data.0, writer_handle);
+                            o_cb(user_data.0, 0, writer_handle);
                         })
                         .map_err(move |e| {
-                            o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                            o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                         })
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                    o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                     None
                 }
             }
-        }));
-        0
+        })
     })
 }
 
@@ -106,36 +104,33 @@ pub unsafe extern "C" fn nfs_writer_open(session: *const Session,
                                          file_path_len: usize,
                                          is_path_shared: bool,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(int32_t, *mut c_void, *mut Writer))
-                                         -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                         o_cb: extern "C" fn(*mut c_void, int32_t, *mut Writer)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get nfs writer for modification of existing file.");
-        let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
+        let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |client, obj_cache| {
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = writer_open(&client, &app, file_path, is_path_shared)
                         .map(move |writer| {
                             let writer_handle = Box::into_raw(Box::new(writer));
-                            o_cb(0, user_data.0, writer_handle);
+                            o_cb(user_data.0, 0, writer_handle);
                         })
                         .map_err(move |e| {
-                            o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                            o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                         })
                         .into_box();
                     Some(fut)
                 }
                 Err(e) => {
-                    o_cb(ffi_error_code!(e), user_data.0, ptr::null_mut());
+                    o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut());
                     None
                 }
             }
-        }));
-
-        0
+        })
     })
 }
 
@@ -146,9 +141,8 @@ pub unsafe extern "C" fn nfs_writer_write(session: *const Session,
                                           data: *const u8,
                                           len: usize,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(int32_t, *mut c_void))
-                                          -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                          o_cb: extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI Write data using nfs writer.");
 
         let data = slice::from_raw_parts(data, len);
@@ -156,18 +150,17 @@ pub unsafe extern "C" fn nfs_writer_write(session: *const Session,
         let user_data = OpaqueCtx(user_data);
         let writer_handle = OpaqueCtx(writer_handle as *mut _);
 
-        ffi_try!((*session).send(move |_, _| {
+        (*session).send(move |_, _| {
             let writer_handle: *mut Writer = writer_handle.0 as *mut _;
             Some((*writer_handle)
                 .inner
                 .write(&data[..])
                 .then(move |res| {
-                    o_cb(ffi_result_code!(res), user_data.0);
+                    o_cb(user_data.0, ffi_result_code!(res));
                     Ok(())
                 })
                 .into_box())
-        }));
-        0
+        })
     })
 }
 
@@ -176,25 +169,22 @@ pub unsafe extern "C" fn nfs_writer_write(session: *const Session,
 pub unsafe extern "C" fn nfs_writer_close(session: *const Session,
                                           writer_handle: *mut Writer,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(int32_t, *mut c_void))
-                                          -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                          o_cb: extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI Close and consume nfs writer.");
 
         let writer = *Box::from_raw(writer_handle);
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |_, _| {
+        (*session).send(move |_, _| {
             Some(writer.close()
                 .then(move |res| {
-                    o_cb(ffi_result_code!(res), user_data.0);
+                    o_cb(user_data.0, ffi_result_code!(res));
                     Ok(())
                 })
                 .into_box())
-        }));
-
-        0
+        })
     })
 }
 

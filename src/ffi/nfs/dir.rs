@@ -44,16 +44,15 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
                                         is_private: bool,
                                         is_shared: bool,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void, int32_t))
-                                        -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                        o_cb: extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI create directory, given the path.");
 
-        let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
+        let dir_path = try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let user_metadata = slice::from_raw_parts(user_metadata, user_metadata_len);
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |client, obj_cache| {
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     let fut = create_dir(&client,
@@ -71,9 +70,7 @@ pub unsafe extern "C" fn nfs_create_dir(session: *const Session,
                     None
                 }
             }
-        }));
-
-        0
+        })
     })
 }
 
@@ -85,14 +82,13 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
                                         dir_path_len: usize,
                                         is_shared: bool,
                                         user_data: *mut c_void,
-                                        o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
-                                        -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                        o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI delete dir, given the path.");
-        let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
+        let dir_path = try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |client, obj_cache| {
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     delete_dir(&client, &app, dir_path, is_shared)
@@ -105,9 +101,7 @@ pub unsafe extern "C" fn nfs_delete_dir(session: *const Session,
                     None
                 }
             }
-        }));
-
-        0
+        })
     })
 }
 
@@ -121,14 +115,13 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void,
                                                          int32_t,
-                                                         details_handle: *mut DirDetails))
-                                     -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                                         details_handle: *mut DirDetails)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get dir, given the path.");
-        let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
+        let dir_path = try!(helper::c_utf8_to_str(dir_path, dir_path_len));
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |client, obj_cache| {
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     get_dir(&client, &app, dir_path, is_shared)
@@ -147,9 +140,7 @@ pub unsafe extern "C" fn nfs_get_dir(session: *const Session,
                     None
                 }
             }
-        }));
-
-        0
+        })
     })
 }
 
@@ -165,17 +156,16 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
                                         new_user_metadata: *const u8,
                                         new_user_metadata_len: usize,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void, int32_t))
-                                        -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                        o_cb: extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI modify directory, given the path.");
-        let dir_path = ffi_try!(helper::c_utf8_to_str(dir_path, dir_path_len));
-        let new_name = ffi_try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
+        let dir_path = try!(helper::c_utf8_to_str(dir_path, dir_path_len));
+        let new_name = try!(helper::c_utf8_to_opt_string(new_name, new_name_len));
         let new_user_metadata = helper::u8_ptr_to_opt_vec(new_user_metadata, new_user_metadata_len);
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |client, obj_cache| {
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     modify_dir(&client,
@@ -193,9 +183,7 @@ pub unsafe extern "C" fn nfs_modify_dir(session: *const Session,
                     None
                 }
             }
-        }));
-
-        0
+        })
     })
 }
 
@@ -211,16 +199,15 @@ pub unsafe extern "C" fn nfs_move_dir(session: *const Session,
                                       is_dst_path_shared: bool,
                                       retain_src: bool,
                                       user_data: *mut c_void,
-                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
-                                      -> int32_t {
-    helper::catch_unwind_i32(|| {
+                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI move directory, from {:?} to {:?}.", src_path, dst_path);
 
-        let src_path = ffi_try!(helper::c_utf8_to_str(src_path, src_path_len));
-        let dst_path = ffi_try!(helper::c_utf8_to_str(dst_path, dst_path_len));
+        let src_path = try!(helper::c_utf8_to_str(src_path, src_path_len));
+        let dst_path = try!(helper::c_utf8_to_str(dst_path, dst_path_len));
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |client, obj_cache| {
+        (*session).send(move |client, obj_cache| {
             match obj_cache.get_app(app_handle) {
                 Ok(app) => {
                     move_dir(&client,
@@ -239,8 +226,7 @@ pub unsafe extern "C" fn nfs_move_dir(session: *const Session,
                     None
                 }
             }
-        }));
-        0
+        })
     })
 }
 

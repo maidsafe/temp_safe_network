@@ -39,25 +39,15 @@ macro_rules! ffi_result_code {
     }
 }
 
-macro_rules! ffi_try {
-    ($result:expr) => {
+macro_rules! try_cb {
+    ($result:expr, $user_data:expr, $cb:expr) => {
         match $result {
-            Ok(value)  => value,
-            Err(error) => {
-                return ffi_error_code!(error)
-            },
-        }
-    }
-}
-
-macro_rules! ffi_ptr_try {
-    ($result:expr, $out:expr) => {
-        match $result {
-            Ok(value)  => value,
-            Err(error) => {
-                let _ = ffi_error_code!(error);
-                return ::std::ptr::null();
-            },
+            Ok(value) => value,
+            Err(err) => {
+                use $crate::ffi::callback::{Callback, CallbackArgs};
+                $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());
+                return None;
+            }
         }
     }
 }

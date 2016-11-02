@@ -22,12 +22,13 @@
 use core::Client;
 use core::futures::FutureExt;
 use ffi::{App, FfiError, FfiFuture};
+use ffi::callback::{Callback, CallbackArgs};
 use ffi::config::SAFE_DRIVE_DIR_NAME;
 use futures::Future;
-use libc::int32_t;
+use libc::{c_void, int32_t};
 use nfs::{Dir, DirMetadata};
 use nfs::helper::dir_helper;
-use std::{self, mem, ptr, slice};
+use std::{self, mem, slice};
 use std::error::Error;
 use std::panic::{self, AssertUnwindSafe};
 
@@ -80,28 +81,42 @@ pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
     (ptr, len, cap)
 }
 
-pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
-    let errno: i32 = FfiError::Unexpected(String::new()).into();
-    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(errno)
+// Catch panics. On error return default value.
+pub fn catch_unwind<T: CallbackArgs, F: FnOnce() -> Result<T, FfiError>>(f: F) -> T {
+    match catch_unwind_result(f) {
+        Ok(value) => value,
+        Err(err) => {
+            let _ = ffi_error_code!(err);
+            CallbackArgs::default()
+        }
+    }
 }
 
-pub fn catch_unwind_ptr<T, F: FnOnce() -> *const T>(f: F) -> *const T {
-    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(ptr::null())
+// Catch panics. Use this when the code cannot fail.
+pub fn catch_unwind_ok<T: CallbackArgs, F: FnOnce() -> T>(f: F) -> T {
+    catch_unwind(|| Ok(f()))
 }
 
-// Every FFI function which uses result callback should have its body wrapped
-// in this.
-pub fn catch_unwind_cb<F, G>(body: F, on_error: G)
-    where F: FnOnce() -> Result<(), FfiError>,
-          G: FnOnce(i32),
+// Catch panics. On error return the error code.
+pub fn catch_unwind_error_code<F: FnOnce() -> Result<(), FfiError>>(f: F) -> int32_t {
+    ffi_result_code!(catch_unwind_result(f))
+}
+
+// Catch panics. On error call the callback.
+pub fn catch_unwind_cb<U, C, F>(user_data: U, cb: C, f: F)
+    where U: Into<*mut c_void>,
+          C: Callback,
+          F: FnOnce() -> Result<(), FfiError>
 {
-    let result = match panic::catch_unwind(AssertUnwindSafe(body)) {
+    if let Err(err) = catch_unwind_result(f) {
+        cb.call(user_data.into(), ffi_error_code!(err), CallbackArgs::default());
+    }
+}
+
+fn catch_unwind_result<T, F: FnOnce() -> Result<T, FfiError>>(f: F) -> Result<T, FfiError> {
+    match panic::catch_unwind(AssertUnwindSafe(f)) {
         Err(_) => Err(FfiError::from("panic")),
         Ok(result) => result,
-    };
-
-    if let Err(err) = result {
-        on_error(ffi_error_code!(err));
     }
 }
 

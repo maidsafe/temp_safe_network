@@ -21,6 +21,7 @@
 
 use core::{Client, CoreError, FutureExt};
 use ffi::{FfiError, FfiResult, OpaqueCtx, Session};
+use ffi::callback::CallbackArgs;
 use ffi::helper::catch_unwind_cb;
 use ffi::object_cache::{AppHandle, AppendableDataHandle, DataIdHandle, EncryptKeyHandle,
                         ObjectCache, SignKeyHandle};
@@ -71,6 +72,12 @@ pub enum FilterType {
     WhiteList,
 }
 
+impl CallbackArgs for FilterType {
+    fn default() -> Self {
+        FilterType::BlackList
+    }
+}
+
 /// Create new PubAppendableData
 #[no_mangle]
 pub unsafe extern "C" fn appendable_data_new_pub(session: *const Session,
@@ -79,7 +86,7 @@ pub unsafe extern "C" fn appendable_data_new_pub(session: *const Session,
                                                  o_cb: unsafe extern "C" fn(*mut c_void,
                                                                             int32_t,
                                                                             ADHandle)) {
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
         let user_data = OpaqueCtx(user_data);
 
@@ -90,8 +97,7 @@ pub unsafe extern "C" fn appendable_data_new_pub(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data, ffi_error_code!(err), 0));
+    });
 }
 
 fn appendable_data_new_pub_impl(client: &Client,
@@ -123,7 +129,7 @@ pub unsafe extern "C" fn appendable_data_new_priv(session: *const Session,
                                                                              ADHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
         (*session).send(move |client, obj_cache| {
@@ -133,8 +139,7 @@ pub unsafe extern "C" fn appendable_data_new_priv(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 fn appendable_data_new_priv_impl(client: &Client,
@@ -171,7 +176,7 @@ pub unsafe extern "C" fn appendable_data_get(session: *const Session,
                                                                         ADHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |client, obj_cache| {
             let c2 = client.clone();
             let obj_cache = obj_cache.clone();
@@ -197,8 +202,7 @@ pub unsafe extern "C" fn appendable_data_get(session: *const Session,
 
             Some(fut)
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Extract DataIdentifier from AppendableData.
@@ -211,7 +215,7 @@ pub unsafe extern "C" fn appendable_data_extract_data_id(session: *const Session
                                                                                     DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_extract_data_id_impl(obj_cache, ad_h) {
                 Ok(handle) => o_cb(user_data.0, 0, handle),
@@ -219,8 +223,7 @@ pub unsafe extern "C" fn appendable_data_extract_data_id(session: *const Session
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 fn appendable_data_extract_data_id_impl(object_cache: &ObjectCache,
@@ -241,7 +244,7 @@ pub unsafe extern "C" fn appendable_data_put(session: *const Session,
                                              o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |client, obj_cache| {
             let data_res = obj_cache.get_ad(ad_h).map(|v| v.clone());
             let c2 = client.clone();
@@ -256,8 +259,7 @@ pub unsafe extern "C" fn appendable_data_put(session: *const Session,
 
             Some(fut)
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 /// POST appendable data (bumps the version).
@@ -269,7 +271,7 @@ pub unsafe extern "C" fn appendable_data_post(session: *const Session,
                                               o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |client, obj_cache| {
             let c2 = client.clone();
             let new_ad = appendable_data_post_impl(client, obj_cache, ad_h, include_data);
@@ -286,8 +288,7 @@ pub unsafe extern "C" fn appendable_data_post(session: *const Session,
 
             Some(fut)
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e)));
+    });
 }
 
 fn appendable_data_post_impl(client: &Client,
@@ -346,7 +347,7 @@ pub unsafe extern "C" fn appendable_data_filter_type(session: *const Session,
                                                                                 FilterType)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match obj_cache.get_ad(ad_h) {
                 Ok(mut ad) => {
@@ -361,8 +362,7 @@ pub unsafe extern "C" fn appendable_data_filter_type(session: *const Session,
             }
             None
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e), FilterType::BlackList))
+    })
 }
 
 /// Switch the filter of the appendable data.
@@ -374,7 +374,7 @@ pub unsafe extern "C" fn appendable_data_toggle_filter(session: *const Session,
                                                                                   int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match obj_cache.get_ad(ad_h) {
                 Ok(mut ad) => {
@@ -389,8 +389,7 @@ pub unsafe extern "C" fn appendable_data_toggle_filter(session: *const Session,
             }
             None
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
+    })
 }
 
 /// Insert a new entry to the (whitelist or blacklist) filter. If the key was
@@ -404,14 +403,13 @@ pub unsafe extern "C" fn appendable_data_insert_to_filter(session: *const Sessio
                                                                                      int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = appendable_data_insert_to_filter_impl(obj_cache, ad_h, sign_key_h);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 fn appendable_data_insert_to_filter_impl(obj_cache: &ObjectCache,
@@ -439,14 +437,13 @@ pub unsafe extern "C" fn appendable_data_remove_from_filter(session: *const Sess
                                                                int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = appendable_data_remove_from_filter_impl(obj_cache, ad_h, sign_key_h);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 fn appendable_data_remove_from_filter_impl(obj_cache: &ObjectCache,
@@ -472,7 +469,7 @@ pub unsafe extern "C" fn appendable_data_encrypt_key(session: *const Session,
                                                                                 EncryptKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_encrypt_key_impl(obj_cache, ad_h) {
                 Ok(handle) => o_cb(user_data.0, 0, handle),
@@ -480,8 +477,7 @@ pub unsafe extern "C" fn appendable_data_encrypt_key(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 fn appendable_data_encrypt_key_impl(object_cache: &ObjectCache,
@@ -504,7 +500,7 @@ pub unsafe extern "C" fn appendable_data_num_of_data(session: *const Session,
                                                                                 size_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_num_of_data_impl(obj_cache, ad_h, false) {
                 Ok(num_of_data) => o_cb(user_data.0, 0, num_of_data),
@@ -512,8 +508,7 @@ pub unsafe extern "C" fn appendable_data_num_of_data(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Get number of appended deleted data items.
@@ -526,7 +521,7 @@ pub unsafe extern "C" fn appendable_data_num_of_deleted_data(session: *const Ses
                                                                                         size_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_num_of_data_impl(obj_cache, ad_h, true) {
                 Ok(num) => o_cb(user_data.0, 0, num),
@@ -534,8 +529,7 @@ pub unsafe extern "C" fn appendable_data_num_of_deleted_data(session: *const Ses
             }
             None
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
+    });
 }
 
 fn appendable_data_num_of_data_impl(obj_cache: &ObjectCache,
@@ -573,7 +567,7 @@ pub unsafe extern "C" fn appendable_data_nth_data_id(session: *const Session,
                                                                                 DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_nth_data_id_impl(obj_cache, app, ad_h, n, false) {
                 Ok(handle) => o_cb(user_data.0, 0, handle),
@@ -581,8 +575,7 @@ pub unsafe extern "C" fn appendable_data_nth_data_id(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Get nth appended DataIdentifier from deleted data.
@@ -598,7 +591,7 @@ pub unsafe extern "C" fn appendable_data_nth_deleted_data_id(session: *const Ses
                                                                 DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_nth_data_id_impl(obj_cache, app, ad_h, n, true) {
                 Ok(handle) => {
@@ -610,8 +603,7 @@ pub unsafe extern "C" fn appendable_data_nth_deleted_data_id(session: *const Ses
             }
             None
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
+    });
 }
 
 fn appendable_data_nth_data_id_impl(obj_cache: &ObjectCache,
@@ -657,7 +649,7 @@ pub unsafe extern "C" fn appendable_data_nth_data_sign_key(session: *const Sessi
                                                               SignKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_nth_sign_key_impl(obj_cache, app, ad_h, n, false) {
                 Ok(handle) => o_cb(user_data.0, 0, handle),
@@ -665,8 +657,7 @@ pub unsafe extern "C" fn appendable_data_nth_data_sign_key(session: *const Sessi
             }
             None
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0))
+    })
 }
 
 /// Get nth sign key from deleted data
@@ -682,7 +673,7 @@ pub unsafe extern "C" fn appendable_data_nth_deleted_data_sign_key(session: *con
                                                                       SignKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_nth_sign_key_impl(obj_cache, app, ad_h, n, true) {
                 Ok(handle) => o_cb(user_data.0, 0, handle),
@@ -690,8 +681,7 @@ pub unsafe extern "C" fn appendable_data_nth_deleted_data_sign_key(session: *con
             }
             None
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e), 0));
+    });
 }
 
 unsafe fn appendable_data_nth_sign_key_impl(obj_cache: &ObjectCache,
@@ -736,14 +726,13 @@ pub unsafe extern "C" fn appendable_data_remove_nth_data(session: *const Session
                                                                                     int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = appendable_data_remove_nth_data_impl(obj_cache, ad_h, n);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e)))
+    })
 }
 
 fn appendable_data_remove_nth_data_impl(obj_cache: &ObjectCache,
@@ -781,14 +770,13 @@ pub unsafe extern "C" fn appendable_data_restore_nth_deleted_data(session: *cons
                                                                      int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = appendable_data_restore_nth_deleted_data_impl(obj_cache, ad_h, n);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                    move |e| o_cb(user_data.0, ffi_error_code!(e)));
+    });
 }
 
 fn appendable_data_restore_nth_deleted_data_impl(obj_cache: &ObjectCache,
@@ -823,14 +811,13 @@ pub unsafe extern "C" fn appendable_data_clear_data(session: *const Session,
                                                                                int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = appendable_data_clear_data_impl(obj_cache, ad_h);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 fn appendable_data_clear_data_impl(obj_cache: &ObjectCache, ad_h: ADHandle) -> FfiResult<()> {
@@ -860,14 +847,13 @@ pub unsafe extern "C" fn appendable_data_remove_nth_deleted_data(session: *const
                                                                     int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = appendable_data_remove_nth_deleted_data_impl(obj_cache, ad_h, n);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 fn appendable_data_remove_nth_deleted_data_impl(obj_cache: &ObjectCache,
@@ -897,14 +883,13 @@ pub unsafe extern "C" fn appendable_data_clear_deleted_data(session: *const Sess
                                                                int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = appendable_data_clear_deleted_data_impl(obj_cache, ad_h);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 fn appendable_data_clear_deleted_data_impl(obj_cache: &ObjectCache,
@@ -926,7 +911,7 @@ pub unsafe extern "C" fn appendable_data_append(session: *const Session,
                                                 o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |client, obj_cache| {
             let c2 = client.clone();
 
@@ -941,8 +926,7 @@ pub unsafe extern "C" fn appendable_data_append(session: *const Session,
 
             Some(fut)
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 fn appendable_data_append_impl(client: &Client,
@@ -984,7 +968,7 @@ pub unsafe extern "C" fn appendable_data_version(session: *const Session,
                                                                             uint64_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_version_impl(obj_cache, handle) {
                 Ok(ver) => o_cb(user_data.0, 0, ver),
@@ -992,8 +976,7 @@ pub unsafe extern "C" fn appendable_data_version(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 fn appendable_data_version_impl(obj_cache: &ObjectCache, handle: ADHandle) -> FfiResult<u64> {
@@ -1013,7 +996,7 @@ pub unsafe extern "C" fn appendable_data_is_owned(session: *const Session,
                                                                              bool)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |client, obj_cache| {
             match appendable_data_is_owned_impl(client, obj_cache, handle) {
                 Ok(is_owned) => o_cb(user_data.0, 0, is_owned),
@@ -1021,8 +1004,7 @@ pub unsafe extern "C" fn appendable_data_is_owned(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), false));
+    });
 }
 
 fn appendable_data_is_owned_impl(client: &Client,
@@ -1046,7 +1028,7 @@ pub unsafe extern "C" fn appendable_data_validate_size(session: *const Session,
                                                                                   bool)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match appendable_data_validate_size_impl(obj_cache, handle) {
                 Ok(is_valid) => o_cb(user_data.0, 0, is_valid),
@@ -1054,8 +1036,7 @@ pub unsafe extern "C" fn appendable_data_validate_size(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err), false));
+    });
 }
 
 fn appendable_data_validate_size_impl(obj_cache: &ObjectCache,
@@ -1075,7 +1056,7 @@ pub unsafe extern "C" fn appendable_data_free(session: *const Session,
                                               o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(|| {
+    catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match obj_cache.remove_ad(handle) {
                 Ok(_) => o_cb(user_data.0, 0),
@@ -1083,8 +1064,7 @@ pub unsafe extern "C" fn appendable_data_free(session: *const Session,
             }
             None
         })
-    },
-                    move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 // Convenience function to access n-th item from the given set, returning

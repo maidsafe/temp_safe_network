@@ -37,14 +37,13 @@ pub unsafe extern "C" fn misc_encrypt_key_free(session: *const Session,
                                                o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = obj_cache.remove_encrypt_key(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                            move |e| o_cb(user_data.0, ffi_error_code!(e)))
+    })
 }
 
 /// Free Sign Key handle
@@ -55,14 +54,13 @@ pub unsafe extern "C" fn misc_sign_key_free(session: *const Session,
                                             o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             let res = obj_cache.remove_sign_key(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err)));
+    });
 }
 
 /// Serialise sign::PubKey
@@ -77,7 +75,7 @@ pub unsafe extern "C" fn misc_serialise_sign_key(session: *const Session,
                                                                             size_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match misc_serialise_sign_key_impl(obj_cache, sign_key_h) {
                 Ok(mut ser_sign_key) => {
@@ -91,10 +89,7 @@ pub unsafe extern "C" fn misc_serialise_sign_key(session: *const Session,
             }
             None
         })
-    },
-                            move |err| {
-                                o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut(), 0, 0)
-                            });
+    });
 }
 
 fn misc_serialise_sign_key_impl(obj_cache: &ObjectCache,
@@ -114,7 +109,7 @@ pub unsafe extern "C" fn misc_deserialise_sign_key(session: *const Session,
                                                                               SignKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let data = OpaqueCtx(data as *mut _);
 
         (*session).send(move |_, obj_cache| {
@@ -130,8 +125,7 @@ pub unsafe extern "C" fn misc_deserialise_sign_key(session: *const Session,
             o_cb(user_data.0, 0, handle);
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Get MAID-sign::PubKey
@@ -143,7 +137,7 @@ pub unsafe extern "C" fn misc_maid_sign_key(session: *const Session,
                                                                        SignKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |client, obj_cache| {
             let sign_key = match client.public_signing_key() {
                 Ok(sign_key) => sign_key,
@@ -156,8 +150,7 @@ pub unsafe extern "C" fn misc_maid_sign_key(session: *const Session,
             o_cb(user_data.0, 0, handle);
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Serialise DataIdentifier
@@ -173,7 +166,7 @@ pub unsafe extern "C" fn misc_serialise_data_id(session: *const Session,
                                                                            size_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match misc_serialise_data_id_impl(obj_cache, data_id_h) {
                 Ok(mut ser_data_id) => {
@@ -190,10 +183,7 @@ pub unsafe extern "C" fn misc_serialise_data_id(session: *const Session,
             }
             None
         })
-    },
-                            move |err| {
-                                o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut(), 0, 0)
-                            });
+    });
 }
 
 fn misc_serialise_data_id_impl(obj_cache: &ObjectCache,
@@ -213,7 +203,7 @@ pub unsafe extern "C" fn misc_deserialise_data_id(session: *const Session,
                                                                              DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let data = OpaqueCtx(data as *mut _);
 
         (*session).send(move |_, obj_cache| {
@@ -231,8 +221,7 @@ pub unsafe extern "C" fn misc_deserialise_data_id(session: *const Session,
             o_cb(user_data.0, 0, handle);
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 /// Serialise AppendableData
@@ -247,7 +236,7 @@ pub unsafe extern "C" fn misc_serialise_appendable_data(session: *const Session,
                                                                                    size_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match serialise_appendable_data_impl(obj_cache, ad_h) {
                 Ok(mut ser_ad) => {
@@ -261,10 +250,7 @@ pub unsafe extern "C" fn misc_serialise_appendable_data(session: *const Session,
             }
             None
         })
-    },
-                            move |e| {
-                                o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0)
-                            });
+    });
 }
 
 fn serialise_appendable_data_impl(object_cache: &ObjectCache,
@@ -287,7 +273,7 @@ pub unsafe extern "C" fn misc_deserialise_appendable_data(session: *const Sessio
                                                                                      ADHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let data = OpaqueCtx(data as *mut _);
 
         (*session).send(move |_, obj_cache| {
@@ -298,8 +284,7 @@ pub unsafe extern "C" fn misc_deserialise_appendable_data(session: *const Sessio
             }
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 fn deserialise_appendable_data_impl(obj_cache: &ObjectCache,
@@ -327,7 +312,7 @@ pub unsafe extern "C" fn misc_serialise_struct_data(session: *const Session,
                                                                                size_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match misc_serialise_struct_data_impl(obj_cache, sd_h) {
                 Ok(mut ser_sd) => {
@@ -342,10 +327,7 @@ pub unsafe extern "C" fn misc_serialise_struct_data(session: *const Session,
             }
             None
         })
-    },
-                            move |err| {
-                                o_cb(user_data.0, ffi_error_code!(err), ptr::null_mut(), 0, 0)
-                            });
+    });
 }
 
 fn misc_serialise_struct_data_impl(obj_cache: &ObjectCache,
@@ -366,7 +348,7 @@ pub unsafe extern "C" fn misc_deserialise_struct_data(session: *const Session,
                                                          StructDataHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(|| {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let data = OpaqueCtx(data as *mut _);
 
         (*session).send(move |_, obj_cache| {
@@ -382,8 +364,7 @@ pub unsafe extern "C" fn misc_deserialise_struct_data(session: *const Session,
             o_cb(user_data.0, 0, handle);
             None
         })
-    },
-                            move |err| o_cb(user_data.0, ffi_error_code!(err), 0));
+    });
 }
 
 
@@ -401,17 +382,16 @@ pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: usize, capacity: u
 #[no_mangle]
 pub unsafe extern "C" fn misc_object_cache_reset(session: *const Session,
                                                  user_data: *mut c_void,
-                                                 o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
-                                                 -> i32 {
+                                                 o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    ffi_try!((*session).send(move |_, obj_cache| {
-        obj_cache.reset();
-        o_cb(user_data.0, 0);
-        None
-    }));
-
-    0
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        (*session).send(move |_, obj_cache| {
+            obj_cache.reset();
+            o_cb(user_data.0, 0);
+            None
+        })
+    })
 }
 
 #[cfg(test)]

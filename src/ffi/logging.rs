@@ -33,9 +33,8 @@ use super::helper;
 /// This function should be called to enable logging to a file
 #[no_mangle]
 pub extern "C" fn init_logging() -> int32_t {
-    helper::catch_unwind_i32(|| {
-        ffi_try!(safe_log::init(false).map_err(CoreError::Unexpected));
-        0
+    helper::catch_unwind_error_code(|| {
+        Ok(try!(safe_log::init(false).map_err(CoreError::Unexpected)))
     })
 }
 
@@ -45,33 +44,30 @@ pub extern "C" fn init_logging() -> int32_t {
 #[no_mangle]
 pub unsafe extern "C" fn output_log_path(c_output_file_name: *const u8,
                                          c_output_file_name_len: usize,
-                                         c_size: *mut int32_t,
-                                         c_capacity: *mut int32_t,
-                                         c_result: *mut int32_t)
-                                         -> *const u8 {
-    helper::catch_unwind_ptr(|| {
-        let op_file = ffi_ptr_try!(helper::c_utf8_to_string(c_output_file_name,
-                                                            c_output_file_name_len),
-                                   c_result);
-        let fh = ffi_ptr_try!(FileHandler::<()>::new(&op_file, true)
-                                  .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
-                              c_result);
-        let op_file_path = ffi_ptr_try!(fh.path()
+                                         c_ptr: *mut *const u8,
+                                         c_size: *mut usize,
+                                         c_capacity: *mut usize)
+                                         -> int32_t {
+    helper::catch_unwind_error_code(|| {
+        let op_file = try!(helper::c_utf8_to_string(c_output_file_name,
+                                                    c_output_file_name_len));
+        let fh = try!(FileHandler::<()>::new(&op_file, true)
+                                  .map_err(|e| CoreError::Unexpected(format!("{:?}", e))));
+        let op_file_path = try!(fh.path()
                              .to_path_buf()
                              .into_os_string()
                              .into_string()
-                             .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
-                         c_result)
+                             .map_err(|e| CoreError::Unexpected(format!("{:?}", e))))
             .into_bytes();
 
-        ptr::write(c_size, op_file_path.len() as i32);
-        ptr::write(c_capacity, op_file_path.capacity() as i32);
-        ptr::write(c_result, 0);
-
         let ptr = op_file_path.as_ptr();
+        ptr::write(c_ptr, ptr);
+        ptr::write(c_size, op_file_path.len());
+        ptr::write(c_capacity, op_file_path.capacity());
+
         mem::forget(op_file_path);
 
-        ptr
+        Ok(())
     })
 }
 
