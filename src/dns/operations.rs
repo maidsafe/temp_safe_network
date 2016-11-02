@@ -438,7 +438,7 @@ mod tests {
         });
 
         // Gets should be possible with unregistered clients
-        setup_client(|core_tx, net_tx| Client::unregistered(core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::unregistered(el_h, core_tx, net_tx),
                      move |client| {
             get_all_services(client, &dns_name3, None).map(move |names| {
                 // Convert to HashSet to ignore order.
@@ -792,7 +792,7 @@ mod tests {
         });
 
         // unregistered clients can get the home dir too
-        setup_client(|core_tx, net_tx| Client::unregistered(core_tx, net_tx),
+        setup_client(|el_h, core_tx, net_tx| Client::unregistered(el_h, core_tx, net_tx),
                      move |client| {
                          get_service_home_dir_id(client, &dns_name3, service_name2, None)
                              .map(move |dir_id| {

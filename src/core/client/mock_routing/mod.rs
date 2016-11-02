@@ -61,6 +61,7 @@ pub struct MockRouting {
     sender: Sender<Event>,
     client_auth: Authority,
     max_ops_countdown: Option<Cell<u64>>,
+    timeout_simulation: bool,
 }
 
 impl MockRouting {
@@ -82,6 +83,7 @@ impl MockRouting {
             sender: sender,
             client_auth: client_auth,
             max_ops_countdown: None,
+            timeout_simulation: false,
         })
     }
 
@@ -93,6 +95,10 @@ impl MockRouting {
                             data_id: DataIdentifier,
                             msg_id: MessageId)
                             -> Result<(), InterfaceError> {
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
@@ -163,6 +169,10 @@ impl MockRouting {
                             data: Data,
                             msg_id: MessageId)
                             -> Result<(), InterfaceError> {
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
@@ -249,6 +259,10 @@ impl MockRouting {
                              data: Data,
                              msg_id: MessageId)
                              -> Result<(), InterfaceError> {
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
@@ -337,6 +351,10 @@ impl MockRouting {
                                data: Data,
                                msg_id: MessageId)
                                -> Result<(), InterfaceError> {
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
@@ -398,6 +416,10 @@ impl MockRouting {
                                          dst: Authority,
                                          msg_id: MessageId)
                                          -> Result<(), InterfaceError> {
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
         let client_name = self.client_name();
@@ -458,6 +480,10 @@ impl MockRouting {
                                wrapper: AppendWrapper,
                                msg_id: MessageId)
                                -> Result<(), InterfaceError> {
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
         let cloned_sender = self.sender.clone();
         let client_auth = self.client_auth.clone();
 
@@ -621,6 +647,11 @@ impl MockRouting {
     pub fn simulate_disconnect(&self) {
         let sender = self.sender.clone();
         let _ = std::thread::spawn(move || unwrap!(sender.send(Event::RestartRequired)));
+    }
+
+    #[cfg(test)]
+    pub fn set_simulate_timeout(&mut self, enable: bool) {
+        self.timeout_simulation = enable;
     }
 
     fn network_limits_reached(&self) -> bool {

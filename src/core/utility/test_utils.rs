@@ -27,7 +27,7 @@ use rust_sodium::crypto::sign;
 use std::{iter, u8};
 use std::fmt::Debug;
 use tokio_core::channel;
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Core, Handle};
 
 /// Generates random public keys
 pub fn generate_public_keys(len: usize) -> Vec<sign::PublicKey> {
@@ -68,10 +68,10 @@ pub fn random_client_with_net_obs<NetObs, Run, I, E>(n: NetObs, r: Run)
           I: IntoFuture<Item = (), Error = E> + 'static,
           E: Debug
 {
-    let c = |core_tx, net_tx| {
+    let c = |el_h, core_tx, net_tx| {
         let acc_locator = unwrap!(utility::generate_random_string(10));
         let acc_password = unwrap!(utility::generate_random_string(10));
-        Client::registered(&acc_locator, &acc_password, core_tx, net_tx)
+        Client::registered(&acc_locator, &acc_password, el_h, core_tx, net_tx)
     };
     setup_client_with_net_obs(c, n, r)
 }
@@ -81,7 +81,7 @@ pub fn random_client_with_net_obs<NetObs, Run, I, E>(n: NetObs, r: Run)
 // unregistered or as a result of successful login. Use this to create Client
 // manually,
 pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
-    where Create: FnOnce(CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
+    where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
           Run: FnOnce(&Client) -> I + Send + 'static,
           I: IntoFuture<Item = (), Error = E> + 'static,
           E: Debug
@@ -95,7 +95,7 @@ pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
 // unregistered or as a result of successful login. Use this to create Client
 // manually,
 pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: NetObs, r: Run)
-    where Create: FnOnce(CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
+    where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
           NetObs: FnMut(NetworkEvent) + 'static,
           Run: FnOnce(&Client) -> I + Send + 'static,
           I: IntoFuture<Item = (), Error = E> + 'static,
@@ -106,7 +106,7 @@ pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: Ne
 
     let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
     let (net_tx, net_rx) = unwrap!(channel::channel(&el_h));
-    let client = unwrap!(c(core_tx.clone(), net_tx));
+    let client = unwrap!(c(el_h.clone(), core_tx.clone(), net_tx));
 
     let net_fut = net_rx.for_each(move |net_event| Ok(n(net_event)))
         .map_err(|e| panic!("Network event stream error: {:?}", e));
