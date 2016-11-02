@@ -144,16 +144,18 @@ impl DirMetadata {
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_get_metadata(details: *const DirDetails)
                                                         -> *const DirMetadata {
-    match (*details).metadata {
-        Some(ref metadata) => metadata,
-        None => ptr::null(),
-    }
+    helper::catch_unwind_ok(|| {
+        match (*details).metadata {
+            Some(ref metadata) => metadata,
+            None => ptr::null(),
+        }
+    })
 }
 
 /// Get the number of files in the directory.
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirDetails) -> usize {
-    (*details).files.len()
+    helper::catch_unwind_ok(|| (*details).files.len())
 }
 
 /// Get a non-owning pointer to the metadata of the i-th file in the directory.
@@ -161,20 +163,22 @@ pub unsafe extern "C" fn directory_details_get_files_len(details: *const DirDeta
 pub unsafe extern "C" fn directory_details_get_file_at(details: *const DirDetails,
                                                        index: usize)
                                                        -> *const FileMetadata {
-    let details = &*details;
+    helper::catch_unwind_ok(|| {
+        let details = &*details;
 
-    if index < details.files.len() {
-        &details.files[index]
-    } else {
-        ptr::null()
-    }
+        if index < details.files.len() {
+            &details.files[index]
+        } else {
+            ptr::null()
+        }
+    })
 }
 
 /// Get the number of sub-directories in the directory.
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_get_sub_directories_len(details: *const DirDetails)
                                                                    -> usize {
-    (*details).sub_dirs.len()
+    helper::catch_unwind_ok(|| (*details).sub_dirs.len())
 }
 
 /// Get a non-owning pointer to the metadata of the i-th sub-directory of the
@@ -183,17 +187,21 @@ pub unsafe extern "C" fn directory_details_get_sub_directories_len(details: *con
 pub unsafe extern "C" fn directory_details_get_sub_directory_at(details: *const DirDetails,
                                                                 index: usize)
                                                                 -> *const DirMetadata {
-    let details = &*details;
+    helper::catch_unwind_ok(|| {
+        let details = &*details;
 
-    if index < details.sub_dirs.len() {
-        &details.sub_dirs[index]
-    } else {
-        ptr::null()
-    }
+        if index < details.sub_dirs.len() {
+            &details.sub_dirs[index]
+        } else {
+            ptr::null()
+        }
+    })
 }
 
 /// Dispose of the DirDetails instance.
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_free(details: *mut DirDetails) {
-    let _ = Box::from_raw(details);
+    helper::catch_unwind_ok(|| {
+        let _ = Box::from_raw(details);
+    })
 }

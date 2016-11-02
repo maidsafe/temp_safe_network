@@ -244,7 +244,7 @@ pub unsafe extern "C" fn create_unregistered_client(user_data: *mut c_void,
                                                                                  int32_t),
                                                     session_handle: *mut *mut Session)
                                                     -> int32_t {
-    helper::catch_unwind_i32(|| {
+    helper::catch_unwind_error_code(|| {
         trace!("FFI create unregistered client.");
         let user_data = OpaqueCtx(user_data);
         let session = try!(Session::unregistered(move |net_event| {
@@ -273,7 +273,7 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
                                                                                int32_t,
                                                                                int32_t))
                                         -> int32_t {
-    helper::catch_unwind_i32(|| {
+    helper::catch_unwind_error_code(|| {
         trace!("FFI create a client account.");
 
         let acc_locator = try!(helper::c_utf8_to_str(account_locator, account_locator_len));
@@ -307,7 +307,7 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
                                                                        int32_t,
                                                                        int32_t))
                                 -> int32_t {
-    helper::catch_unwind_i32(|| {
+    helper::catch_unwind_error_code(|| {
         trace!("FFI login a registered client.");
 
         let acc_locator = try!(helper::c_utf8_to_str(account_locator, account_locator_len));
