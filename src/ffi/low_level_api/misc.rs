@@ -19,10 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use ffi::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle, StructDataHandle};
 use ffi::{FfiError, FfiResult, OpaqueCtx, Session, helper};
 use ffi::low_level_api::appendable_data::AppendableData;
-use ffi::object_cache::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, ObjectCache,
-                        SignKeyHandle, StructDataHandle};
+use ffi::object_cache::ObjectCache;
 use libc::{c_void, int32_t, size_t, uint8_t};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use std::{mem, ptr, slice};
@@ -287,9 +287,7 @@ pub unsafe extern "C" fn misc_deserialise_appendable_data(session: *const Sessio
     });
 }
 
-fn deserialise_appendable_data_impl(obj_cache: &ObjectCache,
-                                    ser_ad: &[u8])
-                                    -> FfiResult<ADHandle> {
+fn deserialise_appendable_data_impl(obj_cache: &ObjectCache, ser_ad: &[u8]) -> FfiResult<ADHandle> {
     let ad = {
         if let Ok(elt) = deserialise(ser_ad) {
             AppendableData::Priv(elt)
@@ -446,9 +444,7 @@ mod tests {
     fn appendable_data_serialisation() {
         let sess = test_utils::create_session();
         let app = test_utils::create_app(&sess, false);
-        let app_h = test_utils::run_now(&sess, move |_, obj_cache| {
-            obj_cache.insert_app(app)
-        });
+        let app_h = test_utils::run_now(&sess, move |_, obj_cache| obj_cache.insert_app(app));
 
         let ad_pub_h;
         let ad_priv_h;
@@ -516,9 +512,7 @@ mod tests {
     fn structured_data_serialisation() {
         let sess = test_utils::create_session();
         let app = test_utils::create_app(&sess, false);
-        let app_h = test_utils::run_now(&sess, move |_, obj_cache| {
-            obj_cache.insert_app(app)
-        });
+        let app_h = test_utils::run_now(&sess, move |_, obj_cache| obj_cache.insert_app(app));
 
         let cipher_opt_h;
         let sd_h;
@@ -576,12 +570,12 @@ mod tests {
         assert!(data_id_sd != data_id_ad);
         assert!(data_id_ad != data_id_id);
 
-        let (sd_data_id_h, id_data_id_h, ad_data_id_h) =
-            test_utils::run_now(&sess, move |_, obj_cache| {
-                (obj_cache.insert_data_id(data_id_sd),
-                 obj_cache.insert_data_id(data_id_id),
-                 obj_cache.insert_data_id(data_id_ad))
-            });
+        let (sd_data_id_h, id_data_id_h, ad_data_id_h) = test_utils::run_now(&sess, move |_,
+                                                                                   obj_cache| {
+            (obj_cache.insert_data_id(data_id_sd),
+             obj_cache.insert_data_id(data_id_id),
+             obj_cache.insert_data_id(data_id_ad))
+        });
 
         unsafe {
             let mut data = unwrap!(test_utils::call_vec_u8(|user_data, cb| {

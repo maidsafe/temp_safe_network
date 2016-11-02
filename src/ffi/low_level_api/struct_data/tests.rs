@@ -21,9 +21,8 @@
 
 use core::{CoreError, utility};
 use core::CLIENT_STRUCTURED_DATA_TAG;
-use ffi::{FfiError, Session, test_utils};
+use ffi::{AppHandle, CipherOptHandle, FfiError, Session, test_utils};
 use ffi::low_level_api::cipher_opt::*;
-use ffi::object_cache::{AppHandle, CipherOptHandle};
 use rand;
 use routing::XOR_NAME_LEN;
 use super::*;

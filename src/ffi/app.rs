@@ -119,7 +119,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void, int32_t, AppHandle)) {
+                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t, AppHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     let _ = helper::catch_unwind_cb(user_data, o_cb, || {
@@ -142,7 +142,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
     });
 }
 
-/// Register an annonymous app with the launcher. Can access only public data
+/// Register an anonymous app with the launcher. Can access only public data
 #[no_mangle]
 pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
                                                  user_data: *mut c_void,

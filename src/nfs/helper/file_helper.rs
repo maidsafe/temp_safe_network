@@ -200,7 +200,7 @@ pub fn update_content(client: Client,
 }
 
 /// Returns a reader for reading the file contents
-pub fn read(client: Client, file: &File) -> Result<Reader, NfsError> {
+pub fn read(client: Client, file: &FileMetadata) -> Result<Reader, NfsError> {
     trace!("Reading file with name: {}", file.name());
     Reader::new(client.clone(), SelfEncryptionStorage::new(client), file)
 }
@@ -251,7 +251,7 @@ mod tests {
                 .then(move |res| {
                     let (dir, _) = unwrap!(res);
                     let file = unwrap!(dir.find_file("hello.txt"), "File not found");
-                    let reader = unwrap!(file_helper::read(c2, file));
+                    let reader = unwrap!(file_helper::read(c2, file.metadata()));
                     let size = reader.size();
                     println!("reading {} bytes", size);
                     reader.read(0, size)
@@ -284,7 +284,7 @@ mod tests {
                     let dir = unwrap!(res);
                     let file = unwrap!(dir.find_file("hello.txt"), "File not found");
 
-                    let reader = unwrap!(file_helper::read(c3, file));
+                    let reader = unwrap!(file_helper::read(c3, file.metadata()));
                     let size = reader.size();
                     println!("reading {} bytes", size);
                     reader.read(0, size)
@@ -317,7 +317,7 @@ mod tests {
                     let dir = unwrap!(res);
                     let file = unwrap!(dir.find_file("hello.txt"), "File not found");
 
-                    let reader = unwrap!(file_helper::read(c3, file));
+                    let reader = unwrap!(file_helper::read(c3, file.metadata()));
                     let size = reader.size();
                     reader.read(0, size)
                         .map(move |data| {

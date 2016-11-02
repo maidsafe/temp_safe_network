@@ -23,10 +23,8 @@
 
 use core::futures::FutureExt;
 use dns::operations;
-use ffi::{FfiError, OpaqueCtx, Session};
+use ffi::{AppHandle, FfiError, OpaqueCtx, Session, helper};
 use ffi::dir_details::DirDetails;
-use ffi::helper;
-use ffi::object_cache::AppHandle;
 use ffi::string_list::{self, StringList};
 use futures::Future;
 use libc::{c_void, int32_t};

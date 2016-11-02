@@ -20,11 +20,11 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::{Client, CoreError, FutureExt};
+use ffi::{AppHandle, AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle};
 use ffi::{FfiError, FfiResult, OpaqueCtx, Session};
 use ffi::callback::CallbackArgs;
 use ffi::helper::catch_unwind_cb;
-use ffi::object_cache::{AppHandle, AppendableDataHandle, DataIdHandle, EncryptKeyHandle,
-                        ObjectCache, SignKeyHandle};
+use ffi::object_cache::ObjectCache;
 use futures::{self, Future};
 use libc::{c_void, int32_t, size_t, uint64_t};
 use routing::{AppendWrapper, AppendedData, Data, Filter, PrivAppendableData, PrivAppendedData,
@@ -1075,9 +1075,9 @@ fn nth<T>(items: &BTreeSet<T>, n: usize) -> Result<&T, FfiError> {
 
 #[cfg(test)]
 mod tests {
+    use ffi::{AppHandle, AppendableDataHandle, DataIdHandle, ObjectHandle};
     use ffi::{FfiError, Session, test_utils};
     use ffi::low_level_api::misc::*;
-    use ffi::object_cache::{AppHandle, AppendableDataHandle, DataIdHandle, ObjectHandle};
     use libc::c_void;
     use rand;
     use routing::DataIdentifier;
@@ -1492,13 +1492,12 @@ mod tests {
             assert_eq!(err_code, 0);
             assert_eq!(filter_type, FilterType::BlackList);
 
-            let (sign_key1_h, sign_key2_h) =
-                test_utils::run_now(&sess0, move |_, obj_cache| {
-                    let h1 = obj_cache.insert_sign_key(sign_key1);
-                    let h2 = obj_cache.insert_sign_key(sign_key2);
+            let (sign_key1_h, sign_key2_h) = test_utils::run_now(&sess0, move |_, obj_cache| {
+                let h1 = obj_cache.insert_sign_key(sign_key1);
+                let h2 = obj_cache.insert_sign_key(sign_key2);
 
-                    (h1, h2)
-                });
+                (h1, h2)
+            });
 
             appendable_data_insert_to_filter(&sess0,
                                              ad_priv_h,
@@ -1767,8 +1766,7 @@ mod tests {
             assert_eq!(err_code, 0);
 
             test_utils::run_now(&sess0, move |_, obj_cache| {
-                assert_eq!(*unwrap!(obj_cache.get_sign_key(sign_key_h)),
-                           sign_key1);
+                assert_eq!(*unwrap!(obj_cache.get_sign_key(sign_key_h)), sign_key1);
             });
 
             // Now try to get a data key from deleted data
@@ -1786,8 +1784,7 @@ mod tests {
             assert_eq!(err_code, 0);
 
             test_utils::run_now(&sess0, move |_, obj_cache| {
-                assert_eq!(*unwrap!(obj_cache.get_sign_key(deleted_sk_h)),
-                           sign_key1);
+                assert_eq!(*unwrap!(obj_cache.get_sign_key(deleted_sk_h)), sign_key1);
             });
 
             // Filter out the key that we've got for an app1
@@ -1858,18 +1855,15 @@ mod tests {
             unwrap!(obj_cache.get_data_id(ad_id_h)).clone()
         });
 
-        test_utils::run_now(dst_sess, move |_, obj_cache| {
-            obj_cache.insert_data_id(data_id)
-        })
+        test_utils::run_now(dst_sess,
+                            move |_, obj_cache| obj_cache.insert_data_id(data_id))
     }
 
     fn generate_random_immutable_data_id(session: &Session) -> DataIdHandle {
         let name = rand::random();
         let id = DataIdentifier::Immutable(name);
 
-        test_utils::run_now(session, move |_, obj_cache| {
-            obj_cache.insert_data_id(id)
-        })
+        test_utils::run_now(session, move |_, obj_cache| obj_cache.insert_data_id(id))
     }
 
     unsafe fn reload_ad(sess: *const Session,

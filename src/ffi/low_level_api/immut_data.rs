@@ -20,11 +20,11 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::{CoreError, FutureExt, SelfEncryptionStorage, immutable_data};
+use ffi::{AppHandle, CipherOptHandle, DataIdHandle, SelfEncryptorReaderHandle,
+          SelfEncryptorWriterHandle};
 use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::helper::catch_unwind_cb;
 use ffi::low_level_api::cipher_opt::CipherOpt;
-use ffi::object_cache::{AppHandle, CipherOptHandle, DataIdHandle, SelfEncryptorReaderHandle,
-                        SelfEncryptorWriterHandle};
 use futures::Future;
 use libc::{c_void, int32_t, size_t};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -384,11 +384,10 @@ pub unsafe extern "C" fn immut_data_self_encryptor_reader_free(session: *const S
 #[cfg(test)]
 mod tests {
     use core::utility;
+    use ffi::{ObjectHandle, test_utils};
     use ffi::errors::FfiError;
     use ffi::low_level_api::cipher_opt::*;
     use ffi::low_level_api::data_id::data_id_free;
-    use ffi::object_cache::ObjectHandle;
-    use ffi::test_utils;
     use libc::c_void;
     use std::{panic, process};
     use std::sync::mpsc;
@@ -402,16 +401,14 @@ mod tests {
 
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
 
-        let (app_1_encrypt_key_handle,
-             app_0,
-             app_1) = test_utils::run_now(&sess, |_, obj_cache| {
-                let app_1_pub_encrypt_key = unwrap!(app_1.asym_enc_keys()).0;
-                let encrypt_key_h = obj_cache.insert_encrypt_key(app_1_pub_encrypt_key);
-                let app_0_h = obj_cache.insert_app(app_0);
-                let app_1_h = obj_cache.insert_app(app_1);
+        let (app_1_encrypt_key_handle, app_0, app_1) = test_utils::run_now(&sess, |_, obj_cache| {
+            let app_1_pub_encrypt_key = unwrap!(app_1.asym_enc_keys()).0;
+            let encrypt_key_h = obj_cache.insert_encrypt_key(app_1_pub_encrypt_key);
+            let app_0_h = obj_cache.insert_app(app_0);
+            let app_1_h = obj_cache.insert_app(app_1);
 
-                (encrypt_key_h, app_0_h, app_1_h)
-            });
+            (encrypt_key_h, app_0_h, app_1_h)
+        });
 
         unsafe {
             // App-0

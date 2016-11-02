@@ -25,8 +25,8 @@ mod tests;
 use core::{CLIENT_STRUCTURED_DATA_TAG, CoreError};
 use core::futures::FutureExt;
 use core::structured_data::{self, unversioned, versioned};
-use ffi::{FfiError, helper, OpaqueCtx, Session};
-use ffi::object_cache::{AppHandle, CipherOptHandle, DataIdHandle, StructDataHandle};
+use ffi::{AppHandle, CipherOptHandle, DataIdHandle, StructDataHandle};
+use ffi::{FfiError, OpaqueCtx, Session, helper};
 use futures::{self, Future};
 use libc::{c_void, int32_t, uint64_t};
 use routing::{Data, StructuredData, XorName, XOR_NAME_LEN};
@@ -44,8 +44,10 @@ pub unsafe extern "C" fn struct_data_new(session: *const Session,
                                          data: *const u8,
                                          data_len: usize,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+                                         o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                    int32_t,
+                                                                    StructDataHandle)) {
+    helper::catch_unwind_cb(|| {
         let id = XorName(*id);
         let data = slice::from_raw_parts(data, data_len);
         let user_data = OpaqueCtx(user_data);
@@ -116,8 +118,10 @@ pub unsafe extern "C" fn struct_data_new(session: *const Session,
 pub unsafe extern "C" fn struct_data_fetch(session: *const Session,
                                            data_id_h: DataIdHandle,
                                            user_data: *mut c_void,
-                                           o_cb: unsafe extern "C" fn(*mut c_void, int32_t, StructDataHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+                                           o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                      int32_t,
+                                                                      StructDataHandle)) {
+    helper::catch_unwind_cb(|| {
         let user_data = OpaqueCtx(user_data);
 
         (*session).send(move |client, object_cache| {

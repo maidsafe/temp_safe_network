@@ -23,9 +23,8 @@
 
 use core::Client;
 use core::futures::FutureExt;
-use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session, helper};
+use ffi::{App, AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use ffi::dir_details::DirDetails;
-use ffi::object_cache::AppHandle;
 use futures::Future;
 use libc::{c_void, int32_t};
 use nfs::helper::dir_helper;

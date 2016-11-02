@@ -26,8 +26,7 @@
 //! Operations on file writer
 
 use core::{Client, FutureExt, SelfEncryptionStorage};
-use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session, helper};
-use ffi::object_cache::AppHandle;
+use ffi::{App, AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use futures::Future;
 use libc::{c_void, int32_t};
 use nfs::helper::file_helper;
@@ -277,7 +276,7 @@ mod tests {
                 .then(move |res| {
                     let app_dir = unwrap!(res, "can't get app dir");
                     let file = unwrap!(app_dir.find_file("test_file.txt"));
-                    let reader = unwrap!(file_helper::read(c3, file));
+                    let reader = unwrap!(file_helper::read(c3, file.metadata()));
                     let size = reader.size();
                     reader.read(0, size)
                 })
