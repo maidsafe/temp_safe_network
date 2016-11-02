@@ -61,7 +61,7 @@ use safe_core::dns::operations as dns;
 use safe_core::nfs::helper::{dir_helper, file_helper};
 use std::sync::mpsc;
 use tokio_core::channel;
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Core, Handle};
 
 macro_rules! fry {
     ($res:expr) => {
@@ -77,7 +77,7 @@ macro_rules! fry {
 const DEFAULT_SERVICE: &'static str = "www";
 const HOME_PAGE_FILE_NAME: &'static str = "index.html";
 
-fn handle_login<T: 'static>(core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Client {
+fn handle_login<T: 'static>(el_h: Handle, core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Client {
     let mut secret_0 = String::new();
     let mut secret_1 = String::new();
 
@@ -105,10 +105,14 @@ fn handle_login<T: 'static>(core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Client 
     // Account Creation
     if user_option != "Y" && user_option != "y" {
         println!("\nTrying to create an account ...");
-        unwrap!(Client::registered::<T>(&secret_0, &secret_1, core_tx.clone(), net_tx.clone()))
+        unwrap!(Client::registered::<T>(&secret_0,
+                                        &secret_1,
+                                        el_h,
+                                        core_tx.clone(),
+                                        net_tx.clone()))
     } else {
         println!("\nTrying to log into the created account using supplied credentials ...");
-        unwrap!(Client::login::<T>(&secret_0, &secret_1, core_tx.clone(), net_tx.clone()))
+        unwrap!(Client::login::<T>(&secret_0, &secret_1, el_h, core_tx.clone(), net_tx.clone()))
     }
 }
 
@@ -351,7 +355,7 @@ fn main() {
         let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
         let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
 
-        let client = handle_login(core_tx.clone(), net_tx);
+        let client = handle_login(el_h, core_tx.clone(), net_tx);
         let _ = unwrap!(tx.send(core_tx.clone()));
 
         core::run(el, client, (), core_rx);

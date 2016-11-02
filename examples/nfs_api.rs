@@ -63,9 +63,9 @@ use safe_core::nfs::helper::{dir_helper, file_helper};
 use safe_core::nfs::helper::writer::Mode;
 use std::sync::mpsc;
 use tokio_core::channel;
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Core, Handle};
 
-fn handle_login<T: 'static>(core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Client {
+fn handle_login<T: 'static>(el_h: Handle, core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Client {
     let mut secret_0 = String::new();
     let mut secret_1 = String::new();
 
@@ -93,10 +93,10 @@ fn handle_login<T: 'static>(core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Client 
 
     if user_option != "Y" && user_option != "y" {
         println!("\nTrying to create an account ...");
-        unwrap!(Client::registered(&secret_0, &secret_1, core_tx, net_tx))
+        unwrap!(Client::registered(&secret_0, &secret_1, el_h, core_tx, net_tx))
     } else {
         println!("\nTrying to log in ...");
-        unwrap!(Client::login(&secret_0, &secret_1, core_tx, net_tx))
+        unwrap!(Client::login(&secret_0, &secret_1, el_h, core_tx, net_tx))
     }
 }
 
@@ -464,7 +464,7 @@ fn main() {
         let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
         let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
 
-        let client = handle_login(core_tx.clone(), net_tx);
+        let client = handle_login(el_h, core_tx.clone(), net_tx);
         let _ = unwrap!(tx.send(core_tx.clone()));
 
         core::run(el, client, (), core_rx);

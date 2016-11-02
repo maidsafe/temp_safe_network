@@ -128,12 +128,12 @@ fn main() {
     let secret_1: String = rng.gen_ascii_chars().take(20).collect();
 
     let client = if args.flag_get_only {
-        unwrap!(Client::login(&secret_0, &secret_1, core_tx.clone(), net_tx))
+        unwrap!(Client::login(&secret_0, &secret_1, el_h, core_tx.clone(), net_tx))
     } else {
         println!("\n\tAccount Creation");
         println!("\t================");
         println!("\nTrying to create an account ...");
-        unwrap!(Client::registered(&secret_0, &secret_1, core_tx.clone(), net_tx))
+        unwrap!(Client::registered(&secret_0, &secret_1, el_h, core_tx.clone(), net_tx))
     };
     println!("Logged in successfully!");
     let public_key = unwrap!(client.public_signing_key());

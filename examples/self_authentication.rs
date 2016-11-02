@@ -86,7 +86,11 @@ fn main() {
         {
             println!("\nTrying to create an account ...");
 
-            match Client::registered::<()>(&secret_0, &secret_1, core_tx.clone(), net_tx.clone()) {
+            match Client::registered::<()>(&secret_0,
+                                           &secret_1,
+                                           el_h.clone(),
+                                           core_tx.clone(),
+                                           net_tx.clone()) {
                 Ok(_) => (),
                 Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => {
                     println!("ERROR: This domain is already taken. Please retry with different \
@@ -105,8 +109,11 @@ fn main() {
         {
             println!("\nTrying to log into the created account using supplied credentials ...");
 
-            let _ =
-                unwrap!(Client::login::<()>(&secret_0, &secret_1, core_tx.clone(), net_tx.clone()));
+            let _ = unwrap!(Client::login::<()>(&secret_0,
+                                                &secret_1,
+                                                el_h.clone(),
+                                                core_tx.clone(),
+                                                net_tx.clone()));
             println!("Account Login Successful !!");
         }
     }
@@ -117,6 +124,7 @@ fn main() {
     loop {
         secret_0 = String::new();
         secret_1 = String::new();
+        let el_h2 = el_h.clone();
 
         println!("\n------------ Enter account-locator ---------------");
         let _ = std::io::stdin().read_line(&mut secret_0);
@@ -128,7 +136,7 @@ fn main() {
         // Log into the created account
         {
             println!("\nTrying to log in ...");
-            match Client::login(&secret_0, &secret_1, core_tx.clone(), net_tx.clone()) {
+            match Client::login(&secret_0, &secret_1, el_h2, core_tx.clone(), net_tx.clone()) {
                 Ok(_) => {
                     println!("Account Login Successful !!");
                     break;
