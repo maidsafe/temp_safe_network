@@ -54,20 +54,18 @@ extern crate unwrap;
 
 
 
-use futures::{Async, Future, IntoFuture, Poll};
-use futures::stream::Stream;
+use futures::Future;
+use maidsafe_utilities::thread;
 use rust_sodium::crypto::secretbox;
-use safe_core::core::{self, Client, CoreMsg, CoreMsgTx, FutureExt};
+use safe_core::core::{self, Client, CoreMsg, CoreMsgTx, FutureExt, NetworkTx};
 use safe_core::nfs::{Dir, DirId, DirMetadata, File, NfsError};
 use safe_core::nfs::helper::{dir_helper, file_helper};
 use safe_core::nfs::helper::writer::Mode;
+use std::sync::mpsc;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
 
-fn create_account<Run, I>(r: Run)
-    where Run: Fn(&Client, CoreMsgTx<()>) -> I + Send + 'static,
-          I: IntoFuture<Item = (), Error = ()> + 'static
-{
+fn handle_login<T: 'static>(core_tx: CoreMsgTx<T>, net_tx: NetworkTx) -> Client {
     let mut secret_0 = String::new();
     let mut secret_1 = String::new();
 
@@ -93,35 +91,13 @@ fn create_account<Run, I>(r: Run)
     let _ = std::io::stdin().read_line(&mut secret_1);
     secret_1 = secret_1.trim().to_string();
 
-    let el = unwrap!(Core::new());
-    let el_h = el.handle();
-
-    let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
-    let (net_tx, net_rx) = unwrap!(channel::channel(&el_h));
-    // Account Creation
-    let client = if user_option != "Y" && user_option != "y" {
+    if user_option != "Y" && user_option != "y" {
         println!("\nTrying to create an account ...");
-        unwrap!(Client::registered(&secret_0, &secret_1, core_tx.clone(), net_tx.clone()))
+        unwrap!(Client::registered(&secret_0, &secret_1, core_tx, net_tx))
     } else {
         println!("\nTrying to log in ...");
-        unwrap!(Client::login(&secret_0, &secret_1, core_tx.clone(), net_tx.clone()))
-    };
-
-    let net_fut =
-        net_rx.for_each(move |net_event| {
-                panic!("Unexpected NetworkEvent occurred: {:?}", net_event)
-            })
-            .map_err(|e| panic!("Network event stream error: {:?}", e));
-    el_h.spawn(net_fut);
-
-    let core_tx_clone = core_tx.clone();
-
-    unwrap!(core_tx.send(CoreMsg::new(move |client, _| {
-        let fut = r(client, core_tx_clone.clone());
-        Some(fut.into_future().into_box())
-    })));
-
-    core::run(el, client, (), core_rx);
+        unwrap!(Client::login(&secret_0, &secret_1, core_tx, net_tx))
+    }
 }
 
 fn get_user_string(placeholder: &str) -> String {
@@ -479,32 +455,52 @@ fn file_operation(option: u32,
 }
 
 fn main() {
-    create_account(move |client, core_tx| {
-        println!("\n\n------  (Tip) Start by creating a directory and then store file, modify \
-                  file within the directory --------------------");
+    let (tx, rx) = mpsc::channel::<CoreMsgTx<()>>();
 
-        let client = client.clone();
+    let _joiner = thread::named("Core Event Loop", move || {
+        let el = unwrap!(Core::new());
+        let el_h = el.handle();
 
-        infinite().fold((), move |_, _| {
-            println!("\n----------Choose an Operation----------------");
-            println!("1. Create Directory");
-            println!("2. List Directories");
-            println!("3. Delete Directory");
-            println!("4. List Files from directory");
-            println!("5. Create File");
-            println!("6. Update File");
-            println!("7. Get file content");
-            println!("8. Get file content by version");
-            println!("9. Delete file");
-            println!("10. Copy file");
-            println!("11. Exit");
-            println!("------ Enter a number --------------------");
+        let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
+        let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
 
+        let client = handle_login(core_tx.clone(), net_tx);
+        let _ = unwrap!(tx.send(core_tx.clone()));
+
+        core::run(el, client, (), core_rx);
+    });
+
+    let core_tx = unwrap!(rx.recv());
+
+    println!("Account Login Successful!");
+
+    println!("\n\n------  (Tip) Start by creating a directory and then store file, modify \
+              file within the directory --------------------");
+
+    loop {
+        println!("\n----------Choose an Operation----------------");
+        println!("1. Create Directory");
+        println!("2. List Directories");
+        println!("3. Delete Directory");
+        println!("4. List Files from directory");
+        println!("5. Create File");
+        println!("6. Update File");
+        println!("7. Get file content");
+        println!("8. Get file content by version");
+        println!("9. Delete file");
+        println!("10. Copy file");
+        println!("11. Exit");
+        println!("------ Enter a number --------------------");
+
+        let (tx, rx) = mpsc::channel::<bool>();
+        let core_tx_clone = core_tx.clone();
+
+        unwrap!(core_tx.send(CoreMsg::new(move |client, _| {
             let mut option = String::new();
             let _ = std::io::stdin().read_line(&mut option);
             println!("\n");
 
-            match option.trim().parse::<u32>() {
+            let fut = match option.trim().parse::<u32>() {
                 Ok(selection) => {
                     match selection {
                         1...3 => {
@@ -513,10 +509,6 @@ fn main() {
                             dir_helper::user_root_dir(client.clone())
                                 .and_then(move |(mut root_dir, dir_id)| {
                                     directory_operation(selection, &c2, &mut root_dir, dir_id)
-                                })
-                                .or_else(move |e| {
-                                    println!("Failed: {:?}", e);
-                                    futures::finished(())
                                 })
                                 .into_box()
                         }
@@ -527,15 +519,12 @@ fn main() {
                                 .and_then(move |(mut root_dir, _)| {
                                     file_operation(selection, c2, &mut root_dir)
                                 })
-                                .or_else(move |e| {
-                                    println!("Failed: {:?}", e);
-                                    futures::finished(())
-                                })
                                 .into_box()
                         }
                         11 => {
-                            unwrap!(core_tx.send(CoreMsg::build_terminator()));
-                            futures::failed(()).into_box()
+                            unwrap!(core_tx_clone.send(CoreMsg::build_terminator()));
+                            let _ = unwrap!(tx.send(false));
+                            return futures::failed(()).into_box().into();
                         }
                         _ => {
                             println!("Invalid option");
@@ -547,24 +536,23 @@ fn main() {
                     println!("Enter a valid number");
                     futures::finished(()).into_box()
                 }
-            }
-        })
-    });
-}
+            };
 
-// Hack to provide an infinite loop that uses futures
-#[must_use = "streams do nothing unless polled"]
-struct Infinite {}
+            fut.then(move |res| {
+                    match res {
+                        Err(e) => println!("Error: {:?}", e),
+                        _ => {}
+                    }
+                    let _ = unwrap!(tx.send(true));
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })));
 
-fn infinite() -> Infinite {
-    Infinite {}
-}
-
-impl Stream for Infinite {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<Option<()>, ()> {
-        Ok(Async::Ready(Some(())))
+        let continue_loop = unwrap!(rx.recv());
+        if !continue_loop {
+            break;
+        }
     }
 }

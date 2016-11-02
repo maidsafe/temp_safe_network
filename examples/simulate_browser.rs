@@ -52,13 +52,14 @@ extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
 
-use futures::{Async, Future, Poll};
-use futures::stream::Stream;
+use futures::Future;
+use maidsafe_utilities::thread;
 use regex::Regex;
 use safe_core::core::{self, Client, CoreMsg, CoreMsgTx, FutureExt, NetworkTx};
 use safe_core::dns::{DnsError, DnsFuture};
 use safe_core::dns::operations as dns;
 use safe_core::nfs::helper::{dir_helper, file_helper};
+use std::sync::mpsc;
 use tokio_core::channel;
 use tokio_core::reactor::Core;
 
@@ -341,100 +342,99 @@ fn parse_url_and_get_home_page(client: &Client) -> Box<DnsFuture<()>> {
 }
 
 fn main() {
-    let el = unwrap!(Core::new());
-    let el_h = el.handle();
+    let (tx, rx) = mpsc::channel::<CoreMsgTx<()>>();
 
-    let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
-    let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
+    let _joiner = thread::named("Core Event Loop", move || {
+        let el = unwrap!(Core::new());
+        let el_h = el.handle();
 
-    let client = handle_login(core_tx.clone(), net_tx);
-    let core_tx_clone = core_tx.clone();
+        let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
+        let (net_tx, _net_rx) = unwrap!(channel::channel(&el_h));
+
+        let client = handle_login(core_tx.clone(), net_tx);
+        let _ = unwrap!(tx.send(core_tx.clone()));
+
+        core::run(el, client, (), core_rx);
+    });
+
+    let core_tx = unwrap!(rx.recv());
 
     println!("Account Login Successful!");
 
-    unwrap!(core_tx.send(CoreMsg::new(move |client, _| {
+    loop {
         let mut user_option = String::new();
 
-        let client = client.clone();
+        println!("\n\n     ------\n    | MENU |\n     ------");
+        println!("\n<1> Register Your Dns");
+        println!("\n<2> Delete Dns Record");
+        println!("\n<3> List Dns Records");
+        println!("\n<4> Add Service");
+        println!("\n<5> Remove Service");
+        println!("\n<6> List Services");
+        println!("\n<7> Parse URL (Simulate Browser)");
+        println!("\n<8> Exit");
 
-        infinite()
-            .fold((), move |_, _| {
-                println!("\n\n     ------\n    | MENU |\n     ------");
-                println!("\n<1> Register Your Dns");
-                println!("\n<2> Delete Dns Record");
-                println!("\n<3> List Dns Records");
-                println!("\n<4> Add Service");
-                println!("\n<5> Remove Service");
-                println!("\n<6> List Services");
-                println!("\n<7> Parse URL (Simulate Browser)");
-                println!("\n<8> Exit");
+        println!("\nEnter Option [1-8]:");
 
-                println!("\nEnter Option [1-8]:");
+        let (tx, rx) = mpsc::channel::<bool>();
 
-                let _ = std::io::stdin().read_line(&mut user_option);
+        let _ = std::io::stdin().read_line(&mut user_option);
+        let core_tx_clone = core_tx.clone();
 
-                let fut = if let Ok(option) = user_option.trim().parse::<u8>() {
-                    let fut = match option {
-                        1 => create_dns_record(&client),
-                        2 => delete_dns_record(&client),
-                        3 => display_dns_records(&client),
-                        4 => add_service(&client),
-                        5 => remove_service(&client),
-                        6 => display_services(&client),
-                        7 => parse_url_and_get_home_page(&client),
-                        8 => {
-                            unwrap!(core_tx_clone.send(CoreMsg::build_terminator()));
-                            return futures::failed(()).into_box();
-                        }
-                        _ => {
-                            println!("\nUnrecognised option !!");
-                            return futures::finished(()).into_box();
-                        }
-                    };
+        unwrap!(core_tx.send(CoreMsg::new(move |client, _| {
+            let client = client.clone();
 
-                    println!("\n ----------------------------------------------");
-
-                    fut.map_err(move |err| {
-                            println!("|  ERROR !! {:?}", err);
-                        })
-                        .map(move |_| {
-                            println!("|  Operation Completed Successfully!");
-                        })
-                        .or_else(move |_| Ok(()))
-                        .into_box()
-                } else {
-                    println!("\nUnrecognised option !!");
-
-                    futures::finished(()).into_box()
+            let fut = if let Ok(option) = user_option.trim().parse::<u8>() {
+                let fut = match option {
+                    1 => create_dns_record(&client),
+                    2 => delete_dns_record(&client),
+                    3 => display_dns_records(&client),
+                    4 => add_service(&client),
+                    5 => remove_service(&client),
+                    6 => display_services(&client),
+                    7 => parse_url_and_get_home_page(&client),
+                    8 => {
+                        unwrap!(core_tx_clone.send(CoreMsg::build_terminator()));
+                        let _ = unwrap!(tx.send(false));
+                        return futures::failed(()).into_box().into();
+                    }
+                    _ => {
+                        println!("\nUnrecognised option !!");
+                        futures::finished(()).into_box()
+                    }
                 };
 
-                println!("Hit Enter to continue...");
-                let _ = std::io::stdin().read_line(&mut user_option);
-                user_option.clear();
+                println!("\n ----------------------------------------------");
 
-                fut
-            })
-            .map_err(move |_| ())
-            .into_box()
-            .into()
-    })));
+                fut.then(move |res| {
+                        match res {
+                            Err(err) => println!("|  ERROR !! {:?}", err),
+                            Ok(_) => println!("|  Operation Completed Successfully!"),
+                        }
+                        Ok(())
+                    })
+                    .into_box()
+            } else {
+                println!("\nUnrecognised option !!");
+                futures::finished(()).into_box()
+            };
 
-    core::run(el, client, (), core_rx);
-}
+            fut.map(move |_| {
+                    let _ = unwrap!(tx.send(true));
+                })
+                .into_box()
+                .into()
+        })));
 
-// Hack to provide an infinite loop that uses futures
-#[must_use = "streams do nothing unless polled"]
-struct Infinite {}
+        let continue_loop = unwrap!(rx.recv());
 
-fn infinite() -> Infinite {
-    Infinite {}
-}
-
-impl Stream for Infinite {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<Option<()>, ()> {
-        Ok(Async::Ready(Some(())))
+        if !continue_loop {
+            break;
+        } else {
+            let mut user_option = String::new();
+            println!("Hit Enter to continue...");
+            let _ = std::io::stdin().read_line(&mut user_option);
+            user_option.clear();
+        }
     }
 }
