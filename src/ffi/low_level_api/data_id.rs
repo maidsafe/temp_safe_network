@@ -53,19 +53,17 @@ pub unsafe extern "C" fn data_id_new_immut_data(session: *const Session,
                                                 user_data: *mut c_void,
                                                 o_cb: unsafe extern "C" fn(*mut c_void,
                                                                            int32_t,
-                                                                           DataIdHandle))
-                                                -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                           DataIdHandle)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let xor_id = XorName(*id);
         let data_id = DataIdentifier::Immutable(xor_id);
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |_, obj_cache| {
+        (*session).send(move |_, obj_cache| {
             let handle = obj_cache.insert_data_id(data_id);
             o_cb(user_data.0, 0, handle);
             None
-        }));
-        0
+        })
     })
 }
 
@@ -77,9 +75,8 @@ pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void,
                                                                                 int32_t,
-                                                                                DataIdHandle))
-                                                     -> i32 {
-    helper::catch_unwind_i32(|| {
+                                                                                DataIdHandle)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
         let xor_id = XorName(*id);
         let data_id = if is_private {
             DataIdentifier::PrivAppendable(xor_id)
@@ -89,12 +86,11 @@ pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
 
         let user_data = OpaqueCtx(user_data);
 
-        ffi_try!((*session).send(move |_, obj_cache| {
+        (*session).send(move |_, obj_cache| {
             let handle = obj_cache.insert_data_id(data_id);
             o_cb(user_data.0, 0, handle);
             None
-        }));
-        0
+        })
     })
 }
 
@@ -151,24 +147,21 @@ mod tests {
             data_id_new_struct_data(sess_ptr, type_tag, &struct_id_arr, tx, data_id_cb);
             data_id_handle_struct = unwrap!(rx.recv());
 
-            assert_eq!(data_id_new_immut_data(sess_ptr, &immut_id_arr, tx, data_id_cb),
-                       0);
+            data_id_new_immut_data(sess_ptr, &immut_id_arr, tx, data_id_cb);
             data_id_handle_immut = unwrap!(rx.recv());
 
-            assert_eq!(data_id_new_appendable_data(sess_ptr,
-                                                   &priv_app_id_arr,
-                                                   true,
-                                                   tx,
-                                                   data_id_cb),
-                       0);
+            data_id_new_appendable_data(sess_ptr,
+                                        &priv_app_id_arr,
+                                        true,
+                                        tx,
+                                        data_id_cb);
             data_id_handle_priv_appendable = unwrap!(rx.recv());
 
-            assert_eq!(data_id_new_appendable_data(sess_ptr,
-                                                   &pub_app_id_arr,
-                                                   false,
-                                                   tx,
-                                                   data_id_cb),
-                       0);
+            data_id_new_appendable_data(sess_ptr,
+                                        &pub_app_id_arr,
+                                        false,
+                                        tx,
+                                        data_id_cb);
             data_id_handle_pub_appendable = unwrap!(rx.recv());
         }
 

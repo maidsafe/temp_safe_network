@@ -382,17 +382,16 @@ pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: usize, capacity: u
 #[no_mangle]
 pub unsafe extern "C" fn misc_object_cache_reset(session: *const Session,
                                                  user_data: *mut c_void,
-                                                 o_cb: unsafe extern "C" fn(*mut c_void, int32_t))
-                                                 -> i32 {
+                                                 o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
     let user_data = OpaqueCtx(user_data);
 
-    ffi_try!((*session).send(move |_, obj_cache| {
-        obj_cache.reset();
-        o_cb(user_data.0, 0);
-        None
-    }));
-
-    0
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        (*session).send(move |_, obj_cache| {
+            obj_cache.reset();
+            o_cb(user_data.0, 0);
+            None
+        })
+    })
 }
 
 #[cfg(test)]

@@ -81,29 +81,36 @@ pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
     (ptr, len, cap)
 }
 
-pub fn catch_unwind_i32<F: FnOnce() -> int32_t>(f: F) -> int32_t {
-    let errno: i32 = FfiError::Unexpected(String::new()).into();
-    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(errno)
+pub fn catch_unwind_i32<F: FnOnce() -> Result<(), FfiError>>(f: F) -> int32_t {
+    ffi_result_code!(catch_unwind(f))
 }
 
-pub fn catch_unwind_ptr<T, F: FnOnce() -> *const T>(f: F) -> *const T {
-    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(ptr::null())
+pub fn catch_unwind_ptr<T, F: FnOnce() -> Result<*const T, FfiError>>(f: F) -> *const T {
+    match catch_unwind(f) {
+        Ok(ptr) => ptr,
+        Err(err) => {
+            let _ = ffi_error_code!(err);
+            ptr::null()
+        }
+    }
 }
 
 // Every FFI function which uses result callback should have its body wrapped
 // in this.
-pub fn catch_unwind_cb<U, C, F>(user_data: U, cb: C, body: F)
+pub fn catch_unwind_cb<U, C, F>(user_data: U, cb: C, f: F)
     where U: Into<*mut c_void>,
           C: Callback,
           F: FnOnce() -> Result<(), FfiError>
 {
-    let result = match panic::catch_unwind(AssertUnwindSafe(body)) {
+    if let Err(err) = catch_unwind(f) {
+        cb.call(user_data.into(), ffi_error_code!(err), CallbackArgs::default());
+    }
+}
+
+fn catch_unwind<T, F: FnOnce() -> Result<T, FfiError>>(f: F) -> Result<T, FfiError> {
+    match panic::catch_unwind(AssertUnwindSafe(f)) {
         Err(_) => Err(FfiError::from("panic")),
         Ok(result) => result,
-    };
-
-    if let Err(err) = result {
-        cb.call(user_data.into(), ffi_error_code!(err), CallbackArgs::default());
     }
 }
 

@@ -39,29 +39,6 @@ macro_rules! ffi_result_code {
     }
 }
 
-macro_rules! ffi_try {
-    ($result:expr) => {
-        match $result {
-            Ok(value)  => value,
-            Err(error) => {
-                return ffi_error_code!(error)
-            },
-        }
-    }
-}
-
-macro_rules! ffi_ptr_try {
-    ($result:expr, $out:expr) => {
-        match $result {
-            Ok(value)  => value,
-            Err(error) => {
-                let _ = ffi_error_code!(error);
-                return ::std::ptr::null();
-            },
-        }
-    }
-}
-
 macro_rules! try_cb {
     ($result:expr, $user_data:expr, $cb:expr) => {
         match $result {
