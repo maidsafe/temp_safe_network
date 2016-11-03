@@ -35,37 +35,32 @@ regex = "~0.1.77"
 
 [[example]]
 bench = false
-test = false
+test = true
 name = "email_stress_test"
 
 [[example]]
 bench = false
-test = false
+test = true
 name = "client_stress_test"
 
 [[example]]
 bench = false
-test = false
+test = true
 name = "self_authentication"
 
 [[example]]
 bench = false
-test = false
-name = "safe_client"
-
-[[example]]
-bench = false
-test = false
+test = true
 name = "nfs_api"
 
 [[example]]
 bench = false
-test = false
+test = true
 name = "simulate_browser"
 
 [[example]]
 bench = false
-test = false
+test = true
 name = "email"
 
 [features]
