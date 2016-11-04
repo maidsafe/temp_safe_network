@@ -144,19 +144,28 @@ impl MockRouting {
 
                         Self::send(&cloned_sender, event);
                     } else {
+                        let err = if let DataIdentifier::Structured(_, TYPE_TAG_SESSION_PACKET) =
+                                         data_id {
+                            GetError::NoSuchAccount
+                        } else {
+                            GetError::NoSuchData
+                        };
                         Self::send_failure_resp(&cloned_sender,
                                                 nae_auth,
                                                 client_auth,
                                                 request,
-                                                GetError::NoSuchData);
+                                                err);
                     }
                 }
-                Err(error) => {
-                    Self::send_failure_resp(&cloned_sender,
-                                            nae_auth,
-                                            client_auth,
-                                            request,
-                                            GetError::from(error));
+                Err(e) => {
+                    let err = match (GetError::from(e), data_id) {
+                        (GetError::NoSuchData,
+                         DataIdentifier::Structured(_, TYPE_TAG_SESSION_PACKET)) => {
+                            GetError::NoSuchAccount
+                        }
+                        (e, _) => e,
+                    };
+                    Self::send_failure_resp(&cloned_sender, nae_auth, client_auth, request, err);
                 }
             };
         });

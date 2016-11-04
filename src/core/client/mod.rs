@@ -1019,9 +1019,8 @@ mod tests {
     use futures::Future;
     use rand;
     use routing::{Data, DataIdentifier, ImmutableData, StructuredData};
-    use routing::client_errors::MutationError;
+    use routing::client_errors::{GetError, MutationError};
     use rust_sodium::crypto::secretbox;
-    use std::panic;
     use super::*;
     use tokio_core::channel;
     use tokio_core::reactor::Core;
@@ -1119,18 +1118,19 @@ mod tests {
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
-        let res = panic::catch_unwind(|| {
-            setup_client(|el_h, core_tx, net_tx| {
-                             Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx)
-                         },
-                         |_| finish());
-        });
-        assert!(res.is_err());
-
         setup_client(|el_h, core_tx, net_tx| {
-                         Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
-                     },
+            match Client::login(&sec_0,
+                                &sec_1,
+                                el_h.clone(),
+                                core_tx.clone(),
+                                net_tx.clone()) {
+                Err(CoreError::GetFailure { reason: GetError::NoSuchAccount, .. }) => (),
+                x => panic!("Unexpected Login outcome: {:?}", x),
+            }
+            Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
+        },
                      |_| finish());
+
         setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      |_| finish());
     }
