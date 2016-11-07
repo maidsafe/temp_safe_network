@@ -32,20 +32,6 @@ use routing::{Data, DataIdentifier, ImmutableData};
 use self_encryption::{DataMap, SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr, slice};
 
-/// SelfEncryptorWriterWrapper ties in the objects with dependent lifetimes and
-/// manages correct destruction sequence.
-pub struct SelfEncryptorWriterWrapper {
-    se: SequentialEncryptor<SelfEncryptionStorage>,
-    _storage: Box<SelfEncryptionStorage>,
-}
-
-/// SelfEncryptorWriterWrapper ties in the objects with dependent lifetimes and
-/// manages correct destruction sequence.
-pub struct SelfEncryptorReaderWrapper {
-    se: SelfEncryptor<SelfEncryptionStorage>,
-    _storage: Box<SelfEncryptionStorage>,
-}
-
 type SEWriterHandle = SelfEncryptorWriterHandle;
 type SEReaderHandle = SelfEncryptorReaderHandle;
 
@@ -60,17 +46,13 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |client, obj_cache| {
-            let mut se_storage = Box::new(SelfEncryptionStorage::new(client.clone()));
+            let se_storage = SelfEncryptionStorage::new(client.clone());
             let obj_cache = obj_cache.clone();
 
-            let fut = SequentialEncryptor::new(mem::transmute(&mut *se_storage), None)
+            let fut = SequentialEncryptor::new(se_storage, None)
                 .map_err(CoreError::from)
                 .map(move |se| {
-                    let se_wrapper = SelfEncryptorWriterWrapper {
-                        se: se,
-                        _storage: se_storage,
-                    };
-                    let handle = obj_cache.insert_se_writer(se_wrapper);
+                    let handle = obj_cache.insert_se_writer(se);
                     o_cb(user_data.0, 0, handle);
                 })
                 .map_err(move |e| {
@@ -100,7 +82,7 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
         (*session).send(move |_, obj_cache| {
             let fut = {
                 match obj_cache.get_se_writer(se_h) {
-                    Ok(writer) => writer.se.write(data_slice),
+                    Ok(writer) => writer.write(data_slice),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e));
                         return None;
@@ -134,7 +116,7 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
         (*session).send(move |client, obj_cache| {
             let fut = {
                 match obj_cache.remove_se_writer(se_h) {
-                    Ok(se_wrapper) => se_wrapper.se.close().into_box(),
+                    Ok(se_wrapper) => se_wrapper.close(),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e), 0);
                         return None;
@@ -241,17 +223,11 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
                 .and_then(move |ser_data_map| {
                     let data_map = try!(deserialise::<DataMap>(&ser_data_map));
 
-                    let mut se_storage = Box::new(SelfEncryptionStorage::new(c3));
+                    let se_storage = SelfEncryptionStorage::new(c3);
 
-                    SelfEncryptor::new(mem::transmute(&mut *se_storage), data_map)
+                    SelfEncryptor::new(se_storage, data_map)
                         .map_err(CoreError::from)
                         .map_err(FfiError::from)
-                        .map(move |se| {
-                            SelfEncryptorReaderWrapper {
-                                se: se,
-                                _storage: se_storage,
-                            }
-                        })
                 })
                 .map(move |se_wrapper| {
                     let handle = obj_cache3.insert_se_reader(se_wrapper);
@@ -277,8 +253,8 @@ pub unsafe extern "C" fn immut_data_size(session: *const Session,
     catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
             match obj_cache.get_se_reader(se_h) {
-                Ok(se_wrapper) => {
-                    o_cb(user_data.0, 0, se_wrapper.se.len());
+                Ok(se) => {
+                    o_cb(user_data.0, 0, se.len());
                 }
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e), 0);
@@ -306,15 +282,13 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
 
     catch_unwind_cb(user_data, o_cb, || {
         (*session).send(move |_, obj_cache| {
-            let mut se_wrapper = match obj_cache.get_se_reader(se_h) {
+            let se = match obj_cache.get_se_reader(se_h) {
                 Ok(r) => r,
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0);
                     return None;
                 }
             };
-
-            let se = &mut se_wrapper.se;
 
             if from_pos + len > se.len() {
                 o_cb(user_data.0,

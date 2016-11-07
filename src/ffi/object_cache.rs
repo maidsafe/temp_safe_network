@@ -19,16 +19,17 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use core::SelfEncryptionStorage;
 use ffi::{App, AppHandle, AppendableDataHandle, CipherOptHandle, DataIdHandle, EncryptKeyHandle,
           ObjectHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle, SignKeyHandle,
           StructDataHandle};
 use ffi::errors::FfiError;
 use ffi::low_level_api::appendable_data::AppendableData;
 use ffi::low_level_api::cipher_opt::CipherOpt;
-use ffi::low_level_api::immut_data::{SelfEncryptorReaderWrapper, SelfEncryptorWriterWrapper};
 use lru_cache::LruCache;
 use routing::{DataIdentifier, StructuredData};
 use rust_sodium::crypto::{box_, sign};
+use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::rc::Rc;
 use std::u64;
@@ -49,8 +50,8 @@ struct Inner {
     data_id: Store<DataIdentifier>,
     encrypt_key: Store<box_::PublicKey>,
     sd: Store<StructuredData>,
-    se_reader: Store<SelfEncryptorReaderWrapper>,
-    se_writer: Store<SelfEncryptorWriterWrapper>,
+    se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
+    se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
     sign_key: Store<sign::PublicKey>,
 }
 
@@ -152,14 +153,14 @@ impl_cache!(encrypt_key,
             insert_encrypt_key,
             remove_encrypt_key);
 impl_cache!(se_reader,
-            SelfEncryptorReaderWrapper,
+            SelfEncryptor<SelfEncryptionStorage>,
             SelfEncryptorReaderHandle,
             InvalidSelfEncryptorHandle,
             get_se_reader,
             insert_se_reader,
             remove_se_reader);
 impl_cache!(se_writer,
-            SelfEncryptorWriterWrapper,
+            SequentialEncryptor<SelfEncryptionStorage>,
             SelfEncryptorWriterHandle,
             InvalidSelfEncryptorHandle,
             get_se_writer,
