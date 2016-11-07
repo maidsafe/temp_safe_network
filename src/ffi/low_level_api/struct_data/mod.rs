@@ -28,9 +28,9 @@ use core::structured_data::{self, unversioned, versioned};
 use ffi::{AppHandle, CipherOptHandle, DataIdHandle, StructDataHandle};
 use ffi::{FfiError, OpaqueCtx, Session, helper};
 use futures::{self, Future};
-use libc::{c_void, int32_t, uint64_t};
 use routing::{Data, StructuredData, XOR_NAME_LEN, XorName};
 use std::{ptr, slice};
+use std::os::raw::c_void;
 use super::cipher_opt::CipherOpt;
 
 /// Create new StructuredData
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn struct_data_new(session: *const Session,
                                          data_len: usize,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                    int32_t,
+                                                                    i32,
                                                                     StructDataHandle)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let id = XorName(*id);
@@ -120,7 +120,7 @@ pub unsafe extern "C" fn struct_data_fetch(session: *const Session,
                                            data_id_h: DataIdHandle,
                                            user_data: *mut c_void,
                                            o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                      int32_t,
+                                                                      i32,
                                                                       StructDataHandle)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -154,7 +154,7 @@ pub unsafe extern "C" fn struct_data_extract_data_id(session: *const Session,
                                                      sd_h: StructDataHandle,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                int32_t,
+                                                                                i32,
                                                                                 DataIdHandle)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn struct_data_update(session: *const Session,
                                             data: *const u8,
                                             data_len: usize,
                                             user_data: *mut c_void,
-                                            o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                            o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let data = slice::from_raw_parts(data, data_len);
         let user_data = OpaqueCtx(user_data);
@@ -254,7 +254,7 @@ pub unsafe extern "C" fn struct_data_extract_data(session: *const Session,
                                                   sd_h: StructDataHandle,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             int32_t,
+                                                                             i32,
                                                                              *mut u8,
                                                                              usize,
                                                                              usize)) {
@@ -303,8 +303,8 @@ pub unsafe extern "C" fn struct_data_num_of_versions(session: *const Session,
                                                      sd_h: StructDataHandle,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                int32_t,
-                                                                                uint64_t)) {
+                                                                                i32,
+                                                                                u64)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -324,10 +324,10 @@ pub unsafe extern "C" fn struct_data_num_of_versions(session: *const Session,
 pub unsafe extern "C" fn struct_data_nth_version(session: *const Session,
                                                  app_h: AppHandle,
                                                  sd_h: StructDataHandle,
-                                                 n: uint64_t,
+                                                 n: u64,
                                                  user_data: *mut c_void,
                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                            int32_t,
+                                                                            i32,
                                                                             *mut u8,
                                                                             usize,
                                                                             usize)) {
@@ -371,9 +371,7 @@ pub unsafe extern "C" fn struct_data_nth_version(session: *const Session,
 pub unsafe extern "C" fn struct_data_version(session: *const Session,
                                              handle: StructDataHandle,
                                              user_data: *mut c_void,
-                                             o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                        int32_t,
-                                                                        uint64_t)) {
+                                             o_cb: unsafe extern "C" fn(*mut c_void, i32, u64)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -390,7 +388,7 @@ pub unsafe extern "C" fn struct_data_version(session: *const Session,
 pub unsafe extern "C" fn struct_data_put(session: *const Session,
                                          sd_h: StructDataHandle,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -430,7 +428,7 @@ pub unsafe extern "C" fn struct_data_put(session: *const Session,
 pub unsafe extern "C" fn struct_data_post(session: *const Session,
                                           sd_h: StructDataHandle,
                                           user_data: *mut c_void,
-                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -454,7 +452,7 @@ pub unsafe extern "C" fn struct_data_post(session: *const Session,
 pub unsafe extern "C" fn struct_data_delete(session: *const Session,
                                             sd_h: StructDataHandle,
                                             user_data: *mut c_void,
-                                            o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                            o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -479,9 +477,7 @@ pub unsafe extern "C" fn struct_data_delete(session: *const Session,
 pub unsafe extern "C" fn struct_data_validate_size(session: *const Session,
                                                    handle: StructDataHandle,
                                                    user_data: *mut c_void,
-                                                   o_cb: extern "C" fn(*mut c_void,
-                                                                       int32_t,
-                                                                       bool)) {
+                                                   o_cb: extern "C" fn(*mut c_void, i32, bool)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -498,9 +494,7 @@ pub unsafe extern "C" fn struct_data_validate_size(session: *const Session,
 pub unsafe extern "C" fn struct_data_is_owned(session: *const Session,
                                               sd_h: StructDataHandle,
                                               user_data: *mut c_void,
-                                              o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                         int32_t,
-                                                                         bool)) {
+                                              o_cb: unsafe extern "C" fn(*mut c_void, i32, bool)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -519,7 +513,7 @@ pub unsafe extern "C" fn struct_data_is_owned(session: *const Session,
 pub unsafe extern "C" fn struct_data_free(session: *const Session,
                                           handle: StructDataHandle,
                                           user_data: *mut c_void,
-                                          o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 

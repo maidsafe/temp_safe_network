@@ -27,8 +27,8 @@ use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::helper;
 use ffi::string_list::{self, StringList};
 use futures::Future;
-use libc::{c_void, int32_t};
 use rust_sodium::crypto::box_;
+use std::os::raw::c_void;
 use std::ptr;
 
 /// Register DNS long name.
@@ -37,7 +37,7 @@ pub unsafe extern "C" fn dns_register_long_name(session: *const Session,
                                                 long_name: *const u8,
                                                 long_name_len: usize,
                                                 user_data: *mut c_void,
-                                                o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                                o_cb: extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
 
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
                                               long_name: *const u8,
                                               long_name_len: usize,
                                               user_data: *mut c_void,
-                                              o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                              o_cb: extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI delete DNS.");
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn dns_delete_long_name(session: *const Session,
 pub unsafe extern "C" fn dns_get_long_names(session: *const Session,
                                             user_data: *mut c_void,
                                             o_cb: extern "C" fn(*mut c_void,
-                                                                int32_t,
+                                                                i32,
                                                                 *mut StringList)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI Get all dns long names.");
@@ -121,9 +121,9 @@ pub unsafe extern "C" fn dns_get_long_names(session: *const Session,
 mod tests {
     use core::utility;
     use dns::DnsError;
-    use ffi::test_utils;
     use ffi::string_list::*;
-    use libc::{c_void, int32_t};
+    use ffi::test_utils;
+    use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
 
@@ -138,12 +138,12 @@ mod tests {
         {
             let session = test_utils::create_session();
 
-            extern "C" fn register_cb(user_data: *mut c_void, error: int32_t) {
+            extern "C" fn register_cb(user_data: *mut c_void, error: i32) {
                 assert_eq!(error, 0);
                 unsafe { test_utils::send_via_user_data(user_data, ()) }
             }
 
-            extern "C" fn get_cb(user_data: *mut c_void, error: int32_t, list: *mut StringList) {
+            extern "C" fn get_cb(user_data: *mut c_void, error: i32, list: *mut StringList) {
                 assert_eq!(error, 0);
 
                 unsafe {
@@ -174,7 +174,7 @@ mod tests {
         {
             let session = test_utils::create_session();
 
-            extern "C" fn callback(user_data: *mut c_void, error: int32_t) {
+            extern "C" fn callback(user_data: *mut c_void, error: i32) {
                 assert_eq!(error, DnsError::DnsNameAlreadyRegistered.into());
                 unsafe { test_utils::send_via_user_data(user_data, ()) }
             }

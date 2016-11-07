@@ -26,10 +26,10 @@ use ffi::{App, AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use ffi::file_details::{FileDetails, FileMetadata};
 use ffi::helper::catch_unwind_cb;
 use futures::{self, Future};
-use libc::{c_void, int32_t, uint64_t};
 use nfs::{File, NfsError};
 use nfs::helper::{dir_helper, file_helper};
 use nfs::helper::writer::Mode;
+use std::os::raw::c_void;
 use std::ptr;
 use time;
 
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn nfs_delete_file(session: *const Session,
                                          file_path_len: usize,
                                          is_shared: bool,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -81,7 +81,7 @@ pub unsafe extern "C" fn nfs_get_file(session: *const Session,
                                       include_metadata: bool,
                                       user_data: *mut c_void,
                                       o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                 int32_t,
+                                                                 i32,
                                                                  *mut FileDetails)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn nfs_modify_file(session: *const Session,
                                          new_content: *const u8,
                                          new_content_len: usize,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn nfs_move_file(session: *const Session,
                                        is_dst_path_shared: bool,
                                        retain_src: bool,
                                        user_data: *mut c_void,
-                                       o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                       o_cb: extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -225,9 +225,7 @@ pub unsafe extern "C" fn nfs_get_file_num_of_versions(session: *const Session,
                                                       file_path_len: usize,
                                                       is_path_shared: bool,
                                                       user_data: *mut c_void,
-                                                      o_cb: extern "C" fn(*mut c_void,
-                                                                          int32_t,
-                                                                          uint64_t)) {
+                                                      o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -280,7 +278,7 @@ pub unsafe extern "C" fn nfs_get_file_metadata(session: *const Session,
                                                version: u64,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
-                                                                   int32_t,
+                                                                   i32,
                                                                    *mut FileMetadata)) {
     let user_data = OpaqueCtx(user_data);
     catch_unwind_cb(user_data, o_cb, || {

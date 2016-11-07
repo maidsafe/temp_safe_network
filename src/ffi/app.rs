@@ -29,9 +29,9 @@
 use core::{Client, FutureExt};
 use ffi::{AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper, launcher_config};
 use futures::{self, Future};
-use libc::{c_void, int32_t};
 use nfs::DirId;
 use rust_sodium::crypto::{box_, secretbox};
+use std::os::raw::c_void;
 
 /// Represents an application connected to the launcher.
 #[derive(RustcEncodable, RustcDecodable, Debug, Clone)]
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
                                       user_data: *mut c_void,
-                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t, AppHandle)) {
+                                      o_cb: unsafe extern "C" fn(*mut c_void, i32, AppHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     let _ = helper::catch_unwind_cb(user_data, o_cb, || {
@@ -139,9 +139,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
 #[no_mangle]
 pub unsafe extern "C" fn create_unregistered_app(session: *mut Session,
                                                  user_data: *mut c_void,
-                                                 o_cb: extern "C" fn(*mut c_void,
-                                                                     int32_t,
-                                                                     AppHandle)) {
+                                                 o_cb: extern "C" fn(*mut c_void, i32, AppHandle)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |_, object_cache| {

@@ -21,9 +21,9 @@
 
 use core::CoreError;
 use ffi::{App, CipherOptHandle, EncryptKeyHandle, FfiError, OpaqueCtx, Session, helper};
-use libc::{c_void, int32_t};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
+use std::os::raw::c_void;
 
 /// Cipher Options
 #[derive(Debug)]
@@ -99,7 +99,7 @@ impl CipherOpt {
 pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             int32_t,
+                                                                             i32,
                                                                              CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -117,7 +117,7 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
 pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             int32_t,
+                                                                             i32,
                                                                              CipherOptHandle)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
                                                    peer_encrypt_key_h: EncryptKeyHandle,
                                                    user_data: *mut c_void,
                                                    o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                              int32_t,
+                                                                              i32,
                                                                               CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
 pub unsafe extern "C" fn cipher_opt_free(session: *const Session,
                                          handle: CipherOptHandle,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {
@@ -178,8 +178,8 @@ mod tests {
     use core::utility;
     use ffi::{App, CipherOptHandle, FfiError, Session};
     use ffi::test_utils;
-    use libc::c_void;
     use rust_sodium::crypto::box_;
+    use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
 

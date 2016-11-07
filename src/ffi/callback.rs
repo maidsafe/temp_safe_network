@@ -21,72 +21,73 @@
 
 //! Helpers to work with extern "C" callbacks.
 
-use libc::{c_void, int32_t};
+use std::os::raw::c_void;
 use std::ptr;
 
 // This trait allows us to treat callbacks with different number and type of
 // arguments uniformly.
 pub trait Callback {
     type Args: CallbackArgs;
-    fn call(&self, user_data: *mut c_void, error: int32_t, args: Self::Args);
+    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args);
 }
 
-// TODO: remove the impls for unsafe fn's (after we decide all callbacks should be safe).
+// TODO: remove the impls for unsafe fn's (after we decide all callbacks should
+// be safe).
 
-impl Callback for extern "C" fn(*mut c_void, int32_t) {
+impl Callback for extern "C" fn(*mut c_void, i32) {
     type Args = ();
-    fn call(&self, user_data: *mut c_void, error: int32_t, _args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: i32, _args: Self::Args) {
         self(user_data, error)
     }
 }
 
-impl Callback for unsafe extern "C" fn(*mut c_void, int32_t) {
+impl Callback for unsafe extern "C" fn(*mut c_void, i32) {
     type Args = ();
-    fn call(&self, user_data: *mut c_void, error: int32_t, _args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: i32, _args: Self::Args) {
         unsafe { self(user_data, error) }
     }
 }
 
-impl<T: CallbackArgs> Callback for extern "C" fn(*mut c_void, int32_t, a: T) {
+impl<T: CallbackArgs> Callback for extern "C" fn(*mut c_void, i32, a: T) {
     type Args = T;
-    fn call(&self, user_data: *mut c_void, error: int32_t, args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
         self(user_data, error, args)
     }
 }
 
-impl<T: CallbackArgs> Callback for unsafe extern "C" fn(*mut c_void, int32_t, a: T) {
+impl<T: CallbackArgs> Callback for unsafe extern "C" fn(*mut c_void, i32, a: T) {
     type Args = T;
-    fn call(&self, user_data: *mut c_void, error: int32_t, args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
         unsafe { self(user_data, error, args) }
     }
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs> Callback
-    for unsafe extern "C" fn(*mut c_void, int32_t, a0: T0, a1: T1) {
+    for extern "C" fn(*mut c_void, i32, a0: T0, a1: T1) {
     type Args = (T0, T1);
-    fn call(&self, user_data: *mut c_void, error: int32_t, args: Self::Args) {
-        unsafe { self(user_data, error, args.0, args.1) }
+    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
+        self(user_data, error, args.0, args.1)
     }
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
-    for extern "C" fn(*mut c_void, int32_t, a0: T0, a1: T1, a2: T2) {
+    for extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2) {
     type Args = (T0, T1, T2);
-    fn call(&self, user_data: *mut c_void, error: int32_t, args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
         self(user_data, error, args.0, args.1, args.2)
     }
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
-    for unsafe extern "C" fn(*mut c_void, int32_t, a0: T0, a1: T1, a2: T2) {
+    for unsafe extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2) {
     type Args = (T0, T1, T2);
-    fn call(&self, user_data: *mut c_void, error: int32_t, args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
         unsafe { self(user_data, error, args.0, args.1, args.2) }
     }
 }
 
-// This is similar to `Default`, but allows us to implement it for foreign types that
-// don't already implement `Default`.
+// This is similar to `Default`, but allows us to implement it for foreign
+// types that don't already implement `Default`.
 pub trait CallbackArgs {
     fn default() -> Self;
 }

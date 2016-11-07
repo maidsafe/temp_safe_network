@@ -23,8 +23,8 @@
 //! corresponding FFI-enabled API.
 
 use ffi::errors::FfiError;
-use libc::c_char;
 use std::ffi::CString;
+use std::os::raw::c_char;
 use std::ptr;
 
 /// List of strings.
@@ -48,9 +48,8 @@ pub unsafe fn into_vec(list: *mut StringList) -> Result<Vec<String>, FfiError> {
     let mut result = Vec::with_capacity(cstrings.len());
 
     for cstring in cstrings {
-        result.push(try!(cstring.into_string().map_err(|err| {
-            FfiError::Unexpected(format!("{:?}", err))
-        })));
+        result.push(try!(cstring.into_string()
+            .map_err(|err| FfiError::Unexpected(format!("{:?}", err)))));
     }
 
     Ok(result)

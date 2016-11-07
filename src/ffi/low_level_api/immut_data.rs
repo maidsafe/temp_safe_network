@@ -26,11 +26,11 @@ use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::helper::catch_unwind_cb;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use futures::Future;
-use libc::{c_void, int32_t, size_t};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData};
 use self_encryption::{DataMap, SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr, slice};
+use std::os::raw::c_void;
 
 type SEWriterHandle = SelfEncryptorWriterHandle;
 type SEReaderHandle = SelfEncryptorReaderHandle;
@@ -40,7 +40,7 @@ type SEReaderHandle = SelfEncryptorReaderHandle;
 pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
                                                        user_data: *mut c_void,
                                                        o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                  int32_t,
+                                                                                  i32,
                                                                                   SEWriterHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
                                                             size: usize,
                                                             user_data: *mut c_void,
                                                             o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                       int32_t)) {
+                                                                                       i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                                                          cipher_opt_h: CipherOptHandle,
                                                          user_data: *mut c_void,
                                                          o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                    int32_t,
+                                                                                    i32,
                                                                                     DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -179,7 +179,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
                                                          user_data: *mut c_void,
                                                          o_cb: unsafe extern "C" fn(
                                                              *mut c_void,
-                                                             int32_t,
+                                                             i32,
                                                              SEReaderHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -247,7 +247,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
 pub unsafe extern "C" fn immut_data_size(session: *const Session,
                                          se_h: SEReaderHandle,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, int32_t, u64)) {
+                                         o_cb: unsafe extern "C" fn(*mut c_void, i32, u64)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -274,10 +274,10 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
                                                              len: u64,
                                                              user_data: *mut c_void,
                                                              o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                        int32_t,
+                                                                                        i32,
                                                                                         *mut u8,
-                                                                                        size_t,
-                                                                                        size_t)) {
+                                                                                        usize,
+                                                                                        usize)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -324,7 +324,7 @@ pub unsafe extern "C" fn immut_data_self_encryptor_writer_free(session: *const S
                                                                user_data: *mut c_void,
                                                                o_cb: unsafe
                                                                extern "C" fn(*mut c_void,
-                                                                             int32_t)) {
+                                                                             i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -343,7 +343,7 @@ pub unsafe extern "C" fn immut_data_self_encryptor_reader_free(session: *const S
                                                                user_data: *mut c_void,
                                                                o_cb: unsafe
                                                                extern "C" fn(*mut c_void,
-                                                                             int32_t)) {
+                                                                             i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -362,8 +362,8 @@ mod tests {
     use ffi::errors::FfiError;
     use ffi::low_level_api::cipher_opt::*;
     use ffi::low_level_api::data_id::data_id_free;
-    use libc::c_void;
     use std::{panic, process};
+    use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
 

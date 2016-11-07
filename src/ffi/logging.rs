@@ -24,7 +24,6 @@
 use config_file_handler::FileHandler;
 
 use core::CoreError;
-use libc::int32_t;
 use maidsafe_utilities::log as safe_log;
 use std::mem;
 use std::ptr;
@@ -32,7 +31,7 @@ use super::helper;
 
 /// This function should be called to enable logging to a file
 #[no_mangle]
-pub extern "C" fn init_logging() -> int32_t {
+pub extern "C" fn init_logging() -> i32 {
     helper::catch_unwind_error_code(|| {
         Ok(try!(safe_log::init(false).map_err(CoreError::Unexpected)))
     })
@@ -47,17 +46,16 @@ pub unsafe extern "C" fn output_log_path(c_output_file_name: *const u8,
                                          c_ptr: *mut *const u8,
                                          c_size: *mut usize,
                                          c_capacity: *mut usize)
-                                         -> int32_t {
+                                         -> i32 {
     helper::catch_unwind_error_code(|| {
-        let op_file = try!(helper::c_utf8_to_string(c_output_file_name,
-                                                    c_output_file_name_len));
+        let op_file = try!(helper::c_utf8_to_string(c_output_file_name, c_output_file_name_len));
         let fh = try!(FileHandler::<()>::new(&op_file, true)
-                                  .map_err(|e| CoreError::Unexpected(format!("{:?}", e))));
+            .map_err(|e| CoreError::Unexpected(format!("{:?}", e))));
         let op_file_path = try!(fh.path()
-                             .to_path_buf()
-                             .into_os_string()
-                             .into_string()
-                             .map_err(|e| CoreError::Unexpected(format!("{:?}", e))))
+                .to_path_buf()
+                .into_os_string()
+                .into_string()
+                .map_err(|e| CoreError::Unexpected(format!("{:?}", e))))
             .into_bytes();
 
         let ptr = op_file_path.as_ptr();

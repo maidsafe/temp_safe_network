@@ -20,8 +20,8 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use ffi::{DataIdHandle, OpaqueCtx, Session, helper};
-use libc::{c_void, int32_t};
 use routing::{DataIdentifier, XOR_NAME_LEN, XorName};
+use std::os::raw::c_void;
 
 /// Construct DataIdentifier for StructuredData.
 #[no_mangle]
@@ -30,7 +30,7 @@ pub unsafe extern "C" fn data_id_new_struct_data(session: *const Session,
                                                  id: *const [u8; XOR_NAME_LEN],
                                                  user_data: *mut c_void,
                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                            int32_t,
+                                                                            i32,
                                                                             DataIdHandle)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let xor_id = XorName(*id);
@@ -51,7 +51,7 @@ pub unsafe extern "C" fn data_id_new_immut_data(session: *const Session,
                                                 id: *const [u8; XOR_NAME_LEN],
                                                 user_data: *mut c_void,
                                                 o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                           int32_t,
+                                                                           i32,
                                                                            DataIdHandle)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let xor_id = XorName(*id);
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
                                                      is_private: bool,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                int32_t,
+                                                                                i32,
                                                                                 DataIdHandle)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let xor_id = XorName(*id);
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn data_id_new_appendable_data(session: *const Session,
 pub unsafe extern "C" fn data_id_free(session: *const Session,
                                       handle: DataIdHandle,
                                       user_data: *mut c_void,
-                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                      o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {
@@ -113,9 +113,9 @@ pub unsafe extern "C" fn data_id_free(session: *const Session,
 #[cfg(test)]
 mod tests {
     use ffi::{DataIdHandle, FfiError, Session, test_utils};
-    use libc::c_void;
     use rand;
     use routing::XOR_NAME_LEN;
+    use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
 
@@ -148,18 +148,10 @@ mod tests {
             data_id_new_immut_data(sess_ptr, &immut_id_arr, tx, data_id_cb);
             data_id_handle_immut = unwrap!(rx.recv());
 
-            data_id_new_appendable_data(sess_ptr,
-                                        &priv_app_id_arr,
-                                        true,
-                                        tx,
-                                        data_id_cb);
+            data_id_new_appendable_data(sess_ptr, &priv_app_id_arr, true, tx, data_id_cb);
             data_id_handle_priv_appendable = unwrap!(rx.recv());
 
-            data_id_new_appendable_data(sess_ptr,
-                                        &pub_app_id_arr,
-                                        false,
-                                        tx,
-                                        data_id_cb);
+            data_id_new_appendable_data(sess_ptr, &pub_app_id_arr, false, tx, data_id_cb);
             data_id_handle_pub_appendable = unwrap!(rx.recv());
         }
 
