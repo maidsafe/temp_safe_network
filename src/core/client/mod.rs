@@ -327,6 +327,8 @@ impl Client {
         trace!("GET for {:?}", data_id);
         self.stats_mut().issued_gets += 1;
 
+        let msg_id = MessageId::new();
+
         let (hook, oneshot) = futures::oneshot();
         // TODO Implement some kind of From for these ignored errors in this file.
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
@@ -362,9 +364,9 @@ impl Client {
                 data
             });
 
-            timeout(&self.inner().el_handle, self.inner().timeout, rx)
+            self.timeout(msg_id, rx)
         } else {
-            timeout(&self.inner().el_handle, self.inner().timeout, rx)
+            self.timeout(msg_id, rx)
         };
 
         let dst = match opt_dst {
@@ -372,7 +374,6 @@ impl Client {
             None => Authority::NaeManager(*data_id.name()),
         };
 
-        let msg_id = MessageId::new();
         let result = self.routing_mut().send_get_request(dst, data_id, msg_id);
         if let Err(e) = result {
             hook.complete(CoreEvent::Get(Err(From::from(e))));
@@ -391,8 +392,10 @@ impl Client {
         trace!("PUT for {:?}", data);
         self.stats_mut().issued_puts += 1;
 
+        let msg_id = MessageId::new();
+
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(&self.inner().el_handle, self.inner().timeout, oneshot);
+        let rx = self.build_mutation_future(msg_id, oneshot);
 
         let dst = match dst {
             Some(a) => Ok(a),
@@ -407,7 +410,6 @@ impl Client {
             }
         };
 
-        let msg_id = MessageId::new();
         let result = self.routing_mut().send_put_request(dst, data, msg_id);
         if let Err(e) = result {
             hook.complete(CoreEvent::Get(Err(From::from(e))));
@@ -518,11 +520,12 @@ impl Client {
         trace!("Post for {:?}", data);
         self.stats_mut().issued_posts += 1;
 
+        let msg_id = MessageId::new();
+
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(&self.inner().el_handle, self.inner().timeout, oneshot);
+        let rx = self.build_mutation_future(msg_id, oneshot);
 
         let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
-        let msg_id = MessageId::new();
         let result = self.routing_mut().send_post_request(dst, data, msg_id);
 
         if let Err(e) = result {
@@ -540,11 +543,12 @@ impl Client {
 
         self.stats_mut().issued_deletes += 1;
 
+        let msg_id = MessageId::new();
+
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(&self.inner().el_handle, self.inner().timeout, oneshot);
+        let rx = self.build_mutation_future(msg_id, oneshot);
 
         let dst = dst.unwrap_or_else(|| Authority::NaeManager(*data.name()));
-        let msg_id = MessageId::new();
         let result = self.routing_mut().send_delete_request(dst, data, msg_id);
 
         if let Err(e) = result {
@@ -590,8 +594,10 @@ impl Client {
 
         self.stats_mut().issued_appends += 1;
 
+        let msg_id = MessageId::new();
+
         let (hook, oneshot) = futures::oneshot();
-        let rx = build_mutation_future(&self.inner().el_handle, self.inner().timeout, oneshot);
+        let rx = self.build_mutation_future(msg_id, oneshot);
 
         let dst = match dst {
             Some(auth) => auth,
@@ -604,7 +610,6 @@ impl Client {
             }
         };
 
-        let msg_id = MessageId::new();
         let result = self.routing_mut().send_append_request(dst, appender, msg_id);
 
         if let Err(e) = result {
@@ -620,13 +625,15 @@ impl Client {
     pub fn get_account_info(&self, dst: Option<Authority>) -> Box<CoreFuture<(u64, u64)>> {
         trace!("Account info GET issued.");
 
+        let msg_id = MessageId::new();
+
         let (hook, oneshot) = futures::oneshot();
         let rx = oneshot.map_err(|_| CoreError::OperationAborted)
             .and_then(|event| match event {
                 CoreEvent::AccountInfo(res) => res,
                 _ => Err(CoreError::ReceivedUnexpectedEvent),
             });
-        let rx = timeout(&self.inner().el_handle, self.inner().timeout, rx);
+        let rx = self.timeout(msg_id, rx);
 
         let dst = match dst {
             Some(a) => Ok(a),
@@ -641,7 +648,6 @@ impl Client {
             }
         };
 
-        let msg_id = MessageId::new();
         let result = self.routing_mut().send_get_account_info_request(dst, msg_id);
 
         if let Err(e) = result {
@@ -811,6 +817,45 @@ impl Client {
             .into_box()
     }
 
+    fn timeout<F, T>(&self, msg_id: MessageId, future: F) -> Box<CoreFuture<T>>
+        where F: Future<Item = T, Error = CoreError> + 'static,
+              T: 'static
+    {
+        let duration = self.inner().timeout;
+        let timeout = match Timeout::new(duration, &self.inner().el_handle) {
+            Ok(timeout) => timeout,
+            Err(err) => return err!(CoreError::Unexpected(format!("Timeout create error: {:?}", err))),
+        };
+
+        let client = self.clone();
+        let timeout = timeout.then(move |result| -> Result<T, _> {
+            let _ = client.inner_mut().hooks.remove(&msg_id);
+
+            match result {
+                Ok(()) => Err(CoreError::RequestTimeout),
+                Err(err) => Err(CoreError::Unexpected(format!("Timeout fire error {:?}", err))),
+            }
+        });
+
+        future.select(timeout)
+            .then(|result| match result {
+                Ok((a, _)) => Ok(a),
+                Err((a, _)) => Err(a),
+            })
+            .into_box()
+    }
+
+    fn build_mutation_future(&self, msg_id: MessageId, oneshot: Oneshot<CoreEvent>)
+                             -> Box<CoreFuture<()>> {
+        let fut = oneshot.map_err(|_| CoreError::OperationAborted)
+            .and_then(|event| match event {
+                CoreEvent::Mutation(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            });
+
+        self.timeout(msg_id, fut)
+    }
+
     fn routing_mut(&self) -> RefMut<Routing> {
         RefMut::map(self.inner.borrow_mut(), |i| &mut i.routing)
     }
@@ -972,43 +1017,6 @@ fn spawn_routing_thread<T>(routing_rx: Receiver<Event>,
 {
     thread::named("Routing Event Loop",
                   move || routing_el::run(routing_rx, core_tx, net_tx))
-}
-
-fn timeout<F, T>(handle: &Handle, duration: Duration, future: F) -> Box<CoreFuture<T>>
-    where F: Future<Item = T, Error = CoreError> + 'static,
-          T: 'static
-{
-    let timeout = match Timeout::new(duration, handle) {
-        Ok(timeout) => timeout,
-        Err(err) => return err!(CoreError::Unexpected(format!("Timeout create error: {:?}", err))),
-    };
-
-    let timeout = timeout.then(|result| -> Result<T, _> {
-        match result {
-            Ok(()) => Err(CoreError::RequestTimeout),
-            Err(err) => Err(CoreError::Unexpected(format!("Timeout fire error {:?}", err))),
-        }
-    });
-
-    future.select(timeout)
-        .then(|result| match result {
-            Ok((a, _)) => Ok(a),
-            Err((a, _)) => Err(a),
-        })
-        .into_box()
-}
-
-fn build_mutation_future(handle: &Handle,
-                         timeout_duration: Duration,
-                         oneshot: Oneshot<CoreEvent>)
-                         -> Box<CoreFuture<()>> {
-    let fut = oneshot.map_err(|_| CoreError::OperationAborted)
-        .and_then(|event| match event {
-            CoreEvent::Mutation(res) => res,
-            _ => Err(CoreError::ReceivedUnexpectedEvent),
-        });
-
-    timeout(handle, timeout_duration, fut)
 }
 
 #[cfg(test)]
