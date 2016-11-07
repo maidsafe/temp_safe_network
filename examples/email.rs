@@ -46,11 +46,9 @@ extern crate maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
 
-extern crate libc;
 extern crate rust_sodium;
 extern crate safe_core;
 
-use libc::c_void;
 use rust_sodium::crypto::hash::sha256::{self, Digest};
 use safe_core::ffi::AppHandle;
 use safe_core::ffi::app::*;
@@ -60,6 +58,7 @@ use safe_core::ffi::low_level_api::data_id::*;
 use safe_core::ffi::low_level_api::immut_data::*;
 use safe_core::ffi::low_level_api::misc::*;
 use safe_core::ffi::session::*;
+use std::os::raw::c_void;
 use std::ptr;
 use std::sync::mpsc::{self, Sender};
 

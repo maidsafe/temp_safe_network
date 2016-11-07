@@ -28,11 +28,11 @@
 use core::{Client, FutureExt, SelfEncryptionStorage};
 use ffi::{App, AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use futures::Future;
-use libc::{c_void, int32_t};
 use nfs::helper::file_helper;
 use nfs::helper::writer::Mode;
 use nfs::helper::writer::Writer as InnerWriter;
 use std::{ptr, slice};
+use std::os::raw::c_void;
 
 /// File writer.
 pub struct Writer {
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn nfs_create_file(session: *const Session,
                                          is_path_shared: bool,
                                          is_versioned: bool,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, int32_t, *mut Writer)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32, *mut Writer)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get nfs writer for creating a new file.");
 
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn nfs_writer_open(session: *const Session,
                                          file_path_len: usize,
                                          is_path_shared: bool,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, int32_t, *mut Writer)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32, *mut Writer)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get nfs writer for modification of existing file.");
         let file_path = try!(helper::c_utf8_to_str(file_path, file_path_len));
@@ -140,7 +140,7 @@ pub unsafe extern "C" fn nfs_writer_write(session: *const Session,
                                           data: *const u8,
                                           len: usize,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                          o_cb: extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI Write data using nfs writer.");
 
@@ -168,7 +168,7 @@ pub unsafe extern "C" fn nfs_writer_write(session: *const Session,
 pub unsafe extern "C" fn nfs_writer_close(session: *const Session,
                                           writer_handle: *mut Writer,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                          o_cb: extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI Close and consume nfs writer.");
 

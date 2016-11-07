@@ -25,11 +25,11 @@ use ffi::{App, FfiError, FfiFuture};
 use ffi::callback::{Callback, CallbackArgs};
 use ffi::config::SAFE_DRIVE_DIR_NAME;
 use futures::Future;
-use libc::{c_void, int32_t};
 use nfs::{Dir, DirMetadata};
 use nfs::helper::dir_helper;
 use std::{self, mem, slice};
 use std::error::Error;
+use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};
 
 pub unsafe fn c_utf8_to_string(ptr: *const u8, len: usize) -> Result<String, FfiError> {
@@ -98,7 +98,7 @@ pub fn catch_unwind_ok<T: CallbackArgs, F: FnOnce() -> T>(f: F) -> T {
 }
 
 // Catch panics. On error return the error code.
-pub fn catch_unwind_error_code<F: FnOnce() -> Result<(), FfiError>>(f: F) -> int32_t {
+pub fn catch_unwind_error_code<F: FnOnce() -> Result<(), FfiError>>(f: F) -> i32 {
     ffi_result_code!(catch_unwind_result(f))
 }
 
@@ -109,7 +109,9 @@ pub fn catch_unwind_cb<U, C, F>(user_data: U, cb: C, f: F)
           F: FnOnce() -> Result<(), FfiError>
 {
     if let Err(err) = catch_unwind_result(f) {
-        cb.call(user_data.into(), ffi_error_code!(err), CallbackArgs::default());
+        cb.call(user_data.into(),
+                ffi_error_code!(err),
+                CallbackArgs::default());
     }
 }
 
@@ -154,7 +156,11 @@ pub fn safe_drive_metadata(client: Client) -> Box<FfiFuture<DirMetadata>> {
 }
 
 // Return a Dir corresponding to the path.
-pub fn dir<S>(client: &Client, app: &App, path: S, is_shared: bool) -> Box<FfiFuture<(Dir, DirMetadata)>>
+pub fn dir<S>(client: &Client,
+              app: &App,
+              path: S,
+              is_shared: bool)
+              -> Box<FfiFuture<(Dir, DirMetadata)>>
     where S: Into<String>
 {
     let client2 = client.clone();
@@ -162,8 +168,7 @@ pub fn dir<S>(client: &Client, app: &App, path: S, is_shared: bool) -> Box<FfiFu
 
     app.root_dir(client.clone(), is_shared)
         .and_then(move |root_dir| {
-            dir_helper::get_dir_by_path(&client2, Some(&root_dir), &path)
-                .map_err(FfiError::from)
+            dir_helper::get_dir_by_path(&client2, Some(&root_dir), &path).map_err(FfiError::from)
         })
         .into_box()
 }
@@ -179,8 +184,7 @@ pub fn dir_and_file(client: &Client,
 
     app.root_dir(client.clone(), is_shared)
         .and_then(move |start_dir| {
-            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir))
-                .map_err(FfiError::from)
+            dir_helper::final_sub_dir(&c2, &tokens, Some(&start_dir)).map_err(FfiError::from)
         })
         .map(move |(dir_listing, dir_meta)| (dir_listing, dir_meta, file_name))
         .into_box()

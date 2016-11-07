@@ -48,14 +48,12 @@ extern crate unwrap;
 
 extern crate crossbeam;
 extern crate docopt;
-extern crate libc;
 extern crate rand;
 extern crate rust_sodium;
 extern crate rustc_serialize;
 extern crate safe_core;
 
 use docopt::Docopt;
-use libc::c_void;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
 use safe_core::ffi::{AppHandle, AppendableDataHandle, CipherOptHandle};
@@ -67,6 +65,7 @@ use safe_core::ffi::low_level_api::data_id::*;
 use safe_core::ffi::low_level_api::immut_data::*;
 use safe_core::ffi::low_level_api::misc::*;
 use safe_core::ffi::session::*;
+use std::os::raw::c_void;
 use std::ptr;
 use std::sync::Mutex;
 use std::sync::mpsc::{self, Sender};

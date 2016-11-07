@@ -26,12 +26,12 @@ use ffi::callback::CallbackArgs;
 use ffi::helper::catch_unwind_cb;
 use ffi::object_cache::ObjectCache;
 use futures::{self, Future};
-use libc::{c_void, int32_t, size_t, uint64_t};
 use routing::{AppendWrapper, AppendedData, Data, Filter, PrivAppendableData, PrivAppendedData,
               PubAppendableData, XOR_NAME_LEN, XorName};
 use std::collections::BTreeSet;
 use std::iter;
 use std::mem;
+use std::os::raw::c_void;
 
 type ADHandle = AppendableDataHandle;
 
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn appendable_data_new_pub(session: *const Session,
                                                  name: *const [u8; XOR_NAME_LEN],
                                                  user_data: *mut c_void,
                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                            int32_t,
+                                                                            i32,
                                                                             ADHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
@@ -125,7 +125,7 @@ pub unsafe extern "C" fn appendable_data_new_priv(session: *const Session,
                                                   name: *const [u8; XOR_NAME_LEN],
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             int32_t,
+                                                                             i32,
                                                                              ADHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -172,7 +172,7 @@ pub unsafe extern "C" fn appendable_data_get(session: *const Session,
                                              data_id_h: DataIdHandle,
                                              user_data: *mut c_void,
                                              o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                        int32_t,
+                                                                        i32,
                                                                         ADHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -211,7 +211,7 @@ pub unsafe extern "C" fn appendable_data_extract_data_id(session: *const Session
                                                          ad_h: ADHandle,
                                                          user_data: *mut c_void,
                                                          o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                    int32_t,
+                                                                                    i32,
                                                                                     DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -241,7 +241,7 @@ fn appendable_data_extract_data_id_impl(object_cache: &ObjectCache,
 pub unsafe extern "C" fn appendable_data_put(session: *const Session,
                                              ad_h: ADHandle,
                                              user_data: *mut c_void,
-                                             o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                             o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -268,7 +268,7 @@ pub unsafe extern "C" fn appendable_data_post(session: *const Session,
                                               ad_h: ADHandle,
                                               include_data: bool,
                                               user_data: *mut c_void,
-                                              o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                              o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -343,7 +343,7 @@ pub unsafe extern "C" fn appendable_data_filter_type(session: *const Session,
                                                      ad_h: ADHandle,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                int32_t,
+                                                                                i32,
                                                                                 FilterType)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -371,7 +371,7 @@ pub unsafe extern "C" fn appendable_data_toggle_filter(session: *const Session,
                                                        ad_h: ADHandle,
                                                        user_data: *mut c_void,
                                                        o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                  int32_t)) {
+                                                                                  i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -400,7 +400,7 @@ pub unsafe extern "C" fn appendable_data_insert_to_filter(session: *const Sessio
                                                           sign_key_h: SignKeyHandle,
                                                           user_data: *mut c_void,
                                                           o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                     int32_t)) {
+                                                                                     i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -434,7 +434,7 @@ pub unsafe extern "C" fn appendable_data_remove_from_filter(session: *const Sess
                                                             user_data: *mut c_void,
                                                             o_cb: unsafe extern "C"
                                                             fn(*mut c_void,
-                                                               int32_t)) {
+                                                               i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -465,7 +465,7 @@ pub unsafe extern "C" fn appendable_data_encrypt_key(session: *const Session,
                                                      ad_h: ADHandle,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                int32_t,
+                                                                                i32,
                                                                                 EncryptKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -496,8 +496,8 @@ pub unsafe extern "C" fn appendable_data_num_of_data(session: *const Session,
                                                      ad_h: ADHandle,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                int32_t,
-                                                                                size_t)) {
+                                                                                i32,
+                                                                                usize)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -517,8 +517,8 @@ pub unsafe extern "C" fn appendable_data_num_of_deleted_data(session: *const Ses
                                                              ad_h: ADHandle,
                                                              user_data: *mut c_void,
                                                              o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                        int32_t,
-                                                                                        size_t)) {
+                                                                                        i32,
+                                                                                        usize)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -563,7 +563,7 @@ pub unsafe extern "C" fn appendable_data_nth_data_id(session: *const Session,
                                                      n: usize,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                int32_t,
+                                                                                i32,
                                                                                 DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -587,7 +587,7 @@ pub unsafe extern "C" fn appendable_data_nth_deleted_data_id(session: *const Ses
                                                              user_data: *mut c_void,
                                                              o_cb: unsafe extern "C"
                                                              fn(*mut c_void,
-                                                                int32_t,
+                                                                i32,
                                                                 DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -645,7 +645,7 @@ pub unsafe extern "C" fn appendable_data_nth_data_sign_key(session: *const Sessi
                                                            user_data: *mut c_void,
                                                            o_cb: unsafe extern "C"
                                                            fn(*mut c_void,
-                                                              int32_t,
+                                                              i32,
                                                               SignKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -669,7 +669,7 @@ pub unsafe extern "C" fn appendable_data_nth_deleted_data_sign_key(session: *con
                                                                    user_data: *mut c_void,
                                                                    o_cb: unsafe extern "C"
                                                                    fn(*mut c_void,
-                                                                      int32_t,
+                                                                      i32,
                                                                       SignKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -723,7 +723,7 @@ pub unsafe extern "C" fn appendable_data_remove_nth_data(session: *const Session
                                                          n: usize,
                                                          user_data: *mut c_void,
                                                          o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                    int32_t)) {
+                                                                                    i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -767,7 +767,7 @@ pub unsafe extern "C" fn appendable_data_restore_nth_deleted_data(session: *cons
                                                                   user_data: *mut c_void,
                                                                   o_cb: unsafe extern "C"
                                                                   fn(*mut c_void,
-                                                                     int32_t)) {
+                                                                     i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -807,8 +807,7 @@ fn appendable_data_restore_nth_deleted_data_impl(obj_cache: &ObjectCache,
 pub unsafe extern "C" fn appendable_data_clear_data(session: *const Session,
                                                     ad_h: ADHandle,
                                                     user_data: *mut c_void,
-                                                    o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                               int32_t)) {
+                                                    o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -844,7 +843,7 @@ pub unsafe extern "C" fn appendable_data_remove_nth_deleted_data(session: *const
                                                                  user_data: *mut c_void,
                                                                  o_cb: unsafe extern "C"
                                                                  fn(*mut c_void,
-                                                                    int32_t)) {
+                                                                    i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -880,7 +879,7 @@ pub unsafe extern "C" fn appendable_data_clear_deleted_data(session: *const Sess
                                                             user_data: *mut c_void,
                                                             o_cb: unsafe extern "C"
                                                             fn(*mut c_void,
-                                                               int32_t)) {
+                                                               i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -908,7 +907,7 @@ pub unsafe extern "C" fn appendable_data_append(session: *const Session,
                                                 ad_h: ADHandle,
                                                 data_id_h: DataIdHandle,
                                                 user_data: *mut c_void,
-                                                o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                                o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -964,8 +963,8 @@ pub unsafe extern "C" fn appendable_data_version(session: *const Session,
                                                  handle: ADHandle,
                                                  user_data: *mut c_void,
                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                            int32_t,
-                                                                            uint64_t)) {
+                                                                            i32,
+                                                                            u64)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -992,7 +991,7 @@ pub unsafe extern "C" fn appendable_data_is_owned(session: *const Session,
                                                   handle: ADHandle,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             int32_t,
+                                                                             i32,
                                                                              bool)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -1024,7 +1023,7 @@ pub unsafe extern "C" fn appendable_data_validate_size(session: *const Session,
                                                        handle: ADHandle,
                                                        user_data: *mut c_void,
                                                        o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                  int32_t,
+                                                                                  i32,
                                                                                   bool)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -1053,7 +1052,7 @@ fn appendable_data_validate_size_impl(obj_cache: &ObjectCache,
 pub unsafe extern "C" fn appendable_data_free(session: *const Session,
                                               handle: ADHandle,
                                               user_data: *mut c_void,
-                                              o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                              o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -1078,12 +1077,12 @@ mod tests {
     use ffi::{AppHandle, AppendableDataHandle, DataIdHandle, ObjectHandle};
     use ffi::{FfiError, Session, test_utils};
     use ffi::low_level_api::misc::*;
-    use libc::c_void;
     use rand;
     use routing::DataIdentifier;
     use rust_sodium::crypto::sign;
     use std::{panic, process};
     use std::collections::HashSet;
+    use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
 

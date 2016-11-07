@@ -27,8 +27,8 @@ use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::file_details::{FileDetails, FileMetadata};
 use ffi::helper;
 use futures::Future;
-use libc::{c_void, int32_t};
 use nfs::helper::dir_helper;
+use std::os::raw::c_void;
 use std::ptr;
 
 /// Get file.
@@ -44,7 +44,7 @@ pub unsafe extern "C" fn dns_get_file(session: *const Session,
                                       length: i64,
                                       include_metadata: bool,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void, int32_t, *mut FileDetails)) {
+                                      o_cb: extern "C" fn(*mut c_void, i32, *mut FileDetails)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
         let service_name = try!(helper::c_utf8_to_string(service_name, service_name_len));
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn dns_get_file_metadata(session: *const Session,
                                                file_path_len: usize,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
-                                                                   int32_t,
+                                                                   i32,
                                                                    *mut FileMetadata)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
@@ -141,10 +141,10 @@ mod tests {
     use ffi::file_details::FileDetails;
     use ffi::test_utils;
     use futures::Future;
-    use libc::{c_void, int32_t};
     use nfs::DirId;
     use nfs::helper::{dir_helper, file_helper};
     use rust_sodium::crypto::box_;
+    use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
 
@@ -220,7 +220,7 @@ mod tests {
         let file_name = test_utils::as_raw_parts(&file_name);
 
         extern "C" fn callback(user_data: *mut c_void,
-                               error: int32_t,
+                               error: i32,
                                _file_details_ptr: *mut FileDetails) {
             assert_eq!(error, 0);
             unsafe { test_utils::send_via_user_data(user_data, ()) }

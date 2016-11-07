@@ -70,7 +70,7 @@ pub use ffi::errors::FfiError;
 pub use ffi::session::Session;
 
 use futures::Future;
-use libc::c_void;
+use std::os::raw::c_void;
 
 /// Helper type to represent the FFI future result
 pub type FfiFuture<T> = Future<Item = T, Error = FfiError>;
@@ -82,7 +82,7 @@ unsafe impl Send for OpaqueCtx {}
 
 impl Into<*mut c_void> for OpaqueCtx {
     fn into(self) -> *mut c_void {
-       self.0
+        self.0
     }
 }
 

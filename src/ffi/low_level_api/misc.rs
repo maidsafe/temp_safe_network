@@ -23,9 +23,9 @@ use ffi::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle, S
 use ffi::{FfiError, FfiResult, OpaqueCtx, Session, helper};
 use ffi::low_level_api::appendable_data::AppendableData;
 use ffi::object_cache::ObjectCache;
-use libc::{c_void, int32_t, size_t, uint8_t};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use std::{mem, ptr, slice};
+use std::os::raw::c_void;
 
 type ADHandle = AppendableDataHandle;
 
@@ -34,7 +34,7 @@ type ADHandle = AppendableDataHandle;
 pub unsafe extern "C" fn misc_encrypt_key_free(session: *const Session,
                                                handle: EncryptKeyHandle,
                                                user_data: *mut c_void,
-                                               o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                               o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {
@@ -51,7 +51,7 @@ pub unsafe extern "C" fn misc_encrypt_key_free(session: *const Session,
 pub unsafe extern "C" fn misc_sign_key_free(session: *const Session,
                                             handle: SignKeyHandle,
                                             user_data: *mut c_void,
-                                            o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                            o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {
@@ -69,10 +69,10 @@ pub unsafe extern "C" fn misc_serialise_sign_key(session: *const Session,
                                                  sign_key_h: SignKeyHandle,
                                                  user_data: *mut c_void,
                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                            int32_t,
-                                                                            *mut uint8_t,
-                                                                            size_t,
-                                                                            size_t)) {
+                                                                            i32,
+                                                                            *mut u8,
+                                                                            usize,
+                                                                            usize)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn misc_deserialise_sign_key(session: *const Session,
                                                    size: usize,
                                                    user_data: *mut c_void,
                                                    o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                              int32_t,
+                                                                              i32,
                                                                               SignKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn misc_deserialise_sign_key(session: *const Session,
 pub unsafe extern "C" fn misc_maid_sign_key(session: *const Session,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                       int32_t,
+                                                                       i32,
                                                                        SignKeyHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -160,10 +160,10 @@ pub unsafe extern "C" fn misc_serialise_data_id(session: *const Session,
                                                 data_id_h: DataIdHandle,
                                                 user_data: *mut c_void,
                                                 o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                           int32_t,
-                                                                           *mut uint8_t,
-                                                                           size_t,
-                                                                           size_t)) {
+                                                                           i32,
+                                                                           *mut u8,
+                                                                           usize,
+                                                                           usize)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn misc_deserialise_data_id(session: *const Session,
                                                   size: usize,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             int32_t,
+                                                                             i32,
                                                                              DataIdHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -230,10 +230,10 @@ pub unsafe extern "C" fn misc_serialise_appendable_data(session: *const Session,
                                                         ad_h: ADHandle,
                                                         user_data: *mut c_void,
                                                         o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                   int32_t,
-                                                                                   *mut uint8_t,
-                                                                                   size_t,
-                                                                                   size_t)) {
+                                                                                   i32,
+                                                                                   *mut u8,
+                                                                                   usize,
+                                                                                   usize)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn misc_deserialise_appendable_data(session: *const Sessio
                                                           size: usize,
                                                           user_data: *mut c_void,
                                                           o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                     int32_t,
+                                                                                     i32,
                                                                                      ADHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -304,10 +304,10 @@ pub unsafe extern "C" fn misc_serialise_struct_data(session: *const Session,
                                                     sd_h: StructDataHandle,
                                                     user_data: *mut c_void,
                                                     o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                               int32_t,
-                                                                               *mut uint8_t,
-                                                                               size_t,
-                                                                               size_t)) {
+                                                                               i32,
+                                                                               *mut u8,
+                                                                               usize,
+                                                                               usize)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {
@@ -342,7 +342,7 @@ pub unsafe extern "C" fn misc_deserialise_struct_data(session: *const Session,
                                                       user_data: *mut c_void,
                                                       o_cb: unsafe extern "C"
                                                       fn(*mut c_void,
-                                                         int32_t,
+                                                         i32,
                                                          StructDataHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -380,7 +380,7 @@ pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: usize, capacity: u
 #[no_mangle]
 pub unsafe extern "C" fn misc_object_cache_reset(session: *const Session,
                                                  user_data: *mut c_void,
-                                                 o_cb: unsafe extern "C" fn(*mut c_void, int32_t)) {
+                                                 o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     helper::catch_unwind_cb(user_data, o_cb, || {

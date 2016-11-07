@@ -27,8 +27,8 @@ use ffi::{AppHandle, FfiError, OpaqueCtx, Session, helper};
 use ffi::dir_details::DirDetails;
 use ffi::string_list::{self, StringList};
 use futures::Future;
-use libc::{c_void, int32_t};
 use nfs::helper::dir_helper;
+use std::os::raw::c_void;
 use std::ptr;
 
 /// Add service.
@@ -43,7 +43,7 @@ pub unsafe extern "C" fn dns_add_service(session: *const Session,
                                          service_home_dir_path_len: usize,
                                          is_path_shared: bool,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI add service.");
 
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn dns_delete_service(session: *const Session,
                                             service_name: *const u8,
                                             service_name_len: usize,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(*mut c_void, int32_t)) {
+                                            o_cb: extern "C" fn(*mut c_void, i32)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI delete service.");
 
@@ -119,9 +119,7 @@ pub unsafe extern "C" fn dns_get_services(session: *const Session,
                                           long_name: *const u8,
                                           long_name_len: usize,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void,
-                                                              int32_t,
-                                                              *mut StringList)) {
+                                          o_cb: extern "C" fn(*mut c_void, i32, *mut StringList)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
 
@@ -155,7 +153,7 @@ pub unsafe extern "C" fn dns_get_service_dir(session: *const Session,
                                              service_name_len: usize,
                                              user_data: *mut c_void,
                                              o_cb: extern "C" fn(*mut c_void,
-                                                                 int32_t,
+                                                                 i32,
                                                                  *mut DirDetails)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         let long_name = try!(helper::c_utf8_to_string(long_name, long_name_len));
@@ -198,10 +196,10 @@ mod tests {
     use ffi::{App, FfiError, FfiFuture, helper, test_utils};
     use ffi::dir_details::DirDetails;
     use futures::Future;
-    use libc::{c_void, int32_t};
     use nfs::DirId;
     use nfs::helper::dir_helper;
     use rust_sodium::crypto::box_;
+    use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
 
@@ -229,7 +227,7 @@ mod tests {
         let service_name = test_utils::as_raw_parts("www");
         let service_home_dir_path = test_utils::as_raw_parts("www-dir");
 
-        extern "C" fn callback(user_data: *mut c_void, error: int32_t) {
+        extern "C" fn callback(user_data: *mut c_void, error: i32) {
             assert_eq!(error, 0);
             unsafe { test_utils::send_via_user_data(user_data, ()) }
         }
@@ -277,9 +275,7 @@ mod tests {
         let long_name = test_utils::as_raw_parts(&long_name2);
         let service_name = test_utils::as_raw_parts("www");
 
-        extern "C" fn callback(user_data: *mut c_void,
-                               error: int32_t,
-                               dir_details: *mut DirDetails) {
+        extern "C" fn callback(user_data: *mut c_void, error: i32, dir_details: *mut DirDetails) {
             assert_eq!(error, 0);
             assert!(!dir_details.is_null());
             unsafe { test_utils::send_via_user_data(user_data, ()) }

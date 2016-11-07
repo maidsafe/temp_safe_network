@@ -25,9 +25,9 @@ use ffi::{App, Session};
 use ffi::launcher_config;
 use ffi::object_cache::ObjectCache;
 use futures::{Future, IntoFuture};
-use libc::{c_void, int32_t};
 use std::ffi::CString;
 use std::fmt::Debug;
+use std::os::raw::c_void;
 use std::sync::mpsc::{self, Sender};
 
 pub fn generate_random_cstring(len: usize) -> CString {
@@ -61,14 +61,15 @@ pub fn create_unregistered_session() -> Session {
 // returned.
 pub fn run<F, I, R, E>(session: &Session, f: F) -> R
     where F: FnOnce(&Client, &ObjectCache) -> I + Send + 'static,
-          I: IntoFuture<Item=R, Error=E> + 'static,
+          I: IntoFuture<Item = R, Error = E> + 'static,
           R: Send + 'static,
           E: Debug
 {
     let (tx, rx) = mpsc::channel();
 
     unwrap!(session.send(move |client, object_cache| {
-        let future = f(client, object_cache).into_future()
+        let future = f(client, object_cache)
+            .into_future()
             .map_err(|err| panic!("{:?}", err))
             .map(move |result| unwrap!(tx.send(result)))
             .into_box();
@@ -135,81 +136,68 @@ pub fn as_raw_parts(s: &str) -> FfiStr {
 // Call a FFI function and block until its callback gets called.
 // Use this if the callback accepts no arguments in addition to user_data
 // and error_code.
-pub fn call_0<F>(f: F) -> Result<(), int32_t>
-    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, int32_t))
+pub fn call_0<F>(f: F) -> Result<(), i32>
+    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, i32))
 {
-    let (tx, rx) = mpsc::channel::<int32_t>();
+    let (tx, rx) = mpsc::channel::<i32>();
     f(sender_as_user_data(&tx), callback_0);
 
     let error = unwrap!(rx.recv());
-    if error == 0 {
-        Ok(())
-    } else {
-        Err(error)
-    }
+    if error == 0 { Ok(()) } else { Err(error) }
 }
 
 // Call a FFI function and block until its callback gets called, then return
 // the argument which were passed to that callback.
 // Use this if the callback accepts one argument in addition to user_data
 // and error_code.
-pub unsafe fn call_1<F, T>(f: F) -> Result<T, int32_t>
-    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, int32_t, T))
+pub unsafe fn call_1<F, T>(f: F) -> Result<T, i32>
+    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, i32, T))
 {
-    let (tx, rx) = mpsc::channel::<(int32_t, SendWrapper<T>)>();
+    let (tx, rx) = mpsc::channel::<(i32, SendWrapper<T>)>();
     f(sender_as_user_data(&tx), callback_1::<T>);
 
     let (error, args) = unwrap!(rx.recv());
-    if error == 0 {
-        Ok(args.0)
-    } else {
-        Err(error)
-    }
+    if error == 0 { Ok(args.0) } else { Err(error) }
 }
 
 // Call a FFI function and block until its callback gets called, then return
 // the arguments which were passed to that callback in a tuple.
 // Use this if the callback accepts three arguments in addition to user_data and
 // error_code.
-pub unsafe fn call_3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), int32_t>
-    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, int32_t, T0, T1, T2))
+pub unsafe fn call_3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), i32>
+    where F: FnOnce(*mut c_void,
+                    unsafe extern "C" fn(*mut c_void, i32, T0, T1, T2))
 {
-    let (tx, rx) = mpsc::channel::<(int32_t, SendWrapper<(T0, T1, T2)>)>();
+    let (tx, rx) = mpsc::channel::<(i32, SendWrapper<(T0, T1, T2)>)>();
     f(sender_as_user_data(&tx), callback_3::<T0, T1, T2>);
 
     let (error, args) = unwrap!(rx.recv());
-    if error == 0 {
-        Ok(args.0)
-    } else {
-        Err(error)
-    }
+    if error == 0 { Ok(args.0) } else { Err(error) }
 }
 
 // Call a FFI function and block until its callback gets called, then return
 // the arguments which were passed to that callback converted to Vec<u8>.
 // The callbacks must accept three arguments (in addition to user_data and
-// error_code): pointer to the begining of the data (`*mut u8`), lengths (`usize`)
+// error_code): pointer to the begining of the data (`*mut u8`), lengths
+// (`usize`)
 // and capacity (`usize`).
-pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, int32_t>
-    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, int32_t, *mut u8, usize, usize))
+pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
+    where F: FnOnce(*mut c_void,
+                    unsafe extern "C" fn(*mut c_void, i32, *mut u8, usize, usize))
 {
-    call_3(f).map(|(ptr, len, cap)| {
-        Vec::from_raw_parts(ptr, len, cap)
-    })
+    call_3(f).map(|(ptr, len, cap)| Vec::from_raw_parts(ptr, len, cap))
 }
 
-unsafe extern "C" fn callback_0(user_data: *mut c_void, error: int32_t) {
+unsafe extern "C" fn callback_0(user_data: *mut c_void, error: i32) {
     send_via_user_data(user_data, error)
 }
 
-unsafe extern "C" fn callback_1<T>(user_data: *mut c_void,
-                                   error: int32_t,
-                                   arg: T) {
+unsafe extern "C" fn callback_1<T>(user_data: *mut c_void, error: i32, arg: T) {
     send_via_user_data(user_data, (error, SendWrapper(arg)))
 }
 
 unsafe extern "C" fn callback_3<T0, T1, T2>(user_data: *mut c_void,
-                                            error: int32_t,
+                                            error: i32,
                                             arg0: T0,
                                             arg1: T1,
                                             arg2: T2) {

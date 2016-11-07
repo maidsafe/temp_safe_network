@@ -27,8 +27,8 @@ use ffi::{FfiError, OpaqueCtx};
 use ffi::object_cache::ObjectCache;
 use futures::Future;
 use futures::stream::Stream;
-use libc::{c_void, int32_t, int64_t, uint64_t};
 use maidsafe_utilities::thread::{self, Joiner};
+use std::os::raw::c_void;
 use std::sync::{Arc, Mutex, mpsc};
 use super::helper;
 use tokio_core::channel;
@@ -208,7 +208,7 @@ impl Session {
 
     fn account_info(&self,
                     user_data: OpaqueCtx,
-                    callback: unsafe extern "C" fn(*mut c_void, int32_t, uint64_t, uint64_t))
+                    callback: unsafe extern "C" fn(*mut c_void, i32, u64, u64))
                     -> Result<(), FfiError> {
         self.send(move |client, _| {
             Some(client.get_account_info(None)
@@ -240,10 +240,10 @@ impl Drop for Session {
 #[no_mangle]
 pub unsafe extern "C" fn create_unregistered_client(user_data: *mut c_void,
                                                     obs_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                 int32_t,
-                                                                                 int32_t),
+                                                                                 i32,
+                                                                                 i32),
                                                     session_handle: *mut *mut Session)
-                                                    -> int32_t {
+                                                    -> i32 {
     helper::catch_unwind_error_code(|| {
         trace!("FFI create unregistered client.");
         let user_data = OpaqueCtx(user_data);
@@ -270,22 +270,21 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
                                         session_handle: *mut *mut Session,
                                         user_data: *mut c_void,
                                         o_network_obs_cb: unsafe extern "C" fn(*mut c_void,
-                                                                               int32_t,
-                                                                               int32_t))
-                                        -> int32_t {
+                                                                               i32,
+                                                                               i32))
+                                        -> i32 {
     helper::catch_unwind_error_code(|| {
         trace!("FFI create a client account.");
 
         let acc_locator = try!(helper::c_utf8_to_str(account_locator, account_locator_len));
         let acc_password = try!(helper::c_utf8_to_str(account_password, account_password_len));
         let user_data = OpaqueCtx(user_data);
-        let session =
-            try!(Session::create_account(acc_locator, acc_password, move |net_event| {
-                match net_event {
-                    Ok(event) => o_network_obs_cb(user_data.0, 0, event.into()),
-                    Err(e) => o_network_obs_cb(user_data.0, ffi_error_code!(e), 0),
-                }
-            }));
+        let session = try!(Session::create_account(acc_locator, acc_password, move |net_event| {
+            match net_event {
+                Ok(event) => o_network_obs_cb(user_data.0, 0, event.into()),
+                Err(e) => o_network_obs_cb(user_data.0, ffi_error_code!(e), 0),
+            }
+        }));
 
         *session_handle = Box::into_raw(Box::new(session));
         Ok(())
@@ -303,10 +302,8 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
                                 account_password_len: usize,
                                 session_handle: *mut *mut Session,
                                 user_data: *mut c_void,
-                                o_network_obs_cb: unsafe extern "C" fn(*mut c_void,
-                                                                       int32_t,
-                                                                       int32_t))
-                                -> int32_t {
+                                o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
+                                -> i32 {
     helper::catch_unwind_error_code(|| {
         trace!("FFI login a registered client.");
 
@@ -329,14 +326,12 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_gets(session: *const Session,
                                             user_data: *mut c_void,
-                                            o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                       int32_t,
-                                                                       int64_t)) {
+                                            o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued GETs.");
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |client, _| {
-            o_cb(user_data.0, 0, client.issued_gets() as int64_t);
+            o_cb(user_data.0, 0, client.issued_gets());
             None
         })
     })
@@ -346,14 +341,12 @@ pub unsafe extern "C" fn client_issued_gets(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_puts(session: *const Session,
                                             user_data: *mut c_void,
-                                            o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                       int32_t,
-                                                                       int64_t)) {
+                                            o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued PUTs.");
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |client, _| {
-            o_cb(user_data.0, 0, client.issued_puts() as int64_t);
+            o_cb(user_data.0, 0, client.issued_puts());
             None
         })
     })
@@ -363,14 +356,12 @@ pub unsafe extern "C" fn client_issued_puts(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_posts(session: *const Session,
                                              user_data: *mut c_void,
-                                             o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                        int32_t,
-                                                                        int64_t)) {
+                                             o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued POSTs.");
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |client, _| {
-            o_cb(user_data.0, 0, client.issued_posts() as int64_t);
+            o_cb(user_data.0, 0, client.issued_posts());
             None
         })
     })
@@ -380,14 +371,12 @@ pub unsafe extern "C" fn client_issued_posts(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_deletes(session: *const Session,
                                                user_data: *mut c_void,
-                                               o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                          int32_t,
-                                                                          int64_t)) {
+                                               o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued DELETEs.");
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |client, _| {
-            o_cb(user_data.0, 0, client.issued_deletes() as int64_t);
+            o_cb(user_data.0, 0, client.issued_deletes());
             None
         })
     })
@@ -397,14 +386,12 @@ pub unsafe extern "C" fn client_issued_deletes(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_appends(session: *const Session,
                                                user_data: *mut c_void,
-                                               o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                          int32_t,
-                                                                          int64_t)) {
+                                               o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI retrieve client issued APPENDs.");
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |client, _| {
-            o_cb(user_data.0, 0, client.issued_appends() as int64_t);
+            o_cb(user_data.0, 0, client.issued_appends());
             None
         })
     })
@@ -416,10 +403,7 @@ pub unsafe extern "C" fn client_issued_appends(session: *const Session,
 #[no_mangle]
 pub unsafe extern "C" fn get_account_info(session: *const Session,
                                           user_data: *mut c_void,
-                                          o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                     int32_t,
-                                                                     uint64_t,
-                                                                     uint64_t)) {
+                                          o_cb: extern "C" fn(*mut c_void, i32, u64, u64)) {
     helper::catch_unwind_cb(user_data, o_cb, || {
         trace!("FFI get account information.");
         let user_data = OpaqueCtx(user_data);
@@ -439,7 +423,7 @@ pub unsafe extern "C" fn session_free(session: *mut Session) {
 #[cfg(test)]
 mod tests {
     use ffi::test_utils;
-    use libc::c_void;
+    use std::os::raw::c_void;
     use std::ptr;
     use super::*;
 
