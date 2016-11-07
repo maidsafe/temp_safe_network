@@ -18,6 +18,29 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+//! Email Example
+
+// For explanation of lint checks, run `rustc -W help` or see
+// https://github.
+// com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
+#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
+          unknown_crate_types, warnings)]
+#![deny(bad_style, deprecated, improper_ctypes, missing_docs,
+        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
+        private_no_mangle_fns, private_no_mangle_statics, stable_features, unconditional_recursion,
+        unknown_lints, unused, unused_allocation, unused_attributes,
+        unused_comparisons, unused_features, unused_parens, while_true)]
+#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+        unused_qualifications, unused_results)]
+#![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
+         missing_debug_implementations, variant_size_differences)]
+
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
+                                   option_unwrap_used))]
+#![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))]
+
 #[macro_use]
 extern crate maidsafe_utilities;
 #[macro_use]
@@ -71,22 +94,24 @@ unsafe fn self_auth(session_h: *mut *mut Session) {
 
     if user_option != "Y" && user_option != "y" {
         println!("\nTrying to create an account ...");
-        create_account(secret_0.as_bytes().as_ptr(),
-                       secret_0.as_bytes().len(),
-                       secret_1.as_bytes().as_ptr(),
-                       secret_1.as_bytes().len(),
-                       session_h,
-                       ptr::null_mut(),
-                       network_event_callback);
+        assert_eq!(create_account(secret_0.as_bytes().as_ptr(),
+                                  secret_0.as_bytes().len(),
+                                  secret_1.as_bytes().as_ptr(),
+                                  secret_1.as_bytes().len(),
+                                  session_h,
+                                  ptr::null_mut(),
+                                  network_event_callback),
+                   0);
     } else {
         println!("\nTrying to log in ...");
-        log_in(secret_0.as_bytes().as_ptr(),
-               secret_0.as_bytes().len(),
-               secret_1.as_bytes().as_ptr(),
-               secret_1.as_bytes().len(),
-               session_h,
-               ptr::null_mut(),
-               network_event_callback);
+        assert_eq!(log_in(secret_0.as_bytes().as_ptr(),
+                          secret_0.as_bytes().len(),
+                          secret_1.as_bytes().as_ptr(),
+                          secret_1.as_bytes().len(),
+                          session_h,
+                          ptr::null_mut(),
+                          network_event_callback),
+                   0);
     }
 }
 
