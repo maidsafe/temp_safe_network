@@ -36,8 +36,8 @@ use rust_sodium::crypto::{box_, secretbox};
 /// Represents an application connected to the launcher.
 #[derive(RustcEncodable, RustcDecodable, Debug, Clone)]
 pub enum App {
-    /// Unautorised applicationa
-    Unauthorised,
+    /// Unregistered application
+    Unregistered,
     /// Authorised application
     Registered {
         /// Application directory
@@ -91,12 +91,11 @@ impl App {
                     .map(move |dir_meta| dir_meta.id())
                     .into_box()
             } else {
-                err!(FfiError::from("Safe Drive directory key is not present"))
+                err!(FfiError::from("Safe Drive directory is not available for an unregistered \
+                                     app"))
             }
         } else {
-            futures::done(self.app_dir()
-                    .map_err(move |_| FfiError::from("Application directory is not present")))
-                .into_box()
+            futures::done(self.app_dir()).into_box()
         }
     }
 }
@@ -138,7 +137,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
 
 /// Register an anonymous app with the launcher. Can access only public data
 #[no_mangle]
-pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
+pub unsafe extern "C" fn create_unregistered_app(session: *mut Session,
                                                  user_data: *mut c_void,
                                                  o_cb: extern "C" fn(*mut c_void,
                                                                      int32_t,
@@ -146,7 +145,7 @@ pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
     helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*session).send(move |_, object_cache| {
-            let app_handle = object_cache.insert_app(App::Unauthorised);
+            let app_handle = object_cache.insert_app(App::Unregistered);
             o_cb(user_data.0, 0, app_handle);
             None
         })
