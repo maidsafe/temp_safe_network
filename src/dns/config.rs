@@ -50,7 +50,7 @@ pub fn read(client: &Client) -> Box<DnsFuture<Vec<DnsConfig>>> {
     dir_helper::configuration_dir(client.clone(), DNS_CONFIG_DIR_NAME.to_owned())
         .and_then(move |(dir, _)| {
             if let Some(file) = dir.find_file(DNS_CONFIG_FILE_NAME) {
-                let reader = try!(file_helper::read(client2, file));
+                let reader = try!(file_helper::read(client2, file.metadata()));
                 if reader.size() == 0 {
                     Err(NfsError::FileNotFound)
                 } else {

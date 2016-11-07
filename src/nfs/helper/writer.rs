@@ -19,10 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::Client;
-use core::SelfEncryptionStorage;
-use core::futures::FutureExt;
-use core::immutable_data;
+use core::{Client, FutureExt, SelfEncryptionStorage, immutable_data};
 use futures::Future;
 use maidsafe_utilities::serialisation::serialise;
 use nfs::{Dir, DirId, File, FileMetadata, NfsFuture};
@@ -117,24 +114,30 @@ impl Writer {
                     }
                     File::Versioned { ptr_versions, num_of_versions, latest_version } => {
                         // Create a new file version
-                        let new_version = FileMetadata::new(latest_version.name()
-                                                                .to_owned(),
-                                                            latest_version.user_metadata()
-                                                                .to_owned(),
-                                                            data_map);
+                        let mut new_version = FileMetadata::new(latest_version.name()
+                                                                    .to_owned(),
+                                                                latest_version.user_metadata()
+                                                                    .to_owned(),
+                                                                data_map);
+                        new_version.set_created_time(latest_version.created_time().clone());
+                        new_version.set_modified_time(::time::now_utc());
 
                         let c2 = client.clone();
                         let c3 = client.clone();
 
                         let previous_versions_fut = if num_of_versions > 0 {
                             file_helper::get_versions(&client, &ptr_versions, sk.clone())
+                                .map(move |mut versions| {
+                                    versions.push(latest_version);
+                                    versions
+                                })
+                                .into_box()
                         } else {
                             // ptr_versions is null, create a new list of versions
                             ok!(Vec::<FileMetadata>::new())
                         };
 
-                        previous_versions_fut.and_then(move |mut versions| {
-                                versions.push(latest_version);
+                        previous_versions_fut.and_then(move |versions| {
                                 immutable_data::create(&c2, fry!(serialise(&versions)), sk)
                                     .map_err(From::from)
                                     .into_box()

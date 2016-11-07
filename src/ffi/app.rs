@@ -26,18 +26,12 @@
 // references instead of copies etc.) and uniform (i.e. not use get_ prefix for
 // mem functions.
 
-use core::Client;
-use core::futures::FutureExt;
-use ffi::{FfiFuture, OpaqueCtx};
+use core::{Client, FutureExt};
+use ffi::{AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper, launcher_config};
 use futures::{self, Future};
 use libc::{c_void, int32_t};
 use nfs::DirId;
 use rust_sodium::crypto::{box_, secretbox};
-use super::Session;
-use super::errors::FfiError;
-use super::helper;
-use super::launcher_config;
-use super::object_cache::AppHandle;
 
 /// Represents an application connected to the launcher.
 #[derive(RustcEncodable, RustcDecodable, Debug, Clone)]
@@ -119,7 +113,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
                                       vendor_len: usize,
                                       safe_drive_access: bool,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void, int32_t, AppHandle)) {
+                                      o_cb: unsafe extern "C" fn(*mut c_void, int32_t, AppHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     let _ = helper::catch_unwind_cb(user_data, o_cb, || {
@@ -142,7 +136,7 @@ pub unsafe extern "C" fn register_app(session: *mut Session,
     });
 }
 
-/// Register an annonymous app with the launcher. Can access only public data
+/// Register an anonymous app with the launcher. Can access only public data
 #[no_mangle]
 pub unsafe extern "C" fn create_unauthorised_app(session: *mut Session,
                                                  user_data: *mut c_void,

@@ -1,24 +1,28 @@
-// Copyright 2015 MaidSafe.net limited.
+// Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences").
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+// Commercial License, version 1.0 or later, or (2) The General Public License
+// (GPL), version 3, depending on which licence you accepted on initial access
+// to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project
+// generally, you agree to be bound by the terms of the MaidSafe Contributor
+// Agreement, version 1.0. This, along with the Licenses can be found in the
+// root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.
+// Unless required by applicable law or agreed to in writing, the SAFE Network
+// Software distributed under the GPL Licence is distributed on an "AS IS"
+// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 //
-// Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.
+// Please review the Licences for the specific language governing permissions
+// and limitations relating to use of the SAFE Network Software.
 
 //! Email Stress Test
 
 // For explanation of lint checks, run `rustc -W help` or see
-// https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
+// https://github.
+// com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 #![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
           unknown_crate_types, warnings)]
 #![deny(bad_style, deprecated, improper_ctypes, missing_docs,
@@ -44,25 +48,28 @@ extern crate unwrap;
 
 extern crate crossbeam;
 extern crate docopt;
+extern crate libc;
 extern crate rand;
 extern crate rust_sodium;
 extern crate rustc_serialize;
 extern crate safe_core;
 
 use docopt::Docopt;
+use libc::c_void;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
+use safe_core::ffi::{AppHandle, AppendableDataHandle, CipherOptHandle};
 use safe_core::ffi::app::*;
 use safe_core::ffi::logging::*;
-use safe_core::ffi::low_level_api::{AppendableDataHandle, CipherOptHandle};
 use safe_core::ffi::low_level_api::appendable_data::*;
 use safe_core::ffi::low_level_api::cipher_opt::*;
 use safe_core::ffi::low_level_api::data_id::*;
 use safe_core::ffi::low_level_api::immut_data::*;
 use safe_core::ffi::low_level_api::misc::*;
 use safe_core::ffi::session::*;
-use std::{ptr, slice};
+use std::ptr;
 use std::sync::Mutex;
+use std::sync::mpsc::{self, Sender};
 use std::time::Instant;
 
 static USAGE: &'static str = "
@@ -86,16 +93,15 @@ const BOTS: usize = 5;
 const MSGS_SENT_BY_EACH_BOT: usize = 10;
 
 struct Bot {
-    app_h: *mut App,
-    session_h: *mut SessionHandle,
+    app_h: AppHandle,
+    session: *mut Session,
     email: String,
     tx_msgs: Vec<Vec<u8>>,
 }
 
 impl Bot {
-    fn new(n: usize, rng: &mut XorShiftRng, account_exists: bool) -> Self {
-        let mut app_h: *mut App = ptr::null_mut();
-        let mut session_h: *mut SessionHandle = ptr::null_mut();
+    fn new(n: usize, rng: &mut XorShiftRng, account_exists: bool) -> Result<Self, i32> {
+        let mut session: *mut Session = ptr::null_mut();
 
         let mut sec_0: String = rng.gen_iter::<char>().take(10).collect();
         let mut sec_1: String = rng.gen_iter::<char>().take(10).collect();
@@ -109,7 +115,9 @@ impl Bot {
                                   sec_0.as_bytes().len(),
                                   sec_1.as_bytes().as_ptr(),
                                   sec_1.as_bytes().len(),
-                                  &mut session_h),
+                                  &mut session,
+                                  ptr::null_mut(),
+                                  network_event_callback),
                            0);
             }
         } else {
@@ -118,7 +126,9 @@ impl Bot {
                                           sec_0.as_bytes().len(),
                                           sec_1.as_bytes().as_ptr(),
                                           sec_1.as_bytes().len(),
-                                          &mut session_h),
+                                          &mut session,
+                                          ptr::null_mut(),
+                                          network_event_callback),
                            0);
             }
         }
@@ -127,18 +137,20 @@ impl Bot {
         let unique_token = format!("Bot-{}", n);
         let vendor = "MaidSafe".to_string();
 
-        unsafe {
-            assert_eq!(register_app(session_h,
-                                    app_name.as_bytes().as_ptr(),
-                                    app_name.as_bytes().len(),
-                                    unique_token.as_bytes().as_ptr(),
-                                    unique_token.as_bytes().len(),
-                                    vendor.as_bytes().as_ptr(),
-                                    vendor.as_bytes().len(),
-                                    false,
-                                    &mut app_h),
-                       0);
-        }
+        let app_h = unsafe {
+            try!(c1(|user_data, cb| {
+                register_app(session,
+                             app_name.as_bytes().as_ptr(),
+                             app_name.as_bytes().len(),
+                             unique_token.as_bytes().as_ptr(),
+                             unique_token.as_bytes().len(),
+                             vendor.as_bytes().as_ptr(),
+                             vendor.as_bytes().len(),
+                             false,
+                             user_data,
+                             cb)
+            }))
+        };
 
         let prefix: String = rng.gen_iter::<char>().take(10).collect();
         let email = format!("{}-Bot-{}-mail", prefix, n);
@@ -151,148 +163,149 @@ impl Bot {
             })
             .collect();
 
-        Bot {
+        Ok(Bot {
             app_h: app_h,
-            session_h: session_h,
+            session: session,
             email: email,
             tx_msgs: tx_msgs,
-        }
+        })
     }
 
-    fn create_email(&self) {
+    fn create_email(&self) -> Result<(), i32> {
         let Digest(digest) = sha256::hash(self.email.as_bytes());
 
-        let mut ad_h = 0;
+        let ad_h;
         unsafe {
-            assert_eq!(appendable_data_new_priv(self.app_h, &digest, &mut ad_h), 0);
-            assert_eq!(appendable_data_put(self.app_h, ad_h), 0);
+            ad_h = try!(c1(|user_data, cb| {
+                appendable_data_new_priv(self.session, self.app_h, &digest, user_data, cb)
+            }));
+            try!(c0(|user_data, cb| appendable_data_put(self.session, ad_h, user_data, cb)));
+            try!(c0(|user_data, cb| appendable_data_free(self.session, ad_h, user_data, cb)));
+            Ok(())
         }
-        assert_eq!(appendable_data_free(ad_h), 0);
     }
 
-    fn get_peer_email_handles(&self, peer_email: &str) -> (AppendableDataHandle, CipherOptHandle) {
+    fn get_peer_email_handles(&self,
+                              peer_email: &str)
+                              -> Result<(AppendableDataHandle, CipherOptHandle), i32> {
         let Digest(digest) = sha256::hash(peer_email.as_bytes());
-        let mut data_id_h = 0;
+        let data_id_h = unsafe {
+            try!(c1(|user_data, cb| {
+                data_id_new_appendable_data(self.session, &digest, true, user_data, cb)
+            }))
+        };
+
+        let ad_h;
         unsafe {
-            assert_eq!(data_id_new_appendable_data(&digest, true, &mut data_id_h),
-                       0);
+            ad_h = try!(c1(|u, cb| appendable_data_get(self.session, data_id_h, u, cb)));
+            try!(c0(|u, cb| data_id_free(self.session, data_id_h, u, cb)));
         }
 
-        let mut ad_h = 0;
+        let cipher_opt_h;
+        let encrypt_key_h;
         unsafe {
-            assert_eq!(appendable_data_get(self.app_h, data_id_h, &mut ad_h), 0);
+            encrypt_key_h = try!(c1(|user_data, cb| {
+                appendable_data_encrypt_key(self.session, ad_h, user_data, cb)
+            }));
+            cipher_opt_h = try!(c1(|user_data, cb| {
+                cipher_opt_new_asymmetric(self.session, encrypt_key_h, user_data, cb)
+            }));
+            try!(c0(|user_data, cb| {
+                misc_encrypt_key_free(self.session, encrypt_key_h, user_data, cb)
+            }));
         }
-        assert_eq!(data_id_free(data_id_h), 0);
 
-        let mut cipher_opt_h = 0;
-        let mut encrypt_key_h = 0;
-        unsafe {
-            assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h), 0);
-            assert_eq!(cipher_opt_new_asymmetric(encrypt_key_h, &mut cipher_opt_h),
-                       0);
-        }
-        assert_eq!(misc_encrypt_key_free(encrypt_key_h), 0);
-
-        (ad_h, cipher_opt_h)
+        Ok((ad_h, cipher_opt_h))
     }
 
-    fn send_email(&self, peer_ad_h: u64, cipher_opt_h: u64, msg: &[u8]) {
-        let mut se_h = 0;
+    fn send_email(&self, peer_ad_h: u64, cipher_opt_h: u64, msg: &[u8]) -> Result<(), i32> {
+        let se_h;
         unsafe {
-            assert_eq!(immut_data_new_self_encryptor(self.app_h, &mut se_h), 0);
-            assert_eq!(immut_data_write_to_self_encryptor(se_h, msg.as_ptr(), msg.len()),
-                       0);
+            se_h = try!(c1(|u, cb| immut_data_new_self_encryptor(self.session, u, cb)));
+            try!(c0(|u, cb| {
+                immut_data_write_to_self_encryptor(self.session,
+                                                   se_h,
+                                                   msg.as_ptr(),
+                                                   msg.len(),
+                                                   u,
+                                                   cb)
+            }));
         }
 
-        let mut data_id_h = 0;
+        let data_id_h;
         unsafe {
-            assert_eq!(immut_data_close_self_encryptor(self.app_h,
-                                                       se_h,
-                                                       cipher_opt_h,
-                                                       &mut data_id_h),
-                       0);
-            assert_eq!(appendable_data_append(self.app_h, peer_ad_h, data_id_h), 0);
-        }
+            data_id_h = try!(c1(|u, cb| {
+                immut_data_close_self_encryptor(self.session, self.app_h, se_h, cipher_opt_h, u, cb)
+            }));
+            try!(c0(|u, cb| appendable_data_append(self.session, peer_ad_h, data_id_h, u, cb)));
 
-        assert_eq!(data_id_free(data_id_h), 0);
-        assert_eq!(immut_data_self_encryptor_writer_free(se_h), 0);
+            try!(c0(|u, cb| data_id_free(self.session, data_id_h, u, cb)));
+        }
+        Ok(())
     }
 
-    fn get_all_emails(&self) -> Vec<Vec<u8>> {
+    fn get_all_emails(&self) -> Result<Vec<Vec<u8>>, i32> {
         let Digest(digest) = sha256::hash(self.email.as_bytes());
 
-        let mut data_id_h = 0;
-        unsafe {
-            assert_eq!(data_id_new_appendable_data(&digest, true, &mut data_id_h),
-                       0);
-        }
+        let data_id_h = try!(unsafe {
+            c1(|u, cb| data_id_new_appendable_data(self.session, &digest, true, u, cb))
+        });
 
-        let mut ad_h = 0;
+        let ad_h;
         unsafe {
-            assert_eq!(appendable_data_get(self.app_h, data_id_h, &mut ad_h), 0);
-        }
-        assert_eq!(data_id_free(data_id_h), 0);
+            ad_h = try!(c1(|u, cb| appendable_data_get(self.session, data_id_h, u, cb)));
+            try!(c0(|u, cb| data_id_free(self.session, data_id_h, u, cb)));
+        };
 
-        let mut num_of_emails = 0;
-        unsafe {
-            assert_eq!(appendable_data_num_of_data(ad_h, &mut num_of_emails), 0);
-        }
+        let num_of_emails =
+            unsafe { try!(c1(|u, cb| appendable_data_num_of_data(self.session, ad_h, u, cb))) };
 
         let mut rx_msgs = Vec::with_capacity(num_of_emails);
 
         for n in 0..num_of_emails {
-            unsafe {
-                assert_eq!(appendable_data_nth_data_id(self.app_h, ad_h, n, &mut data_id_h),
-                           0);
-            }
+            let data_id_h = unsafe {
+                try!(c1(|u, cb| {
+                    appendable_data_nth_data_id(self.session, self.app_h, ad_h, n, u, cb)
+                }))
+            };
 
-            let mut se_h = 0;
-            unsafe {
-                assert_eq!(immut_data_fetch_self_encryptor(self.app_h, data_id_h, &mut se_h),
-                           0);
-            }
+            let se_h = unsafe {
+                try!(c1(|u, cb| {
+                    immut_data_fetch_self_encryptor(self.session, self.app_h, data_id_h, u, cb)
+                }))
+            };
 
-            let mut total_size = 0;
-            unsafe {
-                assert_eq!(immut_data_size(se_h, &mut total_size), 0);
-            }
+            let total_size =
+                unsafe { try!(c1(|u, cb| immut_data_size(self.session, se_h, u, cb))) };
 
-            let mut data_ptr: *mut u8 = ptr::null_mut();
-            let mut read_size = 0;
-            let mut capacity = 0;
-            unsafe {
-                assert_eq!(immut_data_read_from_self_encryptor(se_h,
-                                                               0,
-                                                               total_size,
-                                                               &mut data_ptr,
-                                                               &mut read_size,
-                                                               &mut capacity),
-                           0);
-            }
+            let rx_msg = unsafe {
+                try!(call_vec_u8(|u, cb| {
+                    immut_data_read_from_self_encryptor(self.session, se_h, 0, total_size, u, cb)
+                }))
+            };
 
-            // TODO Confirm that cloning is done - else this is UB as we are freeing the vector
-            // separately.
-            let rx_msg = unsafe { slice::from_raw_parts(data_ptr, read_size).to_owned() };
             rx_msgs.push(rx_msg);
 
-            assert_eq!(data_id_free(data_id_h), 0);
-            assert_eq!(immut_data_self_encryptor_reader_free(se_h), 0);
             unsafe {
-                misc_u8_ptr_free(data_ptr, read_size, capacity);
+                try!(c0(|user_data, cb| data_id_free(self.session, data_id_h, user_data, cb)));
+                try!(c0(|user_data, cb| {
+                    immut_data_self_encryptor_reader_free(self.session, se_h, user_data, cb)
+                }));
             }
         }
 
-        assert_eq!(appendable_data_free(ad_h), 0);
+        unsafe {
+            try!(c0(|user_data, cb| appendable_data_free(self.session, ad_h, user_data, cb)));
+        }
 
-        rx_msgs
+        Ok(rx_msgs)
     }
 }
 
 impl Drop for Bot {
     fn drop(&mut self) {
         unsafe {
-            drop_app(self.app_h);
-            drop_session(self.session_h);
+            session_free(self.session);
         }
     }
 }
@@ -301,7 +314,8 @@ unsafe impl Send for Bot {}
 unsafe impl Sync for Bot {}
 
 fn main() {
-    // Sample timmings in release run with mock-routing and cleared VaultStorageSimulation:
+    // Sample timings in release run with mock-routing and cleared
+    // VaultStorageSimulation:
     // ------------------------------------------------------------------------------------
     // Create accounts for 5 bots: 3 secs, 0 millis
     // Create emails for 5 bots: 0 secs, 218 millis
@@ -328,7 +342,12 @@ fn main() {
     // ------------------------------------------------------------------------
     // Create bots
     let mut now = Instant::now();
-    let bots: Vec<_> = (0..BOTS).map(|n| Bot::new(n, &mut rng, args.flag_get_only)).collect();
+    let bots: Vec<_> = (0..BOTS)
+        .map(|n| {
+            unwrap!(Bot::new(n, &mut rng, args.flag_get_only),
+                    "Can't create bot")
+        })
+        .collect();
     let mut duration = now.elapsed();
     info!("Create accounts for {} bots: {} secs, {} millis\n",
           BOTS,
@@ -365,7 +384,7 @@ fn main() {
                     }
                     let _ = scope.spawn(move || {
                         unwrap!(peer_handles_ref.lock())
-                            .push(bot.get_peer_email_handles(&peer_bot.email))
+                            .push(unwrap!(bot.get_peer_email_handles(&peer_bot.email)))
                     });
                 }
             });
@@ -375,15 +394,27 @@ fn main() {
                 let guard = unwrap!(peer_handles.lock());
                 crossbeam::scope(|scope| {
                     for &(ad_h, cipher_opt_h) in &*guard {
-                        let _ = scope.spawn(move || bot.send_email(ad_h, cipher_opt_h, msg));
+                        let _ = scope.spawn(move || {
+                            assert!(bot.send_email(ad_h, cipher_opt_h, msg).is_ok())
+                        });
                     }
                 })
             }
 
             let guard = unwrap!(peer_handles.lock());
             for &(ad_h, cipher_opt_h) in &*guard {
-                assert_eq!(appendable_data_free(ad_h), 0);
-                assert_eq!(cipher_opt_free(cipher_opt_h), 0);
+                unsafe {
+                    assert!(c0(|user_data, cb| {
+                                    appendable_data_free(bot.session, ad_h, user_data, cb)
+                                })
+                                .is_ok(),
+                            "can't free AppendableData");
+                    assert!(c0(|user_data, cb| {
+                                    cipher_opt_free(bot.session, cipher_opt_h, user_data, cb)
+                                })
+                                .is_ok(),
+                            "can't free CipherOpt");
+                }
             }
         }
         duration = now.elapsed();
@@ -402,7 +433,7 @@ fn main() {
 
         for (i, bot) in bots_ref.iter().enumerate() {
             let _ = scope.spawn(move || {
-                let mut rx_emails = bot.get_all_emails();
+                let mut rx_emails = unwrap!(bot.get_all_emails(), "can't get emails");
                 assert_eq!(rx_emails.len(), MSGS_SENT_BY_EACH_BOT * (BOTS - 1));
 
                 for (j, peer_bot) in bots_ref.iter().enumerate() {
@@ -425,4 +456,99 @@ fn main() {
           duration.as_secs(),
           duration.subsec_nanos() / 1000000);
 
+}
+
+// Convert a `mpsc::Sender<T>` to a void ptr which can be passed as user data to
+// ffi functions
+fn sender_as_user_data<T>(tx: &Sender<T>) -> *mut c_void {
+    let ptr: *const _ = tx;
+    ptr as *mut c_void
+}
+
+// Send through a `mpsc::Sender` pointed to by the user data pointer.
+unsafe fn send_via_user_data<T>(u: *mut c_void, value: T)
+    where T: Send
+{
+    let tx = u as *mut Sender<T>;
+    unwrap!((*tx).send(value));
+}
+
+// Call a FFI function and block until its callback gets called.
+// Use this if the callback accepts no arguments in addition to u
+// and error_code.
+fn c0<F>(f: F) -> Result<(), i32>
+    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, i32))
+{
+    let (tx, rx) = mpsc::channel::<i32>();
+    f(sender_as_user_data(&tx), callback_0);
+
+    let error = unwrap!(rx.recv());
+    if error == 0 { Ok(()) } else { Err(error) }
+}
+
+// Call a FFI function and block until its callback gets called, then return
+// the argument which were passed to that callback.
+// Use this if the callback accepts one argument in addition to u
+// and error_code.
+unsafe fn c1<F, T>(f: F) -> Result<T, i32>
+    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, i32, T))
+{
+    let (tx, rx) = mpsc::channel::<(i32, SendWrapper<T>)>();
+    f(sender_as_user_data(&tx), callback_1::<T>);
+
+    let (error, args) = unwrap!(rx.recv());
+    if error == 0 { Ok(args.0) } else { Err(error) }
+}
+
+// Call a FFI function and block until its callback gets called, then return
+// the arguments which were passed to that callback in a tuple.
+// Use this if the callback accepts three arguments in addition to u and
+// error_code.
+unsafe fn c3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), i32>
+    where F: FnOnce(*mut c_void,
+                    unsafe extern "C" fn(*mut c_void, i32, T0, T1, T2))
+{
+    let (tx, rx) = mpsc::channel::<(i32, SendWrapper<(T0, T1, T2)>)>();
+    f(sender_as_user_data(&tx), callback_3::<T0, T1, T2>);
+
+    let (error, args) = unwrap!(rx.recv());
+    if error == 0 { Ok(args.0) } else { Err(error) }
+}
+
+// Call a FFI function and block until its callback gets called, then return
+// the arguments which were passed to that callback converted to Vec<u8>.
+// The callbacks must accept three arguments (in addition to u and
+// error_code): pointer to the begining of the data (`*mut u8`), lengths
+// (`usize`)
+// and capacity (`usize`).
+unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
+    where F: FnOnce(*mut c_void,
+                    unsafe extern "C" fn(*mut c_void, i32, *mut u8, usize, usize))
+{
+    c3(f).map(|(ptr, len, cap)| Vec::from_raw_parts(ptr, len, cap))
+}
+
+unsafe extern "C" fn callback_0(user_data: *mut c_void, error: i32) {
+    send_via_user_data(user_data, error)
+}
+
+unsafe extern "C" fn callback_1<T>(user_data: *mut c_void, error: i32, arg: T) {
+    send_via_user_data(user_data, (error, SendWrapper(arg)))
+}
+
+unsafe extern "C" fn callback_3<T0, T1, T2>(user_data: *mut c_void,
+                                            error: i32,
+                                            arg0: T0,
+                                            arg1: T1,
+                                            arg2: T2) {
+    send_via_user_data(user_data, (error, SendWrapper((arg0, arg1, arg2))))
+}
+
+// Unsafe wrapper for passing non-Send types through mpsc channels.
+// Use with caution!
+struct SendWrapper<T>(T);
+unsafe impl<T> Send for SendWrapper<T> {}
+
+unsafe extern "C" fn network_event_callback(_user_data: *mut c_void, err_code: i32, event: i32) {
+    println!("Network event with code {}, err_code: {}", event, err_code);
 }

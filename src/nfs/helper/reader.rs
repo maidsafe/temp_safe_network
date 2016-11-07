@@ -19,12 +19,9 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, SelfEncryptionStorage};
-use core::futures::FutureExt;
+use core::{Client, FutureExt, SelfEncryptionStorage};
 use futures::Future;
-use nfs::NfsFuture;
-use nfs::errors::NfsError;
-use nfs::file::File;
+use nfs::{FileMetadata, NfsError, NfsFuture};
 use self_encryption::SelfEncryptor;
 
 /// Reader is used to read contents of a File. It can read in chunks if the
@@ -39,7 +36,7 @@ impl Reader {
     /// Create a new instance of Reader
     pub fn new(client: Client,
                storage: SelfEncryptionStorage,
-               file: &File)
+               file: &FileMetadata)
                -> Result<Reader, NfsError> {
         Ok(Reader {
             client: client,

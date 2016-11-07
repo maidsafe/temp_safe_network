@@ -19,8 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use ffi::{OpaqueCtx, Session, helper};
-use ffi::object_cache::DataIdHandle;
+use ffi::{DataIdHandle, OpaqueCtx, Session, helper};
 use libc::{c_void, int32_t};
 use routing::{DataIdentifier, XOR_NAME_LEN, XorName};
 
@@ -113,8 +112,7 @@ pub unsafe extern "C" fn data_id_free(session: *const Session,
 
 #[cfg(test)]
 mod tests {
-    use ffi::{FfiError, Session, test_utils};
-    use ffi::object_cache::DataIdHandle;
+    use ffi::{DataIdHandle, FfiError, Session, test_utils};
     use libc::c_void;
     use rand;
     use routing::XOR_NAME_LEN;

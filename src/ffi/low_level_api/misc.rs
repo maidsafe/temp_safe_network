@@ -19,10 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use ffi::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle, StructDataHandle};
 use ffi::{FfiError, FfiResult, OpaqueCtx, Session, helper};
 use ffi::low_level_api::appendable_data::AppendableData;
-use ffi::object_cache::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, ObjectCache,
-                        SignKeyHandle, StructDataHandle};
+use ffi::object_cache::ObjectCache;
 use libc::{c_void, int32_t, size_t, uint8_t};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use std::{mem, ptr, slice};

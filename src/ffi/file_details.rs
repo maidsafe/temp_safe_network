@@ -56,7 +56,7 @@ impl FileDetails {
                -> Box<FfiFuture<Self>> {
         let start_position = offset as u64;
 
-        let reader = fry!(file_helper::read(client, &file).map_err(FfiError::from));
+        let reader = fry!(file_helper::read(client, &file.metadata()).map_err(FfiError::from));
         let mut size = length as u64;
         if size == 0 {
             size = reader.size() - start_position;

@@ -20,8 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::CoreError;
-use ffi::{App, FfiError, OpaqueCtx, Session, helper};
-use ffi::object_cache::{CipherOptHandle, EncryptKeyHandle};
+use ffi::{App, CipherOptHandle, EncryptKeyHandle, FfiError, OpaqueCtx, Session, helper};
 use libc::{c_void, int32_t};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
@@ -149,8 +148,8 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
                     return None;
                 }
             };
-            let handle = obj_cache
-                .insert_cipher_opt(CipherOpt::Asymmetric { peer_encrypt_key: pk });
+            let handle =
+                obj_cache.insert_cipher_opt(CipherOpt::Asymmetric { peer_encrypt_key: pk });
             o_cb(user_data.0, 0, handle);
             None
         })
@@ -177,8 +176,7 @@ pub unsafe extern "C" fn cipher_opt_free(session: *const Session,
 #[cfg(test)]
 mod tests {
     use core::utility;
-    use ffi::{App, FfiError, Session};
-    use ffi::object_cache::CipherOptHandle;
+    use ffi::{App, CipherOptHandle, FfiError, Session};
     use ffi::test_utils;
     use libc::c_void;
     use rust_sodium::crypto::box_;

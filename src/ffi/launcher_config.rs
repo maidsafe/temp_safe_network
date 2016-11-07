@@ -176,7 +176,8 @@ fn launcher_global_config_and_dir(client: &Client)
             };
 
             file_fut.and_then(move |(dir, file)| {
-                    let reader = fry!(file_helper::read(c2, &file).map_err(FfiError::from));
+                    let reader = fry!(file_helper::read(c2, &file.metadata())
+                        .map_err(FfiError::from));
                     let size = reader.size();
                     if size == 0 {
                         ok!((dir, HashMap::new()))

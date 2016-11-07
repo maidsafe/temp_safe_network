@@ -22,11 +22,9 @@
 //! File operations
 
 use core::{Client, FutureExt};
-use ffi::{App, FfiError, FfiFuture, OpaqueCtx, Session};
+use ffi::{App, AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper};
 use ffi::file_details::{FileDetails, FileMetadata};
-use ffi::helper;
 use ffi::helper::catch_unwind_cb;
-use ffi::object_cache::AppHandle;
 use futures::{self, Future};
 use libc::{c_void, int32_t, uint64_t};
 use nfs::{File, NfsError};
@@ -789,7 +787,7 @@ mod tests {
                     let app_root_dir = unwrap!(res);
                     let file = unwrap!(app_root_dir.find_file("test_file.txt"));
 
-                    let reader = unwrap!(file_helper::read(c4, file));
+                    let reader = unwrap!(file_helper::read(c4, file.metadata()));
                     let size = reader.size();
 
                     reader.read(0, size)
@@ -815,7 +813,7 @@ mod tests {
                 .then(move |res| {
                     let app_root_dir = unwrap!(res);
                     let file = unwrap!(app_root_dir.find_file("test_file.txt"));
-                    let reader = unwrap!(file_helper::read(c7, file));
+                    let reader = unwrap!(file_helper::read(c7, file.metadata()));
                     let size = reader.size();
 
                     reader.read(0, size)

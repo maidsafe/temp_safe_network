@@ -95,6 +95,11 @@ impl FileMetadata {
         self.size = size;
     }
 
+    /// Set time of creation
+    pub fn set_created_time(&mut self, created_time: Tm) {
+        self.created = created_time
+    }
+
     /// Set time of modification
     pub fn set_modified_time(&mut self, modified_time: Tm) {
         self.modified = modified_time
