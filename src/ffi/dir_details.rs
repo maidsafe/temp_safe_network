@@ -67,24 +67,6 @@ impl DirDetails {
     }
 }
 
-// TODO: when drop-flags removal lands in stable, we should implement Drop for
-// DirMetadata and FileMetadata and remove this whole impl.
-impl Drop for DirDetails {
-    fn drop(&mut self) {
-        if let Some(mut metadata) = self.metadata.take() {
-            metadata.deallocate();
-        }
-
-        for mut metadata in self.files.drain(..) {
-            metadata.deallocate();
-        }
-
-        for mut metadata in self.sub_dirs.drain(..) {
-            metadata.deallocate();
-        }
-    }
-}
-
 #[allow(missing_docs)]
 #[derive(Debug)]
 #[repr(C)]
@@ -127,10 +109,10 @@ impl DirMetadata {
             modification_time_nsec: modified_time.nsec as i64,
         })
     }
+}
 
-    // TODO: when drop-flag removal lands in stable, we should turn this into
-    // a proper impl Drop.
-    fn deallocate(&mut self) {
+impl Drop for DirMetadata {
+    fn drop(&mut self) {
         unsafe {
             let _ = Vec::from_raw_parts(self.name, self.name_len, self.name_cap);
             let _ = Vec::from_raw_parts(self.user_metadata,

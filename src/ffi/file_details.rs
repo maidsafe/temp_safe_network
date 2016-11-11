@@ -82,18 +82,12 @@ impl FileDetails {
             })
             .into_box()
     }
+}
 
-    // TODO: when drop-flag removal lands in stable, we should turn this into
-    // a proper impl Drop.
-    fn deallocate(self) {
+impl Drop for FileDetails {
+    fn drop(&mut self) {
         unsafe {
             let _ = Vec::from_raw_parts(self.content, self.content_len, self.content_cap);
-        }
-
-        if !self.metadata.is_null() {
-            unsafe {
-                Box::from_raw(self.metadata).deallocate();
-            }
         }
     }
 }
@@ -143,11 +137,10 @@ impl FileMetadata {
             modification_time_nsec: modified_time.nsec as i64,
         })
     }
+}
 
-    /// Deallocate memory allocated by this struct (drop-flags workaround).
-    // TODO: when drop-flag removal lands in stable, we should turn this into a
-    // proper impl Drop.
-    pub fn deallocate(&mut self) {
+impl Drop for FileMetadata {
+    fn drop(&mut self) {
         unsafe {
             let _ = Vec::from_raw_parts(self.name, self.name_len, self.name_cap);
             let _ = Vec::from_raw_parts(self.user_metadata,
@@ -160,11 +153,11 @@ impl FileMetadata {
 /// Dispose of the FileDetails instance.
 #[no_mangle]
 pub unsafe extern "C" fn file_details_drop(details: *mut FileDetails) {
-    Box::from_raw(details).deallocate()
+    let _ = Box::from_raw(details);
 }
 
 /// Dispose of the FileMetadata instance.
 #[no_mangle]
 pub unsafe extern "C" fn file_metadata_drop(metadata: *mut FileMetadata) {
-    Box::from_raw(metadata).deallocate()
+    let _ = Box::from_raw(metadata);
 }
