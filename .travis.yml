@@ -128,7 +128,7 @@ install:
 
 script:
   - export QUICK_TEST=true
-  - ./ci/travis/script.sh
+  - travis_wait 60 ./ci/travis/script.sh
 
 after_success:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/after_success.sh | bash

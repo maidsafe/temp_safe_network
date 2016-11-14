@@ -22,6 +22,8 @@ use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullI
               PublicId, Response, StructuredData, XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
+use std::iter;
+use std::collections::BTreeSet;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use super::poll;
 
@@ -100,8 +102,10 @@ impl TestClient {
 
     /// create an account and store it
     pub fn create_account(&mut self, nodes: &mut [TestNode]) {
-        let account =
-            unwrap!(StructuredData::new(0, self.rng.gen(), 0, vec![], vec![], vec![], None));
+        let owner_pubkey = *self.full_id.public_id().signing_public_key();
+        let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
+        let mut account = unwrap!(StructuredData::new(0, self.rng.gen(), 0, vec![], owner));
+        let _ = account.add_signature(&(owner_pubkey, self.full_id.signing_private_key().clone()));
 
         unwrap!(self.put_and_verify(Data::Structured(account), nodes));
     }
