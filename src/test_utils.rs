@@ -19,9 +19,10 @@
 
 use rand::Rng;
 use routing::{AppendedData, DataIdentifier, Filter, FullId, ImmutableData, PrivAppendableData,
-              PubAppendableData, StructuredData};
+              PrivAppendedData, PubAppendableData, StructuredData};
 use rust_sodium::crypto::box_;
 use std::collections::BTreeSet;
+use std::iter;
 
 /// Toggle iterations for quick test environment variable
 pub fn iterations() -> usize {
@@ -51,14 +52,16 @@ pub fn random_structured_data_with_size<R: Rng>(type_tag: u64,
                                                 size: usize,
                                                 rng: &mut R)
                                                 -> StructuredData {
-    StructuredData::new(type_tag,
-                        rng.gen(),
-                        0,
-                        rng.gen_iter().take(size).collect(),
-                        vec![full_id.public_id().signing_public_key().clone()],
-                        vec![],
-                        Some(full_id.signing_private_key()))
-        .expect("Cannot create structured data for test")
+    let owner_pubkey = *full_id.public_id().signing_public_key();
+    let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
+    let mut sd = StructuredData::new(type_tag,
+                                     rng.gen(),
+                                     0,
+                                     rng.gen_iter().take(size).collect(),
+                                     owner)
+        .expect("Cannot create structured data for test");
+    let _ = sd.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
+    sd
 }
 
 /// Creates random public appendable data - tests only
@@ -71,20 +74,25 @@ pub fn random_pub_appendable_data_with_size<R: Rng>(full_id: &FullId,
                                                     size: usize,
                                                     rng: &mut R)
                                                     -> PubAppendableData {
-    let mut current_owner_keys = vec![full_id.public_id().signing_public_key().clone()];
-    if size > 0 {
-        for _ in 0..size / 32 {
-            current_owner_keys.push(*full_id.public_id().signing_public_key());
-        }
+    let owner_pubkey = *full_id.public_id().signing_public_key();
+    let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
+    let mut ad = PubAppendableData::new(rng.gen(),
+                                        0,
+                                        owner,
+                                        BTreeSet::new(),
+                                        Filter::black_list(None))
+        .expect("Cannot create public appendable data for test");
+
+    for _ in 0..size / 128 {
+        let pointer = DataIdentifier::Structured(rng.gen(), 12345);
+        let appended_data = unwrap!(AppendedData::new(pointer,
+                                                      owner_pubkey,
+                                                      full_id.signing_private_key()));
+        ad.append(appended_data);
     }
-    PubAppendableData::new(rng.gen(),
-                           0,
-                           current_owner_keys,
-                           vec![],
-                           BTreeSet::new(),
-                           Filter::black_list(None),
-                           Some(full_id.signing_private_key()))
-        .expect("Cannot create public appendable data for test")
+
+    let _ = ad.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
+    ad
 }
 
 /// Creates a new public appendable data with an incremented version number
@@ -92,25 +100,23 @@ pub fn pub_appendable_data_version_up<R: Rng>(full_id: &FullId,
                                               old_ad: &PubAppendableData,
                                               rng: &mut R)
                                               -> PubAppendableData {
+    let owner_pubkey = *full_id.public_id().signing_public_key();
+    let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
     let mut new_ad = PubAppendableData::new(*old_ad.name(),
                                             old_ad.get_version() + 1,
-                                            vec![*full_id.public_id().signing_public_key()],
-                                            vec![*full_id.public_id().signing_public_key()],
+                                            owner,
                                             BTreeSet::new(),
-                                            Filter::black_list(None),
-                                            None)
+                                            Filter::black_list(None))
         .expect("Cannot create public appendable data for test");
     for data in old_ad.get_data() {
         new_ad.append(data.clone());
     }
     let pointer = DataIdentifier::Structured(rng.gen(), 12345);
     let appended_data = unwrap!(AppendedData::new(pointer,
-                                                  full_id.public_id()
-                                                      .signing_public_key()
-                                                      .clone(),
+                                                  owner_pubkey,
                                                   full_id.signing_private_key()));
     new_ad.append(appended_data);
-    let _ = new_ad.add_signature(full_id.signing_private_key());
+    let _ = new_ad.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
     new_ad
 }
 
@@ -128,19 +134,25 @@ pub fn random_priv_appendable_data_with_size<R: Rng>(full_id: &FullId,
                                                      size: usize,
                                                      rng: &mut R)
                                                      -> PrivAppendableData {
-    let mut current_owner_keys = vec![*full_id.public_id().signing_public_key()];
-    if size > 0 {
-        for _ in 0..size / 32 {
-            current_owner_keys.push(*full_id.public_id().signing_public_key());
-        }
+    let owner_pubkey = *full_id.public_id().signing_public_key();
+    let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
+    let mut ad = PrivAppendableData::new(rng.gen(),
+                                         0,
+                                         owner,
+                                         BTreeSet::new(),
+                                         Filter::black_list(None),
+                                         encrypt_key)
+        .expect("Cannot create private appendable data for test");
+
+    for _ in 0..size / 128 {
+        let pointer = DataIdentifier::Structured(rng.gen(), 12345);
+        let appended_data = unwrap!(AppendedData::new(pointer,
+                                                      owner_pubkey,
+                                                      full_id.signing_private_key()));
+        let priv_appended_data = unwrap!(PrivAppendedData::new(&appended_data, &encrypt_key));
+        ad.append(priv_appended_data, &owner_pubkey);
     }
-    PrivAppendableData::new(rng.gen(),
-                            0,
-                            current_owner_keys,
-                            vec![],
-                            BTreeSet::new(),
-                            Filter::black_list(None),
-                            encrypt_key,
-                            Some(full_id.signing_private_key()))
-        .expect("Cannot create private appendable data for test")
+
+    let _ = ad.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
+    ad
 }

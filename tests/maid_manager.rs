@@ -28,6 +28,7 @@ use rust_sodium::crypto::box_;
 use safe_vault::mock_crust_detail::{self, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::test_utils;
+use std::collections::BTreeSet;
 
 const TEST_NET_SIZE: usize = 20;
 
@@ -175,9 +176,7 @@ fn create_account_twice() {
                                               rng.gen(),
                                               0,
                                               vec![],
-                                              vec![],
-                                              vec![],
-                                              None));
+                                              BTreeSet::new()));
 
     // Create an account using `client0`.
     unwrap!(client0.put_and_verify(Data::Structured(account.clone()), &mut nodes));

@@ -385,7 +385,7 @@ impl DataManager {
                capacity: u64)
                -> Result<DataManager, InternalError> {
         Ok(DataManager {
-            chunk_store: try!(ChunkStore::new(chunk_store_root, capacity)),
+            chunk_store: ChunkStore::new(chunk_store_root, capacity)?,
             refresh_accumulator:
                 Accumulator::with_duration(ACCUMULATOR_QUORUM,
                                            Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
@@ -419,9 +419,9 @@ impl DataManager {
         }
         trace!("DM sending get_failure of {:?}", data_id);
         let error = GetError::NoSuchData;
-        let external_error_indicator = try!(serialisation::serialise(&error));
-        try!(self.routing_node
-            .send_get_failure(dst, src, data_id, external_error_indicator, message_id));
+        let external_error_indicator = serialisation::serialise(&error)?;
+        self.routing_node
+            .send_get_failure(dst, src, data_id, external_error_indicator, message_id)?;
         Ok(())
     }
 
@@ -442,13 +442,13 @@ impl DataManager {
                     let overwrite_deleted = match (old_data_result, &data) {
                         (Ok(Data::Structured(ref old_data)), &Data::Structured(ref new_data)) => {
                             old_data.is_deleted() &&
-                            old_data.validate_self_against_successor(new_data).is_ok()
+                            old_data.get_version() + 1 == new_data.get_version()
                         }
                         _ => false,
                     };
                     if !overwrite_deleted {
                         let error = MutationError::DataExists;
-                        let external_error_indicator = try!(serialisation::serialise(&error));
+                        let external_error_indicator = serialisation::serialise(&error)?;
                         trace!("DM sending PutFailure for data {:?}, it already exists.",
                                data_id);
                         let _ = self.routing_node
@@ -473,7 +473,7 @@ impl DataManager {
 
         if self.chunk_store_full() {
             let error = MutationError::NetworkFull;
-            let external_error_indicator = try!(serialisation::serialise(&error));
+            let external_error_indicator = serialisation::serialise(&error)?;
             let _ = self.routing_node
                 .send_put_failure(dst, src, data_id, external_error_indicator, message_id);
             return Err(From::from(error));
@@ -492,11 +492,11 @@ impl DataManager {
 
         if !new_data.validate_size() {
             let error = MutationError::DataTooLarge;
-            let post_error = try!(serialisation::serialise(&error));
+            let post_error = serialisation::serialise(&error)?;
             trace!("DM sending post_failure for data {:?}, data exceeds size limit.",
                    data_id);
-            return Ok(try!(self.routing_node
-                .send_post_failure(dst, src, data_id, post_error, message_id)));
+            return Ok(self.routing_node
+                .send_post_failure(dst, src, data_id, post_error, message_id)?);
         }
 
         let update_result = match (new_data, self.chunk_store.get(&data_id)) {
@@ -505,19 +505,18 @@ impl DataManager {
                        data_id,
                        message_id,
                        error);
-                let post_error = try!(serialisation::serialise(&MutationError::NoSuchData));
-                return Ok(try!(self.routing_node
-                    .send_post_failure(dst, src, data_id, post_error, message_id)));
+                let post_error = serialisation::serialise(&MutationError::NoSuchData)?;
+                return Ok(self.routing_node
+                    .send_post_failure(dst, src, data_id, post_error, message_id)?);
             }
             (Data::Structured(new_sd), Ok(Data::Structured(mut sd))) => {
                 if sd.is_deleted() {
                     warn!("Post operation for deleted data. {:?} - {:?}",
                           data_id,
                           message_id);
-                    let post_error =
-                        try!(serialisation::serialise(&MutationError::InvalidOperation));
-                    return Ok(try!(self.routing_node
-                        .send_post_failure(dst, src, data_id, post_error, message_id)));
+                    let post_error = serialisation::serialise(&MutationError::InvalidOperation)?;
+                    return Ok(self.routing_node
+                        .send_post_failure(dst, src, data_id, post_error, message_id)?);
                 }
                 let result = sd.replace_with_other(new_sd);
                 result.map(|()| Data::Structured(sd))
@@ -534,9 +533,9 @@ impl DataManager {
                 warn!("Post operation for Invalid Data Type. {:?} - {:?}",
                       data_id,
                       message_id);
-                let post_error = try!(serialisation::serialise(&MutationError::InvalidOperation));
-                return Ok(try!(self.routing_node
-                    .send_post_failure(dst, src, data_id, post_error, message_id)));
+                let post_error = serialisation::serialise(&MutationError::InvalidOperation)?;
+                return Ok(self.routing_node
+                    .send_post_failure(dst, src, data_id, post_error, message_id)?);
             }
         };
         let data = match update_result {
@@ -546,9 +545,9 @@ impl DataManager {
                        data_id,
                        message_id,
                        error);
-                let post_error = try!(serialisation::serialise(&MutationError::InvalidSuccessor));
-                return Ok(try!(self.routing_node
-                    .send_post_failure(dst, src, data_id, post_error, message_id)));
+                let post_error = serialisation::serialise(&MutationError::InvalidSuccessor)?;
+                return Ok(self.routing_node
+                    .send_post_failure(dst, src, data_id, post_error, message_id)?);
             }
         };
         self.update_pending_writes(data, PendingMutationType::Post, src, dst, message_id)
@@ -581,8 +580,8 @@ impl DataManager {
             Err(_) => MutationError::NoSuchData,
         };
         trace!("DM sending delete_failure for {:?}", new_data.identifier());
-        let err_data = try!(serialisation::serialise(&error));
-        try!(self.routing_node.send_delete_failure(dst, src, data_id, err_data, message_id));
+        let err_data = serialisation::serialise(&error)?;
+        self.routing_node.send_delete_failure(dst, src, data_id, err_data, message_id)?;
         Ok(())
     }
 
@@ -619,29 +618,29 @@ impl DataManager {
                        data_id,
                        message_id,
                        error);
-                let append_error = try!(serialisation::serialise(&MutationError::NoSuchData));
-                return Ok(try!(self.routing_node
-                    .send_append_failure(dst, src, data_id, append_error, message_id)));
+                let append_error = serialisation::serialise(&MutationError::NoSuchData)?;
+                return Ok(self.routing_node
+                    .send_append_failure(dst, src, data_id, append_error, message_id)?);
             }
         };
 
         if let Some(data) = append_result {
             if !data.validate_size() {
                 let error = MutationError::DataTooLarge;
-                let append_error = try!(serialisation::serialise(&error));
+                let append_error = serialisation::serialise(&error)?;
                 trace!("DM sending append_failure for data {:?}, data exceeds size limit.",
                        data_id);
-                return Ok(try!(self.routing_node
-                    .send_append_failure(dst, src, data_id, append_error, message_id)));
+                return Ok(self.routing_node
+                    .send_append_failure(dst, src, data_id, append_error, message_id)?);
             }
             self.update_pending_writes(data, PendingMutationType::Append, src, dst, message_id)
         } else {
             trace!("DM sending append_failure for: {:?} with {:?}",
                    data_id,
                    message_id);
-            let append_error = try!(serialisation::serialise(&MutationError::InvalidSuccessor));
-            Ok(try!(self.routing_node
-                .send_append_failure(dst, src, data_id, append_error, message_id)))
+            let append_error = serialisation::serialise(&MutationError::InvalidSuccessor)?;
+            Ok(self.routing_node
+                .send_append_failure(dst, src, data_id, append_error, message_id)?)
         }
     }
 
@@ -651,7 +650,7 @@ impl DataManager {
                               -> Result<(), InternalError> {
         let (data_id, version) = id_and_version_of(&data);
         self.cache.handle_get_success(src, &data_id, version);
-        try!(self.send_gets_for_needed_data());
+        self.send_gets_for_needed_data()?;
         // If we're no longer in the close group, return.
         if !self.close_to_address(data_id.name()) {
             return Ok(());
@@ -709,7 +708,7 @@ impl DataManager {
 
         self.clean_chunk_store();
         // chunk_store::put() deletes the old data automatically.
-        try!(self.chunk_store.put(&data_id, &data));
+        self.chunk_store.put(&data_id, &data)?;
         if got_new_data {
             self.count_added_data(&data_id);
             if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
@@ -735,7 +734,7 @@ impl DataManager {
                           src: XorName,
                           serialised_data_list: &[u8])
                           -> Result<(), InternalError> {
-        let RefreshDataList(data_list) = try!(serialisation::deserialise(serialised_data_list));
+        let RefreshDataList(data_list) = serialisation::deserialise(serialised_data_list)?;
         for data_idv in data_list {
             if self.cache.register_data_with_holder(&src, &data_idv) {
                 continue;
@@ -782,7 +781,7 @@ impl DataManager {
     /// Handles an accumulated refresh message sent from the whole group.
     pub fn handle_group_refresh(&mut self, serialised_refresh: &[u8]) -> Result<(), InternalError> {
         let RefreshData((data_id, version), refresh_hash) =
-            try!(serialisation::deserialise(serialised_refresh));
+            serialisation::deserialise(serialised_refresh)?;
         for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in self.cache
             .take_pending_writes(&data_id) {
             if hash == refresh_hash {
@@ -793,7 +792,7 @@ impl DataManager {
                            error);
                     let error = MutationError::NetworkOther(format!("Failed to store chunk: {:?}",
                                                                     error));
-                    try!(self.send_failure(mutate_type, src, dst, data_id, message_id, error));
+                    self.send_failure(mutate_type, src, dst, data_id, message_id, error)?;
                 } else {
                     trace!("DM updated for: {:?}", data_id);
                     let _ = match mutate_type {
@@ -828,7 +827,7 @@ impl DataManager {
             } else {
                 trace!("{:?} did not accumulate. Sending failure", data_id);
                 let error = MutationError::NetworkOther("Concurrent modification.".to_owned());
-                try!(self.send_failure(mutate_type, src, dst, data.identifier(), message_id, error));
+                self.send_failure(mutate_type, src, dst, data.identifier(), message_id, error)?;
             }
         }
         Ok(())
@@ -842,8 +841,8 @@ impl DataManager {
                     message_id: MessageId,
                     error: MutationError)
                     -> Result<(), InternalError> {
-        let write_error = try!(serialisation::serialise(&error));
-        Ok(try!(match mutate_type {
+        let write_error = serialisation::serialise(&error)?;
+        Ok(match mutate_type {
             PendingMutationType::Append => {
                 self.routing_node.send_append_failure(dst, src, data_id, write_error, message_id)
             }
@@ -856,7 +855,7 @@ impl DataManager {
             PendingMutationType::Delete => {
                 self.routing_node.send_delete_failure(dst, src, data_id, write_error, message_id)
             }
-        }))
+        }?)
     }
 
     fn update_pending_writes(&mut self,
@@ -871,7 +870,7 @@ impl DataManager {
             let data_id = data.identifier();
             let error = MutationError::NetworkOther("Request expired.".to_owned());
             trace!("{:?} did not accumulate. Sending failure", data_id);
-            try!(self.send_failure(mutate_type, src, dst, data_id, message_id, error));
+            self.send_failure(mutate_type, src, dst, data_id, message_id, error)?;
         }
         let data_name = *data.name();
         if let Some(refresh_data) = self.cache
@@ -882,7 +881,7 @@ impl DataManager {
     }
 
     fn send_gets_for_needed_data(&mut self) -> Result<(), InternalError> {
-        let src = Authority::ManagedNode(try!(self.routing_node.name()));
+        let src = Authority::ManagedNode(self.routing_node.name()?);
         let candidates = self.cache.needed_data();
         for (idle_holder, data_idv) in candidates {
             if let Ok(Some(group)) = self.routing_node.close_group(*data_idv.0.name()) {
@@ -1072,7 +1071,7 @@ impl DataManager {
                     dst: Authority,
                     data_list: Vec<IdAndVersion>)
                     -> Result<(), InternalError> {
-        let src = Authority::ManagedNode(try!(self.routing_node.name()));
+        let src = Authority::ManagedNode(self.routing_node.name()?);
         // FIXME - We need to handle >2MB chunks
         match serialisation::serialise(&RefreshDataList(data_list)) {
             Ok(serialised_list) => {
