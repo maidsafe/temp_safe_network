@@ -239,7 +239,7 @@ impl MaidManager {
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete = self.request_cache
             .iter()
-            .filter(|&(_, &(ref src, _))| accounts_to_delete.contains(src.name()))
+            .filter(|&(_, &(ref src, _))| accounts_to_delete.contains(&src.name()))
             .map(|(msg_id, _)| *msg_id)
             .collect_vec();
         for msg_id in msg_ids_to_delete {
@@ -298,7 +298,7 @@ impl MaidManager {
         // exist.
         let client_name = utils::client_name(&src);
         if data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
-            if dst.name() != &client_name {
+            if dst.name() != client_name {
                 trace!("Cannot create account for {:?} as {:?}.", src, dst);
                 let error = MutationError::InvalidOperation;
                 self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error)?;

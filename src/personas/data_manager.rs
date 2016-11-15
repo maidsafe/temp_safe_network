@@ -432,6 +432,7 @@ impl DataManager {
                       message_id: MessageId)
                       -> Result<(), InternalError> {
         let data_id = data.identifier();
+        let mut valid = true;
 
         if self.chunk_store.has(&data_id) {
             match data_id {
@@ -439,31 +440,22 @@ impl DataManager {
                 DataIdentifier::PrivAppendable(..) |
                 DataIdentifier::Structured(..) => {
                     let old_data_result = self.chunk_store.get(&data_id);
-                    let overwrite_deleted = match (old_data_result, &data) {
+                    valid = match (old_data_result, &data) {
                         (Ok(Data::Structured(ref old_data)), &Data::Structured(ref new_data)) => {
                             old_data.is_deleted() &&
                             old_data.get_version() + 1 == new_data.get_version()
                         }
                         _ => false,
                     };
-                    if !overwrite_deleted {
-                        let error = MutationError::DataExists;
-                        let external_error_indicator = serialisation::serialise(&error)?;
+                    if !valid {
                         trace!("DM sending PutFailure for data {:?}, it already exists.",
                                data_id);
-                        let _ = self.routing_node
-                            .send_put_failure(dst,
-                                              src,
-                                              data_id,
-                                              external_error_indicator,
-                                              message_id);
-                        return Err(From::from(error));
                     }
                 }
                 DataIdentifier::Immutable(..) => {
                     trace!("DM sending PutSuccess for data {:?}, it already exists.",
                            data_id);
-                    let _ = self.routing_node.send_put_success(dst, src, data_id, message_id);
+                    self.routing_node.send_put_success(dst, src, data_id, message_id)?;
                     return Ok(());
                 }
             }
@@ -471,14 +463,26 @@ impl DataManager {
 
         self.clean_chunk_store();
 
-        if self.chunk_store_full() {
-            let error = MutationError::NetworkFull;
+        let is_full = self.chunk_store_full();
+
+        let error_opt = if !valid {
+            Some(MutationError::DataExists)
+        } else if is_full {
+            Some(MutationError::NetworkFull)
+        } else {
+            None
+        };
+
+        if let Some(error) = error_opt {
             let external_error_indicator = serialisation::serialise(&error)?;
-            let _ = self.routing_node
-                .send_put_failure(dst, src, data_id, external_error_indicator, message_id);
-            return Err(From::from(error));
+            self.routing_node
+                .send_put_failure(dst, src, data_id, external_error_indicator, message_id)?;
+            if is_full {
+                return Err(From::from(error));
+            }
         }
-        self.update_pending_writes(data, PendingMutationType::Put, src, dst, message_id)
+
+        self.update_pending_writes(data, PendingMutationType::Put, src, dst, message_id, valid)
     }
 
     /// Handles a Post request for structured or appendable data.
@@ -499,45 +503,43 @@ impl DataManager {
                 .send_post_failure(dst, src, data_id, post_error, message_id)?);
         }
 
+        let mut error_opt = None;
         let update_result = match (new_data, self.chunk_store.get(&data_id)) {
-            (_, Err(error)) => {
-                trace!("DM sending post_failure for: {:?} with {:?} - {:?}",
-                       data_id,
-                       message_id,
-                       error);
-                let post_error = serialisation::serialise(&MutationError::NoSuchData)?;
-                return Ok(self.routing_node
-                    .send_post_failure(dst, src, data_id, post_error, message_id)?);
+            (Data::Structured(new_sd), Err(_)) => {
+                    warn!("Post operation for nonexistent data. {:?} - {:?}",
+                          data_id,
+                          message_id);
+                    error_opt = Some(MutationError::NoSuchData);
+                    Ok(Data::Structured(new_sd))
             }
+            (_, Err(_)) => Err(MutationError::NoSuchData),
             (Data::Structured(new_sd), Ok(Data::Structured(mut sd))) => {
                 if sd.is_deleted() {
                     warn!("Post operation for deleted data. {:?} - {:?}",
                           data_id,
                           message_id);
-                    let post_error = serialisation::serialise(&MutationError::InvalidOperation)?;
-                    return Ok(self.routing_node
-                        .send_post_failure(dst, src, data_id, post_error, message_id)?);
+                    error_opt = Some(MutationError::InvalidOperation);
+                } else if sd.replace_with_other(new_sd.clone()).is_err() {
+                    error_opt = Some(MutationError::InvalidSuccessor);
                 }
-                let result = sd.replace_with_other(new_sd);
-                result.map(|()| Data::Structured(sd))
+                Ok(Data::Structured(new_sd))
             }
-            (Data::PubAppendable(new_ad), Ok(Data::PubAppendable(mut ad))) => {
-                let result = ad.update_with_other(new_ad);
-                result.map(|()| Data::PubAppendable(ad))
-            }
-            (Data::PrivAppendable(new_ad), Ok(Data::PrivAppendable(mut ad))) => {
-                let result = ad.update_with_other(new_ad);
-                result.map(|()| Data::PrivAppendable(ad))
-            }
+            (Data::PubAppendable(new_ad), Ok(Data::PubAppendable(mut ad))) =>
+                ad.update_with_other(new_ad)
+                  .map(|()| Data::PubAppendable(ad))
+                  .map_err(|_| MutationError::InvalidSuccessor),
+            (Data::PrivAppendable(new_ad), Ok(Data::PrivAppendable(mut ad))) =>
+                ad.update_with_other(new_ad)
+                  .map(|()| Data::PrivAppendable(ad))
+                  .map_err(|_| MutationError::InvalidSuccessor),
             (_, Ok(_)) => {
                 warn!("Post operation for Invalid Data Type. {:?} - {:?}",
                       data_id,
                       message_id);
-                let post_error = serialisation::serialise(&MutationError::InvalidOperation)?;
-                return Ok(self.routing_node
-                    .send_post_failure(dst, src, data_id, post_error, message_id)?);
+                Err(MutationError::InvalidOperation)
             }
         };
+
         let data = match update_result {
             Ok(data) => data,
             Err(error) => {
@@ -545,12 +547,22 @@ impl DataManager {
                        data_id,
                        message_id,
                        error);
-                let post_error = serialisation::serialise(&MutationError::InvalidSuccessor)?;
+                let post_error = serialisation::serialise(&error)?;
                 return Ok(self.routing_node
-                    .send_post_failure(dst, src, data_id, post_error, message_id)?);
+                              .send_post_failure(dst, src, data_id, post_error, message_id)?);
             }
         };
-        self.update_pending_writes(data, PendingMutationType::Post, src, dst, message_id)
+
+        if let Some(ref error) = error_opt {
+            let post_error = serialisation::serialise(error)?;
+            self.routing_node.send_post_failure(dst, src, data_id, post_error, message_id)?;
+        }
+        self.update_pending_writes(data,
+                                   PendingMutationType::Post,
+                                   src,
+                                   dst,
+                                   message_id,
+                                   error_opt.is_none())
     }
 
     /// The structured_data in the delete request must be a valid updating version of the target
@@ -562,26 +574,31 @@ impl DataManager {
                          -> Result<(), InternalError> {
         let data_id = new_data.identifier();
 
-        let error = match self.chunk_store.get(&data_id) {
+        let error_opt = match self.chunk_store.get(&data_id) {
             Ok(Data::Structured(mut data)) => {
-                if data.is_deleted() {
-                    MutationError::InvalidOperation
+                let error_opt = if data.is_deleted() {
+                    Some(MutationError::InvalidOperation)
                 } else if data.delete_if_valid_successor(&new_data).is_ok() {
-                    return self.update_pending_writes(Data::Structured(data),
-                                                      PendingMutationType::Delete,
-                                                      src,
-                                                      dst,
-                                                      message_id);
+                    None
                 } else {
-                    MutationError::InvalidSuccessor
-                }
+                    Some(MutationError::InvalidSuccessor)
+                };
+                self.update_pending_writes(Data::Structured(data),
+                                           PendingMutationType::Delete,
+                                           src,
+                                           dst,
+                                           message_id,
+                                           error_opt.is_none())?;
+                error_opt
             }
-            Ok(_) => MutationError::InvalidOperation,
-            Err(_) => MutationError::NoSuchData,
+            Ok(_) => Some(MutationError::InvalidOperation),
+            Err(_) => Some(MutationError::NoSuchData),
         };
-        trace!("DM sending delete_failure for {:?}", new_data.identifier());
-        let err_data = serialisation::serialise(&error)?;
-        self.routing_node.send_delete_failure(dst, src, data_id, err_data, message_id)?;
+        if let Some(error) = error_opt {
+            trace!("DM sending delete_failure for {:?}", new_data.identifier());
+            let err_data = serialisation::serialise(&error)?;
+            self.routing_node.send_delete_failure(dst, src, data_id, err_data, message_id)?;
+        }
         Ok(())
     }
 
@@ -633,7 +650,12 @@ impl DataManager {
                 return Ok(self.routing_node
                     .send_append_failure(dst, src, data_id, append_error, message_id)?);
             }
-            self.update_pending_writes(data, PendingMutationType::Append, src, dst, message_id)
+            self.update_pending_writes(data,
+                                       PendingMutationType::Append,
+                                       src,
+                                       dst,
+                                       message_id,
+                                       true)
         } else {
             trace!("DM sending append_failure for: {:?} with {:?}",
                    data_id,
@@ -863,7 +885,8 @@ impl DataManager {
                              mutate_type: PendingMutationType,
                              src: Authority<XorName>,
                              dst: Authority<XorName>,
-                             message_id: MessageId)
+                             message_id: MessageId,
+                             refresh: bool)
                              -> Result<(), InternalError> {
         for PendingWrite { mutate_type, src, dst, data, message_id, .. } in
             self.cache.remove_expired_writes() {
@@ -873,9 +896,12 @@ impl DataManager {
             self.send_failure(mutate_type, src, dst, data_id, message_id, error)?;
         }
         let data_name = *data.name();
+
         if let Some(refresh_data) =
             self.cache.insert_pending_write(data, mutate_type, src, dst, message_id) {
-            let _ = self.send_group_refresh(data_name, refresh_data, message_id);
+            if refresh {
+                let _ = self.send_group_refresh(data_name, refresh_data, message_id);
+            }
         }
         Ok(())
     }
