@@ -8,7 +8,7 @@ environment:
 #    - RUST_VERSION: nightly
 branches:
   only:
-    - dev
+    - mutable-data
 
 clone_depth: 50
 
