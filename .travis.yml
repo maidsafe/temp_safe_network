@@ -16,7 +16,7 @@ matrix:
 sudo: false
 branches:
   only:
-    - dev
+    - mutable-data
 cache:
   cargo: true
   directories:
