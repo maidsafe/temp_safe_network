@@ -506,11 +506,11 @@ impl DataManager {
         let mut error_opt = None;
         let update_result = match (new_data, self.chunk_store.get(&data_id)) {
             (Data::Structured(new_sd), Err(_)) => {
-                    warn!("Post operation for nonexistent data. {:?} - {:?}",
-                          data_id,
-                          message_id);
-                    error_opt = Some(MutationError::NoSuchData);
-                    Ok(Data::Structured(new_sd))
+                warn!("Post operation for nonexistent data. {:?} - {:?}",
+                      data_id,
+                      message_id);
+                error_opt = Some(MutationError::NoSuchData);
+                Ok(Data::Structured(new_sd))
             }
             (_, Err(_)) => Err(MutationError::NoSuchData),
             (Data::Structured(new_sd), Ok(Data::Structured(mut sd))) => {
@@ -549,7 +549,7 @@ impl DataManager {
                        error);
                 let post_error = serialisation::serialise(&error)?;
                 return Ok(self.routing_node
-                              .send_post_failure(dst, src, data_id, post_error, message_id)?);
+                    .send_post_failure(dst, src, data_id, post_error, message_id)?);
             }
         };
 
@@ -804,6 +804,7 @@ impl DataManager {
     pub fn handle_group_refresh(&mut self, serialised_refresh: &[u8]) -> Result<(), InternalError> {
         let RefreshData((data_id, version), refresh_hash) =
             serialisation::deserialise(serialised_refresh)?;
+        let mut success = false;
         for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in
             self.cache.take_pending_writes(&data_id) {
             if hash == refresh_hash {
@@ -845,11 +846,21 @@ impl DataManager {
                     };
                     let data_list = vec![(data_id, version)];
                     let _ = self.send_refresh(Authority::NaeManager(*data_id.name()), data_list);
+                    success = true;
                 }
             } else {
                 trace!("{:?} did not accumulate. Sending failure", data_id);
                 let error = MutationError::NetworkOther("Concurrent modification.".to_owned());
                 self.send_failure(mutate_type, src, dst, data.identifier(), message_id, error)?;
+            }
+        }
+        if !success {
+            if let Ok(Some(group)) = self.routing_node.close_group(*data_id.name(), GROUP_SIZE) {
+                let data_idv = (data_id, version);
+                for node in &group {
+                    let _ = self.cache.register_data_with_holder(node, &data_idv);
+                }
+                self.send_gets_for_needed_data()?;
             }
         }
         Ok(())
