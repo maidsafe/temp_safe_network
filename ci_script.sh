@@ -8,8 +8,14 @@ set -o errtrace
 trap 'exit' ERR
 
 if [[ $APPVEYOR = true ]]; then
+  echo "Appveyor Folder ----"
+  echo $APPVEYOR_BUILD_FOLDER
   cd $APPVEYOR_BUILD_FOLDER
+  echo "ABCD Folder ----"
+  echo $ABCD
+  echo "ASDF Folder ${ASDF}----"
 else
+  echo "Into Travis ----"
   cd $TRAVIS_BUILD_DIR
 fi
 
