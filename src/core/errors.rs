@@ -21,6 +21,7 @@
 
 use core::SelfEncryptionStorageError;
 use maidsafe_utilities::serialisation::SerialisationError;
+use routing::{ClientError, DataIdentifier};
 use routing::messaging;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
