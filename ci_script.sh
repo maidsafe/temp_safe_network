@@ -7,16 +7,16 @@ set -x
 set -o errtrace
 trap 'exit' ERR
 
-if [[ $APPVEYOR = true ]]; then
+if [[ $TRAVIS = true ]]; then
+  echo "Into Travis ----"
+  cd $TRAVIS_BUILD_DIR
+else
   echo "Appveyor Folder ----"
   echo $APPVEYOR_BUILD_FOLDER
   cd $APPVEYOR_BUILD_FOLDER
   echo "ABCD Folder ----"
   echo $ABCD
   echo "ASDF Folder ${ASDF}----"
-else
-  echo "Into Travis ----"
-  cd $TRAVIS_BUILD_DIR
 fi
 
 if [[ ! $TRAVIS_RUST_VERSION = nightly ]]; then
