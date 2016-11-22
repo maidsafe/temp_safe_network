@@ -110,7 +110,7 @@ impl MockRouting {
 
         self.send_response(GET_ACCOUNT_INFO_DELAY_MS,
                            dst,
-                           self.client_auth.clone(),
+                           self.client_auth,
                            Response::GetAccountInfo {
                                res: res,
                                msg_id: msg_id,
@@ -156,7 +156,7 @@ impl MockRouting {
         let nae_auth = Authority::NaeManager(data_name);
         self.send_response(PUT_IDATA_DELAY_MS,
                            nae_auth,
-                           self.client_auth.clone(),
+                           self.client_auth,
                            Response::PutIData {
                                res: res,
                                msg_id: msg_id,
@@ -186,7 +186,7 @@ impl MockRouting {
         let nae_auth = Authority::NaeManager(name);
         self.send_response(GET_IDATA_DELAY_MS,
                            nae_auth,
-                           self.client_auth.clone(),
+                           self.client_auth,
                            Response::GetIData {
                                res: res,
                                msg_id: msg_id,
@@ -228,7 +228,7 @@ impl MockRouting {
         let nae_auth = Authority::NaeManager(data_name);
         self.send_response(PUT_MDATA_DELAY_MS,
                            nae_auth,
-                           self.client_auth.clone(),
+                           self.client_auth,
                            Response::PutMData {
                                res: res,
                                msg_id: msg_id,
@@ -406,7 +406,7 @@ impl MockRouting {
                             // TODO: better ClientError variant
                             data.user_permissions(&user)
                                 .cloned()
-                                .ok_or(ClientError::from("User not found"))
+                                .ok_or_else(|| ClientError::from("User not found"))
                         },
                         |res| {
                             Response::ListMDataUserPermissions {
@@ -578,7 +578,7 @@ impl MockRouting {
         };
 
         let nae_auth = Authority::NaeManager(name);
-        self.send_response(delay_ms, nae_auth, self.client_auth.clone(), g(res));
+        self.send_response(delay_ms, nae_auth, self.client_auth, g(res));
         Ok(())
     }
 
@@ -641,15 +641,15 @@ fn update_account_info(storage: &mut Storage, client_name: &XorName) {
 #[cfg(test)]
 mod tests {
     use core::utility;
+    use rand;
     use routing::{AccountInfo, Authority, ClientError, Event, FullId, ImmutableData, MessageId,
-                  Response};
+                  MutableData, Response};
     use std::sync::mpsc::{self, Receiver};
     use super::*;
     use super::storage::DEFAULT_CLIENT_ACCOUNT_SIZE;
 
     /*
     use maidsafe_utilities::serialisation::{deserialise, serialise};
-    use rand;
     use routing::{AppendWrapper, AppendedData, Data, DataIdentifier, Filter,
                   PubAppendableData, StructuredData,
                   XOR_NAME_LEN, XorName};
@@ -699,9 +699,19 @@ mod tests {
         }
     }
 
+    macro_rules! btree_set {
+        ($($item:expr),*) => {{
+            let mut set = ::std::collections::BTreeSet::new();
+            $(
+                let _ = set.insert($item);
+            )*
+            set
+        }}
+    }
+
     #[test]
     fn immutable_data_basics() {
-        let (mut routing, routing_rx) = setup();
+        let (mut routing, routing_rx, _) = setup();
 
         // Construct ImmutableData
         let orig_data = ImmutableData::new(unwrap!(utility::generate_random_vector(100)));
@@ -728,7 +738,7 @@ mod tests {
         assert_eq!(got_data, orig_data);
 
         // GetAccountInfo should pass and show one chunk stored
-        let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr.clone());
+        let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr);
         assert_eq!(account_info.data_stored, 1);
         assert_eq!(account_info.space_available,
                    DEFAULT_CLIENT_ACCOUNT_SIZE - 1);
@@ -746,19 +756,34 @@ mod tests {
 
 
         // GetAccountInfo should pass and show two chunks stored
-        let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr.clone());
+        let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr);
         assert_eq!(account_info.data_stored, 2);
         assert_eq!(account_info.space_available,
                    DEFAULT_CLIENT_ACCOUNT_SIZE - 2);
     }
 
+    /*
     #[test]
-    fn mutable_data_basics() {}
+    fn mutable_data_basics() {
+        let (mut routing, routing_rx, full_id) = setup();
 
-    fn setup() -> (MockRouting, Receiver<Event>) {
+        // Construct MutableData
+        let name = rand::random();
+        let tag = 1000u64;
+        let owner_key = *full_id.public_id().signing_public_key();
+
+        let data = unwrap!(MutableData::new(name,
+                                            tag,
+                                            Default::default(),
+                                            Default::default(),
+                                            btree_set!(owner_key)));
+    }
+    */
+
+    fn setup() -> (MockRouting, Receiver<Event>, FullId) {
         let full_id = FullId::new();
         let (routing_tx, routing_rx) = mpsc::channel();
-        let mut routing = unwrap!(MockRouting::new(routing_tx, Some(full_id)));
+        let mut routing = unwrap!(MockRouting::new(routing_tx, Some(full_id.clone())));
 
         // Wait until connection is established.
         match unwrap!(routing_rx.recv()) {
@@ -766,7 +791,7 @@ mod tests {
             e => panic!("Unexpected event {:?}", e),
         }
 
-        (routing, routing_rx)
+        (routing, routing_rx, full_id)
     }
 
     fn do_get_account_info(routing: &mut MockRouting,

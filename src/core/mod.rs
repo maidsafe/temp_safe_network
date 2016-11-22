@@ -31,9 +31,9 @@ pub mod id;
 pub mod utility;
 /// Implements the Self Encryption storage trait
 pub mod self_encryption_storage;
-/// Helper functions to handle ImmutableData related operations
+/// Helper functions to handle `ImmutableData` related operations
 // pub mod immutable_data;
-/// Helper functions to handle StructuredData related operations
+/// Helper functions to handle `StructuredData` related operations
 // pub mod structured_data;
 
 // pub use self::client::Client;
@@ -46,15 +46,14 @@ pub use self::self_encryption_storage::SelfEncryptionStorageError;
 
 /// Future trait returned from core operations.
 // pub type CoreFuture<T> = Future<Item = T, Error = CoreError>;
-/// NetworkEvent receiver stream.
+/// `NetworkEvent` receiver stream.
 // pub type NetworkRx = channel::Receiver<NetworkEvent>;
-/// NetworkEvent transmitter.
+/// `NetworkEvent` transmitter.
 // pub type NetworkTx = channel::Sender<NetworkEvent>;
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;
-/// All StructuredData tagging should positive-offset from this if the
-/// operation needs to go
-/// through this safe_core crate
+/// All `StructuredData` tagging should positive-offset from this if the
+/// operation needs to go through this crate
 // pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;
 
 mod client;

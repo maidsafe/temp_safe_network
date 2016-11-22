@@ -47,7 +47,7 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
                                    option_unwrap_used))]
-#![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))] // TODO: Fix doc_markdown errors.
+#![cfg_attr(feature="clippy", allow(use_debug, too_many_arguments))]
 
 // extern crate config_file_handler;
 // extern crate futures;
@@ -78,7 +78,7 @@ pub mod core;
 // pub mod dns;
 /// Ffi module;
 // pub mod ffi;
-/// Unversioned StructuredData
+/// Unversioned `StructuredData`
 pub const UNVERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 500;
-/// Versioned StructuredData
+/// Versioned `StructuredData`
 pub const VERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 501;
