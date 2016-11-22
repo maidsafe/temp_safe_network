@@ -407,15 +407,15 @@ impl Error for CoreError {
 
 #[cfg(test)]
 mod tests {
-    // use core::SelfEncryptionStorageError;
-    // use rand;
-    // use routing::{ClientError, DataIdentifier};
-    // use self_encryption::SelfEncryptionError;
-    // use super::*;
+    /*
+    use core::SelfEncryptionStorageError;
+    use rand;
+    use routing::{ClientError, DataIdentifier};
+    use self_encryption::SelfEncryptionError;
+    use super::*;
 
     #[test]
     fn self_encryption_error() {
-        /*
         let id = rand::random();
         let core_err_0 = CoreError::MutationFailure {
             data_id: DataIdentifier::Structured(id, 10000),
@@ -431,8 +431,6 @@ mod tests {
 
         assert_eq!(Into::<i32>::into(core_err_1),
                    Into::<i32>::into(core_from_se_err));
-        */
-
-        unimplemented!()
     }
+    */
 }
