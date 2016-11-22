@@ -19,12 +19,14 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+#![allow(unused)] // <-- TODO: remove this
+
+
 mod storage;
 // use maidsafe_utilities::serialisation::serialise;
 
 use maidsafe_utilities::thread;
 use rand;
-// use routing::{DataIdentifier, Request};
 use routing::{Authority, ClientError, Data, EntryAction, Event, FullId, ImmutableData,
               InterfaceError, MessageId, MutableData, PermissionSet, Response, RoutingError, User,
               XorName};
@@ -35,7 +37,7 @@ use rust_sodium::crypto::sign;
 use self::storage::{Storage, StorageError};
 use std;
 use std::cell::Cell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
@@ -45,10 +47,18 @@ const DELAY_THREAD_NAME: &'static str = "Mock routing delay";
 
 const DEFAULT_DELAY_MS: u64 = 0;
 const CONNECT_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+
 const GET_ACCOUNT_INFO_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const PUT_IDATA_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const GET_IDATA_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+
 const PUT_MDATA_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+const GET_MDATA_VERSION_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+const GET_MDATA_ENTRIES_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+const SET_MDATA_ENTRIES_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+const GET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+const SET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+const CHANGE_MDATA_OWNER_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 
 lazy_static! {
     static ref STORAGE: Mutex<Storage> = Mutex::new(Storage::new());
@@ -237,7 +247,17 @@ impl MockRouting {
                              tag: u64,
                              msg_id: MessageId)
                              -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.read_mdata(name,
+                        msg_id,
+                        "get_mdata_version",
+                        GET_MDATA_VERSION_DELAY_MS,
+                        |data| Ok(data.version()),
+                        |res| {
+                            Response::GetMDataVersion {
+                                res: res,
+                                msg_id: msg_id,
+                            }
+                        })
     }
 
     /// Fetches a list of entries (keys + values).
@@ -247,7 +267,17 @@ impl MockRouting {
                               tag: u64,
                               msg_id: MessageId)
                               -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.read_mdata(name,
+                        msg_id,
+                        "list_mdata_entries",
+                        GET_MDATA_ENTRIES_DELAY_MS,
+                        |data| Ok(data.entries().clone()),
+                        |res| {
+                            Response::ListMDataEntries {
+                                res: res,
+                                msg_id: msg_id,
+                            }
+                        })
     }
 
     /// Fetches a list of keys in MutableData.
@@ -257,7 +287,20 @@ impl MockRouting {
                            tag: u64,
                            msg_id: MessageId)
                            -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.read_mdata(name,
+                        msg_id,
+                        "list_mdata_keys",
+                        GET_MDATA_ENTRIES_DELAY_MS,
+                        |data| {
+                            let keys = data.keys().into_iter().cloned().collect();
+                            Ok(keys)
+                        },
+                        |res| {
+                            Response::ListMDataKeys {
+                                res: res,
+                                msg_id: msg_id,
+                            }
+                        })
     }
 
     /// Fetches a list of values in MutableData.
@@ -267,7 +310,20 @@ impl MockRouting {
                              tag: u64,
                              msg_id: MessageId)
                              -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.read_mdata(name,
+                        msg_id,
+                        "list_mdata_values",
+                        GET_MDATA_ENTRIES_DELAY_MS,
+                        |data| {
+                            let values = data.values().into_iter().cloned().collect();
+                            Ok(values)
+                        },
+                        |res| {
+                            Response::ListMDataValues {
+                                res: res,
+                                msg_id: msg_id,
+                            }
+                        })
     }
 
     /// Fetches a single value from MutableData
@@ -278,7 +334,22 @@ impl MockRouting {
                            key: Vec<u8>,
                            msg_id: MessageId)
                            -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.read_mdata(name,
+                        msg_id,
+                        "get_mdata_value",
+                        GET_MDATA_ENTRIES_DELAY_MS,
+                        |data| {
+                            // TODO: better error variant
+                            data.get(&key)
+                                .cloned()
+                                .ok_or_else(|| ClientError::from("Entry not found"))
+                        },
+                        |res| {
+                            Response::GetMDataValue {
+                                res: res,
+                                msg_id: msg_id,
+                            }
+                        })
     }
 
     /// Updates MutableData entries in bulk.
@@ -290,7 +361,20 @@ impl MockRouting {
                                 msg_id: MessageId,
                                 requester: sign::PublicKey)
                                 -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.mutate_mdata(name,
+                          msg_id,
+                          "mutate_mdata_entries",
+                          SET_MDATA_ENTRIES_DELAY_MS,
+                          |data| {
+                              data.mutate_entries(actions, requester)
+                                  .map_err(|err| ClientError::from(format!("{:?}", err)))
+                          },
+                          |res| {
+                              Response::MutateMDataEntries {
+                                  res: res,
+                                  msg_id: msg_id,
+                              }
+                          })
     }
 
     /// Fetches a complete list of permissions.
@@ -300,7 +384,17 @@ impl MockRouting {
                                   tag: u64,
                                   msg_id: MessageId)
                                   -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.read_mdata(name,
+                        msg_id,
+                        "list_mdata_permissions",
+                        GET_MDATA_PERMISSIONS_DELAY_MS,
+                        |data| Ok(data.permissions().clone()),
+                        |res| {
+                            Response::ListMDataPermissions {
+                                res: res,
+                                msg_id: msg_id,
+                            }
+                        })
     }
 
     /// Fetches a list of permissions for a particular User.
@@ -311,7 +405,23 @@ impl MockRouting {
                                        user: User,
                                        msg_id: MessageId)
                                        -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.read_mdata(name,
+                        msg_id,
+                        "list_mdata_user_permissions",
+                        GET_MDATA_PERMISSIONS_DELAY_MS,
+                        // TODO: data doesn't need to be mut here
+                        |mut data| {
+                            // TODO: better ClientError variant
+                            data.user_permissions(&user)
+                                .cloned()
+                                .ok_or(ClientError::from("User not found"))
+                        },
+                        |res| {
+                            Response::ListMDataUserPermissions {
+                                res: res,
+                                msg_id: msg_id,
+                            }
+                        })
     }
 
     /// Updates or inserts a list of permissions for a particular User in the given
@@ -326,7 +436,20 @@ impl MockRouting {
                                       msg_id: MessageId,
                                       requester: sign::PublicKey)
                                       -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.mutate_mdata(name,
+                          msg_id,
+                          "set_mdata_user_permissions",
+                          SET_MDATA_PERMISSIONS_DELAY_MS,
+                          |data| {
+                              data.set_user_permissions(user, permissions, version, requester)
+                                  .map_err(|err| ClientError::from(format!("{:?}", err)))
+                          },
+                          |res| {
+                              Response::SetMDataUserPermissions {
+                                  res: res,
+                                  msg_id: msg_id,
+                              }
+                          })
     }
 
     /// Deletes a list of permissions for a particular User in the given MutableData.
@@ -339,7 +462,21 @@ impl MockRouting {
                                       msg_id: MessageId,
                                       requester: sign::PublicKey)
                                       -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.mutate_mdata(name,
+                          msg_id,
+                          "del_mdata_user_permissions",
+                          SET_MDATA_PERMISSIONS_DELAY_MS,
+                          |data| {
+                              // TODO: better ClientError variant
+                              data.del_user_permissions(&user, version, requester)
+                                  .map_err(|err| ClientError::from(format!("{:?}", err)))
+                          },
+                          |res| {
+                              Response::DelMDataUserPermissions {
+                                  res: res,
+                                  msg_id: msg_id,
+                              }
+                          })
     }
 
     /// Changes an owner of the given MutableData. Only the current owner can perform this action.
@@ -347,11 +484,26 @@ impl MockRouting {
                               dst: Authority,
                               name: XorName,
                               tag: u64,
-                              new_owners: BTreeSet<sign::PublicKey>,
+                              new_owner: sign::PublicKey,
                               version: u64,
-                              msg_id: MessageId)
+                              msg_id: MessageId,
+                              requester: sign::PublicKey)
                               -> Result<(), InterfaceError> {
-        unimplemented!()
+        self.mutate_mdata(name,
+                          msg_id,
+                          "change_mdata_owner",
+                          CHANGE_MDATA_OWNER_DELAY_MS,
+                          |data| {
+                              // TODO: better ClientError variant
+                              data.change_owner(new_owner, version, requester)
+                                  .map_err(|err| ClientError::from(format!("{:?}", err)))
+                          },
+                          |res| {
+                              Response::ChangeMDataOwner {
+                                  res: res,
+                                  msg_id: msg_id,
+                              }
+                          })
     }
 
     fn send_response(&self, delay_ms: u64, src: Authority, dst: Authority, response: Response) {
@@ -376,6 +528,79 @@ impl MockRouting {
             Authority::Client { ref client_key, .. } => XorName(sha256::hash(&client_key[..]).0),
             _ => panic!("This authority must be Client"),
         }
+    }
+
+    fn read_mdata<F, G, R>(&self,
+                           name: XorName,
+                           msg_id: MessageId,
+                           log_label: &str,
+                           delay_ms: u64,
+                           f: F,
+                           g: G)
+                           -> Result<(), InterfaceError>
+        where F: FnOnce(MutableData) -> Result<R, ClientError>,
+              G: FnOnce(Result<R, ClientError>) -> Response
+    {
+        self.with_mdata(name, msg_id, log_label, delay_ms, |data, _| f(data), g)
+    }
+
+    fn mutate_mdata<F, G, R>(&self,
+                             name: XorName,
+                             msg_id: MessageId,
+                             log_label: &str,
+                             delay_ms: u64,
+                             f: F,
+                             g: G)
+                             -> Result<(), InterfaceError>
+        where F: FnOnce(&mut MutableData) -> Result<R, ClientError>,
+              G: FnOnce(Result<R, ClientError>) -> Response
+    {
+        let mutate = |mut data: MutableData, storage: &mut Storage| {
+            f(&mut data)
+                .and_then(|r| {
+                    storage.put_data(name, Data::Mutable(data))
+                        .map_err(ClientError::from)
+                        .map(|_| r)
+                })
+                .map(|r| {
+                    storage.sync();
+                    r
+                })
+        };
+
+        self.with_mdata(name, msg_id, log_label, delay_ms, mutate, g)
+    }
+
+    fn with_mdata<F, G, R>(&self,
+                           name: XorName,
+                           msg_id: MessageId,
+                           log_label: &str,
+                           delay_ms: u64,
+                           f: F,
+                           g: G)
+                           -> Result<(), InterfaceError>
+        where F: FnOnce(MutableData, &mut Storage) -> Result<R, ClientError>,
+              G: FnOnce(Result<R, ClientError>) -> Response
+    {
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
+        // TODO: permission verification
+
+        let res = if let Err(err) = self.verify_network_limits(msg_id, log_label) {
+            Err(err)
+        } else {
+            let mut storage = unwrap!(STORAGE.lock());
+            match storage.get_data(&name) {
+                Ok(Data::Mutable(data)) => f(data, &mut *storage),
+                _ => Err(ClientError::NoSuchData),
+            }
+        };
+
+        let nae_auth = Authority::NaeManager(name);
+        self.send_response(delay_ms, nae_auth, self.client_auth.clone(), g(res));
+        Ok(())
     }
 
     #[cfg(test)]

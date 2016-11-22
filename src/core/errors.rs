@@ -21,7 +21,6 @@
 
 use core::SelfEncryptionStorageError;
 use maidsafe_utilities::serialisation::SerialisationError;
-use routing::{ClientError, DataIdentifier};
 use routing::messaging;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
@@ -408,11 +407,11 @@ impl Error for CoreError {
 
 #[cfg(test)]
 mod tests {
-    use core::SelfEncryptionStorageError;
-    use rand;
-    use routing::{ClientError, DataIdentifier};
-    use self_encryption::SelfEncryptionError;
-    use super::*;
+    // use core::SelfEncryptionStorageError;
+    // use rand;
+    // use routing::{ClientError, DataIdentifier};
+    // use self_encryption::SelfEncryptionError;
+    // use super::*;
 
     #[test]
     fn self_encryption_error() {
