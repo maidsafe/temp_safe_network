@@ -23,6 +23,8 @@ mod account;
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing;
 
+pub use self::account::{ClientKeys, Dir};
+
 /*
 mod routing_el;
 

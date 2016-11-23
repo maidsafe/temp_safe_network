@@ -25,8 +25,6 @@
 /// Helpers to work with futures.
 // #[macro_use]
 // pub mod futures;
-/// Public and Private Id types
-pub mod id;
 /// Utility functions
 pub mod utility;
 /// Implements the Self Encryption storage trait
@@ -37,6 +35,7 @@ pub mod self_encryption_storage;
 // pub mod structured_data;
 
 // pub use self::client::Client;
+pub use self::client::{ClientKeys, Dir};
 // pub use self::core_el::{CoreMsg, CoreMsgRx, CoreMsgTx, TailFuture, run};
 pub use self::errors::{CORE_ERROR_START_RANGE, CoreError};
 
