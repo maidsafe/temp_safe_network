@@ -25,9 +25,8 @@ mod storage;
 use maidsafe_utilities::thread;
 use rand;
 use routing::{Authority, ClientError, Data, EntryAction, Event, FullId, ImmutableData,
-              InterfaceError, MessageId, MutableData, PermissionSet, Response, RoutingError, User,
-              XorName};
-// use routing::TYPE_TAG_SESSION_PACKET;
+              InterfaceError, MessageId, MutableData, PermissionSet, Response, RoutingError,
+              TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use self::storage::{Storage, StorageError};
@@ -212,7 +211,11 @@ impl MockRouting {
         } else {
             let mut storage = unwrap!(STORAGE.lock());
             if storage.contains_data(data.name()) {
-                Err(ClientError::DataExists)
+                if data.tag() == TYPE_TAG_SESSION_PACKET {
+                    Err(ClientError::AccountExists)
+                } else {
+                    Err(ClientError::DataExists)
+                }
             } else {
                 storage.put_data(data_name, Data::Mutable(data))
                     .map_err(ClientError::from)
@@ -244,6 +247,7 @@ impl MockRouting {
                              msg_id: MessageId)
                              -> Result<(), InterfaceError> {
         self.read_mdata(name,
+                        tag,
                         msg_id,
                         "get_mdata_version",
                         GET_MDATA_VERSION_DELAY_MS,
@@ -264,6 +268,7 @@ impl MockRouting {
                               msg_id: MessageId)
                               -> Result<(), InterfaceError> {
         self.read_mdata(name,
+                        tag,
                         msg_id,
                         "list_mdata_entries",
                         GET_MDATA_ENTRIES_DELAY_MS,
@@ -284,6 +289,7 @@ impl MockRouting {
                            msg_id: MessageId)
                            -> Result<(), InterfaceError> {
         self.read_mdata(name,
+                        tag,
                         msg_id,
                         "list_mdata_keys",
                         GET_MDATA_ENTRIES_DELAY_MS,
@@ -307,6 +313,7 @@ impl MockRouting {
                              msg_id: MessageId)
                              -> Result<(), InterfaceError> {
         self.read_mdata(name,
+                        tag,
                         msg_id,
                         "list_mdata_values",
                         GET_MDATA_ENTRIES_DELAY_MS,
@@ -331,6 +338,7 @@ impl MockRouting {
                            msg_id: MessageId)
                            -> Result<(), InterfaceError> {
         self.read_mdata(name,
+                        tag,
                         msg_id,
                         "get_mdata_value",
                         GET_MDATA_ENTRIES_DELAY_MS,
@@ -357,6 +365,7 @@ impl MockRouting {
                                 requester: sign::PublicKey)
                                 -> Result<(), InterfaceError> {
         self.mutate_mdata(name,
+                          tag,
                           msg_id,
                           "mutate_mdata_entries",
                           SET_MDATA_ENTRIES_DELAY_MS,
@@ -377,6 +386,7 @@ impl MockRouting {
                                   msg_id: MessageId)
                                   -> Result<(), InterfaceError> {
         self.read_mdata(name,
+                        tag,
                         msg_id,
                         "list_mdata_permissions",
                         GET_MDATA_PERMISSIONS_DELAY_MS,
@@ -398,6 +408,7 @@ impl MockRouting {
                                        msg_id: MessageId)
                                        -> Result<(), InterfaceError> {
         self.read_mdata(name,
+                        tag,
                         msg_id,
                         "list_mdata_user_permissions",
                         GET_MDATA_PERMISSIONS_DELAY_MS,
@@ -429,6 +440,7 @@ impl MockRouting {
                                       requester: sign::PublicKey)
                                       -> Result<(), InterfaceError> {
         self.mutate_mdata(name,
+                          tag,
                           msg_id,
                           "set_mdata_user_permissions",
                           SET_MDATA_PERMISSIONS_DELAY_MS,
@@ -452,6 +464,7 @@ impl MockRouting {
                                       requester: sign::PublicKey)
                                       -> Result<(), InterfaceError> {
         self.mutate_mdata(name,
+                          tag,
                           msg_id,
                           "del_mdata_user_permissions",
                           SET_MDATA_PERMISSIONS_DELAY_MS,
@@ -475,6 +488,7 @@ impl MockRouting {
                               requester: sign::PublicKey)
                               -> Result<(), InterfaceError> {
         self.mutate_mdata(name,
+                          tag,
                           msg_id,
                           "change_mdata_owner",
                           CHANGE_MDATA_OWNER_DELAY_MS,
@@ -513,6 +527,7 @@ impl MockRouting {
 
     fn read_mdata<F, G, R>(&self,
                            name: XorName,
+                           tag: u64,
                            msg_id: MessageId,
                            log_label: &str,
                            delay_ms: u64,
@@ -522,11 +537,12 @@ impl MockRouting {
         where F: FnOnce(MutableData) -> Result<R, ClientError>,
               G: FnOnce(Result<R, ClientError>) -> Response
     {
-        self.with_mdata(name, msg_id, log_label, delay_ms, |data, _| f(data), g)
+        self.with_mdata(name, tag, msg_id, log_label, delay_ms, |data, _| f(data), g)
     }
 
     fn mutate_mdata<F, G, R>(&self,
                              name: XorName,
+                             tag: u64,
                              msg_id: MessageId,
                              log_label: &str,
                              delay_ms: u64,
@@ -547,11 +563,12 @@ impl MockRouting {
             })
         };
 
-        self.with_mdata(name, msg_id, log_label, delay_ms, mutate, g)
+        self.with_mdata(name, tag, msg_id, log_label, delay_ms, mutate, g)
     }
 
     fn with_mdata<F, G, R>(&self,
                            name: XorName,
+                           tag: u64,
                            msg_id: MessageId,
                            log_label: &str,
                            delay_ms: u64,
@@ -573,7 +590,13 @@ impl MockRouting {
             let mut storage = unwrap!(STORAGE.lock());
             match storage.get_data(&name) {
                 Ok(Data::Mutable(data)) => f(data, &mut *storage),
-                _ => Err(ClientError::NoSuchData),
+                _ => {
+                    if tag == TYPE_TAG_SESSION_PACKET {
+                        Err(ClientError::NoSuchAccount)
+                    } else {
+                        Err(ClientError::NoSuchData)
+                    }
+                }
             }
         };
 
