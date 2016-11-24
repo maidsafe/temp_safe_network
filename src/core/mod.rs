@@ -21,7 +21,7 @@
 
 use futures::Future;
 use futures::sync::mpsc;
-// use tokio_core::channel;
+
 
 /// Helpers to work with futures.
 #[macro_use]
