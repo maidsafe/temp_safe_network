@@ -50,15 +50,15 @@ fn unversioned_struct_data_crud() {
         }))
     };
 
-    let sd_data_id_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_extract_data_id(&session, sd_h, user_data, cb)
-        }))
+    let sd_id_h = unsafe {
+        let clo = |user_data, cb| struct_data_extract_data_id(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     // PUT
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_put(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -68,7 +68,8 @@ fn unversioned_struct_data_crud() {
 
     // Remove SD from the object cache.
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_free(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -77,9 +78,8 @@ fn unversioned_struct_data_crud() {
 
     // GET
     let sd_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_fetch(&session, sd_id_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -88,9 +88,8 @@ fn unversioned_struct_data_crud() {
 
     // Extract Data
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_extract_data(&session, app_h, sd_h, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_0);
 
@@ -112,7 +111,8 @@ fn unversioned_struct_data_crud() {
 
     // POST
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_post(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_post(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -122,7 +122,8 @@ fn unversioned_struct_data_crud() {
 
     // Remove SD from the object cache.
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_free(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -131,9 +132,8 @@ fn unversioned_struct_data_crud() {
 
     // Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_fetch(&session, sd_id_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -142,17 +142,15 @@ fn unversioned_struct_data_crud() {
 
     // Extract Data
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_extract_data(&session, app_h, sd_h, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_1);
 
     // Perform Invalid Operations - should error out
     let result = unsafe {
-        test_utils::call_1(|user_data, cb| {
-            struct_data_num_of_versions(&session, sd_h, user_data, cb)
-        })
+        let clo = |user_data, cb| struct_data_num_of_versions(&session, sd_h, user_data, cb);
+        test_utils::call_1(clo)
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
@@ -163,9 +161,8 @@ fn unversioned_struct_data_crud() {
     }
 
     let result = unsafe {
-        test_utils::call_3(|user_data, cb| {
-            struct_data_nth_version(&session, app_h, sd_h, 0, user_data, cb)
-        })
+        let clo = |user_data, cb| struct_data_nth_version(&session, app_h, sd_h, 0, user_data, cb);
+        test_utils::call_3(clo)
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
@@ -177,32 +174,27 @@ fn unversioned_struct_data_crud() {
 
     // Check SD owners
     let is_owned = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_is_owned(&session, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_is_owned(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
     assert!(is_owned);
 
     let other_session = test_utils::create_session();
 
-    let sd_data_id = test_utils::run_now(&session, move |_, object_cache| {
-        *unwrap!(object_cache.get_data_id(sd_data_id_h))
-    });
+    let sd_id = test_utils::run_now(&session, move |_, oc| *unwrap!(oc.get_data_id(sd_id_h)));
 
-    let other_sd_data_id_h = test_utils::run_now(&other_session, move |_, object_cache| {
-        object_cache.insert_data_id(sd_data_id)
-    });
+
+    let o_sd_id_h = test_utils::run_now(&other_session, move |_, oc| oc.insert_data_id(sd_id));
+
 
     let other_sd_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&other_session, other_sd_data_id_h, user_data, cb)
-        }))
+        let clo = |ud, cb| struct_data_fetch(&other_session, o_sd_id_h, ud, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     let is_owned = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_is_owned(&other_session, other_sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_is_owned(&other_session, other_sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
     assert!(!is_owned);
 
@@ -214,7 +206,8 @@ fn unversioned_struct_data_crud() {
 
     // DELETE
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_delete(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -223,7 +216,8 @@ fn unversioned_struct_data_crud() {
 
     // Re-DELETE should fail
     let result = unsafe {
-        test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_clone_h, user_data, cb))
+        let clo = |user_data, cb| struct_data_delete(&session, sd_clone_h, user_data, cb);
+        test_utils::call_0(clo)
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
@@ -235,9 +229,8 @@ fn unversioned_struct_data_crud() {
 
     // Fetch deleted data is OK
     let sd_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_fetch(&session, sd_id_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -248,9 +241,8 @@ fn unversioned_struct_data_crud() {
 
     // Deleted data should be empty
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_extract_data(&session, app_h, sd_h, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert!(retrieved_content.is_empty());
 
@@ -297,49 +289,42 @@ fn versioned_struct_data_crud() {
         }))
     };
 
-    let sd_data_id_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_extract_data_id(&session, sd_h, user_data, cb)
-        }))
+    let sd_id_h = unsafe {
+        let clo = |user_data, cb| struct_data_extract_data_id(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     // PUT and Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)));
+        unwrap!(test_utils::call_0(|ud, cb| struct_data_put(&session, sd_h, ud, cb)));
 
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)));
+        unwrap!(test_utils::call_0(|ud, cb| struct_data_free(&session, sd_h, ud, cb)));
 
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_1(|ud, cb| struct_data_fetch(&session, sd_id_h, ud, cb)))
     };
 
     // Check content
     let num_versions = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_num_of_versions(&session, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_num_of_versions(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
     assert_eq!(num_versions, 1);
 
     let version = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_version(&session, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_version(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
     assert_eq!(version, 0);
 
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_nth_version(&session, app_h, sd_h, 0, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_nth_version(&session, app_h, sd_h, 0, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_0);
 
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_extract_data(&session, app_h, sd_h, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_0);
 
@@ -360,68 +345,60 @@ fn versioned_struct_data_crud() {
 
     // POST and Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_post(&session, sd_h, user_data, cb)));
+        unwrap!(test_utils::call_0(|ud, cb| struct_data_post(&session, sd_h, ud, cb)));
 
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)));
+        unwrap!(test_utils::call_0(|ud, cb| struct_data_free(&session, sd_h, ud, cb)));
 
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_1(|ud, cb| struct_data_fetch(&session, sd_id_h, ud, cb)))
     };
 
     // Check content
     let num_versions = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_num_of_versions(&session, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_num_of_versions(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
     assert_eq!(num_versions, 2);
 
     let version = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_version(&session, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_version(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
     assert_eq!(version, 1);
 
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_nth_version(&session, app_h, sd_h, 0, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_nth_version(&session, app_h, sd_h, 0, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_0);
 
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_nth_version(&session, app_h, sd_h, 1, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_nth_version(&session, app_h, sd_h, 1, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_1);
 
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_extract_data(&session, app_h, sd_h, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_1);
 
     // DELETE
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_delete(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     // Fetch deleted data is OK
     let sd_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_fetch(&session, sd_id_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     // Deleted data should be empty
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_extract_data(&session, app_h, sd_h, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert!(retrieved_content.is_empty());
 }
@@ -472,28 +449,24 @@ fn client_struct_data_crud() {
         }))
     };
 
-    let sd_data_id_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_extract_data_id(&session, sd_h, user_data, cb)
-        }))
+    let sd_id_h = unsafe {
+        let clo = |user_data, cb| struct_data_extract_data_id(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     // PUT and Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)));
+        unwrap!(test_utils::call_0(|ud, cb| struct_data_put(&session, sd_h, ud, cb)));
 
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)));
+        unwrap!(test_utils::call_0(|ud, cb| struct_data_free(&session, sd_h, ud, cb)));
 
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_1(|ud, cb| struct_data_fetch(&session, sd_id_h, ud, cb)))
     };
 
     // Check content
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_extract_data(&session, app_h, sd_h, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_0);
 
@@ -514,28 +487,24 @@ fn client_struct_data_crud() {
 
     // POST and Fetch
     let sd_h = unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_post(&session, sd_h, user_data, cb)));
+        unwrap!(test_utils::call_0(|ud, cb| struct_data_post(&session, sd_h, ud, cb)));
 
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_free(&session, sd_h, user_data, cb)));
+        unwrap!(test_utils::call_0(|ud, cb| struct_data_free(&session, sd_h, ud, cb)));
 
-        unwrap!(test_utils::call_1(|user_data, cb| {
-            struct_data_fetch(&session, sd_data_id_h, user_data, cb)
-        }))
+        unwrap!(test_utils::call_1(|ud, cb| struct_data_fetch(&session, sd_id_h, ud, cb)))
     };
 
     // Check content
     let retrieved_content = unsafe {
-        unwrap!(test_utils::call_vec_u8(|user_data, cb| {
-            struct_data_extract_data(&session, app_h, sd_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_extract_data(&session, app_h, sd_h, user_data, cb);
+        unwrap!(test_utils::call_vec_u8(clo))
     };
     assert_eq!(retrieved_content, content_1);
 
     // Invalid operations
     let result = unsafe {
-        test_utils::call_1(|user_data, cb| {
-            struct_data_num_of_versions(&session, sd_h, user_data, cb)
-        })
+        let clo = |user_data, cb| struct_data_num_of_versions(&session, sd_h, user_data, cb);
+        test_utils::call_1(clo)
     };
     match result {
         Ok(_) => panic!("Unexpected success"),
@@ -547,7 +516,8 @@ fn client_struct_data_crud() {
 
     // DELETE
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_delete(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 }
 
@@ -581,7 +551,8 @@ fn reclaim() {
 
     // PUT the original SD
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_put(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_put(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -591,15 +562,15 @@ fn reclaim() {
 
     // DELETE it
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| struct_data_delete(&session, sd_h, user_data, cb)))
+        let clo = |user_data, cb| struct_data_delete(&session, sd_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     // Now PUT the cloned one. This should reclaim the deleted data and
     // update the version number properly.
     unsafe {
-        unwrap!(test_utils::call_0(|user_data, cb| {
-            struct_data_put(&session, sd_clone_h, user_data, cb)
-        }))
+        let clo = |user_data, cb| struct_data_put(&session, sd_clone_h, user_data, cb);
+        unwrap!(test_utils::call_0(clo))
     }
 
     test_utils::run_now(&session, move |_, object_cache| {
@@ -617,7 +588,8 @@ fn setup_session() -> (Session, AppHandle, CipherOptHandle) {
 
     // Create cipher opt.
     let cipher_opt_h = unsafe {
-        unwrap!(test_utils::call_1(|user_data, cb| cipher_opt_new_symmetric(&session, user_data, cb)))
+        let clo = |user_data, cb| cipher_opt_new_symmetric(&session, user_data, cb);
+        unwrap!(test_utils::call_1(clo))
     };
 
     (session, app_h, cipher_opt_h)

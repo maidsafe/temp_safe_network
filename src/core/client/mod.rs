@@ -824,7 +824,9 @@ impl Client {
         let duration = self.inner().timeout;
         let timeout = match Timeout::new(duration, &self.inner().el_handle) {
             Ok(timeout) => timeout,
-            Err(err) => return err!(CoreError::Unexpected(format!("Timeout create error: {:?}", err))),
+            Err(err) => {
+                return err!(CoreError::Unexpected(format!("Timeout create error: {:?}", err)))
+            }
         };
 
         let client = self.clone();
@@ -845,7 +847,9 @@ impl Client {
             .into_box()
     }
 
-    fn build_mutation_future(&self, msg_id: MessageId, oneshot: Oneshot<CoreEvent>)
+    fn build_mutation_future(&self,
+                             msg_id: MessageId,
+                             oneshot: Oneshot<CoreEvent>)
                              -> Box<CoreFuture<()>> {
         let fut = oneshot.map_err(|_| CoreError::OperationAborted)
             .and_then(|event| match event {

@@ -145,7 +145,7 @@ impl MockRouting {
                         Self::send(&cloned_sender, event);
                     } else {
                         let err = if let DataIdentifier::Structured(_, TYPE_TAG_SESSION_PACKET) =
-                                         data_id {
+                            data_id {
                             GetError::NoSuchAccount
                         } else {
                             GetError::NoSuchData
