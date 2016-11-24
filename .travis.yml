@@ -20,11 +20,14 @@ branches:
 cache:
   cargo: true
 script:
-    - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
-        (
-          set -x;
-          cargo rustc --verbose --release -- --test -Zno-trans &&
-          cargo test  --verbose --release --features use-mock-routing
-        );
-      fi
-    - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/run_clippy.sh | bash
+  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
+      (
+        set -x;
+        curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/run_rustfmt.sh | bash &&
+        cargo rustc --verbose --release -- --test -Zno-trans &&
+        cargo test  --verbose --release --features use-mock-routing
+      );
+    fi
+  - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/run_clippy.sh | bash
+before_cache:
+  - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/run_cargo_prune.sh | bash
