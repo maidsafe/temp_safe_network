@@ -17,7 +17,15 @@ branches:
   only:
     - master
     - dev
+cache:
+  cargo: true
 script:
-    - cd $TRAVIS_BUILD_DIR
-    - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then (set -x; cargo rustc --verbose -- --test -Zno-trans && cargo test --release --features use-mock-routing --verbose); fi
-    - if [ "${TRAVIS_RUST_VERSION}" = nightly -a "${TRAVIS_OS_NAME}" = linux ]; then (set -x; cargo rustc --features clippy --verbose -- --test -Zno-trans && cargo rustc --features "clippy use-mock-routing" --verbose -- --test -Zno-trans); fi
+    - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
+        (
+          set -x;
+          curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/run_rustfmt.sh | bash &&
+          cargo rustc --verbose --release -- --test -Zno-trans &&
+          cargo test  --verbose --release --features use-mock-routing
+        );
+      fi
+    - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/run_clippy.sh | bash
