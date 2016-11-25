@@ -23,10 +23,10 @@ use core::{self, Client, CoreError, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent,
            utility};
 use futures::{Future, IntoFuture};
 use futures::stream::Stream;
+use futures::sync::mpsc;
 use rust_sodium::crypto::sign;
 use std::{iter, u8};
 use std::fmt::Debug;
-use tokio_core::channel;
 use tokio_core::reactor::{Core, Handle};
 
 /// Generates random public keys
@@ -104,15 +104,15 @@ pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: Ne
     let el = unwrap!(Core::new());
     let el_h = el.handle();
 
-    let (core_tx, core_rx) = unwrap!(channel::channel(&el_h));
-    let (net_tx, net_rx) = unwrap!(channel::channel(&el_h));
+    let (mut core_tx, core_rx) = mpsc::unbounded();
+    let (net_tx, net_rx) = mpsc::unbounded();
     let client = unwrap!(c(el_h.clone(), core_tx.clone(), net_tx));
 
     let net_fut = net_rx.for_each(move |net_event| Ok(n(net_event)))
         .map_err(|e| panic!("Network event stream error: {:?}", e));
     el_h.spawn(net_fut);
 
-    let core_tx_clone = core_tx.clone();
+    let mut core_tx_clone = core_tx.clone();
     unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
         let fut = r(client).into_future()
             .map_err(|e| panic!("{:?}", e))

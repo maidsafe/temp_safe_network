@@ -50,13 +50,13 @@
 #![cfg_attr(feature="clippy", allow(use_debug, too_many_arguments))]
 
 // extern crate config_file_handler;
-// extern crate futures;
+extern crate futures;
 #[cfg(feature = "use-mock-routing")]
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-// extern crate lru_cache;
+extern crate lru_cache;
 #[macro_use]
 extern crate maidsafe_utilities;
 extern crate rand;
@@ -65,7 +65,7 @@ extern crate rustc_serialize;
 extern crate rust_sodium;
 extern crate self_encryption;
 // extern crate time;
-// extern crate tokio_core;
+extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
 

@@ -22,14 +22,13 @@
 use core::Client;
 use futures::Future;
 use futures::stream::Stream;
-use std::io::{self, ErrorKind};
-use tokio_core::channel;
+use futures::sync::mpsc;
 use tokio_core::reactor::Core;
 
 /// Transmitter of messages to be run in the core event loop.
-pub type CoreMsgTx<T> = channel::Sender<CoreMsg<T>>;
+pub type CoreMsgTx<T> = mpsc::UnboundedSender<CoreMsg<T>>;
 /// Receiver of messages to be run in the core event loop.
-pub type CoreMsgRx<T> = channel::Receiver<CoreMsg<T>>;
+pub type CoreMsgRx<T> = mpsc::UnboundedReceiver<CoreMsg<T>>;
 
 /// The final future which the event loop will run.
 pub type TailFuture = Box<Future<Item = (), Error = ()>>;
@@ -68,7 +67,8 @@ pub fn run<T>(mut el: Core, client: Client, context: T, el_rx: CoreMsgRx<T>) {
             }
             Ok(())
         } else {
-            Err(io::Error::new(ErrorKind::Other, "Graceful Termination"))
+            // Err(io::Error::new(ErrorKind::Other, "Graceful Termination"))
+            Err(())
         }
     });
 

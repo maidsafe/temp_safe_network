@@ -21,21 +21,22 @@
 
 use core::{CoreError, CoreMsg, CoreMsgTx, NetworkTx};
 use core::event::{CoreEvent, NetworkEvent};
-use maidsafe_utilities::serialisation::deserialise;
 use routing::{Event, MessageId, Response};
-use routing::client_errors::{GetError, MutationError};
 use std::sync::mpsc::Receiver;
 
 /// Run the routing event loop - this will receive messages from routing.
-pub fn run<T>(routing_rx: Receiver<Event>, core_tx: CoreMsgTx<T>, net_tx: NetworkTx)
+pub fn run<T>(routing_rx: Receiver<Event>, mut core_tx: CoreMsgTx<T>, mut net_tx: NetworkTx)
     where T: 'static
 {
     for it in routing_rx.iter() {
         trace!("Received Routing Event: {:?}", it);
         match it {
             Event::Response { response, .. } => {
-                let (id, event) = handle_resp(response);
-                if !fire(&core_tx, id, event) {
+                let (msg_id, event) = match get_core_event(response) {
+                    Ok(val) => val,
+                    Err(_) => break,
+                };
+                if !fire(&mut core_tx, msg_id, event) {
                     break;
                 }
             }
@@ -45,10 +46,11 @@ pub fn run<T>(routing_rx: Receiver<Event>, core_tx: CoreMsgTx<T>, net_tx: Networ
                 }
 
                 let msg = {
-                    let core_tx = core_tx.clone();
-                    let net_tx = net_tx.clone();
-                    CoreMsg::new(move |client, _| {
-                        client.restart_routing(core_tx, net_tx);
+                    let _core_tx = core_tx.clone();
+                    let _net_tx = net_tx.clone();
+                    CoreMsg::new(move |_client, _| {
+                        // TODO(nbaksalyar) uncomment
+                        // client.restart_routing(core_tx, net_tx);
                         None
                     })
                 };
@@ -66,43 +68,25 @@ pub fn run<T>(routing_rx: Receiver<Event>, core_tx: CoreMsgTx<T>, net_tx: Networ
     }
 }
 
-fn handle_resp(resp: Response) -> (MessageId, CoreEvent) {
-    match resp {
-        Response::GetSuccess(data, id) => (id, CoreEvent::Get(Ok(data))),
-        Response::GetFailure { id, data_id, external_error_indicator } => {
-            let reason = parse_get_err(&external_error_indicator);
-            let e = CoreError::GetFailure {
-                data_id: data_id,
-                reason: reason,
-            };
-            (id, CoreEvent::Get(Err(e)))
+fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
+    Ok(match res {
+        Response::GetIData { res, msg_id } => {
+            (msg_id, CoreEvent::GetIData(res.map_err(CoreError::from)))
         }
-        Response::PutSuccess(_, id) |
-        Response::PostSuccess(_, id) |
-        Response::DeleteSuccess(_, id) |
-        Response::AppendSuccess(_, id) => (id, CoreEvent::Mutation(Ok(()))),
-        Response::PutFailure { id, data_id, external_error_indicator } |
-        Response::PostFailure { id, data_id, external_error_indicator } |
-        Response::DeleteFailure { id, data_id, external_error_indicator } |
-        Response::AppendFailure { id, data_id, external_error_indicator } => {
-            let reason = parse_mutation_err(&external_error_indicator);
-            let e = CoreError::MutationFailure {
-                data_id: data_id,
-                reason: reason,
-            };
-            (id, CoreEvent::Mutation(Err(e)))
+        Response::PutIData { res, msg_id } => {
+            (msg_id, CoreEvent::PutIData(res.map_err(CoreError::from)))
         }
-        Response::GetAccountInfoSuccess { id, data_stored, space_available } => {
-            (id, CoreEvent::AccountInfo(Ok((data_stored, space_available))))
+        Response::PutMData { res, msg_id } => {
+            (msg_id, CoreEvent::PutMData(res.map_err(CoreError::from)))
         }
-        Response::GetAccountInfoFailure { id, external_error_indicator } => {
-            let reason = parse_get_err(&external_error_indicator);
-            let e = CoreError::GetAccountInfoFailure { reason: reason };
-            (id, CoreEvent::AccountInfo(Err(e)))
+        Response::GetMDataValue { res, msg_id } => {
+            (msg_id, CoreEvent::GetMDataValue(res.map_err(CoreError::from)))
         }
-    }
+        _ => return Err(CoreError::Unexpected("Invalid response type".to_owned())),
+    })
 }
 
+/*
 pub fn parse_get_err(reason_raw: &[u8]) -> GetError {
     match deserialise(&reason_raw) {
         Ok(elt) => elt,
@@ -124,14 +108,14 @@ pub fn parse_mutation_err(reason_raw: &[u8]) -> MutationError {
         }
     }
 }
-
+*/
 /// Fire completion event to the core event loop. If the receiver in core event
 /// loop has hung up or sending fails for some other reason, treat it as an
 /// exit condition. The return value thus signifies if the firing was
 /// successful.
-fn fire<T>(core_tx: &CoreMsgTx<T>, id: MessageId, event: CoreEvent) -> bool {
+fn fire<T>(core_tx: &mut CoreMsgTx<T>, msg_id: MessageId, event: CoreEvent) -> bool {
     let msg = CoreMsg::new(move |client, _| {
-        client.fire_hook(&id, event);
+        client.fire_hook(&msg_id, event);
         None
     });
 

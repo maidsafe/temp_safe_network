@@ -19,12 +19,13 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-// use futures::Future;
+use futures::Future;
+use futures::sync::mpsc;
 // use tokio_core::channel;
 
 /// Helpers to work with futures.
-// #[macro_use]
-// pub mod futures;
+#[macro_use]
+pub mod futures;
 /// Utility functions
 pub mod utility;
 /// Implements the Self Encryption storage trait
@@ -34,28 +35,26 @@ pub mod self_encryption_storage;
 /// Helper functions to handle `StructuredData` related operations
 // pub mod structured_data;
 
-// pub use self::client::Client;
-pub use self::client::{ClientKeys, Dir};
-// pub use self::core_el::{CoreMsg, CoreMsgRx, CoreMsgTx, TailFuture, run};
+pub use self::client::Client;
+pub use self::core_el::{CoreMsg, CoreMsgRx, CoreMsgTx, TailFuture, run};
 pub use self::errors::{CORE_ERROR_START_RANGE, CoreError};
 
-// pub use self::event::NetworkEvent;
-// pub use self::futures::FutureExt;
+pub use self::event::{CoreEvent, NetworkEvent};
+pub use self::futures::FutureExt;
 pub use self::self_encryption_storage::SelfEncryptionStorageError;
 
 /// Future trait returned from core operations.
-// pub type CoreFuture<T> = Future<Item = T, Error = CoreError>;
+pub type CoreFuture<T> = Future<Item = T, Error = CoreError>;
 /// `NetworkEvent` receiver stream.
-// pub type NetworkRx = channel::Receiver<NetworkEvent>;
+pub type NetworkRx = mpsc::UnboundedReceiver<NetworkEvent>;
 /// `NetworkEvent` transmitter.
-// pub type NetworkTx = channel::Sender<NetworkEvent>;
+pub type NetworkTx = mpsc::UnboundedSender<NetworkEvent>;
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;
-/// All `StructuredData` tagging should positive-offset from this if the
-/// operation needs to go through this crate
-// pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;
+/// MutableData type tag for a directory
+pub const DIR_TAG: u64 = 15000;
 
 mod client;
-// mod core_el;
+mod core_el;
 mod errors;
-// mod event;
+mod event;

@@ -22,7 +22,7 @@
 use core::errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand;
-use routing::{XOR_NAME_LEN, XorName};
+use routing::{FullId, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
 use rust_sodium::crypto::hash::sha256;
 
@@ -38,10 +38,10 @@ pub struct Account {
 // TODO: remove allow(unused)
 #[allow(unused)]
 impl Account {
-    /// Create new Account with randomly generated maid keys.
-    pub fn new(user_root: Dir, config_root: Dir) -> Self {
+    /// Create new Account with a provided set of keys
+    pub fn new(keys: ClientKeys, user_root: Dir, config_root: Dir) -> Self {
         Account {
-            maid_keys: ClientKeys::new(),
+            maid_keys: keys,
             user_root: user_root,
             config_root: config_root,
         }
@@ -135,7 +135,7 @@ impl Dir {
 }
 
 /// Client signing and encryption keypairs
-#[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct ClientKeys {
     /// Signing public key
     pub sign_pk: sign::PublicKey,
@@ -165,6 +165,12 @@ impl ClientKeys {
 impl Default for ClientKeys {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Into<FullId> for ClientKeys {
+    fn into(self) -> FullId {
+        FullId::with_keys((self.enc_pk, self.enc_sk), (self.sign_pk, self.sign_sk))
     }
 }
 
@@ -253,6 +259,6 @@ mod tests {
         let user_root = Dir::random(0);
         let config_root = Dir::random(0);
 
-        Account::new(user_root, config_root)
+        Account::new(ClientKeys::new(), user_root, config_root)
     }
 }
