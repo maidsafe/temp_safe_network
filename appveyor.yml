@@ -3,6 +3,7 @@ environment:
     RUST_BACKTRACE: 1
   matrix:
     - RUST_VERSION: stable
+
 branches:
   only:
     - master
@@ -24,7 +25,7 @@ configuration:
   - Release
 
 build_script:
-  - cargo test --release --no-run
+  - cargo rustc --verbose --release -- --test -Zno-trans
 
 test_script:
-  - cargo test --release --features use-mock-routing
+  - cargo test  --verbose --release --features use-mock-routing
