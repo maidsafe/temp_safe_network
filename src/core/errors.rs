@@ -21,7 +21,7 @@
 
 use core::SelfEncryptionStorageError;
 use maidsafe_utilities::serialisation::SerialisationError;
-// use routing::{ClientError, DataIdentifier};
+use routing::{ClientError, InterfaceError, RoutingError};
 use routing::messaging;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
@@ -57,9 +57,11 @@ pub enum CoreError {
     /// Unexpected - Probably a Logic error
     Unexpected(String),
     /// Routing Error
-    RoutingError(::routing::RoutingError),
+    RoutingError(RoutingError),
     /// Interface Error
-    RoutingInterfaceError(::routing::InterfaceError),
+    RoutingInterfaceError(InterfaceError),
+    /// Routing Client Error
+    RoutingClientError(ClientError),
     /// Unable to pack into or operate with size of Salt
     UnsupportedSaltSizeForPwHash,
     /// Unable to complete computation for password hashing - usually because
@@ -90,15 +92,21 @@ impl From<SerialisationError> for CoreError {
     }
 }
 
-impl From<::routing::RoutingError> for CoreError {
-    fn from(error: ::routing::RoutingError) -> CoreError {
+impl From<RoutingError> for CoreError {
+    fn from(error: RoutingError) -> CoreError {
         CoreError::RoutingError(error)
     }
 }
 
-impl From<::routing::InterfaceError> for CoreError {
-    fn from(error: ::routing::InterfaceError) -> CoreError {
+impl From<InterfaceError> for CoreError {
+    fn from(error: InterfaceError) -> CoreError {
         CoreError::RoutingInterfaceError(error)
+    }
+}
+
+impl From<ClientError> for CoreError {
+    fn from(error: ClientError) -> CoreError {
+        CoreError::RoutingClientError(error)
     }
 }
 
@@ -120,6 +128,7 @@ impl From<SelfEncryptionError<SelfEncryptionStorageError>> for CoreError {
     }
 }
 
+/*
 impl Into<i32> for CoreError {
     fn into(self) -> i32 {
         match self {
@@ -139,45 +148,45 @@ impl Into<i32> for CoreError {
             CoreError::UnsuccessfulPwHash => CORE_ERROR_START_RANGE - 13,
             CoreError::OperationAborted => CORE_ERROR_START_RANGE - 14,
             CoreError::MpidMessagingError(_) => CORE_ERROR_START_RANGE - 15,
-            // CoreError::GetFailure { reason: GetError::NoSuchAccount, .. } => {
-            //     CORE_ERROR_START_RANGE - 16
-            // }
-            // CoreError::GetFailure { reason: GetError::NoSuchData, .. } => {
-            //     CORE_ERROR_START_RANGE - 17
-            // }
-            // CoreError::GetFailure { reason: GetError::NetworkOther(_), .. } => {
-            //     CORE_ERROR_START_RANGE - 18
-            // }
-            // CoreError::MutationFailure { reason: MutationError::NoSuchAccount, .. } => {
-            //     CORE_ERROR_START_RANGE - 19
-            // }
-            // CoreError::MutationFailure { reason: MutationError::AccountExists, .. } => {
-            //     CORE_ERROR_START_RANGE - 20
-            // }
-            // CoreError::MutationFailure { reason: MutationError::NoSuchData, .. } => {
-            //     CORE_ERROR_START_RANGE - 21
-            // }
-            // CoreError::MutationFailure { reason: MutationError::DataExists, .. } => {
-            //     CORE_ERROR_START_RANGE - 22
-            // }
-            // CoreError::MutationFailure { reason: MutationError::LowBalance, .. } => {
-            //     CORE_ERROR_START_RANGE - 23
-            // }
-            // CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. } => {
-            //     CORE_ERROR_START_RANGE - 24
-            // }
-            // CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. } => {
-            //     CORE_ERROR_START_RANGE - 25
-            // }
-            // CoreError::MutationFailure { reason: MutationError::NetworkOther(_), .. } => {
-            //     CORE_ERROR_START_RANGE - 26
-            // }
-            // CoreError::MutationFailure { reason: MutationError::NetworkFull, .. } => {
-            //     CORE_ERROR_START_RANGE - 27
-            // }
-            // CoreError::MutationFailure { reason: MutationError::DataTooLarge, .. } => {
-            //     CORE_ERROR_START_RANGE - 28
-            // }
+            CoreError::GetFailure { reason: GetError::NoSuchAccount, .. } => {
+                CORE_ERROR_START_RANGE - 16
+            }
+            CoreError::GetFailure { reason: GetError::NoSuchData, .. } => {
+                CORE_ERROR_START_RANGE - 17
+            }
+            CoreError::GetFailure { reason: GetError::NetworkOther(_), .. } => {
+                CORE_ERROR_START_RANGE - 18
+            }
+            CoreError::MutationFailure { reason: MutationError::NoSuchAccount, .. } => {
+                CORE_ERROR_START_RANGE - 19
+            }
+            CoreError::MutationFailure { reason: MutationError::AccountExists, .. } => {
+                CORE_ERROR_START_RANGE - 20
+            }
+            CoreError::MutationFailure { reason: MutationError::NoSuchData, .. } => {
+                CORE_ERROR_START_RANGE - 21
+            }
+            CoreError::MutationFailure { reason: MutationError::DataExists, .. } => {
+                CORE_ERROR_START_RANGE - 22
+            }
+            CoreError::MutationFailure { reason: MutationError::LowBalance, .. } => {
+                CORE_ERROR_START_RANGE - 23
+            }
+            CoreError::MutationFailure { reason: MutationError::InvalidSuccessor, .. } => {
+                CORE_ERROR_START_RANGE - 24
+            }
+            CoreError::MutationFailure { reason: MutationError::InvalidOperation, .. } => {
+                CORE_ERROR_START_RANGE - 25
+            }
+            CoreError::MutationFailure { reason: MutationError::NetworkOther(_), .. } => {
+                CORE_ERROR_START_RANGE - 26
+            }
+            CoreError::MutationFailure { reason: MutationError::NetworkFull, .. } => {
+                CORE_ERROR_START_RANGE - 27
+            }
+            CoreError::MutationFailure { reason: MutationError::DataTooLarge, .. } => {
+                CORE_ERROR_START_RANGE - 28
+            }
             CoreError::SelfEncryption(
                 SelfEncryptionError::Compression::<SelfEncryptionStorageError>) => {
                 CORE_ERROR_START_RANGE - 29
@@ -189,10 +198,10 @@ impl Into<i32> for CoreError {
             CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
                 CORE_ERROR_START_RANGE - 31
             }
-            // CoreError::GetAccountInfoFailure { reason: GetError::NoSuchAccount, .. } => {
-            //     CORE_ERROR_START_RANGE - 32
-            // }
-            // CoreError::GetAccountInfoFailure { .. } => CORE_ERROR_START_RANGE - 33,
+            CoreError::GetAccountInfoFailure { reason: GetError::NoSuchAccount, .. } => {
+                CORE_ERROR_START_RANGE - 32
+            }
+            CoreError::GetAccountInfoFailure { .. } => CORE_ERROR_START_RANGE - 33,
             CoreError::RequestTimeout => CORE_ERROR_START_RANGE - 34,
             CoreError::SelfEncryption(
                 SelfEncryptionError::Storage::<SelfEncryptionStorageError>(
@@ -202,6 +211,7 @@ impl Into<i32> for CoreError {
         }
     }
 }
+*/
 
 impl Debug for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
@@ -245,6 +255,9 @@ impl Debug for CoreError {
             }
             CoreError::RoutingInterfaceError(ref error) => {
                 write!(formatter, "CoreError::RoutingInterfaceError -> {:?}", error)
+            }
+            CoreError::RoutingClientError(ref error) => {
+                write!(formatter, "CoreError::RoutingClientError -> {:?}", error)
             }
             CoreError::UnsupportedSaltSizeForPwHash => {
                 write!(formatter, "CoreError::UnsupportedSaltSizeForPwHash")
@@ -325,6 +338,9 @@ impl Display for CoreError {
                 // TODO - use `{}` once `InterfaceError` implements `std::error::Error`.
                 write!(formatter, "Routing interface error -> {:?}", error)
             }
+            CoreError::RoutingClientError(ref error) => {
+                write!(formatter, "Routing client error -> {}", error)
+            }
             CoreError::UnsupportedSaltSizeForPwHash => {
                 write!(formatter,
                        "Unable to pack into or operate with size of Salt")
@@ -378,6 +394,7 @@ impl Error for CoreError {
             // TODO - use `error.description()` once `RoutingError` implements `std::error::Error`.
             CoreError::RoutingError(_) => "Routing internal error",
             // TODO - use `error.description()` once `InterfaceError` implements `std::error::Error`
+            CoreError::RoutingClientError(ref error) => error.description(),
             CoreError::RoutingInterfaceError(_) => "Routing interface error",
             CoreError::UnsupportedSaltSizeForPwHash => "Unsupported size of salt",
             CoreError::UnsuccessfulPwHash => "Failed while password hashing",

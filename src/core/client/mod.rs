@@ -22,30 +22,26 @@
 mod account;
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing;
-
-pub use self::account::{ClientKeys, Dir};
-
-/*
 mod routing_el;
 
-use core::{CoreError, CoreFuture, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx, utility};
-use core::event::CoreEvent;
-use futures::{self, Complete, Future, Oneshot};
+use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent,
+           NetworkTx, utility};
+use futures::{Complete, Future};
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId, Response,
-              StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
+use rand;
+use routing::{Authority, Event, FullId, ImmutableData, MessageId, MutableData, Response,
+              TYPE_TAG_SESSION_PACKET, Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
-use routing::client_errors::MutationError;
-use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::{secretbox, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
-use rust_sodium::crypto::secretbox;
+pub use self::account::{ClientKeys, Dir};
 use self::account::Account;
 #[cfg(feature = "use-mock-routing")]
 use self::mock_routing::MockRouting as Routing;
 use std::cell::{Ref, RefCell, RefMut};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver};
@@ -56,6 +52,20 @@ const ACC_PKT_TIMEOUT_SECS: u64 = 60;
 const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 const REQUEST_TIMEOUT_SECS: u64 = 120;
+
+macro_rules! oneshot {
+    ($client:expr, $event:path) => {{
+        let msg_id = MessageId::new();
+        let (hook, oneshot) = futures::oneshot();
+        let fut = oneshot.map_err(|_| CoreError::OperationAborted)
+            .and_then(|event| match event {
+                $event(res) => res,
+                _ => Err(CoreError::ReceivedUnexpectedEvent),
+            });
+
+        (hook, $client.timeout(msg_id, fut), msg_id)
+    }}
+}
 
 /// The main self-authentication client instance that will interface all the
 /// request from high level API's to the actual routing layer and manage all
@@ -69,13 +79,13 @@ pub struct Client {
     inner: Rc<RefCell<Inner>>,
 }
 
+#[allow(unused)] // <-- TODO(nbaksalyar) remove this
 struct Inner {
     el_handle: Handle,
     routing: Routing,
     hooks: HashMap<MessageId, Complete<CoreEvent>>,
-    cache: LruCache<XorName, Data>,
+    cache: LruCache<XorName, ImmutableData>,
     client_type: ClientType,
-    stats: Stats,
     timeout: Duration,
     joiner: Joiner,
 }
@@ -92,7 +102,7 @@ impl Client {
     {
         trace!("Creating unregistered client.");
 
-        let (routing, routing_rx) = try!(setup_routing(None));
+        let (routing, routing_rx) = setup_routing(None)?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
@@ -103,10 +113,45 @@ impl Client {
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::Unregistered,
-            stats: Default::default(),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
             joiner: joiner,
         }))
+    }
+
+    /// Creates an empty dir to hold configuration or user data
+    fn create_empty_dir(routing: &mut Routing,
+                        routing_rx: &Receiver<Event>,
+                        owners: BTreeSet<sign::PublicKey>,
+                        requester: sign::PublicKey)
+                        -> Result<Dir, CoreError> {
+        let id = rand::random();
+        let dir_md = MutableData::new(id, 15000, BTreeMap::new(), BTreeMap::new(), owners)?;
+
+        let msg_id = MessageId::new();
+        routing.put_mdata(Authority::NaeManager(id), dir_md, msg_id, requester)?;
+
+        match routing_rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)) {
+            Ok(Event::Response { response: Response::PutMData { ref res, msg_id: ref id }, .. })
+                if *id == msg_id => {
+                match *res {
+                    Ok(..) => (),
+                    Err(ref client_error) => {
+                        return Err(CoreError::RoutingClientError(client_error.clone()));
+                    }
+                }
+            }
+            x => {
+                warn!("Could not put MutableData to the Network. Unexpected: {:?}",
+                      x);
+                return Err(CoreError::OperationAborted);
+            }
+        }
+
+        Ok(Dir {
+            name: id,
+            type_tag: 15000,
+            enc_key: secretbox::gen_key(),
+        })
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
@@ -123,40 +168,53 @@ impl Client {
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
-        let acc = Account::new();
-        let id_packet = FullId::with_keys((acc.get_maid().public_keys().1,
-                                           acc.get_maid().secret_keys().1.clone()),
-                                          (acc.get_maid().public_keys().0,
-                                           acc.get_maid().secret_keys().0.clone()));
-
-        let (routing, routing_rx) = try!(setup_routing(Some(id_packet)));
-
-        let acc_loc = try!(Account::generate_network_id(&keyword, &pin));
+        let acc_loc = Account::generate_network_id(&keyword, &pin)?;
         let user_cred = UserCred::new(password, pin);
-        let acc_sd = try!(StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                              acc_loc,
-                                              0,
-                                              try!(acc.encrypt(&user_cred.password,
-                                                               &user_cred.pin)),
-                                              vec![acc.get_public_maid().public_keys().0.clone()],
-                                              Vec::new(),
-                                              Some(&acc.get_maid().secret_keys().0)));
 
-        let Digest(digest) = sha256::hash(&(acc.get_maid().public_keys().0).0);
+        let maid_keys = ClientKeys::new();
+        let pub_key = maid_keys.sign_pk.clone();
+        let full_id = Some(maid_keys.clone().into());
+
+        let mut owners = BTreeSet::new();
+        owners.insert(pub_key.clone());
+
+        let (mut routing, routing_rx) = setup_routing(full_id)?;
+
+        let user_root =
+            Client::create_empty_dir(&mut routing, &routing_rx, owners.clone(), pub_key)?;
+        let config_dir =
+            Client::create_empty_dir(&mut routing, &routing_rx, owners.clone(), pub_key)?;
+
+        let acc = Account::from_keys(maid_keys, user_root, config_dir);
+
+        let mut acc_data = BTreeMap::new();
+        let _ = acc_data.insert("Login".as_bytes().to_owned(),
+                                Value {
+                                    content: acc.encrypt(&user_cred.password, &user_cred.pin)?,
+                                    entry_version: 0,
+                                });
+
+        let acc_md = MutableData::new(acc_loc,
+                                      TYPE_TAG_SESSION_PACKET,
+                                      BTreeMap::new(),
+                                      acc_data,
+                                      owners)?;
+
+        let Digest(digest) = sha256::hash(&pub_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         let msg_id = MessageId::new();
-        try!(routing.send_put_request(cm_addr.clone(), Data::Structured(acc_sd), msg_id));
+        routing.put_mdata(cm_addr.clone(), acc_md, msg_id, pub_key.clone())?;
+
         match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
-            Ok(Event::Response { response: Response::PutSuccess(_, id), .. }) if id == msg_id => (),
-            Ok(Event::Response { response: Response::PutFailure { id,
-                                                        data_id,
-                                                        ref external_error_indicator },
-                                 .. }) if id == msg_id => {
-                return Err(CoreError::MutationFailure {
-                    data_id: data_id,
-                    reason: routing_el::parse_mutation_err(external_error_indicator),
-                });
+            Ok(Event::Response { response: Response::PutMData { ref res, msg_id: ref id }, .. })
+                if *id == msg_id => {
+                match *res {
+                    Ok(..) => (),
+                    Err(ref client_error) => {
+                        return Err(CoreError::RoutingClientError(client_error.clone()));
+                    }
+                }
             }
             x => {
                 warn!("Could not put session packet to the Network. Unexpected: {:?}",
@@ -175,7 +233,6 @@ impl Client {
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
-            stats: Default::default(),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
             joiner: joiner,
         }))
@@ -195,34 +252,36 @@ impl Client {
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
-        let acc_loc = try!(Account::generate_network_id(&keyword, &pin));
+        let acc_loc = Account::generate_network_id(&keyword, &pin)?;
         let user_cred = UserCred::new(password, pin);
-        let acc_sd_id = DataIdentifier::Structured(acc_loc, TYPE_TAG_SESSION_PACKET);
 
         let msg_id = MessageId::new();
-        let dst = Authority::NaeManager(*acc_sd_id.name());
+        let dst = Authority::NaeManager(acc_loc);
 
-        let acc_sd = {
+        let acc_content = {
             trace!("Creating throw-away routing getter for account packet.");
-            let (mut routing, routing_rx) = try!(setup_routing(None));
+            let (mut routing, routing_rx) = setup_routing(None)?;
 
-            try!(routing.send_get_request(dst, acc_sd_id, msg_id));
+            routing.get_mdata_value(dst,
+                                 acc_loc,
+                                 TYPE_TAG_SESSION_PACKET,
+                                 "Login".as_bytes().to_owned(),
+                                 msg_id)?;
+
             match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
                 Ok(Event::Response { response:
-                    Response::GetSuccess(Data::Structured(data), id), .. }) => {
-                    if id == msg_id {
-                        data
-                    } else {
+                                     Response::GetMDataValue { msg_id: id, res }, .. }) => {
+                    if id != msg_id {
                         return Err(CoreError::OperationAborted);
                     }
-                }
-                Ok(Event::Response {
-                    response: Response::GetFailure { id, data_id, ref external_error_indicator }, ..
-                }) if id == msg_id => {
-                    return Err(CoreError::GetFailure {
-                        data_id: data_id,
-                        reason: routing_el::parse_get_err(external_error_indicator),
-                    });
+                    match res {
+                        Ok(Value { content, .. }) => {
+                            content
+                        },
+                        Err(client_error) => {
+                            return Err(CoreError::RoutingClientError(client_error));
+                        }
+                    }
                 }
                 x => {
                     warn!("Could not fetch account packet from the Network. Unexpected: {:?}",
@@ -232,17 +291,14 @@ impl Client {
             }
         };
 
-        let acc = try!(Account::decrypt(acc_sd.get_data(), &user_cred.password, &user_cred.pin));
-        let id_packet = FullId::with_keys((acc.get_maid().public_keys().1,
-                                           acc.get_maid().secret_keys().1.clone()),
-                                          (acc.get_maid().public_keys().0,
-                                           acc.get_maid().secret_keys().0.clone()));
+        let acc = Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?;
+        let id_packet = acc.maid_keys.clone().into();
 
-        let Digest(digest) = sha256::hash(&(acc.get_maid().public_keys().0).0);
+        let Digest(digest) = sha256::hash(&acc.maid_keys.sign_pk.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         trace!("Creating an actual routing...");
-        let (routing, routing_rx) = try!(setup_routing(Some(id_packet)));
+        let (routing, routing_rx) = setup_routing(Some(id_packet))?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
@@ -253,7 +309,38 @@ impl Client {
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
-            stats: Default::default(),
+            timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
+            joiner: joiner,
+        }))
+    }
+
+    /// This is a Gateway function to the Maidsafe network. This will help
+    /// login to an already existing account of the user in the SAFE-network.
+    pub fn from_keys<T>(keys: ClientKeys,
+                        owner: sign::PublicKey,
+                        el_handle: Handle,
+                        core_tx: CoreMsgTx<T>,
+                        net_tx: NetworkTx)
+                        -> Result<Client, CoreError>
+        where T: 'static
+    {
+        trace!("Attempting to log into an acc using client keys.");
+
+        let Digest(digest) = sha256::hash(&keys.sign_pk.0);
+        let cm_addr = Authority::ClientManager(XorName(digest));
+
+        trace!("Creating an actual routing...");
+        let (routing, routing_rx) = setup_routing(Some(keys.clone().into()))?;
+        let net_tx_clone = net_tx.clone();
+        let core_tx_clone = core_tx.clone();
+        let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
+
+        Ok(Self::new(Inner {
+            el_handle: el_handle,
+            routing: routing,
+            hooks: HashMap::with_capacity(10),
+            cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
+            client_type: ClientType::from_keys(owner, cm_addr),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
             joiner: joiner,
         }))
@@ -269,14 +356,11 @@ impl Client {
     }
 
     #[doc(hidden)]
-    pub fn restart_routing<T>(&self, core_tx: CoreMsgTx<T>, net_tx: NetworkTx)
+    pub fn restart_routing<T>(&self, mut core_tx: CoreMsgTx<T>, mut net_tx: NetworkTx)
         where T: 'static
     {
         let opt_id = if let ClientType::Registered { ref acc, .. } = self.inner().client_type {
-            Some(FullId::with_keys((acc.get_maid().public_keys().1,
-                                    acc.get_maid().secret_keys().1.clone()),
-                                   (acc.get_maid().public_keys().0,
-                                    acc.get_maid().secret_keys().0.clone())))
+            Some(acc.maid_keys.clone().into())
         } else {
             None
         };
@@ -317,6 +401,7 @@ impl Client {
         }
     }
 
+    /*
     fn insert_hook(&self, msg_id: MessageId, hook: Complete<CoreEvent>) {
         let _ = self.inner_mut().hooks.insert(msg_id, hook);
     }
@@ -820,7 +905,9 @@ impl Client {
             .and_then(move |data| self3.post(Data::Structured(data), None))
             .into_box()
     }
+    */
 
+    #[allow(unused)] // TODO(nbaksalyar) remove this
     fn timeout<F, T>(&self, msg_id: MessageId, future: F) -> Box<CoreFuture<T>>
         where F: Future<Item = T, Error = CoreError> + 'static,
               T: 'static
@@ -851,25 +938,9 @@ impl Client {
             .into_box()
     }
 
-    fn build_mutation_future(&self,
-                             msg_id: MessageId,
-                             oneshot: Oneshot<CoreEvent>)
-                             -> Box<CoreFuture<()>> {
-        let fut = oneshot.map_err(|_| CoreError::OperationAborted)
-            .and_then(|event| match event {
-                CoreEvent::Mutation(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            });
-
-        self.timeout(msg_id, fut)
-    }
-
+    #[allow(unused)] // TODO(nbaksalyar) remove this
     fn routing_mut(&self) -> RefMut<Routing> {
         RefMut::map(self.inner.borrow_mut(), |i| &mut i.routing)
-    }
-
-    fn stats_mut(&self) -> RefMut<Stats> {
-        RefMut::map(self.inner.borrow_mut(), |i| &mut i.stats)
     }
 
     fn inner(&self) -> Ref<Inner> {
@@ -923,6 +994,7 @@ impl UserCred {
     }
 }
 
+#[allow(unused)] // <-- TODO(nbaksalyar) remove this
 enum ClientType {
     Unregistered,
     Registered {
@@ -931,9 +1003,20 @@ enum ClientType {
         user_cred: UserCred,
         cm_addr: Authority,
     },
+    FromKeys {
+        owner: sign::PublicKey,
+        cm_addr: Authority,
+    },
 }
 
 impl ClientType {
+    fn from_keys(owner: sign::PublicKey, cm_addr: Authority) -> Self {
+        ClientType::FromKeys {
+            owner: owner,
+            cm_addr: cm_addr,
+        }
+    }
+
     fn reg(acc: Account, acc_loc: XorName, user_cred: UserCred, cm_addr: Authority) -> Self {
         ClientType::Registered {
             acc: acc,
@@ -943,65 +1026,55 @@ impl ClientType {
         }
     }
 
+    #[allow(unused)] // <-- TODO(nbaksalyar) remove this
     fn acc(&self) -> Result<&Account, CoreError> {
         match *self {
             ClientType::Registered { ref acc, .. } => Ok(acc),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::FromKeys { .. } => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
+    #[allow(unused)] // <-- TODO(nbaksalyar) remove this
     fn acc_mut(&mut self) -> Result<&mut Account, CoreError> {
         match *self {
             ClientType::Registered { ref mut acc, .. } => Ok(acc),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::FromKeys { .. } => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
+    #[allow(unused)] // <-- TODO(nbaksalyar) remove this
     fn acc_loc(&self) -> Result<XorName, CoreError> {
         match *self {
             ClientType::Registered { acc_loc, .. } => Ok(acc_loc),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::FromKeys { .. } => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
+    #[allow(unused)] // <-- TODO(nbaksalyar) remove this
     fn user_cred(&self) -> Result<&UserCred, CoreError> {
         match *self {
             ClientType::Registered { ref user_cred, .. } => Ok(user_cred),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::FromKeys { .. } => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
+    #[allow(unused)] // <-- TODO(nbaksalyar) remove this
     fn cm_addr(&self) -> Result<&Authority, CoreError> {
         match *self {
             ClientType::Registered { ref cm_addr, .. } => Ok(cm_addr),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
-        }
-    }
-}
-
-struct Stats {
-    issued_gets: u64,
-    issued_puts: u64,
-    issued_posts: u64,
-    issued_deletes: u64,
-    issued_appends: u64,
-}
-
-impl Default for Stats {
-    fn default() -> Self {
-        Stats {
-            issued_gets: 0,
-            issued_puts: 0,
-            issued_posts: 0,
-            issued_deletes: 0,
-            issued_appends: 0,
+            ClientType::FromKeys { ref cm_addr, .. } => Ok(cm_addr),
         }
     }
 }
 
 fn setup_routing(full_id: Option<FullId>) -> Result<(Routing, Receiver<Event>), CoreError> {
     let (routing_tx, routing_rx) = mpsc::channel();
-    let routing = try!(Routing::new(routing_tx, full_id));
+    let routing = Routing::new(routing_tx, full_id)?;
 
     trace!("Waiting to get connected to the Network...");
     match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
@@ -1031,16 +1104,15 @@ fn spawn_routing_thread<T>(routing_rx: Receiver<Event>,
 mod tests {
     use core::CoreError;
     use core::utility;
-    use core::utility::test_utils::{finish, random_client, setup_client};
-    use futures::Future;
-    use rand;
-    use routing::{Data, DataIdentifier, ImmutableData, StructuredData};
-    use routing::client_errors::{GetError, MutationError};
-    use rust_sodium::crypto::secretbox;
+    use core::utility::test_utils::{finish, setup_client};
+    // use futures::Future;
+    use futures::sync::mpsc;
+    // use rand;
+    use routing::ClientError;
+    // use rust_sodium::crypto::secretbox;
     use super::*;
-    use tokio_core::channel;
     use tokio_core::reactor::Core;
-
+    /*
     #[test]
     fn unregistered_client() {
         let orig_data = ImmutableData::new(unwrap!(utility::generate_random_vector(30)));
@@ -1104,12 +1176,12 @@ mod tests {
                 })
         });
     }
-
+*/
     #[test]
     fn registered_client() {
         let el = unwrap!(Core::new());
-        let (core_tx, _) = unwrap!(channel::channel(&el.handle()));
-        let (net_tx, _) = unwrap!(channel::channel(&el.handle()));
+        let (core_tx, _) = mpsc::unbounded();
+        let (net_tx, _) = mpsc::unbounded();
 
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
@@ -1124,7 +1196,7 @@ mod tests {
         // Account creation - same secrets - should fail
         match Client::registered(&sec_0, &sec_1, el.handle(), core_tx, net_tx) {
             Ok(_) => panic!("Account name hijacking should fail"),
-            Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
+            Err(CoreError::RoutingClientError(ClientError::AccountExists)) => (),
             Err(err) => panic!("{:?}", err),
         }
     }
@@ -1140,7 +1212,7 @@ mod tests {
                                 el_h.clone(),
                                 core_tx.clone(),
                                 net_tx.clone()) {
-                Err(CoreError::GetFailure { reason: GetError::NoSuchAccount, .. }) => (),
+                Err(CoreError::RoutingClientError(ClientError::NoSuchAccount)) => (),
                 x => panic!("Unexpected Login outcome: {:?}", x),
             }
             Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
@@ -1150,7 +1222,7 @@ mod tests {
         setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
                      |_| finish());
     }
-
+    /*
     #[test]
     fn user_root_dir_creation() {
         let sec_0 = unwrap!(utility::generate_random_string(10));
@@ -1351,5 +1423,5 @@ mod tests {
                 })
         })
     }
-}
 */
+}
