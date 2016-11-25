@@ -51,9 +51,8 @@ pub type NetworkRx = mpsc::UnboundedReceiver<NetworkEvent>;
 pub type NetworkTx = mpsc::UnboundedSender<NetworkEvent>;
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;
-/// All `StructuredData` tagging should positive-offset from this if the
-/// operation needs to go through this crate
-// pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;
+/// MutableData type tag for a directory
+pub const DIR_TAG: u64 = 15000;
 
 mod client;
 mod core_el;

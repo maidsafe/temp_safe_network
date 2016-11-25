@@ -24,18 +24,17 @@ mod account;
 mod mock_routing;
 mod routing_el;
 
-use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent,
+use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, DIR_TAG, FutureExt, NetworkEvent,
            NetworkTx, utility};
 use futures::{Complete, Future};
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
-use rand;
 use routing::{Authority, Event, FullId, ImmutableData, MessageId, MutableData, Response,
               TYPE_TAG_SESSION_PACKET, Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
-use rust_sodium::crypto::{secretbox, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
+use rust_sodium::crypto::sign;
 pub use self::account::{ClientKeys, Dir};
 use self::account::Account;
 #[cfg(feature = "use-mock-routing")]
@@ -124,11 +123,15 @@ impl Client {
                         owners: BTreeSet<sign::PublicKey>,
                         requester: sign::PublicKey)
                         -> Result<Dir, CoreError> {
-        let id = rand::random();
-        let dir_md = MutableData::new(id, 15000, BTreeMap::new(), BTreeMap::new(), owners)?;
+        let dir = Dir::random(DIR_TAG);
+        let dir_md = MutableData::new(dir.name,
+                                      dir.type_tag,
+                                      BTreeMap::new(),
+                                      BTreeMap::new(),
+                                      owners)?;
 
         let msg_id = MessageId::new();
-        routing.put_mdata(Authority::NaeManager(id), dir_md, msg_id, requester)?;
+        routing.put_mdata(Authority::NaeManager(dir.name), dir_md, msg_id, requester)?;
 
         match routing_rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)) {
             Ok(Event::Response { response: Response::PutMData { ref res, msg_id: ref id }, .. })
@@ -147,11 +150,7 @@ impl Client {
             }
         }
 
-        Ok(Dir {
-            name: id,
-            type_tag: 15000,
-            enc_key: secretbox::gen_key(),
-        })
+        Ok(dir)
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
@@ -185,7 +184,7 @@ impl Client {
         let config_dir =
             Client::create_empty_dir(&mut routing, &routing_rx, owners.clone(), pub_key)?;
 
-        let acc = Account::from_keys(maid_keys, user_root, config_dir);
+        let acc = Account::new(maid_keys, user_root, config_dir);
 
         let mut acc_data = BTreeMap::new();
         let _ = acc_data.insert("Login".as_bytes().to_owned(),

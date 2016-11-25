@@ -38,19 +38,10 @@ pub struct Account {
 // TODO: remove allow(unused)
 #[allow(unused)]
 impl Account {
-    /// Create new Account from a given set of keys
-    pub fn from_keys(keys: ClientKeys, user_root: Dir, config_root: Dir) -> Self {
+    /// Create new Account with a provided set of keys
+    pub fn new(keys: ClientKeys, user_root: Dir, config_root: Dir) -> Self {
         Account {
             maid_keys: keys,
-            user_root: user_root,
-            config_root: config_root,
-        }
-    }
-
-    /// Create new Account with randomly generated maid keys.
-    pub fn new(user_root: Dir, config_root: Dir) -> Self {
-        Account {
-            maid_keys: ClientKeys::new(),
             user_root: user_root,
             config_root: config_root,
         }
@@ -134,7 +125,6 @@ pub struct Dir {
 
 impl Dir {
     /// Generate random `Dir` with the given type tag.
-    #[allow(unused)] // TODO(nbaksalyar) -- get rid of this
     pub fn random(type_tag: u64) -> Self {
         Dir {
             name: rand::random(),
@@ -269,6 +259,6 @@ mod tests {
         let user_root = Dir::random(0);
         let config_root = Dir::random(0);
 
-        Account::new(user_root, config_root)
+        Account::new(ClientKeys::new(), user_root, config_root)
     }
 }
