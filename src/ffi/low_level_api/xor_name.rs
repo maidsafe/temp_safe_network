@@ -19,6 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+/*
 use ffi::{DataIdHandle, OpaqueCtx, Session, helper};
 use routing::{DataIdentifier, XOR_NAME_LEN, XorName};
 use std::os::raw::c_void;
@@ -200,3 +201,4 @@ mod tests {
         }
     }
 }
+*/

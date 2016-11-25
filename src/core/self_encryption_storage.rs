@@ -19,17 +19,16 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use core::Client;
 use core::CoreError;
-// use core::Client;
-// use core::futures::FutureExt;
-// use futures::{self, Future};
-// use routing::{Data, DataIdentifier, ImmutableData, XOR_NAME_LEN, XorName};
-use self_encryption::StorageError;
-// use self_encryption::{Storage};
+use core::futures::FutureExt;
+use futures::{self, Future};
+// use routing::{Data, DataIdentifier};
+use routing::{ImmutableData, XOR_NAME_LEN, XorName};
+use self_encryption::{Storage, StorageError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-/*
 /// Network storage is the concrete type which self-encryption crate will use
 /// to put or get data from the network
 pub struct SelfEncryptionStorage {
@@ -47,7 +46,7 @@ impl Storage for SelfEncryptionStorage {
     type Error = SelfEncryptionStorageError;
 
     fn get(&self, name: &[u8]) -> Box<Future<Item = Vec<u8>, Error = Self::Error>> {
-        trace!("Self encrypt invoked GET.");
+        trace!("Self encrypt invoked GetIData.");
 
         if name.len() != XOR_NAME_LEN {
             let err = CoreError::Unexpected("Requested `name` is incorrect size.".to_owned());
@@ -57,30 +56,23 @@ impl Storage for SelfEncryptionStorage {
 
         let name = {
             let mut temp = [0u8; XOR_NAME_LEN];
-            for i in 0..XOR_NAME_LEN {
-                temp[i] = name[i];
-            }
-            temp
+            temp.clone_from_slice(&name);
+            XorName(temp)
         };
 
-        let data_id = DataIdentifier::Immutable(XorName(name));
         self.client
-            .get(data_id, None)
-            .and_then(|data| match data {
-                Data::Immutable(data) => Ok(data.value().clone()),
-                _ => Err(CoreError::ReceivedUnexpectedData),
-            })
+            .get_idata(name, None)
+            .map(|data| data.value().clone())
             .map_err(From::from)
             .into_box()
     }
 
     fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Box<Future<Item = (), Error = Self::Error>> {
-        trace!("Self encrypt invoked PUT.");
-        let data = Data::Immutable(ImmutableData::new(data));
-        self.client.put(data, None).map_err(From::from).into_box()
+        trace!("Self encrypt invoked PutIData.");
+        let data = ImmutableData::new(data);
+        self.client.put_idata(data, None).map_err(From::from).into_box()
     }
 }
-*/
 
 /// Errors arising from storage object being used by self-encryptors.
 #[derive(Debug)]

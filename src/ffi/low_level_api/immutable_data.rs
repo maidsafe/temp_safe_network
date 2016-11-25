@@ -20,14 +20,14 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::{CoreError, FutureExt, SelfEncryptionStorage, immutable_data};
-use ffi::{AppHandle, CipherOptHandle, DataIdHandle, SelfEncryptorReaderHandle,
-          SelfEncryptorWriterHandle};
+use ffi::{AppHandle, CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle,
+          XorNameHandle};
 use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::helper::catch_unwind_cb;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Data, DataIdentifier, ImmutableData};
+use routing::ImmutableData;
 use self_encryption::{DataMap, SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr, slice};
 use std::os::raw::c_void;
@@ -51,6 +51,7 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
 
             let fut = SequentialEncryptor::new(se_storage, None)
                 .map_err(CoreError::from)
+                .map_err(FfiError::from)
                 .map(move |se| {
                     let handle = obj_cache.insert_se_writer(se);
                     o_cb(user_data.0, 0, handle);
@@ -90,6 +91,7 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
                 }
             };
             let fut = fut.map_err(CoreError::from)
+                .map_err(FfiError::from)
                 .then(move |res| {
                     o_cb(user_data.0, ffi_result_code!(res));
                     Ok(())
@@ -102,14 +104,13 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
 
 /// Close Self Encryptor
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session,
-                                                         app: AppHandle,
-                                                         se_h: SEWriterHandle,
-                                                         cipher_opt_h: CipherOptHandle,
-                                                         user_data: *mut c_void,
-                                                         o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                    i32,
-                                                                                    DataIdHandle)) {
+pub unsafe extern "C" fn immut_data_close_self_encryptor(
+    session: *const Session,
+    app: AppHandle,
+    se_h: SEWriterHandle,
+    cipher_opt_h: CipherOptHandle,
+    user_data: *mut c_void,
+    o_cb: unsafe extern "C" fn(*mut c_void, i32, XorNameHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -149,12 +150,9 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                     let raw_immut_data = ImmutableData::new(raw_data);
                     let raw_immut_data_name = *raw_immut_data.name();
 
-                    c3.put(Data::Immutable(raw_immut_data), None)
+                    c3.put_idata(raw_immut_data, None)
                         .map_err(FfiError::from)
-                        .map(move |_| {
-                            let data_id = DataIdentifier::Immutable(raw_immut_data_name);
-                            obj_cache.insert_data_id(data_id)
-                        })
+                        .map(move |_| obj_cache.insert_xor_name(raw_immut_data_name))
                         .into_box()
                 })
                 .then(move |result| {
@@ -175,7 +173,7 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
 #[no_mangle]
 pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session,
                                                          app: AppHandle,
-                                                         data_id_h: DataIdHandle,
+                                                         name_h: XorNameHandle,
                                                          user_data: *mut c_void,
                                                          o_cb: unsafe extern "C" fn(
                                                              *mut c_void,
@@ -192,8 +190,8 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
             let obj_cache3 = obj_cache.clone();
 
             let fut = {
-                match obj_cache.get_data_id(data_id_h) {
-                    Ok(data_id) => client.get(*data_id, None),
+                match obj_cache.get_xor_name(name_h) {
+                    Ok(data_id) => client.get_idata(*data_id, None),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e), 0);
                         return None;
@@ -202,12 +200,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
             };
 
             let fut = fut.map_err(FfiError::from)
-                .and_then(move |data| {
-                    let raw_immut_data = match data {
-                        Data::Immutable(immut_data) => immut_data,
-                        _ => fry!(Err(CoreError::ReceivedUnexpectedData)),
-                    };
-
+                .and_then(move |raw_immut_data| {
                     let ser_final_immut_data = {
                         let app = fry!(obj_cache2.get_app(app));
                         fry!(CipherOpt::decrypt(&app, raw_immut_data.value()))
@@ -307,6 +300,7 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
                     mem::forget(data);
                 })
                 .map_err(CoreError::from)
+                .map_err(FfiError::from)
                 .map_err(move |e| {
                     o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0);
                 })
@@ -357,6 +351,7 @@ pub unsafe extern "C" fn immut_data_self_encryptor_reader_free(session: *const S
 
 #[cfg(test)]
 mod tests {
+    /*
     use core::utility;
     use ffi::{ObjectHandle, test_utils};
     use ffi::errors::FfiError;
@@ -542,4 +537,5 @@ mod tests {
             process::exit(-1);
         }
     }
+    */
 }

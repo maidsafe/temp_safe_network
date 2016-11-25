@@ -21,18 +21,16 @@
 
 //! Session management
 
-use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
-use core::futures::FutureExt;
-use ffi::{FfiError, OpaqueCtx};
+use core::{Client, CoreMsg, CoreMsgTx};
+use ffi::FfiError;
 use ffi::object_cache::ObjectCache;
 use futures::Future;
-use futures::stream::Stream;
-use maidsafe_utilities::thread::{self, Joiner};
+// use futures::stream::Stream;
+use maidsafe_utilities::thread::Joiner;
 use std::os::raw::c_void;
-use std::sync::{Arc, Mutex, mpsc};
-use super::helper;
-use tokio_core::channel;
-use tokio_core::reactor::Core;
+use std::sync::{Arc, Mutex};
+// use super::helper;
+// use tokio_core::reactor::Core;
 
 macro_rules! try_tx {
     ($result:expr, $tx:ident) => {
@@ -62,10 +60,11 @@ impl Session {
                  + Send + 'static
     {
         let msg = CoreMsg::new(f);
-        let core_tx = unwrap!(self.inner.core_tx.lock());
+        let mut core_tx = unwrap!(self.inner.core_tx.lock());
         core_tx.send(msg).map_err(FfiError::from)
     }
 
+    /*
     /// Create unregistered client.
     pub fn unregistered<NetObs>(mut network_observer: NetObs) -> Result<Self, FfiError>
         where NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
@@ -219,13 +218,14 @@ impl Session {
                 .into_box())
         })
     }
+    */
 }
 
 impl Drop for Session {
     fn drop(&mut self) {
         debug!("Session is now being dropped.");
 
-        let core_tx = unwrap!(self.inner.core_tx.lock());
+        let mut core_tx = unwrap!(self.inner.core_tx.lock());
         let msg = CoreMsg::build_terminator();
 
         if let Err(e) = core_tx.send(msg) {
@@ -238,12 +238,13 @@ impl Drop for Session {
 /// companion functions to get a session must be called before initiating any
 /// operation allowed by this crate.
 #[no_mangle]
-pub unsafe extern "C" fn create_unregistered_client(user_data: *mut c_void,
-                                                    obs_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                 i32,
-                                                                                 i32),
-                                                    session_handle: *mut *mut Session)
+pub unsafe extern "C" fn create_unregistered_client(_user_data: *mut c_void,
+                                                    _obs_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                  i32,
+                                                                                  i32),
+                                                    _session_handle: *mut *mut Session)
                                                     -> i32 {
+    /*
     helper::catch_unwind_error_code(|| {
         trace!("FFI create unregistered client.");
         let user_data = OpaqueCtx(user_data);
@@ -256,6 +257,9 @@ pub unsafe extern "C" fn create_unregistered_client(user_data: *mut c_void,
         *session_handle = Box::into_raw(Box::new(session));
         Ok(())
     })
+    */
+
+    unimplemented!()
 }
 
 /// Create a registered client. This or any one of the other companion
@@ -263,16 +267,17 @@ pub unsafe extern "C" fn create_unregistered_client(user_data: *mut c_void,
 /// allowed by this crate. `session_handle` is a pointer to a pointer and must
 /// point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
-pub unsafe extern "C" fn create_account(account_locator: *const u8,
-                                        account_locator_len: usize,
-                                        account_password: *const u8,
-                                        account_password_len: usize,
-                                        session_handle: *mut *mut Session,
-                                        user_data: *mut c_void,
-                                        o_network_obs_cb: unsafe extern "C" fn(*mut c_void,
-                                                                               i32,
-                                                                               i32))
+pub unsafe extern "C" fn create_account(_account_locator: *const u8,
+                                        _account_locator_len: usize,
+                                        _account_password: *const u8,
+                                        _account_password_len: usize,
+                                        _session_handle: *mut *mut Session,
+                                        _user_data: *mut c_void,
+                                        _o_network_obs_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                i32,
+                                                                                i32))
                                         -> i32 {
+    /*
     helper::catch_unwind_error_code(|| {
         trace!("FFI create a client account.");
 
@@ -289,6 +294,9 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
         *session_handle = Box::into_raw(Box::new(session));
         Ok(())
     })
+    */
+
+    unimplemented!()
 }
 
 /// Log into a registered client. This or any one of the other companion
@@ -296,14 +304,15 @@ pub unsafe extern "C" fn create_account(account_locator: *const u8,
 /// allowed by this crate. `session_handle` is a pointer to a pointer and must
 /// point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
-pub unsafe extern "C" fn log_in(account_locator: *const u8,
-                                account_locator_len: usize,
-                                account_password: *const u8,
-                                account_password_len: usize,
-                                session_handle: *mut *mut Session,
-                                user_data: *mut c_void,
-                                o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
+pub unsafe extern "C" fn log_in(_account_locator: *const u8,
+                                _account_locator_len: usize,
+                                _account_password: *const u8,
+                                _account_password_len: usize,
+                                _session_handle: *mut *mut Session,
+                                _user_data: *mut c_void,
+                                _o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
                                 -> i32 {
+    /*
     helper::catch_unwind_error_code(|| {
         trace!("FFI login a registered client.");
 
@@ -320,8 +329,12 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
         *session_handle = Box::into_raw(Box::new(session));
         Ok(())
     })
+    */
+
+    unimplemented!()
 }
 
+/*
 /// Return the amount of calls that were done to `get`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_gets(session: *const Session,
@@ -410,6 +423,7 @@ pub unsafe extern "C" fn get_account_info(session: *const Session,
         (*session).account_info(user_data, o_cb)
     })
 }
+*/
 
 /// Discard and clean up the previously allocated session. Use this only if the
 /// session is obtained from one of the session obtainment functions in this
@@ -422,6 +436,7 @@ pub unsafe extern "C" fn session_free(session: *mut Session) {
 
 #[cfg(test)]
 mod tests {
+    /*
     use ffi::test_utils;
     use std::os::raw::c_void;
     use std::ptr;
@@ -476,4 +491,5 @@ mod tests {
             assert_eq!(err_code, 0);
         }
     }
+    */
 }

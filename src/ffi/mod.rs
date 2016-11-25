@@ -47,23 +47,23 @@
 mod macros;
 
 pub mod app;
-pub mod dir_details;
-pub mod dns;
+// pub mod dir_details;
+// pub mod dns;
 pub mod errors;
-pub mod file_details;
-pub mod logging;
+// pub mod file_details;
+// pub mod logging;
 pub mod low_level_api;
-pub mod nfs;
+// pub mod nfs;
 pub mod session;
-pub mod string_list;
+// pub mod string_list;
 
 mod callback;
-mod config;
+// mod config;
 mod helper;
 mod launcher_config;
 mod object_cache;
-#[cfg(test)]
-mod test_utils;
+// #[cfg(test)]
+// mod test_utils;
 
 pub use ffi::app::App;
 pub use ffi::errors::FfiError;
@@ -86,8 +86,8 @@ impl Into<*mut c_void> for OpaqueCtx {
     }
 }
 
-/// Result that uses FfiError as error type
-pub type FfiResult<T> = Result<T, FfiError>;
+// /// Result that uses FfiError as error type
+// pub type FfiResult<T> = Result<T, FfiError>;
 
 /// Object handle associated with objects. In normal C API one would expect
 /// rust code to pass pointers to opaque object to C. C code would then need to
@@ -105,11 +105,7 @@ pub type ObjectHandle = u64;
 /// Disambiguating ObjectHandle
 pub type AppHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
-pub type AppendableDataHandle = ObjectHandle;
-/// Disambiguating ObjectHandle
-pub type StructDataHandle = ObjectHandle;
-/// Disambiguating ObjectHandle
-pub type DataIdHandle = ObjectHandle;
+pub type XorNameHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
 pub type SelfEncryptorReaderHandle = ObjectHandle;
 /// Disambiguating ObjectHandle

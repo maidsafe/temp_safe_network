@@ -19,14 +19,16 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::Client;
-use core::futures::FutureExt;
-use ffi::{App, FfiError, FfiFuture};
+// use core::Client;
+// use core::futures::FutureExt;
+// use ffi::{App, FfiError, FfiFuture};
+
+use ffi::FfiError;
 use ffi::callback::{Callback, CallbackArgs};
-use ffi::config::SAFE_DRIVE_DIR_NAME;
-use futures::Future;
-use nfs::{Dir, DirMetadata};
-use nfs::helper::dir_helper;
+// use ffi::config::SAFE_DRIVE_DIR_NAME;
+// use futures::Future;
+// use nfs::{Dir, DirMetadata};
+// use nfs::helper::dir_helper;
 use std::{self, mem, slice};
 use std::error::Error;
 use std::os::raw::c_void;
@@ -41,6 +43,7 @@ pub unsafe fn c_utf8_to_str(ptr: *const u8, len: usize) -> Result<&'static str, 
         .map_err(|error| FfiError::from(error.description()))
 }
 
+/*
 pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize) -> Result<Option<String>, FfiError> {
     if ptr.is_null() {
         Ok(None)
@@ -50,20 +53,24 @@ pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize) -> Result<Option<
             .map_err(|error| FfiError::from(error.description()))
     }
 }
+*/
 
 // TODO: add c_utf8_to_opt_str (return Option<&str> instead of Option<String>)
 
 /// Returns a heap-allocated raw string, usable by C/FFI-boundary. The tuple
 /// means (pointer, length_in_bytes, capacity). Use `misc_u8_ptr_free` to free
 /// the memory.
+#[allow(unused)] // <-- TODO: remove this
 pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
     u8_vec_to_ptr(s.into_bytes())
 }
 
+#[allow(unused)] // <-- TODO: remove this
 pub unsafe fn u8_ptr_to_vec(ptr: *const u8, len: usize) -> Vec<u8> {
     slice::from_raw_parts(ptr, len).to_owned()
 }
 
+/*
 pub unsafe fn u8_ptr_to_opt_vec(ptr: *const u8, len: usize) -> Option<Vec<u8>> {
     if ptr.is_null() {
         None
@@ -71,7 +78,9 @@ pub unsafe fn u8_ptr_to_opt_vec(ptr: *const u8, len: usize) -> Option<Vec<u8>> {
         Some(u8_ptr_to_vec(ptr, len))
     }
 }
+*/
 
+#[allow(unused)] // <-- TODO: remove this
 pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
     v.shrink_to_fit();
     let ptr = v.as_mut_ptr();
@@ -82,6 +91,7 @@ pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
 }
 
 // Catch panics. On error return default value.
+#[allow(unused)] // <-- TODO: remove this
 pub fn catch_unwind<T: CallbackArgs, F: FnOnce() -> Result<T, FfiError>>(f: F) -> T {
     match catch_unwind_result(f) {
         Ok(value) => value,
@@ -93,11 +103,13 @@ pub fn catch_unwind<T: CallbackArgs, F: FnOnce() -> Result<T, FfiError>>(f: F) -
 }
 
 // Catch panics. Use this when the code cannot fail.
+#[allow(unused)] // <-- TODO: remove this
 pub fn catch_unwind_ok<T: CallbackArgs, F: FnOnce() -> T>(f: F) -> T {
     catch_unwind(|| Ok(f()))
 }
 
 // Catch panics. On error return the error code.
+#[allow(unused)] // <-- TODO: remove this
 pub fn catch_unwind_error_code<F: FnOnce() -> Result<(), FfiError>>(f: F) -> i32 {
     ffi_result_code!(catch_unwind_result(f))
 }
@@ -122,6 +134,7 @@ fn catch_unwind_result<T, F: FnOnce() -> Result<T, FfiError>>(f: F) -> Result<T,
     }
 }
 
+/*
 pub fn safe_drive_metadata(client: Client) -> Box<FfiFuture<DirMetadata>> {
     trace!("Obtain directory metadata for SAFEDrive - This can be cached for efficiency. So if \
             this is seen many times, check for missed optimisation opportunity.");
@@ -189,6 +202,7 @@ pub fn dir_and_file(client: &Client,
         .map(move |(dir_listing, dir_meta)| (dir_listing, dir_meta, file_name))
         .into_box()
 }
+*/
 
 #[cfg(test)]
 mod tests {

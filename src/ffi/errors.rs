@@ -21,11 +21,13 @@
 
 //! Errors thrown by the FFI operations
 
-use core::CoreError;
-use dns::{DNS_ERROR_START_RANGE, DnsError};
+use core::{CORE_ERROR_START_RANGE, CoreError};
+use futures::sync::mpsc::SendError;
+// use dns::{DNS_ERROR_START_RANGE, DnsError};
 use maidsafe_utilities::serialisation::SerialisationError;
-use nfs::errors::NfsError;
+// use nfs::errors::NfsError;
 use routing::RoutingError;
+use std::any::Any;
 use std::error::Error;
 use std::ffi::NulError;
 use std::fmt;
@@ -34,7 +36,8 @@ use std::sync::mpsc::RecvError;
 
 /// Intended for converting Launcher Errors into numeric codes for propagating
 /// some error information across FFI boundaries and specially to C.
-pub const FFI_ERROR_START_RANGE: i32 = DNS_ERROR_START_RANGE - 500;
+// pub const FFI_ERROR_START_RANGE: i32 = DNS_ERROR_START_RANGE - 500;
+pub const FFI_ERROR_START_RANGE: i32 = CORE_ERROR_START_RANGE - 1000;
 
 /// Launcher Errors
 pub enum FfiError {
@@ -42,10 +45,10 @@ pub enum FfiError {
     /// this enum variant is
     /// not insanely bigger than others.
     CoreError(Box<CoreError>),
-    /// Errors from safe_nfs
-    NfsError(Box<NfsError>),
-    /// Errors from safe_nfs
-    DnsError(Box<DnsError>),
+    // /// Errors from safe_nfs
+    // NfsError(Box<NfsError>),
+    // /// Errors from safe_nfs
+    // DnsError(Box<DnsError>),
     /// Unable to find/traverse directory or file path
     PathNotFound,
     /// Supplied path was invalid
@@ -65,8 +68,8 @@ pub enum FfiError {
     InvalidAppHandle,
     /// Invalid StructuredData handle
     InvalidStructDataHandle,
-    /// Invalid DataIdentifier handle
-    InvalidDataIdHandle,
+    /// Invalid XorName handle
+    InvalidXorNameHandle,
     /// Invalid Pub/PrivAppendableData handle
     InvalidAppendableDataHandle,
     /// Invalid Self Encryptor handle
@@ -110,6 +113,12 @@ impl From<RecvError> for FfiError {
     }
 }
 
+impl<T: Any> From<SendError<T>> for FfiError {
+    fn from(error: SendError<T>) -> Self {
+        FfiError::Unexpected(error.description().to_owned())
+    }
+}
+
 impl From<RoutingError> for FfiError {
     fn from(error: RoutingError) -> FfiError {
         FfiError::from(CoreError::from(error))
@@ -128,6 +137,7 @@ impl From<CoreError> for FfiError {
     }
 }
 
+/*
 impl From<NfsError> for FfiError {
     fn from(error: NfsError) -> FfiError {
         FfiError::NfsError(Box::new(error))
@@ -139,6 +149,7 @@ impl From<DnsError> for FfiError {
         FfiError::DnsError(Box::new(error))
     }
 }
+*/
 
 impl From<NulError> for FfiError {
     fn from(error: NulError) -> Self {
@@ -149,9 +160,12 @@ impl From<NulError> for FfiError {
 impl Into<i32> for FfiError {
     fn into(self) -> i32 {
         match self {
-            FfiError::CoreError(error) => (*error).into(),
-            FfiError::NfsError(error) => (*error).into(),
-            FfiError::DnsError(error) => (*error).into(),
+            FfiError::CoreError(_error) => {
+                // (*error).into()
+                unimplemented!()
+            }
+            // FfiError::NfsError(error) => (*error).into(),
+            // FfiError::DnsError(error) => (*error).into(),
             FfiError::PathNotFound => FFI_ERROR_START_RANGE - 1,
             FfiError::InvalidPath => FFI_ERROR_START_RANGE - 2,
             FfiError::PermissionDenied => FFI_ERROR_START_RANGE - 3,
@@ -161,7 +175,7 @@ impl Into<i32> for FfiError {
             FfiError::NulError(_) => FFI_ERROR_START_RANGE - 11,
             FfiError::InvalidAppHandle => FFI_ERROR_START_RANGE - 26,
             FfiError::InvalidStructDataHandle => FFI_ERROR_START_RANGE - 12,
-            FfiError::InvalidDataIdHandle => FFI_ERROR_START_RANGE - 13,
+            FfiError::InvalidXorNameHandle => FFI_ERROR_START_RANGE - 13,
             FfiError::InvalidAppendableDataHandle => FFI_ERROR_START_RANGE - 14,
             FfiError::InvalidSelfEncryptorHandle => FFI_ERROR_START_RANGE - 15,
             FfiError::InvalidCipherOptHandle => FFI_ERROR_START_RANGE - 16,
@@ -181,8 +195,8 @@ impl fmt::Debug for FfiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             FfiError::CoreError(ref error) => write!(f, "FfiError::CoreError -> {:?}", error),
-            FfiError::NfsError(ref error) => write!(f, "FfiError::NfsError -> {:?}", error),
-            FfiError::DnsError(ref error) => write!(f, "FfiError::DnsError -> {:?}", error),
+            // FfiError::NfsError(ref error) => write!(f, "FfiError::NfsError -> {:?}", error),
+            // FfiError::DnsError(ref error) => write!(f, "FfiError::DnsError -> {:?}", error),
             FfiError::PathNotFound => write!(f, "FfiError::PathNotFound"),
             FfiError::InvalidPath => write!(f, "FfiError::InvalidPath"),
             FfiError::PermissionDenied => write!(f, "FfiError::PermissionDenied"),
@@ -196,7 +210,7 @@ impl fmt::Debug for FfiError {
             FfiError::NulError(ref error) => write!(f, "FfiError::NulError -> {:?}", error),
             FfiError::InvalidAppHandle => write!(f, "FfiError::InvalidAppHandle"),
             FfiError::InvalidStructDataHandle => write!(f, "FfiError::InvalidStructDataHandle"),
-            FfiError::InvalidDataIdHandle => write!(f, "FfiError::InvalidDataIdHandle"),
+            FfiError::InvalidXorNameHandle => write!(f, "FfiError::InvalidXorNameHandle"),
             FfiError::InvalidAppendableDataHandle => {
                 write!(f, "FfiError::InvalidAppendableDataHandle")
             }

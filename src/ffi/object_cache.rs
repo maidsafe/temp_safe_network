@@ -20,14 +20,12 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::SelfEncryptionStorage;
-use ffi::{App, AppHandle, AppendableDataHandle, CipherOptHandle, DataIdHandle, EncryptKeyHandle,
-          ObjectHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle, SignKeyHandle,
-          StructDataHandle};
+use ffi::{App, AppHandle, CipherOptHandle, EncryptKeyHandle, ObjectHandle,
+          SelfEncryptorReaderHandle, SelfEncryptorWriterHandle, SignKeyHandle, XorNameHandle};
 use ffi::errors::FfiError;
-use ffi::low_level_api::appendable_data::AppendableData;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
-use routing::{DataIdentifier, StructuredData};
+use routing::XorName;
 use rust_sodium::crypto::{box_, sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
@@ -44,12 +42,10 @@ pub struct ObjectCache {
 
 struct Inner {
     handle_gen: HandleGenerator,
-    ad: Store<AppendableData>,
     app: Store<App>,
     cipher_opt: Store<CipherOpt>,
-    data_id: Store<DataIdentifier>,
+    xor_name: Store<XorName>,
     encrypt_key: Store<box_::PublicKey>,
-    sd: Store<StructuredData>,
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
     sign_key: Store<sign::PublicKey>,
@@ -60,12 +56,10 @@ impl ObjectCache {
         ObjectCache {
             inner: Rc::new(Inner {
                 handle_gen: HandleGenerator::new(),
-                ad: Store::new(),
                 app: Store::new(),
                 cipher_opt: Store::new(),
-                data_id: Store::new(),
+                xor_name: Store::new(),
                 encrypt_key: Store::new(),
-                sd: Store::new(),
                 se_reader: Store::new(),
                 se_writer: Store::new(),
                 sign_key: Store::new(),
@@ -75,19 +69,13 @@ impl ObjectCache {
 
     pub fn reset(&self) {
         self.inner.handle_gen.reset();
-        self.inner.ad.clear();
         self.inner.app.clear();
         self.inner.cipher_opt.clear();
-        self.inner.data_id.clear();
+        self.inner.xor_name.clear();
         self.inner.encrypt_key.clear();
-        self.inner.sd.clear();
         self.inner.se_reader.clear();
         self.inner.se_writer.clear();
         self.inner.sign_key.clear();
-    }
-
-    pub fn insert_sd_at(&self, handle: StructDataHandle, data: StructuredData) {
-        let _ = self.inner.sd.insert(handle, data);
     }
 }
 
@@ -124,13 +112,6 @@ impl_cache!(app,
             get_app,
             insert_app,
             remove_app);
-impl_cache!(ad,
-            AppendableData,
-            AppendableDataHandle,
-            InvalidAppendableDataHandle,
-            get_ad,
-            insert_ad,
-            remove_ad);
 impl_cache!(cipher_opt,
             CipherOpt,
             CipherOptHandle,
@@ -138,13 +119,13 @@ impl_cache!(cipher_opt,
             get_cipher_opt,
             insert_cipher_opt,
             remove_cipher_opt);
-impl_cache!(data_id,
-            DataIdentifier,
-            DataIdHandle,
-            InvalidDataIdHandle,
-            get_data_id,
-            insert_data_id,
-            remove_data_id);
+impl_cache!(xor_name,
+            XorName,
+            XorNameHandle,
+            InvalidXorNameHandle,
+            get_xor_name,
+            insert_xor_name,
+            remove_xor_name);
 impl_cache!(encrypt_key,
             box_::PublicKey,
             EncryptKeyHandle,
@@ -173,13 +154,6 @@ impl_cache!(sign_key,
             get_sign_key,
             insert_sign_key,
             remove_sign_key);
-impl_cache!(sd,
-            StructuredData,
-            StructDataHandle,
-            InvalidStructDataHandle,
-            get_sd,
-            insert_sd,
-            remove_sd);
 
 impl Default for ObjectCache {
     fn default() -> Self {
@@ -241,17 +215,16 @@ impl<V> Store<V> {
 #[cfg(test)]
 mod tests {
     use rand;
-    use routing::DataIdentifier;
     use super::*;
 
     #[test]
     fn reset() {
         let object_cache = ObjectCache::new();
 
-        let handle = object_cache.insert_data_id(DataIdentifier::Immutable(rand::random()));
-        assert!(object_cache.get_data_id(handle).is_ok());
+        let handle = object_cache.insert_xor_name(rand::random());
+        assert!(object_cache.get_xor_name(handle).is_ok());
 
         object_cache.reset();
-        assert!(object_cache.get_data_id(handle).is_err());
+        assert!(object_cache.get_xor_name(handle).is_err());
     }
 }
