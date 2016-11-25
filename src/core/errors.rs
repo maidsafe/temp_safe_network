@@ -21,6 +21,7 @@
 
 use core::SelfEncryptionStorageError;
 use maidsafe_utilities::serialisation::SerialisationError;
+// use routing::{ClientError, DataIdentifier};
 use routing::messaging;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
@@ -204,7 +205,7 @@ impl Into<i32> for CoreError {
 
 impl Debug for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        try!(write!(formatter, "{} - ", self.description()));
+        write!(formatter, "{} - ", self.description())?;
         match *self {
             CoreError::StructuredDataHeaderSizeProhibitive => {
                 write!(formatter, "CoreError::StructuredDataHeaderSizeProhibitive")
