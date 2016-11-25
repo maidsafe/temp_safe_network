@@ -31,10 +31,8 @@ pub const NETWORK_EVENT_START_RANGE: i32 = 0;
 pub enum CoreEvent {
     /// Result of getting ImmutableData
     GetIData(Result<ImmutableData, CoreError>),
-    /// Result of putting ImmutableData
-    PutIData(Result<(), CoreError>),
-    /// Result of putting MutableData
-    PutMData(Result<(), CoreError>),
+    /// Result of data mutation request
+    Mutation(Result<(), CoreError>),
     /// Result of getting a single value from MutableData
     GetMDataValue(Result<Value, CoreError>),
 }

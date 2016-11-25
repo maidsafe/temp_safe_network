@@ -73,11 +73,13 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
         Response::GetIData { res, msg_id } => {
             (msg_id, CoreEvent::GetIData(res.map_err(CoreError::from)))
         }
+        Response::ChangeMDataOwner { res, msg_id } |
+        Response::DelMDataUserPermissions { res, msg_id } |
+        Response::SetMDataUserPermissions { res, msg_id } |
+        Response::MutateMDataEntries { res, msg_id } |
+        Response::PutMData { res, msg_id } |
         Response::PutIData { res, msg_id } => {
-            (msg_id, CoreEvent::PutIData(res.map_err(CoreError::from)))
-        }
-        Response::PutMData { res, msg_id } => {
-            (msg_id, CoreEvent::PutMData(res.map_err(CoreError::from)))
+            (msg_id, CoreEvent::Mutation(res.map_err(CoreError::from)))
         }
         Response::GetMDataValue { res, msg_id } => {
             (msg_id, CoreEvent::GetMDataValue(res.map_err(CoreError::from)))
