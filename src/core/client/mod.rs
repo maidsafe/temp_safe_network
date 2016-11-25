@@ -22,6 +22,8 @@
 mod account;
 #[cfg(feature = "use-mock-routing")]
 mod mock_routing;
+
+/*
 mod routing_el;
 
 use core::{CoreError, CoreFuture, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent, NetworkTx, utility};
@@ -1348,3 +1350,4 @@ mod tests {
         })
     }
 }
+*/
