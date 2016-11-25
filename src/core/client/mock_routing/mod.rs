@@ -90,7 +90,7 @@ impl MockRouting {
     }
 
     /// Gets MAID account information.
-    pub fn get_account_info(&mut self,
+    pub fn get_account_info(&self,
                             dst: Authority,
                             msg_id: MessageId)
                             -> Result<(), InterfaceError> {
@@ -119,7 +119,7 @@ impl MockRouting {
     }
 
     /// Puts ImmutableData to the network.
-    pub fn put_idata(&mut self,
+    pub fn put_idata(&self,
                      _dst: Authority,
                      data: ImmutableData,
                      msg_id: MessageId)
@@ -164,7 +164,7 @@ impl MockRouting {
     }
 
     /// Fetches ImmutableData from the network by the given name.
-    pub fn get_idata(&mut self,
+    pub fn get_idata(&self,
                      _dst: Authority,
                      name: XorName,
                      msg_id: MessageId)
@@ -194,7 +194,7 @@ impl MockRouting {
     }
 
     /// Creates a new MutableData in the network.
-    pub fn put_mdata(&mut self,
+    pub fn put_mdata(&self,
                      dst: Authority,
                      data: MutableData,
                      msg_id: MessageId,
@@ -240,7 +240,7 @@ impl MockRouting {
     }
 
     /// Fetches a latest version number.
-    pub fn get_mdata_version(&mut self,
+    pub fn get_mdata_version(&self,
                              dst: Authority,
                              name: XorName,
                              tag: u64,
@@ -261,7 +261,7 @@ impl MockRouting {
     }
 
     /// Fetches a list of entries (keys + values).
-    pub fn list_mdata_entries(&mut self,
+    pub fn list_mdata_entries(&self,
                               dst: Authority,
                               name: XorName,
                               tag: u64,
@@ -282,7 +282,7 @@ impl MockRouting {
     }
 
     /// Fetches a list of keys in MutableData.
-    pub fn list_mdata_keys(&mut self,
+    pub fn list_mdata_keys(&self,
                            dst: Authority,
                            name: XorName,
                            tag: u64,
@@ -306,7 +306,7 @@ impl MockRouting {
     }
 
     /// Fetches a list of values in MutableData.
-    pub fn list_mdata_values(&mut self,
+    pub fn list_mdata_values(&self,
                              dst: Authority,
                              name: XorName,
                              tag: u64,
@@ -330,7 +330,7 @@ impl MockRouting {
     }
 
     /// Fetches a single value from MutableData
-    pub fn get_mdata_value(&mut self,
+    pub fn get_mdata_value(&self,
                            dst: Authority,
                            name: XorName,
                            tag: u64,
@@ -356,7 +356,7 @@ impl MockRouting {
     }
 
     /// Updates MutableData entries in bulk.
-    pub fn mutate_mdata_entries(&mut self,
+    pub fn mutate_mdata_entries(&self,
                                 dst: Authority,
                                 name: XorName,
                                 tag: u64,
@@ -379,7 +379,7 @@ impl MockRouting {
     }
 
     /// Fetches a complete list of permissions.
-    pub fn list_mdata_permissions(&mut self,
+    pub fn list_mdata_permissions(&self,
                                   dst: Authority,
                                   name: XorName,
                                   tag: u64,
@@ -400,7 +400,7 @@ impl MockRouting {
     }
 
     /// Fetches a list of permissions for a particular User.
-    pub fn list_mdata_user_permissions(&mut self,
+    pub fn list_mdata_user_permissions(&self,
                                        dst: Authority,
                                        name: XorName,
                                        tag: u64,
@@ -429,7 +429,7 @@ impl MockRouting {
 
     /// Updates or inserts a list of permissions for a particular User in the given
     /// MutableData.
-    pub fn set_mdata_user_permissions(&mut self,
+    pub fn set_mdata_user_permissions(&self,
                                       dst: Authority,
                                       name: XorName,
                                       tag: u64,
@@ -454,7 +454,7 @@ impl MockRouting {
     }
 
     /// Deletes a list of permissions for a particular User in the given MutableData.
-    pub fn del_mdata_user_permissions(&mut self,
+    pub fn del_mdata_user_permissions(&self,
                                       dst: Authority,
                                       name: XorName,
                                       tag: u64,
@@ -478,7 +478,7 @@ impl MockRouting {
     }
 
     /// Changes an owner of the given MutableData. Only the current owner can perform this action.
-    pub fn change_mdata_owner(&mut self,
+    pub fn change_mdata_owner(&self,
                               dst: Authority,
                               name: XorName,
                               tag: u64,

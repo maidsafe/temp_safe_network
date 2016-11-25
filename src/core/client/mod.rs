@@ -104,7 +104,7 @@ impl Client {
     }
 
     /// Creates an empty dir to hold configuration or user data
-    fn create_empty_dir(routing: &mut Routing,
+    fn create_empty_dir(routing: &Routing,
                         routing_rx: &Receiver<Event>,
                         owners: BTreeSet<sign::PublicKey>,
                         requester: sign::PublicKey)
@@ -163,12 +163,10 @@ impl Client {
         let mut owners = BTreeSet::new();
         owners.insert(pub_key.clone());
 
-        let (mut routing, routing_rx) = setup_routing(full_id)?;
+        let (routing, routing_rx) = setup_routing(full_id)?;
 
-        let user_root =
-            Client::create_empty_dir(&mut routing, &routing_rx, owners.clone(), pub_key)?;
-        let config_dir =
-            Client::create_empty_dir(&mut routing, &routing_rx, owners.clone(), pub_key)?;
+        let user_root = Client::create_empty_dir(&routing, &routing_rx, owners.clone(), pub_key)?;
+        let config_dir = Client::create_empty_dir(&routing, &routing_rx, owners.clone(), pub_key)?;
 
         let acc = Account::new(maid_keys, user_root, config_dir);
 
@@ -245,7 +243,7 @@ impl Client {
 
         let acc_content = {
             trace!("Creating throw-away routing getter for account packet.");
-            let (mut routing, routing_rx) = setup_routing(None)?;
+            let (routing, routing_rx) = setup_routing(None)?;
 
             routing.get_mdata_value(dst,
                                  acc_loc,
