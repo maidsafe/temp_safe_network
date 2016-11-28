@@ -161,8 +161,10 @@ impl Into<i32> for FfiError {
     fn into(self) -> i32 {
         match self {
             FfiError::CoreError(_error) => {
+                // TODO: implement this properly.
+                FFI_ERROR_START_RANGE
+
                 // (*error).into()
-                unimplemented!()
             }
             // FfiError::NfsError(error) => (*error).into(),
             // FfiError::DnsError(error) => (*error).into(),

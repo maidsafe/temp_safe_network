@@ -351,12 +351,11 @@ pub unsafe extern "C" fn immut_data_self_encryptor_reader_free(session: *const S
 
 #[cfg(test)]
 mod tests {
-    /*
     use core::utility;
     use ffi::{ObjectHandle, test_utils};
     use ffi::errors::FfiError;
     use ffi::low_level_api::cipher_opt::*;
-    use ffi::low_level_api::data_id::data_id_free;
+    use ffi::low_level_api::xor_name::*;
     use std::{panic, process};
     use std::os::raw::c_void;
     use std::sync::mpsc;
@@ -429,7 +428,7 @@ mod tests {
                                             cipher_opt_h,
                                             handle_tx,
                                             handle_cb);
-            let (err_code, data_id_h) = unwrap!(handle_rx.recv());
+            let (err_code, name_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
             immut_data_self_encryptor_reader_free(&sess, se_writer_h, err_code_tx, err_code_cb);
@@ -452,7 +451,7 @@ mod tests {
             let (err_code, _) = unwrap!(data_size_rx.recv());
             assert_eq!(err_code, FfiError::InvalidSelfEncryptorHandle.into());
 
-            immut_data_fetch_self_encryptor(&sess, app_0, data_id_h, handle_tx, handle_cb);
+            immut_data_fetch_self_encryptor(&sess, app_0, name_h, handle_tx, handle_cb);
             let (err_code, _) = unwrap!(handle_rx.recv());
             assert!(err_code != 0);
 
@@ -460,7 +459,7 @@ mod tests {
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            immut_data_fetch_self_encryptor(&sess, app_1, data_id_h, handle_tx, handle_cb);
+            immut_data_fetch_self_encryptor(&sess, app_1, name_h, handle_tx, handle_cb);
             let (err_code, se_reader_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
@@ -489,7 +488,7 @@ mod tests {
             cipher_opt_free(&sess, cipher_opt_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            data_id_free(&sess, data_id_h, err_code_tx, err_code_cb);
+            xor_name_free(&sess, name_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
         }
     }
@@ -537,5 +536,4 @@ mod tests {
             process::exit(-1);
         }
     }
-    */
 }

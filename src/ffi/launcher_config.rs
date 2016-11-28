@@ -30,7 +30,7 @@ use ffi::FfiFuture;
 // use nfs::helper::{dir_helper, file_helper};
 // use nfs::helper::writer::Mode::Overwrite;
 use routing::XorName;
-// use rust_sodium::crypto::{box_, secretbox};
+use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::hash::sha256;
 // use std::collections::HashMap;
 use super::App;
@@ -39,8 +39,19 @@ pub fn app(_client: &Client,
            _app_name: String,
            _app_key: String,
            _vendor: String,
-           _safe_drive_access: bool)
+           safe_drive_access: bool)
            -> Box<FfiFuture<App>> {
+
+    // TODO: fix `launcher_global_config_and_dir` and replace the following code
+    // with the commented out one below.
+
+    ok!(App::Registered {
+        asym_enc_keys: box_::gen_keypair(),
+        sym_key: secretbox::gen_key(),
+        safe_drive_access: safe_drive_access,
+    })
+
+
     /*
     let app_id = app_id(&app_key, &vendor);
     let c2 = client.clone();
@@ -87,7 +98,6 @@ pub fn app(_client: &Client,
         })
         .into_box()
     */
-    unimplemented!()
 }
 
 #[allow(unused)] // <-- TODO: remove this

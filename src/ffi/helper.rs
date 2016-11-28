@@ -109,7 +109,6 @@ pub fn catch_unwind_ok<T: CallbackArgs, F: FnOnce() -> T>(f: F) -> T {
 }
 
 // Catch panics. On error return the error code.
-#[allow(unused)] // <-- TODO: remove this
 pub fn catch_unwind_error_code<F: FnOnce() -> Result<(), FfiError>>(f: F) -> i32 {
     ffi_result_code!(catch_unwind_result(f))
 }

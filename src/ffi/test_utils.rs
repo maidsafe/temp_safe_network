@@ -19,20 +19,16 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::Client;
-// use core::utility;
-// use core::futures::FutureExt;
-use ffi::Session;
-// use ffi::App;
-// use ffi::launcher_config;
+use core::{Client, FutureExt, utility};
+use ffi::{App, Session};
+use ffi::launcher_config;
 use ffi::object_cache::ObjectCache;
-// use futures::{Future, IntoFuture};
-// use std::ffi::CString;
-// use std::fmt::Debug;
+use futures::{Future, IntoFuture};
+use std::ffi::CString;
+use std::fmt::Debug;
 use std::os::raw::c_void;
 use std::sync::mpsc::{self, Sender};
 
-/*
 pub fn generate_random_cstring(len: usize) -> CString {
     let mut cstring_vec = unwrap!(utility::generate_random_vector::<u8>(len));
 
@@ -47,23 +43,19 @@ pub fn generate_random_cstring(len: usize) -> CString {
     // Ok to unwrap, as we took care of removing all NULs above.
     unwrap!(CString::new(cstring_vec))
 }
-*/
 
 pub fn create_session() -> Session {
-    /*
     let acc_locator = unwrap!(utility::generate_random_string(10));
     let acc_password = unwrap!(utility::generate_random_string(10));
 
     unwrap!(Session::create_account(acc_locator, acc_password, |_net_evt| ()))
-    */
-
-    unimplemented!()
 }
 
 /*
 pub fn create_unregistered_session() -> Session {
     unwrap!(Session::unregistered(|_| ()))
 }
+*/
 
 // Run the given closure inside the session event loop. The closure should
 // return a future which will then be driven to completion and its result
@@ -88,7 +80,6 @@ pub fn run<F, I, R, E>(session: &Session, f: F) -> R
 
     unwrap!(rx.recv())
 }
-*/
 
 // Run the given closure inside the session event loop. The return value of
 // the closure is returned immediately.
@@ -106,7 +97,6 @@ pub fn run_now<F, R>(session: &Session, f: F) -> R
     unwrap!(rx.recv())
 }
 
-/*
 pub fn create_app(session: &Session, has_safe_drive_access: bool) -> App {
     let app_name = "Test App".to_string();
     let app_id = unwrap!(utility::generate_random_string(10));
@@ -116,7 +106,6 @@ pub fn create_app(session: &Session, has_safe_drive_access: bool) -> App {
         launcher_config::app(client, app_name, app_id, vendor, has_safe_drive_access)
     })
 }
-*/
 
 // Convert a `mpsc::Sender<T>` to a void ptr which can be passed as user data to
 // ffi functions
