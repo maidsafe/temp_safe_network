@@ -663,6 +663,40 @@ impl Client {
         })
     }
 
+    /// Fetches a list of authorised keys and version in MaidManager
+    pub fn list_auth_keys(&self) -> Box<CoreFuture<BTreeSet<sign::PublicKey>>> {
+        trace!("ListAuthKeysAndVersion");
+
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
+
+        self.get(CoreEvent::ListAuthKeysAndVersion,
+                 |routing, msg_id| routing.list_auth_keys(dst, msg_id))
+            .and_then(|event| match_event!(event, CoreEvent::ListAuthKeysAndVersion))
+            .into_box()
+    }
+
+    /// Adds a new authorised key to MaidManager
+    pub fn ins_auth_key(&self, key: sign::PublicKey, version: u64) -> Box<CoreFuture<()>> {
+        trace!("InsAuthKey ({:?})", key);
+
+        let requester = fry!(self.public_signing_key());
+
+        self.mutate(|routing, dst, msg_id| {
+            routing.ins_auth_key(dst, key, version, msg_id, requester)
+        })
+    }
+
+    /// Removes an authorised key from MaidManager
+    pub fn del_auth_key(&self, key: sign::PublicKey, version: u64) -> Box<CoreFuture<()>> {
+        trace!("DelAuthKey ({:?})", key);
+
+        let requester = fry!(self.public_signing_key());
+
+        self.mutate(|routing, dst, msg_id| {
+            routing.del_auth_key(dst, key, version, msg_id, requester)
+        })
+    }
+
     /// Create an entry for the Root Directory ID for the user into the session
     /// packet, encrypt and store it. It will be retrieved when the user logs
     /// into their account.  Root directory ID is necessary to fetch all of the
