@@ -501,6 +501,34 @@ impl MockRouting {
                           })
     }
 
+    /// Fetches a list of authorised keys and version in MaidManager
+    pub fn list_auth_keys(&self,
+                          _dst: Authority,
+                          _message_id: MessageId)
+                          -> Result<(), InterfaceError> {
+        unimplemented!();
+    }
+
+    /// Adds a new authorised key to MaidManager
+    pub fn ins_auth_key(&self,
+                        _dst: Authority,
+                        _key: sign::PublicKey,
+                        _version: u64,
+                        _message_id: MessageId)
+                        -> Result<(), InterfaceError> {
+        unimplemented!();
+    }
+
+    /// Removes an authorised key from MaidManager
+    pub fn del_auth_key(&self,
+                        _dst: Authority,
+                        _key: sign::PublicKey,
+                        _version: u64,
+                        _message_id: MessageId)
+                        -> Result<(), InterfaceError> {
+        unimplemented!();
+    }
+
     fn send_response(&self, delay_ms: u64, src: Authority, dst: Authority, response: Response) {
         let event = Event::Response {
             response: response,
