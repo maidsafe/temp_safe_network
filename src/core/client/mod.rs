@@ -380,10 +380,7 @@ impl Client {
     /// Get immutable data from the network. If the data exists locally in the cache
     /// then it will be immediately be returned without making an actual network
     /// request.
-    pub fn get_idata(&self,
-                     name: XorName,
-                     dst: Option<Authority>)
-                     -> Box<CoreFuture<ImmutableData>> {
+    pub fn get_idata(&self, name: XorName) -> Box<CoreFuture<ImmutableData>> {
         trace!("GetIData for {:?}", name);
 
         let (hook, rx, msg_id) = oneshot!(self, CoreEvent::GetIData);
@@ -407,8 +404,7 @@ impl Client {
                 .into_box()
         };
 
-        let dst = dst.unwrap_or_else(|| Authority::NaeManager(name));
-        let result = self.routing_mut().get_idata(dst, name, msg_id);
+        let result = self.routing_mut().get_idata(Authority::NaeManager(name), name, msg_id);
         if let Err(err) = result {
             hook.complete(CoreEvent::GetIData(Err(CoreError::from(err))));
         } else {
@@ -422,52 +418,41 @@ impl Client {
     // Trait when it arrives in stable. Change from `Box<CoreFuture>` -> `impl
     // CoreFuture`.
     /// Put immutable data onto the network.
-    pub fn put_idata(&self, data: ImmutableData, dst: Option<Authority>) -> Box<CoreFuture<()>> {
+    pub fn put_idata(&self, data: ImmutableData) -> Box<CoreFuture<()>> {
         trace!("PutIData for {:?}", data);
 
-        self.mutate(dst,
-                    |routing, dst, msg_id| routing.put_idata(dst, data, msg_id))
+        self.mutate(|routing, dst, msg_id| routing.put_idata(dst, data, msg_id))
     }
 
     /// Put `MutableData` onto the network.
-    pub fn put_mdata(&self, data: MutableData, dst: Option<Authority>) -> Box<CoreFuture<()>> {
+    pub fn put_mdata(&self, data: MutableData) -> Box<CoreFuture<()>> {
         trace!("PutMData for {:?}", data);
 
         let requester = fry!(self.public_signing_key());
-
-        self.mutate(dst,
-                    |routing, dst, msg_id| routing.put_mdata(dst, data, msg_id, requester))
+        self.mutate(|routing, dst, msg_id| routing.put_mdata(dst, data, msg_id, requester))
     }
 
     /// Mutates `MutableData` entries in bulk.
     pub fn mutate_mdata_entries(&self,
                                 name: XorName,
                                 tag: u64,
-                                actions: BTreeMap<Vec<u8>, EntryAction>,
-                                dst: Option<Authority>)
+                                actions: BTreeMap<Vec<u8>, EntryAction>)
                                 -> Box<CoreFuture<()>> {
         trace!("PutMData for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
 
-        self.mutate(dst, |routing, dst, msg_id| {
+        self.mutate(|routing, dst, msg_id| {
             routing.mutate_mdata_entries(dst, name, tag, actions, msg_id, requester)
         })
     }
 
     /// Get a current version of `MutableData` from the network.
-    pub fn get_mdata_version(&self,
-                             name: XorName,
-                             tag: u64,
-                             dst: Option<Authority>)
-                             -> Box<CoreFuture<u64>> {
+    pub fn get_mdata_version(&self, name: XorName, tag: u64) -> Box<CoreFuture<u64>> {
         trace!("GetMDataVersion for {:?}", name);
 
         self.get(CoreEvent::GetMDataVersion, |routing, msg_id| {
-                routing.get_mdata_version(dst.unwrap_or_else(|| Authority::NaeManager(name)),
-                                          name,
-                                          tag,
-                                          msg_id)
+                routing.get_mdata_version(Authority::NaeManager(name), name, tag, msg_id)
             })
             .and_then(|event| match_event!(event, CoreEvent::GetMDataVersion))
             .into_box()
@@ -476,88 +461,57 @@ impl Client {
     /// Returns a complete list of entries in `MutableData`.
     pub fn list_mdata_entries(&self,
                               name: XorName,
-                              tag: u64,
-                              dst: Option<Authority>)
+                              tag: u64)
                               -> Box<CoreFuture<BTreeMap<Vec<u8>, Value>>> {
         trace!("ListMDataEntries for {:?}", name);
 
         self.get(CoreEvent::ListMDataEntries, |routing, msg_id| {
-                routing.list_mdata_entries(dst.unwrap_or_else(|| Authority::NaeManager(name)),
-                                           name,
-                                           tag,
-                                           msg_id)
+                routing.list_mdata_entries(Authority::NaeManager(name), name, tag, msg_id)
             })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataEntries))
             .into_box()
     }
 
     /// Returns a list of keys in `MutableData` stored on the network
-    pub fn list_mdata_keys(&self,
-                           name: XorName,
-                           tag: u64,
-                           dst: Option<Authority>)
-                           -> Box<CoreFuture<BTreeSet<Vec<u8>>>> {
+    pub fn list_mdata_keys(&self, name: XorName, tag: u64) -> Box<CoreFuture<BTreeSet<Vec<u8>>>> {
         trace!("ListMDataKeys for {:?}", name);
 
         self.get(CoreEvent::ListMDataKeys, |routing, msg_id| {
-                routing.list_mdata_keys(dst.unwrap_or_else(|| Authority::NaeManager(name)),
-                                        name,
-                                        tag,
-                                        msg_id)
+                routing.list_mdata_keys(Authority::NaeManager(name), name, tag, msg_id)
             })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataKeys))
             .into_box()
     }
 
     /// Returns a list of keys in `MutableData` stored on the network
-    pub fn list_mdata_values(&self,
-                             name: XorName,
-                             tag: u64,
-                             dst: Option<Authority>)
-                             -> Box<CoreFuture<Vec<Value>>> {
+    pub fn list_mdata_values(&self, name: XorName, tag: u64) -> Box<CoreFuture<Vec<Value>>> {
         trace!("ListMDataValues for {:?}", name);
 
         self.get(CoreEvent::ListMDataValues, |routing, msg_id| {
-                routing.list_mdata_values(dst.unwrap_or_else(|| Authority::NaeManager(name)),
-                                          name,
-                                          tag,
-                                          msg_id)
+                routing.list_mdata_values(Authority::NaeManager(name), name, tag, msg_id)
             })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataValues))
             .into_box()
     }
 
     /// Get a single entry from `MutableData`
-    pub fn get_mdata_value(&self,
-                           name: XorName,
-                           tag: u64,
-                           key: Vec<u8>,
-                           dst: Option<Authority>)
-                           -> Box<CoreFuture<Value>> {
+    pub fn get_mdata_value(&self, name: XorName, tag: u64, key: Vec<u8>) -> Box<CoreFuture<Value>> {
         trace!("GetMDataValue for {:?}", name);
 
         self.get(CoreEvent::GetMDataValue, |routing, msg_id| {
-                routing.get_mdata_value(dst.unwrap_or_else(|| Authority::NaeManager(name)),
-                                        name,
-                                        tag,
-                                        key,
-                                        msg_id)
+                routing.get_mdata_value(Authority::NaeManager(name), name, tag, key, msg_id)
             })
             .and_then(|event| match_event!(event, CoreEvent::GetMDataValue))
             .into_box()
     }
 
     /// Get data from the network.
-    pub fn get_account_info(&self, dst: Option<Authority>) -> Box<CoreFuture<AccountInfo>> {
+    pub fn get_account_info(&self) -> Box<CoreFuture<AccountInfo>> {
         trace!("Account info GET issued.");
-
-        let dst = fry!(match dst {
-            Some(a) => Ok(a),
-            None => self.inner().client_type.cm_addr().map(|a| a.clone()),
-        });
 
         let (hook, rx, msg_id) = oneshot!(self, CoreEvent::AccountInfo);
 
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
         let result = self.routing_mut().get_account_info(dst, msg_id);
 
         if let Err(e) = result {
@@ -572,16 +526,12 @@ impl Client {
     /// Returns a list of permissions in `MutableData` stored on the network
     pub fn list_mdata_permissions(&self,
                                   name: XorName,
-                                  tag: u64,
-                                  dst: Option<Authority>)
+                                  tag: u64)
                                   -> Box<CoreFuture<BTreeMap<User, PermissionSet>>> {
         trace!("ListMDataPermissions for {:?}", name);
 
         self.get(CoreEvent::ListMDataPermissions, |routing, msg_id| {
-                routing.list_mdata_permissions(dst.unwrap_or_else(|| Authority::NaeManager(name)),
-                                               name,
-                                               tag,
-                                               msg_id)
+                routing.list_mdata_permissions(Authority::NaeManager(name), name, tag, msg_id)
             })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataPermissions))
             .into_box()
@@ -591,13 +541,12 @@ impl Client {
     pub fn list_mdata_user_permissions(&self,
                                        name: XorName,
                                        tag: u64,
-                                       user: User,
-                                       dst: Option<Authority>)
+                                       user: User)
                                        -> Box<CoreFuture<PermissionSet>> {
         trace!("ListMDataUserPermissions for {:?}", name);
 
         self.get(CoreEvent::ListMDataUserPermissions, |routing, msg_id| {
-                let dst = dst.unwrap_or_else(|| Authority::NaeManager(name));
+                let dst = Authority::NaeManager(name);
                 routing.list_mdata_user_permissions(dst, name, tag, user, msg_id)
             })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataUserPermissions))
@@ -610,14 +559,13 @@ impl Client {
                                       tag: u64,
                                       user: User,
                                       permissions: PermissionSet,
-                                      version: u64,
-                                      dst: Option<Authority>)
+                                      version: u64)
                                       -> Box<CoreFuture<()>> {
         trace!("SetMDataUserPermissions for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
 
-        self.mutate(dst, |routing, dst, msg_id| {
+        self.mutate(|routing, dst, msg_id| {
             routing.set_mdata_user_permissions(dst,
                                                name,
                                                tag,
@@ -634,14 +582,13 @@ impl Client {
                                       name: XorName,
                                       tag: u64,
                                       user: User,
-                                      version: u64,
-                                      dst: Option<Authority>)
+                                      version: u64)
                                       -> Box<CoreFuture<()>> {
         trace!("DelMDataUserPermissions for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
 
-        self.mutate(dst, |routing, dst, msg_id| {
+        self.mutate(|routing, dst, msg_id| {
             routing.del_mdata_user_permissions(dst, name, tag, user, version, msg_id, requester)
         })
     }
@@ -651,14 +598,13 @@ impl Client {
                               name: XorName,
                               tag: u64,
                               new_owner: sign::PublicKey,
-                              version: u64,
-                              dst: Option<Authority>)
+                              version: u64)
                               -> Box<CoreFuture<()>> {
         trace!("ChangeMDataOwner for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
 
-        self.mutate(dst, |routing, dst, msg_id| {
+        self.mutate(|routing, dst, msg_id| {
             routing.change_mdata_owner(dst, name, tag, new_owner, version, msg_id, requester)
         })
     }
@@ -800,7 +746,7 @@ impl Client {
                                    entry_version: entry_version,
                                }));
 
-        self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, actions, None)
+        self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, actions)
     }
 
     /// Creates an empty dir to hold configuration or user data
@@ -862,13 +808,10 @@ impl Client {
     }
 
     /// Generic mutation request
-    fn mutate<F>(&self, dst: Option<Authority>, req: F) -> Box<CoreFuture<()>>
+    fn mutate<F>(&self, req: F) -> Box<CoreFuture<()>>
         where F: FnOnce(&mut Routing, Authority, MessageId) -> Result<(), InterfaceError>
     {
-        let dst = fry!(match dst {
-            Some(a) => Ok(a),
-            None => self.inner().client_type.cm_addr().map(|a| a.clone()),
-        });
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
 
         self.get(CoreEvent::Mutation,
                  |routing, msg_id| req(routing, dst, msg_id))
@@ -1081,7 +1024,7 @@ mod tests {
         // Registered Client PUTs something onto the network
         {
             let orig_data = orig_data.clone();
-            random_client(|client| client.put_idata(orig_data, None));
+            random_client(|client| client.put_idata(orig_data));
         }
 
         // Unregistered Client should be able to retrieve the data
@@ -1089,7 +1032,7 @@ mod tests {
             let client2 = client.clone();
             let client3 = client.clone();
 
-            client.get_idata(*orig_data.name(), None)
+            client.get_idata(*orig_data.name())
                 .then(move |res| {
                     let data = unwrap!(res);
                     assert_eq!(data, orig_data);
@@ -1350,7 +1293,7 @@ mod tests {
             client.set_simulate_timeout(true);
             client.set_timeout(Duration::from_millis(250));
 
-            client.get_idata(rand::random(), None)
+            client.get_idata(rand::random())
                 .then(|result| match result {
                     Ok(_) => panic!("Unexpected success"),
                     Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
@@ -1362,7 +1305,7 @@ mod tests {
                     let data = unwrap!(utility::generate_random_vector(4));
                     let data = ImmutableData::new(data);
 
-                    client2.put_idata(data, None)
+                    client2.put_idata(data)
                 })
                 .then(|result| match result {
                     Ok(_) => panic!("Unexpected success"),
