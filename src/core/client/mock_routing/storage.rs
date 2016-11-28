@@ -128,10 +128,8 @@ mod sync {
     pub fn load() -> Option<Storage> {
         if let Ok(mut file) = File::open(path()) {
             let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata()).len() as usize);
-            if let Ok(_) = file.read_to_end(&mut raw_disk_data) {
-                if !raw_disk_data.is_empty() {
-                    return deserialise(&raw_disk_data).ok();
-                }
+            if file.read_to_end(&mut raw_disk_data).is_ok() && !raw_disk_data.is_empty() {
+                return deserialise(&raw_disk_data).ok();
             }
         }
 

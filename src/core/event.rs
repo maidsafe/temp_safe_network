@@ -20,7 +20,9 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::CoreError;
-use routing::{ImmutableData, Value};
+use routing::{AccountInfo, ImmutableData, PermissionSet, User, Value};
+use rust_sodium::crypto::sign;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Network Events will be translated into values starting from this number for
 /// propagating them beyond the FFI boudaries when required
@@ -29,14 +31,28 @@ pub const NETWORK_EVENT_START_RANGE: i32 = 0;
 /// Wraps responses from routing
 #[derive(Debug)]
 pub enum CoreEvent {
-    /// Result of getting ImmutableData
+    /// Result of getting account info
+    AccountInfo(Result<AccountInfo, CoreError>),
+    /// Result of data mutation request
+    Mutation(Result<(), CoreError>),
+    /// Result of getting `ImmutableData`
     GetIData(Result<ImmutableData, CoreError>),
-    /// Result of putting ImmutableData
-    PutIData(Result<(), CoreError>),
-    /// Result of putting MutableData
-    PutMData(Result<(), CoreError>),
-    /// Result of getting a single value from MutableData
+    /// Result of getting a version of `MutableData`
+    GetMDataVersion(Result<u64, CoreError>),
+    /// Result of getting a list of `MutableData` entries
+    ListMDataEntries(Result<BTreeMap<Vec<u8>, Value>, CoreError>),
+    /// Result of getting a list of `MutableData` keys
+    ListMDataKeys(Result<BTreeSet<Vec<u8>>, CoreError>),
+    /// Result of getting a list of `MutableData` keys
+    ListMDataValues(Result<Vec<Value>, CoreError>),
+    /// Result of getting a single value from `MutableData`
     GetMDataValue(Result<Value, CoreError>),
+    /// Result of getting a list of all `MutableData` permissions
+    ListMDataPermissions(Result<BTreeMap<User, PermissionSet>, CoreError>),
+    /// Result of getting a list of permissions in `MutableData` for a single user
+    ListMDataUserPermissions(Result<PermissionSet, CoreError>),
+    /// Result of getting a list of authorised keys
+    ListAuthKeysAndVersion(Result<BTreeSet<sign::PublicKey>, CoreError>),
 }
 
 /// Netowork Events that Client Modules need to deal with

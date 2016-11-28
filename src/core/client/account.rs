@@ -113,7 +113,7 @@ impl Account {
 }
 
 /// Information about a directory associated with an account.
-#[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct Dir {
     /// Name of the data where the directory is stored.
     pub name: XorName,
