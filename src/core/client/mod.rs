@@ -53,15 +53,24 @@ const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 const REQUEST_TIMEOUT_SECS: u64 = 120;
 
+macro_rules! match_event {
+    ($r:ident, $event:path) => {
+        match $r {
+            $event(res) => res,
+            x => {
+                debug!("Unexpected Event: {:?}", x);
+                Err(CoreError::ReceivedUnexpectedEvent)
+            }
+        }
+    }
+}
+
 macro_rules! oneshot {
     ($client:ident, $event:path) => {{
         let msg_id = MessageId::new();
         let (hook, oneshot) = futures::oneshot();
         let fut = oneshot.map_err(|_| CoreError::OperationAborted)
-            .and_then(|event| match event {
-                $event(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            });
+            .and_then(|event| match_event!(event, $event));
 
         (hook, $client.timeout(msg_id, fut), msg_id)
     }}
@@ -69,11 +78,8 @@ macro_rules! oneshot {
 
 /// The main self-authentication client instance that will interface all the
 /// request from high level API's to the actual routing layer and manage all
-/// interactions with it. This is essentially a non-blocking Client with upper
-/// layers having an option to either block and wait on the returned
-/// ResponseGetters for receiving network response or spawn a new thread. The
-/// Client itself is however well equipped for parallel and non-blocking PUTs
-/// and GETS.
+/// interactions with it. This is essentially a non-blocking Client with
+/// an asynchronous API using the futures abstraction from the futures-rs crate
 #[derive(Clone)]
 pub struct Client {
     inner: Rc<RefCell<Inner>>,
@@ -137,11 +143,11 @@ impl Client {
         let user_cred = UserCred::new(password, pin);
 
         let maid_keys = ClientKeys::new();
-        let pub_key = maid_keys.sign_pk.clone();
+        let pub_key = maid_keys.sign_pk;
         let full_id = Some(maid_keys.clone().into());
 
         let mut owners = BTreeSet::new();
-        owners.insert(pub_key.clone());
+        owners.insert(pub_key);
 
         let (routing, routing_rx) = setup_routing(full_id)?;
 
@@ -151,7 +157,7 @@ impl Client {
         let acc = Account::new(maid_keys, user_root, config_dir);
 
         let mut acc_data = BTreeMap::new();
-        let _ = acc_data.insert("Login".as_bytes().to_owned(),
+        let _ = acc_data.insert(b"Login".to_vec(),
                                 Value {
                                     content: acc.encrypt(&user_cred.password, &user_cred.pin)?,
                                     entry_version: 0,
@@ -167,7 +173,7 @@ impl Client {
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         let msg_id = MessageId::new();
-        routing.put_mdata(cm_addr.clone(), acc_md, msg_id, pub_key.clone())?;
+        routing.put_mdata(cm_addr, acc_md, msg_id, pub_key)?;
 
         match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
             Ok(Event::Response { response: Response::PutMData { ref res, msg_id: ref id }, .. })
@@ -229,7 +235,7 @@ impl Client {
             routing.get_mdata_value(dst,
                                  acc_loc,
                                  TYPE_TAG_SESSION_PACKET,
-                                 "Login".as_bytes().to_owned(),
+                                 b"Login".to_vec(),
                                  msg_id)?;
 
             match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
@@ -385,14 +391,11 @@ impl Client {
         // Check if the data is in the cache. If it is, return it immediately.
         // If not, retrieve it from the network and store it in the cache.
         let rx = {
-            let data = self.inner_mut()
+            if let Some(data) = self.inner_mut()
                 .cache
-                .get_mut(&name)
-                .map(|data| data.clone());
-
-            if let Some(data) = data {
+                .get_mut(&name) {
                 trace!("ImmutableData found in cache.");
-                hook.complete(CoreEvent::GetIData(Ok(data)));
+                hook.complete(CoreEvent::GetIData(Ok(data.clone())));
                 return rx.into_box();
             }
 
@@ -409,7 +412,7 @@ impl Client {
         if let Err(err) = result {
             hook.complete(CoreEvent::GetIData(Err(CoreError::from(err))));
         } else {
-            let _ = self.insert_hook(msg_id, hook);
+            self.insert_hook(msg_id, hook);
         }
 
         rx
@@ -466,10 +469,7 @@ impl Client {
                                           tag,
                                           msg_id)
             })
-            .and_then(|event| match event {
-                CoreEvent::GetMDataVersion(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            })
+            .and_then(|event| match_event!(event, CoreEvent::GetMDataVersion))
             .into_box()
     }
 
@@ -487,10 +487,7 @@ impl Client {
                                            tag,
                                            msg_id)
             })
-            .and_then(|event| match event {
-                CoreEvent::ListMDataEntries(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            })
+            .and_then(|event| match_event!(event, CoreEvent::ListMDataEntries))
             .into_box()
     }
 
@@ -508,10 +505,7 @@ impl Client {
                                         tag,
                                         msg_id)
             })
-            .and_then(|event| match event {
-                CoreEvent::ListMDataKeys(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            })
+            .and_then(|event| match_event!(event, CoreEvent::ListMDataKeys))
             .into_box()
     }
 
@@ -529,10 +523,7 @@ impl Client {
                                           tag,
                                           msg_id)
             })
-            .and_then(|event| match event {
-                CoreEvent::ListMDataValues(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            })
+            .and_then(|event| match_event!(event, CoreEvent::ListMDataValues))
             .into_box()
     }
 
@@ -552,10 +543,7 @@ impl Client {
                                         key,
                                         msg_id)
             })
-            .and_then(|event| match event {
-                CoreEvent::GetMDataValue(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            })
+            .and_then(|event| match_event!(event, CoreEvent::GetMDataValue))
             .into_box()
     }
 
@@ -563,27 +551,19 @@ impl Client {
     pub fn get_account_info(&self, dst: Option<Authority>) -> Box<CoreFuture<AccountInfo>> {
         trace!("Account info GET issued.");
 
-        let (hook, rx, msg_id) = oneshot!(self, CoreEvent::AccountInfo);
-
-        let dst = match dst {
+        let dst = fry!(match dst {
             Some(a) => Ok(a),
             None => self.inner().client_type.cm_addr().map(|a| a.clone()),
-        };
+        });
 
-        let dst = match dst {
-            Ok(a) => a,
-            Err(e) => {
-                hook.complete(CoreEvent::Mutation(Err(e)));
-                return rx;
-            }
-        };
+        let (hook, rx, msg_id) = oneshot!(self, CoreEvent::AccountInfo);
 
         let result = self.routing_mut().get_account_info(dst, msg_id);
 
         if let Err(e) = result {
             hook.complete(CoreEvent::AccountInfo(Err(From::from(e))));
         } else {
-            let _ = self.insert_hook(msg_id, hook);
+            self.insert_hook(msg_id, hook);
         }
 
         rx
@@ -603,10 +583,7 @@ impl Client {
                                                tag,
                                                msg_id)
             })
-            .and_then(|event| match event {
-                CoreEvent::ListMDataPermissions(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            })
+            .and_then(|event| match_event!(event, CoreEvent::ListMDataPermissions))
             .into_box()
     }
 
@@ -623,10 +600,7 @@ impl Client {
                 let dst = dst.unwrap_or_else(|| Authority::NaeManager(name));
                 routing.list_mdata_user_permissions(dst, name, tag, user, msg_id)
             })
-            .and_then(|event| match event {
-                CoreEvent::ListMDataUserPermissions(res) => res,
-                _ => Err(CoreError::ReceivedUnexpectedEvent),
-            })
+            .and_then(|event| match_event!(event, CoreEvent::ListMDataUserPermissions))
             .into_box()
     }
 
@@ -786,7 +760,7 @@ impl Client {
         };
 
         let mut actions = BTreeMap::new();
-        let _ = actions.insert("Login".as_bytes().to_owned(),
+        let _ = actions.insert(b"Login".to_vec(),
                                EntryAction::Update(Value {
                                    content: encrypted_account,
                                    entry_version: entry_version,
@@ -847,7 +821,7 @@ impl Client {
         if let Err(err) = result {
             hook.complete(err_event(Err(CoreError::from(err))));
         } else {
-            let _ = self.insert_hook(msg_id, hook);
+            self.insert_hook(msg_id, hook);
         }
 
         rx
@@ -864,13 +838,7 @@ impl Client {
 
         self.get(CoreEvent::Mutation,
                  |routing, msg_id| req(routing, dst, msg_id))
-            .and_then(|event| match event {
-                CoreEvent::Mutation(res) => res,
-                x => {
-                    debug!("Unexpected Event: {:?}", x);
-                    Err(CoreError::ReceivedUnexpectedEvent)
-                }
-            })
+            .and_then(|event| match_event!(event, CoreEvent::Mutation))
             .into_box()
     }
 
@@ -994,40 +962,40 @@ impl ClientType {
     fn acc(&self) -> Result<&Account, CoreError> {
         match *self {
             ClientType::Registered { ref acc, .. } => Ok(acc),
+            ClientType::FromKeys { .. } |
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
-            ClientType::FromKeys { .. } => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
     fn acc_mut(&mut self) -> Result<&mut Account, CoreError> {
         match *self {
             ClientType::Registered { ref mut acc, .. } => Ok(acc),
+            ClientType::FromKeys { .. } |
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
-            ClientType::FromKeys { .. } => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
     fn acc_loc(&self) -> Result<XorName, CoreError> {
         match *self {
             ClientType::Registered { acc_loc, .. } => Ok(acc_loc),
+            ClientType::FromKeys { .. } |
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
-            ClientType::FromKeys { .. } => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
     fn user_cred(&self) -> Result<&UserCred, CoreError> {
         match *self {
             ClientType::Registered { ref user_cred, .. } => Ok(user_cred),
+            ClientType::FromKeys { .. } |
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
-            ClientType::FromKeys { .. } => Err(CoreError::OperationForbiddenForClient),
         }
     }
 
     fn cm_addr(&self) -> Result<&Authority, CoreError> {
         match *self {
+            ClientType::FromKeys { ref cm_addr, .. } |
             ClientType::Registered { ref cm_addr, .. } => Ok(cm_addr),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
-            ClientType::FromKeys { ref cm_addr, .. } => Ok(cm_addr),
         }
     }
 }
@@ -1066,6 +1034,7 @@ mod tests {
     use core::utility::test_utils::{finish, random_client, setup_client};
     use futures::Future;
     use futures::sync::mpsc;
+    #[cfg(feature = "use-mock-routing")]
     use rand;
     use routing::{ClientError, ImmutableData};
     use super::*;
@@ -1082,8 +1051,7 @@ mod tests {
         }
 
         // Unregistered Client should be able to retrieve the data
-        setup_client(|el_h, core_tx, net_tx| Client::unregistered(el_h, core_tx, net_tx),
-                     move |client| {
+        setup_client(Client::unregistered, move |client| {
             let client2 = client.clone();
             let client3 = client.clone();
 

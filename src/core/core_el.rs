@@ -33,7 +33,9 @@ pub type CoreMsgRx<T> = mpsc::UnboundedReceiver<CoreMsg<T>>;
 /// The final future which the event loop will run.
 pub type TailFuture = Box<Future<Item = (), Error = ()>>;
 /// The message format that core event loop understands.
+#[allow(type_complexity)]
 pub struct CoreMsg<T>(Option<Box<FnMut(&Client, &T) -> Option<TailFuture> + Send + 'static>>);
+
 impl<T> CoreMsg<T> {
     /// Construct a new message to ask core event loop to do something. If the
     /// return value of the given closure is optionally a future, it will be
@@ -43,7 +45,7 @@ impl<T> CoreMsg<T> {
     {
         let mut f = Some(f);
         CoreMsg(Some(Box::new(move |client, context| -> Option<TailFuture> {
-            let f = f.take().unwrap();
+            let f = unwrap!(f.take());
             f(client, context)
         })))
     }
