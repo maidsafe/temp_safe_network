@@ -29,6 +29,26 @@ use rand::Rng;
 use rust_sodium::crypto::hash::sha512::{self, DIGESTBYTES, Digest};
 use rust_sodium::crypto::secretbox;
 
+macro_rules! btree_set {
+    ($($item:expr),*) => {{
+        let mut _set = ::std::collections::BTreeSet::new();
+        $(
+            let _ = _set.insert($item);
+        )*
+        _set
+    }}
+}
+
+macro_rules! btree_map {
+    ($($key:expr => $value:expr),*) => {{
+        let mut _map = ::std::collections::BTreeMap::new();
+        $(
+            let _ = _map.insert($key, $value);
+        )*
+        _map
+    }}
+}
+
 /// Symmetric encryption
 pub fn symmetric_encrypt(plain_text: &[u8],
                          secret_key: &secretbox::Key)

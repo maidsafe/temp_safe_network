@@ -20,15 +20,17 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::SelfEncryptionStorage;
-use ffi::{App, AppHandle, CipherOptHandle, EncryptKeyHandle, ObjectHandle,
+use ffi::{App, AppHandle, CipherOptHandle, EncryptKeyHandle, MDataEntriesHandle,
+          MDataEntryActionsHandle, MDataKeysHandle, MDataValuesHandle, ObjectHandle,
           SelfEncryptorReaderHandle, SelfEncryptorWriterHandle, SignKeyHandle, XorNameHandle};
 use ffi::errors::FfiError;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
-use routing::XorName;
+use routing::{EntryAction, Value, XorName};
 use rust_sodium::crypto::{box_, sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::u64;
 
@@ -44,11 +46,15 @@ struct Inner {
     handle_gen: HandleGenerator,
     app: Store<App>,
     cipher_opt: Store<CipherOpt>,
-    xor_name: Store<XorName>,
     encrypt_key: Store<box_::PublicKey>,
+    mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
+    mdata_keys: Store<BTreeSet<Vec<u8>>>,
+    mdata_values: Store<Vec<Value>>,
+    mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
     sign_key: Store<sign::PublicKey>,
+    xor_name: Store<XorName>,
 }
 
 impl ObjectCache {
@@ -58,11 +64,15 @@ impl ObjectCache {
                 handle_gen: HandleGenerator::new(),
                 app: Store::new(),
                 cipher_opt: Store::new(),
-                xor_name: Store::new(),
                 encrypt_key: Store::new(),
+                mdata_entries: Store::new(),
+                mdata_keys: Store::new(),
+                mdata_values: Store::new(),
+                mdata_entry_actions: Store::new(),
                 se_reader: Store::new(),
                 se_writer: Store::new(),
                 sign_key: Store::new(),
+                xor_name: Store::new(),
             }),
         }
     }
@@ -71,11 +81,15 @@ impl ObjectCache {
         self.inner.handle_gen.reset();
         self.inner.app.clear();
         self.inner.cipher_opt.clear();
-        self.inner.xor_name.clear();
         self.inner.encrypt_key.clear();
+        self.inner.mdata_entries.clear();
+        self.inner.mdata_keys.clear();
+        self.inner.mdata_values.clear();
+        self.inner.mdata_entry_actions.clear();
         self.inner.se_reader.clear();
         self.inner.se_writer.clear();
         self.inner.sign_key.clear();
+        self.inner.xor_name.clear();
     }
 }
 
@@ -119,13 +133,6 @@ impl_cache!(cipher_opt,
             get_cipher_opt,
             insert_cipher_opt,
             remove_cipher_opt);
-impl_cache!(xor_name,
-            XorName,
-            XorNameHandle,
-            InvalidXorNameHandle,
-            get_xor_name,
-            insert_xor_name,
-            remove_xor_name);
 impl_cache!(encrypt_key,
             box_::PublicKey,
             EncryptKeyHandle,
@@ -133,6 +140,34 @@ impl_cache!(encrypt_key,
             get_encrypt_key,
             insert_encrypt_key,
             remove_encrypt_key);
+impl_cache!(mdata_entries,
+            BTreeMap<Vec<u8>, Value>,
+            MDataEntriesHandle,
+            InvalidMDataEntriesHandle,
+            get_mdata_entries,
+            insert_mdata_entries,
+            remove_mdata_entries);
+impl_cache!(mdata_keys,
+            BTreeSet<Vec<u8>>,
+            MDataKeysHandle,
+            InvalidMDataEntriesHandle,
+            get_mdata_keys,
+            insert_mdata_keys,
+            remove_mdata_keys);
+impl_cache!(mdata_values,
+            Vec<Value>,
+            MDataValuesHandle,
+            InvalidMDataEntriesHandle,
+            get_mdata_values,
+            insert_mdata_values,
+            remove_mdata_values);
+impl_cache!(mdata_entry_actions,
+            BTreeMap<Vec<u8>, EntryAction>,
+            MDataEntryActionsHandle,
+            InvalidMDataEntryActionsHandle,
+            get_mdata_entry_actions,
+            insert_mdata_entry_actions,
+            remove_mdata_entry_actions);
 impl_cache!(se_reader,
             SelfEncryptor<SelfEncryptionStorage>,
             SelfEncryptorReaderHandle,
@@ -154,6 +189,13 @@ impl_cache!(sign_key,
             get_sign_key,
             insert_sign_key,
             remove_sign_key);
+impl_cache!(xor_name,
+            XorName,
+            XorNameHandle,
+            InvalidXorNameHandle,
+            get_xor_name,
+            insert_xor_name,
+            remove_xor_name);
 
 impl Default for ObjectCache {
     fn default() -> Self {

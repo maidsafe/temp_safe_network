@@ -23,7 +23,7 @@ macro_rules! ffi_error_code {
     ($err:expr) => {{
         let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
         let err_str = format!("{:?}", $err);
-        let err_code: i32 = $err.into();
+        let err_code: i32 = $crate::ffi::FfiError::from($err).into();
         info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
               decorator, err_code, err_str, decorator);
         err_code
@@ -44,6 +44,7 @@ macro_rules! try_cb {
         match $result {
             Ok(value) => value,
             Err(err) => {
+                #[allow(unused)]
                 use $crate::ffi::callback::{Callback, CallbackArgs};
                 $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());
                 return None;

@@ -65,7 +65,6 @@ pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
     u8_vec_to_ptr(s.into_bytes())
 }
 
-#[allow(unused)] // <-- TODO: remove this
 pub unsafe fn u8_ptr_to_vec(ptr: *const u8, len: usize) -> Vec<u8> {
     slice::from_raw_parts(ptr, len).to_owned()
 }
@@ -80,7 +79,6 @@ pub unsafe fn u8_ptr_to_opt_vec(ptr: *const u8, len: usize) -> Option<Vec<u8>> {
 }
 */
 
-#[allow(unused)] // <-- TODO: remove this
 pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
     v.shrink_to_fit();
     let ptr = v.as_mut_ptr();

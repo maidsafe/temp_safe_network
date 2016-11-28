@@ -70,6 +70,14 @@ impl<T0: CallbackArgs, T1: CallbackArgs> Callback
     }
 }
 
+impl<T0: CallbackArgs, T1: CallbackArgs> Callback
+    for unsafe extern "C" fn(*mut c_void, i32, a0: T0, a1: T1) {
+    type Args = (T0, T1);
+    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
+        unsafe { self(user_data, error, args.0, args.1) }
+    }
+}
+
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
     for extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2) {
     type Args = (T0, T1, T2);
@@ -83,6 +91,14 @@ impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
     type Args = (T0, T1, T2);
     fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
         unsafe { self(user_data, error, args.0, args.1, args.2) }
+    }
+}
+
+impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs, T3: CallbackArgs> Callback
+    for unsafe extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2, a3: T3) {
+    type Args = (T0, T1, T2, T3);
+    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
+        unsafe { self(user_data, error, args.0, args.1, args.2, args.3) }
     }
 }
 
@@ -143,5 +159,15 @@ impl<T0: CallbackArgs, T1: CallbackArgs> CallbackArgs for (T0, T1) {
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> CallbackArgs for (T0, T1, T2) {
     fn default() -> Self {
         (CallbackArgs::default(), CallbackArgs::default(), CallbackArgs::default())
+    }
+}
+
+impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs, T3: CallbackArgs> CallbackArgs
+    for (T0, T1, T2, T3) {
+    fn default() -> Self {
+        (CallbackArgs::default(),
+         CallbackArgs::default(),
+         CallbackArgs::default(),
+         CallbackArgs::default())
     }
 }

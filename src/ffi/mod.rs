@@ -105,14 +105,22 @@ pub type ObjectHandle = u64;
 /// Disambiguating ObjectHandle
 pub type AppHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
-pub type XorNameHandle = ObjectHandle;
+pub type CipherOptHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
+pub type EncryptKeyHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
+pub type MDataEntriesHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
+pub type MDataKeysHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
+pub type MDataValuesHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
+pub type MDataEntryActionsHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
 pub type SelfEncryptorReaderHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
 pub type SelfEncryptorWriterHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
-pub type CipherOptHandle = ObjectHandle;
-/// Disambiguating ObjectHandle
-pub type EncryptKeyHandle = ObjectHandle;
-/// Disambiguating ObjectHandle
 pub type SignKeyHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
+pub type XorNameHandle = ObjectHandle;

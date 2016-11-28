@@ -66,12 +66,12 @@ pub enum FfiError {
     NulError(NulError),
     /// Invalid App handle
     InvalidAppHandle,
-    /// Invalid StructuredData handle
-    InvalidStructDataHandle,
+    /// Invalid MutableData enties handle
+    InvalidMDataEntriesHandle,
+    /// Invalid MutableData entry actions handle
+    InvalidMDataEntryActionsHandle,
     /// Invalid XorName handle
     InvalidXorNameHandle,
-    /// Invalid Pub/PrivAppendableData handle
-    InvalidAppendableDataHandle,
     /// Invalid Self Encryptor handle
     InvalidSelfEncryptorHandle,
     /// Invalid CipherOpt handle
@@ -176,9 +176,9 @@ impl Into<i32> for FfiError {
             FfiError::UnsuccessfulEncodeDecode(_) => FFI_ERROR_START_RANGE - 10,
             FfiError::NulError(_) => FFI_ERROR_START_RANGE - 11,
             FfiError::InvalidAppHandle => FFI_ERROR_START_RANGE - 26,
-            FfiError::InvalidStructDataHandle => FFI_ERROR_START_RANGE - 12,
+            FfiError::InvalidMDataEntriesHandle => FFI_ERROR_START_RANGE - 27,
+            FfiError::InvalidMDataEntryActionsHandle => FFI_ERROR_START_RANGE - 28,
             FfiError::InvalidXorNameHandle => FFI_ERROR_START_RANGE - 13,
-            FfiError::InvalidAppendableDataHandle => FFI_ERROR_START_RANGE - 14,
             FfiError::InvalidSelfEncryptorHandle => FFI_ERROR_START_RANGE - 15,
             FfiError::InvalidCipherOptHandle => FFI_ERROR_START_RANGE - 16,
             FfiError::InvalidEncryptKeyHandle => FFI_ERROR_START_RANGE - 17,
@@ -211,11 +211,11 @@ impl fmt::Debug for FfiError {
             }
             FfiError::NulError(ref error) => write!(f, "FfiError::NulError -> {:?}", error),
             FfiError::InvalidAppHandle => write!(f, "FfiError::InvalidAppHandle"),
-            FfiError::InvalidStructDataHandle => write!(f, "FfiError::InvalidStructDataHandle"),
-            FfiError::InvalidXorNameHandle => write!(f, "FfiError::InvalidXorNameHandle"),
-            FfiError::InvalidAppendableDataHandle => {
-                write!(f, "FfiError::InvalidAppendableDataHandle")
+            FfiError::InvalidMDataEntriesHandle => write!(f, "FfiError::InvalidMDataEntriesHandle"),
+            FfiError::InvalidMDataEntryActionsHandle => {
+                write!(f, "FfiError::InvalidMDataEntryActionsHandle")
             }
+            FfiError::InvalidXorNameHandle => write!(f, "FfiError::InvalidXorNameHandle"),
             FfiError::InvalidSelfEncryptorHandle => {
                 write!(f, "FfiError::InvalidSelfEncryptorHandle")
             }

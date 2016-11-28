@@ -26,6 +26,7 @@ use futures::sync::mpsc;
 #[macro_use]
 pub mod futures;
 /// Utility functions
+#[macro_use]
 pub mod utility;
 /// Implements the Self Encryption storage trait
 pub mod self_encryption_storage;

@@ -27,7 +27,7 @@ pub mod cipher_opt;
 pub mod xor_name;
 /// Low level manipulation of ImmutableData
 pub mod immutable_data;
-// /// Low level manipulation of MutableData
-// pub mod mutable_data;
+/// Low level manipulation of MutableData
+pub mod mutable_data;
 // /// Miscellaneous routines
 // pub mod misc;
