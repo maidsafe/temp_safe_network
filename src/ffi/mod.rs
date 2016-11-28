@@ -62,8 +62,8 @@ mod callback;
 mod helper;
 mod launcher_config;
 mod object_cache;
-// #[cfg(test)]
-// mod test_utils;
+#[cfg(test)]
+mod test_utils;
 
 pub use ffi::app::App;
 pub use ffi::errors::FfiError;
