@@ -46,11 +46,10 @@ pub fn run<T>(routing_rx: Receiver<Event>, mut core_tx: CoreMsgTx<T>, mut net_tx
                 }
 
                 let msg = {
-                    let _core_tx = core_tx.clone();
-                    let _net_tx = net_tx.clone();
-                    CoreMsg::new(move |_client, _| {
-                        // TODO(nbaksalyar) uncomment
-                        // client.restart_routing(core_tx, net_tx);
+                    let core_tx = core_tx.clone();
+                    let net_tx = net_tx.clone();
+                    CoreMsg::new(move |client, _| {
+                        client.restart_routing(core_tx, net_tx);
                         None
                     })
                 };
@@ -88,29 +87,6 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
     })
 }
 
-/*
-pub fn parse_get_err(reason_raw: &[u8]) -> GetError {
-    match deserialise(&reason_raw) {
-        Ok(elt) => elt,
-        Err(e) => {
-            let err_msg = format!("Couldn't obtain get failure reason: {:?}", e);
-            warn!("{}", err_msg);
-            GetError::NetworkOther(err_msg)
-        }
-    }
-}
-
-pub fn parse_mutation_err(reason_raw: &[u8]) -> MutationError {
-    match deserialise(&reason_raw) {
-        Ok(elt) => elt,
-        Err(e) => {
-            let err_msg = format!("Couldn't obtain mutation failure reason: {:?}", e);
-            warn!("{}", err_msg);
-            MutationError::NetworkOther(err_msg)
-        }
-    }
-}
-*/
 /// Fire completion event to the core event loop. If the receiver in core event
 /// loop has hung up or sending fails for some other reason, treat it as an
 /// exit condition. The return value thus signifies if the firing was
