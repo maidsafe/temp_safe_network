@@ -78,6 +78,8 @@ pub mod core;
 // pub mod dns;
 /// Ffi module;
 // pub mod ffi;
+/// Auth module;
+pub mod auth;
 /// Unversioned `StructuredData`
 pub const UNVERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 500;
 /// Versioned `StructuredData`
