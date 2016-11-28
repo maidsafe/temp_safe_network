@@ -514,8 +514,7 @@ impl MockRouting {
                         _dst: Authority,
                         _key: sign::PublicKey,
                         _version: u64,
-                        _message_id: MessageId,
-                        _requester: sign::PublicKey)
+                        _message_id: MessageId)
                         -> Result<(), InterfaceError> {
         unimplemented!();
     }
@@ -525,8 +524,7 @@ impl MockRouting {
                         _dst: Authority,
                         _key: sign::PublicKey,
                         _version: u64,
-                        _message_id: MessageId,
-                        _requester: sign::PublicKey)
+                        _message_id: MessageId)
                         -> Result<(), InterfaceError> {
         unimplemented!();
     }

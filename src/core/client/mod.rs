@@ -625,22 +625,14 @@ impl Client {
     pub fn ins_auth_key(&self, key: sign::PublicKey, version: u64) -> Box<CoreFuture<()>> {
         trace!("InsAuthKey ({:?})", key);
 
-        let requester = fry!(self.public_signing_key());
-
-        self.mutate(|routing, dst, msg_id| {
-            routing.ins_auth_key(dst, key, version, msg_id, requester)
-        })
+        self.mutate(|routing, dst, msg_id| routing.ins_auth_key(dst, key, version, msg_id))
     }
 
     /// Removes an authorised key from MaidManager
     pub fn del_auth_key(&self, key: sign::PublicKey, version: u64) -> Box<CoreFuture<()>> {
         trace!("DelAuthKey ({:?})", key);
 
-        let requester = fry!(self.public_signing_key());
-
-        self.mutate(|routing, dst, msg_id| {
-            routing.del_auth_key(dst, key, version, msg_id, requester)
-        })
+        self.mutate(|routing, dst, msg_id| routing.del_auth_key(dst, key, version, msg_id))
     }
 
     /// Create an entry for the Root Directory ID for the user into the session
