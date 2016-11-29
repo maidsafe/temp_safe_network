@@ -25,21 +25,26 @@ pub mod entry_actions;
 pub mod entries;
 
 use core::{Client, CoreError, FutureExt};
-use ffi::{MDataEntriesHandle, MDataEntryActionsHandle, MDataKeysHandle, MDataValuesHandle,
-          OpaqueCtx, Session, helper};
+use ffi::{MDataEntriesHandle, MDataEntryActionsHandle, MDataKeysHandle, MDataPermissionSetHandle,
+          MDataPermissionsHandle, MDataValuesHandle, OpaqueCtx, Session, SignKeyHandle, helper};
 use ffi::callback::{Callback, CallbackArgs};
 use ffi::errors::FfiError;
 use ffi::object_cache::ObjectCache;
 use futures::Future;
-use routing::{MutableData, XOR_NAME_LEN, XorName};
+use routing::{MutableData, User, XOR_NAME_LEN, XorName};
 use std::fmt::Debug;
 use std::os::raw::c_void;
 
 /// Create new mutable data and put it on the network.
+///
+/// `permissions_h` is a handle to permissions to be set on the mutable data.
+/// If 0, the permissions will be empty.
+/// `entries_h` is a handle to entries for the mutable data. If 0, the entries will be empty.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_put(session: *const Session,
                                    name: *const [u8; XOR_NAME_LEN],
                                    type_tag: u64,
+                                   permissions_h: MDataPermissionsHandle,
                                    entries_h: MDataEntriesHandle,
                                    user_data: *mut c_void,
                                    o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
@@ -49,6 +54,16 @@ pub unsafe extern "C" fn mdata_put(session: *const Session,
 
         (*session).send(move |client, object_cache| {
             let sign_pk = try_cb!(client.public_signing_key(), user_data, o_cb);
+
+            let permissions = if permissions_h != 0 {
+                try_cb!(object_cache.get_mdata_permissions(permissions_h),
+                        user_data,
+                        o_cb)
+                    .clone()
+            } else {
+                Default::default()
+            };
+
             let entries = if entries_h != 0 {
                 try_cb!(object_cache.get_mdata_entries(entries_h), user_data, o_cb).clone()
             } else {
@@ -57,7 +72,7 @@ pub unsafe extern "C" fn mdata_put(session: *const Session,
 
             let data = try_cb!(MutableData::new(name,
                                                 type_tag,
-                                                Default::default(),
+                                                permissions,
                                                 entries,
                                                 btree_set![sign_pk])
                                    .map_err(CoreError::from),
@@ -75,7 +90,7 @@ pub unsafe extern "C" fn mdata_put(session: *const Session,
     })
 }
 
-/// Get version of a mutable data.
+/// Get version of the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_get_version(session: *const Session,
                                            name: *const [u8; XOR_NAME_LEN],
@@ -92,7 +107,7 @@ pub unsafe extern "C" fn mdata_get_version(session: *const Session,
     })
 }
 
-/// Get value at the given key from a mutable data.
+/// Get value at the given key from the mutable data.
 /// The arguments to the callback are:
 ///     1. user data
 ///     2. error code
@@ -127,7 +142,7 @@ pub unsafe extern "C" fn mdata_get_value(session: *const Session,
     })
 }
 
-/// Get complete list of entries in a mutable data.
+/// Get complete list of entries in the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_entries(session: *const Session,
                                             name: *const [u8; XOR_NAME_LEN],
@@ -147,7 +162,7 @@ pub unsafe extern "C" fn mdata_list_entries(session: *const Session,
     })
 }
 
-/// Get list of keys in a mutable data.
+/// Get list of keys in the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_keys(session: *const Session,
                                          name: *const [u8; XOR_NAME_LEN],
@@ -167,7 +182,7 @@ pub unsafe extern "C" fn mdata_list_keys(session: *const Session,
     })
 }
 
-/// Get list of values in a mutable data.
+/// Get list of values in the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_values(session: *const Session,
                                            name: *const [u8; XOR_NAME_LEN],
@@ -187,7 +202,7 @@ pub unsafe extern "C" fn mdata_list_values(session: *const Session,
     })
 }
 
-/// Mutate entries of a mutable data.
+/// Mutate entries of the mutable data.
 #[no_mangle]
 pub unsafe fn mdata_mutate_entries(session: *const Session,
                                    name: *const [u8; XOR_NAME_LEN],
@@ -216,8 +231,149 @@ pub unsafe fn mdata_mutate_entries(session: *const Session,
     })
 }
 
+/// Get list of all permissions set on the mutable data
+#[no_mangle]
+pub unsafe fn mdata_list_permissions(session: *const Session,
+                                     name: *const [u8; XOR_NAME_LEN],
+                                     type_tag: u64,
+                                     user_data: *mut c_void,
+                                     o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                i32,
+                                                                MDataPermissionsHandle)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        let name = XorName(*name);
+
+        send(session, user_data, o_cb, move |client, object_cache| {
+            let object_cache = object_cache.clone();
+            client.list_mdata_permissions(name, type_tag, None)
+                .map(move |perms| object_cache.insert_mdata_permissions(perms))
+        })
+    })
+}
+
+/// Get list of permissions set on the mutable data for the given user.
+///
+/// User is either handle to a signing key, or 0 which means "anyone".
+#[no_mangle]
+pub unsafe fn mdata_list_user_permissions(session: *const Session,
+                                          name: *const [u8; XOR_NAME_LEN],
+                                          type_tag: u64,
+                                          user_h: SignKeyHandle,
+                                          user_data: *mut c_void,
+                                          o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                     i32,
+                                                                     MDataPermissionSetHandle)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let name = XorName(*name);
+
+        (*session).send(move |client, object_cache| {
+            let object_cache = object_cache.clone();
+            let user = try_cb!(get_user(&object_cache, user_h), user_data, o_cb);
+
+            client.list_mdata_user_permissions(name, type_tag, user, None)
+                .map(move |set| {
+                    let handle = object_cache.insert_mdata_permission_set(set);
+                    o_cb(user_data.0, 0, handle);
+                })
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), 0))
+                .into_box()
+                .into()
+        })
+    })
+}
+
+/// Set permissions set on the mutable data for the given user.
+///
+/// User is either handle to a signing key, or 0 which means "anyone".
+#[no_mangle]
+pub unsafe fn mdata_set_user_permissions(session: *const Session,
+                                         name: *const [u8; XOR_NAME_LEN],
+                                         type_tag: u64,
+                                         user_h: SignKeyHandle,
+                                         permission_set_h: MDataPermissionSetHandle,
+                                         version: u64,
+                                         user_data: *mut c_void,
+                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let name = XorName(*name);
+
+        (*session).send(move |client, object_cache| {
+            let user = try_cb!(get_user(object_cache, user_h), user_data, o_cb);
+            let permission_set = try_cb!(object_cache.get_mdata_permission_set(permission_set_h),
+                                         user_data,
+                                         o_cb)
+                .clone();
+
+            client.set_mdata_user_permissions(name, type_tag, user, permission_set, version, None)
+                .then(move |result| {
+                    o_cb(user_data.0, ffi_result_code!(result));
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
+    })
+}
+
+/// Delete permissions set on the mutable data for the given user.
+///
+/// User is either handle to a signing key, or 0 which means "anyone".
+#[no_mangle]
+pub unsafe fn mdata_del_user_permissions(session: *const Session,
+                                         name: *const [u8; XOR_NAME_LEN],
+                                         type_tag: u64,
+                                         user_h: SignKeyHandle,
+                                         version: u64,
+                                         user_data: *mut c_void,
+                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let name = XorName(*name);
+
+        (*session).send(move |client, object_cache| {
+            let user = try_cb!(get_user(object_cache, user_h), user_data, o_cb);
+
+            client.del_mdata_user_permissions(name, type_tag, user, version, None)
+                .then(move |result| {
+                    o_cb(user_data.0, ffi_result_code!(result));
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
+    })
+}
+
+/// Change owner of the mutable data.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_change_owner(session: *const Session,
+                                            name: *const [u8; XOR_NAME_LEN],
+                                            type_tag: u64,
+                                            new_owner_h: SignKeyHandle,
+                                            version: u64,
+                                            user_data: *mut c_void,
+                                            o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let name = XorName(*name);
+
+        (*session).send(move |client, object_cache| {
+            let new_owner = *try_cb!(object_cache.get_sign_key(new_owner_h), user_data, o_cb);
+
+            client.change_mdata_owner(name, type_tag, new_owner, version, None)
+                .then(move |result| {
+                    o_cb(user_data.0, ffi_result_code!(result));
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
+    })
+}
+
 // FFI call boilerplate
-// TODO: consider moving this over to `Session`, or `helper`, ...
 unsafe fn send<C, F, U, E>(session: *const Session,
                            user_data: *mut c_void,
                            cb: C,
@@ -238,4 +394,15 @@ unsafe fn send<C, F, U, E>(session: *const Session,
             .into_box()
             .into()
     })
+}
+
+fn get_user(object_cache: &ObjectCache, handle: SignKeyHandle) -> Result<User, FfiError> {
+    let user = if handle != 0 {
+        let sign_key = object_cache.get_sign_key(handle)?;
+        User::Key(*sign_key)
+    } else {
+        User::Anyone
+    };
+
+    Ok(user)
 }

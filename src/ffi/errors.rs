@@ -70,6 +70,10 @@ pub enum FfiError {
     InvalidMDataEntriesHandle,
     /// Invalid MutableData entry actions handle
     InvalidMDataEntryActionsHandle,
+    /// Invalid MutableData permissions handle
+    InvalidMDataPermissionsHandle,
+    /// Invalid MutableData permission set handle
+    InvalidMDataPermissionSetHandle,
     /// Invalid XorName handle
     InvalidXorNameHandle,
     /// Invalid Self Encryptor handle
@@ -178,6 +182,8 @@ impl Into<i32> for FfiError {
             FfiError::InvalidAppHandle => FFI_ERROR_START_RANGE - 26,
             FfiError::InvalidMDataEntriesHandle => FFI_ERROR_START_RANGE - 27,
             FfiError::InvalidMDataEntryActionsHandle => FFI_ERROR_START_RANGE - 28,
+            FfiError::InvalidMDataPermissionsHandle => FFI_ERROR_START_RANGE - 29,
+            FfiError::InvalidMDataPermissionSetHandle => FFI_ERROR_START_RANGE - 30,
             FfiError::InvalidXorNameHandle => FFI_ERROR_START_RANGE - 13,
             FfiError::InvalidSelfEncryptorHandle => FFI_ERROR_START_RANGE - 15,
             FfiError::InvalidCipherOptHandle => FFI_ERROR_START_RANGE - 16,
@@ -214,6 +220,12 @@ impl fmt::Debug for FfiError {
             FfiError::InvalidMDataEntriesHandle => write!(f, "FfiError::InvalidMDataEntriesHandle"),
             FfiError::InvalidMDataEntryActionsHandle => {
                 write!(f, "FfiError::InvalidMDataEntryActionsHandle")
+            }
+            FfiError::InvalidMDataPermissionsHandle => {
+                write!(f, "FfiError::InvalidMDataPermissionsHandle")
+            }
+            FfiError::InvalidMDataPermissionSetHandle => {
+                write!(f, "FfiError::InvalidMDataPermissionSetHandle")
             }
             FfiError::InvalidXorNameHandle => write!(f, "FfiError::InvalidXorNameHandle"),
             FfiError::InvalidSelfEncryptorHandle => {

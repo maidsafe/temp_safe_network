@@ -21,12 +21,13 @@
 
 use core::SelfEncryptionStorage;
 use ffi::{App, AppHandle, CipherOptHandle, EncryptKeyHandle, MDataEntriesHandle,
-          MDataEntryActionsHandle, MDataKeysHandle, MDataValuesHandle, ObjectHandle,
-          SelfEncryptorReaderHandle, SelfEncryptorWriterHandle, SignKeyHandle, XorNameHandle};
+          MDataEntryActionsHandle, MDataKeysHandle, MDataPermissionSetHandle,
+          MDataPermissionsHandle, MDataValuesHandle, ObjectHandle, SelfEncryptorReaderHandle,
+          SelfEncryptorWriterHandle, SignKeyHandle, XorNameHandle};
 use ffi::errors::FfiError;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
-use routing::{EntryAction, Value, XorName};
+use routing::{EntryAction, PermissionSet, User, Value, XorName};
 use rust_sodium::crypto::{box_, sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
@@ -51,6 +52,8 @@ struct Inner {
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
     mdata_values: Store<Vec<Value>>,
     mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
+    mdata_permissions: Store<BTreeMap<User, PermissionSet>>,
+    mdata_permission_set: Store<PermissionSet>,
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
     sign_key: Store<sign::PublicKey>,
@@ -69,6 +72,8 @@ impl ObjectCache {
                 mdata_keys: Store::new(),
                 mdata_values: Store::new(),
                 mdata_entry_actions: Store::new(),
+                mdata_permissions: Store::new(),
+                mdata_permission_set: Store::new(),
                 se_reader: Store::new(),
                 se_writer: Store::new(),
                 sign_key: Store::new(),
@@ -86,6 +91,8 @@ impl ObjectCache {
         self.inner.mdata_keys.clear();
         self.inner.mdata_values.clear();
         self.inner.mdata_entry_actions.clear();
+        self.inner.mdata_permissions.clear();
+        self.inner.mdata_permission_set.clear();
         self.inner.se_reader.clear();
         self.inner.se_writer.clear();
         self.inner.sign_key.clear();
@@ -168,6 +175,20 @@ impl_cache!(mdata_entry_actions,
             get_mdata_entry_actions,
             insert_mdata_entry_actions,
             remove_mdata_entry_actions);
+impl_cache!(mdata_permissions,
+            BTreeMap<User, PermissionSet>,
+            MDataPermissionsHandle,
+            InvalidMDataPermissionsHandle,
+            get_mdata_permissions,
+            insert_mdata_permissions,
+            remove_mdata_permissions);
+impl_cache!(mdata_permission_set,
+            PermissionSet,
+            MDataPermissionSetHandle,
+            InvalidMDataPermissionSetHandle,
+            get_mdata_permission_set,
+            insert_mdata_permission_set,
+            remove_mdata_permission_set);
 impl_cache!(se_reader,
             SelfEncryptor<SelfEncryptionStorage>,
             SelfEncryptorReaderHandle,

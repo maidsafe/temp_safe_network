@@ -117,6 +117,10 @@ pub type MDataValuesHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
 pub type MDataEntryActionsHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
+pub type MDataPermissionsHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
+pub type MDataPermissionSetHandle = ObjectHandle;
+/// Disambiguating ObjectHandle
 pub type SelfEncryptorReaderHandle = ObjectHandle;
 /// Disambiguating ObjectHandle
 pub type SelfEncryptorWriterHandle = ObjectHandle;
