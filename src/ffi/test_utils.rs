@@ -19,8 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, utility};
-use core::futures::FutureExt;
+use core::{Client, FutureExt, utility};
 use ffi::{App, Session};
 use ffi::launcher_config;
 use ffi::object_cache::ObjectCache;
@@ -52,9 +51,11 @@ pub fn create_session() -> Session {
     unwrap!(Session::create_account(acc_locator, acc_password, |_net_evt| ()))
 }
 
+/*
 pub fn create_unregistered_session() -> Session {
     unwrap!(Session::unregistered(|_| ()))
 }
+*/
 
 // Run the given closure inside the session event loop. The closure should
 // return a future which will then be driven to completion and its result
@@ -121,6 +122,7 @@ pub unsafe fn send_via_user_data<T>(user_data: *mut c_void, value: T)
     unwrap!((*tx).send(value));
 }
 
+/*
 pub struct FfiStr {
     pub ptr: *const u8,
     pub len: usize,
@@ -132,6 +134,7 @@ pub fn as_raw_parts(s: &str) -> FfiStr {
         len: s.len(),
     }
 }
+*/
 
 // Call a FFI function and block until its callback gets called.
 // Use this if the callback accepts no arguments in addition to user_data
@@ -175,18 +178,19 @@ pub unsafe fn call_3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), i32>
     if error == 0 { Ok(args.0) } else { Err(error) }
 }
 
+/*
 // Call a FFI function and block until its callback gets called, then return
 // the arguments which were passed to that callback converted to Vec<u8>.
 // The callbacks must accept three arguments (in addition to user_data and
 // error_code): pointer to the begining of the data (`*mut u8`), lengths
-// (`usize`)
-// and capacity (`usize`).
+// (`usize`) and capacity (`usize`).
 pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
     where F: FnOnce(*mut c_void,
                     unsafe extern "C" fn(*mut c_void, i32, *mut u8, usize, usize))
 {
     call_3(f).map(|(ptr, len, cap)| Vec::from_raw_parts(ptr, len, cap))
 }
+*/
 
 unsafe extern "C" fn callback_0(user_data: *mut c_void, error: i32) {
     send_via_user_data(user_data, error)

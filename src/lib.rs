@@ -77,7 +77,7 @@ pub mod core;
 /// Dns module;
 // pub mod dns;
 /// Ffi module;
-// pub mod ffi;
+pub mod ffi;
 /// Auth module;
 pub mod auth;
 /// Unversioned `StructuredData`

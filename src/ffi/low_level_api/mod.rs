@@ -21,15 +21,13 @@
 
 //! Low Level APIs
 
-/// Low level manipulation of {Pub|Priv}AppendableData
-pub mod appendable_data;
 /// Cipher Options
 pub mod cipher_opt;
-/// DataIdentifier constructions and freeing
-pub mod data_id;
+/// XorName constructions and freeing
+pub mod xor_name;
 /// Low level manipulation of ImmutableData
-pub mod immut_data;
-/// Miscellaneous routines
-pub mod misc;
-/// Low level manipulation of StructuredData
-pub mod struct_data;
+pub mod immutable_data;
+/// Low level manipulation of MutableData
+pub mod mutable_data;
+// /// Miscellaneous routines
+// pub mod misc;

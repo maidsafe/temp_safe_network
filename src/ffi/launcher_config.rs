@@ -20,27 +20,39 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::Client;
-use core::futures::FutureExt;
+// use core::futures::FutureExt;
 use ffi::FfiFuture;
-use ffi::config::{LAUNCHER_GLOBAL_CONFIG_FILE_NAME, LAUNCHER_GLOBAL_DIRECTORY_NAME};
-use ffi::errors::FfiError;
-use futures::Future;
-use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{Dir, DirMetadata};
-use nfs::helper::{dir_helper, file_helper};
-use nfs::helper::writer::Mode::Overwrite;
+// use ffi::config::{LAUNCHER_GLOBAL_CONFIG_FILE_NAME, LAUNCHER_GLOBAL_DIRECTORY_NAME};
+// use ffi::errors::FfiError;
+// use futures::Future;
+// use maidsafe_utilities::serialisation::{deserialise, serialise};
+// use nfs::{Dir, DirMetadata};
+// use nfs::helper::{dir_helper, file_helper};
+// use nfs::helper::writer::Mode::Overwrite;
 use routing::XorName;
 use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::hash::sha256;
-use std::collections::HashMap;
+// use std::collections::HashMap;
 use super::App;
 
-pub fn app(client: &Client,
-           app_name: String,
-           app_key: String,
-           vendor: String,
+pub fn app(_client: &Client,
+           _app_name: String,
+           _app_key: String,
+           _vendor: String,
            safe_drive_access: bool)
            -> Box<FfiFuture<App>> {
+
+    // TODO: fix `launcher_global_config_and_dir` and replace the following code
+    // with the commented out one below.
+
+    ok!(App::Registered {
+        asym_enc_keys: box_::gen_keypair(),
+        sym_key: secretbox::gen_key(),
+        safe_drive_access: safe_drive_access,
+    })
+
+
+    /*
     let app_id = app_id(&app_key, &vendor);
     let c2 = client.clone();
 
@@ -85,8 +97,10 @@ pub fn app(client: &Client,
             }
         })
         .into_box()
+    */
 }
 
+#[allow(unused)] // <-- TODO: remove this
 fn app_id(app_key: &str, vendor: &str) -> XorName {
     let mut id_str = String::new();
     id_str.push_str(app_key);
@@ -94,6 +108,7 @@ fn app_id(app_key: &str, vendor: &str) -> XorName {
     XorName(sha256::hash(id_str.as_bytes()).0)
 }
 
+/*
 fn app_dir_name(app_name: &str, directory: &Dir) -> String {
     let mut dir_name = format!("{}-Root-Dir", app_name);
     if directory.find_sub_dir(&dir_name).is_some() {
@@ -109,11 +124,14 @@ fn app_dir_name(app_name: &str, directory: &Dir) -> String {
     }
     dir_name
 }
+*/
 
+#[allow(unused)] // <-- TODO: remove this
 fn upsert_to_launcher_global_config(client: &Client,
                                     app_id: XorName,
                                     config: App)
                                     -> Box<FfiFuture<()>> {
+    /*
     trace!("Update (by overwriting) Launcher's config file by appending a new config.");
 
     let client_clone = client.clone();
@@ -140,8 +158,11 @@ fn upsert_to_launcher_global_config(client: &Client,
         })
         .map(|_| ())
         .into_box()
+    */
+    unimplemented!()
 }
 
+/*
 fn launcher_global_config_and_dir(client: &Client)
                                   -> Box<FfiFuture<(HashMap<XorName, App>, Dir, DirMetadata)>> {
     trace!("Get Launcher's config directory.");
@@ -195,3 +216,4 @@ fn launcher_global_config_and_dir(client: &Client)
         })
         .into_box()
 }
+*/

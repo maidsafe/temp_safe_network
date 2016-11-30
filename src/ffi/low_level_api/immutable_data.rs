@@ -20,14 +20,14 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::{CoreError, FutureExt, SelfEncryptionStorage, immutable_data};
-use ffi::{AppHandle, CipherOptHandle, DataIdHandle, SelfEncryptorReaderHandle,
-          SelfEncryptorWriterHandle};
+use ffi::{AppHandle, CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle,
+          XorNameHandle};
 use ffi::{FfiError, OpaqueCtx, Session};
 use ffi::helper::catch_unwind_cb;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Data, DataIdentifier, ImmutableData};
+use routing::ImmutableData;
 use self_encryption::{DataMap, SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr, slice};
 use std::os::raw::c_void;
@@ -37,11 +37,11 @@ type SEReaderHandle = SelfEncryptorReaderHandle;
 
 /// Get a Self Encryptor
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
-                                                       user_data: *mut c_void,
-                                                       o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                  i32,
-                                                                                  SEWriterHandle)) {
+pub unsafe extern "C" fn idata_new_self_encryptor(session: *const Session,
+                                                  user_data: *mut c_void,
+                                                  o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                             i32,
+                                                                             SEWriterHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -51,6 +51,7 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
 
             let fut = SequentialEncryptor::new(se_storage, None)
                 .map_err(CoreError::from)
+                .map_err(FfiError::from)
                 .map(move |se| {
                     let handle = obj_cache.insert_se_writer(se);
                     o_cb(user_data.0, 0, handle);
@@ -67,13 +68,13 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(session: *const Session,
 
 /// Write to Self Encryptor
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Session,
-                                                            se_h: SEWriterHandle,
-                                                            data: *const u8,
-                                                            size: usize,
-                                                            user_data: *mut c_void,
-                                                            o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                       i32)) {
+pub unsafe extern "C" fn idata_write_to_self_encryptor(session: *const Session,
+                                                       se_h: SEWriterHandle,
+                                                       data: *const u8,
+                                                       size: usize,
+                                                       user_data: *mut c_void,
+                                                       o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                  i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -90,6 +91,7 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
                 }
             };
             let fut = fut.map_err(CoreError::from)
+                .map_err(FfiError::from)
                 .then(move |res| {
                     o_cb(user_data.0, ffi_result_code!(res));
                     Ok(())
@@ -102,14 +104,14 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(session: *const Sess
 
 /// Close Self Encryptor
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session,
-                                                         app: AppHandle,
-                                                         se_h: SEWriterHandle,
-                                                         cipher_opt_h: CipherOptHandle,
-                                                         user_data: *mut c_void,
-                                                         o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                    i32,
-                                                                                    DataIdHandle)) {
+pub unsafe extern "C" fn idata_close_self_encryptor(session: *const Session,
+                                                    app: AppHandle,
+                                                    se_h: SEWriterHandle,
+                                                    cipher_opt_h: CipherOptHandle,
+                                                    user_data: *mut c_void,
+                                                    o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                               i32,
+                                                                               XorNameHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -149,12 +151,9 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
                     let raw_immut_data = ImmutableData::new(raw_data);
                     let raw_immut_data_name = *raw_immut_data.name();
 
-                    c3.put(Data::Immutable(raw_immut_data), None)
+                    c3.put_idata(raw_immut_data)
                         .map_err(FfiError::from)
-                        .map(move |_| {
-                            let data_id = DataIdentifier::Immutable(raw_immut_data_name);
-                            obj_cache.insert_data_id(data_id)
-                        })
+                        .map(move |_| obj_cache.insert_xor_name(raw_immut_data_name))
                         .into_box()
                 })
                 .then(move |result| {
@@ -173,14 +172,13 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(session: *const Session
 
 /// Fetch Self Encryptor
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session,
-                                                         app: AppHandle,
-                                                         data_id_h: DataIdHandle,
-                                                         user_data: *mut c_void,
-                                                         o_cb: unsafe extern "C" fn(
-                                                             *mut c_void,
-                                                             i32,
-                                                             SEReaderHandle)) {
+pub unsafe extern "C" fn idata_fetch_self_encryptor(session: *const Session,
+                                                    app: AppHandle,
+                                                    name_h: XorNameHandle,
+                                                    user_data: *mut c_void,
+                                                    o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                               i32,
+                                                                               SEReaderHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -192,8 +190,8 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
             let obj_cache3 = obj_cache.clone();
 
             let fut = {
-                match obj_cache.get_data_id(data_id_h) {
-                    Ok(data_id) => client.get(*data_id, None),
+                match obj_cache.get_xor_name(name_h) {
+                    Ok(data_id) => client.get_idata(*data_id),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e), 0);
                         return None;
@@ -202,12 +200,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
             };
 
             let fut = fut.map_err(FfiError::from)
-                .and_then(move |data| {
-                    let raw_immut_data = match data {
-                        Data::Immutable(immut_data) => immut_data,
-                        _ => fry!(Err(CoreError::ReceivedUnexpectedData)),
-                    };
-
+                .and_then(move |raw_immut_data| {
                     let ser_final_immut_data = {
                         let app = fry!(obj_cache2.get_app(app));
                         fry!(CipherOpt::decrypt(&app, raw_immut_data.value()))
@@ -244,10 +237,10 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(session: *const Session
 
 /// Get data size from Self Encryptor
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_size(session: *const Session,
-                                         se_h: SEReaderHandle,
-                                         user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, i32, u64)) {
+pub unsafe extern "C" fn idata_size(session: *const Session,
+                                    se_h: SEReaderHandle,
+                                    user_data: *mut c_void,
+                                    o_cb: unsafe extern "C" fn(*mut c_void, i32, u64)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -268,16 +261,16 @@ pub unsafe extern "C" fn immut_data_size(session: *const Session,
 /// Read from Self Encryptor
 /// Callback parameters are: user_data, error_code, data, size, capacity
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Session,
-                                                             se_h: SEReaderHandle,
-                                                             from_pos: u64,
-                                                             len: u64,
-                                                             user_data: *mut c_void,
-                                                             o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                        i32,
-                                                                                        *mut u8,
-                                                                                        usize,
-                                                                                        usize)) {
+pub unsafe extern "C" fn idata_read_from_self_encryptor(session: *const Session,
+                                                        se_h: SEReaderHandle,
+                                                        from_pos: u64,
+                                                        len: u64,
+                                                        user_data: *mut c_void,
+                                                        o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                   i32,
+                                                                                   *mut u8,
+                                                                                   usize,
+                                                                                   usize)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -307,6 +300,7 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
                     mem::forget(data);
                 })
                 .map_err(CoreError::from)
+                .map_err(FfiError::from)
                 .map_err(move |e| {
                     o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0);
                 })
@@ -319,12 +313,11 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(session: *const Ses
 
 /// Free Self Encryptor Writer handle
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_self_encryptor_writer_free(session: *const Session,
-                                                               handle: SEWriterHandle,
-                                                               user_data: *mut c_void,
-                                                               o_cb: unsafe
-                                                               extern "C" fn(*mut c_void,
-                                                                             i32)) {
+pub unsafe extern "C" fn idata_self_encryptor_writer_free(session: *const Session,
+                                                          handle: SEWriterHandle,
+                                                          user_data: *mut c_void,
+                                                          o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                     i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -338,12 +331,11 @@ pub unsafe extern "C" fn immut_data_self_encryptor_writer_free(session: *const S
 
 /// Free Self Encryptor Reader handle
 #[no_mangle]
-pub unsafe extern "C" fn immut_data_self_encryptor_reader_free(session: *const Session,
-                                                               handle: SEReaderHandle,
-                                                               user_data: *mut c_void,
-                                                               o_cb: unsafe
-                                                               extern "C" fn(*mut c_void,
-                                                                             i32)) {
+pub unsafe extern "C" fn idata_self_encryptor_reader_free(session: *const Session,
+                                                          handle: SEReaderHandle,
+                                                          user_data: *mut c_void,
+                                                          o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                     i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -361,7 +353,7 @@ mod tests {
     use ffi::{ObjectHandle, test_utils};
     use ffi::errors::FfiError;
     use ffi::low_level_api::cipher_opt::*;
-    use ffi::low_level_api::data_id::data_id_free;
+    use ffi::low_level_api::xor_name::*;
     use std::{panic, process};
     use std::os::raw::c_void;
     use std::sync::mpsc;
@@ -407,41 +399,41 @@ mod tests {
             let (err_code, cipher_opt_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
-            immut_data_new_self_encryptor(&sess, handle_tx, handle_cb);
+            idata_new_self_encryptor(&sess, handle_tx, handle_cb);
             let (err_code, se_writer_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
-            immut_data_write_to_self_encryptor(&sess,
-                                               0,
-                                               plain_text.as_ptr(),
-                                               plain_text.len(),
-                                               err_code_tx,
-                                               err_code_cb);
+            idata_write_to_self_encryptor(&sess,
+                                          0,
+                                          plain_text.as_ptr(),
+                                          plain_text.len(),
+                                          err_code_tx,
+                                          err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            immut_data_write_to_self_encryptor(&sess,
-                                               se_writer_h,
-                                               plain_text.as_ptr(),
-                                               plain_text.len(),
-                                               err_code_tx,
-                                               err_code_cb);
+            idata_write_to_self_encryptor(&sess,
+                                          se_writer_h,
+                                          plain_text.as_ptr(),
+                                          plain_text.len(),
+                                          err_code_tx,
+                                          err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            immut_data_close_self_encryptor(&sess,
-                                            app_0,
-                                            se_writer_h,
-                                            cipher_opt_h,
-                                            handle_tx,
-                                            handle_cb);
-            let (err_code, data_id_h) = unwrap!(handle_rx.recv());
+            idata_close_self_encryptor(&sess,
+                                       app_0,
+                                       se_writer_h,
+                                       cipher_opt_h,
+                                       handle_tx,
+                                       handle_cb);
+            let (err_code, name_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
-            immut_data_self_encryptor_reader_free(&sess, se_writer_h, err_code_tx, err_code_cb);
+            idata_self_encryptor_reader_free(&sess, se_writer_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            immut_data_self_encryptor_writer_free(&sess, se_writer_h, err_code_tx, err_code_cb);
+            idata_self_encryptor_writer_free(&sess, se_writer_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        // It should've been closed by immut_data_close_self_encryptor
                        FfiError::InvalidSelfEncryptorHandle.into());
@@ -449,52 +441,52 @@ mod tests {
             // App-1
             let se_reader_h = 0;
             let se_writer_h = 0;
-            immut_data_size(&sess, se_reader_h, data_size_tx, data_size_cb);
+            idata_size(&sess, se_reader_h, data_size_tx, data_size_cb);
             let (err_code, _) = unwrap!(data_size_rx.recv());
             assert_eq!(err_code, FfiError::InvalidSelfEncryptorHandle.into());
 
-            immut_data_size(&sess, se_writer_h, data_size_tx, data_size_cb);
+            idata_size(&sess, se_writer_h, data_size_tx, data_size_cb);
             let (err_code, _) = unwrap!(data_size_rx.recv());
             assert_eq!(err_code, FfiError::InvalidSelfEncryptorHandle.into());
 
-            immut_data_fetch_self_encryptor(&sess, app_0, data_id_h, handle_tx, handle_cb);
+            idata_fetch_self_encryptor(&sess, app_0, name_h, handle_tx, handle_cb);
             let (err_code, _) = unwrap!(handle_rx.recv());
             assert!(err_code != 0);
 
-            immut_data_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
+            idata_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
-            immut_data_fetch_self_encryptor(&sess, app_1, data_id_h, handle_tx, handle_cb);
+            idata_fetch_self_encryptor(&sess, app_1, name_h, handle_tx, handle_cb);
             let (err_code, se_reader_h) = unwrap!(handle_rx.recv());
             assert_eq!(err_code, 0);
 
-            immut_data_size(&sess, se_reader_h, data_size_tx, data_size_cb);
+            idata_size(&sess, se_reader_h, data_size_tx, data_size_cb);
             let (err_code, size) = unwrap!(data_size_rx.recv());
             assert_eq!(err_code, 0);
             assert_eq!(size, plain_text.len() as u64);
 
-            immut_data_read_from_self_encryptor(&sess, se_reader_h, 1, size, read_tx, read_cb);
+            idata_read_from_self_encryptor(&sess, se_reader_h, 1, size, read_tx, read_cb);
             let (err_code, _, _, _) = unwrap!(read_rx.recv());
             assert_eq!(err_code, FfiError::InvalidSelfEncryptorReadOffsets.into());
 
-            immut_data_read_from_self_encryptor(&sess, se_reader_h, 0, size, read_tx, read_cb);
+            idata_read_from_self_encryptor(&sess, se_reader_h, 0, size, read_tx, read_cb);
             let (err_code, data_ptr, data_size, capacity) = unwrap!(read_rx.recv());
             assert_eq!(err_code, 0);
             let plain_text_rx = Vec::from_raw_parts(data_ptr, data_size, capacity);
             assert_eq!(plain_text, plain_text_rx);
 
-            immut_data_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
+            idata_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            immut_data_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
+            idata_self_encryptor_reader_free(&sess, se_reader_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()),
                        FfiError::InvalidSelfEncryptorHandle.into());
 
             cipher_opt_free(&sess, cipher_opt_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
 
-            data_id_free(&sess, data_id_h, err_code_tx, err_code_cb);
+            xor_name_free(&sess, name_h, err_code_tx, err_code_cb);
             assert_eq!(unwrap!(err_code_rx.recv()), 0);
         }
     }

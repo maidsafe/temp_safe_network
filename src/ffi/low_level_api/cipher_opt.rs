@@ -175,6 +175,7 @@ pub unsafe extern "C" fn cipher_opt_free(session: *const Session,
 
 #[cfg(test)]
 mod tests {
+    /*
     use core::utility;
     use ffi::{App, CipherOptHandle, FfiError, Session};
     use ffi::test_utils;
@@ -366,4 +367,5 @@ mod tests {
         };
         unwrap!((*tx).send(res));
     }
+    */
 }

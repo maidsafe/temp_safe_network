@@ -19,11 +19,11 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, CoreError, CoreFuture, SelfEncryptionStorage, utility};
+use core::{Client, CoreFuture, SelfEncryptionStorage, utility};
 use core::futures::FutureExt;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::{Data, DataIdentifier, ImmutableData, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, XorName};
+use routing::{ImmutableData, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, XorName};
 use rust_sodium::crypto::secretbox;
 use self_encryption::{DataMap, SelfEncryptor};
 
@@ -64,17 +64,6 @@ pub fn create(client: &Client,
         .into_box()
 }
 
-/// GET immutable data from the network.
-pub fn get(client: &Client, name: &XorName) -> Box<CoreFuture<ImmutableData>> {
-    let data_id = DataIdentifier::Immutable(*name);
-    client.get(data_id, None)
-        .and_then(|data| match data {
-            Data::Immutable(data) => Ok(data),
-            _ => Err(CoreError::ReceivedUnexpectedData),
-        })
-        .into_box()
-}
-
 /// Get the raw bytes from ImmutableData created via `create()` function in
 /// this module.
 pub fn extract_value(client: &Client,
@@ -110,7 +99,7 @@ pub fn get_value(client: &Client,
                  decryption_key: Option<secretbox::Key>)
                  -> Box<CoreFuture<Vec<u8>>> {
     let client2 = client.clone();
-    get(client, name)
+    client.get_idata(*name)
         .and_then(move |data| extract_value(&client2, data, decryption_key))
         .into_box()
 }
@@ -121,7 +110,7 @@ fn pack(client: Client, value: Vec<u8>) -> Box<CoreFuture<ImmutableData>> {
     let data = ImmutableData::new(value);
     let serialised_data = fry!(serialise(&data));
 
-    if serialised_data.len() > MAX_IMMUTABLE_DATA_SIZE_IN_BYTES {
+    if serialised_data.len() as u64 > MAX_IMMUTABLE_DATA_SIZE_IN_BYTES {
         let storage = SelfEncryptionStorage::new(client.clone());
         let self_encryptor = fry!(SelfEncryptor::new(storage, DataMap::None));
         self_encryptor.write(&serialised_data, 0)
@@ -160,7 +149,6 @@ mod tests {
     use core::utility;
     use core::utility::test_utils::{finish, random_client};
     use futures::Future;
-    use routing::Data;
     use rust_sodium::crypto::secretbox;
     use super::*;
 
@@ -200,7 +188,7 @@ mod tests {
                     .then(move |res| {
                         let data_before = unwrap!(res);
                         let data_name = *data_before.name();
-                        client2.put(Data::Immutable(data_before), None)
+                        client2.put_idata(data_before)
                             .map(move |_| data_name)
                     })
                     .then(move |res| {
@@ -228,7 +216,7 @@ mod tests {
                     .then(move |res| {
                         let data_before = unwrap!(res);
                         let data_name = *data_before.name();
-                        client2.put(Data::Immutable(data_before), None)
+                        client2.put_idata(data_before)
                             .map(move |_| data_name)
                     })
                     .then(move |res| {
@@ -256,7 +244,7 @@ mod tests {
                     .then(move |res| {
                         let data = unwrap!(res);
                         let data_name = *data.name();
-                        client2.put(Data::Immutable(data), None)
+                        client2.put_idata(data)
                             .map(move |_| data_name)
                     })
                     .then(move |res| {
@@ -283,7 +271,7 @@ mod tests {
                     .then(move |res| {
                         let data = unwrap!(res);
                         let data_name = *data.name();
-                        client2.put(Data::Immutable(data), None)
+                        client2.put_idata(data)
                             .map(move |_| data_name)
                     })
                     .then(move |res| {

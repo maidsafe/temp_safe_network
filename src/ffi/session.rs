@@ -22,16 +22,16 @@
 //! Session management
 
 use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
-use core::futures::FutureExt;
 use ffi::{FfiError, OpaqueCtx};
 use ffi::object_cache::ObjectCache;
 use futures::Future;
 use futures::stream::Stream;
+use futures::sync::mpsc as futures_mpsc;
 use maidsafe_utilities::thread::{self, Joiner};
 use std::os::raw::c_void;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc as std_mpsc;
 use super::helper;
-use tokio_core::channel;
 use tokio_core::reactor::Core;
 
 macro_rules! try_tx {
@@ -62,7 +62,7 @@ impl Session {
                  + Send + 'static
     {
         let msg = CoreMsg::new(f);
-        let core_tx = unwrap!(self.inner.core_tx.lock());
+        let mut core_tx = unwrap!(self.inner.core_tx.lock());
         core_tx.send(msg).map_err(FfiError::from)
     }
 
@@ -70,22 +70,17 @@ impl Session {
     pub fn unregistered<NetObs>(mut network_observer: NetObs) -> Result<Self, FfiError>
         where NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
     {
-        let (tx, rx) = mpsc::sync_channel(0);
+        let (tx, rx) = std_mpsc::sync_channel(0);
 
         let joiner = thread::named("Core Event Loop", move || {
             let el = try_tx!(Core::new(), tx);
             let el_h = el.handle();
 
-            let (core_tx, core_rx) = try_tx!(channel::channel(&el_h), tx);
-            let (net_tx, net_rx) = try_tx!(channel::channel(&el_h), tx);
+            let (core_tx, core_rx) = futures_mpsc::unbounded();
+            let (net_tx, net_rx) = futures_mpsc::unbounded();
 
-            let net_obs_fut =
-                net_rx.then(move |net_event| {
-                        Ok(network_observer(net_event.map_err(FfiError::from)))
-                    })
-                    .for_each(|_| Ok(()));
-
-            el_h.spawn(net_obs_fut);
+            el_h.spawn(net_rx.map(move |event| network_observer(Ok(event)))
+                .for_each(|_| Ok(())));
 
             let core_tx_clone = core_tx.clone();
 
@@ -114,7 +109,7 @@ impl Session {
         where S: Into<String>,
               NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
     {
-        let (tx, rx) = mpsc::sync_channel(0);
+        let (tx, rx) = std_mpsc::sync_channel(0);
 
         let locator = locator.into();
         let password = password.into();
@@ -123,16 +118,12 @@ impl Session {
             let el = try_tx!(Core::new(), tx);
             let el_h = el.handle();
 
-            let (core_tx, core_rx) = try_tx!(channel::channel(&el_h), tx);
-            let (net_tx, net_rx) = try_tx!(channel::channel(&el_h), tx);
+            let (core_tx, core_rx) = futures_mpsc::unbounded();
+            let (net_tx, net_rx) = futures_mpsc::unbounded();
             let core_tx_clone = core_tx.clone();
 
-            let net_obs_fut =
-                net_rx.then(move |net_event| {
-                        Ok(network_observer(net_event.map_err(FfiError::from)))
-                    })
-                    .for_each(|_| Ok(()));
-            el_h.spawn(net_obs_fut);
+            el_h.spawn(net_rx.map(move |event| network_observer(Ok(event)))
+                .for_each(|_| Ok(())));
 
             let client =
                 try_tx!(Client::registered(&locator, &password, el_h, core_tx_clone, net_tx),
@@ -162,7 +153,7 @@ impl Session {
         where S: Into<String>,
               NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
     {
-        let (tx, rx) = mpsc::sync_channel(0);
+        let (tx, rx) = std_mpsc::sync_channel(0);
 
         let locator = locator.into();
         let password = password.into();
@@ -171,16 +162,12 @@ impl Session {
             let el = try_tx!(Core::new(), tx);
             let el_h = el.handle();
 
-            let (core_tx, core_rx) = try_tx!(channel::channel(&el_h), tx);
-            let (net_tx, net_rx) = try_tx!(channel::channel(&el_h), tx);
+            let (core_tx, core_rx) = futures_mpsc::unbounded();
+            let (net_tx, net_rx) = futures_mpsc::unbounded();
             let core_tx_clone = core_tx.clone();
 
-            let net_obs_fut =
-                net_rx.then(move |net_event| {
-                        Ok(network_observer(net_event.map_err(FfiError::from)))
-                    })
-                    .for_each(|_| Ok(()));
-            el_h.spawn(net_obs_fut);
+            el_h.spawn(net_rx.map(move |event| network_observer(Ok(event)))
+                .for_each(|_| Ok(())));
 
             let client = try_tx!(Client::login(&locator, &password, el_h, core_tx_clone, net_tx),
                                  tx);
@@ -201,6 +188,8 @@ impl Session {
         })
     }
 
+    /*
+
     // /// Get SAFEdrive directory key.
     // pub fn safe_drive_dir(&self) -> &Option<Dir> {
     //     &self.safe_drive_dir
@@ -219,13 +208,14 @@ impl Session {
                 .into_box())
         })
     }
+    */
 }
 
 impl Drop for Session {
     fn drop(&mut self) {
         debug!("Session is now being dropped.");
 
-        let core_tx = unwrap!(self.inner.core_tx.lock());
+        let mut core_tx = unwrap!(self.inner.core_tx.lock());
         let msg = CoreMsg::build_terminator();
 
         if let Err(e) = core_tx.send(msg) {
@@ -322,6 +312,7 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
     })
 }
 
+/*
 /// Return the amount of calls that were done to `get`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_gets(session: *const Session,
@@ -410,6 +401,7 @@ pub unsafe extern "C" fn get_account_info(session: *const Session,
         (*session).account_info(user_data, o_cb)
     })
 }
+*/
 
 /// Discard and clean up the previously allocated session. Use this only if the
 /// session is obtained from one of the session obtainment functions in this

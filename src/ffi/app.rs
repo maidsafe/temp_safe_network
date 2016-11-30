@@ -26,10 +26,10 @@
 // references instead of copies etc.) and uniform (i.e. not use get_ prefix for
 // mem functions.
 
-use core::{Client, FutureExt};
-use ffi::{AppHandle, FfiError, FfiFuture, OpaqueCtx, Session, helper, launcher_config};
-use futures::{self, Future};
-use nfs::DirId;
+use core::FutureExt;
+use ffi::{AppHandle, FfiError, OpaqueCtx, Session, helper, launcher_config};
+use futures::Future;
+// use nfs::DirId;
 use rust_sodium::crypto::{box_, secretbox};
 use std::os::raw::c_void;
 
@@ -40,8 +40,8 @@ pub enum App {
     Unregistered,
     /// Authorised application
     Registered {
-        /// Application directory
-        app_dir_id: DirId,
+        // /// Application directory
+        // app_dir_id: DirId,
         /// Defines whether the application has access to SAFE Drive
         safe_drive_access: bool,
         /// Asymmetric encryption keys of the app
@@ -70,6 +70,7 @@ impl App {
         }
     }
 
+    /*
     /// Get app root directory ID
     pub fn app_dir(&self) -> Result<DirId, FfiError> {
         if let App::Registered { ref app_dir_id, .. } = *self {
@@ -98,6 +99,7 @@ impl App {
             futures::done(self.app_dir()).into_box()
         }
     }
+    */
 }
 
 /// Register an app with the launcher. The returned app handle must be disposed

@@ -741,26 +741,6 @@ mod tests {
         }
     }
 
-    macro_rules! btree_set {
-        ($($item:expr),*) => {{
-            let mut set = ::std::collections::BTreeSet::new();
-            $(
-                let _ = set.insert($item);
-            )*
-            set
-        }}
-    }
-
-    macro_rules! btree_map {
-        ($($key:expr => $value:expr),*) => {{
-            let mut map = ::std::collections::BTreeMap::new();
-            $(
-                let _ = map.insert($key, $value);
-            )*
-            map
-        }}
-    }
-
     #[test]
     fn immutable_data_basics() {
         let (mut routing, routing_rx, _) = setup();
