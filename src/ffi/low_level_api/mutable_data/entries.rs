@@ -22,13 +22,14 @@
 //! FFI for mutable data entries, keys and values.
 
 use core::CoreError;
-use ffi::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle, OpaqueCtx, Session, helper};
-use ffi::callback::{Callback, CallbackArgs};
+use ffi::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle, OpaqueCtx, Session};
+use ffi::callback::Callback;
 use ffi::errors::FfiError;
-use ffi::object_cache::ObjectCache;
+use ffi::helper as ffi_helper;
 use routing::{ClientError, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::os::raw::c_void;
+use super::helper;
 
 /// Create new empty entries.
 #[no_mangle]
@@ -37,11 +38,11 @@ pub unsafe extern "C" fn mdata_entries_new(session: *const Session,
                                            o_cb: unsafe extern "C" fn(*mut c_void,
                                                                       i32,
                                                                       MDataEntriesHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        send(session,
-             user_data,
-             o_cb,
-             |object_cache| Ok(object_cache.insert_mdata_entries(Default::default())))
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        helper::send_sync(session,
+                          user_data,
+                          o_cb,
+                          |object_cache| Ok(object_cache.insert_mdata_entries(Default::default())))
     })
 }
 
@@ -55,9 +56,9 @@ pub unsafe extern "C" fn mdata_entries_insert(session: *const Session,
                                               value_len: usize,
                                               user_data: *mut c_void,
                                               o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        let key = helper::u8_ptr_to_vec(key_ptr, key_len);
-        let value = helper::u8_ptr_to_vec(value_ptr, value_len);
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        let key = ffi_helper::u8_ptr_to_vec(key_ptr, key_len);
+        let value = ffi_helper::u8_ptr_to_vec(value_ptr, value_len);
 
         with_entries(session, entries_h, user_data, o_cb, |entries| {
             let _ = entries.insert(key,
@@ -77,7 +78,7 @@ pub unsafe extern "C" fn mdata_entries_len(session: *const Session,
                                            entries_h: MDataEntriesHandle,
                                            user_data: *mut c_void,
                                            o_cb: unsafe extern "C" fn(*mut c_void, i32, usize)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         with_entries(session,
                      entries_h,
                      user_data,
@@ -100,8 +101,8 @@ pub unsafe extern "C" fn mdata_entries_get(session: *const Session,
                                                                       *const u8,
                                                                       usize,
                                                                       u64)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        let key = helper::u8_ptr_to_vec(key_ptr, key_len);
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        let key = ffi_helper::u8_ptr_to_vec(key_ptr, key_len);
 
         with_entries(session, entries_h, user_data, o_cb, move |entries| {
             let value = entries.get(&key)
@@ -132,7 +133,7 @@ pub unsafe extern "C" fn mdata_entries_for_each(session: *const Session,
                                                                                u64),
                                                 user_data: *mut c_void,
                                                 o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         with_entries(session, entries_h, user_data.0, o_cb, move |entries| {
@@ -156,8 +157,8 @@ pub unsafe extern "C" fn mdata_entries_free(session: *const Session,
                                             entries_h: MDataEntriesHandle,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        send(session, user_data, o_cb, move |object_cache| {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        helper::send_sync(session, user_data, o_cb, move |object_cache| {
             let _ = object_cache.remove_mdata_entries(entries_h)?;
             Ok(())
         })
@@ -170,9 +171,9 @@ pub unsafe extern "C" fn mdata_keys_len(session: *const Session,
                                         keys_h: MDataKeysHandle,
                                         user_data: *mut c_void,
                                         o_cb: unsafe extern "C" fn(*mut c_void, i32, usize)) {
-    helper::catch_unwind_cb(user_data,
-                            o_cb,
-                            || with_keys(session, keys_h, user_data, o_cb, |keys| Ok(keys.len())))
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        with_keys(session, keys_h, user_data, o_cb, |keys| Ok(keys.len()))
+    })
 }
 
 /// Iterate over the keys.
@@ -189,7 +190,7 @@ pub unsafe extern "C" fn mdata_keys_for_each(session: *const Session,
                                                                           usize),
                                              user_data: *mut c_void,
                                              o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         with_keys(session, keys_h, user_data.0, o_cb, move |keys| {
@@ -208,8 +209,8 @@ pub unsafe extern "C" fn mdata_keys_free(session: *const Session,
                                          keys_h: MDataKeysHandle,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        send(session, user_data, o_cb, move |object_cache| {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        helper::send_sync(session, user_data, o_cb, move |object_cache| {
             let _ = object_cache.remove_mdata_keys(keys_h)?;
             Ok(())
         })
@@ -222,7 +223,7 @@ pub unsafe extern "C" fn mdata_values_len(session: *const Session,
                                           values_h: MDataValuesHandle,
                                           user_data: *mut c_void,
                                           o_cb: unsafe extern "C" fn(*mut c_void, i32, usize)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         with_values(session,
                     values_h,
                     user_data,
@@ -246,7 +247,7 @@ pub unsafe extern "C" fn mdata_values_for_each(session: *const Session,
                                                                               u64),
                                                user_data: *mut c_void,
                                                o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
         with_values(session, values_h, user_data.0, o_cb, move |values| {
@@ -268,8 +269,8 @@ pub unsafe extern "C" fn mdata_values_free(session: *const Session,
                                            values_h: MDataValuesHandle,
                                            user_data: *mut c_void,
                                            o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        send(session, user_data, o_cb, move |object_cache| {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        helper::send_sync(session, user_data, o_cb, move |object_cache| {
             let _ = object_cache.remove_mdata_values(values_h)?;
             Ok(())
         })
@@ -287,7 +288,7 @@ unsafe fn with_entries<C, F>(session: *const Session,
     where C: Callback + Copy + Send + 'static,
           F: FnOnce(&mut BTreeMap<Vec<u8>, Value>) -> Result<C::Args, FfiError> + Send + 'static
 {
-    send(session, user_data, o_cb, move |object_cache| {
+    helper::send_sync(session, user_data, o_cb, move |object_cache| {
         let mut entries = object_cache.get_mdata_entries(entries_h)?;
         f(&mut *entries)
     })
@@ -302,7 +303,7 @@ unsafe fn with_keys<C, F>(session: *const Session,
     where C: Callback + Copy + Send + 'static,
           F: FnOnce(&BTreeSet<Vec<u8>>) -> Result<C::Args, FfiError> + Send + 'static
 {
-    send(session, user_data, o_cb, move |object_cache| {
+    helper::send_sync(session, user_data, o_cb, move |object_cache| {
         let keys = object_cache.get_mdata_keys(keys_h)?;
         f(&*keys)
     })
@@ -317,29 +318,9 @@ unsafe fn with_values<C, F>(session: *const Session,
     where C: Callback + Copy + Send + 'static,
           F: FnOnce(&Vec<Value>) -> Result<C::Args, FfiError> + Send + 'static
 {
-    send(session, user_data, o_cb, move |object_cache| {
+    helper::send_sync(session, user_data, o_cb, move |object_cache| {
         let values = object_cache.get_mdata_values(values_h)?;
         f(&*values)
-    })
-}
-
-unsafe fn send<C, F>(session: *const Session,
-                     user_data: *mut c_void,
-                     o_cb: C,
-                     f: F)
-                     -> Result<(), FfiError>
-    where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&ObjectCache) -> Result<C::Args, FfiError> + Send + 'static
-{
-    let user_data = OpaqueCtx(user_data);
-
-    (*session).send(move |_, object_cache| {
-        match f(object_cache) {
-            Ok(args) => o_cb.call(user_data.0, 0, args),
-            Err(err) => o_cb.call(user_data.0, ffi_error_code!(err), C::Args::default()),
-        }
-
-        None
     })
 }
 

@@ -22,16 +22,16 @@
 pub mod entry_actions;
 pub mod entries;
 pub mod permissions;
+mod helper;
 
-use core::{Client, CoreError, FutureExt};
+use core::{CoreError, FutureExt};
 use ffi::{MDataEntriesHandle, MDataEntryActionsHandle, MDataKeysHandle, MDataPermissionSetHandle,
-          MDataPermissionsHandle, MDataValuesHandle, OpaqueCtx, Session, SignKeyHandle, helper};
-use ffi::callback::{Callback, CallbackArgs};
+          MDataPermissionsHandle, MDataValuesHandle, OpaqueCtx, Session, SignKeyHandle};
 use ffi::errors::FfiError;
+use ffi::helper as ffi_helper;
 use ffi::object_cache::ObjectCache;
 use futures::Future;
 use routing::{MutableData, User, XOR_NAME_LEN, XorName};
-use std::fmt::Debug;
 use std::os::raw::c_void;
 
 /// Create new mutable data and put it on the network.
@@ -47,7 +47,7 @@ pub unsafe extern "C" fn mdata_put(session: *const Session,
                                    entries_h: MDataEntriesHandle,
                                    user_data: *mut c_void,
                                    o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
@@ -96,13 +96,13 @@ pub unsafe extern "C" fn mdata_get_version(session: *const Session,
                                            type_tag: u64,
                                            user_data: *mut c_void,
                                            o_cb: unsafe extern "C" fn(*mut c_void, i32, u64)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        send(session,
-             user_data,
-             o_cb,
-             move |client, _| client.get_mdata_version(name, type_tag, None))
+        helper::send_async(session,
+                           user_data,
+                           o_cb,
+                           move |client, _| client.get_mdata_version(name, type_tag, None))
     })
 }
 
@@ -127,14 +127,14 @@ pub unsafe extern "C" fn mdata_get_value(session: *const Session,
                                                                     usize,
                                                                     usize,
                                                                     u64)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
-        let key = helper::u8_ptr_to_vec(key_ptr, key_len);
+        let key = ffi_helper::u8_ptr_to_vec(key_ptr, key_len);
 
-        send(session, user_data, o_cb, move |client, _| {
+        helper::send_async(session, user_data, o_cb, move |client, _| {
             client.get_mdata_value(name, type_tag, key, None)
                 .map(move |value| {
-                    let content = helper::u8_vec_to_ptr(value.content);
+                    let content = ffi_helper::u8_vec_to_ptr(value.content);
                     (content.0, content.1, content.2, value.entry_version)
                 })
         })
@@ -150,10 +150,10 @@ pub unsafe extern "C" fn mdata_list_entries(session: *const Session,
                                             o_cb: unsafe extern "C" fn(*mut c_void,
                                                                        i32,
                                                                        MDataEntriesHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        send(session, user_data, o_cb, move |client, object_cache| {
+        helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
             client.list_mdata_entries(name, type_tag, None)
                 .map(move |entries| object_cache.insert_mdata_entries(entries))
@@ -170,10 +170,10 @@ pub unsafe extern "C" fn mdata_list_keys(session: *const Session,
                                          o_cb: unsafe extern "C" fn(*mut c_void,
                                                                     i32,
                                                                     MDataKeysHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        send(session, user_data, o_cb, move |client, object_cache| {
+        helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
             client.list_mdata_keys(name, type_tag, None)
                 .map(move |keys| object_cache.insert_mdata_keys(keys))
@@ -190,10 +190,10 @@ pub unsafe extern "C" fn mdata_list_values(session: *const Session,
                                            o_cb: unsafe extern "C" fn(*mut c_void,
                                                                       i32,
                                                                       MDataValuesHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        send(session, user_data, o_cb, move |client, object_cache| {
+        helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
             client.list_mdata_values(name, type_tag, None)
                 .map(move |values| object_cache.insert_mdata_values(values))
@@ -209,7 +209,7 @@ pub unsafe fn mdata_mutate_entries(session: *const Session,
                                    actions_h: MDataEntryActionsHandle,
                                    user_data: *mut c_void,
                                    o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
@@ -239,10 +239,10 @@ pub unsafe fn mdata_list_permissions(session: *const Session,
                                      o_cb: unsafe extern "C" fn(*mut c_void,
                                                                 i32,
                                                                 MDataPermissionsHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        send(session, user_data, o_cb, move |client, object_cache| {
+        helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
             client.list_mdata_permissions(name, type_tag, None)
                 .map(move |perms| object_cache.insert_mdata_permissions(perms))
@@ -262,7 +262,7 @@ pub unsafe fn mdata_list_user_permissions(session: *const Session,
                                           o_cb: unsafe extern "C" fn(*mut c_void,
                                                                      i32,
                                                                      MDataPermissionSetHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
@@ -294,7 +294,7 @@ pub unsafe fn mdata_set_user_permissions(session: *const Session,
                                          version: u64,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
@@ -327,7 +327,7 @@ pub unsafe fn mdata_del_user_permissions(session: *const Session,
                                          version: u64,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
@@ -354,7 +354,7 @@ pub unsafe extern "C" fn mdata_change_owner(session: *const Session,
                                             version: u64,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
@@ -369,29 +369,6 @@ pub unsafe extern "C" fn mdata_change_owner(session: *const Session,
                 .into_box()
                 .into()
         })
-    })
-}
-
-// FFI call boilerplate
-unsafe fn send<C, F, U, E>(session: *const Session,
-                           user_data: *mut c_void,
-                           cb: C,
-                           f: F)
-                           -> Result<(), FfiError>
-    where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&Client, &ObjectCache) -> U + Send + 'static,
-          U: Future<Item = C::Args, Error = E> + 'static,
-          E: Debug,
-          FfiError: From<E>
-{
-    let user_data = OpaqueCtx(user_data);
-
-    (*session).send(move |client, object_cache| {
-        f(client, object_cache)
-            .map(move |args| cb.call(user_data.0, 0, args))
-            .map_err(move |err| cb.call(user_data.0, ffi_error_code!(err), C::Args::default()))
-            .into_box()
-            .into()
     })
 }
 

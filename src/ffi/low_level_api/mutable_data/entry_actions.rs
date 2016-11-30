@@ -21,9 +21,11 @@
 
 //! FFI for mutable data entry actions.
 
-use ffi::{MDataEntryActionsHandle, OpaqueCtx, Session, helper};
+use ffi::{MDataEntryActionsHandle, Session};
+use ffi::helper as ffi_helper;
 use routing::{EntryAction, Value};
 use std::os::raw::c_void;
+use super::helper;
 
 /// Create new entry actions.
 #[no_mangle]
@@ -33,15 +35,10 @@ fn mdata_entry_actions_new(session: *const Session,
                            o_cb: unsafe extern "C" fn(*mut c_void,
                                                       i32,
                                                       MDataEntryActionsHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        let user_data = OpaqueCtx(user_data);
-
-        (*session).send(move |_, object_cache| {
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        helper::send_sync(session, user_data, o_cb, |object_cache| {
             let actions = Default::default();
-            let handle = object_cache.insert_mdata_entry_actions(actions);
-
-            o_cb(user_data.0, 0, handle);
-            None
+            Ok(object_cache.insert_mdata_entry_actions(actions))
         })
     })
 }
@@ -58,7 +55,7 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(session: *const Session,
                                                     o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     add_action(session, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Ins(Value {
-            content: helper::u8_ptr_to_vec(value_ptr, value_len),
+            content: ffi_helper::u8_ptr_to_vec(value_ptr, value_len),
             entry_version: 0,
         })
     })
@@ -77,7 +74,7 @@ pub unsafe extern "C" fn mdata_entry_actions_update(session: *const Session,
                                                     o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     add_action(session, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
-            content: helper::u8_ptr_to_vec(value_ptr, value_len),
+            content: ffi_helper::u8_ptr_to_vec(value_ptr, value_len),
             entry_version: entry_version,
         })
     })
@@ -107,16 +104,10 @@ pub unsafe extern "C" fn mdata_entry_actions_free(session: *const Session,
                                                   actions_h: MDataEntryActionsHandle,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        let user_data = OpaqueCtx(user_data);
-
-        (*session).send(move |_, object_cache| {
-            let _ = try_cb!(object_cache.remove_mdata_entry_actions(actions_h),
-                            user_data,
-                            o_cb);
-
-            o_cb(user_data.0, 0);
-            None
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        helper::send_sync(session, user_data, o_cb, move |object_cache| {
+            let _ = object_cache.remove_mdata_entry_actions(actions_h)?;
+            Ok(())
         })
     })
 }
@@ -132,19 +123,14 @@ unsafe fn add_action<F>(session: *const Session,
                         f: F)
     where F: FnOnce() -> EntryAction
 {
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        let user_data = OpaqueCtx(user_data);
-        let key = helper::u8_ptr_to_vec(key_ptr, key_len);
+    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
+        let key = ffi_helper::u8_ptr_to_vec(key_ptr, key_len);
         let action = f();
 
-        (*session).send(move |_, object_cache| {
-            let mut actions = try_cb!(object_cache.get_mdata_entry_actions(actions_h),
-                                      user_data,
-                                      o_cb);
+        helper::send_sync(session, user_data, o_cb, move |object_cache| {
+            let mut actions = object_cache.get_mdata_entry_actions(actions_h)?;
             let _ = actions.insert(key, action);
-
-            o_cb(user_data.0, 0);
-            None
+            Ok(())
         })
     })
 }
