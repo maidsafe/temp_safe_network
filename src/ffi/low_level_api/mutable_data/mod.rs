@@ -19,10 +19,9 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-/// FFI for mutable data entry actions.
 pub mod entry_actions;
-/// FFI for mutable data entries, keys and values.
 pub mod entries;
+pub mod permissions;
 
 use core::{Client, CoreError, FutureExt};
 use ffi::{MDataEntriesHandle, MDataEntryActionsHandle, MDataKeysHandle, MDataPermissionSetHandle,

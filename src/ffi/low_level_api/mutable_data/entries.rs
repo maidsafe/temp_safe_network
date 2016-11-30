@@ -19,6 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+//! FFI for mutable data entries, keys and values.
+
 use core::CoreError;
 use ffi::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle, OpaqueCtx, Session, helper};
 use ffi::callback::{Callback, CallbackArgs};
@@ -27,6 +29,47 @@ use ffi::object_cache::ObjectCache;
 use routing::{ClientError, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::os::raw::c_void;
+
+/// Create new empty entries.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_entries_new(session: *const Session,
+                                           user_data: *mut c_void,
+                                           o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                      i32,
+                                                                      MDataEntriesHandle)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        send(session,
+             user_data,
+             o_cb,
+             |object_cache| Ok(object_cache.insert_mdata_entries(Default::default())))
+    })
+}
+
+/// Insert an entry to the entries.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_entries_insert(session: *const Session,
+                                              entries_h: MDataEntriesHandle,
+                                              key_ptr: *const u8,
+                                              key_len: usize,
+                                              value_ptr: *const u8,
+                                              value_len: usize,
+                                              user_data: *mut c_void,
+                                              o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+    helper::catch_unwind_cb(user_data, o_cb, || {
+        let key = helper::u8_ptr_to_vec(key_ptr, key_len);
+        let value = helper::u8_ptr_to_vec(value_ptr, value_len);
+
+        with_entries(session, entries_h, user_data, o_cb, |entries| {
+            let _ = entries.insert(key,
+                                   Value {
+                                       content: value,
+                                       entry_version: 0,
+                                   });
+
+            Ok(())
+        })
+    })
+}
 
 /// Returns the number of entries.
 #[no_mangle]
@@ -242,11 +285,11 @@ unsafe fn with_entries<C, F>(session: *const Session,
                              f: F)
                              -> Result<(), FfiError>
     where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&BTreeMap<Vec<u8>, Value>) -> Result<C::Args, FfiError> + Send + 'static
+          F: FnOnce(&mut BTreeMap<Vec<u8>, Value>) -> Result<C::Args, FfiError> + Send + 'static
 {
     send(session, user_data, o_cb, move |object_cache| {
-        let entries = object_cache.get_mdata_entries(entries_h)?;
-        f(&*entries)
+        let mut entries = object_cache.get_mdata_entries(entries_h)?;
+        f(&mut *entries)
     })
 }
 
