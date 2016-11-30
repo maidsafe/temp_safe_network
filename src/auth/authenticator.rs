@@ -92,10 +92,10 @@ impl Authenticator {
     }
 
     /// Log in to an existing account
-    pub fn log_in<S, NetObs>(locator: S,
-                             password: S,
-                             mut network_observer: NetObs)
-                             -> Result<Self, AuthError>
+    pub fn login<S, NetObs>(locator: S,
+                            password: S,
+                            mut network_observer: NetObs)
+                            -> Result<Self, AuthError>
         where S: Into<String>,
               NetObs: FnMut(Result<NetworkEvent, ()>) + Send + 'static
     {
@@ -183,32 +183,19 @@ pub unsafe extern "C" fn create_acc(account_locator: *const u8,
     })
 }
 
-/// Create an authenticator as an unregistered client. This or any one of the other
-/// companion functions to get an auth instance must be called before initiating any
-/// operation allowed by this module.
-#[no_mangle]
-pub unsafe extern "C" fn create_unregistered(_auth_handle: *mut *mut Authenticator,
-                                             _user_data: *mut c_void,
-                                             _o_network_obs_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                     i32,
-                                                                                     i32))
-                                             -> i32 {
-    0
-}
-
 /// Log into a registered account. This or any one of the other companion
 /// functions to get an authenticator instance must be called before initiating
 /// any operation allowed for authenticator. `auth_handle` is a pointer to a pointer
 /// and must point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
-pub unsafe extern "C" fn log_in(account_locator: *const u8,
-                                account_locator_len: usize,
-                                account_password: *const u8,
-                                account_password_len: usize,
-                                auth_handle: *mut *mut Authenticator,
-                                user_data: *mut c_void,
-                                o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
-                                -> i32 {
+pub unsafe extern "C" fn login(account_locator: *const u8,
+                               account_locator_len: usize,
+                               account_password: *const u8,
+                               account_password_len: usize,
+                               auth_handle: *mut *mut Authenticator,
+                               user_data: *mut c_void,
+                               o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
+                               -> i32 {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_error_code(|| -> Result<(), AuthError> {
@@ -217,7 +204,7 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
         let acc_locator = c_utf8_to_str(account_locator, account_locator_len)?;
         let acc_password = c_utf8_to_str(account_password, account_password_len)?;
 
-        let authenticator = Authenticator::log_in(acc_locator, acc_password, move |net_event| {
+        let authenticator = Authenticator::login(acc_locator, acc_password, move |net_event| {
             let user_data: *mut c_void = user_data.into();
 
             match net_event {
@@ -234,7 +221,7 @@ pub unsafe extern "C" fn log_in(account_locator: *const u8,
 
 /// Discard and clean up the previously allocated authenticator instance.
 /// Use this only if the authenticator is obtained from one of the auth
-/// functions in this crate (`create_acc`, `log_in`, `create_unregistered`).
+/// functions in this crate (`create_acc`, `login`, `create_unregistered`).
 /// Using `auth` after a call to this functions is undefined behaviour.
 #[no_mangle]
 pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
@@ -249,7 +236,7 @@ mod tests {
     use util::ffi;
 
     #[test]
-    fn create_account_and_log_in() {
+    fn create_account_and_login() {
         let acc_locator = ffi::generate_random_cstring(10);
         let acc_password = ffi::generate_random_cstring(10);
 
@@ -280,13 +267,13 @@ mod tests {
             unsafe {
                 let auth_h_ptr = &mut auth_h;
 
-                assert_eq!(log_in(acc_locator.as_ptr() as *const u8,
-                                  10,
-                                  acc_password.as_ptr() as *const u8,
-                                  10,
-                                  auth_h_ptr,
-                                  ptr::null_mut(),
-                                  net_event_cb),
+                assert_eq!(login(acc_locator.as_ptr() as *const u8,
+                                 10,
+                                 acc_password.as_ptr() as *const u8,
+                                 10,
+                                 auth_h_ptr,
+                                 ptr::null_mut(),
+                                 net_event_cb),
                            0);
             }
 
