@@ -122,7 +122,7 @@ pub fn get_permissions(object_cache: &ObjectCache,
 
     for (user_h, permission_set_h) in input {
         let user = get_user(object_cache, user_h)?;
-        let permission_set = object_cache.get_mdata_permission_set(permission_set_h)?.clone();
+        let permission_set = *object_cache.get_mdata_permission_set(permission_set_h)?;
 
         let _ = output.insert(user, permission_set);
     }

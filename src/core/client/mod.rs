@@ -21,7 +21,7 @@
 
 mod account;
 #[cfg(feature = "use-mock-routing")]
-mod mock_routing;
+mod mock;
 mod routing_el;
 
 use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, DIR_TAG, FutureExt, NetworkEvent,
@@ -39,7 +39,7 @@ use rust_sodium::crypto::hash::sha256::{self, Digest};
 pub use self::account::{ClientKeys, Dir};
 use self::account::Account;
 #[cfg(feature = "use-mock-routing")]
-use self::mock_routing::MockRouting as Routing;
+use self::mock::Routing;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
@@ -48,7 +48,6 @@ use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 use tokio_core::reactor::{Handle, Timeout};
 
-const ACC_PKT_TIMEOUT_SECS: u64 = 60;
 const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 const REQUEST_TIMEOUT_SECS: u64 = 120;
@@ -74,6 +73,32 @@ macro_rules! oneshot {
 
         (hook, $client.timeout(msg_id, fut), msg_id)
     }}
+}
+
+macro_rules! wait_for_response {
+    ($rx:expr, $res:path, $msg_id:expr) => {
+        match $rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)) {
+            Ok(Event::Response {
+                response: $res { res, msg_id: res_msg_id },
+                ..
+            }) => {
+                if res_msg_id == $msg_id {
+                    res.map_err(CoreError::RoutingClientError)
+                } else {
+                    warn!("Received response with unexpected message id");
+                    Err(CoreError::OperationAborted)
+                }
+            }
+            Ok(x) => {
+                warn!("Received unexpected response: {:?}", x);
+                Err(CoreError::OperationAborted)
+            }
+            Err(err) => {
+                warn!("Failed to receive response: {:?}", err);
+                Err(CoreError::OperationAborted)
+            }
+        }
+    }
 }
 
 /// The main self-authentication client instance that will interface all the
@@ -135,7 +160,7 @@ impl Client {
                          -> Result<Client, CoreError>
         where T: 'static
     {
-        trace!("Creating an acc.");
+        trace!("Creating an account.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
@@ -146,28 +171,24 @@ impl Client {
         let pub_key = maid_keys.sign_pk;
         let full_id = Some(maid_keys.clone().into());
 
-        let mut owners = BTreeSet::new();
-        owners.insert(pub_key);
-
         let (routing, routing_rx) = setup_routing(full_id)?;
 
-        let user_root = Client::create_empty_dir(&routing, &routing_rx, owners.clone(), pub_key)?;
-        let config_dir = Client::create_empty_dir(&routing, &routing_rx, owners.clone(), pub_key)?;
+        let user_root_dir = Dir::random(DIR_TAG);
+        let config_dir = Dir::random(DIR_TAG);
+        let acc = Account::new(maid_keys, user_root_dir.clone(), config_dir.clone());
 
-        let acc = Account::new(maid_keys, user_root, config_dir);
-
-        let mut acc_data = BTreeMap::new();
-        let _ = acc_data.insert(b"Login".to_vec(),
-                                Value {
-                                    content: acc.encrypt(&user_cred.password, &user_cred.pin)?,
-                                    entry_version: 0,
-                                });
+        let acc_data = btree_map![
+            b"Login".to_vec() => Value {
+                content: acc.encrypt(&user_cred.password, &user_cred.pin)?,
+                entry_version: 0,
+            }
+        ];
 
         let acc_md = MutableData::new(acc_loc,
                                       TYPE_TAG_SESSION_PACKET,
                                       BTreeMap::new(),
                                       acc_data,
-                                      owners)?;
+                                      btree_set![pub_key])?;
 
         let Digest(digest) = sha256::hash(&pub_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
@@ -175,22 +196,16 @@ impl Client {
         let msg_id = MessageId::new();
         routing.put_mdata(cm_addr, acc_md, msg_id, pub_key)?;
 
-        match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
-            Ok(Event::Response { response: Response::PutMData { ref res, msg_id: ref id }, .. })
-                if *id == msg_id => {
-                match *res {
-                    Ok(..) => (),
-                    Err(ref client_error) => {
-                        return Err(CoreError::RoutingClientError(client_error.clone()));
-                    }
-                }
-            }
-            x => {
-                warn!("Could not put session packet to the Network. Unexpected: {:?}",
-                      x);
-                return Err(CoreError::OperationAborted);
+        match wait_for_response!(routing_rx, Response::PutMData, msg_id) {
+            Ok(_) => (),
+            Err(err) => {
+                warn!("Could not put account to the Network: {:?}", err);
+                return Err(err);
             }
         }
+
+        create_empty_dir(&routing, &routing_rx, cm_addr, user_root_dir, pub_key)?;
+        create_empty_dir(&routing, &routing_rx, cm_addr, config_dir, pub_key)?;
 
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
@@ -238,25 +253,11 @@ impl Client {
                                  b"Login".to_vec(),
                                  msg_id)?;
 
-            match routing_rx.recv_timeout(Duration::from_secs(ACC_PKT_TIMEOUT_SECS)) {
-                Ok(Event::Response { response:
-                                     Response::GetMDataValue { msg_id: id, res }, .. }) => {
-                    if id != msg_id {
-                        return Err(CoreError::OperationAborted);
-                    }
-                    match res {
-                        Ok(Value { content, entry_version }) => {
-                            (content, entry_version)
-                        },
-                        Err(client_error) => {
-                            return Err(CoreError::RoutingClientError(client_error));
-                        }
-                    }
-                }
-                x => {
-                    warn!("Could not fetch account packet from the Network. Unexpected: {:?}",
-                          x);
-                    return Err(CoreError::OperationAborted);
+            match wait_for_response!(routing_rx, Response::GetMDataValue, msg_id) {
+                Ok(Value { content, entry_version }) => (content, entry_version),
+                Err(err) => {
+                    warn!("Could not fetch account from the Network: {:?}", err);
+                    return Err(err);
                 }
             }
         };
@@ -746,42 +747,6 @@ impl Client {
         self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, actions)
     }
 
-    /// Creates an empty dir to hold configuration or user data
-    fn create_empty_dir(routing: &Routing,
-                        routing_rx: &Receiver<Event>,
-                        owners: BTreeSet<sign::PublicKey>,
-                        requester: sign::PublicKey)
-                        -> Result<Dir, CoreError> {
-        let dir = Dir::random(DIR_TAG, false);
-        let dir_md = MutableData::new(dir.name,
-                                      dir.type_tag,
-                                      BTreeMap::new(),
-                                      BTreeMap::new(),
-                                      owners)?;
-
-        let msg_id = MessageId::new();
-        routing.put_mdata(Authority::NaeManager(dir.name), dir_md, msg_id, requester)?;
-
-        match routing_rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)) {
-            Ok(Event::Response { response: Response::PutMData { ref res, msg_id: ref id }, .. })
-                if *id == msg_id => {
-                match *res {
-                    Ok(..) => (),
-                    Err(ref client_error) => {
-                        return Err(CoreError::RoutingClientError(client_error.clone()));
-                    }
-                }
-            }
-            x => {
-                warn!("Could not put MutableData to the Network. Unexpected: {:?}",
-                      x);
-                return Err(CoreError::OperationAborted);
-            }
-        }
-
-        Ok(dir)
-    }
-
     /// Generic GET request
     fn get<T, F, G>(&self, err_event: F, req: G) -> Box<CoreFuture<CoreEvent>>
         where F: FnOnce(Result<T, CoreError>) -> CoreEvent,
@@ -901,7 +866,6 @@ impl UserCred {
     }
 }
 
-#[allow(unused)] // <- TODO(nbaksalyar) remove this
 enum ClientType {
     Unregistered,
     Registered {
@@ -911,7 +875,7 @@ enum ClientType {
         cm_addr: Authority,
     },
     FromKeys {
-        owner: sign::PublicKey,
+        _owner: sign::PublicKey,
         cm_addr: Authority,
     },
 }
@@ -919,7 +883,7 @@ enum ClientType {
 impl ClientType {
     fn from_keys(owner: sign::PublicKey, cm_addr: Authority) -> Self {
         ClientType::FromKeys {
-            owner: owner,
+            _owner: owner,
             cm_addr: cm_addr,
         }
     }
@@ -1008,6 +972,33 @@ fn spawn_routing_thread<T>(routing_rx: Receiver<Event>,
 {
     thread::named("Routing Event Loop",
                   move || routing_el::run(routing_rx, core_tx, net_tx))
+}
+
+/// Creates an empty dir to hold configuration or user data
+fn create_empty_dir(routing: &Routing,
+                    routing_rx: &Receiver<Event>,
+                    dst: Authority,
+                    dir: Dir,
+                    owner_key: sign::PublicKey)
+                    -> Result<(), CoreError> {
+    let dir_md = MutableData::new(dir.name,
+                                  dir.type_tag,
+                                  BTreeMap::new(),
+                                  BTreeMap::new(),
+                                  btree_set![owner_key])?;
+
+    let msg_id = MessageId::new();
+    routing.put_mdata(dst, dir_md, msg_id, owner_key)?;
+
+    match wait_for_response!(routing_rx, Response::PutMData, msg_id) {
+        Ok(_) => (),
+        Err(err) => {
+            warn!("Could not put directory to the Network: {:?}", err);
+            return Err(err);
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
