@@ -69,23 +69,19 @@ mod tests {
     #[test]
     fn create_and_free() {
         let session = test_utils::create_session();
-        let xor_name_array: [u8; XOR_NAME_LEN] = rand::random();
+        let array: [u8; XOR_NAME_LEN] = rand::random();
 
-        let xor_name_handle = unsafe {
-            unwrap!(test_utils::call_1(|ud, cb| xor_name_new(&session, &xor_name_array, ud, cb)))
-        };
+        let handle =
+            unsafe { unwrap!(test_utils::call_1(|ud, cb| xor_name_new(&session, &array, ud, cb))) };
 
         test_utils::run_now(&session, move |_, obj_cache| {
-            assert_eq!(*unwrap!(obj_cache.get_xor_name(xor_name_handle)),
-                       XorName(xor_name_array));
+            assert_eq!(*unwrap!(obj_cache.get_xor_name(handle)), XorName(array));
         });
 
-        unsafe {
-            unwrap!(test_utils::call_0(|ud, cb| xor_name_free(&session, xor_name_handle, ud, cb)))
-        }
+        unsafe { unwrap!(test_utils::call_0(|ud, cb| xor_name_free(&session, handle, ud, cb))) }
 
         test_utils::run_now(&session, move |_, obj_cache| {
-            assert!(obj_cache.get_xor_name(xor_name_handle).is_err());
+            assert!(obj_cache.get_xor_name(handle).is_err());
         });
     }
 }
