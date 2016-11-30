@@ -25,6 +25,12 @@ use std::mem;
 
 /// Ffi module
 pub mod ffi;
+/// Authenticator module
+pub mod authenticator;
+/// Authenticator errors
+mod errors;
+
+pub use self::errors::AuthError;
 
 use self::ffi::PermissionAccess;
 
