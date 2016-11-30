@@ -204,21 +204,22 @@ mod tests {
             let actions = unwrap!(object_cache.get_mdata_entry_actions(handle));
             assert_eq!(actions.len(), 3);
 
-            match unwrap!(actions.get(&key0)) {
-                &EntryAction::Ins(Value { ref content, entry_version: 0 }) if *content ==
-                                                                              value0 => (),
+            match *unwrap!(actions.get(&key0)) {
+                EntryAction::Ins(Value { ref content, entry_version: 0 }) if *content == value0 => {
+                    ()
+                }
                 _ => panic!("Unexpected action"),
             }
 
-            match unwrap!(actions.get(&key1)) {
-                &EntryAction::Update(Value { ref content, entry_version }) if *content == value1 &&
-                                                                              entry_version ==
-                                                                              version1 => (),
+            match *unwrap!(actions.get(&key1)) {
+                EntryAction::Update(Value { ref content, entry_version }) if *content == value1 &&
+                                                                             entry_version ==
+                                                                             version1 => (),
                 _ => panic!("Unexpected action"),
             }
 
-            match unwrap!(actions.get(&key2)) {
-                &EntryAction::Del(version) if version == version2 => (),
+            match *unwrap!(actions.get(&key2)) {
+                EntryAction::Del(version) if version == version2 => (),
                 _ => panic!("Unexpected action"),
             }
         });

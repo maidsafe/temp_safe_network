@@ -56,7 +56,7 @@ impl Storage for SelfEncryptionStorage {
 
         let name = {
             let mut temp = [0u8; XOR_NAME_LEN];
-            temp.clone_from_slice(&name);
+            temp.clone_from_slice(name);
             XorName(temp)
         };
 

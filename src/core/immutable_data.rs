@@ -64,7 +64,7 @@ pub fn create(client: &Client,
         .into_box()
 }
 
-/// Get the raw bytes from ImmutableData created via `create()` function in
+/// Get the raw bytes from `ImmutableData` created via `create()` function in
 /// this module.
 pub fn extract_value(client: &Client,
                      data: ImmutableData,

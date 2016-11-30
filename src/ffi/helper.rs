@@ -58,7 +58,7 @@ pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize) -> Result<Option<
 // TODO: add c_utf8_to_opt_str (return Option<&str> instead of Option<String>)
 
 /// Returns a heap-allocated raw string, usable by C/FFI-boundary. The tuple
-/// means (pointer, length_in_bytes, capacity). Use `misc_u8_ptr_free` to free
+/// means `(pointer, length_in_bytes, capacity)`. Use `misc_u8_ptr_free` to free
 /// the memory.
 #[allow(unused)] // <-- TODO: remove this
 pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
