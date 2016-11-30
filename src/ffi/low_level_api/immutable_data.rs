@@ -151,7 +151,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(session: *const Session,
                     let raw_immut_data = ImmutableData::new(raw_data);
                     let raw_immut_data_name = *raw_immut_data.name();
 
-                    c3.put_idata(raw_immut_data, None)
+                    c3.put_idata(raw_immut_data)
                         .map_err(FfiError::from)
                         .map(move |_| obj_cache.insert_xor_name(raw_immut_data_name))
                         .into_box()
@@ -191,7 +191,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(session: *const Session,
 
             let fut = {
                 match obj_cache.get_xor_name(name_h) {
-                    Ok(data_id) => client.get_idata(*data_id, None),
+                    Ok(data_id) => client.get_idata(*data_id),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e), 0);
                         return None;

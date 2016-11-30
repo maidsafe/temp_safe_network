@@ -75,7 +75,7 @@ pub unsafe extern "C" fn mdata_put(session: *const Session,
                                user_data,
                                o_cb);
 
-            client.put_mdata(data, None)
+            client.put_mdata(data)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn mdata_get_version(session: *const Session,
         helper::send_async(session,
                            user_data,
                            o_cb,
-                           move |client, _| client.get_mdata_version(name, type_tag, None))
+                           move |client, _| client.get_mdata_version(name, type_tag))
     })
 }
 
@@ -129,7 +129,7 @@ pub unsafe extern "C" fn mdata_get_value(session: *const Session,
         let key = ffi_helper::u8_ptr_to_vec(key_ptr, key_len);
 
         helper::send_async(session, user_data, o_cb, move |client, _| {
-            client.get_mdata_value(name, type_tag, key, None)
+            client.get_mdata_value(name, type_tag, key)
                 .map(move |value| {
                     let content = ffi_helper::u8_vec_to_ptr(value.content);
                     (content.0, content.1, content.2, value.entry_version)
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn mdata_list_entries(session: *const Session,
 
         helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
-            client.list_mdata_entries(name, type_tag, None)
+            client.list_mdata_entries(name, type_tag)
                 .map(move |entries| object_cache.insert_mdata_entries(entries))
         })
     })
@@ -172,7 +172,7 @@ pub unsafe extern "C" fn mdata_list_keys(session: *const Session,
 
         helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
-            client.list_mdata_keys(name, type_tag, None)
+            client.list_mdata_keys(name, type_tag)
                 .map(move |keys| object_cache.insert_mdata_keys(keys))
         })
     })
@@ -192,7 +192,7 @@ pub unsafe extern "C" fn mdata_list_values(session: *const Session,
 
         helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
-            client.list_mdata_values(name, type_tag, None)
+            client.list_mdata_values(name, type_tag)
                 .map(move |values| object_cache.insert_mdata_values(values))
         })
     })
@@ -216,7 +216,7 @@ pub unsafe fn mdata_mutate_entries(session: *const Session,
                                   o_cb)
                 .clone();
 
-            client.mutate_mdata_entries(name, type_tag, actions, None)
+            client.mutate_mdata_entries(name, type_tag, actions)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -241,7 +241,7 @@ pub unsafe fn mdata_list_permissions(session: *const Session,
 
         helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
-            client.list_mdata_permissions(name, type_tag, None)
+            client.list_mdata_permissions(name, type_tag)
                 .map(move |perms| helper::insert_permissions(&object_cache, perms))
         })
     })
@@ -267,7 +267,7 @@ pub unsafe fn mdata_list_user_permissions(session: *const Session,
             let object_cache = object_cache.clone();
             let user = try_cb!(helper::get_user(&object_cache, user_h), user_data, o_cb);
 
-            client.list_mdata_user_permissions(name, type_tag, user, None)
+            client.list_mdata_user_permissions(name, type_tag, user)
                 .map(move |set| {
                     let handle = object_cache.insert_mdata_permission_set(set);
                     o_cb(user_data.0, 0, handle);
@@ -302,7 +302,7 @@ pub unsafe fn mdata_set_user_permissions(session: *const Session,
                                          o_cb)
                 .clone();
 
-            client.set_mdata_user_permissions(name, type_tag, user, permission_set, version, None)
+            client.set_mdata_user_permissions(name, type_tag, user, permission_set, version)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -331,7 +331,7 @@ pub unsafe fn mdata_del_user_permissions(session: *const Session,
         (*session).send(move |client, object_cache| {
             let user = try_cb!(helper::get_user(object_cache, user_h), user_data, o_cb);
 
-            client.del_mdata_user_permissions(name, type_tag, user, version, None)
+            client.del_mdata_user_permissions(name, type_tag, user, version)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -358,7 +358,7 @@ pub unsafe extern "C" fn mdata_change_owner(session: *const Session,
         (*session).send(move |client, object_cache| {
             let new_owner = *try_cb!(object_cache.get_sign_key(new_owner_h), user_data, o_cb);
 
-            client.change_mdata_owner(name, type_tag, new_owner, version, None)
+            client.change_mdata_owner(name, type_tag, new_owner, version)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())

@@ -99,7 +99,7 @@ pub fn get_value(client: &Client,
                  decryption_key: Option<secretbox::Key>)
                  -> Box<CoreFuture<Vec<u8>>> {
     let client2 = client.clone();
-    client.get_idata(*name, None)
+    client.get_idata(*name)
         .and_then(move |data| extract_value(&client2, data, decryption_key))
         .into_box()
 }
@@ -188,7 +188,7 @@ mod tests {
                     .then(move |res| {
                         let data_before = unwrap!(res);
                         let data_name = *data_before.name();
-                        client2.put_idata(data_before, None)
+                        client2.put_idata(data_before)
                             .map(move |_| data_name)
                     })
                     .then(move |res| {
@@ -216,7 +216,7 @@ mod tests {
                     .then(move |res| {
                         let data_before = unwrap!(res);
                         let data_name = *data_before.name();
-                        client2.put_idata(data_before, None)
+                        client2.put_idata(data_before)
                             .map(move |_| data_name)
                     })
                     .then(move |res| {
@@ -244,7 +244,7 @@ mod tests {
                     .then(move |res| {
                         let data = unwrap!(res);
                         let data_name = *data.name();
-                        client2.put_idata(data, None)
+                        client2.put_idata(data)
                             .map(move |_| data_name)
                     })
                     .then(move |res| {
@@ -271,7 +271,7 @@ mod tests {
                     .then(move |res| {
                         let data = unwrap!(res);
                         let data_name = *data.name();
-                        client2.put_idata(data, None)
+                        client2.put_idata(data)
                             .map(move |_| data_name)
                     })
                     .then(move |res| {

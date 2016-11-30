@@ -61,7 +61,7 @@ impl Storage for SelfEncryptionStorage {
         };
 
         self.client
-            .get_idata(name, None)
+            .get_idata(name)
             .map(|data| data.value().clone())
             .map_err(From::from)
             .into_box()
@@ -70,7 +70,7 @@ impl Storage for SelfEncryptionStorage {
     fn put(&mut self, _: Vec<u8>, data: Vec<u8>) -> Box<Future<Item = (), Error = Self::Error>> {
         trace!("Self encrypt invoked PutIData.");
         let data = ImmutableData::new(data);
-        self.client.put_idata(data, None).map_err(From::from).into_box()
+        self.client.put_idata(data).map_err(From::from).into_box()
     }
 }
 
