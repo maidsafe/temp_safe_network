@@ -23,25 +23,27 @@ use routing::XorName;
 use rust_sodium::crypto::{box_, secretbox, sign};
 use std::mem;
 
-/// TODO: doc
+/// Ffi module
 pub mod ffi;
 
 use self::ffi::PermissionAccess;
 
 // TODO: replace with `crust::Config`
-/// empty doc
+/// Placeholder for `crust::Config`
 pub struct Config;
 
-/// TODO: doc
+/// Represents the set of permissions for a given container
 pub struct ContainerPermission {
-    /// TODO: doc
+    /// The id
     pub container_key: String,
-    /// TODO: doc
+    /// The permissions
     pub access: Vec<PermissionAccess>,
 }
 
 impl ContainerPermission {
-    /// TODO: doc
+    /// Consumes the object and returns the wrapped raw pointer
+    ///
+    /// You're now responsible for freeing this memory once you're done.
     pub fn into_raw(self) -> *mut ffi::ContainerPermission {
         let ContainerPermission { container_key, mut access } = self;
 
@@ -67,7 +69,10 @@ impl ContainerPermission {
         }))
     }
 
-    /// TODO: doc
+    /// Constructs the object from a raw pointer.
+    ///
+    /// After calling this function, the raw pointer is owned by the resulting
+    /// object.
     #[allow(unsafe_code)]
     pub unsafe fn from_raw(raw: *mut ffi::ContainerPermission) -> Self {
         let raw = Box::from_raw(raw);
@@ -81,20 +86,22 @@ impl ContainerPermission {
     }
 }
 
-/// TODO: doc
+/// Represents an application ID in the process of asking permissions
 pub struct AppExchangeInfo {
-    /// TODO: doc
+    /// The ID. It must be unique.
     pub id: String,
-    /// TODO: doc
+    /// Reserved by the frontend.
     pub scope: Option<String>,
-    /// TODO: doc
+    /// The application friendly-name.
     pub name: String,
-    /// TODO: doc
+    /// The application provider/vendor (e.g. MaidSafe)
     pub vendor: String,
 }
 
 impl AppExchangeInfo {
-    /// TODO: doc
+    /// Consumes the object and returns the wrapped raw pointer
+    ///
+    /// You're now responsible for freeing this memory once you're done.
     pub fn into_raw(self) -> *mut ffi::AppExchangeInfo {
         let AppExchangeInfo { id, scope, name, vendor } = self;
 
@@ -139,7 +146,10 @@ impl AppExchangeInfo {
         }))
     }
 
-    /// TODO: doc
+    /// Constructs the object from a raw pointer.
+    ///
+    /// After calling this function, the raw pointer is owned by the resulting
+    /// object.
     #[allow(unsafe_code)]
     pub unsafe fn from_raw(raw: *mut ffi::AppExchangeInfo) -> Self {
         let raw = Box::from_raw(raw);
@@ -160,18 +170,22 @@ impl AppExchangeInfo {
     }
 }
 
-/// TODO: doc
+/// Represents an authorization request
 pub struct AuthRequest {
-    /// TODO: doc
+    /// The application identifier for this request
     pub app: AppExchangeInfo,
-    /// TODO: doc
+    /// `true` if the app wants dedicated container for itself. `false`
+    /// otherwise.
     pub app_container: bool,
-    /// TODO: doc
+    /// The list of containers it wishes to access (and desired permissions).
     pub containers: Vec<ContainerPermission>,
 }
 
 impl AuthRequest {
-    /// TODO: doc
+    /// Consumes the object and returns the FFI counterpart.
+    ///
+    /// You're now responsible for freeing the subobjects memory once you're
+    /// done.
     pub fn into_ffi(self) -> ffi::AuthRequest {
         let AuthRequest { app, app_container, containers } = self;
 
@@ -194,7 +208,10 @@ impl AuthRequest {
         }
     }
 
-    /// TODO: doc
+    /// Constructs the object from the FFI counterpart.
+    ///
+    /// After calling this function, the subobjects memory is owned by the
+    /// resulting object.
     #[allow(unsafe_code)]
     pub unsafe fn from_ffi(raw: ffi::AuthRequest) -> Self {
         let app = AppExchangeInfo::from_raw(raw.app);
@@ -211,22 +228,26 @@ impl AuthRequest {
     }
 }
 
-/// TODO: doc
+/// Represents the needed keys to work with the data
 pub struct AppAccessToken {
-    /// TODO: doc
+    /// Data symmetric encryption key
     pub enc_key: secretbox::Key,
-    /// TODO: doc
+    /// Asymmetric sign public key.
+    ///
+    /// This is the identity of the App in the Network.
     pub sign_pk: sign::PublicKey,
-    /// TODO: doc
+    /// Asymmetric sign private key.
     pub sign_sk: sign::SecretKey,
-    /// TODO: doc
+    /// Asymmetric enc public key.
     pub enc_pk: box_::PublicKey,
-    /// TODO: doc
+    /// Asymmetric enc private key.
     pub enc_sk: box_::SecretKey,
 }
 
 impl AppAccessToken {
-    /// TODO: doc
+    /// Consumes the object and returns the wrapped raw pointer
+    ///
+    /// You're now responsible for freeing this memory once you're done.
     pub fn into_raw(self) -> *mut ffi::AppAccessToken {
         let AppAccessToken { enc_key, sign_pk, sign_sk, enc_pk, enc_sk } = self;
         Box::into_raw(Box::new(ffi::AppAccessToken {
@@ -238,7 +259,10 @@ impl AppAccessToken {
         }))
     }
 
-    /// TODO: doc
+    /// Constructs the object from a raw pointer.
+    ///
+    /// After calling this function, the raw pointer is owned by the resulting
+    /// object.
     #[allow(unsafe_code)]
     pub unsafe fn from_raw(raw: *mut ffi::AppAccessToken) -> Self {
         let raw = Box::from_raw(raw);
@@ -252,18 +276,20 @@ impl AppAccessToken {
     }
 }
 
-/// TODO: doc
+/// It represents the authentication response.
 pub enum AuthResponse {
-    /// TODO: doc
+    /// If permission is granted.
     Granted {
-        /// TODO: doc
+        /// The access keys.
         access_token: AppAccessToken,
-        /// TODO: doc
+        /// The crust config.
+        ///
+        /// Useful to reuse bootstrap nodes and speed up access.
         bootstrap_config: Config,
         /// TODO: doc
         access_container: Option<(XorName, u64, secretbox::Nonce)>,
     },
-    /// TODO: doc
+    /// If permissions is rejected.
     Denied,
 }
 

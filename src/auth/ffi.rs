@@ -23,39 +23,39 @@ use rust_sodium::crypto::{box_, secretbox, sign};
 
 #[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// TODO: doc
+/// The permission type
 pub enum PermissionAccess {
-    /// TODO: doc
+    /// Read
     Read,
-    /// TODO: doc
+    /// Insert
     Insert,
-    /// TODO: doc
+    /// Update
     Update,
-    /// TODO: doc
+    /// Delete
     Delete,
-    /// TODO: doc
+    /// Modify permissions
     ManagePermissions,
 }
 
 #[repr(C)]
-/// TODO: doc
+/// Represents the set of permissions for a given container
 pub struct ContainerPermission {
-    /// TODO: doc
+    /// The UTF-8 encoded id
     pub container_key: *const u8,
-    /// TODO: doc
+    /// `container_key`'s length
     pub container_key_len: usize,
-    /// TODO: doc
+    /// Used by the Rust memory allocator
     pub container_key_cap: usize,
 
-    /// TODO: doc
+    /// The `PermissionAccess` array
     pub access: *mut PermissionAccess,
-    /// TODO: doc
+    /// `access`'s length.
     pub access_len: usize,
-    /// TODO: doc
+    /// Used by the Rust memory allocator
     pub access_cap: usize,
 }
 
-/// TODO: doc
+/// Free memory
 #[no_mangle]
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn container_permission_free(cp: *mut ContainerPermission) {
@@ -63,44 +63,44 @@ pub unsafe extern "C" fn container_permission_free(cp: *mut ContainerPermission)
 }
 
 #[repr(C)]
-/// TODO: doc
+/// Represents an application ID in the process of asking permissions
 pub struct AppExchangeInfo {
-    /// TODO: doc
+    /// UTF-8 encoded id
     pub id: *const u8,
-    /// TODO: doc
+    /// `id`'s length
     pub id_len: usize,
-    /// TODO: doc
+    /// Used by the Rust memory allocator
     pub id_cap: usize,
 
-    /// TODO: doc
+    /// Reserved by the frontend
     ///
     /// null if not present
     pub scope: *const u8,
-    /// TODO: doc
+    /// `scope`'s length.
     ///
-    /// 0 if above is null
+    /// 0 if `scope` is null
     pub scope_len: usize,
-    /// TODO: doc
+    /// Used by the Rust memory allocator.
     ///
-    /// 0 if above is null
+    /// 0 if `scope` is null
     pub scope_cap: usize,
 
-    /// TODO: doc
+    /// UTF-8 encoded application friendly-name.
     pub name: *const u8,
-    /// TODO: doc
+    /// `name`'s length
     pub name_len: usize,
-    /// TODO: doc
+    /// Used by the Rust memory allocator
     pub name_cap: usize,
 
-    /// TODO: doc
+    /// UTF-8 encoded application provider/vendor (e.g. MaidSafe)
     pub vendor: *const u8,
-    /// TODO: doc
+    /// `vendor`'s length
     pub vendor_len: usize,
-    /// TODO: doc
+    /// Reserved by the Rust allocator
     pub vendor_cap: usize,
 }
 
-/// TODO: doc
+/// Free memory
 #[no_mangle]
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn app_exchange_info_free(a: *mut AppExchangeInfo) {
@@ -108,22 +108,23 @@ pub unsafe extern "C" fn app_exchange_info_free(a: *mut AppExchangeInfo) {
 }
 
 #[repr(C)]
-/// TODO: doc
+/// Represents an authorization request
 pub struct AuthRequest {
-    /// TODO: doc
+    /// The application identifier for this request
     pub app: *mut AppExchangeInfo,
-    /// TODO: doc
+    /// `true` if the app wants dedicated container for itself. `false`
+    /// otherwise.
     pub app_container: bool,
 
-    /// TODO: doc
+    /// Array of `*mut ContainerPermission`
     pub containers: *mut *mut ContainerPermission,
-    /// TODO: doc
+    /// `containers`'s length
     pub containers_len: usize,
-    /// TODO: doc
+    /// Reserved by the Rust allocator
     pub containers_cap: usize,
 }
 
-/// TODO: doc
+/// Free memory from the subobjects
 #[no_mangle]
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn auth_request_drop(a: AuthRequest) {
@@ -131,21 +132,23 @@ pub unsafe extern "C" fn auth_request_drop(a: AuthRequest) {
 }
 
 #[repr(C)]
-/// TODO: doc
+/// Represents the needed keys to work with the data
 pub struct AppAccessToken {
-    /// TODO: doc
+    /// Data symmetric encryption key
     pub enc_key: [u8; secretbox::KEYBYTES],
-    /// TODO: doc
+    /// Asymmetric sign public key.
+    ///
+    /// This is the identity of the App in the Network.
     pub sign_pk: [u8; sign::PUBLICKEYBYTES],
-    /// TODO: doc
+    /// Asymmetric sign private key.
     pub sign_sk: [u8; sign::SECRETKEYBYTES],
-    /// TODO: doc
+    /// Asymmetric enc public key.
     pub enc_pk: [u8; box_::PUBLICKEYBYTES],
-    /// TODO: doc
+    /// Asymmetric enc private key.
     pub enc_sk: [u8; box_::SECRETKEYBYTES],
 }
 
-/// TODO: doc
+/// Free memory
 #[no_mangle]
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn app_access_token_free(a: *mut AppAccessToken) {
