@@ -27,7 +27,7 @@ use ffi::{App, AppHandle, CipherOptHandle, EncryptKeyHandle, MDataEntriesHandle,
 use ffi::errors::FfiError;
 use ffi::low_level_api::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
-use routing::{EntryAction, PermissionSet, User, Value, XorName};
+use routing::{EntryAction, PermissionSet, Value, XorName};
 use rust_sodium::crypto::{box_, sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
@@ -52,7 +52,7 @@ struct Inner {
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
     mdata_values: Store<Vec<Value>>,
     mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
-    mdata_permissions: Store<BTreeMap<User, PermissionSet>>,
+    mdata_permissions: Store<BTreeMap<SignKeyHandle, MDataPermissionSetHandle>>,
     mdata_permission_set: Store<PermissionSet>,
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
@@ -176,7 +176,7 @@ impl_cache!(mdata_entry_actions,
             insert_mdata_entry_actions,
             remove_mdata_entry_actions);
 impl_cache!(mdata_permissions,
-            BTreeMap<User, PermissionSet>,
+            BTreeMap<SignKeyHandle, MDataPermissionSetHandle>,
             MDataPermissionsHandle,
             InvalidMDataPermissionsHandle,
             get_mdata_permissions,

@@ -27,11 +27,9 @@ mod helper;
 use core::{CoreError, FutureExt};
 use ffi::{MDataEntriesHandle, MDataEntryActionsHandle, MDataKeysHandle, MDataPermissionSetHandle,
           MDataPermissionsHandle, MDataValuesHandle, OpaqueCtx, Session, SignKeyHandle};
-use ffi::errors::FfiError;
 use ffi::helper as ffi_helper;
-use ffi::object_cache::ObjectCache;
 use futures::Future;
-use routing::{MutableData, User, XOR_NAME_LEN, XorName};
+use routing::{MutableData, XOR_NAME_LEN, XorName};
 use std::os::raw::c_void;
 
 /// Create new mutable data and put it on the network.
@@ -55,10 +53,9 @@ pub unsafe extern "C" fn mdata_put(session: *const Session,
             let sign_pk = try_cb!(client.public_signing_key(), user_data, o_cb);
 
             let permissions = if permissions_h != 0 {
-                try_cb!(object_cache.get_mdata_permissions(permissions_h),
+                try_cb!(helper::get_permissions(object_cache, permissions_h),
                         user_data,
                         o_cb)
-                    .clone()
             } else {
                 Default::default()
             };
@@ -245,7 +242,7 @@ pub unsafe fn mdata_list_permissions(session: *const Session,
         helper::send_async(session, user_data, o_cb, move |client, object_cache| {
             let object_cache = object_cache.clone();
             client.list_mdata_permissions(name, type_tag, None)
-                .map(move |perms| object_cache.insert_mdata_permissions(perms))
+                .map(move |perms| helper::insert_permissions(&object_cache, perms))
         })
     })
 }
@@ -268,7 +265,7 @@ pub unsafe fn mdata_list_user_permissions(session: *const Session,
 
         (*session).send(move |client, object_cache| {
             let object_cache = object_cache.clone();
-            let user = try_cb!(get_user(&object_cache, user_h), user_data, o_cb);
+            let user = try_cb!(helper::get_user(&object_cache, user_h), user_data, o_cb);
 
             client.list_mdata_user_permissions(name, type_tag, user, None)
                 .map(move |set| {
@@ -299,7 +296,7 @@ pub unsafe fn mdata_set_user_permissions(session: *const Session,
         let name = XorName(*name);
 
         (*session).send(move |client, object_cache| {
-            let user = try_cb!(get_user(object_cache, user_h), user_data, o_cb);
+            let user = try_cb!(helper::get_user(object_cache, user_h), user_data, o_cb);
             let permission_set = try_cb!(object_cache.get_mdata_permission_set(permission_set_h),
                                          user_data,
                                          o_cb)
@@ -332,7 +329,7 @@ pub unsafe fn mdata_del_user_permissions(session: *const Session,
         let name = XorName(*name);
 
         (*session).send(move |client, object_cache| {
-            let user = try_cb!(get_user(object_cache, user_h), user_data, o_cb);
+            let user = try_cb!(helper::get_user(object_cache, user_h), user_data, o_cb);
 
             client.del_mdata_user_permissions(name, type_tag, user, version, None)
                 .then(move |result| {
@@ -370,15 +367,4 @@ pub unsafe extern "C" fn mdata_change_owner(session: *const Session,
                 .into()
         })
     })
-}
-
-fn get_user(object_cache: &ObjectCache, handle: SignKeyHandle) -> Result<User, FfiError> {
-    let user = if handle != 0 {
-        let sign_key = object_cache.get_sign_key(handle)?;
-        User::Key(*sign_key)
-    } else {
-        User::Anyone
-    };
-
-    Ok(user)
 }
