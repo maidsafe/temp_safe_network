@@ -685,8 +685,8 @@ impl Drop for MockRouting {
 
 fn update_account_info(storage: &mut Storage, client_name: &XorName) {
     let account = storage.get_or_create_account_info(client_name);
-    account.data_stored += 1;
-    account.space_available -= 1;
+    account.mutations_done += 1;
+    account.mutations_available -= 1;
 }
 
 #[cfg(test)]
@@ -771,8 +771,8 @@ mod tests {
 
         // GetAccountInfo should pass and show one chunk stored
         let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr);
-        assert_eq!(account_info.data_stored, 1);
-        assert_eq!(account_info.space_available,
+        assert_eq!(account_info.mutations_done, 1);
+        assert_eq!(account_info.mutations_available,
                    DEFAULT_CLIENT_ACCOUNT_SIZE - 1);
 
         // Subsequent PutIData for same data should succeed - De-duplication
@@ -789,8 +789,8 @@ mod tests {
 
         // GetAccountInfo should pass and show two chunks stored
         let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr);
-        assert_eq!(account_info.data_stored, 2);
-        assert_eq!(account_info.space_available,
+        assert_eq!(account_info.mutations_done, 2);
+        assert_eq!(account_info.mutations_available,
                    DEFAULT_CLIENT_ACCOUNT_SIZE - 2);
     }
 

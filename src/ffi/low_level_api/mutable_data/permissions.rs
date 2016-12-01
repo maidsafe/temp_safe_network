@@ -47,7 +47,7 @@ impl Into<Action> for MDataAction {
             MDataAction::Insert => Action::Insert,
             MDataAction::Update => Action::Update,
             MDataAction::Delete => Action::Delete,
-            MDataAction::ManagePermissions => Action::ManagePermission,
+            MDataAction::ManagePermissions => Action::ManagePermissions,
         }
     }
 }

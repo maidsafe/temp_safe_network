@@ -75,8 +75,8 @@ impl Storage {
     pub fn get_or_create_account_info(&mut self, name: &XorName) -> &mut AccountInfo {
         self.client_accounts.entry(*name).or_insert_with(|| {
             AccountInfo {
-                data_stored: 0,
-                space_available: DEFAULT_CLIENT_ACCOUNT_SIZE,
+                mutations_done: 0,
+                mutations_available: DEFAULT_CLIENT_ACCOUNT_SIZE,
             }
         })
     }
