@@ -34,8 +34,6 @@ pub const CORE_ERROR_START_RANGE: i32 = -1;
 
 /// Client Errors
 pub enum CoreError {
-    /// StructuredData has no space available to fit in any user data inside it.
-    StructuredDataHeaderSizeProhibitive,
     /// Could not Serialise or Deserialise
     UnsuccessfulEncodeDecode(SerialisationError),
     /// Asymmetric Key Decryption Failed
@@ -76,8 +74,6 @@ pub enum CoreError {
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
     /// The request has timed out
     RequestTimeout,
-    /// Invalid type tag for StructuredData
-    InvalidStructuredDataTypeTag,
 }
 
 impl<'a> From<&'a str> for CoreError {
@@ -131,7 +127,6 @@ impl From<SelfEncryptionError<SelfEncryptionStorageError>> for CoreError {
 impl Into<i32> for CoreError {
     fn into(self) -> i32 {
         match self {
-            CoreError::StructuredDataHeaderSizeProhibitive => CORE_ERROR_START_RANGE,
             CoreError::UnsuccessfulEncodeDecode(_) => CORE_ERROR_START_RANGE - 1,
             CoreError::AsymmetricDecipherFailure => CORE_ERROR_START_RANGE - 2,
             CoreError::SymmetricDecipherFailure => CORE_ERROR_START_RANGE - 3,
@@ -163,7 +158,6 @@ impl Into<i32> for CoreError {
             CoreError::SelfEncryption(
                 SelfEncryptionError::Storage::<SelfEncryptionStorageError>(
                     SelfEncryptionStorageError(err))) => (*err).into(),
-            CoreError::InvalidStructuredDataTypeTag => CORE_ERROR_START_RANGE - 35,
             CoreError::ReceivedUnexpectedEvent => CORE_ERROR_START_RANGE - 36,
         }
     }
@@ -173,9 +167,6 @@ impl Debug for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{} - ", self.description())?;
         match *self {
-            CoreError::StructuredDataHeaderSizeProhibitive => {
-                write!(formatter, "CoreError::StructuredDataHeaderSizeProhibitive")
-            }
             CoreError::UnsuccessfulEncodeDecode(ref error) => {
                 write!(formatter,
                        "CoreError::UnsuccessfulEncodeDecode -> {:?}",
@@ -244,9 +235,6 @@ impl Debug for CoreError {
                 write!(formatter, "CoreError::SelfEncryption -> {:?}", error)
             }
             CoreError::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
-            CoreError::InvalidStructuredDataTypeTag => {
-                write!(formatter, "CoreError::InvalidStructuredDataTypeTag")
-            }
         }
     }
 }
@@ -254,11 +242,6 @@ impl Debug for CoreError {
 impl Display for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         match *self {
-            CoreError::StructuredDataHeaderSizeProhibitive => {
-                write!(formatter,
-                       "StructuredData doesn't have enough space available to accommodate user \
-                        data")
-            }
             CoreError::UnsuccessfulEncodeDecode(ref error) => {
                 write!(formatter,
                        "Error while serialising/deserialising: {}",
@@ -326,9 +309,6 @@ impl Display for CoreError {
                 write!(formatter, "Self-encryption error: {}", error)
             }
             CoreError::RequestTimeout => write!(formatter, "CoreError::RequestTimeout"),
-            CoreError::InvalidStructuredDataTypeTag => {
-                write!(formatter, "CoreError::InvalidStructuredDataTypeTag")
-            }
         }
     }
 }
@@ -336,7 +316,6 @@ impl Display for CoreError {
 impl Error for CoreError {
     fn description(&self) -> &str {
         match *self {
-            CoreError::StructuredDataHeaderSizeProhibitive => "SD Header too large",
             CoreError::UnsuccessfulEncodeDecode(_) => "Serialisation error",
             CoreError::AsymmetricDecipherFailure => "Asymmetric decryption failure",
             CoreError::SymmetricDecipherFailure => "Symmetric decryption failure",
@@ -361,7 +340,6 @@ impl Error for CoreError {
             // CoreError::MutationFailure { ref reason, .. } => reason.description(),
             CoreError::SelfEncryption(ref error) => error.description(),
             CoreError::RequestTimeout => "Request has timed out",
-            CoreError::InvalidStructuredDataTypeTag => "Invalid Structured Data type tag",
         }
     }
 

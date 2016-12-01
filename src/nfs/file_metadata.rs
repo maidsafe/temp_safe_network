@@ -23,7 +23,7 @@ use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use self_encryption::DataMap;
 use time::{self, Timespec, Tm};
 
-/// FileMetadata about a File or a Directory
+/// `FileMetadata` about a File or a Directory
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct FileMetadata {
     name: String,
