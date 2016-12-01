@@ -70,8 +70,6 @@ extern crate unwrap;
 
 /// Core module
 #[macro_use]
-// TODO: remove allow(unused)
-#[allow(unused)]
 pub mod core;
 /// Nfs module;
 pub mod nfs;
@@ -85,7 +83,3 @@ pub mod auth;
 pub mod util;
 // /// Application functions;
 // pub mod app;
-/// Unversioned `StructuredData`
-pub const UNVERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 500;
-/// Versioned `StructuredData`
-pub const VERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 501;

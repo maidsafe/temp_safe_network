@@ -38,7 +38,6 @@ pub struct Account {
     pub config_root: Dir,
 }
 
-
 impl Account {
     /// Create new Account with a provided set of keys
     pub fn new(keys: ClientKeys, user_root: Dir, config_root: Dir) -> Self {
@@ -339,7 +338,6 @@ mod tests {
             enc_info: Some((secretbox::gen_key(), None)),
         };
         let key = Vec::from("str of key");
-        let val = Vec::from("other is value");
         let enc_key = unwrap!(dir.enc_entry_key(key.clone()));
         assert_ne!(enc_key, key);
         // encrypted is different on every run
@@ -352,5 +350,4 @@ mod tests {
 
         Account::new(ClientKeys::new(), user_root, config_root)
     }
-
 }

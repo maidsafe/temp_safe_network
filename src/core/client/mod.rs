@@ -173,8 +173,8 @@ impl Client {
 
         let (routing, routing_rx) = setup_routing(full_id)?;
 
-        let user_root_dir = Dir::random(DIR_TAG);
-        let config_dir = Dir::random(DIR_TAG);
+        let user_root_dir = Dir::random(DIR_TAG, false);
+        let config_dir = Dir::random(DIR_TAG, false);
         let acc = Account::new(maid_keys, user_root_dir.clone(), config_dir.clone());
 
         let acc_data = btree_map![
@@ -875,7 +875,7 @@ enum ClientType {
         cm_addr: Authority,
     },
     FromKeys {
-        _owner: sign::PublicKey,
+        owner: sign::PublicKey,
         cm_addr: Authority,
     },
 }
@@ -883,7 +883,7 @@ enum ClientType {
 impl ClientType {
     fn from_keys(owner: sign::PublicKey, cm_addr: Authority) -> Self {
         ClientType::FromKeys {
-            _owner: owner,
+            owner: owner,
             cm_addr: cm_addr,
         }
     }
