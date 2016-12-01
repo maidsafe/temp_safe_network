@@ -23,7 +23,7 @@ use ffi::{OpaqueCtx, Session, XorNameHandle, helper};
 use routing::{XOR_NAME_LEN, XorName};
 use std::os::raw::c_void;
 
-/// Construct new XorName.
+/// Construct new `XorName`.
 #[no_mangle]
 pub unsafe extern "C" fn xor_name_new(session: *const Session,
                                       id: *const [u8; XOR_NAME_LEN],
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn xor_name_new(session: *const Session,
     })
 }
 
-/// Free XorName handle
+/// Free `XorName` handle
 #[no_mangle]
 pub unsafe extern "C" fn xor_name_free(session: *const Session,
                                        handle: XorNameHandle,

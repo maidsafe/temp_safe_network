@@ -44,7 +44,6 @@ macro_rules! try_cb {
         match $result {
             Ok(value) => value,
             Err(err) => {
-                #[allow(unused)]
                 use $crate::ffi::callback::{Callback, CallbackArgs};
                 $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());
                 return None;

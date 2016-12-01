@@ -94,7 +94,7 @@ impl CipherOpt {
     }
 }
 
-/// Construct CipherOpt::PlainText handle
+/// Construct `CipherOpt::PlainText` handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
                                                   user_data: *mut c_void,
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
     });
 }
 
-/// Construct CipherOpt::Symmetric handle
+/// Construct `CipherOpt::Symmetric` handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
                                                   user_data: *mut c_void,
@@ -129,7 +129,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
     })
 }
 
-/// Construct CipherOpt::Asymmetric handle
+/// Construct `CipherOpt::Asymmetric` handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
                                                    peer_encrypt_key_h: EncryptKeyHandle,
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
     });
 }
 
-/// Free CipherOpt handle
+/// Free `CipherOpt` handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_free(session: *const Session,
                                          handle: CipherOptHandle,

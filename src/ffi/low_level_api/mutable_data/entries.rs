@@ -423,7 +423,7 @@ mod tests {
                                    done_cb)
         }
 
-        let _ = unwrap!(rx.recv());
+        unwrap!(rx.recv());
         let entries = user_data.1;
 
         assert_eq!(entries.len(), 2);

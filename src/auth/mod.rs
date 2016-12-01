@@ -21,71 +21,388 @@
 
 use routing::XorName;
 use rust_sodium::crypto::{box_, secretbox, sign};
+use std::mem;
 
-/// TODO: doc
+/// Ffi module
 pub mod ffi;
 
 use self::ffi::PermissionAccess;
 
 // TODO: replace with `crust::Config`
-/// empty doc
+/// Placeholder for `crust::Config`
 pub struct Config;
 
-/// TODO: doc
+/// Represents the set of permissions for a given container
 pub struct ContainerPermission {
-    /// TODO: doc
+    /// The id
     pub container_key: String,
-    /// TODO: doc
+    /// The permissions
     pub access: Vec<PermissionAccess>,
 }
 
-/// TODO: doc
+impl ContainerPermission {
+    /// Consumes the object and returns the wrapped raw pointer
+    ///
+    /// You're now responsible for freeing this memory once you're done.
+    pub fn into_raw(self) -> *mut ffi::ContainerPermission {
+        let ContainerPermission { container_key, mut access } = self;
+
+        let ck_ptr = container_key.as_ptr();
+        let ck_len = container_key.len();
+        let ck_cap = container_key.capacity();
+
+        mem::forget(container_key);
+
+        let a_ptr = access.as_mut_ptr();
+        let a_len = access.len();
+        let a_cap = access.capacity();
+
+        mem::forget(access);
+
+        Box::into_raw(Box::new(ffi::ContainerPermission {
+            container_key: ck_ptr,
+            container_key_len: ck_len,
+            container_key_cap: ck_cap,
+            access: a_ptr,
+            access_len: a_len,
+            access_cap: a_cap,
+        }))
+    }
+
+    /// Constructs the object from a raw pointer.
+    ///
+    /// After calling this function, the raw pointer is owned by the resulting
+    /// object.
+    #[allow(unsafe_code)]
+    pub unsafe fn from_raw(raw: *mut ffi::ContainerPermission) -> Self {
+        let raw = Box::from_raw(raw);
+        let ck = String::from_raw_parts(raw.container_key as *mut u8,
+                                        raw.container_key_len,
+                                        raw.container_key_cap);
+        ContainerPermission {
+            container_key: ck,
+            access: Vec::from_raw_parts(raw.access, raw.access_len, raw.access_cap),
+        }
+    }
+}
+
+/// Represents an application ID in the process of asking permissions
 pub struct AppExchangeInfo {
-    /// TODO: doc
+    /// The ID. It must be unique.
     pub id: String,
-    /// TODO: doc
+    /// Reserved by the frontend.
     pub scope: Option<String>,
-    /// TODO: doc
+    /// The application friendly-name.
     pub name: String,
-    /// TODO: doc
+    /// The application provider/vendor (e.g. MaidSafe)
     pub vendor: String,
 }
 
-/// TODO: doc
+impl AppExchangeInfo {
+    /// Consumes the object and returns the wrapped raw pointer
+    ///
+    /// You're now responsible for freeing this memory once you're done.
+    pub fn into_raw(self) -> *mut ffi::AppExchangeInfo {
+        let AppExchangeInfo { id, scope, name, vendor } = self;
+
+        let id_ptr = id.as_ptr();
+        let id_len = id.len();
+        let id_cap = id.capacity();
+
+        mem::forget(id);
+
+        let (s_ptr, s_len, s_cap) = match scope {
+            Some(ref s) => (s.as_ptr(), s.len(), s.capacity()),
+            None => (0 as *const u8, 0, 0),
+        };
+
+        mem::forget(scope);
+
+        let n_ptr = name.as_ptr();
+        let n_len = name.len();
+        let n_cap = name.capacity();
+
+        mem::forget(name);
+
+        let v_ptr = vendor.as_ptr();
+        let v_len = vendor.len();
+        let v_cap = vendor.capacity();
+
+        mem::forget(vendor);
+
+        Box::into_raw(Box::new(ffi::AppExchangeInfo {
+            id: id_ptr,
+            id_len: id_len,
+            id_cap: id_cap,
+            scope: s_ptr,
+            scope_len: s_len,
+            scope_cap: s_cap,
+            name: n_ptr,
+            name_len: n_len,
+            name_cap: n_cap,
+            vendor: v_ptr,
+            vendor_len: v_len,
+            vendor_cap: v_cap,
+        }))
+    }
+
+    /// Constructs the object from a raw pointer.
+    ///
+    /// After calling this function, the raw pointer is owned by the resulting
+    /// object.
+    #[allow(unsafe_code)]
+    pub unsafe fn from_raw(raw: *mut ffi::AppExchangeInfo) -> Self {
+        let raw = Box::from_raw(raw);
+        let id = String::from_raw_parts(raw.id as *mut u8, raw.id_len, raw.id_cap);
+        let scope = match (raw.scope, raw.scope_len, raw.scope_cap) {
+            (p, _, _) if p.is_null() => None,
+            (p, l, c) => Some(String::from_raw_parts(p as *mut u8, l, c)),
+        };
+        let name = String::from_raw_parts(raw.name as *mut u8, raw.name_len, raw.name_cap);
+        let vendor = String::from_raw_parts(raw.vendor as *mut u8, raw.vendor_len, raw.vendor_cap);
+
+        AppExchangeInfo {
+            id: id,
+            scope: scope,
+            name: name,
+            vendor: vendor,
+        }
+    }
+}
+
+/// Represents an authorization request
 pub struct AuthRequest {
-    /// TODO: doc
+    /// The application identifier for this request
     pub app: AppExchangeInfo,
-    /// TODO: doc
+    /// `true` if the app wants dedicated container for itself. `false`
+    /// otherwise.
     pub app_container: bool,
-    /// TODO: doc
+    /// The list of containers it wishes to access (and desired permissions).
     pub containers: Vec<ContainerPermission>,
 }
 
-/// TODO: doc
+impl AuthRequest {
+    /// Consumes the object and returns the FFI counterpart.
+    ///
+    /// You're now responsible for freeing the subobjects memory once you're
+    /// done.
+    pub fn into_ffi(self) -> ffi::AuthRequest {
+        let AuthRequest { app, app_container, containers } = self;
+
+        let mut containers: Vec<_> = containers.into_iter()
+            .map(|c| c.into_raw())
+            .collect();
+
+        let c_ptr = containers.as_mut_ptr();
+        let c_len = containers.len();
+        let c_cap = containers.capacity();
+
+        mem::forget(containers);
+
+        ffi::AuthRequest {
+            app: app.into_raw(),
+            app_container: app_container,
+            containers: c_ptr,
+            containers_len: c_len,
+            containers_cap: c_cap,
+        }
+    }
+
+    /// Constructs the object from the FFI counterpart.
+    ///
+    /// After calling this function, the subobjects memory is owned by the
+    /// resulting object.
+    #[allow(unsafe_code)]
+    pub unsafe fn from_ffi(raw: ffi::AuthRequest) -> Self {
+        let app = AppExchangeInfo::from_raw(raw.app);
+        let containers =
+            Vec::from_raw_parts(raw.containers, raw.containers_len, raw.containers_cap)
+                .into_iter()
+                .map(|c| ContainerPermission::from_raw(c))
+                .collect();
+        AuthRequest {
+            app: app,
+            app_container: raw.app_container,
+            containers: containers,
+        }
+    }
+}
+
+/// Represents the needed keys to work with the data
 pub struct AppAccessToken {
-    /// TODO: doc
+    /// Data symmetric encryption key
     pub enc_key: secretbox::Key,
-    /// TODO: doc
+    /// Asymmetric sign public key.
+    ///
+    /// This is the identity of the App in the Network.
     pub sign_pk: sign::PublicKey,
-    /// TODO: doc
+    /// Asymmetric sign private key.
     pub sign_sk: sign::SecretKey,
-    /// TODO: doc
+    /// Asymmetric enc public key.
     pub enc_pk: box_::PublicKey,
-    /// TODO: doc
+    /// Asymmetric enc private key.
     pub enc_sk: box_::SecretKey,
 }
 
-/// TODO: doc
+impl AppAccessToken {
+    /// Consumes the object and returns the wrapped raw pointer
+    ///
+    /// You're now responsible for freeing this memory once you're done.
+    pub fn into_raw(self) -> *mut ffi::AppAccessToken {
+        let AppAccessToken { enc_key, sign_pk, sign_sk, enc_pk, enc_sk } = self;
+        Box::into_raw(Box::new(ffi::AppAccessToken {
+            enc_key: enc_key.0,
+            sign_pk: sign_pk.0,
+            sign_sk: sign_sk.0,
+            enc_pk: enc_pk.0,
+            enc_sk: enc_sk.0,
+        }))
+    }
+
+    /// Constructs the object from a raw pointer.
+    ///
+    /// After calling this function, the raw pointer is owned by the resulting
+    /// object.
+    #[allow(unsafe_code)]
+    pub unsafe fn from_raw(raw: *mut ffi::AppAccessToken) -> Self {
+        let raw = Box::from_raw(raw);
+        AppAccessToken {
+            enc_key: secretbox::Key(raw.enc_key),
+            sign_pk: sign::PublicKey(raw.sign_pk),
+            sign_sk: sign::SecretKey(raw.sign_sk),
+            enc_pk: box_::PublicKey(raw.enc_pk),
+            enc_sk: box_::SecretKey(raw.enc_sk),
+        }
+    }
+}
+
+/// It represents the authentication response.
 pub enum AuthResponse {
-    /// TODO: doc
+    /// If permission is granted.
     Granted {
-        /// TODO: doc
+        /// The access keys.
         access_token: AppAccessToken,
-        /// TODO: doc
+        /// The crust config.
+        ///
+        /// Useful to reuse bootstrap nodes and speed up access.
         bootstrap_config: Config,
         /// TODO: doc
-        access_container: Option<(XorName, u64)>,
+        access_container: Option<(XorName, u64, secretbox::Nonce)>,
     },
-    /// TODO: doc
+    /// If permissions is rejected.
     Denied,
+}
+
+#[cfg(test)]
+#[allow(unsafe_code)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn container_permission() {
+        let cp = ContainerPermission {
+            container_key: "foobar".to_string(),
+            access: vec![],
+        };
+
+        let raw_cp = cp.into_raw();
+
+        unsafe {
+            assert_eq!((*raw_cp).container_key_len, 6);
+            assert!((*raw_cp).container_key_cap >= 6);
+            assert_eq!(*(*raw_cp).container_key, 'f' as u8);
+            assert_eq!(*(*raw_cp).container_key.offset(1), 'o' as u8);
+            assert_eq!(*(*raw_cp).container_key.offset(2), 'o' as u8);
+            assert_eq!(*(*raw_cp).container_key.offset(3), 'b' as u8);
+            assert_eq!(*(*raw_cp).container_key.offset(4), 'a' as u8);
+            assert_eq!(*(*raw_cp).container_key.offset(5), 'r' as u8);
+
+            assert_eq!((*raw_cp).access_len, 0);
+        }
+
+        let cp = unsafe { ContainerPermission::from_raw(raw_cp) };
+
+        assert_eq!(cp.container_key, "foobar");
+        assert_eq!(cp.access, vec![]);
+
+        // If test runs under special mode (e.g. Valgrind) we can detect memory
+        // leaks
+        unsafe {
+            ffi::container_permission_free(cp.into_raw());
+        }
+    }
+
+    #[test]
+    fn app_exchange_info() {
+        let a = AppExchangeInfo {
+            id: "myid".to_string(),
+            scope: Some("hi".to_string()),
+            name: "bubi".to_string(),
+            vendor: "hey girl".to_string(),
+        };
+
+        let raw = a.into_raw();
+
+        unsafe {
+            assert_eq!((*raw).id_len, 4);
+            assert_eq!((*raw).scope_len, 2);
+            assert_eq!((*raw).name_len, 4);
+            assert_eq!((*raw).vendor_len, 8);
+        }
+
+        let mut a = unsafe { AppExchangeInfo::from_raw(raw) };
+
+        assert_eq!(a.id, "myid");
+        assert_eq!(a.scope, Some("hi".to_string()));
+        assert_eq!(a.name, "bubi");
+        assert_eq!(a.vendor, "hey girl");
+
+        a.scope = None;
+
+        let raw = a.into_raw();
+
+        unsafe {
+            assert_eq!((*raw).id_len, 4);
+            assert_eq!((*raw).scope, 0 as *const u8);
+            assert_eq!((*raw).scope_len, 0);
+            assert_eq!((*raw).scope_cap, 0);
+            assert_eq!((*raw).name_len, 4);
+            assert_eq!((*raw).vendor_len, 8);
+        }
+
+        unsafe { ffi::app_exchange_info_free(raw) };
+    }
+
+    #[test]
+    fn auth_request() {
+        let app = AppExchangeInfo {
+            id: "1".to_string(),
+            scope: Some("2".to_string()),
+            name: "3".to_string(),
+            vendor: "4".to_string(),
+        };
+
+        let a = AuthRequest {
+            app: app,
+            app_container: false,
+            containers: vec![],
+        };
+
+        let ffi = a.into_ffi();
+
+        assert_eq!(ffi.app_container, false);
+        assert_eq!(ffi.containers_len, 0);
+
+        let a = unsafe { AuthRequest::from_ffi(ffi) };
+
+        assert_eq!(a.app.id, "1");
+        assert_eq!(a.app.scope, Some("2".to_string()));
+        assert_eq!(a.app.name, "3");
+        assert_eq!(a.app.vendor, "4");
+        assert_eq!(a.app_container, false);
+        assert_eq!(a.containers.len(), 0);
+
+        unsafe { ffi::auth_request_drop(a.into_ffi()) };
+    }
 }
