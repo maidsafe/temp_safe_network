@@ -10,7 +10,7 @@ repository = "https://github.com/maidsafe/safe_core"
 version = "0.22.0"
 
 [dependencies]
-clippy = { version = "~0.0.97", optional = true }
+clippy = { version = "=0.0.99", optional = true }
 config_file_handler = "~0.4.0"
 futures = "~0.1.6"
 lazy_static = "~0.2.1"

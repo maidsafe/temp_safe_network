@@ -22,7 +22,7 @@
 use core::errors::CoreError;
 use core::utility::{symmetric_decrypt, symmetric_encrypt};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use rand;
+use rand::{OsRng, Rng};
 use routing::{FullId, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
 use rust_sodium::crypto::hash::sha256;
@@ -37,7 +37,6 @@ pub struct Account {
     /// The users configuration directory
     pub config_root: Dir,
 }
-
 
 impl Account {
     /// Create new Account with a provided set of keys
@@ -127,25 +126,26 @@ pub struct Dir {
 }
 
 impl Dir {
-    /// Generate random, encrypted `Dir` with the given type tag.
-    pub fn random(type_tag: u64, is_public: bool) -> Self {
-        Dir {
-            name: rand::random(),
+    /// Generate random, private (encrypted) `Dir` with the given type tag.
+    pub fn random_private(type_tag: u64) -> Result<Self, CoreError> {
+        let mut rng = os_rng()?;
+        let enc_info = Some((secretbox::gen_key(), Some(secretbox::gen_nonce())));
+
+        Ok(Dir {
+            name: rng.gen(),
             type_tag: type_tag,
-            enc_info: if !is_public {
-                Some((secretbox::gen_key(), Some(secretbox::gen_nonce())))
-            } else {
-                None
-            },
-        }
+            enc_info: enc_info,
+        })
     }
     /// Generate a random, publicly accessible `Dir` with the given type tag
-    pub fn random_public(type_tag: u64) -> Self {
-        Dir {
-            name: rand::random(),
+    pub fn random_public(type_tag: u64) -> Result<Self, CoreError> {
+        let mut rng = os_rng()?;
+
+        Ok(Dir {
+            name: rng.gen(),
             type_tag: type_tag,
             enc_info: None,
-        }
+        })
     }
 
     /// encrypt the the key for the mdata entry of this dir accordingly
@@ -154,7 +154,7 @@ impl Dir {
             let nonce = match seed {
                 Some(secretbox::Nonce(ref dir_nonce)) => {
                     let mut pt = plain_text.clone();
-                    pt.extend(&dir_nonce[..]);
+                    pt.extend_from_slice(&dir_nonce[..]);
                     unwrap!(secretbox::Nonce::from_slice(
                         &sha256::hash(&pt)[..secretbox::NONCEBYTES]))
                 }
@@ -178,7 +178,7 @@ impl Dir {
     /// decrypt key or value of this mdata entry
     pub fn decrypt(&self, cipher: Vec<u8>) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.enc_info {
-            symmetric_decrypt(&cipher.as_slice(), key)
+            symmetric_decrypt(cipher.as_slice(), key)
         } else {
             Ok(cipher)
         }
@@ -223,6 +223,10 @@ impl Into<FullId> for ClientKeys {
     fn into(self) -> FullId {
         FullId::with_keys((self.enc_pk, self.enc_sk), (self.sign_pk, self.sign_sk))
     }
+}
+
+fn os_rng() -> Result<OsRng, CoreError> {
+    OsRng::new().map_err(|_| CoreError::RandomDataGenerationFailure)
 }
 
 #[cfg(test)]
@@ -310,7 +314,7 @@ mod tests {
 
     #[test]
     fn random_dir_encrypts() {
-        let dir = Dir::random(0, false);
+        let dir = unwrap!(Dir::random_private(0));
         let key = Vec::from("str of key");
         let val = Vec::from("other is value");
         let enc_key = unwrap!(dir.enc_entry_key(key.clone()));
@@ -323,7 +327,7 @@ mod tests {
 
     #[test]
     fn public_dir_doesnt_encrypt() {
-        let dir = Dir::random(0, true);
+        let dir = unwrap!(Dir::random_public(0));
         let key = Vec::from("str of key");
         let val = Vec::from("other is value");
         assert_eq!(unwrap!(dir.enc_entry_key(key.clone())), key);
@@ -339,7 +343,6 @@ mod tests {
             enc_info: Some((secretbox::gen_key(), None)),
         };
         let key = Vec::from("str of key");
-        let val = Vec::from("other is value");
         let enc_key = unwrap!(dir.enc_entry_key(key.clone()));
         assert_ne!(enc_key, key);
         // encrypted is different on every run
@@ -347,10 +350,9 @@ mod tests {
     }
 
     fn create_account() -> Account {
-        let user_root = Dir::random(0, false);
-        let config_root = Dir::random(0, false);
+        let user_root = unwrap!(Dir::random_private(0));
+        let config_root = unwrap!(Dir::random_private(0));
 
         Account::new(ClientKeys::new(), user_root, config_root)
     }
-
 }

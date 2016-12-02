@@ -108,7 +108,7 @@ impl Writer {
                                                                 latest_version.user_metadata()
                                                                     .to_owned(),
                                                                 data_map);
-                        new_version.set_created_time(latest_version.created_time().clone());
+                        new_version.set_created_time(*latest_version.created_time());
                         new_version.set_modified_time(::time::now_utc());
 
                         let c2 = client.clone();

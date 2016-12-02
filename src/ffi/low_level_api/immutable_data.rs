@@ -259,7 +259,7 @@ pub unsafe extern "C" fn idata_size(session: *const Session,
 }
 
 /// Read from Self Encryptor
-/// Callback parameters are: `user_data`, `error_code`, data, size, capacity
+/// Callback parameters are: user data, error code, data, size, capacity
 #[no_mangle]
 pub unsafe extern "C" fn idata_read_from_self_encryptor(session: *const Session,
                                                         se_h: SEReaderHandle,

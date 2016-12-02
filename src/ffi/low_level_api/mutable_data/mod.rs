@@ -297,10 +297,9 @@ pub unsafe fn mdata_set_user_permissions(session: *const Session,
 
         (*session).send(move |client, object_cache| {
             let user = try_cb!(helper::get_user(object_cache, user_h), user_data, o_cb);
-            let permission_set = try_cb!(object_cache.get_mdata_permission_set(permission_set_h),
-                                         user_data,
-                                         o_cb)
-                .clone();
+            let permission_set = *try_cb!(object_cache.get_mdata_permission_set(permission_set_h),
+                                          user_data,
+                                          o_cb);
 
             client.set_mdata_user_permissions(name, type_tag, user, permission_set, version)
                 .then(move |result| {
