@@ -107,7 +107,7 @@ impl Routing {
             };
 
             let vault = unwrap!(VAULT.lock());
-            match vault.client_manager.get_account(&name) {
+            match vault.get_account(&name) {
                 Some(account) => Ok(*account.account_info()),
                 None => Err(ClientError::NoSuchAccount),
             }
@@ -142,12 +142,12 @@ impl Routing {
             self.authorise_mutation(&dst);
 
             let mut vault = unwrap!(VAULT.lock());
-            match vault.nae_manager.get_data(data.name()) {
+            match vault.get_data(data.name()) {
                 // Immutable data is de-duplicated so always allowed
                 Some(Data::Immutable(_)) => Ok(()),
                 Some(_) => Err(ClientError::DataExists),
                 None => {
-                    vault.nae_manager.insert_data(data_name, Data::Immutable(data));
+                    vault.insert_data(data_name, Data::Immutable(data));
                     Ok(())
                 }
             }
@@ -184,7 +184,7 @@ impl Routing {
             self.authorise_read(&dst, &name);
 
             let vault = unwrap!(VAULT.lock());
-            match vault.nae_manager.get_data(&name) {
+            match vault.get_data(&name) {
                 Some(Data::Immutable(data)) => Ok(data),
                 _ => Err(ClientError::NoSuchData),
             }
@@ -224,11 +224,11 @@ impl Routing {
             };
 
             let mut vault = unwrap!(VAULT.lock());
-            if vault.nae_manager.contains_data(&data_name) {
+            if vault.contains_data(&data_name) {
                 Err(ClientError::AccountExists)
             } else {
-                vault.client_manager.insert_account(dst_name);
-                vault.nae_manager.insert_data(data_name, Data::Mutable(data));
+                vault.insert_account(dst_name);
+                vault.insert_data(data_name, Data::Mutable(data));
                 vault.sync();
                 Ok(())
             }
@@ -239,10 +239,10 @@ impl Routing {
             let res = {
                 let mut vault = unwrap!(VAULT.lock());
 
-                if vault.nae_manager.contains_data(&data_name) {
+                if vault.contains_data(&data_name) {
                     Err(ClientError::DataExists)
                 } else {
-                    vault.nae_manager.insert_data(data_name, Data::Mutable(data));
+                    vault.insert_data(data_name, Data::Mutable(data));
                     Ok(())
                 }
             };
@@ -621,7 +621,7 @@ impl Routing {
     {
         let mutate = |mut data: MutableData, vault: &mut Vault| {
             let output = f(&mut data)?;
-            vault.nae_manager.insert_data(name, Data::Mutable(data));
+            vault.insert_data(name, Data::Mutable(data));
             vault.sync();
             Ok(output)
         };
@@ -652,7 +652,7 @@ impl Routing {
             Err(err)
         } else {
             let mut vault = unwrap!(VAULT.lock());
-            match vault.nae_manager.get_data(&name) {
+            match vault.get_data(&name) {
                 Some(Data::Mutable(data)) => f(data, &mut *vault),
                 _ => {
                     if tag == TYPE_TAG_SESSION_PACKET {
@@ -671,18 +671,17 @@ impl Routing {
 
     fn authorise_read(&self, dst: &Authority, data_name: &XorName) {
         let vault = unwrap!(VAULT.lock());
-        assert!(vault.client_manager.authorise_read(dst, data_name));
+        assert!(vault.authorise_read(dst, data_name));
     }
 
     fn authorise_mutation(&self, dst: &Authority) {
         let vault = unwrap!(VAULT.lock());
-        assert!(vault.client_manager
-            .authorise_mutation(dst, self.full_id.public_id().signing_public_key()));
+        assert!(vault.authorise_mutation(dst, self.full_id.public_id().signing_public_key()));
     }
 
     fn commit_mutation(&self, dst: &Authority) {
         let mut vault = unwrap!(VAULT.lock());
-        assert!(vault.client_manager.increment_account_mutations_counter(dst.name()));
+        assert!(vault.increment_account_mutations_counter(dst.name()));
         vault.sync();
     }
 

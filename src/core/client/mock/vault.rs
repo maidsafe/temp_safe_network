@@ -28,47 +28,33 @@ pub const DEFAULT_MAX_MUTATIONS: u64 = 100;
 
 #[derive(RustcDecodable, RustcEncodable)]
 pub struct Vault {
-    pub client_manager: ClientManager,
-    pub nae_manager: NaeManager,
+    client_manager: HashMap<XorName, Account>,
+    nae_manager: HashMap<XorName, Data>,
 }
 
 impl Vault {
     pub fn new() -> Self {
         sync::load().unwrap_or_else(|| {
             Vault {
-                client_manager: ClientManager::new(),
-                nae_manager: NaeManager::new(),
+                client_manager: HashMap::new(),
+                nae_manager: HashMap::new(),
             }
         })
     }
 
-    // Synchronize the storage with the disk.
-    pub fn sync(&self) {
-        sync::save(self)
-    }
-}
-
-#[derive(RustcDecodable, RustcEncodable)]
-pub struct ClientManager(HashMap<XorName, Account>);
-
-impl ClientManager {
-    fn new() -> Self {
-        ClientManager(HashMap::new())
-    }
-
     // Get account for the client manager name.
     pub fn get_account(&self, name: &XorName) -> Option<&Account> {
-        self.0.get(name)
+        self.client_manager.get(name)
     }
 
     // Create account for the given client manager name.
     pub fn insert_account(&mut self, name: XorName) {
-        let _ = self.0.insert(name, Account::new());
+        let _ = self.client_manager.insert(name, Account::new());
     }
 
     // Increment the counter of mutation operations in the account under the given name.
     pub fn increment_account_mutations_counter(&mut self, name: &XorName) -> bool {
-        if let Some(account) = self.0.get_mut(name) {
+        if let Some(account) = self.client_manager.get_mut(name) {
             account.account_info.mutations_done += 1;
             account.account_info.mutations_available -= 1;
 
@@ -113,29 +99,25 @@ impl ClientManager {
             false
         }
     }
-}
-
-#[derive(RustcDecodable, RustcEncodable)]
-pub struct NaeManager(HashMap<XorName, Data>);
-
-impl NaeManager {
-    fn new() -> Self {
-        NaeManager(HashMap::new())
-    }
 
     // Check if data with the given name is in the storage.
     pub fn contains_data(&self, name: &XorName) -> bool {
-        self.0.contains_key(name)
+        self.nae_manager.contains_key(name)
     }
 
     // Load data with the given name from the storage.
     pub fn get_data(&self, name: &XorName) -> Option<Data> {
-        self.0.get(name).cloned()
+        self.nae_manager.get(name).cloned()
     }
 
     // Save the data to the storage.
     pub fn insert_data(&mut self, name: XorName, data: Data) {
-        let _ = self.0.insert(name, data);
+        let _ = self.nae_manager.insert(name, data);
+    }
+
+    // Synchronize the storage with the disk.
+    pub fn sync(&self) {
+        sync::save(self)
     }
 }
 
