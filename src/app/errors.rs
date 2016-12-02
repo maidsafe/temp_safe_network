@@ -25,6 +25,8 @@ use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
+use std::io::Error as IoError;
+use std::sync::mpsc::{RecvError, RecvTimeoutError};
 
 /// App error.
 #[derive(Debug)]
@@ -58,7 +60,8 @@ pub enum AppError {
     /// Invalid offsets (from-position and lenght combination) provided for
     /// reading form SelfEncryptor. Would have probably caused an overflow.
     InvalidSelfEncryptorReadOffsets,
-
+    /// Input/output Error
+    IoError(IoError),
     /// Unexpected error
     Unexpected(String),
 }
@@ -81,6 +84,12 @@ impl From<SelfEncryptionError<SelfEncryptionStorageError>> for AppError {
     }
 }
 
+impl From<IoError> for AppError {
+    fn from(err: IoError) -> Self {
+        AppError::IoError(err)
+    }
+}
+
 impl<'a> From<&'a str> for AppError {
     fn from(s: &'a str) -> Self {
         AppError::Unexpected(s.to_string())
@@ -95,6 +104,18 @@ impl From<String> for AppError {
 
 impl<T: 'static> From<SendError<T>> for AppError {
     fn from(err: SendError<T>) -> Self {
+        AppError::from(err.description())
+    }
+}
+
+impl From<RecvError> for AppError {
+    fn from(err: RecvError) -> Self {
+        AppError::from(err.description())
+    }
+}
+
+impl From<RecvTimeoutError> for AppError {
+    fn from(err: RecvTimeoutError) -> Self {
         AppError::from(err.description())
     }
 }

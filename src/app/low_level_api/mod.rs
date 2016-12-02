@@ -21,8 +21,6 @@
 
 //! Low Level APIs
 
-#![allow(unsafe_code)]
-
 /// Cipher Options
 pub mod cipher_opt;
 /// `XorName` constructions and freeing

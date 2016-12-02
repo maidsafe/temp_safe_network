@@ -58,41 +58,6 @@ struct Inner {
 }
 
 impl Session {
-    /// Create unregistered client.
-    pub fn unregistered<NetObs>(mut network_observer: NetObs) -> Result<Self, FfiError>
-        where NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
-    {
-        let (tx, rx) = std_mpsc::sync_channel(0);
-
-        let joiner = thread::named("Core Event Loop", move || {
-            let el = try_tx!(Core::new(), tx);
-            let el_h = el.handle();
-
-            let (core_tx, core_rx) = futures_mpsc::unbounded();
-            let (net_tx, net_rx) = futures_mpsc::unbounded();
-
-            el_h.spawn(net_rx.map(move |event| network_observer(Ok(event)))
-                .for_each(|_| Ok(())));
-
-            let core_tx_clone = core_tx.clone();
-
-            let client = try_tx!(Client::unregistered(el_h, core_tx_clone, net_tx), tx);
-            let object_cache = ObjectCache::new();
-            unwrap!(tx.send(Ok(core_tx)));
-
-            core::run(el, client, object_cache, core_rx);
-        });
-
-        let core_tx = rx.recv()??;
-
-        Ok(Session {
-            inner: Arc::new(Inner {
-                core_tx: Mutex::new(core_tx),
-                _core_joiner: joiner,
-            }),
-        })
-    }
-
     /// Create new account.
     pub fn create_account<S, NetObs>(locator: S,
                                      password: S,
@@ -214,30 +179,6 @@ impl Drop for Session {
             info!("Unexpected error in drop: {:?}", e);
         }
     }
-}
-
-/// Create a session as an unregistered client. This or any one of the other
-/// companion functions to get a session must be called before initiating any
-/// operation allowed by this crate.
-#[no_mangle]
-pub unsafe extern "C" fn create_unregistered_client(user_data: *mut c_void,
-                                                    obs_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                 i32,
-                                                                                 i32),
-                                                    session_handle: *mut *mut Session)
-                                                    -> i32 {
-    helper::catch_unwind_error_code(|| {
-        trace!("FFI create unregistered client.");
-        let user_data = OpaqueCtx(user_data);
-        let session = Session::unregistered(move |net_event| {
-            match net_event {
-                Ok(event) => obs_cb(user_data.0, 0, event.into()),
-                Err(e) => obs_cb(user_data.0, ffi_error_code!(e), 0),
-            }
-        })?;
-        *session_handle = Box::into_raw(Box::new(session));
-        Ok(())
-    })
 }
 
 /// Create a registered client. This or any one of the other companion

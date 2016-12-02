@@ -28,7 +28,6 @@ use std::any::Any;
 use std::error::Error;
 use std::ffi::NulError;
 use std::fmt;
-use std::io::Error as IoError;
 use std::sync::mpsc::RecvError;
 
 /// Intended for converting Launcher Errors into numeric codes for propagating
@@ -67,8 +66,6 @@ pub enum FfiError {
     InvalidIndex,
     /// Unsupported Operation (e.g. mixing Pub/PrivAppendableData operations)
     UnsupportedOperation,
-    /// Input/output Error
-    IoError(IoError),
 }
 
 impl<'a> From<&'a str> for FfiError {
@@ -92,12 +89,6 @@ impl<T: Any> From<SendError<T>> for FfiError {
 impl From<RoutingError> for FfiError {
     fn from(error: RoutingError) -> FfiError {
         FfiError::from(CoreError::from(error))
-    }
-}
-
-impl From<IoError> for FfiError {
-    fn from(error: IoError) -> FfiError {
-        FfiError::IoError(error)
     }
 }
 
@@ -148,7 +139,6 @@ impl Into<i32> for FfiError {
             FfiError::InvalidVersionNumber => FFI_ERROR_START_RANGE - 21,
             FfiError::InvalidIndex => FFI_ERROR_START_RANGE - 23,
             FfiError::UnsupportedOperation => FFI_ERROR_START_RANGE - 24,
-            FfiError::IoError(_) => FFI_ERROR_START_RANGE - 25,
         }
     }
 }
@@ -171,7 +161,6 @@ impl fmt::Debug for FfiError {
             FfiError::InvalidVersionNumber => write!(f, "FfiError::InvalidVersionNumber"),
             FfiError::InvalidIndex => write!(f, "FfiError::InvalidIndex"),
             FfiError::UnsupportedOperation => write!(f, "FfiError::UnsupportedOperation"),
-            FfiError::IoError(ref error) => write!(f, "FfiError::IoError -> {:?}", error),
         }
     }
 }
