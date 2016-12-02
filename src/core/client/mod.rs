@@ -939,8 +939,8 @@ impl ClientType {
 
     fn owner_sign_key(&self) -> Result<sign::PublicKey, CoreError> {
         match *self {
-            ClientType::FromKeys { owner, .. } => Ok(owner.clone()),
-            ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_pk.clone()),
+            ClientType::FromKeys { owner, .. } => Ok(owner),
+            ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_pk),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
         }
     }

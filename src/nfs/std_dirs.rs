@@ -79,7 +79,7 @@ mod tests {
         random_client(move |client| {
             let cl2 = client.clone();
             create_std_dirs(client.clone()).then(move |res| {
-                let _ = unwrap!(res);
+                unwrap!(res);
                 let root_dir = unwrap!(cl2.user_root_dir());
                 cl2.list_mdata_entries(root_dir.name, DIR_TAG)
                     .then(move |mdata_entries| {
@@ -88,10 +88,10 @@ mod tests {
                                    DEFAULT_PUBLIC_DIRS.len() + DEFAULT_PRIVATE_DIRS.len());
                         for key in DEFAULT_PUBLIC_DIRS.iter().chain(DEFAULT_PRIVATE_DIRS.iter()) {
                             // let's check whether all our entires have been created properly
-                            let enc_key = root_dir.enc_entry_key(Vec::from(key.clone())).unwrap();
-                            assert_ne!(enc_key, Vec::from(key.clone()));
+                            let enc_key = root_dir.enc_entry_key(Vec::from(*key)).unwrap();
+                            assert_ne!(enc_key, Vec::from(*key));
                             assert_eq!(root_mdata.contains_key(&enc_key), true);
-                            assert_ne!(root_mdata.contains_key(&Vec::from(key.clone())), true);
+                            assert_ne!(root_mdata.contains_key(&Vec::from(*key)), true);
                         }
                         finish()
                     })

@@ -154,7 +154,7 @@ impl Dir {
             let nonce = match seed {
                 Some(secretbox::Nonce(ref dir_nonce)) => {
                     let mut pt = plain_text.clone();
-                    pt.extend(&dir_nonce[..]);
+                    pt.extend_from_slice(&dir_nonce[..]);
                     unwrap!(secretbox::Nonce::from_slice(
                         &sha256::hash(&pt)[..secretbox::NONCEBYTES]))
                 }
@@ -178,7 +178,7 @@ impl Dir {
     /// decrypt key or value of this mdata entry
     pub fn decrypt(&self, cipher: Vec<u8>) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.enc_info {
-            symmetric_decrypt(&cipher.as_slice(), key)
+            symmetric_decrypt(cipher.as_slice(), key)
         } else {
             Ok(cipher)
         }
