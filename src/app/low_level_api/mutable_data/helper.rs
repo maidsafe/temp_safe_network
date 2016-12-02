@@ -19,34 +19,35 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use app::App;
+use app::errors::AppError;
+use app::object_cache::{MDataPermissionsHandle, ObjectCache, SignKeyHandle};
 use core::{Client, FutureExt};
-use ffi::{MDataPermissionsHandle, OpaqueCtx, Session, SignKeyHandle};
-use ffi::callback::{Callback, CallbackArgs};
-use ffi::errors::FfiError;
-use ffi::object_cache::ObjectCache;
 use futures::Future;
 use routing::{PermissionSet, User};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::os::raw::c_void;
+use util::ffi::OpaqueCtx;
+use util::ffi::callback::{Callback, CallbackArgs};
 
 // TODO: consider moving the send_* functions to ffi::helper, or even make them methods of
 // Session.
 
-// Convenience wrapper around `Session::send` which automatically handles the callback
+// Convenience wrapper around `App::send` which automatically handles the callback
 // boilerplate.
 // Use this if the lambda never returns future.
-pub unsafe fn send_sync<C, F>(session: *const Session,
+pub unsafe fn send_sync<C, F>(app: *const App,
                               user_data: *mut c_void,
                               o_cb: C,
                               f: F)
-                              -> Result<(), FfiError>
+                              -> Result<(), AppError>
     where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&ObjectCache) -> Result<C::Args, FfiError> + Send + 'static
+          F: FnOnce(&ObjectCache) -> Result<C::Args, AppError> + Send + 'static
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*session).send(move |_, object_cache| {
+    (*app).send(move |_, object_cache| {
         match f(object_cache) {
             Ok(args) => o_cb.call(user_data.0, 0, args),
             Err(err) => o_cb.call(user_data.0, ffi_error_code!(err), C::Args::default()),
@@ -56,25 +57,26 @@ pub unsafe fn send_sync<C, F>(session: *const Session,
     })
 }
 
-// Convenience wrapper around `Session::send` which automatically handles the callback
+// Convenience wrapper around `App::send` which automatically handles the callback
 // boilerplate.
 // Use this if the lambda always returns future.
-pub unsafe fn send_async<C, F, U, E>(session: *const Session,
+pub unsafe fn send_async<C, F, U, E>(app: *const App,
                                      user_data: *mut c_void,
                                      cb: C,
                                      f: F)
-                                     -> Result<(), FfiError>
+                                     -> Result<(), AppError>
     where C: Callback + Copy + Send + 'static,
           F: FnOnce(&Client, &ObjectCache) -> U + Send + 'static,
           U: Future<Item = C::Args, Error = E> + 'static,
-          E: Debug,
-          FfiError: From<E>
+          E: Debug + 'static,
+          AppError: From<E>
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*session).send(move |client, object_cache| {
+    (*app).send(move |client, object_cache| {
         f(client, object_cache)
             .map(move |args| cb.call(user_data.0, 0, args))
+            .map_err(AppError::from)
             .map_err(move |err| cb.call(user_data.0, ffi_error_code!(err), C::Args::default()))
             .into_box()
             .into()
@@ -83,7 +85,7 @@ pub unsafe fn send_async<C, F, U, E>(session: *const Session,
 
 // Retrieve the sign key corresponding to the handle from the object cache and wrap it
 // in `User`. If the handle is 0, return `User::Anyone`.
-pub fn get_user(object_cache: &ObjectCache, handle: SignKeyHandle) -> Result<User, FfiError> {
+pub fn get_user(object_cache: &ObjectCache, handle: SignKeyHandle) -> Result<User, AppError> {
     let user = if handle != 0 {
         let sign_key = object_cache.get_sign_key(handle)?;
         User::Key(*sign_key)
@@ -116,7 +118,7 @@ pub fn insert_permissions(object_cache: &ObjectCache,
 // Retrieve permissions from the object cache.
 pub fn get_permissions(object_cache: &ObjectCache,
                        handle: MDataPermissionsHandle)
-                       -> Result<BTreeMap<User, PermissionSet>, FfiError> {
+                       -> Result<BTreeMap<User, PermissionSet>, AppError> {
     let input = object_cache.get_mdata_permissions(handle)?.clone();
     let mut output = BTreeMap::new();
 

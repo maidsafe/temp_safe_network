@@ -19,11 +19,14 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::CoreError;
-use ffi::{App, CipherOptHandle, EncryptKeyHandle, FfiError, OpaqueCtx, Session, helper};
-use maidsafe_utilities::serialisation::{deserialise, serialise};
-use rust_sodium::crypto::{box_, sealedbox, secretbox};
+use app::App;
+use app::object_cache::{CipherOptHandle, EncryptKeyHandle};
+// use core::CoreError;
+// use maidsafe_utilities::serialisation::{deserialise, serialise};
+use rust_sodium::crypto::{box_, secretbox};
+// use rust_sodium::crypto::{box_, sealedbox, secretbox};
 use std::os::raw::c_void;
+use util::ffi::{self, OpaqueCtx};
 
 /// Cipher Options
 #[derive(Debug)]
@@ -50,6 +53,8 @@ enum WireFormat {
 }
 
 impl CipherOpt {
+    /*
+
     /// Encrypt plain text
     pub fn encrypt(&self, app: &App, plain_text: &[u8]) -> Result<Vec<u8>, FfiError> {
         match *self {
@@ -92,19 +97,20 @@ impl CipherOpt {
             }
         }
     }
+    */
 }
 
 /// Construct `CipherOpt::PlainText` handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
+pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
                                                                              i32,
                                                                              CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        (*session).send(move |_, obj_cache| {
+    ffi::catch_unwind_cb(user_data, o_cb, || {
+        (*app).send(move |_, obj_cache| {
             let handle = obj_cache.insert_cipher_opt(CipherOpt::PlainText);
             o_cb(user_data.0, 0, handle);
             None
@@ -114,14 +120,14 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(session: *const Session,
 
 /// Construct `CipherOpt::Symmetric` handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
+pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void,
                                                                              i32,
                                                                              CipherOptHandle)) {
-    helper::catch_unwind_cb(user_data, o_cb, || {
+    ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        (*session).send(move |_, obj_cache| {
+        (*app).send(move |_, obj_cache| {
             let handle = obj_cache.insert_cipher_opt(CipherOpt::Symmetric);
             o_cb(user_data.0, 0, handle);
             None
@@ -131,7 +137,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(session: *const Session,
 
 /// Construct `CipherOpt::Asymmetric` handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
+pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
                                                    peer_encrypt_key_h: EncryptKeyHandle,
                                                    user_data: *mut c_void,
                                                    o_cb: unsafe extern "C" fn(*mut c_void,
@@ -139,8 +145,8 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
                                                                               CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        (*session).send(move |_, obj_cache| {
+    ffi::catch_unwind_cb(user_data, o_cb, || {
+        (*app).send(move |_, obj_cache| {
             let pk = match obj_cache.get_encrypt_key(peer_encrypt_key_h) {
                 Ok(pk) => *pk,
                 Err(e) => {
@@ -158,14 +164,14 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(session: *const Session,
 
 /// Free `CipherOpt` handle
 #[no_mangle]
-pub unsafe extern "C" fn cipher_opt_free(session: *const Session,
+pub unsafe extern "C" fn cipher_opt_free(app: *const App,
                                          handle: CipherOptHandle,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        (*session).send(move |_, obj_cache| {
+    ffi::catch_unwind_cb(user_data, o_cb, || {
+        (*app).send(move |_, obj_cache| {
             let res = obj_cache.remove_cipher_opt(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None

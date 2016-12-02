@@ -19,24 +19,24 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-macro_rules! ffi_error_code {
-    ($err:expr) => {{
-        let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-        let err_str = format!("{:?}", $err);
-        let err_code: i32 = $crate::ffi::FfiError::from($err).into();
-        info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
-              decorator, err_code, err_str, decorator);
-        err_code
-    }}
-}
-
 macro_rules! ffi_result_code {
-    ($result:expr) => {
-        match $result {
+    ($res:expr) => {
+        match $res {
             Ok(_) => 0,
             Err(error) => ffi_error_code!(error),
         }
     }
+}
+
+macro_rules! ffi_error_code {
+    ($err:expr) => {{
+        let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
+        let err_str = format!("{:?}", $err);
+        let err_code: i32 = $err.into();
+        info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
+              decorator, err_code, err_str, decorator);
+        err_code
+    }}
 }
 
 macro_rules! try_cb {
@@ -44,7 +44,7 @@ macro_rules! try_cb {
         match $result {
             Ok(value) => value,
             Err(err) => {
-                use $crate::ffi::callback::{Callback, CallbackArgs};
+                use $crate::util::ffi::callback::{Callback, CallbackArgs};
                 $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());
                 return None;
             }

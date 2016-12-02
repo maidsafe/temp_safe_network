@@ -71,6 +71,9 @@ extern crate unwrap;
 /// Core module
 #[macro_use]
 pub mod core;
+/// Utility functions;
+#[macro_use]
+pub mod util;
 /// Nfs module;
 pub mod nfs;
 // / Dns module;
@@ -81,7 +84,5 @@ pub mod ffi;
 pub mod ipc;
 /// Authenticator module;
 pub mod authenticator;
-/// Utility functions;
-pub mod util;
-// /// Application functions;
-// pub mod app;
+/// Application functions;
+pub mod app;

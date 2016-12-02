@@ -19,6 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+/*
+
 //! Session management
 
 use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
@@ -56,16 +58,6 @@ struct Inner {
 }
 
 impl Session {
-    /// Send a message to the core event loop
-    pub fn send<F>(&self, f: F) -> Result<(), FfiError>
-        where F: FnOnce(&Client, &ObjectCache) -> Option<Box<Future<Item=(), Error=()>>>
-                 + Send + 'static
-    {
-        let msg = CoreMsg::new(f);
-        let mut core_tx = unwrap!(self.inner.core_tx.lock());
-        core_tx.send(msg).map_err(FfiError::from)
-    }
-
     /// Create unregistered client.
     pub fn unregistered<NetObs>(mut network_observer: NetObs) -> Result<Self, FfiError>
         where NetObs: FnMut(Result<NetworkEvent, FfiError>) + Send + 'static
@@ -469,3 +461,5 @@ mod tests {
         }
     }
 }
+
+*/

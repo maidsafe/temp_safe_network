@@ -21,22 +21,23 @@
 
 //! FFI for mutable data entry actions.
 
-use ffi::{MDataEntryActionsHandle, Session};
-use ffi::helper as ffi_helper;
+use app::App;
+use app::object_cache::MDataEntryActionsHandle;
 use routing::{EntryAction, Value};
 use std::os::raw::c_void;
 use super::helper;
+use util::ffi;
 
 /// Create new entry actions.
 #[no_mangle]
 pub unsafe extern "C"
-fn mdata_entry_actions_new(session: *const Session,
+fn mdata_entry_actions_new(app: *const App,
                            user_data: *mut c_void,
                            o_cb: unsafe extern "C" fn(*mut c_void,
                                                       i32,
                                                       MDataEntryActionsHandle)) {
-    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(session, user_data, o_cb, |object_cache| {
+    ffi::catch_unwind_cb(user_data, o_cb, || {
+        helper::send_sync(app, user_data, o_cb, |object_cache| {
             let actions = Default::default();
             Ok(object_cache.insert_mdata_entry_actions(actions))
         })
@@ -45,7 +46,7 @@ fn mdata_entry_actions_new(session: *const Session,
 
 /// Add action to insert new entry.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_entry_actions_insert(session: *const Session,
+pub unsafe extern "C" fn mdata_entry_actions_insert(app: *const App,
                                                     actions_h: MDataEntryActionsHandle,
                                                     key_ptr: *const u8,
                                                     key_len: usize,
@@ -53,9 +54,9 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(session: *const Session,
                                                     value_len: usize,
                                                     user_data: *mut c_void,
                                                     o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    add_action(session, actions_h, key_ptr, key_len, user_data, o_cb, || {
+    add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Ins(Value {
-            content: ffi_helper::u8_ptr_to_vec(value_ptr, value_len),
+            content: ffi::u8_ptr_to_vec(value_ptr, value_len),
             entry_version: 0,
         })
     })
@@ -63,7 +64,7 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(session: *const Session,
 
 /// Add action to update existing entry.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_entry_actions_update(session: *const Session,
+pub unsafe extern "C" fn mdata_entry_actions_update(app: *const App,
                                                     actions_h: MDataEntryActionsHandle,
                                                     key_ptr: *const u8,
                                                     key_len: usize,
@@ -72,9 +73,9 @@ pub unsafe extern "C" fn mdata_entry_actions_update(session: *const Session,
                                                     entry_version: u64,
                                                     user_data: *mut c_void,
                                                     o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    add_action(session, actions_h, key_ptr, key_len, user_data, o_cb, || {
+    add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
-            content: ffi_helper::u8_ptr_to_vec(value_ptr, value_len),
+            content: ffi::u8_ptr_to_vec(value_ptr, value_len),
             entry_version: entry_version,
         })
     })
@@ -82,14 +83,14 @@ pub unsafe extern "C" fn mdata_entry_actions_update(session: *const Session,
 
 /// Add action to delete existing entry.
 #[no_mangle]
-pub unsafe extern "C" fn mdata_entry_actions_delete(session: *const Session,
+pub unsafe extern "C" fn mdata_entry_actions_delete(app: *const App,
                                                     actions_h: MDataEntryActionsHandle,
                                                     key_ptr: *const u8,
                                                     key_len: usize,
                                                     entry_version: u64,
                                                     user_data: *mut c_void,
                                                     o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    add_action(session,
+    add_action(app,
                actions_h,
                key_ptr,
                key_len,
@@ -100,12 +101,12 @@ pub unsafe extern "C" fn mdata_entry_actions_delete(session: *const Session,
 
 /// Free the entry actions from memory
 #[no_mangle]
-pub unsafe extern "C" fn mdata_entry_actions_free(session: *const Session,
+pub unsafe extern "C" fn mdata_entry_actions_free(app: *const App,
                                                   actions_h: MDataEntryActionsHandle,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(session, user_data, o_cb, move |object_cache| {
+    ffi::catch_unwind_cb(user_data, o_cb, || {
+        helper::send_sync(app, user_data, o_cb, move |object_cache| {
             let _ = object_cache.remove_mdata_entry_actions(actions_h)?;
             Ok(())
         })
@@ -114,7 +115,7 @@ pub unsafe extern "C" fn mdata_entry_actions_free(session: *const Session,
 
 // Add new action to the entry actions stored in the object cache. The action
 // to add is the result of the passed in lambda `f`.
-unsafe fn add_action<F>(session: *const Session,
+unsafe fn add_action<F>(app: *const App,
                         actions_h: MDataEntryActionsHandle,
                         key_ptr: *const u8,
                         key_len: usize,
@@ -123,11 +124,11 @@ unsafe fn add_action<F>(session: *const Session,
                         f: F)
     where F: FnOnce() -> EntryAction
 {
-    ffi_helper::catch_unwind_cb(user_data, o_cb, || {
-        let key = ffi_helper::u8_ptr_to_vec(key_ptr, key_len);
+    ffi::catch_unwind_cb(user_data, o_cb, || {
+        let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
         let action = f();
 
-        helper::send_sync(session, user_data, o_cb, move |object_cache| {
+        helper::send_sync(app, user_data, o_cb, move |object_cache| {
             let mut actions = object_cache.get_mdata_entry_actions(actions_h)?;
             let _ = actions.insert(key, action);
             Ok(())
@@ -137,20 +138,19 @@ unsafe fn add_action<F>(session: *const Session,
 
 #[cfg(test)]
 mod tests {
+    use app::test_util::{create_app, run_now};
     use core::utility;
-    use ffi::test_utils;
     use routing::{EntryAction, Value};
     use super::*;
+    use util::ffi::test_util::{call_0, call_1};
 
     #[test]
     fn basics() {
-        let session = test_utils::create_session();
+        let app = create_app();
 
-        let handle = unsafe {
-            unwrap!(test_utils::call_1(|ud, cb| mdata_entry_actions_new(&session, ud, cb)))
-        };
+        let handle = unsafe { unwrap!(call_1(|ud, cb| mdata_entry_actions_new(&app, ud, cb))) };
 
-        test_utils::run_now(&session, move |_, object_cache| {
+        run_now(&app, move |_, object_cache| {
             let actions = unwrap!(object_cache.get_mdata_entry_actions(handle));
             assert!(actions.is_empty());
         });
@@ -166,8 +166,8 @@ mod tests {
         let version2 = 8;
 
         unsafe {
-            unwrap!(test_utils::call_0(|ud, cb| {
-                mdata_entry_actions_insert(&session,
+            unwrap!(call_0(|ud, cb| {
+                mdata_entry_actions_insert(&app,
                                            handle,
                                            key0.as_ptr(),
                                            key0.len(),
@@ -177,8 +177,8 @@ mod tests {
                                            cb)
             }));
 
-            unwrap!(test_utils::call_0(|ud, cb| {
-                mdata_entry_actions_update(&session,
+            unwrap!(call_0(|ud, cb| {
+                mdata_entry_actions_update(&app,
                                            handle,
                                            key1.as_ptr(),
                                            key1.len(),
@@ -189,8 +189,8 @@ mod tests {
                                            cb)
             }));
 
-            unwrap!(test_utils::call_0(|ud, cb| {
-                mdata_entry_actions_delete(&session,
+            unwrap!(call_0(|ud, cb| {
+                mdata_entry_actions_delete(&app,
                                            handle,
                                            key2.as_ptr(),
                                            key2.len(),
@@ -200,7 +200,7 @@ mod tests {
             }));
         }
 
-        test_utils::run_now(&session, move |_, object_cache| {
+        run_now(&app, move |_, object_cache| {
             let actions = unwrap!(object_cache.get_mdata_entry_actions(handle));
             assert_eq!(actions.len(), 3);
 
@@ -224,11 +224,9 @@ mod tests {
             }
         });
 
-        unsafe {
-            unwrap!(test_utils::call_0(|ud, cb| mdata_entry_actions_free(&session, handle, ud, cb)))
-        };
+        unsafe { unwrap!(call_0(|ud, cb| mdata_entry_actions_free(&app, handle, ud, cb))) };
 
-        test_utils::run_now(&session, move |_, object_cache| {
+        run_now(&app, move |_, object_cache| {
             assert!(object_cache.get_mdata_entry_actions(handle).is_err())
         });
     }

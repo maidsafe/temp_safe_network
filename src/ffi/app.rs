@@ -26,8 +26,10 @@
 // references instead of copies etc.) and uniform (i.e. not use get_ prefix for
 // mem functions.
 
+/*
+
 use core::FutureExt;
-use ffi::{AppHandle, FfiError, OpaqueCtx, Session, helper, launcher_config};
+use ffi::{FfiError, OpaqueCtx, Session, helper, launcher_config};
 use futures::Future;
 // use nfs::DirId;
 use rust_sodium::crypto::{box_, secretbox};
@@ -151,3 +153,5 @@ pub unsafe extern "C" fn create_unregistered_app(session: *mut Session,
         })
     })
 }
+
+*/
