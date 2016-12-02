@@ -31,7 +31,12 @@ use std::collections::{BTreeMap, BTreeSet};
 pub fn create_dir(client: &Client, is_public: bool) -> Box<NfsFuture<Dir>> {
     match client.owner_sign_key() {
         Ok(pub_key) => {
-            let dir = Dir::random(DIR_TAG, is_public);
+            let dir = if is_public {
+                fry!(Dir::random_public(DIR_TAG))
+            } else {
+                fry!(Dir::random_private(DIR_TAG))
+            };
+
             let mut owners = BTreeSet::new();
             owners.insert(pub_key);
             let dir_md = fry!(MutableData::new(dir.name,

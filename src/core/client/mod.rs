@@ -173,8 +173,8 @@ impl Client {
 
         let (routing, routing_rx) = setup_routing(full_id)?;
 
-        let user_root_dir = Dir::random(DIR_TAG, false);
-        let config_dir = Dir::random(DIR_TAG, false);
+        let user_root_dir = Dir::random_private(DIR_TAG)?;
+        let config_dir = Dir::random_private(DIR_TAG)?;
         let acc = Account::new(maid_keys, user_root_dir.clone(), config_dir.clone());
 
         let acc_data = btree_map![
@@ -1032,7 +1032,7 @@ mod tests {
                 .then(move |res| {
                     let data = unwrap!(res);
                     assert_eq!(data, orig_data);
-                    let dir = Dir::random(DIR_TAG, false);
+                    let dir = unwrap!(Dir::random_private(DIR_TAG));
                     client2.set_user_root_dir(dir)
                 })
                 .then(move |res| {
@@ -1047,7 +1047,7 @@ mod tests {
                         _ => panic!("Unexpected {:?}", e),
                     }
 
-                    let dir = Dir::random(DIR_TAG, false);
+                    let dir = unwrap!(Dir::random_private(DIR_TAG));
                     client3.set_config_root_dir(dir)
                 })
                 .then(|res| {
@@ -1118,7 +1118,7 @@ mod tests {
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir = Dir::random(DIR_TAG, false);
+        let dir = unwrap!(Dir::random_private(DIR_TAG));
         let dir_clone = dir.clone();
 
         setup_client(|el_h, core_tx, net_tx| {
@@ -1142,7 +1142,7 @@ mod tests {
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir = Dir::random(DIR_TAG, false);
+        let dir = unwrap!(Dir::random_private(DIR_TAG));
         let dir_clone = dir.clone();
 
         setup_client(|el_h, core_tx, net_tx| {
