@@ -24,11 +24,16 @@
 /// Authenticator errors
 mod errors;
 
-use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
+use core::{self, Client, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent};
+use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
+use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::{self, Joiner};
+use nfs::{create_dir, create_std_dirs};
+use routing::{EntryAction, Value};
 pub use self::errors::AuthError;
+use std::collections::BTreeMap;
 use std::os::raw::c_void;
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
@@ -69,7 +74,7 @@ impl Authenticator {
             let el = try_tx!(Core::new(), tx);
             let el_h = el.handle();
 
-            let (core_tx, core_rx) = mpsc::unbounded();
+            let (mut core_tx, core_rx) = mpsc::unbounded();
             let (net_tx, net_rx) = mpsc::unbounded::<NetworkEvent>();
             let core_tx_clone = core_tx.clone();
 
@@ -81,7 +86,44 @@ impl Authenticator {
                 try_tx!(Client::registered(&locator, &password, el_h, core_tx_clone, net_tx),
                         tx);
 
-            unwrap!(tx.send(Ok(core_tx)));
+            let tx2 = tx.clone();
+            let core_tx2 = core_tx.clone();
+            unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
+                let cl2 = client.clone();
+                create_std_dirs(client.clone()).map_err(AuthError::from).and_then(move |()| {
+                    let cl3 = cl2.clone();
+                    create_dir(&cl2, false).map_err(AuthError::from).and_then(move |dir| {
+                        let config_dir = unwrap!(cl3.config_root_dir());
+                        let mut actions = BTreeMap::new();
+                        let encrypted_key
+                            = config_dir.enc_entry_key(Vec::from("authenticator-config"))?;
+                        let _ = actions.insert(encrypted_key,
+                                               EntryAction::Ins(Value {
+                                                   content: vec![],
+                                                   entry_version: 0,
+                                               }));
+
+                        let serialised_dir = serialise(&dir)?;
+                        let encrypted_key = config_dir
+                            .enc_entry_key(Vec::from("access-container"))?;
+                        let encrypted_value = config_dir.enc_entry_value(serialised_dir)?;
+
+                        let _ = actions.insert(encrypted_key,
+                                               EntryAction::Ins(Value {
+                                                   content: encrypted_value,
+                                                   entry_version: 0,
+                                               }));
+
+                        Ok(cl3.mutate_mdata_entries(dir.name, dir.type_tag, actions))
+                    }).and_then(move |fut| {
+                        fut.map_err(AuthError::from)
+                    }).map(move |()| {
+                        unwrap!(tx.send(Ok(core_tx2)));
+                    })
+                }).map_err(move |e| {
+                    unwrap!(tx2.send(Err(AuthError::from(e))));
+                }).into_box().into()
+            })));
 
             core::run(el, client, (), core_rx);
         });
