@@ -51,11 +51,11 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
-        (*app).send(move |client, object_cache| {
+        (*app).send(move |client, context| {
             let sign_pk = try_cb!(client.public_signing_key(), user_data, o_cb);
 
             let permissions = if permissions_h != 0 {
-                try_cb!(helper::get_permissions(object_cache, permissions_h),
+                try_cb!(helper::get_permissions(context.object_cache(), permissions_h),
                         user_data,
                         o_cb)
             } else {
@@ -63,7 +63,10 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
             };
 
             let entries = if entries_h != 0 {
-                try_cb!(object_cache.get_mdata_entries(entries_h), user_data, o_cb).clone()
+                try_cb!(context.object_cache().get_mdata_entries(entries_h),
+                        user_data,
+                        o_cb)
+                    .clone()
             } else {
                 Default::default()
             };
@@ -212,8 +215,8 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
-        (*app).send(move |client, object_cache| {
-            let actions = try_cb!(object_cache.get_mdata_entry_actions(actions_h),
+        (*app).send(move |client, context| {
+            let actions = try_cb!(context.object_cache().get_mdata_entry_actions(actions_h),
                                   user_data,
                                   o_cb)
                 .clone();
@@ -265,8 +268,8 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
-        (*app).send(move |client, object_cache| {
-            let object_cache = object_cache.clone();
+        (*app).send(move |client, context| {
+            let object_cache = context.object_cache().clone();
             let user = try_cb!(helper::get_user(&object_cache, user_h), user_data, o_cb);
 
             client.list_mdata_user_permissions(name, type_tag, user)
@@ -297,9 +300,12 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
-        (*app).send(move |client, object_cache| {
-            let user = try_cb!(helper::get_user(object_cache, user_h), user_data, o_cb);
-            let permission_set = *try_cb!(object_cache.get_mdata_permission_set(permission_set_h),
+        (*app).send(move |client, context| {
+            let user = try_cb!(helper::get_user(context.object_cache(), user_h),
+                               user_data,
+                               o_cb);
+            let permission_set = *try_cb!(context.object_cache()
+                                              .get_mdata_permission_set(permission_set_h),
                                           user_data,
                                           o_cb);
 
@@ -329,8 +335,10 @@ pub unsafe fn mdata_del_user_permissions(app: *const App,
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
-        (*app).send(move |client, object_cache| {
-            let user = try_cb!(helper::get_user(object_cache, user_h), user_data, o_cb);
+        (*app).send(move |client, context| {
+            let user = try_cb!(helper::get_user(context.object_cache(), user_h),
+                               user_data,
+                               o_cb);
 
             client.del_mdata_user_permissions(name, type_tag, user, version)
                 .then(move |result| {
@@ -356,8 +364,10 @@ pub unsafe extern "C" fn mdata_change_owner(app: *const App,
         let user_data = OpaqueCtx(user_data);
         let name = XorName(*name);
 
-        (*app).send(move |client, object_cache| {
-            let new_owner = *try_cb!(object_cache.get_sign_key(new_owner_h), user_data, o_cb);
+        (*app).send(move |client, context| {
+            let new_owner = *try_cb!(context.object_cache().get_sign_key(new_owner_h),
+                                     user_data,
+                                     o_cb);
 
             client.change_mdata_owner(name, type_tag, new_owner, version)
                 .then(move |result| {

@@ -24,10 +24,14 @@
 use std::os::raw::c_void;
 use std::ptr;
 
-// This trait allows us to treat callbacks with different number and type of
-// arguments uniformly.
+/// This trait allows us to treat callbacks with different number and type of
+/// arguments uniformly.
 pub trait Callback {
+    /// Arguments for the callback. Should be a tuple.
     type Args: CallbackArgs;
+
+    /// Call the callback, passing the user data pointer, error code and any
+    /// additional arguments.
     fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args);
 }
 
@@ -102,9 +106,10 @@ impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs, T3: CallbackArgs> Cal
     }
 }
 
-// This is similar to `Default`, but allows us to implement it for foreign
-// types that don't already implement `Default`.
+/// Trait for arguments to callbacks. This is similar to `Default`, but allows
+/// us to implement it for foreign types that don't already implement `Default`.
 pub trait CallbackArgs {
+    /// Return default value for the type, used when calling the callback with error.
     fn default() -> Self;
 }
 

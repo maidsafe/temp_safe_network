@@ -35,8 +35,8 @@ pub unsafe extern "C" fn xor_name_new(app: *const App,
         let xor_name = XorName(*id);
         let user_data = OpaqueCtx(user_data);
 
-        (*app).send(move |_, obj_cache| {
-            let handle = obj_cache.insert_xor_name(xor_name);
+        (*app).send(move |_, context| {
+            let handle = context.object_cache().insert_xor_name(xor_name);
             o_cb(user_data.0, 0, handle);
             None
         })
@@ -52,8 +52,8 @@ pub unsafe extern "C" fn xor_name_free(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, obj_cache| {
-            let res = obj_cache.remove_xor_name(handle);
+        (*app).send(move |_, context| {
+            let res = context.object_cache().remove_xor_name(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
@@ -76,14 +76,15 @@ mod tests {
 
         let handle = unsafe { unwrap!(call_1(|ud, cb| xor_name_new(&session, &array, ud, cb))) };
 
-        run_now(&session, move |_, obj_cache| {
-            assert_eq!(*unwrap!(obj_cache.get_xor_name(handle)), XorName(array));
+        run_now(&session, move |_, context| {
+            assert_eq!(*unwrap!(context.object_cache().get_xor_name(handle)),
+                       XorName(array));
         });
 
         unsafe { unwrap!(call_0(|ud, cb| xor_name_free(&session, handle, ud, cb))) }
 
-        run_now(&session, move |_, obj_cache| {
-            assert!(obj_cache.get_xor_name(handle).is_err());
+        run_now(&session, move |_, context| {
+            assert!(context.object_cache().get_xor_name(handle).is_err());
         });
     }
 }

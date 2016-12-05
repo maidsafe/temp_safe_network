@@ -66,7 +66,7 @@ pub fn catch_unwind_error_code<'a, F, E>(f: F) -> i32
     ffi_result_code!(catch_unwind_result(f))
 }
 
-// Catch panics. On error call the callback.
+/// Catch panics. On error call the callback.
 pub fn catch_unwind_cb<'a, U, C, F, E>(user_data: U, cb: C, f: F)
     where U: Into<*mut c_void>,
           C: Callback,

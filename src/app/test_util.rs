@@ -19,26 +19,35 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use auth::AppKeys;
 use core::Client;
+use rust_sodium::crypto::{box_, secretbox, sign};
 use std::sync::mpsc;
-use super::App;
-use super::object_cache::ObjectCache;
+use super::{App, AppContext};
 
 // Create registered app.
 pub fn create_app() -> App {
-    unimplemented!()
+    let app_keys = gen_app_keys();
+    unwrap!(App::from_keys(app_keys, |_network_event| ()))
 }
+
+/*
+// Create unregistered app.
+pub fn create_unregistered_app() -> App {
+    unwrap!(App::unregistered(|_| ()))
+}
+*/
 
 // Run the given closure inside the app's event loop. The return value of
 // the closure is returned immediately.
 pub fn run_now<F, R>(app: &App, f: F) -> R
-    where F: FnOnce(&Client, &ObjectCache) -> R + Send + 'static,
+    where F: FnOnce(&Client, &AppContext) -> R + Send + 'static,
           R: Send + 'static
 {
     let (tx, rx) = mpsc::channel();
 
-    unwrap!(app.send(move |client, object_cache| {
-        unwrap!(tx.send(f(client, object_cache)));
+    unwrap!(app.send(move |client, context| {
+        unwrap!(tx.send(f(client, context)));
         None
     }));
 
@@ -47,9 +56,6 @@ pub fn run_now<F, R>(app: &App, f: F) -> R
 
 
 /*
-pub fn create_unregistered_session() -> Session {
-    unwrap!(Session::unregistered(|_| ()))
-}
 
 // Run the given closure inside the session event loop. The closure should
 // return a future which will then be driven to completion and its result
@@ -76,3 +82,20 @@ pub fn run<F, I, R, E>(session: &Session, f: F) -> R
 }
 
 */
+
+// Generate random `AppKeys`.
+fn gen_app_keys() -> AppKeys {
+    let owner_key = sign::gen_keypair().0;
+    let enc_key = secretbox::gen_key();
+    let (sign_pk, sign_sk) = sign::gen_keypair();
+    let (enc_pk, enc_sk) = box_::gen_keypair();
+
+    AppKeys {
+        owner_key: owner_key,
+        enc_key: enc_key,
+        sign_pk: sign_pk,
+        sign_sk: sign_sk,
+        enc_pk: enc_pk,
+        enc_sk: enc_sk,
+    }
+}

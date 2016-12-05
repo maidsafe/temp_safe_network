@@ -239,7 +239,9 @@ impl AuthReq {
 
 /// Represents the needed keys to work with the data
 #[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
-pub struct AppAccessToken {
+pub struct AppKeys {
+    /// Owner signing public key.
+    pub owner_key: sign::PublicKey,
     /// Data symmetric encryption key
     pub enc_key: secretbox::Key,
     /// Asymmetric sign public key.
@@ -254,13 +256,14 @@ pub struct AppAccessToken {
     pub enc_sk: box_::SecretKey,
 }
 
-impl AppAccessToken {
+impl AppKeys {
     /// Consumes the object and returns the wrapped raw pointer
     ///
     /// You're now responsible for freeing this memory once you're done.
-    pub fn into_raw(self) -> *mut ffi::AppAccessToken {
-        let AppAccessToken { enc_key, sign_pk, sign_sk, enc_pk, enc_sk } = self;
-        Box::into_raw(Box::new(ffi::AppAccessToken {
+    pub fn into_raw(self) -> *mut ffi::AppKeys {
+        let AppKeys { owner_key, enc_key, sign_pk, sign_sk, enc_pk, enc_sk } = self;
+        Box::into_raw(Box::new(ffi::AppKeys {
+            owner_key: owner_key.0,
             enc_key: enc_key.0,
             sign_pk: sign_pk.0,
             sign_sk: sign_sk.0,
@@ -274,9 +277,10 @@ impl AppAccessToken {
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
     #[allow(unsafe_code)]
-    pub unsafe fn from_raw(raw: *mut ffi::AppAccessToken) -> Self {
+    pub unsafe fn from_raw(raw: *mut ffi::AppKeys) -> Self {
         let raw = Box::from_raw(raw);
-        AppAccessToken {
+        AppKeys {
+            owner_key: sign::PublicKey(raw.owner_key),
             enc_key: secretbox::Key(raw.enc_key),
             sign_pk: sign::PublicKey(raw.sign_pk),
             sign_sk: sign::SecretKey(raw.sign_sk),

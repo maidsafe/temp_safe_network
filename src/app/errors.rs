@@ -35,6 +35,8 @@ pub enum AppError {
     CoreError(CoreError),
     /// Could not serialise or deserialise data
     SerialisationError(SerialisationError),
+    /// Forbidden operation
+    Forbidden,
 
     /// Invalid CipherOpt handle
     InvalidCipherOptHandle,

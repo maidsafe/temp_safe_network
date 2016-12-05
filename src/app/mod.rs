@@ -28,18 +28,20 @@ mod object_cache;
 #[cfg(test)]
 mod test_util;
 
-use auth::AppAccessToken;
-use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
+use auth::AppKeys;
+use auth::ffi::AppKeys as FfiAppKeys;
+use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, NetworkEvent, NetworkTx};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use maidsafe_utilities::thread::{self, Joiner};
+use rust_sodium::crypto::{box_, secretbox, sign};
 use self::errors::AppError;
 use self::object_cache::ObjectCache;
 use std::os::raw::c_void;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Core, Handle};
 use util::ffi::{self, OpaqueCtx};
 
 macro_rules! try_tx {
@@ -53,15 +55,45 @@ macro_rules! try_tx {
 
 /// Handle to an application instance.
 pub struct App {
-    _app_type: AppType,
-    core_tx: Mutex<CoreMsgTx<ObjectCache>>,
+    core_tx: Mutex<CoreMsgTx<AppContext>>,
     _core_joiner: Joiner,
 }
 
 impl App {
     /// Create unregistered app.
-    pub fn unregistered<N>(mut network_observer: N) -> Result<Self, AppError>
+    pub fn unregistered<N>(network_observer: N) -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
+    {
+        Self::new(network_observer, |el_h, core_tx, net_tx| {
+            let client = Client::unregistered(el_h, core_tx, net_tx)?;
+            let context = AppContext::unauthorised();
+            Ok((client, context))
+        })
+    }
+
+    /// Create app given an access token.
+    pub fn from_keys<N>(app_keys: AppKeys, network_observer: N) -> Result<Self, AppError>
+        where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
+    {
+        let AppKeys { owner_key, enc_key, sign_pk, sign_sk, enc_pk, enc_sk } = app_keys;
+        let client_keys = ClientKeys {
+            sign_pk: sign_pk,
+            sign_sk: sign_sk,
+            enc_pk: enc_pk,
+            enc_sk: enc_sk.clone(),
+        };
+
+        Self::new(network_observer, move |el_h, core_tx, net_tx| {
+            let client = Client::from_keys(client_keys, owner_key, el_h, core_tx, net_tx)?;
+            let context = AppContext::authorised(owner_key, enc_key, enc_pk, enc_sk);
+            Ok((client, context))
+        })
+    }
+
+    fn new<N, F>(mut network_observer: N, setup: F) -> Result<Self, AppError>
+        where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
+              F: FnOnce(Handle, CoreMsgTx<AppContext>, NetworkTx)
+                        -> Result<(Client, AppContext), AppError> + Send + 'static
     {
         let (tx, rx) = std_mpsc::sync_channel(0);
 
@@ -77,17 +109,15 @@ impl App {
 
             let core_tx_clone = core_tx.clone();
 
-            let client = try_tx!(Client::unregistered(el_h, core_tx_clone, net_tx), tx);
-            let object_cache = ObjectCache::new();
+            let (client, context) = try_tx!(setup(el_h, core_tx_clone, net_tx), tx);
             unwrap!(tx.send(Ok(core_tx)));
 
-            core::run(el, client, object_cache, core_rx);
+            core::run(el, client, context, core_rx);
         });
 
         let core_tx = rx.recv()??;
 
         Ok(App {
-            _app_type: AppType::Unregistered,
             core_tx: Mutex::new(core_tx),
             _core_joiner: joiner,
         })
@@ -95,7 +125,7 @@ impl App {
 
     /// Send a message to app's event loop
     pub fn send<F>(&self, f: F) -> Result<(), AppError>
-        where F: FnOnce(&Client, &ObjectCache) -> Option<Box<Future<Item=(), Error=()>>>
+        where F: FnOnce(&Client, &AppContext) -> Option<Box<Future<Item=(), Error=()>>>
                  + Send + 'static
     {
         let msg = CoreMsg::new(f);
@@ -121,10 +151,82 @@ impl Drop for App {
     }
 }
 
+/// Application context (data associated with the app).
+pub enum AppContext {
+    /// Context of unauthorised app.
+    Unauthorised(UnauthorisedAppContext),
+    /// Context of authorised app.
+    Authorised(AuthorisedAppContext),
+}
+
+#[allow(missing_docs)]
+pub struct UnauthorisedAppContext {
+    object_cache: ObjectCache,
+}
+
+#[allow(missing_docs)]
 #[allow(unused)] // <-- TODO: remove this
-enum AppType {
-    Unregistered,
-    FromKeys(AppAccessToken),
+pub struct AuthorisedAppContext {
+    object_cache: ObjectCache,
+    owner_key: sign::PublicKey,
+    sym_enc_key: secretbox::Key,
+    enc_pk: box_::PublicKey,
+    enc_sk: box_::SecretKey,
+}
+
+impl AppContext {
+    fn unauthorised() -> Self {
+        AppContext::Unauthorised(UnauthorisedAppContext { object_cache: ObjectCache::new() })
+    }
+
+    fn authorised(owner_key: sign::PublicKey,
+                  sym_enc_key: secretbox::Key,
+                  enc_pk: box_::PublicKey,
+                  enc_sk: box_::SecretKey)
+                  -> Self {
+        AppContext::Authorised(AuthorisedAppContext {
+            object_cache: ObjectCache::new(),
+            owner_key: owner_key,
+            sym_enc_key: sym_enc_key,
+            enc_pk: enc_pk,
+            enc_sk: enc_sk,
+        })
+    }
+
+    /// Object cache
+    pub fn object_cache(&self) -> &ObjectCache {
+        match *self {
+            AppContext::Unauthorised(ref context) => &context.object_cache,
+            AppContext::Authorised(ref context) => &context.object_cache,
+        }
+    }
+
+    /// Public signing key of the app owner.
+    pub fn owner_key(&self) -> Result<&sign::PublicKey, AppError> {
+        Ok(&self.as_authorised()?.owner_key)
+    }
+
+    /// Symmetric encryption/decryption key.
+    pub fn sym_enc_key(&self) -> Result<&secretbox::Key, AppError> {
+        Ok(&self.as_authorised()?.sym_enc_key)
+    }
+
+    /// Get public encryption key.
+    pub fn enc_pk(&self) -> Result<&box_::PublicKey, AppError> {
+        Ok(&self.as_authorised()?.enc_pk)
+    }
+
+    /// Get secret encryption key.
+    pub fn enc_sk(&self) -> Result<&box_::SecretKey, AppError> {
+        Ok(&self.as_authorised()?.enc_sk)
+    }
+
+    fn as_authorised(&self) -> Result<&AuthorisedAppContext, AppError> {
+        match *self {
+            AppContext::Authorised(ref context) => Ok(context),
+            AppContext::Unauthorised(_) => Err(AppError::Forbidden),
+        }
+    }
 }
 
 // ---------- FFI --------------------
@@ -141,14 +243,43 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
         let user_data = OpaqueCtx(user_data);
 
         let app = App::unregistered(move |event| {
-            match event {
-                Ok(event) => network_observer_cb(user_data.0, 0, event.into()),
-                Err(err) => network_observer_cb(user_data.0, ffi_error_code!(err), 0),
-            }
+            call_network_observer(event, user_data.0, network_observer_cb)
         })?;
 
         *o_app = Box::into_raw(Box::new(app));
 
         Ok(())
     })
+}
+
+/// Create app from AppKeys.
+#[no_mangle]
+pub unsafe extern "C" fn app_from_keys(app_keys: *mut FfiAppKeys,
+                                       user_data: *mut c_void,
+                                       network_observer_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                 i32,
+                                                                                 i32),
+                                       o_app: *mut *mut App)
+                                       -> i32 {
+    ffi::catch_unwind_error_code(|| -> Result<_, AppError> {
+        let user_data = OpaqueCtx(user_data);
+        let app_keys = AppKeys::from_raw(app_keys);
+
+        let app = App::from_keys(app_keys, move |event| {
+            call_network_observer(event, user_data.0, network_observer_cb)
+        })?;
+
+        *o_app = Box::into_raw(Box::new(app));
+
+        Ok(())
+    })
+}
+
+unsafe fn call_network_observer(event: Result<NetworkEvent, AppError>,
+                                user_data: *mut c_void,
+                                cb: unsafe extern "C" fn(*mut c_void, i32, i32)) {
+    match event {
+        Ok(event) => cb(user_data, 0, event.into()),
+        Err(err) => cb(user_data, ffi_error_code!(err), 0),
+    }
 }

@@ -350,8 +350,9 @@ mod tests {
         let entries = btree_map![key0.clone() => value0.clone(),
                                  key1.clone() => value1.clone()];
 
-        let handle = run_now(&app,
-                             move |_, object_cache| object_cache.insert_mdata_entries(entries));
+        let handle = run_now(&app, move |_, context| {
+            context.object_cache().insert_mdata_entries(entries)
+        });
 
         let len = unsafe { unwrap!(call_1(|ud, cb| mdata_entries_len(&app, handle, ud, cb))) };
         assert_eq!(len, 2);

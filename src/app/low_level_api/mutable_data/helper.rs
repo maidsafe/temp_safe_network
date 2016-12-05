@@ -47,8 +47,8 @@ pub unsafe fn send_sync<C, F>(app: *const App,
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*app).send(move |_, object_cache| {
-        match f(object_cache) {
+    (*app).send(move |_, context| {
+        match f(context.object_cache()) {
             Ok(args) => o_cb.call(user_data.0, 0, args),
             Err(err) => o_cb.call(user_data.0, ffi_error_code!(err), C::Args::default()),
         }
@@ -73,8 +73,8 @@ pub unsafe fn send_async<C, F, U, E>(app: *const App,
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*app).send(move |client, object_cache| {
-        f(client, object_cache)
+    (*app).send(move |client, context| {
+        f(client, context.object_cache())
             .map(move |args| cb.call(user_data.0, 0, args))
             .map_err(AppError::from)
             .map_err(move |err| cb.call(user_data.0, ffi_error_code!(err), C::Args::default()))

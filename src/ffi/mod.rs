@@ -50,7 +50,7 @@ pub mod errors;
 // pub mod file_details;
 // pub mod logging;
 // pub mod nfs;
-pub mod session;
+// pub mod session;
 // pub mod string_list;
 
 // mod config;

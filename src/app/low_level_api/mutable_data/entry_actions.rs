@@ -150,8 +150,8 @@ mod tests {
 
         let handle = unsafe { unwrap!(call_1(|ud, cb| mdata_entry_actions_new(&app, ud, cb))) };
 
-        run_now(&app, move |_, object_cache| {
-            let actions = unwrap!(object_cache.get_mdata_entry_actions(handle));
+        run_now(&app, move |_, context| {
+            let actions = unwrap!(context.object_cache().get_mdata_entry_actions(handle));
             assert!(actions.is_empty());
         });
 
@@ -200,8 +200,8 @@ mod tests {
             }));
         }
 
-        run_now(&app, move |_, object_cache| {
-            let actions = unwrap!(object_cache.get_mdata_entry_actions(handle));
+        run_now(&app, move |_, context| {
+            let actions = unwrap!(context.object_cache().get_mdata_entry_actions(handle));
             assert_eq!(actions.len(), 3);
 
             match *unwrap!(actions.get(&key0)) {
@@ -226,8 +226,8 @@ mod tests {
 
         unsafe { unwrap!(call_0(|ud, cb| mdata_entry_actions_free(&app, handle, ud, cb))) };
 
-        run_now(&app, move |_, object_cache| {
-            assert!(object_cache.get_mdata_entry_actions(handle).is_err())
+        run_now(&app, move |_, context| {
+            assert!(context.object_cache().get_mdata_entry_actions(handle).is_err())
         });
     }
 }

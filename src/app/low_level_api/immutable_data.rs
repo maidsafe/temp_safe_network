@@ -48,9 +48,9 @@ pub unsafe extern "C" fn idata_new_self_encryptor(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |client, obj_cache| {
+        (*app).send(move |client, context| {
             let se_storage = SelfEncryptionStorage::new(client.clone());
-            let obj_cache = obj_cache.clone();
+            let obj_cache = context.object_cache().clone();
 
             let fut = SequentialEncryptor::new(se_storage, None)
                 .map_err(AppError::from)
@@ -82,9 +82,9 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         let data_slice = slice::from_raw_parts(data, size);
 
-        (*app).send(move |_, obj_cache| {
+        (*app).send(move |_, context| {
             let fut = {
-                match obj_cache.get_se_writer(se_h) {
+                match context.object_cache().get_se_writer(se_h) {
                     Ok(writer) => writer.write(data_slice),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e));
@@ -115,9 +115,9 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |client, obj_cache| {
+        (*app).send(move |client, context| {
             let fut = {
-                match obj_cache.remove_se_writer(se_h) {
+                match context.object_cache().remove_se_writer(se_h) {
                     Ok(se_wrapper) => se_wrapper.close(),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e), 0);
@@ -129,7 +129,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
             let c2 = client.clone();
             let c3 = client.clone();
 
-            let obj_cache = obj_cache.clone();
+            let obj_cache = context.object_cache().clone();
 
             let fut = fut.map_err(AppError::from)
                 .and_then(move |(data_map, _)| {
@@ -185,15 +185,15 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |client, obj_cache| {
+        (*app).send(move |client, context| {
             let c2 = client.clone();
             let c3 = client.clone();
 
-            let obj_cache2 = obj_cache.clone();
-            let obj_cache3 = obj_cache.clone();
+            let obj_cache2 = context.object_cache().clone();
+            let obj_cache3 = context.object_cache().clone();
 
             let fut = {
-                match obj_cache.get_xor_name(name_h) {
+                match context.object_cache().get_xor_name(name_h) {
                     Ok(data_id) => client.get_idata(*data_id),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e), 0);
@@ -248,8 +248,8 @@ pub unsafe extern "C" fn idata_size(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, obj_cache| {
-            match obj_cache.get_se_reader(se_h) {
+        (*app).send(move |_, context| {
+            match context.object_cache().get_se_reader(se_h) {
                 Ok(se) => {
                     o_cb(user_data.0, 0, se.len());
                 }
@@ -278,8 +278,8 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, obj_cache| {
-            let se = match obj_cache.get_se_reader(se_h) {
+        (*app).send(move |_, context| {
+            let se = match context.object_cache().get_se_reader(se_h) {
                 Ok(r) => r,
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0);
@@ -324,8 +324,8 @@ pub unsafe extern "C" fn idata_self_encryptor_writer_free(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, obj_cache| {
-            let res = obj_cache.remove_se_writer(handle);
+        (*app).send(move |_, context| {
+            let res = context.object_cache().remove_se_writer(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
@@ -342,8 +342,8 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        (*app).send(move |_, obj_cache| {
-            let res = obj_cache.remove_se_reader(handle);
+        (*app).send(move |_, context| {
+            let res = context.object_cache().remove_se_reader(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
@@ -371,7 +371,7 @@ mod tests {
 
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
 
-        let (app_1_encrypt_key_handle, app_0, app_1) = test_utils::run_now(&sess, |_, obj_cache| {
+        let (app_1_encrypt_key_handle, app_0, app_1) = test_utils::run_now(&sess, |_, context| {
             let app_1_pub_encrypt_key = unwrap!(app_1.asym_enc_keys()).0;
             let encrypt_key_h = obj_cache.insert_encrypt_key(app_1_pub_encrypt_key);
             let app_0_h = obj_cache.insert_app(app_0);
