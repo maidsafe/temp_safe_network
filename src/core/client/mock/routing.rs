@@ -28,7 +28,7 @@ use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use std;
 use std::cell::Cell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
@@ -238,7 +238,9 @@ impl Routing {
             // Put normal data.
             self.authorise_mutation(&dst);
 
-            let res = {
+            let res = if let Err(err) = self.verify_owner(&dst, data.owners()) {
+                Err(err)
+            } else {
                 let mut vault = unwrap!(VAULT.lock());
 
                 if vault.contains_data(&data_name) {
@@ -522,15 +524,17 @@ impl Routing {
                               new_owner: sign::PublicKey,
                               version: u64,
                               msg_id: MessageId,
-                              requester: sign::PublicKey)
+                              _requester: sign::PublicKey)
                               -> Result<(), InterfaceError> {
+        let sign_pk = *self.full_id.public_id().signing_public_key();
+
         self.mutate_mdata(dst,
                           name,
                           tag,
                           msg_id,
                           "change_mdata_owner",
                           CHANGE_MDATA_OWNER_DELAY_MS,
-                          |data| data.change_owner(new_owner, version, requester),
+                          |data| data.change_owner(new_owner, version, sign_pk),
                           |res| {
                               Response::ChangeMDataOwner {
                                   res: res,
@@ -714,6 +718,27 @@ impl Routing {
         let mut vault = unwrap!(VAULT.lock());
         assert!(vault.increment_account_mutations_counter(dst.name()));
         vault.sync();
+    }
+
+    fn verify_owner(&self,
+                    dst: &Authority,
+                    owner_keys: &BTreeSet<sign::PublicKey>)
+                    -> Result<(), ClientError> {
+        let dst_name = match *dst {
+            Authority::ClientManager(name) => name,
+            _ => return Err(ClientError::InvalidOwners),
+        };
+
+        let ok = owner_keys.iter().any(|owner_key| {
+            let owner_name = XorName(sha256::hash(&owner_key.0).0);
+            owner_name == dst_name
+        });
+
+        if ok {
+            Ok(())
+        } else {
+            Err(ClientError::InvalidOwners)
+        }
     }
 
     #[cfg(test)]

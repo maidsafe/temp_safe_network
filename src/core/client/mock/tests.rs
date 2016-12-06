@@ -589,6 +589,75 @@ fn mutable_data_permissions() {
 
 }
 
+#[test]
+fn mutable_data_ownership() {
+    // Create owner's routing client
+    let (owner_routing, owner_routing_rx, owner_full_id) = setup();
+
+    let owner_key = *owner_full_id.public_id().signing_public_key();
+    let client_mgr = create_account(&owner_routing, &owner_routing_rx, owner_key);
+
+    // Create app's routing client and authorise the app.
+    let (app_routing, app_routing_rx, app_full_id) = setup();
+    let app_sign_key = *app_full_id.public_id().signing_public_key();
+
+    let msg_id = MessageId::new();
+    unwrap!(owner_routing.ins_auth_key(client_mgr, app_sign_key, 1, msg_id));
+    expect_success!(owner_routing_rx, msg_id, Response::InsAuthKey);
+
+    // Attempt to put MutableData using the app sign key as owner key should fail.
+    let name = rand::random();
+    let tag = 1000u64;
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        Default::default(),
+                                        btree_set![app_sign_key]));
+
+    let msg_id = MessageId::new();
+    unwrap!(app_routing.put_mdata(client_mgr, data, msg_id, app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::PutMData,
+                    ClientError::InvalidOwners);
+
+    // Putting it with correct owner succeeds.
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        Default::default(),
+                                        btree_set![owner_key]));
+
+    let msg_id = MessageId::new();
+    unwrap!(owner_routing.put_mdata(client_mgr, data, msg_id, owner_key));
+    expect_success!(owner_routing_rx, msg_id, Response::PutMData);
+
+    // Attempt to change owner by app should fail.
+    let msg_id = MessageId::new();
+    unwrap!(app_routing.change_mdata_owner(client_mgr,
+                                           name,
+                                           tag,
+                                           app_sign_key,
+                                           1,
+                                           msg_id,
+                                           app_sign_key));
+    expect_failure!(app_routing_rx,
+                    msg_id,
+                    Response::ChangeMDataOwner,
+                    ClientError::AccessDenied);
+
+    // Chaning the owner by owner should succeed.
+    let msg_id = MessageId::new();
+    unwrap!(owner_routing.change_mdata_owner(client_mgr,
+                                           name,
+                                           tag,
+                                           app_sign_key,
+                                           1,
+                                           msg_id,
+                                           owner_key));
+    expect_success!(owner_routing_rx, msg_id, Response::ChangeMDataOwner);
+}
+
 fn setup() -> (Routing, Receiver<Event>, FullId) {
     let full_id = FullId::new();
     let (routing_tx, routing_rx) = mpsc::channel();
