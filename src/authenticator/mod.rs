@@ -24,11 +24,11 @@
 /// Authenticator errors
 mod errors;
 
-pub use self::errors::AuthError;
 use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
 use futures::stream::Stream;
 use futures::sync::mpsc;
 use maidsafe_utilities::thread::{self, Joiner};
+pub use self::errors::AuthError;
 use std::os::raw::c_void;
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;

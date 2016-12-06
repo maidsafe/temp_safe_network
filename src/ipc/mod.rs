@@ -309,22 +309,21 @@ pub struct ContainersReq;
 pub struct ContainersGranted;
 
 fn encode_result<E, T, T2>(s: &mut E, res: &Result<T, T2>) -> Result<(), E::Error>
-    where E: Encoder, T: Encodable, T2: Encodable {
+    where E: Encoder,
+          T: Encodable,
+          T2: Encodable
+{
     s.emit_enum("Result", |s| {
         match *res {
             Ok(ref v) => {
                 s.emit_enum_variant("Ok", 0, 1, |s| {
-                    try!(s.emit_enum_variant_arg(0, |s| {
-                        v.encode(s)
-                    }));
+                    s.emit_enum_variant_arg(0, |s| v.encode(s))?;
                     Ok(())
                 })
             }
             Err(ref v) => {
                 s.emit_enum_variant("Err", 1, 1, |s| {
-                    try!(s.emit_enum_variant_arg(0, |s| {
-                        v.encode(s)
-                    }));
+                    s.emit_enum_variant_arg(0, |s| v.encode(s))?;
                     Ok(())
                 })
             }
@@ -333,19 +332,20 @@ fn encode_result<E, T, T2>(s: &mut E, res: &Result<T, T2>) -> Result<(), E::Erro
 }
 
 fn decode_result<D, T, T2>(d: &mut D) -> Result<Result<T, T2>, D::Error>
-    where D: Decoder, T: Decodable, T2: Decodable {
+    where D: Decoder,
+          T: Decodable,
+          T2: Decodable
+{
     d.read_enum("Result", |d| {
         d.read_enum_variant(&["Ok", "Err"], |d, idx| {
             match idx {
                 0 => {
-                    d.read_enum_variant_arg(0, |d| {
-                        T::decode(d)
-                    }).map(|v| Ok(v))
+                    d.read_enum_variant_arg(0, |d| T::decode(d))
+                        .map(|v| Ok(v))
                 }
                 1 => {
-                    d.read_enum_variant_arg(0, |d| {
-                        T2::decode(d)
-                    }).map(|v| Err(v))
+                    d.read_enum_variant_arg(0, |d| T2::decode(d))
+                        .map(|v| Err(v))
                 }
                 _ => panic!("Internal error"),
             }
@@ -363,19 +363,19 @@ pub enum IpcMsg {
         /// TODO: doc
         req_id: u32,
         /// TODO: doc
-        req: IpcReq
+        req: IpcReq,
     },
     /// TODO: doc
     Resp {
         /// TODO: doc
         req_id: u32,
         /// TODO: doc
-        resp: IpcResp
+        resp: IpcResp,
     },
     /// TODO: doc
     Revoked {
         /// TODO: doc
-        app_id: String
+        app_id: String,
     },
     /// Generic error like couldn't parse IpcMsg etc.
     Err(IpcError),
@@ -383,22 +383,22 @@ pub enum IpcMsg {
 
 #[derive(RustcEncodable, RustcDecodable, Debug)]
 /// TODO: doc
+// TODO: `TransOwnership` variant
 pub enum IpcReq {
     /// TODO: doc
     Auth(AuthReq),
     /// TODO: doc
     Containers(ContainersReq),
-    // TransOwnership, //  ----- Keep this commented and write for future use
 }
 
 #[derive(Debug)]
 /// TODO: doc
+// TODO: `TransOwnership` variant
 pub enum IpcResp {
     /// TODO: doc
     Auth(Result<AuthGranted, IpcError>),
     /// TODO: doc
     Containers(Result<ContainersGranted, IpcError>),
-    // TransOwnership ----- Keep this commented and write for future use
 }
 
 impl Encodable for IpcResp {
@@ -407,17 +407,13 @@ impl Encodable for IpcResp {
             match *self {
                 IpcResp::Auth(ref v) => {
                     s.emit_enum_variant("Auth", 0, 1, |s| {
-                        try!(s.emit_enum_variant_arg(0, |s| {
-                            encode_result(s, v)
-                        }));
+                        s.emit_enum_variant_arg(0, |s| encode_result(s, v))?;
                         Ok(())
                     })
                 }
                 IpcResp::Containers(ref v) => {
                     s.emit_enum_variant("Err", 1, 1, |s| {
-                        try!(s.emit_enum_variant_arg(0, |s| {
-                            encode_result(s, v)
-                        }));
+                        s.emit_enum_variant_arg(0, |s| encode_result(s, v))?;
                         Ok(())
                     })
                 }
@@ -432,15 +428,13 @@ impl Decodable for IpcResp {
             d.read_enum_variant(&["Auth", "Containers"], |d, idx| {
                 match idx {
                     0 => {
-                        d.read_enum_variant_arg(0, |d| {
-                            decode_result(d)
-                        }).map(|v| IpcResp::Auth(v))
-                    },
+                        d.read_enum_variant_arg(0, |d| decode_result(d))
+                            .map(|v| IpcResp::Auth(v))
+                    }
                     1 => {
-                        d.read_enum_variant_arg(0, |d| {
-                            decode_result(d)
-                        }).map(|v| IpcResp::Containers(v))
-                    },
+                        d.read_enum_variant_arg(0, |d| decode_result(d))
+                            .map(|v| IpcResp::Containers(v))
+                    }
                     _ => panic!("Internal error"),
                 }
             })

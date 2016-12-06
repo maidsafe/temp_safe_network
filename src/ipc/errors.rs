@@ -25,5 +25,5 @@ pub enum IpcError {
     /// TODO: doc
     AuthDenied,
     /// TODO: doc
-    ContainersDenied
+    ContainersDenied,
 }
