@@ -21,6 +21,7 @@
 
 use routing::XorName;
 use rust_sodium::crypto::{box_, secretbox, sign};
+use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::mem;
 
 /// Ffi module
@@ -35,9 +36,11 @@ use self::ffi::PermissionAccess;
 
 // TODO: replace with `crust::Config`
 /// Placeholder for `crust::Config`
+#[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct Config;
 
 /// Represents the set of permissions for a given container
+#[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct ContainerPermission {
     /// The id
     pub container_key: String,
@@ -92,6 +95,7 @@ impl ContainerPermission {
 }
 
 /// Represents an application ID in the process of asking permissions
+#[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct AppExchangeInfo {
     /// The ID. It must be unique.
     pub id: String,
@@ -176,6 +180,7 @@ impl AppExchangeInfo {
 }
 
 /// Represents an authorization request
+#[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct AuthReq {
     /// The application identifier for this request
     pub app: AppExchangeInfo,
@@ -234,6 +239,7 @@ impl AuthReq {
 }
 
 /// Represents the needed keys to work with the data
+#[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct AppAccessToken {
     /// Data symmetric encryption key
     pub enc_key: secretbox::Key,
@@ -282,6 +288,7 @@ impl AppAccessToken {
 }
 
 /// It represents the authentication response.
+#[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct AuthGranted {
     /// The access keys.
     pub access_token: AppAccessToken,
@@ -294,10 +301,152 @@ pub struct AuthGranted {
 }
 
 /// TODO: doc
+#[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct ContainersReq;
 
 /// TODO: doc
+#[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct ContainersGranted;
+
+fn encode_result<E, T, T2>(s: &mut E, res: &Result<T, T2>) -> Result<(), E::Error>
+    where E: Encoder, T: Encodable, T2: Encodable {
+    s.emit_enum("Result", |s| {
+        match *res {
+            Ok(ref v) => {
+                s.emit_enum_variant("Ok", 0, 1, |s| {
+                    try!(s.emit_enum_variant_arg(0, |s| {
+                        v.encode(s)
+                    }));
+                    Ok(())
+                })
+            }
+            Err(ref v) => {
+                s.emit_enum_variant("Err", 1, 1, |s| {
+                    try!(s.emit_enum_variant_arg(0, |s| {
+                        v.encode(s)
+                    }));
+                    Ok(())
+                })
+            }
+        }
+    })
+}
+
+fn decode_result<D, T, T2>(d: &mut D) -> Result<Result<T, T2>, D::Error>
+    where D: Decoder, T: Decodable, T2: Decodable {
+    d.read_enum("Result", |d| {
+        d.read_enum_variant(&["Ok", "Err"], |d, idx| {
+            match idx {
+                0 => {
+                    d.read_enum_variant_arg(0, |d| {
+                        T::decode(d)
+                    }).map(|v| Ok(v))
+                }
+                1 => {
+                    d.read_enum_variant_arg(0, |d| {
+                        T2::decode(d)
+                    }).map(|v| Err(v))
+                }
+                _ => panic!("Internal error"),
+            }
+        })
+    })
+}
+
+#[derive(RustcEncodable, RustcDecodable, Debug)]
+/// TODO: doc
+pub enum IpcMsg {
+    /// TODO: doc
+    Req {
+        /// TODO: doc
+        app_id: String,
+        /// TODO: doc
+        req_id: u32,
+        /// TODO: doc
+        req: IpcReq
+    },
+    /// TODO: doc
+    Resp {
+        /// TODO: doc
+        req_id: u32,
+        /// TODO: doc
+        resp: IpcResp
+    },
+    /// TODO: doc
+    Revoked {
+        /// TODO: doc
+        app_id: String
+    },
+    /// Generic error like couldn't parse IpcMsg etc.
+    Err(IpcError),
+}
+
+#[derive(RustcEncodable, RustcDecodable, Debug)]
+/// TODO: doc
+pub enum IpcReq {
+    /// TODO: doc
+    Auth(AuthReq),
+    /// TODO: doc
+    Containers(ContainersReq),
+    // TransOwnership, //  ----- Keep this commented and write for future use
+}
+
+#[derive(Debug)]
+/// TODO: doc
+pub enum IpcResp {
+    /// TODO: doc
+    Auth(Result<AuthGranted, IpcError>),
+    /// TODO: doc
+    Containers(Result<ContainersGranted, IpcError>),
+    // TransOwnership ----- Keep this commented and write for future use
+}
+
+impl Encodable for IpcResp {
+    fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
+        s.emit_enum("IpcResp", |s| {
+            match *self {
+                IpcResp::Auth(ref v) => {
+                    s.emit_enum_variant("Auth", 0, 1, |s| {
+                        try!(s.emit_enum_variant_arg(0, |s| {
+                            encode_result(s, v)
+                        }));
+                        Ok(())
+                    })
+                }
+                IpcResp::Containers(ref v) => {
+                    s.emit_enum_variant("Err", 1, 1, |s| {
+                        try!(s.emit_enum_variant_arg(0, |s| {
+                            encode_result(s, v)
+                        }));
+                        Ok(())
+                    })
+                }
+            }
+        })
+    }
+}
+
+impl Decodable for IpcResp {
+    fn decode<D: Decoder>(d: &mut D) -> Result<IpcResp, D::Error> {
+        d.read_enum("IpcResp", |d| {
+            d.read_enum_variant(&["Auth", "Containers"], |d, idx| {
+                match idx {
+                    0 => {
+                        d.read_enum_variant_arg(0, |d| {
+                            decode_result(d)
+                        }).map(|v| IpcResp::Auth(v))
+                    },
+                    1 => {
+                        d.read_enum_variant_arg(0, |d| {
+                            decode_result(d)
+                        }).map(|v| IpcResp::Containers(v))
+                    },
+                    _ => panic!("Internal error"),
+                }
+            })
+        })
+    }
+}
 
 #[cfg(test)]
 #[allow(unsafe_code)]
