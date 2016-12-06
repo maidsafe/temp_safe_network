@@ -277,20 +277,15 @@ impl AppAccessToken {
 }
 
 /// It represents the authentication response.
-pub enum AuthResponse {
-    /// If permission is granted.
-    Granted {
-        /// The access keys.
-        access_token: AppAccessToken,
-        /// The crust config.
-        ///
-        /// Useful to reuse bootstrap nodes and speed up access.
-        bootstrap_config: Config,
-        /// TODO: doc
-        access_container: Option<(XorName, u64, secretbox::Nonce)>,
-    },
-    /// If permissions is rejected.
-    Denied,
+pub struct AuthGranted {
+    /// The access keys.
+    pub access_token: AppAccessToken,
+    /// The crust config.
+    ///
+    /// Useful to reuse bootstrap nodes and speed up access.
+    pub bootstrap_config: Config,
+    /// TODO: doc
+    pub access_container: Option<(XorName, u64, secretbox::Nonce)>,
 }
 
 #[cfg(test)]
