@@ -69,19 +69,27 @@ pub fn run<T>(routing_rx: Receiver<Event>, mut core_tx: CoreMsgTx<T>, mut net_tx
 
 fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
     Ok(match res {
-        Response::GetIData { res, msg_id } => {
-            (msg_id, CoreEvent::GetIData(res.map_err(CoreError::from)))
-        }
         Response::ChangeMDataOwner { res, msg_id } |
         Response::DelMDataUserPermissions { res, msg_id } |
         Response::SetMDataUserPermissions { res, msg_id } |
         Response::MutateMDataEntries { res, msg_id } |
         Response::PutMData { res, msg_id } |
-        Response::PutIData { res, msg_id } => {
+        Response::PutIData { res, msg_id } |
+        Response::InsAuthKey { res, msg_id } |
+        Response::DelAuthKey { res, msg_id } => {
             (msg_id, CoreEvent::Mutation(res.map_err(CoreError::from)))
+        }
+        Response::GetAccountInfo { res, msg_id } => {
+            (msg_id, CoreEvent::GetAccountInfo(res.map_err(CoreError::from)))
+        }
+        Response::GetIData { res, msg_id } => {
+            (msg_id, CoreEvent::GetIData(res.map_err(CoreError::from)))
         }
         Response::GetMDataValue { res, msg_id } => {
             (msg_id, CoreEvent::GetMDataValue(res.map_err(CoreError::from)))
+        }
+        Response::GetMDataVersion { res, msg_id } => {
+            (msg_id, CoreEvent::GetMDataVersion(res.map_err(CoreError::from)))
         }
         Response::ListMDataEntries { res, msg_id } => {
             (msg_id, CoreEvent::ListMDataEntries(res.map_err(CoreError::from)))
@@ -101,7 +109,6 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
         Response::ListAuthKeysAndVersion { res, msg_id } => {
             (msg_id, CoreEvent::ListAuthKeysAndVersion(res.map_err(CoreError::from)))
         }
-        _ => return Err(CoreError::Unexpected("Invalid response type".to_owned())),
     })
 }
 

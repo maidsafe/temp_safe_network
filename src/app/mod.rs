@@ -257,7 +257,7 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
     })
 }
 
-/// Create app from AppKeys.
+/// Create app from `AppKeys`.
 #[no_mangle]
 pub unsafe extern "C" fn app_from_keys(app_keys: *mut FfiAppKeys,
                                        user_data: *mut c_void,

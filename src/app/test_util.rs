@@ -21,13 +21,36 @@
 
 use auth::AppKeys;
 use core::Client;
+use core::utility::test_utils::random_client;
 use rust_sodium::crypto::{box_, secretbox, sign};
 use std::sync::mpsc;
 use super::{App, AppContext};
 
 // Create registered app.
 pub fn create_app() -> App {
-    let app_keys = gen_app_keys();
+    let enc_key = secretbox::gen_key();
+    let (sign_pk, sign_sk) = sign::gen_keypair();
+    let (enc_pk, enc_sk) = box_::gen_keypair();
+
+    // Create account and authorize the app key.
+    let (tx, rx) = mpsc::channel();
+    random_client(move |client| {
+        let owner_key = unwrap!(client.public_signing_key());
+        unwrap!(tx.send(owner_key));
+
+        client.ins_auth_key(sign_pk, 1)
+    });
+    let owner_key = unwrap!(rx.recv());
+
+    let app_keys = AppKeys {
+        owner_key: owner_key,
+        enc_key: enc_key,
+        sign_pk: sign_pk,
+        sign_sk: sign_sk,
+        enc_pk: enc_pk,
+        enc_sk: enc_sk,
+    };
+
     unwrap!(App::from_keys(app_keys, |_network_event| ()))
 }
 
@@ -81,20 +104,3 @@ pub fn run<F, I, R, E>(app: &App, f: F) -> R
 }
 
 */
-
-// Generate random `AppKeys`.
-fn gen_app_keys() -> AppKeys {
-    let owner_key = sign::gen_keypair().0;
-    let enc_key = secretbox::gen_key();
-    let (sign_pk, sign_sk) = sign::gen_keypair();
-    let (enc_pk, enc_sk) = box_::gen_keypair();
-
-    AppKeys {
-        owner_key: owner_key,
-        enc_key: enc_key,
-        sign_pk: sign_pk,
-        sign_sk: sign_sk,
-        enc_pk: enc_pk,
-        enc_sk: enc_sk,
-    }
-}

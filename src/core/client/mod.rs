@@ -298,7 +298,7 @@ impl Client {
     {
         trace!("Attempting to log into an acc using client keys.");
 
-        let Digest(digest) = sha256::hash(&keys.sign_pk.0);
+        let Digest(digest) = sha256::hash(&owner.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         trace!("Creating an actual routing...");
@@ -510,13 +510,13 @@ impl Client {
     pub fn get_account_info(&self) -> Box<CoreFuture<AccountInfo>> {
         trace!("Account info GET issued.");
 
-        let (hook, rx, msg_id) = oneshot!(self, CoreEvent::AccountInfo);
+        let (hook, rx, msg_id) = oneshot!(self, CoreEvent::GetAccountInfo);
 
         let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
         let result = self.routing_mut().get_account_info(dst, msg_id);
 
         if let Err(e) = result {
-            hook.complete(CoreEvent::AccountInfo(Err(From::from(e))));
+            hook.complete(CoreEvent::GetAccountInfo(Err(From::from(e))));
         } else {
             self.insert_hook(msg_id, hook);
         }

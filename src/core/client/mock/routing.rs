@@ -52,6 +52,8 @@ const GET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const SET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const CHANGE_MDATA_OWNER_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 
+const INS_AUTH_KEY_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+
 lazy_static! {
     static ref VAULT: Mutex<Vault> = Mutex::new(Vault::new());
 }
@@ -547,12 +549,41 @@ impl Routing {
 
     /// Adds a new authorised key to MaidManager
     pub fn ins_auth_key(&self,
-                        _dst: Authority,
-                        _key: sign::PublicKey,
+                        dst: Authority,
+                        key: sign::PublicKey,
                         _version: u64,
-                        _message_id: MessageId)
+                        msg_id: MessageId)
                         -> Result<(), InterfaceError> {
-        unimplemented!();
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
+        let res = if let Err(err) = self.verify_network_limits(msg_id, "ins_auth_key") {
+            Err(err)
+        } else {
+            let name = match dst {
+                Authority::ClientManager(name) => name,
+                x => panic!("Unexpected authority: {:?}", x),
+            };
+
+            let mut vault = unwrap!(VAULT.lock());
+            if vault.ins_account_auth_key(&name, key) {
+                vault.sync();
+                Ok(())
+            } else {
+                // TODO: is this the right error to return here?
+                Err(ClientError::NoSuchAccount)
+            }
+        };
+
+        self.send_response(INS_AUTH_KEY_DELAY_MS,
+                           dst,
+                           self.client_auth,
+                           Response::InsAuthKey {
+                               res: res,
+                               msg_id: msg_id,
+                           });
+        Ok(())
     }
 
     /// Removes an authorised key from MaidManager

@@ -60,7 +60,7 @@ impl CipherOpt {
             CipherOpt::Symmetric => {
                 let sym_key = app.sym_enc_key()?;
                 let nonce = secretbox::gen_nonce();
-                let cipher_text = secretbox::seal(plain_text, &nonce, &sym_key);
+                let cipher_text = secretbox::seal(plain_text, &nonce, sym_key);
                 let wire_format = WireFormat::Symmetric {
                     nonce: nonce,
                     cipher_text: cipher_text,
@@ -85,7 +85,7 @@ impl CipherOpt {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {
                 let sym_key = app.sym_enc_key()?;
-                Ok(secretbox::open(&cipher_text, &nonce, &sym_key)
+                Ok(secretbox::open(&cipher_text, &nonce, sym_key)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)?)
             }
             WireFormat::Asymmetric(cipher_text) => {

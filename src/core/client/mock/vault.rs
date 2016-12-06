@@ -64,6 +64,15 @@ impl Vault {
         }
     }
 
+    pub fn ins_account_auth_key(&mut self, name: &XorName, key: sign::PublicKey) -> bool {
+        if let Some(account) = self.client_manager.get_mut(name) {
+            account.ins_auth_key(key);
+            true
+        } else {
+            false
+        }
+    }
+
     // Authorise read (non-mutation) operation.
     pub fn authorise_read(&self, dst: &Authority, data_name: &XorName) -> bool {
         match *dst {
@@ -77,7 +86,7 @@ impl Vault {
         let dst_name = match *dst {
             Authority::ClientManager(name) => name,
             x => {
-                error!("Unexpected authority for mutation: {:?}", x);
+                println!("Unexpected authority for mutation: {:?}", x);
                 return false;
             }
         };
@@ -85,7 +94,7 @@ impl Vault {
         let account = match self.get_account(&dst_name) {
             Some(account) => account,
             None => {
-                error!("Account not found for {:?}", dst);
+                println!("Account not found for {:?}", dst);
                 return false;
             }
         };
@@ -95,7 +104,7 @@ impl Vault {
         if owner_name == dst_name || account.auth_keys.contains(sign_pk) {
             true
         } else {
-            error!("Mutation not authorised");
+            println!("Mutation not authorised");
             false
         }
     }
@@ -146,6 +155,10 @@ impl Account {
 
     pub fn account_info(&self) -> &AccountInfo {
         &self.account_info
+    }
+
+    pub fn ins_auth_key(&mut self, key: sign::PublicKey) {
+        let _ = self.auth_keys.insert(key);
     }
 }
 

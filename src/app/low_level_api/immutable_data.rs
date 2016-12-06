@@ -340,7 +340,6 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    /*
     use app::errors::AppError;
     use app::low_level_api::cipher_opt::*;
     use app::low_level_api::xor_name::*;
@@ -348,14 +347,12 @@ mod tests {
     use core::utility;
     use super::*;
     use util::ffi::test_util::{call_0, call_1, call_3};
-    */
 
     #[test]
     fn immut_data_operations() {
         // TODO: uncomment and fix these tests. We need to create account
         // and authorize the app to be able to perform mutations.
 
-        /*
         let app = create_app();
 
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
@@ -427,6 +424,5 @@ mod tests {
 
             unwrap!(call_0(|ud, cb| xor_name_free(&app, name_h, ud, cb)));
         }
-        */
     }
 }
