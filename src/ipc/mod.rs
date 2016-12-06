@@ -36,7 +36,7 @@ use self::ffi::PermissionAccess;
 
 // TODO: replace with `crust::Config`
 /// Placeholder for `crust::Config`
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub struct Config;
 
 /// Represents the set of permissions for a given container
@@ -239,7 +239,7 @@ impl AuthReq {
 }
 
 /// Represents the needed keys to work with the data
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub struct AppAccessToken {
     /// Data symmetric encryption key
     pub enc_key: secretbox::Key,
@@ -288,7 +288,7 @@ impl AppAccessToken {
 }
 
 /// It represents the authentication response.
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(RustcEncodable, RustcDecodable, Debug, PartialEq, Eq)]
 pub struct AuthGranted {
     /// The access keys.
     pub access_token: AppAccessToken,
@@ -305,7 +305,7 @@ pub struct AuthGranted {
 pub struct ContainersReq;
 
 /// Containers response
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub struct ContainersGranted;
 
 fn encode_result<E, T, T2>(s: &mut E, res: &Result<T, T2>) -> Result<(), E::Error>
@@ -391,7 +391,7 @@ pub enum IpcReq {
     Containers(ContainersReq),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 /// IPC response
 // TODO: `TransOwnership` variant
 pub enum IpcResp {
@@ -445,6 +445,7 @@ impl Decodable for IpcResp {
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
 
     use super::*;
 
@@ -553,5 +554,15 @@ mod tests {
         assert_eq!(a.containers.len(), 0);
 
         unsafe { ffi::auth_request_drop(a.into_ffi()) };
+    }
+
+    #[test]
+    fn ipc_resp_serialisation() {
+        let value = IpcResp::Auth(Err(IpcError::ContainersDenied));
+        let wrapped_value = unwrap!(serialise(&value));
+        assert_eq!(wrapped_value, vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1]);
+        let decoded_value: IpcResp = unwrap!(deserialise(&wrapped_value));
+        assert_eq!(decoded_value,
+                   IpcResp::Auth(Err(IpcError::ContainersDenied)));
     }
 }
