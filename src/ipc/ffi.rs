@@ -22,7 +22,7 @@
 use rust_sodium::crypto::{box_, secretbox, sign};
 
 #[repr(C)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 /// The permission type
 pub enum PermissionAccess {
     /// Read
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn app_exchange_info_free(a: *mut AppExchangeInfo) {
 
 #[repr(C)]
 /// Represents an authorization request
-pub struct AuthRequest {
+pub struct AuthReq {
     /// The application identifier for this request
     pub app: *mut AppExchangeInfo,
     /// `true` if the app wants dedicated container for itself. `false`
@@ -127,8 +127,8 @@ pub struct AuthRequest {
 /// Free memory from the subobjects
 #[no_mangle]
 #[allow(unsafe_code)]
-pub unsafe extern "C" fn auth_request_drop(a: AuthRequest) {
-    let _ = super::AuthRequest::from_ffi(a);
+pub unsafe extern "C" fn auth_request_drop(a: AuthReq) {
+    let _ = super::AuthReq::from_ffi(a);
 }
 
 #[repr(C)]
@@ -154,3 +154,9 @@ pub struct AppAccessToken {
 pub unsafe extern "C" fn app_access_token_free(a: *mut AppAccessToken) {
     let _ = super::AppAccessToken::from_raw(a);
 }
+
+/// Containers request
+pub struct ContainersReq;
+
+/// Containers response
+pub struct ContainersGranted;
