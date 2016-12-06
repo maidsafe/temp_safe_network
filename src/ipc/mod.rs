@@ -171,7 +171,7 @@ impl AppExchangeInfo {
 }
 
 /// Represents an authorization request
-pub struct AuthRequest {
+pub struct AuthReq {
     /// The application identifier for this request
     pub app: AppExchangeInfo,
     /// `true` if the app wants dedicated container for itself. `false`
@@ -181,13 +181,13 @@ pub struct AuthRequest {
     pub containers: Vec<ContainerPermission>,
 }
 
-impl AuthRequest {
+impl AuthReq {
     /// Consumes the object and returns the FFI counterpart.
     ///
     /// You're now responsible for freeing the subobjects memory once you're
     /// done.
-    pub fn into_ffi(self) -> ffi::AuthRequest {
-        let AuthRequest { app, app_container, containers } = self;
+    pub fn into_ffi(self) -> ffi::AuthReq {
+        let AuthReq { app, app_container, containers } = self;
 
         let mut containers: Vec<_> = containers.into_iter()
             .map(|c| c.into_raw())
@@ -199,7 +199,7 @@ impl AuthRequest {
 
         mem::forget(containers);
 
-        ffi::AuthRequest {
+        ffi::AuthReq {
             app: app.into_raw(),
             app_container: app_container,
             containers: c_ptr,
@@ -213,14 +213,14 @@ impl AuthRequest {
     /// After calling this function, the subobjects memory is owned by the
     /// resulting object.
     #[allow(unsafe_code)]
-    pub unsafe fn from_ffi(raw: ffi::AuthRequest) -> Self {
+    pub unsafe fn from_ffi(raw: ffi::AuthReq) -> Self {
         let app = AppExchangeInfo::from_raw(raw.app);
         let containers =
             Vec::from_raw_parts(raw.containers, raw.containers_len, raw.containers_cap)
                 .into_iter()
                 .map(|c| ContainerPermission::from_raw(c))
                 .collect();
-        AuthRequest {
+        AuthReq {
             app: app,
             app_container: raw.app_container,
             containers: containers,
@@ -383,7 +383,7 @@ mod tests {
             vendor: "4".to_string(),
         };
 
-        let a = AuthRequest {
+        let a = AuthReq {
             app: app,
             app_container: false,
             containers: vec![],
@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(ffi.app_container, false);
         assert_eq!(ffi.containers_len, 0);
 
-        let a = unsafe { AuthRequest::from_ffi(ffi) };
+        let a = unsafe { AuthReq::from_ffi(ffi) };
 
         assert_eq!(a.app.id, "1");
         assert_eq!(a.app.scope, Some("2".to_string()));
