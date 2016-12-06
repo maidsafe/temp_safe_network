@@ -21,7 +21,10 @@
 
 #![allow(unsafe_code)]
 
-use auth::AuthError;
+/// Authenticator errors
+mod errors;
+
+pub use self::errors::AuthError;
 use core::{self, Client, CoreMsg, CoreMsgTx, NetworkEvent};
 use futures::stream::Stream;
 use futures::sync::mpsc;

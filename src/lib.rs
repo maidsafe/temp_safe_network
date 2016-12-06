@@ -79,6 +79,8 @@ pub mod nfs;
 pub mod ffi;
 /// Auth module;
 pub mod auth;
+/// Authenticator module;
+pub mod authenticator;
 /// Utility functions;
 pub mod util;
 // /// Application functions;
