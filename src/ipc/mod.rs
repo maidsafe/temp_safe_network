@@ -26,6 +26,11 @@ use std::mem;
 /// Ffi module
 pub mod ffi;
 
+/// Errors module
+mod errors;
+
+pub use self::errors::IpcError;
+
 use self::ffi::PermissionAccess;
 
 // TODO: replace with `crust::Config`
