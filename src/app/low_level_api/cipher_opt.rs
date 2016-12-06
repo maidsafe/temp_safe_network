@@ -188,15 +188,7 @@ mod tests {
     use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
-    use util::ffi::test_util::call_0;
-
-    fn decrypt_and_check(context: &AppContext, raw_data: &[u8], orig_plain_text: &[u8]) -> bool {
-        let plain_text_rx = match CipherOpt::decrypt(context, raw_data) {
-            Ok(pt) => pt,
-            Err(_) => return false,
-        };
-        orig_plain_text == &plain_text_rx[..]
-    }
+    use util::ffi::test_util::{call_0, call_1};
 
     #[test]
     fn app_0_to_app_0_plain() {
@@ -254,42 +246,49 @@ mod tests {
 
     #[test]
     fn app_0_to_app_1_asym() {
-        /* TODO: uncomment and fix
-
         // Setup
         let app_0 = create_app();
         let app_1 = create_app();
 
-        let app_1_enc_pk = run_now(&app_1, move |_, context| *unwrap!(context.enc_pk()));
+        // Get encryption public key of App 1.
+        let enc_pk = run_now(&app_1, move |_, context| *unwrap!(context.enc_pk()));
 
-        let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
-        let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
+        // Insert it into App 0's object cache.
+        let enc_pk_h = run_now(&app_0, move |_, context| {
+            context.object_cache().insert_encrypt_key(enc_pk)
+        });
 
-        // Test
-        // At app-0 end
+        // Create asymmetric cypher opt on App 0's end.
+        let cipher_opt_h = unsafe {
+            unwrap!(call_1(|ud, cb| cipher_opt_new_asymmetric(&app_0, enc_pk_h, ud, cb)))
+        };
+
+        // Encrypt the plaintext on App 0's end.
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
-        let cipher_opt_handle: CipherOptHandle;
-        unsafe {
-            cipher_opt_new_asymmetric(&app_1, app_1_encrypt_key_handle, tx, handle_cb);
-            cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
-        }
-
-        let (app_0, plain_text, cipher_text) = test_utils::run_now(&sess, move |_, context| {
-            let cipher_opt = unwrap!(obj_cache.get_cipher_opt(cipher_opt_handle));
-            let cipher_text = unwrap!(cipher_opt.encrypt(&app_0, &plain_text));
-            (app_0, plain_text, cipher_text)
+        let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
+            let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_h));
+            let cipher_text = unwrap!(cipher_opt.encrypt(context, &plain_text));
+            (plain_text, cipher_text)
         });
-        assert_free(&sess, cipher_opt_handle, 0);
 
-        test_utils::run_now(&sess, move |_, context| {
-            assert!(obj_cache.get_cipher_opt(cipher_opt_handle).is_err());
-        });
         assert!(cipher_text != plain_text);
+        assert_free(&app_0, cipher_opt_h, 0);
 
-        assert!(!decrypt_and_check(&app_0, &cipher_text, &plain_text));
-        assert!(decrypt_and_check(&app_1, &cipher_text, &plain_text));
+        run_now(&app_0, move |_, context| {
+            assert!(context.object_cache().get_cipher_opt(cipher_opt_h).is_err());
+        });
 
-        */
+        // App 0 cannot decrypt the ciphertext, because it was encrypted with
+        // App 1's public key.
+        let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
+            assert!(!decrypt_and_check(context, &cipher_text, &plain_text));
+            (plain_text, cipher_text)
+        });
+
+        // App 1 can decrypt it.
+        run_now(&app_1, move |_, context| {
+            assert!(decrypt_and_check(context, &cipher_text, &plain_text));
+        })
     }
 
     #[test]
@@ -347,6 +346,15 @@ mod tests {
             assert!(obj_cache.get_cipher_opt(cipher_opt_handle_sym).is_err());
             assert!(obj_cache.get_cipher_opt(cipher_opt_handle_asym).is_err());
         })
+    }
+
+    fn decrypt_and_check(context: &AppContext, cipher_text: &[u8], orig_plain_text: &[u8]) -> bool {
+        let plain_text = match CipherOpt::decrypt(context, cipher_text) {
+            Ok(text) => text,
+            Err(_) => return false,
+        };
+
+        orig_plain_text == &plain_text[..]
     }
 
     fn assert_free(app_ptr: *const App, cipher_opt_handle: CipherOptHandle, expected: i32) {

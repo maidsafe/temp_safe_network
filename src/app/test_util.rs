@@ -54,22 +54,21 @@ pub fn run_now<F, R>(app: &App, f: F) -> R
     unwrap!(rx.recv())
 }
 
-
 /*
 
-// Run the given closure inside the session event loop. The closure should
+// Run the given closure inside the app event loop. The closure should
 // return a future which will then be driven to completion and its result
 // returned.
-pub fn run<F, I, R, E>(session: &Session, f: F) -> R
-    where F: FnOnce(&Client, &ObjectCache) -> I + Send + 'static,
+pub fn run<F, I, R, E>(app: &App, f: F) -> R
+    where F: FnOnce(&Client, &AppContext) -> I + Send + 'static,
           I: IntoFuture<Item = R, Error = E> + 'static,
           R: Send + 'static,
           E: Debug
 {
     let (tx, rx) = mpsc::channel();
 
-    unwrap!(session.send(move |client, object_cache| {
-        let future = f(client, object_cache)
+    unwrap!(app.send(move |client, app| {
+        let future = f(client, app)
             .into_future()
             .map_err(|err| panic!("{:?}", err))
             .map(move |result| unwrap!(tx.send(result)))

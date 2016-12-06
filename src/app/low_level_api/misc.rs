@@ -19,33 +19,50 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use ffi::{AppendableDataHandle, DataIdHandle, EncryptKeyHandle, SignKeyHandle, StructDataHandle};
-use ffi::{FfiError, FfiResult, OpaqueCtx, Session, helper};
-use ffi::low_level_api::appendable_data::AppendableData;
-use ffi::object_cache::ObjectCache;
-use maidsafe_utilities::serialisation::{deserialise, serialise};
-use std::{mem, ptr, slice};
+use app::App;
+use app::object_cache::EncryptKeyHandle;
+use rust_sodium::crypto::box_;
 use std::os::raw::c_void;
+use util::ffi::{OpaqueCtx, catch_unwind_cb};
 
-type ADHandle = AppendableDataHandle;
-
-/// Free Encrypt Key handle
+/// Create new public encryption key given its content as a byte array.
 #[no_mangle]
-pub unsafe extern "C" fn misc_encrypt_key_free(session: *const Session,
-                                               handle: EncryptKeyHandle,
-                                               user_data: *mut c_void,
-                                               o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
-    let user_data = OpaqueCtx(user_data);
+pub unsafe extern "C" fn misc_enc_pk_new(app: *const App,
+                                         bytes: *const [u8; box_::PUBLICKEYBYTES],
+                                         user_data: *mut c_void,
+                                         o_cb: unsafe extern "C" fn(*mut c_void,
+                                                                    i32,
+                                                                    EncryptKeyHandle)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let enc_pk = box_::PublicKey(*bytes);
 
-    helper::catch_unwind_cb(user_data, o_cb, || {
-        (*session).send(move |_, obj_cache| {
-            let res = obj_cache.remove_encrypt_key(handle);
+        (*app).send(move |_, context| {
+            let handle = context.object_cache().insert_encrypt_key(enc_pk);
+            o_cb(user_data.0, 0, handle);
+            None
+        })
+    })
+}
+
+/// Free encryption public key handle
+#[no_mangle]
+pub unsafe extern "C" fn misc_enc_pk_free(app: *const App,
+                                          handle: EncryptKeyHandle,
+                                          user_data: *mut c_void,
+                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+
+        (*app).send(move |_, context| {
+            let res = context.object_cache().remove_encrypt_key(handle);
             o_cb(user_data.0, ffi_result_code!(res));
             None
         })
     })
 }
 
+/*
 /// Free Sign Key handle
 #[no_mangle]
 pub unsafe extern "C" fn misc_sign_key_free(session: *const Session,
@@ -248,9 +265,11 @@ pub unsafe extern "C" fn misc_object_cache_reset(session: *const Session,
         })
     })
 }
+*/
 
 #[cfg(test)]
 mod tests {
+    /*
     use core::utility;
     use ffi::low_level_api::appendable_data::*;
     use ffi::low_level_api::cipher_opt::*;
@@ -513,4 +532,5 @@ mod tests {
         t.hash(&mut s);
         s.finish()
     }
+    */
 }

@@ -155,10 +155,10 @@ pub unsafe extern "C" fn mdata_list_entries(app: *const App,
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        helper::send_async(app, user_data, o_cb, move |client, object_cache| {
-            let object_cache = object_cache.clone();
+        helper::send_async(app, user_data, o_cb, move |client, context| {
+            let context = context.clone();
             client.list_mdata_entries(name, type_tag)
-                .map(move |entries| object_cache.insert_mdata_entries(entries))
+                .map(move |entries| context.object_cache().insert_mdata_entries(entries))
         })
     })
 }
@@ -175,10 +175,10 @@ pub unsafe extern "C" fn mdata_list_keys(app: *const App,
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        helper::send_async(app, user_data, o_cb, move |client, object_cache| {
-            let object_cache = object_cache.clone();
+        helper::send_async(app, user_data, o_cb, move |client, context| {
+            let context = context.clone();
             client.list_mdata_keys(name, type_tag)
-                .map(move |keys| object_cache.insert_mdata_keys(keys))
+                .map(move |keys| context.object_cache().insert_mdata_keys(keys))
         })
     })
 }
@@ -195,10 +195,10 @@ pub unsafe extern "C" fn mdata_list_values(app: *const App,
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        helper::send_async(app, user_data, o_cb, move |client, object_cache| {
-            let object_cache = object_cache.clone();
+        helper::send_async(app, user_data, o_cb, move |client, context| {
+            let context = context.clone();
             client.list_mdata_values(name, type_tag)
-                .map(move |values| object_cache.insert_mdata_values(values))
+                .map(move |values| context.object_cache().insert_mdata_values(values))
         })
     })
 }
@@ -244,10 +244,10 @@ pub unsafe fn mdata_list_permissions(app: *const App,
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
-        helper::send_async(app, user_data, o_cb, move |client, object_cache| {
-            let object_cache = object_cache.clone();
+        helper::send_async(app, user_data, o_cb, move |client, context| {
+            let context = context.clone();
             client.list_mdata_permissions(name, type_tag)
-                .map(move |perms| helper::insert_permissions(&object_cache, perms))
+                .map(move |perms| helper::insert_permissions(context.object_cache(), perms))
         })
     })
 }
@@ -269,12 +269,14 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
         let name = XorName(*name);
 
         (*app).send(move |client, context| {
-            let object_cache = context.object_cache().clone();
-            let user = try_cb!(helper::get_user(&object_cache, user_h), user_data, o_cb);
+            let context = context.clone();
+            let user = try_cb!(helper::get_user(context.object_cache(), user_h),
+                               user_data,
+                               o_cb);
 
             client.list_mdata_user_permissions(name, type_tag, user)
                 .map(move |set| {
-                    let handle = object_cache.insert_mdata_permission_set(set);
+                    let handle = context.object_cache().insert_mdata_permission_set(set);
                     o_cb(user_data.0, 0, handle);
                 })
                 .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), 0))

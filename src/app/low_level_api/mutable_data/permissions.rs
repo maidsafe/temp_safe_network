@@ -62,8 +62,8 @@ fn mdata_permission_set_new(app: *const App,
                                                        i32,
                                                        MDataPermissionSetHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, |object_cache| {
-            Ok(object_cache.insert_mdata_permission_set(PermissionSet::new()))
+        helper::send_sync(app, user_data, o_cb, |context| {
+            Ok(context.object_cache().insert_mdata_permission_set(PermissionSet::new()))
         })
     })
 }
@@ -76,8 +76,8 @@ pub unsafe extern "C" fn mdata_permissions_set_allow(app: *const App,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |object_cache| {
-            let mut set = object_cache.get_mdata_permission_set(set_h)?;
+        helper::send_sync(app, user_data, o_cb, move |context| {
+            let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
             let _ = set.allow(action.into());
             Ok(())
         })
@@ -92,8 +92,8 @@ pub unsafe extern "C" fn mdata_permissions_set_deny(app: *const App,
                                                     user_data: *mut c_void,
                                                     o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |object_cache| {
-            let mut set = object_cache.get_mdata_permission_set(set_h)?;
+        helper::send_sync(app, user_data, o_cb, move |context| {
+            let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
             let _ = set.deny(action.into());
             Ok(())
         })
@@ -108,8 +108,8 @@ pub unsafe extern "C" fn mdata_permissions_set_clear(app: *const App,
                                                      user_data: *mut c_void,
                                                      o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |object_cache| {
-            let mut set = object_cache.get_mdata_permission_set(set_h)?;
+        helper::send_sync(app, user_data, o_cb, move |context| {
+            let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
             let _ = set.clear(action.into());
             Ok(())
         })
@@ -123,8 +123,8 @@ pub unsafe extern "C" fn mdata_permissions_set_free(app: *const App,
                                                     user_data: *mut c_void,
                                                     o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |object_cache| {
-            let _ = object_cache.remove_mdata_permission_set(set_h)?;
+        helper::send_sync(app, user_data, o_cb, move |context| {
+            let _ = context.object_cache().remove_mdata_permission_set(set_h)?;
             Ok(())
         })
     })
@@ -138,8 +138,8 @@ pub unsafe extern "C" fn mdata_permissions_new(app: *const App,
                                                                           i32,
                                                                           MDataPermissionsHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, |object_cache| {
-            Ok(object_cache.insert_mdata_permissions(Default::default()))
+        helper::send_sync(app, user_data, o_cb, |context| {
+            Ok(context.object_cache().insert_mdata_permissions(Default::default()))
         })
     })
 }
@@ -153,8 +153,8 @@ pub unsafe extern "C" fn mdata_permissions_len(app: *const App,
                                                                           i32,
                                                                           usize)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |object_cache| {
-            let permissions = object_cache.get_mdata_permissions(permissions_h)?;
+        helper::send_sync(app, user_data, o_cb, move |context| {
+            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
             Ok(permissions.len())
         })
     })
@@ -169,8 +169,8 @@ fn mdata_permissions_get(app: *const App,
                          user_data: *mut c_void,
                          o_cb: unsafe extern "C" fn(*mut c_void, i32, MDataPermissionSetHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |object_cache| {
-            let permissions = object_cache.get_mdata_permissions(permissions_h)?;
+        helper::send_sync(app, user_data, o_cb, move |context| {
+            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
             let handle = *permissions.get(&user_h).ok_or(AppError::InvalidSignKeyHandle)?;
 
             Ok(handle)
@@ -193,8 +193,8 @@ fn mdata_permissions_for_each(app: *const App,
     ffi::catch_unwind_cb(user_data, done_cb, || {
         let user_data = OpaqueCtx(user_data);
 
-        helper::send_sync(app, user_data.0, done_cb, move |object_cache| {
-            let permissions = object_cache.get_mdata_permissions(permissions_h)?;
+        helper::send_sync(app, user_data.0, done_cb, move |context| {
+            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
             for (user_h, permission_set_h) in &*permissions {
                 each_cb(user_data.0, *user_h, *permission_set_h);
             }
@@ -215,8 +215,8 @@ pub unsafe extern "C" fn mdata_permissions_insert(app: *const App,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |object_cache| {
-            let mut permissions = object_cache.get_mdata_permissions(permissions_h)?;
+        helper::send_sync(app, user_data, o_cb, move |context| {
+            let mut permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
             let _ = permissions.insert(user_h, permission_set_h);
 
             Ok(())
@@ -231,8 +231,8 @@ pub unsafe extern "C" fn mdata_permissions_free(app: *const App,
                                                 user_data: *mut c_void,
                                                 o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |object_cache| {
-            let _ = object_cache.remove_mdata_permissions(permissions_h)?;
+        helper::send_sync(app, user_data, o_cb, move |context| {
+            let _ = context.object_cache().remove_mdata_permissions(permissions_h)?;
             Ok(())
         })
     })

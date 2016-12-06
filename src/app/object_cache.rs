@@ -27,7 +27,6 @@ use rust_sodium::crypto::{box_, sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet};
-use std::rc::Rc;
 use std::u64;
 use super::errors::AppError;
 
@@ -72,12 +71,7 @@ pub type SignKeyHandle = ObjectHandle;
 pub type XorNameHandle = ObjectHandle;
 
 /// Contains session object cache
-#[derive(Clone)]
 pub struct ObjectCache {
-    inner: Rc<Inner>,
-}
-
-struct Inner {
     handle_gen: HandleGenerator,
     cipher_opt: Store<CipherOpt>,
     encrypt_key: Store<box_::PublicKey>,
@@ -96,38 +90,36 @@ struct Inner {
 impl ObjectCache {
     pub fn new() -> Self {
         ObjectCache {
-            inner: Rc::new(Inner {
-                handle_gen: HandleGenerator::new(),
-                cipher_opt: Store::new(),
-                encrypt_key: Store::new(),
-                mdata_entries: Store::new(),
-                mdata_keys: Store::new(),
-                mdata_values: Store::new(),
-                mdata_entry_actions: Store::new(),
-                mdata_permissions: Store::new(),
-                mdata_permission_set: Store::new(),
-                se_reader: Store::new(),
-                se_writer: Store::new(),
-                sign_key: Store::new(),
-                xor_name: Store::new(),
-            }),
+            handle_gen: HandleGenerator::new(),
+            cipher_opt: Store::new(),
+            encrypt_key: Store::new(),
+            mdata_entries: Store::new(),
+            mdata_keys: Store::new(),
+            mdata_values: Store::new(),
+            mdata_entry_actions: Store::new(),
+            mdata_permissions: Store::new(),
+            mdata_permission_set: Store::new(),
+            se_reader: Store::new(),
+            se_writer: Store::new(),
+            sign_key: Store::new(),
+            xor_name: Store::new(),
         }
     }
 
     pub fn reset(&self) {
-        self.inner.handle_gen.reset();
-        self.inner.cipher_opt.clear();
-        self.inner.encrypt_key.clear();
-        self.inner.mdata_entries.clear();
-        self.inner.mdata_keys.clear();
-        self.inner.mdata_values.clear();
-        self.inner.mdata_entry_actions.clear();
-        self.inner.mdata_permissions.clear();
-        self.inner.mdata_permission_set.clear();
-        self.inner.se_reader.clear();
-        self.inner.se_writer.clear();
-        self.inner.sign_key.clear();
-        self.inner.xor_name.clear();
+        self.handle_gen.reset();
+        self.cipher_opt.clear();
+        self.encrypt_key.clear();
+        self.mdata_entries.clear();
+        self.mdata_keys.clear();
+        self.mdata_values.clear();
+        self.mdata_entry_actions.clear();
+        self.mdata_permissions.clear();
+        self.mdata_permission_set.clear();
+        self.se_reader.clear();
+        self.se_writer.clear();
+        self.sign_key.clear();
+        self.xor_name.clear();
     }
 }
 
@@ -141,17 +133,17 @@ macro_rules! impl_cache {
      $remove:ident) => {
         impl ObjectCache {
             pub fn $insert(&self, value: $ty) -> $handle {
-                let handle = self.inner.handle_gen.gen();
-                self.inner.$name.insert(handle, value);
+                let handle = self.handle_gen.gen();
+                self.$name.insert(handle, value);
                 handle
             }
 
             pub fn $get(&self, handle: $handle) -> Result<RefMut<$ty>, AppError> {
-                self.inner.$name.get(handle).ok_or(AppError::$error)
+                self.$name.get(handle).ok_or(AppError::$error)
             }
 
             pub fn $remove(&self, handle: $handle) -> Result<$ty, AppError> {
-                self.inner.$name.remove(handle).ok_or(AppError::$error)
+                self.$name.remove(handle).ok_or(AppError::$error)
             }
         }
     }

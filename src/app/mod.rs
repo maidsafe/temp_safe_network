@@ -39,6 +39,7 @@ use rust_sodium::crypto::{box_, secretbox, sign};
 use self::errors::AppError;
 use self::object_cache::ObjectCache;
 use std::os::raw::c_void;
+use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
 use tokio_core::reactor::{Core, Handle};
@@ -152,21 +153,21 @@ impl Drop for App {
 }
 
 /// Application context (data associated with the app).
-pub enum AppContext {
-    /// Context of unauthorised app.
-    Unauthorised(UnauthorisedAppContext),
-    /// Context of authorised app.
-    Authorised(AuthorisedAppContext),
+#[derive(Clone)]
+pub struct AppContext {
+    inner: Rc<Inner>,
 }
 
-#[allow(missing_docs)]
-pub struct UnauthorisedAppContext {
+enum Inner {
+    Unauthorised(Unauthorised),
+    Authorised(Authorised),
+}
+
+struct Unauthorised {
     object_cache: ObjectCache,
 }
 
-#[allow(missing_docs)]
-#[allow(unused)] // <-- TODO: remove this
-pub struct AuthorisedAppContext {
+struct Authorised {
     object_cache: ObjectCache,
     owner_key: sign::PublicKey,
     sym_enc_key: secretbox::Key,
@@ -176,7 +177,9 @@ pub struct AuthorisedAppContext {
 
 impl AppContext {
     fn unauthorised() -> Self {
-        AppContext::Unauthorised(UnauthorisedAppContext { object_cache: ObjectCache::new() })
+        AppContext {
+            inner: Rc::new(Inner::Unauthorised(Unauthorised { object_cache: ObjectCache::new() })),
+        }
     }
 
     fn authorised(owner_key: sign::PublicKey,
@@ -184,20 +187,22 @@ impl AppContext {
                   enc_pk: box_::PublicKey,
                   enc_sk: box_::SecretKey)
                   -> Self {
-        AppContext::Authorised(AuthorisedAppContext {
-            object_cache: ObjectCache::new(),
-            owner_key: owner_key,
-            sym_enc_key: sym_enc_key,
-            enc_pk: enc_pk,
-            enc_sk: enc_sk,
-        })
+        AppContext {
+            inner: Rc::new(Inner::Authorised(Authorised {
+                object_cache: ObjectCache::new(),
+                owner_key: owner_key,
+                sym_enc_key: sym_enc_key,
+                enc_pk: enc_pk,
+                enc_sk: enc_sk,
+            })),
+        }
     }
 
     /// Object cache
     pub fn object_cache(&self) -> &ObjectCache {
-        match *self {
-            AppContext::Unauthorised(ref context) => &context.object_cache,
-            AppContext::Authorised(ref context) => &context.object_cache,
+        match *self.inner {
+            Inner::Unauthorised(ref context) => &context.object_cache,
+            Inner::Authorised(ref context) => &context.object_cache,
         }
     }
 
@@ -221,10 +226,10 @@ impl AppContext {
         Ok(&self.as_authorised()?.enc_sk)
     }
 
-    fn as_authorised(&self) -> Result<&AuthorisedAppContext, AppError> {
-        match *self {
-            AppContext::Authorised(ref context) => Ok(context),
-            AppContext::Unauthorised(_) => Err(AppError::Forbidden),
+    fn as_authorised(&self) -> Result<&Authorised, AppError> {
+        match *self.inner {
+            Inner::Authorised(ref context) => Ok(context),
+            Inner::Unauthorised(_) => Err(AppError::Forbidden),
         }
     }
 }

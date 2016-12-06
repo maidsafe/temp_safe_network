@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::CoreError;
+use core::{CORE_ERROR_START_RANGE, CoreError};
 use core::SelfEncryptionStorageError;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -122,11 +122,30 @@ impl From<RecvTimeoutError> for AppError {
     }
 }
 
-// const APP_ERROR_START_RANGE: i32 = 0;
+const APP_ERROR_START_RANGE: i32 = CORE_ERROR_START_RANGE - 1000;
+
+// TODO: define named constants for the error codes.
 
 /// Conversion to integer error code.
 impl Into<i32> for AppError {
     fn into(self) -> i32 {
-        unimplemented!()
+        match self {
+            AppError::CoreError(err) => err.into(),
+            AppError::SerialisationError(_) => APP_ERROR_START_RANGE - 1,
+            AppError::Forbidden => APP_ERROR_START_RANGE - 2,
+            AppError::InvalidCipherOptHandle => APP_ERROR_START_RANGE - 3,
+            AppError::InvalidEncryptKeyHandle => APP_ERROR_START_RANGE - 4,
+            AppError::InvalidMDataEntriesHandle => APP_ERROR_START_RANGE - 5,
+            AppError::InvalidMDataEntryActionsHandle => APP_ERROR_START_RANGE - 6,
+            AppError::InvalidMDataPermissionsHandle => APP_ERROR_START_RANGE - 7,
+            AppError::InvalidMDataPermissionSetHandle => APP_ERROR_START_RANGE - 8,
+            AppError::InvalidSelfEncryptorHandle => APP_ERROR_START_RANGE - 9,
+            AppError::InvalidSignKeyHandle => APP_ERROR_START_RANGE - 10,
+            AppError::InvalidXorNameHandle => APP_ERROR_START_RANGE - 11,
+            AppError::SelfEncryption(_) => APP_ERROR_START_RANGE - 12,
+            AppError::InvalidSelfEncryptorReadOffsets => APP_ERROR_START_RANGE - 13,
+            AppError::IoError(_) => APP_ERROR_START_RANGE - 14,
+            AppError::Unexpected(_) => APP_ERROR_START_RANGE - 15,
+        }
     }
 }

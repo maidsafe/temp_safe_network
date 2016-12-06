@@ -29,5 +29,5 @@ pub mod xor_name;
 pub mod immutable_data;
 /// Low level manipulation of `MutableData`
 pub mod mutable_data;
-// /// Miscellaneous routines
-// pub mod misc;
+/// Miscellaneous routines
+pub mod misc;
