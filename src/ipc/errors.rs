@@ -19,11 +19,11 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-/// TODO: doc
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+/// Ipc error
+#[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub enum IpcError {
-    /// TODO: doc
+    /// Authentication denied
     AuthDenied,
-    /// TODO: doc
+    /// Containers denied
     ContainersDenied,
 }

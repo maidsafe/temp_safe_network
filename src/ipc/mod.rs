@@ -296,15 +296,15 @@ pub struct AuthGranted {
     ///
     /// Useful to reuse bootstrap nodes and speed up access.
     pub bootstrap_config: Config,
-    /// TODO: doc
+    /// Access container
     pub access_container: Option<(XorName, u64, secretbox::Nonce)>,
 }
 
-/// TODO: doc
+/// Containers request
 #[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct ContainersReq;
 
-/// TODO: doc
+/// Containers response
 #[derive(RustcEncodable, RustcDecodable, Debug)]
 pub struct ContainersGranted;
 
@@ -354,27 +354,27 @@ fn decode_result<D, T, T2>(d: &mut D) -> Result<Result<T, T2>, D::Error>
 }
 
 #[derive(RustcEncodable, RustcDecodable, Debug)]
-/// TODO: doc
+/// IPC message
 pub enum IpcMsg {
-    /// TODO: doc
+    /// Request
     Req {
-        /// TODO: doc
+        /// Application ID
         app_id: String,
-        /// TODO: doc
+        /// Request ID
         req_id: u32,
-        /// TODO: doc
+        /// Request
         req: IpcReq,
     },
-    /// TODO: doc
+    /// Response
     Resp {
-        /// TODO: doc
+        /// Request ID
         req_id: u32,
-        /// TODO: doc
+        /// Response
         resp: IpcResp,
     },
-    /// TODO: doc
+    /// Revoked
     Revoked {
-        /// TODO: doc
+        /// Application ID
         app_id: String,
     },
     /// Generic error like couldn't parse IpcMsg etc.
@@ -382,22 +382,22 @@ pub enum IpcMsg {
 }
 
 #[derive(RustcEncodable, RustcDecodable, Debug)]
-/// TODO: doc
+/// IPC request
 // TODO: `TransOwnership` variant
 pub enum IpcReq {
-    /// TODO: doc
+    /// Authentication request
     Auth(AuthReq),
-    /// TODO: doc
+    /// Containers request
     Containers(ContainersReq),
 }
 
 #[derive(Debug)]
-/// TODO: doc
+/// IPC response
 // TODO: `TransOwnership` variant
 pub enum IpcResp {
-    /// TODO: doc
+    /// Authentication
     Auth(Result<AuthGranted, IpcError>),
-    /// TODO: doc
+    /// Containers
     Containers(Result<ContainersGranted, IpcError>),
 }
 
