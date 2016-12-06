@@ -288,6 +288,12 @@ pub struct AuthGranted {
     pub access_container: Option<(XorName, u64, secretbox::Nonce)>,
 }
 
+/// TODO: doc
+pub struct ContainersReq;
+
+/// TODO: doc
+pub struct ContainersGranted;
+
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {

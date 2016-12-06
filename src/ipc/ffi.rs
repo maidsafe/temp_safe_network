@@ -154,3 +154,9 @@ pub struct AppAccessToken {
 pub unsafe extern "C" fn app_access_token_free(a: *mut AppAccessToken) {
     let _ = super::AppAccessToken::from_raw(a);
 }
+
+/// TODO: doc
+pub struct ContainersReq;
+
+/// TODO: doc
+pub struct ContainersGranted;
