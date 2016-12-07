@@ -22,6 +22,8 @@
 //! Errors thrown by Authenticator routines
 
 use core::CoreError;
+use maidsafe_utilities::serialisation::SerialisationError;
+use nfs::errors::NfsError;
 use std::error::Error;
 use std::fmt::{self, Debug, Formatter};
 use std::io::Error as IoError;
@@ -41,6 +43,10 @@ pub enum AuthError {
     CoreError(CoreError),
     /// Input/output error
     IoError(IoError),
+    /// NFS error
+    NfsError(NfsError),
+    /// Serialisation error
+    SerialisationError(SerialisationError),
 }
 
 impl Into<i32> for AuthError {
@@ -49,6 +55,8 @@ impl Into<i32> for AuthError {
             AuthError::Unexpected(_) => AUTH_ERROR_START_RANGE - 1,
             AuthError::IoError(_) => AUTH_ERROR_START_RANGE - 2,
             AuthError::CoreError(error) => error.into(),
+            AuthError::NfsError(error) => error.into(),
+            AuthError::SerialisationError(_) => AUTH_ERROR_START_RANGE - 3,
         }
     }
 }
@@ -83,12 +91,28 @@ impl From<Utf8Error> for AuthError {
     }
 }
 
+impl From<NfsError> for AuthError {
+    fn from(error: NfsError) -> AuthError {
+        AuthError::NfsError(error)
+    }
+}
+
+impl From<SerialisationError> for AuthError {
+    fn from(error: SerialisationError) -> AuthError {
+        AuthError::SerialisationError(error)
+    }
+}
+
 impl Debug for AuthError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             AuthError::CoreError(ref error) => write!(f, "AuthError::CoreError -> {:?}", error),
             AuthError::IoError(ref error) => write!(f, "AuthError::IoError -> {:?}", error),
             AuthError::Unexpected(ref s) => write!(f, "AuthError::Unexpected{{{:?}}}", s),
+            AuthError::NfsError(ref error) => write!(f, "AuthError::NfsError -> {:?}", error),
+            AuthError::SerialisationError(ref error) => {
+                write!(f, "AuthError::SerialisationError -> {:?}", error)
+            }
         }
     }
 }
