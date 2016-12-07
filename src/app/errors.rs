@@ -22,6 +22,7 @@
 use core::{CORE_ERROR_START_RANGE, CoreError};
 use core::SelfEncryptionStorageError;
 use futures::sync::mpsc::SendError;
+use ipc::IpcError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
@@ -33,6 +34,8 @@ use std::sync::mpsc::{RecvError, RecvTimeoutError};
 pub enum AppError {
     /// Error from safe_core.
     CoreError(CoreError),
+    /// IPC error.
+    IpcError(IpcError),
     /// Could not serialise or deserialise data
     SerialisationError(SerialisationError),
     /// Forbidden operation
@@ -71,6 +74,12 @@ pub enum AppError {
 impl From<CoreError> for AppError {
     fn from(err: CoreError) -> Self {
         AppError::CoreError(err)
+    }
+}
+
+impl From<IpcError> for AppError {
+    fn from(err: IpcError) -> Self {
+        AppError::IpcError(err)
     }
 }
 
@@ -123,7 +132,7 @@ impl From<RecvTimeoutError> for AppError {
     }
 }
 
-const APP_ERROR_START_RANGE: i32 = CORE_ERROR_START_RANGE - 1000;
+const APP_ERROR_START_RANGE: i32 = CORE_ERROR_START_RANGE - 2000;
 
 // TODO: define named constants for the error codes.
 
@@ -132,6 +141,7 @@ impl Into<i32> for AppError {
     fn into(self) -> i32 {
         match self {
             AppError::CoreError(err) => err.into(),
+            AppError::IpcError(err) => err.into(),
             AppError::SerialisationError(_) => APP_ERROR_START_RANGE - 1,
             AppError::Forbidden => APP_ERROR_START_RANGE - 2,
             AppError::InvalidCipherOptHandle => APP_ERROR_START_RANGE - 3,

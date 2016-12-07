@@ -19,17 +19,15 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+pub use self::errors::IpcError;
 pub use self::req::{AppExchangeInfo, AuthReq, ContainerPermission, ContainersReq, IpcReq};
 pub use self::resp::{AppKeys, AuthGranted, IpcResp};
 
-/// Errors module
 mod errors;
 /// Request module
 pub mod req;
 /// Response module
 pub mod resp;
-
-pub use self::errors::IpcError;
 
 // TODO: replace with `crust::Config`
 /// Placeholder for `crust::Config`

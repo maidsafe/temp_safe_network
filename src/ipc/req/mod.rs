@@ -39,7 +39,7 @@ pub enum IpcReq {
 }
 
 /// Represents an authorization request
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct AuthReq {
     /// The application identifier for this request
     pub app: AppExchangeInfo,
@@ -145,7 +145,7 @@ impl ContainersReq {
 }
 
 /// Represents an application ID in the process of asking permissions
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(Clone, Eq, PartialEq, RustcEncodable, RustcDecodable, Debug)]
 pub struct AppExchangeInfo {
     /// The ID. It must be unique.
     pub id: String,
@@ -210,7 +210,7 @@ impl AppExchangeInfo {
 }
 
 /// Represents the set of permissions for a given container
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(Clone, Eq, PartialEq, RustcEncodable, RustcDecodable, Debug)]
 pub struct ContainerPermission {
     /// The id
     pub container_key: String,

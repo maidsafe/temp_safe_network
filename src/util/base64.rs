@@ -19,9 +19,24 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-/// FFI-related helper functions
-#[macro_use]
-pub mod ffi;
-mod base64;
+use rustc_serialize::base64::{CharacterSet, Config, FromBase64, FromBase64Error, Newline, ToBase64};
 
-pub use self::base64::{base64_decode, base64_encode};
+/// Encode the data using base64 encoding.
+pub fn base64_encode(input: &[u8]) -> String {
+    input.to_base64(config())
+}
+
+/// Decode base64 encoded data.
+pub fn base64_decode(input: &str) -> Result<Vec<u8>, FromBase64Error> {
+    input.from_base64()
+}
+
+#[inline]
+fn config() -> Config {
+    Config {
+        char_set: CharacterSet::UrlSafe,
+        newline: Newline::LF,
+        pad: true,
+        line_length: None,
+    }
+}

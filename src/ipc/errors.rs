@@ -19,7 +19,12 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use core::CORE_ERROR_START_RANGE;
+use maidsafe_utilities::serialisation::SerialisationError;
+use rustc_serialize::base64::FromBase64Error;
 use std::str::Utf8Error;
+
+const IPC_ERROR_START_RANGE: i32 = CORE_ERROR_START_RANGE - 1000;
 
 /// Ipc error
 #[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
@@ -28,12 +33,53 @@ pub enum IpcError {
     AuthDenied,
     /// Containers denied
     ContainersDenied,
-    /// Invalid UTF-8 string.
-    Utf8Error,
+    /// Invalid IPC message
+    InvalidMsg,
+    /// Generic encoding / decoding failure.
+    EncodeDecodeError,
+
+    /// Unexpected error
+    Unexpected(String),
 }
 
 impl From<Utf8Error> for IpcError {
     fn from(_err: Utf8Error) -> Self {
-        IpcError::Utf8Error
+        IpcError::EncodeDecodeError
+    }
+}
+
+impl From<FromBase64Error> for IpcError {
+    fn from(_err: FromBase64Error) -> Self {
+        IpcError::EncodeDecodeError
+    }
+}
+
+impl From<SerialisationError> for IpcError {
+    fn from(_err: SerialisationError) -> Self {
+        IpcError::EncodeDecodeError
+    }
+}
+
+impl<'a> From<&'a str> for IpcError {
+    fn from(s: &'a str) -> Self {
+        IpcError::Unexpected(s.to_string())
+    }
+}
+
+impl From<String> for IpcError {
+    fn from(s: String) -> Self {
+        IpcError::Unexpected(s)
+    }
+}
+
+impl Into<i32> for IpcError {
+    fn into(self) -> i32 {
+        match self {
+            IpcError::AuthDenied => IPC_ERROR_START_RANGE - 1,
+            IpcError::ContainersDenied => IPC_ERROR_START_RANGE - 2,
+            IpcError::InvalidMsg => IPC_ERROR_START_RANGE - 3,
+            IpcError::EncodeDecodeError => IPC_ERROR_START_RANGE - 4,
+            IpcError::Unexpected(_) => IPC_ERROR_START_RANGE - 100,
+        }
     }
 }

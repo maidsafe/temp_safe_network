@@ -22,6 +22,7 @@
 //! Utilities for passing strings across FFI boundaries.
 
 use std::mem;
+use std::ptr;
 use std::slice;
 use std::str::{self, Utf8Error};
 
@@ -75,6 +76,16 @@ impl FfiString {
     pub unsafe fn as_str(&self) -> Result<&str, Utf8Error> {
         let s = slice::from_raw_parts(self.ptr, self.len);
         str::from_utf8(s)
+    }
+}
+
+impl Default for FfiString {
+    fn default() -> Self {
+        FfiString {
+            ptr: ptr::null_mut(),
+            len: 0,
+            cap: 0,
+        }
     }
 }
 

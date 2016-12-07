@@ -125,6 +125,12 @@ impl CallbackArgs for bool {
     }
 }
 
+impl CallbackArgs for u32 {
+    fn default() -> Self {
+        0
+    }
+}
+
 impl CallbackArgs for i64 {
     fn default() -> Self {
         0
