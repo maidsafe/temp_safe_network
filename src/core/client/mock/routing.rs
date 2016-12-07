@@ -403,6 +403,7 @@ impl Routing {
                           name,
                           tag,
                           msg_id,
+                          requester,
                           "mutate_mdata_entries",
                           SET_MDATA_ENTRIES_DELAY_MS,
                           |data| data.mutate_entries(actions, requester),
@@ -480,6 +481,7 @@ impl Routing {
                           name,
                           tag,
                           msg_id,
+                          requester,
                           "set_mdata_user_permissions",
                           SET_MDATA_PERMISSIONS_DELAY_MS,
                           |data| data.set_user_permissions(user, permissions, version, requester),
@@ -505,6 +507,7 @@ impl Routing {
                           name,
                           tag,
                           msg_id,
+                          requester,
                           "del_mdata_user_permissions",
                           SET_MDATA_PERMISSIONS_DELAY_MS,
                           |data| data.del_user_permissions(&user, version, requester),
@@ -524,7 +527,7 @@ impl Routing {
                               new_owner: sign::PublicKey,
                               version: u64,
                               msg_id: MessageId,
-                              _requester: sign::PublicKey)
+                              requester: sign::PublicKey)
                               -> Result<(), InterfaceError> {
         let sign_pk = *self.full_id.public_id().signing_public_key();
 
@@ -532,6 +535,7 @@ impl Routing {
                           name,
                           tag,
                           msg_id,
+                          requester,
                           "change_mdata_owner",
                           CHANGE_MDATA_OWNER_DELAY_MS,
                           |data| data.change_owner(new_owner, version, sign_pk),
@@ -638,7 +642,14 @@ impl Routing {
               G: FnOnce(Result<R, ClientError>) -> Response
     {
         self.authorise_read(&dst, &name);
-        self.with_mdata(name, tag, msg_id, log_label, delay_ms, |data, _| f(data), g)
+        self.with_mdata(name,
+                        tag,
+                        msg_id,
+                        None,
+                        log_label,
+                        delay_ms,
+                        |data, _| f(data),
+                        g)
     }
 
     fn mutate_mdata<F, G, R>(&self,
@@ -646,6 +657,7 @@ impl Routing {
                              name: XorName,
                              tag: u64,
                              msg_id: MessageId,
+                             requester: sign::PublicKey,
                              log_label: &str,
                              delay_ms: u64,
                              f: F,
@@ -662,7 +674,14 @@ impl Routing {
         };
 
         self.authorise_mutation(&dst);
-        self.with_mdata(name, tag, msg_id, log_label, delay_ms, mutate, g)?;
+        self.with_mdata(name,
+                        tag,
+                        msg_id,
+                        Some(requester),
+                        log_label,
+                        delay_ms,
+                        mutate,
+                        g)?;
         self.commit_mutation(&dst);
         Ok(())
     }
@@ -671,6 +690,7 @@ impl Routing {
                            name: XorName,
                            tag: u64,
                            msg_id: MessageId,
+                           requester: Option<sign::PublicKey>,
                            log_label: &str,
                            delay_ms: u64,
                            f: F,
@@ -684,6 +704,8 @@ impl Routing {
         }
 
         let res = if let Err(err) = self.verify_network_limits(msg_id, log_label) {
+            Err(err)
+        } else if let Err(err) = self.verify_requester(requester) {
             Err(err)
         } else {
             let mut vault = unwrap!(VAULT.lock());
@@ -738,6 +760,19 @@ impl Routing {
             Ok(())
         } else {
             Err(ClientError::InvalidOwners)
+        }
+    }
+
+    fn verify_requester(&self, requester: Option<sign::PublicKey>) -> Result<(), ClientError> {
+        let requester = match requester {
+            Some(key) => key,
+            None => return Ok(()),
+        };
+
+        if *self.full_id.public_id().signing_public_key() == requester {
+            Ok(())
+        } else {
+            Err(ClientError::from("Invalid requester"))
         }
     }
 

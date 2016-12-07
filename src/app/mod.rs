@@ -28,12 +28,12 @@ mod object_cache;
 #[cfg(test)]
 mod test_util;
 
-use auth::AppKeys;
-use auth::ffi::AppKeys as FfiAppKeys;
 use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, NetworkEvent, NetworkTx};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
+use ipc::AppKeys;
+use ipc::ffi::AppKeys as FfiAppKeys;
 use maidsafe_utilities::thread::{self, Joiner};
 use rust_sodium::crypto::{box_, secretbox, sign};
 use self::errors::AppError;

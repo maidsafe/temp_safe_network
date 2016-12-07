@@ -294,7 +294,7 @@ impl AppKeys {
 #[derive(RustcEncodable, RustcDecodable, Debug, PartialEq, Eq)]
 pub struct AuthGranted {
     /// The access keys.
-    pub access_token: AppAccessToken,
+    pub app_keys: AppKeys,
     /// The crust config.
     ///
     /// Useful to reuse bootstrap nodes and speed up access.

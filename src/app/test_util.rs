@@ -19,9 +19,9 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use auth::AppKeys;
 use core::Client;
 use core::utility::test_utils::random_client;
+use ipc::AppKeys;
 use rust_sodium::crypto::{box_, secretbox, sign};
 use std::sync::mpsc;
 use super::{App, AppContext};
