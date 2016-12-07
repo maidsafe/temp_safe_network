@@ -24,18 +24,16 @@
 pub mod callback;
 #[macro_use]
 mod macros;
+pub mod string;
 #[cfg(test)]
 pub mod test_util;
 
-use rand::{OsRng, Rand, Rng};
 use self::callback::{Callback, CallbackArgs};
-use std::{io, mem, slice, str};
-use std::ffi::CString;
+pub use self::string::FfiString;
+use std::{mem, slice, str};
 use std::fmt::Debug;
 use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};
-use std::str::Utf8Error;
-use std::string::FromUtf8Error;
 
 /// Type that holds opaque user data handed into FFI functions
 #[derive(Clone, Copy)]
@@ -80,34 +78,6 @@ pub fn catch_unwind_cb<'a, U, C, F, E>(user_data: U, cb: C, f: F)
     }
 }
 
-/// Converts a byte pointer to String
-pub unsafe fn c_utf8_to_string(ptr: *const u8, len: usize) -> Result<String, Utf8Error> {
-    c_utf8_to_str(ptr, len).map(|v| v.to_owned())
-}
-
-/// Converts a byte pointer to str
-pub unsafe fn c_utf8_to_str(ptr: *const u8, len: usize) -> Result<&'static str, Utf8Error> {
-    str::from_utf8(slice::from_raw_parts(ptr, len))
-}
-
-/// Converts a null pointer to None and a valid pointer to Some(String)
-pub unsafe fn c_utf8_to_opt_string(ptr: *const u8,
-                                   len: usize)
-                                   -> Result<Option<String>, FromUtf8Error> {
-    if ptr.is_null() {
-        Ok(None)
-    } else {
-        String::from_utf8(slice::from_raw_parts(ptr, len).to_owned()).map(Some)
-    }
-}
-
-/// Returns a heap-allocated raw string, usable by C/FFI-boundary. The tuple
-/// means (pointer, length in bytes, capacity). Use `misc_u8_ptr_free` to free
-/// the memory.
-pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
-    u8_vec_to_ptr(s.into_bytes())
-}
-
 /// Converts a byte pointer to Vec<u8>
 pub unsafe fn u8_ptr_to_vec(ptr: *const u8, len: usize) -> Vec<u8> {
     slice::from_raw_parts(ptr, len).to_owned()
@@ -132,48 +102,5 @@ pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
     (ptr, len, cap)
 }
 
-/// Generate a random vector of given length
-pub fn generate_random_vector<T>(length: usize) -> io::Result<Vec<T>>
-    where T: Rand
-{
-    let mut os_rng = OsRng::new()?;
-    Ok((0..length).map(|_| os_rng.gen()).collect())
-}
-
-/// Generates a random C string for tests
-pub fn generate_random_cstring(len: usize) -> CString {
-    let mut cstring_vec = unwrap!(generate_random_vector::<u8>(len));
-
-    // Avoid internal nulls and ensure valid ASCII (thus valid utf8)
-    for it in &mut cstring_vec {
-        *it %= 128;
-        if *it == 0 {
-            *it += 1;
-        }
-    }
-
-    // Ok to unwrap, as we took care of removing all NULs above.
-    unwrap!(CString::new(cstring_vec))
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn string_conversion() {
-        let (ptr, size, cap) = string_to_c_utf8(String::new());
-        assert_eq!(size, 0);
-        unsafe {
-            let _ = Vec::from_raw_parts(ptr, size, cap);
-        }
-
-        let (ptr, size, cap) = string_to_c_utf8("hello world".to_owned());
-        assert!(!ptr.is_null());
-        assert_eq!(size, 11);
-        assert!(cap >= 11);
-        unsafe {
-            let _ = Vec::from_raw_parts(ptr, size, cap);
-        }
-    }
-}
+mod tests {}
