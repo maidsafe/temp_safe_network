@@ -35,7 +35,7 @@ use futures::sync::mpsc as futures_mpsc;
 use ipc::AppKeys;
 use ipc::ffi::AppKeys as FfiAppKeys;
 use maidsafe_utilities::thread::{self, Joiner};
-use rust_sodium::crypto::{box_, secretbox, sign};
+use rust_sodium::crypto::{box_, secretbox};
 use self::errors::AppError;
 use self::object_cache::ObjectCache;
 use std::os::raw::c_void;
@@ -86,7 +86,7 @@ impl App {
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {
             let client = Client::from_keys(client_keys, owner_key, el_h, core_tx, net_tx)?;
-            let context = AppContext::authorised(owner_key, enc_key, enc_pk, enc_sk);
+            let context = AppContext::authorised(enc_key, enc_pk, enc_sk);
             Ok((client, context))
         })
     }
@@ -169,7 +169,6 @@ struct Unauthorised {
 
 struct Authorised {
     object_cache: ObjectCache,
-    owner_key: sign::PublicKey,
     sym_enc_key: secretbox::Key,
     enc_pk: box_::PublicKey,
     enc_sk: box_::SecretKey,
@@ -182,15 +181,13 @@ impl AppContext {
         }
     }
 
-    fn authorised(owner_key: sign::PublicKey,
-                  sym_enc_key: secretbox::Key,
+    fn authorised(sym_enc_key: secretbox::Key,
                   enc_pk: box_::PublicKey,
                   enc_sk: box_::SecretKey)
                   -> Self {
         AppContext {
             inner: Rc::new(Inner::Authorised(Authorised {
                 object_cache: ObjectCache::new(),
-                owner_key: owner_key,
                 sym_enc_key: sym_enc_key,
                 enc_pk: enc_pk,
                 enc_sk: enc_sk,
@@ -204,11 +201,6 @@ impl AppContext {
             Inner::Unauthorised(ref context) => &context.object_cache,
             Inner::Authorised(ref context) => &context.object_cache,
         }
-    }
-
-    /// Public signing key of the app owner.
-    pub fn owner_key(&self) -> Result<&sign::PublicKey, AppError> {
-        Ok(&self.as_authorised()?.owner_key)
     }
 
     /// Symmetric encryption/decryption key.

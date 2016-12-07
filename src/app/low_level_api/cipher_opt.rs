@@ -244,6 +244,9 @@ mod tests {
         });
     }
 
+    // NOTE: rustfmt is behaving erratically on this function. Disabling it for now.
+    // TODO: try to re-enable it in the next rustfmt version (current: 0.6.3)
+    #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
     fn app_0_to_app_1_asym() {
         // Setup

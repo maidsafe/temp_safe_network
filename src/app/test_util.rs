@@ -35,7 +35,7 @@ pub fn create_app() -> App {
     // Create account and authorize the app key.
     let (tx, rx) = mpsc::channel();
     random_client(move |client| {
-        let owner_key = unwrap!(client.public_signing_key());
+        let owner_key = unwrap!(client.owner_key());
         unwrap!(tx.send(owner_key));
 
         client.ins_auth_key(sign_pk, 1)

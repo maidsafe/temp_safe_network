@@ -52,7 +52,7 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
         let name = XorName(*name);
 
         (*app).send(move |client, context| {
-            let sign_pk = try_cb!(client.public_signing_key(), user_data, o_cb);
+            let owner_key = try_cb!(client.owner_key(), user_data, o_cb);
 
             let permissions = if permissions_h != 0 {
                 try_cb!(helper::get_permissions(context.object_cache(), permissions_h),
@@ -75,7 +75,7 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
                                                 type_tag,
                                                 permissions,
                                                 entries,
-                                                btree_set![sign_pk])
+                                                btree_set![owner_key])
                                    .map_err(CoreError::from),
                                user_data,
                                o_cb);

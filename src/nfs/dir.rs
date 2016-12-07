@@ -29,7 +29,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// create a new directory emulation
 pub fn create_dir(client: &Client, is_public: bool) -> Box<NfsFuture<Dir>> {
-    match client.owner_sign_key() {
+    match client.owner_key() {
         Ok(pub_key) => {
             let dir = if is_public {
                 fry!(Dir::random_public(DIR_TAG))
