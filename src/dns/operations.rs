@@ -373,7 +373,7 @@ mod tests {
             let dns_name2 = dns_name.clone();
 
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
             let signing_key = unwrap!(client.secret_signing_key()).clone();
 
             get_all_registered_names(client)
@@ -415,7 +415,7 @@ mod tests {
             let client2 = client.clone();
 
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
             let signing_key = unwrap!(client.secret_signing_key()).clone();
 
             register_dns(client,
@@ -459,7 +459,7 @@ mod tests {
             let messaging_keypair = box_::gen_keypair();
             let messaging_keypair2 = messaging_keypair.clone();
 
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
             let owners2 = owners.clone();
 
             let signing_key = unwrap!(client.secret_signing_key()).clone();
@@ -503,7 +503,7 @@ mod tests {
         // Client 1
         random_client(move |client| {
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
             let signing_key = unwrap!(client.secret_signing_key()).clone();
 
             register_dns(client,
@@ -519,7 +519,7 @@ mod tests {
         // Client 2
         random_client(move |client| {
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
             let signing_key = unwrap!(client.secret_signing_key()).clone();
 
             register_dns(client,
@@ -556,7 +556,7 @@ mod tests {
             let messaging_keypair = box_::gen_keypair();
             let messaging_keypair2 = messaging_keypair.clone();
 
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
             let owners2 = owners.clone();
 
             let signing_key = unwrap!(client.secret_signing_key()).clone();
@@ -625,7 +625,7 @@ mod tests {
             let dns_name3 = dns_name.clone();
 
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
 
             let signing_key = unwrap!(client.secret_signing_key()).clone();
             let signing_key2 = signing_key.clone();
@@ -674,7 +674,7 @@ mod tests {
             let service_name = service.0.clone();
 
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
 
             let signing_key = unwrap!(client.secret_signing_key()).clone();
             let signing_key2 = signing_key.clone();
@@ -722,7 +722,7 @@ mod tests {
             let service = gen_service("www");
 
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
 
             let signing_key = unwrap!(client.secret_signing_key()).clone();
             let signing_key2 = unwrap!(client.secret_signing_key()).clone();
@@ -771,7 +771,7 @@ mod tests {
             let client2 = client.clone();
 
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(client.public_signing_key()).clone()];
+            let owners = vec![unwrap!(client.owner_key()).clone()];
             let signing_key = unwrap!(client.secret_signing_key()).clone();
 
             register_dns(client,

@@ -21,36 +21,21 @@
 
 #![allow(unsafe_code)]
 
+pub mod callback;
+#[macro_use]
+mod macros;
+#[cfg(test)]
+pub mod test_util;
+
 use rand::{OsRng, Rand, Rng};
-use std::{io, iter, mem, slice, str};
+use self::callback::{Callback, CallbackArgs};
+use std::{io, mem, slice, str};
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
-
-/// Logs an error and returns a numeric error code as a result
-pub fn ffi_error_code<E: Into<i32> + Debug>(err: E) -> i32 {
-    let decorator = iter::repeat('-').take(50).collect::<String>();
-    let err_str = format!("{:?}", err);
-    let err_code: i32 = err.into();
-    info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
-          decorator,
-          err_code,
-          err_str,
-          decorator);
-    err_code
-}
-
-/// Returns a numeric error code for a given result (0 for success)
-#[inline]
-pub fn ffi_result_code<T, E: Into<i32> + Debug>(res: Result<T, E>) -> i32 {
-    match res {
-        Ok(_) => 0,
-        Err(error) => ffi_error_code(error),
-    }
-}
 
 /// Type that holds opaque user data handed into FFI functions
 #[derive(Clone, Copy)]
@@ -63,9 +48,10 @@ impl Into<*mut c_void> for OpaqueCtx {
     }
 }
 
-fn catch_unwind_result<'a, T, E: Debug + From<&'a str>, F: FnOnce() -> Result<T, E>>
-    (f: F)
-     -> Result<T, E> {
+fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
+    where F: FnOnce() -> Result<T, E>,
+          E: Debug + From<&'a str>
+{
     match panic::catch_unwind(AssertUnwindSafe(f)) {
         Err(_) => Err(E::from("panic")),
         Ok(result) => result,
@@ -73,12 +59,25 @@ fn catch_unwind_result<'a, T, E: Debug + From<&'a str>, F: FnOnce() -> Result<T,
 }
 
 /// Catch panics. On error return the error code.
-pub fn catch_unwind_error_code<'a,
-                               E: Debug + Into<i32> + From<&'a str>,
-                               F: FnOnce() -> Result<(), E>>
-    (f: F)
-     -> i32 {
-    ffi_result_code(catch_unwind_result(f))
+pub fn catch_unwind_error_code<'a, F, E>(f: F) -> i32
+    where F: FnOnce() -> Result<(), E>,
+          E: Debug + Into<i32> + From<&'a str>
+{
+    ffi_result_code!(catch_unwind_result(f))
+}
+
+/// Catch panics. On error call the callback.
+pub fn catch_unwind_cb<'a, U, C, F, E>(user_data: U, cb: C, f: F)
+    where U: Into<*mut c_void>,
+          C: Callback,
+          F: FnOnce() -> Result<(), E>,
+          E: Debug + Into<i32> + From<&'a str>
+{
+    if let Err(err) = catch_unwind_result(f) {
+        cb.call(user_data.into(),
+                ffi_error_code!(err),
+                CallbackArgs::default());
+    }
 }
 
 /// Converts a byte pointer to String
@@ -101,8 +100,6 @@ pub unsafe fn c_utf8_to_opt_string(ptr: *const u8,
         String::from_utf8(slice::from_raw_parts(ptr, len).to_owned()).map(Some)
     }
 }
-
-// TODO: add c_utf8_to_opt_str (return Option<&str> instead of Option<String>)
 
 /// Returns a heap-allocated raw string, usable by C/FFI-boundary. The tuple
 /// means (pointer, length in bytes, capacity). Use `misc_u8_ptr_free` to free

@@ -19,35 +19,15 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-macro_rules! ffi_error_code {
-    ($err:expr) => {{
-        let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-        let err_str = format!("{:?}", $err);
-        let err_code: i32 = $crate::ffi::FfiError::from($err).into();
-        info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
-              decorator, err_code, err_str, decorator);
-        err_code
-    }}
-}
+//! Low Level APIs
 
-macro_rules! ffi_result_code {
-    ($result:expr) => {
-        match $result {
-            Ok(_) => 0,
-            Err(error) => ffi_error_code!(error),
-        }
-    }
-}
-
-macro_rules! try_cb {
-    ($result:expr, $user_data:expr, $cb:expr) => {
-        match $result {
-            Ok(value) => value,
-            Err(err) => {
-                use $crate::ffi::callback::{Callback, CallbackArgs};
-                $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());
-                return None;
-            }
-        }
-    }
-}
+/// Cipher Options
+pub mod cipher_opt;
+/// `XorName` constructions and freeing
+pub mod xor_name;
+/// Low level manipulation of `ImmutableData`
+pub mod immutable_data;
+/// Low level manipulation of `MutableData`
+pub mod mutable_data;
+/// Miscellaneous routines
+pub mod misc;

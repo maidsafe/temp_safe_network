@@ -19,33 +19,60 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use app::low_level_api::cipher_opt::CipherOpt;
 use core::SelfEncryptionStorage;
-use ffi::{App, AppHandle, CipherOptHandle, EncryptKeyHandle, MDataEntriesHandle,
-          MDataEntryActionsHandle, MDataKeysHandle, MDataPermissionSetHandle,
-          MDataPermissionsHandle, MDataValuesHandle, ObjectHandle, SelfEncryptorReaderHandle,
-          SelfEncryptorWriterHandle, SignKeyHandle, XorNameHandle};
-use ffi::errors::FfiError;
-use ffi::low_level_api::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, Value, XorName};
 use rust_sodium::crypto::{box_, sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet};
-use std::rc::Rc;
 use std::u64;
+use super::errors::AppError;
 
 const DEFAULT_CAPACITY: usize = 100;
 
-/// Contains session object cache
-#[derive(Clone)]
-pub struct ObjectCache {
-    inner: Rc<Inner>,
-}
+/// Object handle associated with objects. In normal C API one would expect rust
+/// code to pass pointers to opaque object to C. C code would then need to pass
+/// these pointers back each time they needed rust code to execute something on
+/// those objects. However our code base deals with communication over Web
+/// framework (like webservers for instance). Hence it is not possible to pass
+/// pointers to remote apps interfacing with us. Pointers represent handle to
+/// actual object.  Using similar concept, we instead pass `ObjectHandle` type
+/// over Web interface and manage the objects ourselves. This leads to extra
+/// type and memory safety and no chance of Undefined Behaviour.  Passing of
+/// pointer handles to C is replaced by passing of `ObjectHandle` to remote apps
+/// which they will use to do RPC's.
+pub type ObjectHandle = u64;
 
-struct Inner {
+/// Disambiguating `ObjectHandle`
+pub type CipherOptHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type EncryptKeyHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type MDataEntriesHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type MDataKeysHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type MDataValuesHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type MDataEntryActionsHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type MDataPermissionsHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type MDataPermissionSetHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type SelfEncryptorReaderHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type SelfEncryptorWriterHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type SignKeyHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type XorNameHandle = ObjectHandle;
+
+/// Contains session object cache
+pub struct ObjectCache {
     handle_gen: HandleGenerator,
-    app: Store<App>,
     cipher_opt: Store<CipherOpt>,
     encrypt_key: Store<box_::PublicKey>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
@@ -63,40 +90,36 @@ struct Inner {
 impl ObjectCache {
     pub fn new() -> Self {
         ObjectCache {
-            inner: Rc::new(Inner {
-                handle_gen: HandleGenerator::new(),
-                app: Store::new(),
-                cipher_opt: Store::new(),
-                encrypt_key: Store::new(),
-                mdata_entries: Store::new(),
-                mdata_keys: Store::new(),
-                mdata_values: Store::new(),
-                mdata_entry_actions: Store::new(),
-                mdata_permissions: Store::new(),
-                mdata_permission_set: Store::new(),
-                se_reader: Store::new(),
-                se_writer: Store::new(),
-                sign_key: Store::new(),
-                xor_name: Store::new(),
-            }),
+            handle_gen: HandleGenerator::new(),
+            cipher_opt: Store::new(),
+            encrypt_key: Store::new(),
+            mdata_entries: Store::new(),
+            mdata_keys: Store::new(),
+            mdata_values: Store::new(),
+            mdata_entry_actions: Store::new(),
+            mdata_permissions: Store::new(),
+            mdata_permission_set: Store::new(),
+            se_reader: Store::new(),
+            se_writer: Store::new(),
+            sign_key: Store::new(),
+            xor_name: Store::new(),
         }
     }
 
     pub fn reset(&self) {
-        self.inner.handle_gen.reset();
-        self.inner.app.clear();
-        self.inner.cipher_opt.clear();
-        self.inner.encrypt_key.clear();
-        self.inner.mdata_entries.clear();
-        self.inner.mdata_keys.clear();
-        self.inner.mdata_values.clear();
-        self.inner.mdata_entry_actions.clear();
-        self.inner.mdata_permissions.clear();
-        self.inner.mdata_permission_set.clear();
-        self.inner.se_reader.clear();
-        self.inner.se_writer.clear();
-        self.inner.sign_key.clear();
-        self.inner.xor_name.clear();
+        self.handle_gen.reset();
+        self.cipher_opt.clear();
+        self.encrypt_key.clear();
+        self.mdata_entries.clear();
+        self.mdata_keys.clear();
+        self.mdata_values.clear();
+        self.mdata_entry_actions.clear();
+        self.mdata_permissions.clear();
+        self.mdata_permission_set.clear();
+        self.se_reader.clear();
+        self.se_writer.clear();
+        self.sign_key.clear();
+        self.xor_name.clear();
     }
 }
 
@@ -110,29 +133,22 @@ macro_rules! impl_cache {
      $remove:ident) => {
         impl ObjectCache {
             pub fn $insert(&self, value: $ty) -> $handle {
-                let handle = self.inner.handle_gen.gen();
-                self.inner.$name.insert(handle, value);
+                let handle = self.handle_gen.gen();
+                self.$name.insert(handle, value);
                 handle
             }
 
-            pub fn $get(&self, handle: $handle) -> Result<RefMut<$ty>, FfiError> {
-                self.inner.$name.get(handle).ok_or(FfiError::$error)
+            pub fn $get(&self, handle: $handle) -> Result<RefMut<$ty>, AppError> {
+                self.$name.get(handle).ok_or(AppError::$error)
             }
 
-            pub fn $remove(&self, handle: $handle) -> Result<$ty, FfiError> {
-                self.inner.$name.remove(handle).ok_or(FfiError::$error)
+            pub fn $remove(&self, handle: $handle) -> Result<$ty, AppError> {
+                self.$name.remove(handle).ok_or(AppError::$error)
             }
         }
     }
 }
 
-impl_cache!(app,
-            App,
-            AppHandle,
-            InvalidAppHandle,
-            get_app,
-            insert_app,
-            remove_app);
 impl_cache!(cipher_opt,
             CipherOpt,
             CipherOptHandle,

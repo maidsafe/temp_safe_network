@@ -58,7 +58,7 @@ fn register_and_delete_dns_internal_error_recovery() {
         let messaging_keypair3 = messaging_keypair.clone();
         let messaging_keypair4 = messaging_keypair.clone();
 
-        let owners = vec![unwrap!(client.public_signing_key()).clone()];
+        let owners = vec![unwrap!(client.owner_key()).clone()];
         let owners2 = owners.clone();
         let owners3 = owners.clone();
         let owners4 = owners.clone();

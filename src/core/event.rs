@@ -32,7 +32,7 @@ pub const NETWORK_EVENT_START_RANGE: i32 = 0;
 #[derive(Debug)]
 pub enum CoreEvent {
     /// Result of getting account info
-    AccountInfo(Result<AccountInfo, CoreError>),
+    GetAccountInfo(Result<AccountInfo, CoreError>),
     /// Result of data mutation request
     Mutation(Result<(), CoreError>),
     /// Result of getting `ImmutableData`

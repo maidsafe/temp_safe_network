@@ -23,15 +23,11 @@
 
 use core::{CORE_ERROR_START_RANGE, CoreError};
 use futures::sync::mpsc::SendError;
-// use dns::{DNS_ERROR_START_RANGE, DnsError};
-use maidsafe_utilities::serialisation::SerialisationError;
-// use nfs::errors::NfsError;
 use routing::RoutingError;
 use std::any::Any;
 use std::error::Error;
 use std::ffi::NulError;
 use std::fmt;
-use std::io::Error as IoError;
 use std::sync::mpsc::RecvError;
 
 /// Intended for converting Launcher Errors into numeric codes for propagating
@@ -59,52 +55,19 @@ pub enum FfiError {
     LocalConfigAccessFailed(String),
     /// Unexpected - Probably a Logic error
     Unexpected(String),
-    /// Could not serialise or deserialise data
-    UnsuccessfulEncodeDecode(SerialisationError),
     /// Could not convert String to nul-terminated string because it contains
     /// internal nuls.
     NulError(NulError),
-    /// Invalid App handle
-    InvalidAppHandle,
-    /// Invalid MutableData enties handle
-    InvalidMDataEntriesHandle,
-    /// Invalid MutableData entry actions handle
-    InvalidMDataEntryActionsHandle,
-    /// Invalid MutableData permissions handle
-    InvalidMDataPermissionsHandle,
-    /// Invalid MutableData permission set handle
-    InvalidMDataPermissionSetHandle,
-    /// Invalid XorName handle
-    InvalidXorNameHandle,
-    /// Invalid Self Encryptor handle
-    InvalidSelfEncryptorHandle,
-    /// Invalid CipherOpt handle
-    InvalidCipherOptHandle,
-    /// Invalid encrypt (box_) key handle
-    InvalidEncryptKeyHandle,
-    /// Invalid sign key handle
-    InvalidSignKeyHandle,
     /// The requested operation is forbidded for the given app.
     OperationForbiddenForApp,
     /// Invalid version number requested for a versioned StructuredData
     InvalidVersionNumber,
-    /// Invalid offsets (from-position and lenght combination) provided for
-    /// reading form Self
-    /// Encryptor. Would have probably caused an overflow.
-    InvalidSelfEncryptorReadOffsets,
     /// Invalid indexing
     InvalidIndex,
     /// Unsupported Operation (e.g. mixing Pub/PrivAppendableData operations)
     UnsupportedOperation,
-    /// Input/output Error
-    IoError(IoError),
 }
 
-impl From<SerialisationError> for FfiError {
-    fn from(error: SerialisationError) -> FfiError {
-        FfiError::UnsuccessfulEncodeDecode(error)
-    }
-}
 impl<'a> From<&'a str> for FfiError {
     fn from(error: &'a str) -> FfiError {
         FfiError::Unexpected(error.to_string())
@@ -126,12 +89,6 @@ impl<T: Any> From<SendError<T>> for FfiError {
 impl From<RoutingError> for FfiError {
     fn from(error: RoutingError) -> FfiError {
         FfiError::from(CoreError::from(error))
-    }
-}
-
-impl From<IoError> for FfiError {
-    fn from(error: IoError) -> FfiError {
-        FfiError::IoError(error)
     }
 }
 
@@ -177,24 +134,11 @@ impl Into<i32> for FfiError {
             FfiError::PermissionDenied => FFI_ERROR_START_RANGE - 3,
             FfiError::LocalConfigAccessFailed(_) => FFI_ERROR_START_RANGE - 8,
             FfiError::Unexpected(_) => FFI_ERROR_START_RANGE - 9,
-            FfiError::UnsuccessfulEncodeDecode(_) => FFI_ERROR_START_RANGE - 10,
             FfiError::NulError(_) => FFI_ERROR_START_RANGE - 11,
-            FfiError::InvalidAppHandle => FFI_ERROR_START_RANGE - 26,
-            FfiError::InvalidMDataEntriesHandle => FFI_ERROR_START_RANGE - 27,
-            FfiError::InvalidMDataEntryActionsHandle => FFI_ERROR_START_RANGE - 28,
-            FfiError::InvalidMDataPermissionsHandle => FFI_ERROR_START_RANGE - 29,
-            FfiError::InvalidMDataPermissionSetHandle => FFI_ERROR_START_RANGE - 30,
-            FfiError::InvalidXorNameHandle => FFI_ERROR_START_RANGE - 13,
-            FfiError::InvalidSelfEncryptorHandle => FFI_ERROR_START_RANGE - 15,
-            FfiError::InvalidCipherOptHandle => FFI_ERROR_START_RANGE - 16,
-            FfiError::InvalidEncryptKeyHandle => FFI_ERROR_START_RANGE - 17,
-            FfiError::InvalidSignKeyHandle => FFI_ERROR_START_RANGE - 18,
             FfiError::OperationForbiddenForApp => FFI_ERROR_START_RANGE - 19,
             FfiError::InvalidVersionNumber => FFI_ERROR_START_RANGE - 21,
-            FfiError::InvalidSelfEncryptorReadOffsets => FFI_ERROR_START_RANGE - 22,
             FfiError::InvalidIndex => FFI_ERROR_START_RANGE - 23,
             FfiError::UnsupportedOperation => FFI_ERROR_START_RANGE - 24,
-            FfiError::IoError(_) => FFI_ERROR_START_RANGE - 25,
         }
     }
 }
@@ -212,36 +156,11 @@ impl fmt::Debug for FfiError {
                 write!(f, "FfiError::LocalConfigAccessFailed -> {:?}", error)
             }
             FfiError::Unexpected(ref error) => write!(f, "FfiError::Unexpected{{{:?}}}", error),
-            FfiError::UnsuccessfulEncodeDecode(ref error) => {
-                write!(f, "FfiError::UnsuccessfulEncodeDecode -> {:?}", error)
-            }
             FfiError::NulError(ref error) => write!(f, "FfiError::NulError -> {:?}", error),
-            FfiError::InvalidAppHandle => write!(f, "FfiError::InvalidAppHandle"),
-            FfiError::InvalidMDataEntriesHandle => write!(f, "FfiError::InvalidMDataEntriesHandle"),
-            FfiError::InvalidMDataEntryActionsHandle => {
-                write!(f, "FfiError::InvalidMDataEntryActionsHandle")
-            }
-            FfiError::InvalidMDataPermissionsHandle => {
-                write!(f, "FfiError::InvalidMDataPermissionsHandle")
-            }
-            FfiError::InvalidMDataPermissionSetHandle => {
-                write!(f, "FfiError::InvalidMDataPermissionSetHandle")
-            }
-            FfiError::InvalidXorNameHandle => write!(f, "FfiError::InvalidXorNameHandle"),
-            FfiError::InvalidSelfEncryptorHandle => {
-                write!(f, "FfiError::InvalidSelfEncryptorHandle")
-            }
-            FfiError::InvalidCipherOptHandle => write!(f, "FfiError::InvalidCipherOptHandle"),
-            FfiError::InvalidEncryptKeyHandle => write!(f, "FfiError::InvalidEncryptKeyHandle"),
-            FfiError::InvalidSignKeyHandle => write!(f, "FfiError::InvalidSignKeyHandle"),
             FfiError::OperationForbiddenForApp => write!(f, "FfiError::OperationForbiddenForApp"),
             FfiError::InvalidVersionNumber => write!(f, "FfiError::InvalidVersionNumber"),
-            FfiError::InvalidSelfEncryptorReadOffsets => {
-                write!(f, "FfiError::InvalidSelfEncryptorReadOffsets")
-            }
             FfiError::InvalidIndex => write!(f, "FfiError::InvalidIndex"),
             FfiError::UnsupportedOperation => write!(f, "FfiError::UnsupportedOperation"),
-            FfiError::IoError(ref error) => write!(f, "FfiError::IoError -> {:?}", error),
         }
     }
 }

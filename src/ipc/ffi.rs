@@ -133,7 +133,9 @@ pub unsafe extern "C" fn auth_request_drop(a: AuthReq) {
 
 #[repr(C)]
 /// Represents the needed keys to work with the data
-pub struct AppAccessToken {
+pub struct AppKeys {
+    /// Owner signing public key
+    pub owner_key: [u8; sign::PUBLICKEYBYTES],
     /// Data symmetric encryption key
     pub enc_key: [u8; secretbox::KEYBYTES],
     /// Asymmetric sign public key.
@@ -151,8 +153,8 @@ pub struct AppAccessToken {
 /// Free memory
 #[no_mangle]
 #[allow(unsafe_code)]
-pub unsafe extern "C" fn app_access_token_free(a: *mut AppAccessToken) {
-    let _ = super::AppAccessToken::from_raw(a);
+pub unsafe extern "C" fn app_keys_free(a: *mut AppKeys) {
+    let _ = super::AppKeys::from_raw(a);
 }
 
 /// Containers request

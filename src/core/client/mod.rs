@@ -297,11 +297,6 @@ impl Client {
         where T: 'static
     {
         trace!("Attempting to log into an acc using client keys.");
-
-        let Digest(digest) = sha256::hash(&keys.sign_pk.0);
-        let cm_addr = Authority::ClientManager(XorName(digest));
-
-        trace!("Creating an actual routing...");
         let (routing, routing_rx) = setup_routing(Some(keys.clone().into()))?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
@@ -312,7 +307,7 @@ impl Client {
             routing: routing,
             hooks: HashMap::with_capacity(10),
             cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            client_type: ClientType::from_keys(owner, cm_addr),
+            client_type: ClientType::from_keys(keys, owner),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
             joiner: joiner,
             session_packet_version: 0,
@@ -442,7 +437,6 @@ impl Client {
         trace!("PutMData for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
-
         self.mutate(|routing, dst, msg_id| {
             routing.mutate_mdata_entries(dst, name, tag, actions, msg_id, requester)
         })
@@ -510,13 +504,13 @@ impl Client {
     pub fn get_account_info(&self) -> Box<CoreFuture<AccountInfo>> {
         trace!("Account info GET issued.");
 
-        let (hook, rx, msg_id) = oneshot!(self, CoreEvent::AccountInfo);
+        let (hook, rx, msg_id) = oneshot!(self, CoreEvent::GetAccountInfo);
 
         let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
         let result = self.routing_mut().get_account_info(dst, msg_id);
 
         if let Err(e) = result {
-            hook.complete(CoreEvent::AccountInfo(Err(From::from(e))));
+            hook.complete(CoreEvent::GetAccountInfo(Err(From::from(e))));
         } else {
             self.insert_hook(msg_id, hook);
         }
@@ -565,7 +559,6 @@ impl Client {
         trace!("SetMDataUserPermissions for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
-
         self.mutate(|routing, dst, msg_id| {
             routing.set_mdata_user_permissions(dst,
                                                name,
@@ -588,7 +581,6 @@ impl Client {
         trace!("DelMDataUserPermissions for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
-
         self.mutate(|routing, dst, msg_id| {
             routing.del_mdata_user_permissions(dst, name, tag, user, version, msg_id, requester)
         })
@@ -604,7 +596,6 @@ impl Client {
         trace!("ChangeMDataOwner for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
-
         self.mutate(|routing, dst, msg_id| {
             routing.change_mdata_owner(dst, name, tag, new_owner, version, msg_id, requester)
         })
@@ -681,42 +672,35 @@ impl Client {
 
     /// Returns the public encryption key
     pub fn public_encryption_key(&self) -> Result<box_::PublicKey, CoreError> {
-        let inner = self.inner();
-        let account = inner.client_type.acc()?;
-        Ok(account.maid_keys.enc_pk)
+        self.inner().client_type.public_encryption_key()
     }
 
     /// Returns the Secret encryption key
     pub fn secret_encryption_key(&self) -> Result<box_::SecretKey, CoreError> {
-        let inner = self.inner();
-        let account = inner.client_type.acc()?;
-        Ok(account.maid_keys.enc_sk.clone())
+        self.inner().client_type.secret_encryption_key()
     }
 
     /// Returns the Public Signing key
     pub fn public_signing_key(&self) -> Result<sign::PublicKey, CoreError> {
-        let inner = self.inner();
-        let account = inner.client_type.acc()?;
-        Ok(account.maid_keys.sign_pk)
+        self.inner().client_type.public_signing_key()
     }
 
     /// Returns the Secret Signing key
     pub fn secret_signing_key(&self) -> Result<sign::SecretKey, CoreError> {
-        let inner = self.inner();
-        let account = inner.client_type.acc()?;
-        Ok(account.maid_keys.sign_sk.clone())
+        self.inner().client_type.secret_signing_key()
     }
 
     /// Returns the public and secret signing keys.
     pub fn signing_keypair(&self) -> Result<(sign::PublicKey, sign::SecretKey), CoreError> {
         let inner = self.inner();
-        let account = inner.client_type.acc()?;
-        Ok((account.maid_keys.sign_pk, account.maid_keys.sign_sk.clone()))
+        let pk = inner.client_type.public_signing_key()?;
+        let sk = inner.client_type.secret_signing_key()?;
+        Ok((pk, sk))
     }
 
     /// Return the owner signing key
-    pub fn owner_sign_key(&self) -> Result<sign::PublicKey, CoreError> {
-        self.inner().client_type.owner_sign_key()
+    pub fn owner_key(&self) -> Result<sign::PublicKey, CoreError> {
+        self.inner().client_type.owner_key()
     }
 
     fn update_session_packet(&self) -> Box<CoreFuture<()>> {
@@ -875,15 +859,20 @@ enum ClientType {
         cm_addr: Authority,
     },
     FromKeys {
-        owner: sign::PublicKey,
+        keys: ClientKeys,
+        owner_key: sign::PublicKey,
         cm_addr: Authority,
     },
 }
 
 impl ClientType {
-    fn from_keys(owner: sign::PublicKey, cm_addr: Authority) -> Self {
+    fn from_keys(keys: ClientKeys, owner_key: sign::PublicKey) -> Self {
+        let Digest(digest) = sha256::hash(&owner_key.0);
+        let cm_addr = Authority::ClientManager(XorName(digest));
+
         ClientType::FromKeys {
-            owner: owner,
+            keys: keys,
+            owner_key: owner_key,
             cm_addr: cm_addr,
         }
     }
@@ -937,10 +926,42 @@ impl ClientType {
         }
     }
 
-    fn owner_sign_key(&self) -> Result<sign::PublicKey, CoreError> {
+    fn owner_key(&self) -> Result<sign::PublicKey, CoreError> {
         match *self {
-            ClientType::FromKeys { owner, .. } => Ok(owner),
+            ClientType::FromKeys { owner_key, .. } => Ok(owner_key),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_pk),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn public_signing_key(&self) -> Result<sign::PublicKey, CoreError> {
+        match *self {
+            ClientType::FromKeys { ref keys, .. } => Ok(keys.sign_pk),
+            ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_pk),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn secret_signing_key(&self) -> Result<sign::SecretKey, CoreError> {
+        match *self {
+            ClientType::FromKeys { ref keys, .. } => Ok(keys.sign_sk.clone()),
+            ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_sk.clone()),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn public_encryption_key(&self) -> Result<box_::PublicKey, CoreError> {
+        match *self {
+            ClientType::FromKeys { ref keys, .. } => Ok(keys.enc_pk),
+            ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.enc_pk),
+            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+        }
+    }
+
+    fn secret_encryption_key(&self) -> Result<box_::SecretKey, CoreError> {
+        match *self {
+            ClientType::FromKeys { ref keys, .. } => Ok(keys.enc_sk.clone()),
+            ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.enc_sk.clone()),
             ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
         }
     }
