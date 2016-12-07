@@ -38,7 +38,7 @@ use std::os::raw::c_void;
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
 use tokio_core::reactor::Core;
-use util::ffi::{OpaqueCtx, c_utf8_to_str, catch_unwind_error_code};
+use util::ffi::{FfiString, OpaqueCtx, catch_unwind_error_code};
 
 macro_rules! try_tx {
     ($result:expr, $tx:ident) => {
@@ -196,10 +196,8 @@ impl Drop for Authenticator {
 /// operation allowed by this module. `auth_handle` is a pointer to a pointer and must
 /// point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
-pub unsafe extern "C" fn create_acc(account_locator: *const u8,
-                                    account_locator_len: usize,
-                                    account_password: *const u8,
-                                    account_password_len: usize,
+pub unsafe extern "C" fn create_acc(account_locator: FfiString,
+                                    account_password: FfiString,
                                     auth_handle: *mut *mut Authenticator,
                                     user_data: *mut c_void,
                                     o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
@@ -209,8 +207,8 @@ pub unsafe extern "C" fn create_acc(account_locator: *const u8,
     catch_unwind_error_code(|| -> Result<(), AuthError> {
         trace!("Authenticator - create a client account.");
 
-        let acc_locator = c_utf8_to_str(account_locator, account_locator_len)?;
-        let acc_password = c_utf8_to_str(account_password, account_password_len)?;
+        let acc_locator = account_locator.as_str()?;
+        let acc_password = account_password.as_str()?;
 
         let authenticator =
             Authenticator::create_acc(acc_locator, acc_password, move |net_event| {
@@ -233,10 +231,8 @@ pub unsafe extern "C" fn create_acc(account_locator: *const u8,
 /// any operation allowed for authenticator. `auth_handle` is a pointer to a pointer
 /// and must point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
-pub unsafe extern "C" fn login(account_locator: *const u8,
-                               account_locator_len: usize,
-                               account_password: *const u8,
-                               account_password_len: usize,
+pub unsafe extern "C" fn login(account_locator: FfiString,
+                               account_password: FfiString,
                                auth_handle: *mut *mut Authenticator,
                                user_data: *mut c_void,
                                o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
@@ -246,8 +242,8 @@ pub unsafe extern "C" fn login(account_locator: *const u8,
     catch_unwind_error_code(|| -> Result<(), AuthError> {
         trace!("Authenticator - log in a registererd client.");
 
-        let acc_locator = c_utf8_to_str(account_locator, account_locator_len)?;
-        let acc_password = c_utf8_to_str(account_password, account_password_len)?;
+        let acc_locator = account_locator.as_str()?;
+        let acc_password = account_password.as_str()?;
 
         let authenticator = Authenticator::login(acc_locator, acc_password, move |net_event| {
             let user_data: *mut c_void = user_data.into();
@@ -275,15 +271,16 @@ pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
 
 #[cfg(test)]
 mod tests {
+    use core::utility;
     use std::os::raw::c_void;
     use std::ptr;
     use super::*;
-    use util::ffi;
+    use util::ffi::FfiString;
 
     #[test]
     fn create_account_and_login() {
-        let acc_locator = ffi::generate_random_cstring(10);
-        let acc_password = ffi::generate_random_cstring(10);
+        let acc_locator = unwrap!(utility::generate_random_string(10));
+        let acc_password = unwrap!(utility::generate_random_string(10));
 
         {
             let mut auth_h: *mut Authenticator = ptr::null_mut();
@@ -291,10 +288,8 @@ mod tests {
             unsafe {
                 let auth_h_ptr = &mut auth_h;
 
-                assert_eq!(create_acc(acc_locator.as_ptr() as *const u8,
-                                      10,
-                                      acc_password.as_ptr() as *const u8,
-                                      10,
+                assert_eq!(create_acc(FfiString::from_str(&acc_locator),
+                                      FfiString::from_str(&acc_password),
                                       auth_h_ptr,
                                       ptr::null_mut(),
                                       net_event_cb),
@@ -312,10 +307,8 @@ mod tests {
             unsafe {
                 let auth_h_ptr = &mut auth_h;
 
-                assert_eq!(login(acc_locator.as_ptr() as *const u8,
-                                 10,
-                                 acc_password.as_ptr() as *const u8,
-                                 10,
+                assert_eq!(login(FfiString::from_str(&acc_locator),
+                                 FfiString::from_str(&acc_password),
                                  auth_h_ptr,
                                  ptr::null_mut(),
                                  net_event_cb),
