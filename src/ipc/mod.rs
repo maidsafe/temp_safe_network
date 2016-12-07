@@ -21,7 +21,6 @@
 
 use routing::XorName;
 use rust_sodium::crypto::{box_, secretbox, sign};
-use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use std::mem;
 
 /// Ffi module
@@ -308,51 +307,6 @@ pub struct ContainersReq;
 #[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub struct ContainersGranted;
 
-fn encode_result<E, T, T2>(s: &mut E, res: &Result<T, T2>) -> Result<(), E::Error>
-    where E: Encoder,
-          T: Encodable,
-          T2: Encodable
-{
-    s.emit_enum("Result", |s| {
-        match *res {
-            Ok(ref v) => {
-                s.emit_enum_variant("Ok", 0, 1, |s| {
-                    s.emit_enum_variant_arg(0, |s| v.encode(s))?;
-                    Ok(())
-                })
-            }
-            Err(ref v) => {
-                s.emit_enum_variant("Err", 1, 1, |s| {
-                    s.emit_enum_variant_arg(0, |s| v.encode(s))?;
-                    Ok(())
-                })
-            }
-        }
-    })
-}
-
-fn decode_result<D, T, T2>(d: &mut D) -> Result<Result<T, T2>, D::Error>
-    where D: Decoder,
-          T: Decodable,
-          T2: Decodable
-{
-    d.read_enum("Result", |d| {
-        d.read_enum_variant(&["Ok", "Err"], |d, idx| {
-            match idx {
-                0 => {
-                    d.read_enum_variant_arg(0, |d| T::decode(d))
-                        .map(|v| Ok(v))
-                }
-                1 => {
-                    d.read_enum_variant_arg(0, |d| T2::decode(d))
-                        .map(|v| Err(v))
-                }
-                _ => panic!("Internal error"),
-            }
-        })
-    })
-}
-
 #[derive(RustcEncodable, RustcDecodable, Debug)]
 /// IPC message
 pub enum IpcMsg {
@@ -391,7 +345,7 @@ pub enum IpcReq {
     Containers(ContainersReq),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 /// IPC response
 // TODO: `TransOwnership` variant
 pub enum IpcResp {
@@ -401,52 +355,9 @@ pub enum IpcResp {
     Containers(Result<ContainersGranted, IpcError>),
 }
 
-impl Encodable for IpcResp {
-    fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
-        s.emit_enum("IpcResp", |s| {
-            match *self {
-                IpcResp::Auth(ref v) => {
-                    s.emit_enum_variant("Auth", 0, 1, |s| {
-                        s.emit_enum_variant_arg(0, |s| encode_result(s, v))?;
-                        Ok(())
-                    })
-                }
-                IpcResp::Containers(ref v) => {
-                    s.emit_enum_variant("Err", 1, 1, |s| {
-                        s.emit_enum_variant_arg(0, |s| encode_result(s, v))?;
-                        Ok(())
-                    })
-                }
-            }
-        })
-    }
-}
-
-impl Decodable for IpcResp {
-    fn decode<D: Decoder>(d: &mut D) -> Result<IpcResp, D::Error> {
-        d.read_enum("IpcResp", |d| {
-            d.read_enum_variant(&["Auth", "Containers"], |d, idx| {
-                match idx {
-                    0 => {
-                        d.read_enum_variant_arg(0, |d| decode_result(d))
-                            .map(|v| IpcResp::Auth(v))
-                    }
-                    1 => {
-                        d.read_enum_variant_arg(0, |d| decode_result(d))
-                            .map(|v| IpcResp::Containers(v))
-                    }
-                    _ => panic!("Internal error"),
-                }
-            })
-        })
-    }
-}
-
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
-
     use super::*;
 
     #[test]
@@ -554,15 +465,5 @@ mod tests {
         assert_eq!(a.containers.len(), 0);
 
         unsafe { ffi::auth_request_drop(a.into_ffi()) };
-    }
-
-    #[test]
-    fn ipc_resp_serialisation() {
-        let value = IpcResp::Auth(Err(IpcError::ContainersDenied));
-        let wrapped_value = unwrap!(serialise(&value));
-        assert_eq!(wrapped_value, vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1]);
-        let decoded_value: IpcResp = unwrap!(deserialise(&wrapped_value));
-        assert_eq!(decoded_value,
-                   IpcResp::Auth(Err(IpcError::ContainersDenied)));
     }
 }
