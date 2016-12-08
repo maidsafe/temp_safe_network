@@ -262,7 +262,7 @@ mod tests {
         let a = AccessContainer {
             id: XorName([2; XOR_NAME_LEN]),
             tag: 681,
-            nonce: nonce.clone(),
+            nonce: nonce,
         };
 
         let ffi = a.into_repr_c();

@@ -23,24 +23,29 @@
 pub mod errors;
 /// Module for File struct
 
-mod file_metadata;
 mod file;
-/// Helper for `directory_listing` and File for NFS Low level API
-pub mod helper;
 /// Generate Standard Directories
 mod dir;
 mod std_dirs;
+
+/// `FileHelper` provides functions for CRUD on file
+pub mod file_helper;
+/// Data from a file can be read using Reader
+mod reader;
+/// Data for the file can be written using Wirter
+mod writer;
 
 use futures::Future;
 pub use nfs::dir::create_dir;
 pub use nfs::errors::NfsError;
 pub use nfs::file::File;
-pub use nfs::file_metadata::FileMetadata;
+
+pub use nfs::reader::Reader;
 pub use nfs::std_dirs::create_std_dirs;
+pub use nfs::writer::{Mode, Writer};
 
 /// Helper type for futures that can result in `NfsError`
 pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;
-
 
 lazy_static!{
 /// Default Directories to be created at registration
