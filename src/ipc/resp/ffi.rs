@@ -19,6 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use routing::XOR_NAME_LEN;
 use rust_sodium::crypto::{box_, secretbox, sign};
 
 // TODO: crust Config once it's no longer a stub
@@ -95,7 +96,7 @@ pub unsafe extern "C" fn app_keys_drop(a: AppKeys) {
 #[derive(Clone, Copy)]
 pub struct AccessContainer {
     /// ID
-    pub id: [u8; 32],
+    pub id: [u8; XOR_NAME_LEN],
     /// Type tag
     pub tag: u64,
     /// Nonce
