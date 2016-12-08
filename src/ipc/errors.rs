@@ -19,6 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use std::str::Utf8Error;
+
 /// Ipc error
 #[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub enum IpcError {
@@ -26,4 +28,12 @@ pub enum IpcError {
     AuthDenied,
     /// Containers denied
     ContainersDenied,
+    /// Invalid UTF-8 string.
+    Utf8Error,
+}
+
+impl From<Utf8Error> for IpcError {
+    fn from(_err: Utf8Error) -> Self {
+        IpcError::Utf8Error
+    }
 }
