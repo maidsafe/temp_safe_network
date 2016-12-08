@@ -21,7 +21,7 @@
 
 use core::{Client, FutureExt, SelfEncryptionStorage};
 use futures::Future;
-use nfs::{FileMetadata, NfsError, NfsFuture};
+use nfs::{File, NfsError, NfsFuture};
 use self_encryption::SelfEncryptor;
 
 /// Reader is used to read contents of a File. It can read in chunks if the
@@ -36,7 +36,7 @@ impl Reader {
     /// Create a new instance of Reader
     pub fn new(client: Client,
                storage: SelfEncryptionStorage,
-               file: &FileMetadata)
+               file: &File)
                -> Result<Reader, NfsError> {
         Ok(Reader {
             client: client,
