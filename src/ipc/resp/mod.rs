@@ -169,8 +169,46 @@ impl AccessContainer {
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
+    use ipc::Config;
+    use routing::{XOR_NAME_LEN, XorName};
     use rust_sodium::crypto::{box_, secretbox, sign};
     use super::*;
+
+    #[test]
+    fn auth_granted() {
+        let (ok, _) = sign::gen_keypair();
+        let (pk, sk) = sign::gen_keypair();
+        let key = secretbox::gen_key();
+        let (ourpk, oursk) = box_::gen_keypair();
+        let ak = AppKeys {
+            owner_key: ok,
+            enc_key: key,
+            sign_pk: pk,
+            sign_sk: sk,
+            enc_pk: ourpk,
+            enc_sk: oursk,
+        };
+        let ac = AccessContainer {
+            id: XorName([2; XOR_NAME_LEN]),
+            tag: 681,
+            nonce: secretbox::gen_nonce(),
+        };
+        let ag = AuthGranted {
+            app_keys: ak,
+            bootstrap_config: Config,
+            access_container: ac,
+        };
+
+        let ffi = ag.into_repr_c();
+
+        assert_eq!(ffi.access_container.tag, 681);
+
+        let ag = unsafe { AuthGranted::from_repr_c(ffi) };
+
+        assert_eq!(ag.access_container.tag, 681);
+
+        unsafe { ffi::auth_granted_drop(ag.into_repr_c()) };
+    }
 
     #[test]
     fn app_keys() {
@@ -216,5 +254,30 @@ mod tests {
         unsafe {
             ffi::app_keys_drop(ak.into_repr_c());
         }
+    }
+
+    #[test]
+    fn access_container() {
+        let nonce = secretbox::gen_nonce();
+        let a = AccessContainer {
+            id: XorName([2; XOR_NAME_LEN]),
+            tag: 681,
+            nonce: nonce.clone(),
+        };
+
+        let ffi = a.into_repr_c();
+
+        assert_eq!(ffi.id.iter().sum::<u8>() as usize, 2 * XOR_NAME_LEN);
+        assert_eq!(ffi.tag, 681);
+        assert_eq!(ffi.nonce.iter().collect::<Vec<_>>(),
+                   nonce.0.iter().collect::<Vec<_>>());
+
+        let a = unsafe { AccessContainer::from_repr_c(ffi) };
+
+        assert_eq!(a.id.0.iter().sum::<u8>() as usize, 2 * XOR_NAME_LEN);
+        assert_eq!(a.tag, 681);
+        assert_eq!(a.nonce, nonce);
+
+        unsafe { ffi::access_container_drop(a.into_repr_c()) };
     }
 }
