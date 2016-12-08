@@ -37,7 +37,7 @@ pub enum IpcResp {
 }
 
 /// It represents the authentication response.
-#[derive(RustcEncodable, RustcDecodable, Debug, PartialEq, Eq)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Debug, PartialEq, Eq)]
 pub struct AuthGranted {
     /// The access keys.
     pub app_keys: AppKeys,
@@ -77,7 +77,7 @@ impl AuthGranted {
 }
 
 /// Represents the needed keys to work with the data
-#[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub struct AppKeys {
     /// Owner signing public key.
     pub owner_key: sign::PublicKey,
@@ -129,7 +129,7 @@ impl AppKeys {
 }
 
 /// Access container
-#[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub struct AccessContainer {
     /// ID
     pub id: XorName,
