@@ -22,6 +22,7 @@
 #![allow(unsafe_code)]
 
 pub mod low_level_api;
+pub mod ipc;
 
 mod errors;
 mod object_cache;

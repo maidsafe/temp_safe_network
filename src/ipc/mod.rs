@@ -19,21 +19,21 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+pub use self::errors::IpcError;
 pub use self::req::{AppExchangeInfo, AuthReq, ContainerPermission, ContainersReq, IpcReq};
-pub use self::resp::{AppKeys, AuthGranted, IpcResp};
+pub use self::resp::{AccessContainer, AppKeys, AuthGranted, IpcResp};
+use util;
 
-/// Errors module
 mod errors;
 /// Request module
 pub mod req;
 /// Response module
 pub mod resp;
 
-pub use self::errors::IpcError;
-
 // TODO: replace with `crust::Config`
 /// Placeholder for `crust::Config`
-#[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
+#[derive(Clone, RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
 pub struct Config;
 
 #[derive(RustcEncodable, RustcDecodable, Debug)]
@@ -60,4 +60,14 @@ pub enum IpcMsg {
     },
     /// Generic error like couldn't parse IpcMsg etc.
     Err(IpcError),
+}
+
+/// Encode `IpcMsg` into string, using base64 encoding.
+pub fn encode_msg(msg: &IpcMsg) -> Result<String, IpcError> {
+    Ok(util::base64_encode(&serialise(msg)?))
+}
+
+/// Decode `IpcMsg` encoded with base64 encoding.
+pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
+    Ok(deserialise(&util::base64_decode(encoded)?)?)
 }
