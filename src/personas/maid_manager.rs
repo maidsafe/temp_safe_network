@@ -82,7 +82,7 @@ impl Account {
 pub struct MaidManager {
     routing_node: Rc<RoutingNode>,
     accounts: HashMap<XorName, Account>,
-    request_cache: HashMap<MessageId, (Authority, Authority)>,
+    request_cache: HashMap<MessageId, (Authority<XorName>, Authority<XorName>)>,
 }
 
 impl MaidManager {
@@ -95,8 +95,8 @@ impl MaidManager {
     }
 
     pub fn handle_put(&mut self,
-                      src: Authority,
-                      dst: Authority,
+                      src: Authority<XorName>,
+                      dst: Authority<XorName>,
                       data: Data,
                       msg_id: MessageId)
                       -> Result<(), InternalError> {
@@ -182,8 +182,8 @@ impl MaidManager {
     }
 
     pub fn handle_get_account_info(&mut self,
-                                   src: Authority,
-                                   dst: Authority,
+                                   src: Authority<XorName>,
+                                   dst: Authority<XorName>,
                                    msg_id: MessageId)
                                    -> Result<(), InternalError> {
         let client_name = utils::client_name(&src);
@@ -278,8 +278,8 @@ impl MaidManager {
     #[cfg_attr(feature="clippy", allow(cast_possible_truncation, cast_precision_loss,
                                        cast_sign_loss))]
     fn handle_put_immutable_data(&mut self,
-                                 src: Authority,
-                                 dst: Authority,
+                                 src: Authority<XorName>,
+                                 dst: Authority<XorName>,
                                  data: ImmutableData,
                                  msg_id: MessageId)
                                  -> Result<(), InternalError> {
@@ -289,8 +289,8 @@ impl MaidManager {
     }
 
     fn handle_put_structured_data(&mut self,
-                                  src: Authority,
-                                  dst: Authority,
+                                  src: Authority<XorName>,
+                                  dst: Authority<XorName>,
                                   data: StructuredData,
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
@@ -319,8 +319,8 @@ impl MaidManager {
     }
 
     fn forward_put_request(&mut self,
-                           src: Authority,
-                           dst: Authority,
+                           src: Authority<XorName>,
+                           dst: Authority<XorName>,
                            client_name: XorName,
                            data: Data,
                            msg_id: MessageId)
@@ -360,8 +360,8 @@ impl MaidManager {
     }
 
     fn reply_with_put_failure(&self,
-                              src: Authority,
-                              dst: Authority,
+                              src: Authority<XorName>,
+                              dst: Authority<XorName>,
                               data_id: DataIdentifier,
                               msg_id: MessageId,
                               error: &MutationError)

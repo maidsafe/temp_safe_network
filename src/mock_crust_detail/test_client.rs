@@ -125,7 +125,7 @@ impl TestClient {
     pub fn get_with_src(&mut self,
                         request: DataIdentifier,
                         nodes: &mut [TestNode])
-                        -> (Data, Authority) {
+                        -> (Data, Authority<XorName>) {
         let dst = Authority::NaeManager(*request.name());
         let request_message_id = MessageId::new();
         self.flush();

@@ -56,8 +56,8 @@ struct PendingWrite {
     hash: u64,
     data: Data,
     timestamp: Instant,
-    src: Authority,
-    dst: Authority,
+    src: Authority<XorName>,
+    dst: Authority<XorName>,
     message_id: MessageId,
     mutate_type: PendingMutationType,
 }
@@ -310,8 +310,8 @@ impl Cache {
     fn insert_pending_write(&mut self,
                             data: Data,
                             mutate_type: PendingMutationType,
-                            src: Authority,
-                            dst: Authority,
+                            src: Authority<XorName>,
+                            dst: Authority<XorName>,
                             msg_id: MessageId)
                             -> Option<RefreshData> {
         let hash = maidsafe_utilities::big_endian_sip_hash(&data);
@@ -400,8 +400,8 @@ impl DataManager {
     }
 
     pub fn handle_get(&mut self,
-                      src: Authority,
-                      dst: Authority,
+                      src: Authority<XorName>,
+                      dst: Authority<XorName>,
                       data_id: DataIdentifier,
                       message_id: MessageId)
                       -> Result<(), InternalError> {
@@ -426,8 +426,8 @@ impl DataManager {
     }
 
     pub fn handle_put(&mut self,
-                      src: Authority,
-                      dst: Authority,
+                      src: Authority<XorName>,
+                      dst: Authority<XorName>,
                       data: Data,
                       message_id: MessageId)
                       -> Result<(), InternalError> {
@@ -483,8 +483,8 @@ impl DataManager {
 
     /// Handles a Post request for structured or appendable data.
     pub fn handle_post(&mut self,
-                       src: Authority,
-                       dst: Authority,
+                       src: Authority<XorName>,
+                       dst: Authority<XorName>,
                        new_data: Data,
                        message_id: MessageId)
                        -> Result<(), InternalError> {
@@ -555,8 +555,8 @@ impl DataManager {
 
     /// The structured_data in the delete request must be a valid updating version of the target
     pub fn handle_delete(&mut self,
-                         src: Authority,
-                         dst: Authority,
+                         src: Authority<XorName>,
+                         dst: Authority<XorName>,
                          new_data: StructuredData,
                          message_id: MessageId)
                          -> Result<(), InternalError> {
@@ -587,8 +587,8 @@ impl DataManager {
 
     /// Handles a request to append an item to a public or private appendable data chunk.
     pub fn handle_append(&mut self,
-                         src: Authority,
-                         dst: Authority,
+                         src: Authority<XorName>,
+                         dst: Authority<XorName>,
                          wrapper: AppendWrapper,
                          message_id: MessageId)
                          -> Result<(), InternalError> {
@@ -835,8 +835,8 @@ impl DataManager {
 
     fn send_failure(&self,
                     mutate_type: PendingMutationType,
-                    src: Authority,
-                    dst: Authority,
+                    src: Authority<XorName>,
+                    dst: Authority<XorName>,
                     data_id: DataIdentifier,
                     message_id: MessageId,
                     error: MutationError)
@@ -861,8 +861,8 @@ impl DataManager {
     fn update_pending_writes(&mut self,
                              data: Data,
                              mutate_type: PendingMutationType,
-                             src: Authority,
-                             dst: Authority,
+                             src: Authority<XorName>,
+                             dst: Authority<XorName>,
                              message_id: MessageId)
                              -> Result<(), InternalError> {
         for PendingWrite { mutate_type, src, dst, data, message_id, .. } in
@@ -1069,7 +1069,7 @@ impl DataManager {
     }
 
     fn send_refresh(&self,
-                    dst: Authority,
+                    dst: Authority<XorName>,
                     data_list: Vec<IdAndVersion>)
                     -> Result<(), InternalError> {
         let src = Authority::ManagedNode(self.routing_node.name()?);

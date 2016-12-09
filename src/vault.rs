@@ -205,8 +205,8 @@ impl Vault {
 
     fn on_request(&mut self,
                   request: Request,
-                  src: Authority,
-                  dst: Authority)
+                  src: Authority<XorName>,
+                  dst: Authority<XorName>)
                   -> Result<(), InternalError> {
         match (src, dst, request) {
             // ================== Get ==================
@@ -273,8 +273,8 @@ impl Vault {
 
     fn on_response(&mut self,
                    response: Response,
-                   src: Authority,
-                   dst: Authority)
+                   src: Authority<XorName>,
+                   dst: Authority<XorName>)
                    -> Result<(), InternalError> {
         match (src, dst, response) {
             // ================== GetSuccess ==================
