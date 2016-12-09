@@ -149,38 +149,38 @@ impl Dir {
     }
 
     /// encrypt the the key for the mdata entry of this dir accordingly
-    pub fn enc_entry_key(&self, plain_text: Vec<u8>) -> Result<Vec<u8>, CoreError> {
+    pub fn enc_entry_key(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, seed)) = self.enc_info {
             let nonce = match seed {
                 Some(secretbox::Nonce(ref dir_nonce)) => {
-                    let mut pt = plain_text.clone();
+                    let mut pt = plain_text.to_vec();
                     pt.extend_from_slice(&dir_nonce[..]);
                     unwrap!(secretbox::Nonce::from_slice(
                         &sha256::hash(&pt)[..secretbox::NONCEBYTES]))
                 }
                 None => secretbox::gen_nonce(),
             };
-            Ok(serialise(&(nonce, secretbox::seal(&plain_text, &nonce, key)))?)
+            Ok(serialise(&(nonce, secretbox::seal(plain_text, &nonce, key)))?)
         } else {
-            Ok(plain_text)
+            Ok(plain_text.to_vec())
         }
     }
 
     /// encrypt the value for this mdata entry accordingly
-    pub fn enc_entry_value(&self, plain_text: Vec<u8>) -> Result<Vec<u8>, CoreError> {
+    pub fn enc_entry_value(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.enc_info {
-            symmetric_encrypt(&plain_text, key)
+            symmetric_encrypt(plain_text, key)
         } else {
-            Ok(plain_text)
+            Ok(plain_text.to_vec())
         }
     }
 
     /// decrypt key or value of this mdata entry
-    pub fn decrypt(&self, cipher: Vec<u8>) -> Result<Vec<u8>, CoreError> {
+    pub fn decrypt(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.enc_info {
-            symmetric_decrypt(cipher.as_slice(), key)
+            symmetric_decrypt(cipher, key)
         } else {
-            Ok(cipher)
+            Ok(cipher.to_vec())
         }
     }
 }
@@ -317,12 +317,12 @@ mod tests {
         let dir = unwrap!(Dir::random_private(0));
         let key = Vec::from("str of key");
         let val = Vec::from("other is value");
-        let enc_key = unwrap!(dir.enc_entry_key(key.clone()));
-        let enc_val = unwrap!(dir.enc_entry_value(val.clone()));
+        let enc_key = unwrap!(dir.enc_entry_key(&key));
+        let enc_val = unwrap!(dir.enc_entry_value(&val));
         assert_ne!(enc_key, key);
         assert_ne!(enc_val, val);
-        assert_eq!(unwrap!(dir.decrypt(enc_key)), key);
-        assert_eq!(unwrap!(dir.decrypt(enc_val)), val);
+        assert_eq!(unwrap!(dir.decrypt(&enc_key)), key);
+        assert_eq!(unwrap!(dir.decrypt(&enc_val)), val);
     }
 
     #[test]
@@ -330,9 +330,9 @@ mod tests {
         let dir = unwrap!(Dir::random_public(0));
         let key = Vec::from("str of key");
         let val = Vec::from("other is value");
-        assert_eq!(unwrap!(dir.enc_entry_key(key.clone())), key);
-        assert_eq!(unwrap!(dir.enc_entry_value(val.clone())), val);
-        assert_eq!(unwrap!(dir.decrypt(val.clone())), val);
+        assert_eq!(unwrap!(dir.enc_entry_key(&key)), key);
+        assert_eq!(unwrap!(dir.enc_entry_value(&val)), val);
+        assert_eq!(unwrap!(dir.decrypt(&val)), val);
     }
 
     #[test]
@@ -343,10 +343,10 @@ mod tests {
             enc_info: Some((secretbox::gen_key(), None)),
         };
         let key = Vec::from("str of key");
-        let enc_key = unwrap!(dir.enc_entry_key(key.clone()));
+        let enc_key = unwrap!(dir.enc_entry_key(&key));
         assert_ne!(enc_key, key);
         // encrypted is different on every run
-        assert_ne!(unwrap!(dir.enc_entry_key(key.clone())), key);
+        assert_ne!(unwrap!(dir.enc_entry_key(&key)), key);
     }
 
     fn create_account() -> Account {

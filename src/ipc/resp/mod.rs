@@ -33,7 +33,7 @@ pub enum IpcResp {
     /// Authentication
     Auth(Result<AuthGranted, IpcError>),
     /// Containers
-    Containers,
+    Containers(Result<(), IpcError>),
 }
 
 /// It represents the authentication response.

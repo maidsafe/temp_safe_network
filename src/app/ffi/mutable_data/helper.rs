@@ -32,30 +32,7 @@ use util::ffi::OpaqueCtx;
 use util::ffi::callback::{Callback, CallbackArgs};
 
 // TODO: consider moving the send_* functions to ffi::helper, or even make them methods of
-// Session.
-
-// Convenience wrapper around `App::send` which automatically handles the callback
-// boilerplate.
-// Use this if the lambda never returns future.
-pub unsafe fn send_sync<C, F>(app: *const App,
-                              user_data: *mut c_void,
-                              o_cb: C,
-                              f: F)
-                              -> Result<(), AppError>
-    where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&AppContext) -> Result<C::Args, AppError> + Send + 'static
-{
-    let user_data = OpaqueCtx(user_data);
-
-    (*app).send(move |_, context| {
-        match f(context) {
-            Ok(args) => o_cb.call(user_data.0, 0, args),
-            Err(err) => o_cb.call(user_data.0, ffi_error_code!(err), C::Args::default()),
-        }
-
-        None
-    })
-}
+// App.
 
 // Convenience wrapper around `App::send` which automatically handles the callback
 // boilerplate.

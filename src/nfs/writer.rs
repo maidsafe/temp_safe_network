@@ -108,9 +108,9 @@ impl Writer {
                 file.set_modified_time(::time::now_utc());
                 file.set_size(size);
 
-                let key = fry!(parent.enc_entry_key(file_name.into_bytes()));
+                let key = fry!(parent.enc_entry_key(file_name.as_bytes()));
                 let plaintext = fry!(serialise(&file));
-                let ciphertext = fry!(parent.enc_entry_value(plaintext));
+                let ciphertext = fry!(parent.enc_entry_value(&plaintext));
 
                 let actions = if let Some(version) = version {
                     EntryActions::new().update(key, ciphertext, version)

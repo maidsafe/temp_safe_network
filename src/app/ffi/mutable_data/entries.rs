@@ -23,12 +23,12 @@
 
 use app::App;
 use app::errors::AppError;
+use app::ffi::helper::send_sync;
 use app::object_cache::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle};
 use core::CoreError;
 use routing::{ClientError, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::os::raw::c_void;
-use super::helper;
 use util::ffi::{self, OpaqueCtx};
 use util::ffi::callback::Callback;
 
@@ -40,9 +40,10 @@ pub unsafe extern "C" fn mdata_entries_new(app: *const App,
                                                                       i32,
                                                                       MDataEntriesHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, |context| {
-            Ok(context.object_cache().insert_mdata_entries(Default::default()))
-        })
+        send_sync(app,
+                  user_data,
+                  o_cb,
+                  |context| Ok(context.object_cache().insert_mdata_entries(Default::default())))
     })
 }
 
@@ -154,7 +155,7 @@ pub unsafe extern "C" fn mdata_entries_free(app: *const App,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |context| {
             let _ = context.object_cache().remove_mdata_entries(entries_h)?;
             Ok(())
         })
@@ -206,7 +207,7 @@ pub unsafe extern "C" fn mdata_keys_free(app: *const App,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |context| {
             let _ = context.object_cache().remove_mdata_keys(keys_h)?;
             Ok(())
         })
@@ -262,7 +263,7 @@ pub unsafe extern "C" fn mdata_values_free(app: *const App,
                                            user_data: *mut c_void,
                                            o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |context| {
             let _ = context.object_cache().remove_mdata_values(values_h)?;
             Ok(())
         })
@@ -280,7 +281,7 @@ unsafe fn with_entries<C, F>(app: *const App,
     where C: Callback + Copy + Send + 'static,
           F: FnOnce(&mut BTreeMap<Vec<u8>, Value>) -> Result<C::Args, AppError> + Send + 'static
 {
-    helper::send_sync(app, user_data, o_cb, move |context| {
+    send_sync(app, user_data, o_cb, move |context| {
         let mut entries = context.object_cache().get_mdata_entries(entries_h)?;
         f(&mut *entries)
     })
@@ -295,7 +296,7 @@ unsafe fn with_keys<C, F>(app: *const App,
     where C: Callback + Copy + Send + 'static,
           F: FnOnce(&BTreeSet<Vec<u8>>) -> Result<C::Args, AppError> + Send + 'static
 {
-    helper::send_sync(app, user_data, o_cb, move |context| {
+    send_sync(app, user_data, o_cb, move |context| {
         let keys = context.object_cache().get_mdata_keys(keys_h)?;
         f(&*keys)
     })
@@ -310,7 +311,7 @@ unsafe fn with_values<C, F>(app: *const App,
     where C: Callback + Copy + Send + 'static,
           F: FnOnce(&Vec<Value>) -> Result<C::Args, AppError> + Send + 'static
 {
-    helper::send_sync(app, user_data, o_cb, move |context| {
+    send_sync(app, user_data, o_cb, move |context| {
         let values = context.object_cache().get_mdata_values(values_h)?;
         f(&*values)
     })

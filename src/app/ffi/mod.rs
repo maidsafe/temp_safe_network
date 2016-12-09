@@ -35,6 +35,8 @@ use util::ffi::{OpaqueCtx, catch_unwind_error_code};
 pub mod access_container;
 /// Cipher Options
 pub mod cipher_opt;
+/// `Dir` operations
+pub mod dir;
 /// Low level manipulation of `ImmutableData`
 pub mod immutable_data;
 /// IPC utilities
@@ -45,6 +47,8 @@ pub mod misc;
 pub mod mutable_data;
 /// `XorName` constructions and freeing
 pub mod xor_name;
+
+mod helper;
 
 /// Create unregistered app.
 #[no_mangle]

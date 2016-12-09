@@ -22,10 +22,10 @@
 //! FFI for mutable data entry actions.
 
 use app::App;
+use app::ffi::helper::send_sync;
 use app::object_cache::MDataEntryActionsHandle;
 use routing::{EntryAction, Value};
 use std::os::raw::c_void;
-use super::helper;
 use util::ffi;
 
 /// Create new entry actions.
@@ -37,7 +37,7 @@ fn mdata_entry_actions_new(app: *const App,
                                                       i32,
                                                       MDataEntryActionsHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, |context| {
+        send_sync(app, user_data, o_cb, |context| {
             let actions = Default::default();
             Ok(context.object_cache().insert_mdata_entry_actions(actions))
         })
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn mdata_entry_actions_free(app: *const App,
                                                   user_data: *mut c_void,
                                                   o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        helper::send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |context| {
             let _ = context.object_cache().remove_mdata_entry_actions(actions_h)?;
             Ok(())
         })
@@ -128,7 +128,7 @@ unsafe fn add_action<F>(app: *const App,
         let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
         let action = f();
 
-        helper::send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |context| {
             let mut actions = context.object_cache().get_mdata_entry_actions(actions_h)?;
             let _ = actions.insert(key, action);
             Ok(())

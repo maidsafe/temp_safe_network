@@ -96,7 +96,7 @@ impl Authenticator {
                         let config_dir = unwrap!(cl3.config_root_dir());
                         let mut actions = BTreeMap::new();
                         let encrypted_key
-                            = config_dir.enc_entry_key(Vec::from("authenticator-config"))?;
+                            = config_dir.enc_entry_key(b"authenticator-config")?;
                         let _ = actions.insert(encrypted_key,
                                                EntryAction::Ins(Value {
                                                    content: vec![],
@@ -105,8 +105,8 @@ impl Authenticator {
 
                         let serialised_dir = serialise(&dir)?;
                         let encrypted_key = config_dir
-                            .enc_entry_key(Vec::from("access-container"))?;
-                        let encrypted_value = config_dir.enc_entry_value(serialised_dir)?;
+                            .enc_entry_key(b"access-container")?;
+                        let encrypted_value = config_dir.enc_entry_value(&serialised_dir)?;
 
                         let _ = actions.insert(encrypted_key,
                                                EntryAction::Ins(Value {

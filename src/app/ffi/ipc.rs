@@ -89,7 +89,7 @@ pub unsafe extern "C" fn encode_containers_req(req: FfiContainersReq,
 pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
                                         user_data: *mut c_void,
                                         o_auth: extern "C" fn(*mut c_void, u32, FfiAuthGranted),
-                                        _o_containers: extern "C" fn(*mut c_void, u32),
+                                        o_containers: extern "C" fn(*mut c_void, u32),
                                         o_revoked: extern "C" fn(*mut c_void),
                                         o_err: extern "C" fn(*mut c_void, i32, u32)) {
     catch_unwind_cb(user_data, o_err, || -> Result<_, IpcError> {
@@ -103,12 +103,15 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
                         let auth_granted = auth_granted.into_repr_c();
                         o_auth(user_data, req_id, auth_granted);
                     }
-                    Err(err) => {
-                        o_err(user_data, ffi_error_code!(err), req_id);
-                    }
+                    Err(err) => o_err(user_data, ffi_error_code!(err), req_id),
                 }
             }
-            IpcMsg::Resp { resp: IpcResp::Containers, .. } => unimplemented!(),
+            IpcMsg::Resp { resp: IpcResp::Containers(res), req_id } => {
+                match res {
+                    Ok(()) => o_containers(user_data, req_id),
+                    Err(err) => o_err(user_data, ffi_error_code!(err), req_id),
+                }
+            }
             IpcMsg::Revoked { .. } => o_revoked(user_data),
             _ => {
                 return Err(IpcError::InvalidMsg.into());
@@ -289,6 +292,70 @@ mod tests {
         assert_eq!(context.req_id, req_id);
         let decoded_auth_granted = unsafe { AuthGranted::from_repr_c(context.auth_granted) };
         assert_eq!(decoded_auth_granted, auth_granted);
+    }
+
+    #[test]
+    fn decode_ipc_msg_with_containers_granted() {
+        let req_id = gen_req_id();
+
+        let msg = IpcMsg::Resp {
+            req_id: req_id,
+            resp: IpcResp::Containers(Ok(())),
+        };
+
+        let encoded = unwrap!(ipc::encode_msg(&msg, "app-id"));
+        let encoded = FfiString::from_str(&encoded);
+
+        struct Context {
+            unexpected_cb: bool,
+            req_id: u32,
+        };
+
+        let mut context = Context {
+            unexpected_cb: false,
+            req_id: 0,
+        };
+
+        unsafe {
+            extern "C" fn auth_cb(ctx: *mut c_void, _req_id: u32, _auth_granted: FfiAuthGranted) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).unexpected_cb = true;
+                }
+            }
+
+            extern "C" fn containers_cb(ctx: *mut c_void, req_id: u32) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).req_id = req_id;
+                }
+            }
+
+            extern "C" fn revoked_cb(ctx: *mut c_void) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).unexpected_cb = true;
+                }
+            }
+
+            extern "C" fn err_cb(ctx: *mut c_void, _error_code: i32, _req_id: u32) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).unexpected_cb = true;
+                }
+            }
+
+            let context_ptr: *mut Context = &mut context;
+            decode_ipc_msg(encoded,
+                           context_ptr as *mut c_void,
+                           auth_cb,
+                           containers_cb,
+                           revoked_cb,
+                           err_cb);
+        }
+
+        assert!(!context.unexpected_cb);
+        assert_eq!(context.req_id, req_id);
     }
 
     fn gen_app_keys() -> AppKeys {

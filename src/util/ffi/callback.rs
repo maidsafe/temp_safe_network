@@ -21,6 +21,7 @@
 
 //! Helpers to work with extern "C" callbacks.
 
+use routing::XOR_NAME_LEN;
 use std::os::raw::c_void;
 use std::ptr;
 
@@ -158,6 +159,12 @@ impl<T> CallbackArgs for *const T {
 impl<T> CallbackArgs for *mut T {
     fn default() -> Self {
         ptr::null_mut()
+    }
+}
+
+impl CallbackArgs for [u8; XOR_NAME_LEN] {
+    fn default() -> Self {
+        [0; XOR_NAME_LEN]
     }
 }
 

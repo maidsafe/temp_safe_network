@@ -27,15 +27,12 @@ use routing::EntryActions;
 use self_encryption::DataMap;
 
 /// Gets a file from the directory
-pub fn fetch<S: Into<String>>(client: Client,
-                              parent: Dir,
-                              name: S)
-                              -> Box<CoreFuture<(u64, File)>> {
-    let key = fry!(parent.enc_entry_key(name.into().into_bytes()));
+pub fn fetch<S: AsRef<str>>(client: Client, parent: Dir, name: S) -> Box<CoreFuture<(u64, File)>> {
+    let key = fry!(parent.enc_entry_key(name.as_ref().as_bytes()));
 
     client.get_mdata_value(parent.name, parent.type_tag, key)
         .and_then(move |val| {
-            let plaintext = parent.decrypt(val.content)?;
+            let plaintext = parent.decrypt(&val.content)?;
             let file = deserialise::<File>(&plaintext)?;
             Ok((val.entry_version, file))
         })
@@ -49,15 +46,15 @@ pub fn read(client: Client, file: &File) -> Result<Reader, NfsError> {
 }
 
 /// Delete a file from the Directory
-pub fn delete<S: Into<String>>(client: Client,
-                               parent: Dir,
-                               name: S,
-                               version: u64)
-                               -> Box<CoreFuture<()>> {
-    let name = name.into();
+pub fn delete<S: AsRef<str>>(client: Client,
+                             parent: Dir,
+                             name: S,
+                             version: u64)
+                             -> Box<CoreFuture<()>> {
+    let name = name.as_ref();
     trace!("Deleting file with name {}.", name);
 
-    let key = fry!(parent.enc_entry_key(name.into_bytes()));
+    let key = fry!(parent.enc_entry_key(name.as_bytes()));
 
     client.mutate_mdata_entries(parent.name,
                                 parent.type_tag,
@@ -67,18 +64,18 @@ pub fn delete<S: Into<String>>(client: Client,
 }
 
 /// Updates the file.
-pub fn update<S: Into<String>>(client: Client,
-                               parent: Dir,
-                               name: S,
-                               file: File,
-                               version: u64)
-                               -> Box<CoreFuture<()>> {
-    let name = name.into();
+pub fn update<S: AsRef<str>>(client: Client,
+                             parent: Dir,
+                             name: S,
+                             file: File,
+                             version: u64)
+                             -> Box<CoreFuture<()>> {
+    let name = name.as_ref();
     trace!("Updating file with name '{}'", name);
 
-    let key = fry!(parent.enc_entry_key(name.into_bytes()));
+    let key = fry!(parent.enc_entry_key(name.as_bytes()));
     let plaintext = fry!(serialise(&file));
-    let ciphertext = fry!(parent.enc_entry_value(plaintext));
+    let ciphertext = fry!(parent.enc_entry_value(&plaintext));
 
     client.mutate_mdata_entries(parent.name,
                                 parent.type_tag,
