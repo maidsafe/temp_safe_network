@@ -16,11 +16,11 @@
 // relating to use of the SAFE Network Software.
 
 
+use ::GROUP_SIZE;
 use error::InternalError;
 use itertools::Itertools;
-use kademlia_routing_table::RoutingTable;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, Data, DataIdentifier, GROUP_SIZE, ImmutableData, MessageId,
+use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, RoutingTable,
               StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::HashMap;
@@ -82,7 +82,7 @@ impl Account {
 pub struct MaidManager {
     routing_node: Rc<RoutingNode>,
     accounts: HashMap<XorName, Account>,
-    request_cache: HashMap<MessageId, (Authority, Authority)>,
+    request_cache: HashMap<MessageId, (Authority<XorName>, Authority<XorName>)>,
 }
 
 impl MaidManager {
@@ -95,8 +95,8 @@ impl MaidManager {
     }
 
     pub fn handle_put(&mut self,
-                      src: Authority,
-                      dst: Authority,
+                      src: Authority<XorName>,
+                      dst: Authority<XorName>,
                       data: Data,
                       msg_id: MessageId)
                       -> Result<(), InternalError> {
@@ -182,8 +182,8 @@ impl MaidManager {
     }
 
     pub fn handle_get_account_info(&mut self,
-                                   src: Authority,
-                                   dst: Authority,
+                                   src: Authority<XorName>,
+                                   dst: Authority<XorName>,
                                    msg_id: MessageId)
                                    -> Result<(), InternalError> {
         let client_name = utils::client_name(&src);
@@ -204,7 +204,7 @@ impl MaidManager {
     pub fn handle_refresh(&mut self, serialised_msg: &[u8]) -> Result<(), InternalError> {
         match serialisation::deserialise::<Refresh>(serialised_msg)? {
             Refresh::Update(maid_name, account) => {
-                match self.routing_node.close_group(maid_name) {
+                match self.routing_node.close_group(maid_name, GROUP_SIZE) {
                     Ok(None) | Err(_) => return Ok(()),
                     Ok(Some(_)) => (),
                 }
@@ -234,7 +234,7 @@ impl MaidManager {
                              node_name: &XorName,
                              routing_table: &RoutingTable<XorName>) {
         // Remove all accounts which we are no longer responsible for.
-        let not_close = |name: &&XorName| !routing_table.is_close(*name, GROUP_SIZE);
+        let not_close = |name: &&XorName| !routing_table.is_closest(*name, GROUP_SIZE);
         let accounts_to_delete = self.accounts.keys().filter(not_close).cloned().collect_vec();
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete = self.request_cache
@@ -278,8 +278,8 @@ impl MaidManager {
     #[cfg_attr(feature="clippy", allow(cast_possible_truncation, cast_precision_loss,
                                        cast_sign_loss))]
     fn handle_put_immutable_data(&mut self,
-                                 src: Authority,
-                                 dst: Authority,
+                                 src: Authority<XorName>,
+                                 dst: Authority<XorName>,
                                  data: ImmutableData,
                                  msg_id: MessageId)
                                  -> Result<(), InternalError> {
@@ -289,8 +289,8 @@ impl MaidManager {
     }
 
     fn handle_put_structured_data(&mut self,
-                                  src: Authority,
-                                  dst: Authority,
+                                  src: Authority<XorName>,
+                                  dst: Authority<XorName>,
                                   data: StructuredData,
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
@@ -319,8 +319,8 @@ impl MaidManager {
     }
 
     fn forward_put_request(&mut self,
-                           src: Authority,
-                           dst: Authority,
+                           src: Authority<XorName>,
+                           dst: Authority<XorName>,
                            client_name: XorName,
                            data: Data,
                            msg_id: MessageId)
@@ -360,8 +360,8 @@ impl MaidManager {
     }
 
     fn reply_with_put_failure(&self,
-                              src: Authority,
-                              dst: Authority,
+                              src: Authority<XorName>,
+                              dst: Authority<XorName>,
                               data_id: DataIdentifier,
                               msg_id: MessageId,
                               error: &MutationError)

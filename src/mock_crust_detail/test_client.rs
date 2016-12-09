@@ -16,14 +16,15 @@
 // relating to use of the SAFE Network Software.
 
 
+use ::GROUP_SIZE;
 use maidsafe_utilities::serialisation;
 use rand::{Rng, XorShiftRng};
 use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId,
               PublicId, Response, StructuredData, XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
-use std::iter;
 use std::collections::BTreeSet;
+use std::iter;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use super::poll;
 
@@ -50,7 +51,7 @@ impl TestClient {
 
         let handle = network.new_service_handle(config, None);
         let client = mock_crust::make_current(&handle, || {
-            unwrap!(routing::Client::new(routing_tx, Some(full_id.clone())))
+            unwrap!(routing::Client::new(routing_tx, Some(full_id.clone()), GROUP_SIZE))
         });
 
         TestClient {
@@ -124,7 +125,7 @@ impl TestClient {
     pub fn get_with_src(&mut self,
                         request: DataIdentifier,
                         nodes: &mut [TestNode])
-                        -> (Data, Authority) {
+                        -> (Data, Authority<XorName>) {
         let dst = Authority::NaeManager(*request.name());
         let request_message_id = MessageId::new();
         self.flush();

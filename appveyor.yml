@@ -8,6 +8,7 @@ environment:
     - RUST_VERSION: stable
 branches:
   only:
+    - dev
     - master
 
 clone_depth: 50

@@ -16,13 +16,13 @@
 // relating to use of the SAFE Network Software.
 
 
+use ::GROUP_SIZE;
 use accumulator::Accumulator;
 use chunk_store::ChunkStore;
 use error::InternalError;
 use itertools::Itertools;
-use kademlia_routing_table::RoutingTable;
 use maidsafe_utilities::{self, serialisation};
-use routing::{AppendWrapper, Authority, Data, DataIdentifier, GROUP_SIZE, MessageId,
+use routing::{AppendWrapper, Authority, Data, DataIdentifier, MessageId, RoutingTable,
               StructuredData, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -56,8 +56,8 @@ struct PendingWrite {
     hash: u64,
     data: Data,
     timestamp: Instant,
-    src: Authority,
-    dst: Authority,
+    src: Authority<XorName>,
+    dst: Authority<XorName>,
     message_id: MessageId,
     mutate_type: PendingMutationType,
 }
@@ -164,7 +164,7 @@ impl Cache {
     fn prune_unneeded_chunks(&mut self, routing_table: &RoutingTable<XorName>) -> u64 {
         let pruned_unneeded_chunks: HashSet<_> = self.unneeded_chunks
             .iter()
-            .filter(|data_id| routing_table.is_close(data_id.name(), GROUP_SIZE))
+            .filter(|data_id| routing_table.is_closest(data_id.name(), GROUP_SIZE))
             .cloned()
             .collect();
         if !pruned_unneeded_chunks.is_empty() {
@@ -184,9 +184,9 @@ impl Cache {
             let lost_idvs = data_idvs.iter()
                 .filter(|&&(ref data_id, _)| {
                     // The data needs to be removed if either we are not close to it anymore, i. e.
-                    // other_close_nodes returns None, or `holder` is not in it anymore.
-                    routing_table.other_close_nodes(data_id.name(), GROUP_SIZE)
-                        .map_or(true, |group| !group.contains(holder))
+                    // other_closest_names returns None, or `holder` is not in it anymore.
+                    routing_table.other_closest_names(data_id.name(), GROUP_SIZE)
+                        .map_or(true, |group| !group.contains(&holder))
                 })
                 .cloned()
                 .collect_vec();
@@ -208,8 +208,8 @@ impl Cache {
         let lost_gets = self.ongoing_gets
             .iter()
             .filter(|&(holder, &(_, (ref data_id, _)))| {
-                routing_table.other_close_nodes(data_id.name(), GROUP_SIZE)
-                    .map_or(true, |group| !group.contains(holder))
+                routing_table.other_closest_names(data_id.name(), GROUP_SIZE)
+                    .map_or(true, |group| !group.contains(&holder))
             })
             .map(|(holder, _)| *holder)
             .collect_vec();
@@ -310,8 +310,8 @@ impl Cache {
     fn insert_pending_write(&mut self,
                             data: Data,
                             mutate_type: PendingMutationType,
-                            src: Authority,
-                            dst: Authority,
+                            src: Authority<XorName>,
+                            dst: Authority<XorName>,
                             msg_id: MessageId)
                             -> Option<RefreshData> {
         let hash = maidsafe_utilities::big_endian_sip_hash(&data);
@@ -359,11 +359,11 @@ pub struct DataManager {
 fn id_and_version_of(data: &Data) -> IdAndVersion {
     (data.identifier(),
      match *data {
-        Data::Structured(ref sd) => sd.get_version(),
-        Data::PubAppendable(ref ad) => ad.get_version(),
-        Data::PrivAppendable(ref ad) => ad.get_version(),
-        Data::Immutable(_) => 0,
-    })
+         Data::Structured(ref sd) => sd.get_version(),
+         Data::PubAppendable(ref ad) => ad.get_version(),
+         Data::PrivAppendable(ref ad) => ad.get_version(),
+         Data::Immutable(_) => 0,
+     })
 }
 
 impl Debug for DataManager {
@@ -400,8 +400,8 @@ impl DataManager {
     }
 
     pub fn handle_get(&mut self,
-                      src: Authority,
-                      dst: Authority,
+                      src: Authority<XorName>,
+                      dst: Authority<XorName>,
                       data_id: DataIdentifier,
                       message_id: MessageId)
                       -> Result<(), InternalError> {
@@ -426,8 +426,8 @@ impl DataManager {
     }
 
     pub fn handle_put(&mut self,
-                      src: Authority,
-                      dst: Authority,
+                      src: Authority<XorName>,
+                      dst: Authority<XorName>,
                       data: Data,
                       message_id: MessageId)
                       -> Result<(), InternalError> {
@@ -483,8 +483,8 @@ impl DataManager {
 
     /// Handles a Post request for structured or appendable data.
     pub fn handle_post(&mut self,
-                       src: Authority,
-                       dst: Authority,
+                       src: Authority<XorName>,
+                       dst: Authority<XorName>,
                        new_data: Data,
                        message_id: MessageId)
                        -> Result<(), InternalError> {
@@ -555,8 +555,8 @@ impl DataManager {
 
     /// The structured_data in the delete request must be a valid updating version of the target
     pub fn handle_delete(&mut self,
-                         src: Authority,
-                         dst: Authority,
+                         src: Authority<XorName>,
+                         dst: Authority<XorName>,
                          new_data: StructuredData,
                          message_id: MessageId)
                          -> Result<(), InternalError> {
@@ -587,8 +587,8 @@ impl DataManager {
 
     /// Handles a request to append an item to a public or private appendable data chunk.
     pub fn handle_append(&mut self,
-                         src: Authority,
-                         dst: Authority,
+                         src: Authority<XorName>,
+                         dst: Authority<XorName>,
                          wrapper: AppendWrapper,
                          message_id: MessageId)
                          -> Result<(), InternalError> {
@@ -782,8 +782,8 @@ impl DataManager {
     pub fn handle_group_refresh(&mut self, serialised_refresh: &[u8]) -> Result<(), InternalError> {
         let RefreshData((data_id, version), refresh_hash) =
             serialisation::deserialise(serialised_refresh)?;
-        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in self.cache
-            .take_pending_writes(&data_id) {
+        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in
+            self.cache.take_pending_writes(&data_id) {
             if hash == refresh_hash {
                 let already_existed = self.chunk_store.has(&data_id);
                 if let Err(error) = self.chunk_store.put(&data_id, &data) {
@@ -835,8 +835,8 @@ impl DataManager {
 
     fn send_failure(&self,
                     mutate_type: PendingMutationType,
-                    src: Authority,
-                    dst: Authority,
+                    src: Authority<XorName>,
+                    dst: Authority<XorName>,
                     data_id: DataIdentifier,
                     message_id: MessageId,
                     error: MutationError)
@@ -861,20 +861,20 @@ impl DataManager {
     fn update_pending_writes(&mut self,
                              data: Data,
                              mutate_type: PendingMutationType,
-                             src: Authority,
-                             dst: Authority,
+                             src: Authority<XorName>,
+                             dst: Authority<XorName>,
                              message_id: MessageId)
                              -> Result<(), InternalError> {
-        for PendingWrite { mutate_type, src, dst, data, message_id, .. } in self.cache
-            .remove_expired_writes() {
+        for PendingWrite { mutate_type, src, dst, data, message_id, .. } in
+            self.cache.remove_expired_writes() {
             let data_id = data.identifier();
             let error = MutationError::NetworkOther("Request expired.".to_owned());
             trace!("{:?} did not accumulate. Sending failure", data_id);
             self.send_failure(mutate_type, src, dst, data_id, message_id, error)?;
         }
         let data_name = *data.name();
-        if let Some(refresh_data) = self.cache
-            .insert_pending_write(data, mutate_type, src, dst, message_id) {
+        if let Some(refresh_data) =
+            self.cache.insert_pending_write(data, mutate_type, src, dst, message_id) {
             let _ = self.send_group_refresh(data_name, refresh_data, message_id);
         }
         Ok(())
@@ -884,7 +884,7 @@ impl DataManager {
         let src = Authority::ManagedNode(self.routing_node.name()?);
         let candidates = self.cache.needed_data();
         for (idle_holder, data_idv) in candidates {
-            if let Ok(Some(group)) = self.routing_node.close_group(*data_idv.0.name()) {
+            if let Ok(Some(group)) = self.routing_node.close_group(*data_idv.0.name(), GROUP_SIZE) {
                 if group.contains(&idle_holder) {
                     self.cache.insert_into_ongoing_gets(&idle_holder, &data_idv);
                     let (data_id, _) = data_idv;
@@ -899,7 +899,7 @@ impl DataManager {
     }
 
     fn close_to_address(&self, address: &XorName) -> bool {
-        match self.routing_node.close_group(*address) {
+        match self.routing_node.close_group(*address, GROUP_SIZE) {
             Ok(Some(_)) => true,
             _ => false,
         }
@@ -920,7 +920,7 @@ impl DataManager {
         // Only retain data for which we're still in the close group.
         let mut data_list = Vec::new();
         for (data_id, version) in data_idvs {
-            match routing_table.other_close_nodes(data_id.name(), GROUP_SIZE) {
+            match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
                 None => {
                     trace!("No longer a DM for {:?}", data_id);
                     if self.chunk_store.has(&data_id) && !self.cache.is_in_unneeded(&data_id) {
@@ -934,7 +934,7 @@ impl DataManager {
                     }
                 }
                 Some(close_group) => {
-                    if close_group.contains(node_name) {
+                    if close_group.contains(&node_name) {
                         data_list.push((data_id, version));
                     }
                 }
@@ -967,6 +967,7 @@ impl DataManager {
             let _ = self.send_gets_for_needed_data();
         }
 
+
         let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
             .keys()
             .into_iter()
@@ -974,7 +975,7 @@ impl DataManager {
             .collect_vec());
         let mut data_lists: HashMap<XorName, Vec<IdAndVersion>> = HashMap::new();
         for data_idv in data_idvs {
-            match routing_table.other_close_nodes(data_idv.0.name(), GROUP_SIZE) {
+            match routing_table.other_closest_names(data_idv.0.name(), GROUP_SIZE) {
                 None => {
                     error!("Moved out of close group of {:?} in a NodeLost event!",
                            node_name);
@@ -984,7 +985,7 @@ impl DataManager {
                     // If the group has fewer than GROUP_SIZE elements, the lost node was not
                     // replaced at all. Otherwise, if the group's last node is closer to the data
                     // than the lost node, the lost node was not in the group in the first place.
-                    if let Some(outer_node) = close_group.get(GROUP_SIZE - 2) {
+                    if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
                         if data_idv.0.name().closer(node_name, outer_node) {
                             data_lists.entry(*outer_node).or_insert_with(Vec::new).push(data_idv);
                         }
@@ -1068,7 +1069,7 @@ impl DataManager {
     }
 
     fn send_refresh(&self,
-                    dst: Authority,
+                    dst: Authority<XorName>,
                     data_list: Vec<IdAndVersion>)
                     -> Result<(), InternalError> {
         let src = Authority::ManagedNode(self.routing_node.name()?);
