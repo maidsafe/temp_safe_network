@@ -20,7 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use app::ffi::cipher_opt::CipherOpt;
-use core::SelfEncryptionStorage;
+use core::{Dir, SelfEncryptionStorage};
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, Value, XorName};
 use rust_sodium::crypto::{box_, sign};
@@ -48,6 +48,8 @@ pub type ObjectHandle = u64;
 /// Disambiguating `ObjectHandle`
 pub type CipherOptHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
+pub type DirHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
 pub type EncryptKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataEntriesHandle = ObjectHandle;
@@ -74,6 +76,7 @@ pub type XorNameHandle = ObjectHandle;
 pub struct ObjectCache {
     handle_gen: HandleGenerator,
     cipher_opt: Store<CipherOpt>,
+    dir: Store<Dir>,
     encrypt_key: Store<box_::PublicKey>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
@@ -92,6 +95,7 @@ impl ObjectCache {
         ObjectCache {
             handle_gen: HandleGenerator::new(),
             cipher_opt: Store::new(),
+            dir: Store::new(),
             encrypt_key: Store::new(),
             mdata_entries: Store::new(),
             mdata_keys: Store::new(),
@@ -109,6 +113,7 @@ impl ObjectCache {
     pub fn reset(&self) {
         self.handle_gen.reset();
         self.cipher_opt.clear();
+        self.dir.clear();
         self.encrypt_key.clear();
         self.mdata_entries.clear();
         self.mdata_keys.clear();
@@ -156,6 +161,13 @@ impl_cache!(cipher_opt,
             get_cipher_opt,
             insert_cipher_opt,
             remove_cipher_opt);
+impl_cache!(dir,
+            Dir,
+            DirHandle,
+            InvalidDirHandle,
+            get_dir,
+            insert_dir,
+            remove_dir);
 impl_cache!(encrypt_key,
             box_::PublicKey,
             EncryptKeyHandle,

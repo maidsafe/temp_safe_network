@@ -30,7 +30,8 @@ use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, Dir, NetworkEvent, Netw
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
-use ipc::{AccessContainer, AppKeys, AuthGranted, ContainerPermission};
+use ipc::{AccessContainer, AppKeys, AuthGranted, ContainerPermissions};
+use ipc::req::ffi::Permission;
 use maidsafe_utilities::thread::{self, Joiner};
 use rust_sodium::crypto::secretbox;
 use self::errors::AppError;
@@ -48,6 +49,8 @@ macro_rules! try_tx {
         }
     }
 }
+
+type AppFuture<T> = Future<Item = T, Error = AppError>;
 
 /// Handle to an application instance.
 pub struct App {
@@ -171,7 +174,7 @@ struct Authorised {
     object_cache: ObjectCache,
     sym_enc_key: secretbox::Key,
     _access_container: AccessContainer,
-    _access_info: Vec<(Dir, ContainerPermission)>,
+    _access_info: Vec<(Dir, ContainerPermissions)>,
 }
 
 impl AppContext {
@@ -203,6 +206,25 @@ impl AppContext {
     /// Symmetric encryption/decryption key.
     pub fn sym_enc_key(&self) -> Result<&secretbox::Key, AppError> {
         Ok(&self.as_authorised()?.sym_enc_key)
+    }
+
+    /// Refresh access info by fetching it from the network.
+    pub fn refresh_access_info(&self, _client: &Client) -> Box<AppFuture<()>> {
+        unimplemented!()
+    }
+
+    /// Fetch `Dir` by name from the access container.
+    pub fn get_dir<T: Into<String>>(&self, _client: &Client, _dir_name: T) -> Box<AppFuture<Dir>> {
+        unimplemented!()
+    }
+
+    /// Check the given permission for the given directory.
+    pub fn is_permitted<T: Into<String>>(&self,
+                                         _client: &Client,
+                                         _dir_name: T,
+                                         _permission: Permission)
+                                         -> Box<AppFuture<bool>> {
+        unimplemented!()
     }
 
     fn as_authorised(&self) -> Result<&Authorised, AppError> {

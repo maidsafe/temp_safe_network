@@ -123,7 +123,8 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
 mod tests {
     use core::utility;
     use ipc::{self, AccessContainer, AppExchangeInfo, AppKeys, AuthGranted, AuthReq, Config,
-              IpcMsg, IpcReq, IpcResp};
+              ContainerPermissions, ContainersReq, IpcMsg, IpcReq, IpcResp};
+    use ipc::req::ffi::Permission;
     use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
@@ -135,15 +136,8 @@ mod tests {
 
     #[test]
     fn encode_auth_req_basics() {
-        let app = AppExchangeInfo {
-            id: unwrap!(utility::generate_random_string(10)),
-            scope: None,
-            name: "Test app".to_string(),
-            vendor: "Test vendor".to_string(),
-        };
-
         let req = AuthReq {
-            app: app,
+            app: gen_app_exchange_info(),
             app_container: false,
             containers: Vec::new(),
         };
@@ -164,8 +158,7 @@ mod tests {
         };
 
         assert!(encoded.starts_with("safe-auth:"));
-        let encoded = encoded.trim_left_matches("safe-auth:");
-        let msg = unwrap!(ipc::decode_msg(encoded));
+        let msg = unwrap!(ipc::decode_msg(&encoded));
 
         let (decoded_req_id, decoded_req) = match msg {
             IpcMsg::Req { req_id, req: IpcReq::Auth(req) } => (req_id, req),
@@ -178,11 +171,45 @@ mod tests {
 
     #[test]
     fn encode_containers_req_basics() {
-        // TODO: write this test after `ContainerReq` is implemeted.
+        let container_permissions = ContainerPermissions {
+            container_key: unwrap!(utility::generate_random_string(10)),
+            access: btree_set![Permission::Read],
+        };
+
+        let req = ContainersReq {
+            app: gen_app_exchange_info(),
+            containers: vec![container_permissions],
+        };
+
+        let req_c = req.clone().into_repr_c();
+
+        let mut req_id = 0u32;
+        let mut output = FfiString::default();
+
+        let error_code = unsafe { encode_containers_req(req_c, &mut req_id, &mut output) };
+        assert_eq!(error_code, 0);
+
+        // Decode it and verify it's the same we encoded.
+        let encoded = unsafe {
+            let s = unwrap!(output.to_string());
+            ffi_string_free(output);
+            s
+        };
+
+        assert!(encoded.starts_with("safe-auth:"));
+        let msg = unwrap!(ipc::decode_msg(&encoded));
+
+        let (decoded_req_id, decoded_req) = match msg {
+            IpcMsg::Req { req_id, req: IpcReq::Containers(req) } => (req_id, req),
+            x => panic!("Unexpected {:?}", x),
+        };
+
+        assert_eq!(decoded_req_id, req_id);
+        assert_eq!(decoded_req, req);
     }
 
     #[test]
-    fn decode_ipc_msg_basics() {
+    fn decode_ipc_msg_with_auth_granted() {
         let req_id = gen_req_id();
 
         let access_container = AccessContainer {
@@ -277,6 +304,15 @@ mod tests {
             sign_sk: sign_sk,
             enc_pk: enc_pk,
             enc_sk: enc_sk,
+        }
+    }
+
+    fn gen_app_exchange_info() -> AppExchangeInfo {
+        AppExchangeInfo {
+            id: unwrap!(utility::generate_random_string(10)),
+            scope: None,
+            name: unwrap!(utility::generate_random_string(10)),
+            vendor: unwrap!(utility::generate_random_string(10)),
         }
     }
 }

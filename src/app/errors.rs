@@ -27,6 +27,7 @@ use maidsafe_utilities::serialisation::SerialisationError;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
 use std::io::Error as IoError;
+use std::str::Utf8Error;
 use std::sync::mpsc::{RecvError, RecvTimeoutError};
 
 /// App error.
@@ -36,13 +37,15 @@ pub enum AppError {
     CoreError(CoreError),
     /// IPC error.
     IpcError(IpcError),
-    /// Could not serialise or deserialise data
-    SerialisationError(SerialisationError),
+    /// Generic encoding / decoding failure.
+    EncodeDecodeError,
     /// Forbidden operation
     Forbidden,
 
     /// Invalid CipherOpt handle
     InvalidCipherOptHandle,
+    /// Invalid `Dir` handle
+    InvalidDirHandle,
     /// Invalid encrypt (box_) key handle
     InvalidEncryptKeyHandle,
     /// Invalid MutableData enties handle
@@ -73,19 +76,32 @@ pub enum AppError {
 
 impl From<CoreError> for AppError {
     fn from(err: CoreError) -> Self {
-        AppError::CoreError(err)
+        match err {
+            CoreError::Unexpected(reason) => AppError::Unexpected(reason),
+            _ => AppError::CoreError(err),
+        }
     }
 }
 
 impl From<IpcError> for AppError {
     fn from(err: IpcError) -> Self {
-        AppError::IpcError(err)
+        match err {
+            IpcError::EncodeDecodeError => AppError::EncodeDecodeError,
+            IpcError::Unexpected(reason) => AppError::Unexpected(reason),
+            _ => AppError::IpcError(err),
+        }
     }
 }
 
 impl From<SerialisationError> for AppError {
-    fn from(err: SerialisationError) -> Self {
-        AppError::SerialisationError(err)
+    fn from(_err: SerialisationError) -> Self {
+        AppError::EncodeDecodeError
+    }
+}
+
+impl From<Utf8Error> for AppError {
+    fn from(_err: Utf8Error) -> Self {
+        AppError::EncodeDecodeError
     }
 }
 
@@ -142,21 +158,22 @@ impl Into<i32> for AppError {
         match self {
             AppError::CoreError(err) => err.into(),
             AppError::IpcError(err) => err.into(),
-            AppError::SerialisationError(_) => APP_ERROR_START_RANGE - 1,
+            AppError::EncodeDecodeError => APP_ERROR_START_RANGE - 1,
             AppError::Forbidden => APP_ERROR_START_RANGE - 2,
             AppError::InvalidCipherOptHandle => APP_ERROR_START_RANGE - 3,
-            AppError::InvalidEncryptKeyHandle => APP_ERROR_START_RANGE - 4,
-            AppError::InvalidMDataEntriesHandle => APP_ERROR_START_RANGE - 5,
-            AppError::InvalidMDataEntryActionsHandle => APP_ERROR_START_RANGE - 6,
-            AppError::InvalidMDataPermissionsHandle => APP_ERROR_START_RANGE - 7,
-            AppError::InvalidMDataPermissionSetHandle => APP_ERROR_START_RANGE - 8,
-            AppError::InvalidSelfEncryptorHandle => APP_ERROR_START_RANGE - 9,
-            AppError::InvalidSignKeyHandle => APP_ERROR_START_RANGE - 10,
-            AppError::InvalidXorNameHandle => APP_ERROR_START_RANGE - 11,
-            AppError::SelfEncryption(_) => APP_ERROR_START_RANGE - 12,
-            AppError::InvalidSelfEncryptorReadOffsets => APP_ERROR_START_RANGE - 13,
-            AppError::IoError(_) => APP_ERROR_START_RANGE - 14,
-            AppError::Unexpected(_) => APP_ERROR_START_RANGE - 15,
+            AppError::InvalidDirHandle => APP_ERROR_START_RANGE - 4,
+            AppError::InvalidEncryptKeyHandle => APP_ERROR_START_RANGE - 5,
+            AppError::InvalidMDataEntriesHandle => APP_ERROR_START_RANGE - 6,
+            AppError::InvalidMDataEntryActionsHandle => APP_ERROR_START_RANGE - 7,
+            AppError::InvalidMDataPermissionsHandle => APP_ERROR_START_RANGE - 8,
+            AppError::InvalidMDataPermissionSetHandle => APP_ERROR_START_RANGE - 9,
+            AppError::InvalidSelfEncryptorHandle => APP_ERROR_START_RANGE - 10,
+            AppError::InvalidSignKeyHandle => APP_ERROR_START_RANGE - 11,
+            AppError::InvalidXorNameHandle => APP_ERROR_START_RANGE - 12,
+            AppError::SelfEncryption(_) => APP_ERROR_START_RANGE - 13,
+            AppError::InvalidSelfEncryptorReadOffsets => APP_ERROR_START_RANGE - 14,
+            AppError::IoError(_) => APP_ERROR_START_RANGE - 15,
+            AppError::Unexpected(_) => APP_ERROR_START_RANGE - 16,
         }
     }
 }

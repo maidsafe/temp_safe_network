@@ -18,3 +18,82 @@
 //
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
+
+use app::App;
+use app::object_cache::DirHandle;
+use core::FutureExt;
+use futures::Future;
+use ipc::req::ffi::Permission;
+use std::os::raw::c_void;
+use util::ffi::{FfiString, OpaqueCtx, catch_unwind_cb};
+
+/// Fetch access info from the network.
+#[no_mangle]
+pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
+                                                              user_data: *mut c_void,
+                                                              o_cb: extern "C" fn(*mut c_void,
+                                                                                  i32)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+
+        (*app).send(move |client, context| {
+            context.refresh_access_info(client)
+                .then(move |res| {
+                    o_cb(user_data.0, ffi_result_code!(res));
+                    Ok(())
+                })
+                .into_box()
+                .into()
+        })
+    })
+}
+
+/// Retrieve `Dir` for the given name from the access container.
+#[no_mangle]
+pub unsafe extern "C" fn access_container_get_dir(app: *const App,
+                                                  dir_name: FfiString,
+                                                  user_data: *mut c_void,
+                                                  o_cb: extern "C" fn(*mut c_void,
+                                                                      i32,
+                                                                      DirHandle)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let dir_name = dir_name.to_string()?;
+
+        (*app).send(move |client, context| {
+            let context = context.clone();
+
+            context.get_dir(client, dir_name)
+                .map(move |dir| {
+                    let handle = context.object_cache().insert_dir(dir);
+                    o_cb(user_data.0, 0, handle);
+                })
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), 0))
+                .into_box()
+                .into()
+        })
+    })
+}
+
+/// Check whether the app has the given permission for the given directory.
+#[no_mangle]
+pub unsafe extern "C" fn access_container_is_permitted(app: *const App,
+                                                       dir_name: FfiString,
+                                                       permission: Permission,
+                                                       user_data: *mut c_void,
+                                                       o_cb: extern "C" fn(*mut c_void,
+                                                                           i32,
+                                                                           bool)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let dir_name = dir_name.to_string()?;
+
+        (*app).send(move |client, context| {
+            context.is_permitted(client, dir_name, permission)
+                .map(move |answer| o_cb(user_data.0, 0, answer))
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), false))
+                .into_box()
+                .into()
+        })
+    })
+}
