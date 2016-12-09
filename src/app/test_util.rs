@@ -66,7 +66,7 @@ pub fn create_app() -> App {
         access_container: access_container,
     };
 
-    unwrap!(App::authorised(auth_granted, |_network_event| ()))
+    unwrap!(App::registered(auth_granted, |_network_event| ()))
 }
 
 /*

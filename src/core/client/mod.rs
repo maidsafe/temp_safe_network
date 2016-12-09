@@ -680,6 +680,14 @@ impl Client {
         self.inner().client_type.secret_encryption_key()
     }
 
+    /// Returns the public and secret encryption keys.
+    pub fn encryption_keypair(&self) -> Result<(box_::PublicKey, box_::SecretKey), CoreError> {
+        let inner = self.inner();
+        let pk = inner.client_type.public_encryption_key()?;
+        let sk = inner.client_type.secret_encryption_key()?;
+        Ok((pk, sk))
+    }
+
     /// Returns the Public Signing key
     pub fn public_signing_key(&self) -> Result<sign::PublicKey, CoreError> {
         self.inner().client_type.public_signing_key()

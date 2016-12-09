@@ -32,7 +32,7 @@ use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use ipc::{AccessContainer, AppKeys, AuthGranted, ContainerPermission};
 use maidsafe_utilities::thread::{self, Joiner};
-use rust_sodium::crypto::{box_, secretbox};
+use rust_sodium::crypto::secretbox;
 use self::errors::AppError;
 use self::object_cache::ObjectCache;
 use std::rc::Rc;
@@ -56,19 +56,19 @@ pub struct App {
 }
 
 impl App {
-    /// Create unauthorised app.
-    pub fn unauthorised<N>(network_observer: N) -> Result<Self, AppError>
+    /// Create unregistered app.
+    pub fn unregistered<N>(network_observer: N) -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
     {
         Self::new(network_observer, |el_h, core_tx, net_tx| {
             let client = Client::unregistered(el_h, core_tx, net_tx)?;
-            let context = AppContext::unauthorised();
+            let context = AppContext::unregistered();
             Ok((client, context))
         })
     }
 
-    /// Create authorised app.
-    pub fn authorised<N>(auth_granted: AuthGranted, network_observer: N) -> Result<Self, AppError>
+    /// Create registered app.
+    pub fn registered<N>(auth_granted: AuthGranted, network_observer: N) -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
     {
         let AuthGranted {
@@ -81,12 +81,12 @@ impl App {
             sign_pk: sign_pk,
             sign_sk: sign_sk,
             enc_pk: enc_pk,
-            enc_sk: enc_sk.clone(),
+            enc_sk: enc_sk,
         };
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {
             let client = Client::from_keys(client_keys, owner_key, el_h, core_tx, net_tx)?;
-            let context = AppContext::authorised(enc_key, enc_pk, enc_sk, access_container);
+            let context = AppContext::registered(enc_key, access_container);
             Ok((client, context))
         })
     }
@@ -170,30 +170,22 @@ struct Unauthorised {
 struct Authorised {
     object_cache: ObjectCache,
     sym_enc_key: secretbox::Key,
-    enc_pk: box_::PublicKey,
-    enc_sk: box_::SecretKey,
     _access_container: AccessContainer,
     _access_info: Vec<(Dir, ContainerPermission)>,
 }
 
 impl AppContext {
-    fn unauthorised() -> Self {
+    fn unregistered() -> Self {
         AppContext {
             inner: Rc::new(Inner::Unauthorised(Unauthorised { object_cache: ObjectCache::new() })),
         }
     }
 
-    fn authorised(sym_enc_key: secretbox::Key,
-                  enc_pk: box_::PublicKey,
-                  enc_sk: box_::SecretKey,
-                  access_container: AccessContainer)
-                  -> Self {
+    fn registered(sym_enc_key: secretbox::Key, access_container: AccessContainer) -> Self {
         AppContext {
             inner: Rc::new(Inner::Authorised(Authorised {
                 object_cache: ObjectCache::new(),
                 sym_enc_key: sym_enc_key,
-                enc_pk: enc_pk,
-                enc_sk: enc_sk,
                 _access_container: access_container,
                 _access_info: Vec::new(),
             })),
@@ -211,16 +203,6 @@ impl AppContext {
     /// Symmetric encryption/decryption key.
     pub fn sym_enc_key(&self) -> Result<&secretbox::Key, AppError> {
         Ok(&self.as_authorised()?.sym_enc_key)
-    }
-
-    /// Get public encryption key.
-    pub fn enc_pk(&self) -> Result<&box_::PublicKey, AppError> {
-        Ok(&self.as_authorised()?.enc_pk)
-    }
-
-    /// Get secret encryption key.
-    pub fn enc_sk(&self) -> Result<&box_::SecretKey, AppError> {
-        Ok(&self.as_authorised()?.enc_sk)
     }
 
     fn as_authorised(&self) -> Result<&Authorised, AppError> {

@@ -19,17 +19,18 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+/// Request module
+pub mod req;
+/// Response module
+pub mod resp;
+
+mod errors;
+
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 pub use self::errors::IpcError;
 pub use self::req::{AppExchangeInfo, AuthReq, ContainerPermission, ContainersReq, IpcReq};
 pub use self::resp::{AccessContainer, AppKeys, AuthGranted, IpcResp};
 use util;
-
-mod errors;
-/// Request module
-pub mod req;
-/// Response module
-pub mod resp;
 
 // TODO: replace with `crust::Config`
 /// Placeholder for `crust::Config`

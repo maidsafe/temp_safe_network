@@ -74,15 +74,16 @@ pub mod core;
 /// Utility functions;
 #[macro_use]
 pub mod util;
-/// Nfs module;
-pub mod nfs;
-// / Dns module;
+
+/// Application functions;
+pub mod app;
+/// Authenticator module;
+pub mod authenticator;
+// /// Dns module;
 // pub mod dns;
 /// Ffi module;
 pub mod ffi;
 /// Ipc module;
 pub mod ipc;
-/// Authenticator module;
-pub mod authenticator;
-/// Application functions;
-pub mod app;
+/// Nfs module;
+pub mod nfs;

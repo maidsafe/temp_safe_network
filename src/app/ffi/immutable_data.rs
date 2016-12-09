@@ -124,35 +124,35 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                 }
             };
 
-            let c2 = client.clone();
-            let c3 = client.clone();
+            let client2 = client.clone();
+            let client3 = client.clone();
 
-            let context = context.clone();
+            let context2 = context.clone();
+            let context3 = context.clone();
 
             let fut = fut.map_err(AppError::from)
                 .and_then(move |(data_map, _)| {
                     let ser_data_map = fry!(serialise(&data_map));
-                    immutable_data::create(&c2, ser_data_map, None)
+                    immutable_data::create(&client2, ser_data_map, None)
                         .map_err(AppError::from)
                         .into_box()
                 })
                 .and_then(move |final_immut_data| {
-                    let ser_final_immut_data = fry!(serialise(&final_immut_data));
+                    let ser_final_immut_data = serialise(&final_immut_data)?;
 
                     let raw_data = {
-                        let cipher_opt = fry!(context.object_cache().get_cipher_opt(cipher_opt_h));
-                        fry!(cipher_opt.encrypt(&context, &ser_final_immut_data))
+                        let cipher_opt = context2.object_cache().get_cipher_opt(cipher_opt_h)?;
+                        let sym_key = context2.sym_enc_key()?;
+                        cipher_opt.encrypt(&ser_final_immut_data, sym_key)?
                     };
 
                     let raw_immut_data = ImmutableData::new(raw_data);
-                    let raw_immut_data_name = *raw_immut_data.name();
-
-                    c3.put_idata(raw_immut_data)
+                    Ok((*raw_immut_data.name(), raw_immut_data))
+                })
+                .and_then(move |(name, data)| {
+                    client3.put_idata(data)
                         .map_err(AppError::from)
-                        .map(move |_| {
-                            context.object_cache().insert_xor_name(raw_immut_data_name)
-                        })
-                        .into_box()
+                        .map(move |_| context3.object_cache().insert_xor_name(name))
                 })
                 .then(move |result| {
                     match result {
@@ -180,8 +180,9 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |client, context| {
-            let c2 = client.clone();
-            let c3 = client.clone();
+            let client2 = client.clone();
+            let client3 = client.clone();
+            let client4 = client.clone();
 
             let context2 = context.clone();
             let context3 = context.clone();
@@ -198,19 +199,20 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
 
             fut.map_err(AppError::from)
                 .and_then(move |raw_immut_data| {
-                    let ser_final_immut_data = fry!(CipherOpt::decrypt(&context2,
-                                                                       raw_immut_data.value()));
-                    let final_immut_data =
-                        fry!(deserialise::<ImmutableData>(&ser_final_immut_data));
+                    let sym_key = context2.sym_enc_key()?;
+                    let (asym_pk, asym_sk) = client2.encryption_keypair()?;
+                    let ser_final_immut_data =
+                        CipherOpt::decrypt(raw_immut_data.value(), sym_key, &asym_pk, &asym_sk)?;
 
-                    immutable_data::extract_value(&c2, final_immut_data, None)
+                    Ok(deserialise::<ImmutableData>(&ser_final_immut_data)?)
+                })
+                .and_then(move |final_immut_data| {
+                    immutable_data::extract_value(&client3, final_immut_data, None)
                         .map_err(AppError::from)
-                        .into_box()
                 })
                 .and_then(move |ser_data_map| {
                     let data_map = deserialise::<DataMap>(&ser_data_map)?;
-
-                    let se_storage = SelfEncryptionStorage::new(c3);
+                    let se_storage = SelfEncryptionStorage::new(client4);
 
                     SelfEncryptor::new(se_storage, data_map).map_err(AppError::from)
                 })

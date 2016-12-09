@@ -46,9 +46,9 @@ pub mod mutable_data;
 /// `XorName` constructions and freeing
 pub mod xor_name;
 
-/// Create unauthorised app.
+/// Create unregistered app.
 #[no_mangle]
-pub unsafe extern "C" fn app_unauthorised(user_data: *mut c_void,
+pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
                                           network_observer_cb: unsafe extern "C" fn(*mut c_void,
                                                                                     i32,
                                                                                     i32),
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn app_unauthorised(user_data: *mut c_void,
     catch_unwind_error_code(|| -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
 
-        let app = App::unauthorised(move |event| {
+        let app = App::unregistered(move |event| {
             call_network_observer(event, user_data.0, network_observer_cb)
         })?;
 
@@ -67,9 +67,9 @@ pub unsafe extern "C" fn app_unauthorised(user_data: *mut c_void,
     })
 }
 
-/// Create authorised app.
+/// Create registered app.
 #[no_mangle]
-pub unsafe extern "C" fn app_authorised(auth_granted: FfiAuthGranted,
+pub unsafe extern "C" fn app_registered(auth_granted: FfiAuthGranted,
                                         user_data: *mut c_void,
                                         network_observer_cb: unsafe extern "C" fn(*mut c_void,
                                                                                   i32,
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn app_authorised(auth_granted: FfiAuthGranted,
         let user_data = OpaqueCtx(user_data);
         let auth_granted = AuthGranted::from_repr_c(auth_granted);
 
-        let app = App::authorised(auth_granted, move |event| {
+        let app = App::registered(auth_granted, move |event| {
             call_network_observer(event, user_data.0, network_observer_cb)
         })?;
 
