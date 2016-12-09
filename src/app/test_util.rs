@@ -21,10 +21,13 @@
 
 use core::Client;
 use core::utility::test_utils::random_client;
-use ipc::AppKeys;
+use ipc::{AccessContainer, AppKeys, AuthGranted, Config};
+use rand;
 use rust_sodium::crypto::{box_, secretbox, sign};
 use std::sync::mpsc;
 use super::{App, AppContext};
+
+const ACCESS_CONTAINER_TAG: u64 = 1000;
 
 // Create registered app.
 pub fn create_app() -> App {
@@ -51,7 +54,19 @@ pub fn create_app() -> App {
         enc_sk: enc_sk,
     };
 
-    unwrap!(App::from_keys(app_keys, |_network_event| ()))
+    let access_container = AccessContainer {
+        id: rand::random(),
+        tag: ACCESS_CONTAINER_TAG,
+        nonce: secretbox::gen_nonce(),
+    };
+
+    let auth_granted = AuthGranted {
+        app_keys: app_keys,
+        bootstrap_config: Config,
+        access_container: access_container,
+    };
+
+    unwrap!(App::authorised(auth_granted, |_network_event| ()))
 }
 
 /*

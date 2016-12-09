@@ -29,12 +29,12 @@ mod object_cache;
 #[cfg(test)]
 mod test_util;
 
-use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, NetworkEvent, NetworkTx};
+use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, Dir, NetworkEvent, NetworkTx};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
-use ipc::resp::AppKeys;
-use ipc::resp::ffi::AppKeys as FfiAppKeys;
+use ipc::{AccessContainer, AppKeys, AuthGranted, ContainerPermission};
+use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use maidsafe_utilities::thread::{self, Joiner};
 use rust_sodium::crypto::{box_, secretbox};
 use self::errors::AppError;
@@ -62,8 +62,8 @@ pub struct App {
 }
 
 impl App {
-    /// Create unregistered app.
-    pub fn unregistered<N>(network_observer: N) -> Result<Self, AppError>
+    /// Create unauthorised app.
+    pub fn unauthorised<N>(network_observer: N) -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
     {
         Self::new(network_observer, |el_h, core_tx, net_tx| {
@@ -73,11 +73,16 @@ impl App {
         })
     }
 
-    /// Create app given an access token.
-    pub fn from_keys<N>(app_keys: AppKeys, network_observer: N) -> Result<Self, AppError>
+    /// Create authorised app.
+    pub fn authorised<N>(auth_granted: AuthGranted, network_observer: N) -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
     {
-        let AppKeys { owner_key, enc_key, sign_pk, sign_sk, enc_pk, enc_sk } = app_keys;
+        let AuthGranted {
+            app_keys: AppKeys { owner_key, enc_key, enc_pk, enc_sk, sign_pk, sign_sk },
+            access_container,
+            ..
+        } = auth_granted;
+
         let client_keys = ClientKeys {
             sign_pk: sign_pk,
             sign_sk: sign_sk,
@@ -87,7 +92,7 @@ impl App {
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {
             let client = Client::from_keys(client_keys, owner_key, el_h, core_tx, net_tx)?;
-            let context = AppContext::authorised(enc_key, enc_pk, enc_sk);
+            let context = AppContext::authorised(enc_key, enc_pk, enc_sk, access_container);
             Ok((client, context))
         })
     }
@@ -173,6 +178,8 @@ struct Authorised {
     sym_enc_key: secretbox::Key,
     enc_pk: box_::PublicKey,
     enc_sk: box_::SecretKey,
+    _access_container: AccessContainer,
+    _access_info: Vec<(Dir, ContainerPermission)>,
 }
 
 impl AppContext {
@@ -184,7 +191,8 @@ impl AppContext {
 
     fn authorised(sym_enc_key: secretbox::Key,
                   enc_pk: box_::PublicKey,
-                  enc_sk: box_::SecretKey)
+                  enc_sk: box_::SecretKey,
+                  access_container: AccessContainer)
                   -> Self {
         AppContext {
             inner: Rc::new(Inner::Authorised(Authorised {
@@ -192,6 +200,8 @@ impl AppContext {
                 sym_enc_key: sym_enc_key,
                 enc_pk: enc_pk,
                 enc_sk: enc_sk,
+                _access_container: access_container,
+                _access_info: Vec::new(),
             })),
         }
     }
@@ -229,9 +239,9 @@ impl AppContext {
 
 // ---------- FFI --------------------
 
-/// Create unregistered app.
+/// Create unauthorised app.
 #[no_mangle]
-pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
+pub unsafe extern "C" fn app_unauthorised(user_data: *mut c_void,
                                           network_observer_cb: unsafe extern "C" fn(*mut c_void,
                                                                                     i32,
                                                                                     i32),
@@ -240,7 +250,7 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
     ffi::catch_unwind_error_code(|| -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
 
-        let app = App::unregistered(move |event| {
+        let app = App::unauthorised(move |event| {
             call_network_observer(event, user_data.0, network_observer_cb)
         })?;
 
@@ -250,20 +260,20 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
     })
 }
 
-/// Create app from `AppKeys`.
+/// Create authorised app.
 #[no_mangle]
-pub unsafe extern "C" fn app_from_keys(app_keys: FfiAppKeys,
-                                       user_data: *mut c_void,
-                                       network_observer_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                 i32,
-                                                                                 i32),
-                                       o_app: *mut *mut App)
-                                       -> i32 {
+pub unsafe extern "C" fn app_authorised(auth_granted: FfiAuthGranted,
+                                        user_data: *mut c_void,
+                                        network_observer_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                  i32,
+                                                                                  i32),
+                                        o_app: *mut *mut App)
+                                        -> i32 {
     ffi::catch_unwind_error_code(|| -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
-        let app_keys = AppKeys::from_repr_c(app_keys);
+        let auth_granted = AuthGranted::from_repr_c(auth_granted);
 
-        let app = App::from_keys(app_keys, move |event| {
+        let app = App::authorised(auth_granted, move |event| {
             call_network_observer(event, user_data.0, network_observer_cb)
         })?;
 
