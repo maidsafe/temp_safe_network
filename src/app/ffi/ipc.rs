@@ -51,10 +51,10 @@ pub unsafe extern "C" fn encode_auth_req(req: FfiAuthReq,
             req: IpcReq::Auth(req),
         };
 
-        let encoded = ipc::encode_msg(&msg)?;
+        let encoded = ipc::encode_msg(&msg, "safe-auth")?;
 
         *o_req_id = req_id;
-        *o_encoded = FfiString::from_string(format!("safe-auth:{}", encoded));
+        *o_encoded = FfiString::from_string(encoded);
 
         Ok(())
     })
@@ -75,10 +75,10 @@ pub unsafe extern "C" fn encode_containers_req(req: FfiContainersReq,
             req: IpcReq::Containers(req),
         };
 
-        let encoded = ipc::encode_msg(&msg)?;
+        let encoded = ipc::encode_msg(&msg, "safe-auth")?;
 
         *o_req_id = req_id;
-        *o_encoded = FfiString::from_string(format!("safe-auth:{}", encoded));
+        *o_encoded = FfiString::from_string(encoded);
 
         Ok(())
     })
@@ -93,7 +93,9 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
                                         o_revoked: extern "C" fn(*mut c_void),
                                         o_err: extern "C" fn(*mut c_void, i32, u32)) {
     catch_unwind_cb(user_data, o_err, || -> Result<_, IpcError> {
-        let msg = ipc::decode_msg(msg.as_str()?)?;
+        let msg = msg.as_str()?;
+        let msg = ipc::decode_msg(msg)?;
+
         match msg {
             IpcMsg::Resp { resp: IpcResp::Auth(res), req_id } => {
                 match res {
@@ -200,7 +202,7 @@ mod tests {
             resp: IpcResp::Auth(Ok(auth_granted.clone())),
         };
 
-        let encoded = unwrap!(ipc::encode_msg(&msg));
+        let encoded = unwrap!(ipc::encode_msg(&msg, "app-id"));
         let encoded = FfiString::from_str(&encoded);
 
         struct Context {

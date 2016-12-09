@@ -64,11 +64,19 @@ pub enum IpcMsg {
 }
 
 /// Encode `IpcMsg` into string, using base64 encoding.
-pub fn encode_msg(msg: &IpcMsg) -> Result<String, IpcError> {
-    Ok(util::base64_encode(&serialise(msg)?))
+pub fn encode_msg(msg: &IpcMsg, prefix: &str) -> Result<String, IpcError> {
+    let payload = util::base64_encode(&serialise(msg)?);
+    Ok(format!("{}:{}", prefix, payload))
 }
 
 /// Decode `IpcMsg` encoded with base64 encoding.
 pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
-    Ok(deserialise(&util::base64_decode(encoded)?)?)
+    // stip prefix.
+    let payload = if let Some(index) = encoded.find(':') {
+        encoded.split_at(index + 1).1
+    } else {
+        encoded
+    };
+
+    Ok(deserialise(&util::base64_decode(payload)?)?)
 }
