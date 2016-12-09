@@ -19,10 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-#![allow(unsafe_code)]
-
-pub mod low_level_api;
-pub mod ipc;
+pub mod ffi;
 
 mod errors;
 mod object_cache;
@@ -34,17 +31,14 @@ use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use ipc::{AccessContainer, AppKeys, AuthGranted, ContainerPermission};
-use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use maidsafe_utilities::thread::{self, Joiner};
 use rust_sodium::crypto::{box_, secretbox};
 use self::errors::AppError;
 use self::object_cache::ObjectCache;
-use std::os::raw::c_void;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
 use tokio_core::reactor::{Core, Handle};
-use util::ffi::{self, OpaqueCtx};
 
 macro_rules! try_tx {
     ($result:expr, $tx:ident) => {
@@ -234,60 +228,5 @@ impl AppContext {
             Inner::Authorised(ref context) => Ok(context),
             Inner::Unauthorised(_) => Err(AppError::Forbidden),
         }
-    }
-}
-
-// ---------- FFI --------------------
-
-/// Create unauthorised app.
-#[no_mangle]
-pub unsafe extern "C" fn app_unauthorised(user_data: *mut c_void,
-                                          network_observer_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                    i32,
-                                                                                    i32),
-                                          o_app: *mut *mut App)
-                                          -> i32 {
-    ffi::catch_unwind_error_code(|| -> Result<_, AppError> {
-        let user_data = OpaqueCtx(user_data);
-
-        let app = App::unauthorised(move |event| {
-            call_network_observer(event, user_data.0, network_observer_cb)
-        })?;
-
-        *o_app = Box::into_raw(Box::new(app));
-
-        Ok(())
-    })
-}
-
-/// Create authorised app.
-#[no_mangle]
-pub unsafe extern "C" fn app_authorised(auth_granted: FfiAuthGranted,
-                                        user_data: *mut c_void,
-                                        network_observer_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                  i32,
-                                                                                  i32),
-                                        o_app: *mut *mut App)
-                                        -> i32 {
-    ffi::catch_unwind_error_code(|| -> Result<_, AppError> {
-        let user_data = OpaqueCtx(user_data);
-        let auth_granted = AuthGranted::from_repr_c(auth_granted);
-
-        let app = App::authorised(auth_granted, move |event| {
-            call_network_observer(event, user_data.0, network_observer_cb)
-        })?;
-
-        *o_app = Box::into_raw(Box::new(app));
-
-        Ok(())
-    })
-}
-
-unsafe fn call_network_observer(event: Result<NetworkEvent, AppError>,
-                                user_data: *mut c_void,
-                                cb: unsafe extern "C" fn(*mut c_void, i32, i32)) {
-    match event {
-        Ok(event) => cb(user_data, 0, event.into()),
-        Err(err) => cb(user_data, ffi_error_code!(err), 0),
     }
 }

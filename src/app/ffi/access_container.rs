@@ -18,16 +18,3 @@
 //
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
-
-//! Low Level APIs
-
-/// Cipher Options
-pub mod cipher_opt;
-/// `XorName` constructions and freeing
-pub mod xor_name;
-/// Low level manipulation of `ImmutableData`
-pub mod immutable_data;
-/// Low level manipulation of `MutableData`
-pub mod mutable_data;
-/// Miscellaneous routines
-pub mod misc;

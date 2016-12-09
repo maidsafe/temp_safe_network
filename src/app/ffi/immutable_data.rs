@@ -341,8 +341,8 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
 #[cfg(test)]
 mod tests {
     use app::errors::AppError;
-    use app::low_level_api::cipher_opt::*;
-    use app::low_level_api::xor_name::*;
+    use app::ffi::cipher_opt::*;
+    use app::ffi::xor_name::*;
     use app::test_util::create_app;
     use core::utility;
     use super::*;

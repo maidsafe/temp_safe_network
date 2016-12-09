@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::low_level_api::cipher_opt::CipherOpt;
+use app::ffi::cipher_opt::CipherOpt;
 use core::SelfEncryptionStorage;
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, Value, XorName};
