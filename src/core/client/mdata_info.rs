@@ -19,13 +19,13 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use core::errors::CoreError;
+use core::utility::{symmetric_decrypt, symmetric_encrypt};
 use maidsafe_utilities::serialisation::serialise;
 use rand::{OsRng, Rng};
 use routing::XorName;
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::secretbox;
-use super::errors::CoreError;
-use super::utility::{symmetric_decrypt, symmetric_encrypt};
 
 /// Information allowing to locate and access mutable data on the network.
 #[derive(Clone, Debug, PartialEq, RustcDecodable, RustcEncodable)]

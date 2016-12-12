@@ -34,12 +34,11 @@ pub mod immutable_data;
 /// Implements the Self Encryption storage trait
 pub mod self_encryption_storage;
 
-pub use self::client::{Client, ClientKeys};
+pub use self::client::{Client, ClientKeys, MDataInfo};
 pub use self::core_el::{CoreMsg, CoreMsgRx, CoreMsgTx, TailFuture, run};
 pub use self::errors::{CORE_ERROR_START_RANGE, CoreError};
 pub use self::event::{CoreEvent, NetworkEvent};
 pub use self::futures::FutureExt;
-pub use self::mdata_info::MDataInfo;
 pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
 
 /// Future trait returned from core operations.
@@ -55,6 +54,5 @@ pub const DIR_TAG: u64 = 15000;
 
 mod client;
 mod core_el;
-mod mdata_info;
 mod errors;
 mod event;

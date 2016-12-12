@@ -36,9 +36,6 @@ pub trait Callback {
     fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args);
 }
 
-// TODO: remove the impls for unsafe fn's (after we decide all callbacks should
-// be safe).
-
 impl Callback for extern "C" fn(*mut c_void, i32) {
     type Args = ();
     fn call(&self, user_data: *mut c_void, error: i32, _args: Self::Args) {
@@ -46,24 +43,10 @@ impl Callback for extern "C" fn(*mut c_void, i32) {
     }
 }
 
-impl Callback for unsafe extern "C" fn(*mut c_void, i32) {
-    type Args = ();
-    fn call(&self, user_data: *mut c_void, error: i32, _args: Self::Args) {
-        unsafe { self(user_data, error) }
-    }
-}
-
 impl<T: CallbackArgs> Callback for extern "C" fn(*mut c_void, i32, a: T) {
     type Args = T;
     fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
         self(user_data, error, args)
-    }
-}
-
-impl<T: CallbackArgs> Callback for unsafe extern "C" fn(*mut c_void, i32, a: T) {
-    type Args = T;
-    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
-        unsafe { self(user_data, error, args) }
     }
 }
 
@@ -75,14 +58,6 @@ impl<T0: CallbackArgs, T1: CallbackArgs> Callback
     }
 }
 
-impl<T0: CallbackArgs, T1: CallbackArgs> Callback
-    for unsafe extern "C" fn(*mut c_void, i32, a0: T0, a1: T1) {
-    type Args = (T0, T1);
-    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
-        unsafe { self(user_data, error, args.0, args.1) }
-    }
-}
-
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
     for extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2) {
     type Args = (T0, T1, T2);
@@ -91,19 +66,11 @@ impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
     }
 }
 
-impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
-    for unsafe extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2) {
-    type Args = (T0, T1, T2);
-    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
-        unsafe { self(user_data, error, args.0, args.1, args.2) }
-    }
-}
-
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs, T3: CallbackArgs> Callback
-    for unsafe extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2, a3: T3) {
+    for extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2, a3: T3) {
     type Args = (T0, T1, T2, T3);
     fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
-        unsafe { self(user_data, error, args.0, args.1, args.2, args.3) }
+        self(user_data, error, args.0, args.1, args.2, args.3)
     }
 }
 

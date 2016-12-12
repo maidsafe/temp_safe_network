@@ -105,9 +105,9 @@ impl CipherOpt {
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
                                                   user_data: *mut c_void,
-                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             i32,
-                                                                             CipherOptHandle)) {
+                                                  o_cb: extern "C" fn(*mut c_void,
+                                                                      i32,
+                                                                      CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     ffi::catch_unwind_cb(user_data, o_cb, || {
@@ -123,9 +123,9 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
                                                   user_data: *mut c_void,
-                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             i32,
-                                                                             CipherOptHandle)) {
+                                                  o_cb: extern "C" fn(*mut c_void,
+                                                                      i32,
+                                                                      CipherOptHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
@@ -141,9 +141,9 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
 pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
                                                    peer_encrypt_key_h: EncryptKeyHandle,
                                                    user_data: *mut c_void,
-                                                   o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                              i32,
-                                                                              CipherOptHandle)) {
+                                                   o_cb: extern "C" fn(*mut c_void,
+                                                                       i32,
+                                                                       CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     ffi::catch_unwind_cb(user_data, o_cb, || {
@@ -168,7 +168,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
 pub unsafe extern "C" fn cipher_opt_free(app: *const App,
                                          handle: CipherOptHandle,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     ffi::catch_unwind_cb(user_data, o_cb, || {
@@ -384,13 +384,16 @@ mod tests {
         }
     }
 
-    unsafe extern "C" fn handle_cb(tx: *mut c_void, error_code: i32, handle: CipherOptHandle) {
+    extern "C" fn handle_cb(tx: *mut c_void, error_code: i32, handle: CipherOptHandle) {
         let tx = tx as *mut mpsc::Sender<Result<CipherOptHandle, i32>>;
         let res = if error_code == 0 {
             Ok(handle)
         } else {
             Err(error_code)
         };
-        unwrap!((*tx).send(res));
+
+        unsafe {
+            unwrap!((*tx).send(res));
+        }
     }
 }

@@ -40,9 +40,9 @@ type SEReaderHandle = SelfEncryptorReaderHandle;
 #[no_mangle]
 pub unsafe extern "C" fn idata_new_self_encryptor(app: *const App,
                                                   user_data: *mut c_void,
-                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             i32,
-                                                                             SEWriterHandle)) {
+                                                  o_cb: extern "C" fn(*mut c_void,
+                                                                      i32,
+                                                                      SEWriterHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -73,8 +73,7 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(app: *const App,
                                                        data: *const u8,
                                                        size: usize,
                                                        user_data: *mut c_void,
-                                                       o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                  i32)) {
+                                                       o_cb: extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -107,9 +106,9 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                                                     se_h: SEWriterHandle,
                                                     cipher_opt_h: CipherOptHandle,
                                                     user_data: *mut c_void,
-                                                    o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                               i32,
-                                                                               XorNameHandle)) {
+                                                    o_cb: extern "C" fn(*mut c_void,
+                                                                        i32,
+                                                                        XorNameHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -173,9 +172,9 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
 pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
                                                     name_h: XorNameHandle,
                                                     user_data: *mut c_void,
-                                                    o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                               i32,
-                                                                               SEReaderHandle)) {
+                                                    o_cb: extern "C" fn(*mut c_void,
+                                                                        i32,
+                                                                        SEReaderHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -234,7 +233,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
 pub unsafe extern "C" fn idata_size(app: *const App,
                                     se_h: SEReaderHandle,
                                     user_data: *mut c_void,
-                                    o_cb: unsafe extern "C" fn(*mut c_void, i32, u64)) {
+                                    o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -260,11 +259,11 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
                                                         from_pos: u64,
                                                         len: u64,
                                                         user_data: *mut c_void,
-                                                        o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                   i32,
-                                                                                   *mut u8,
-                                                                                   usize,
-                                                                                   usize)) {
+                                                        o_cb: extern "C" fn(*mut c_void,
+                                                                            i32,
+                                                                            *mut u8,
+                                                                            usize,
+                                                                            usize)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -309,8 +308,7 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
 pub unsafe extern "C" fn idata_self_encryptor_writer_free(app: *const App,
                                                           handle: SEWriterHandle,
                                                           user_data: *mut c_void,
-                                                          o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                     i32)) {
+                                                          o_cb: extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -327,8 +325,7 @@ pub unsafe extern "C" fn idata_self_encryptor_writer_free(app: *const App,
 pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
                                                           handle: SEReaderHandle,
                                                           user_data: *mut c_void,
-                                                          o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                     i32)) {
+                                                          o_cb: extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {

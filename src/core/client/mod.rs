@@ -20,12 +20,13 @@
 // and limitations relating to use of the SAFE Network Software.
 
 mod account;
+mod mdata_info;
 #[cfg(feature = "use-mock-routing")]
 mod mock;
 mod routing_el;
 
-use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, DIR_TAG, FutureExt, MDataInfo,
-           NetworkEvent, NetworkTx, utility};
+use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, DIR_TAG, FutureExt, NetworkEvent,
+           NetworkTx, utility};
 use futures::{self, Complete, Future};
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
@@ -38,6 +39,7 @@ use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
 use self::account::Account;
 pub use self::account::ClientKeys;
+pub use self::mdata_info::MDataInfo;
 #[cfg(feature = "use-mock-routing")]
 use self::mock::Routing;
 use std::cell::{Ref, RefCell, RefMut};
@@ -1032,7 +1034,7 @@ fn create_empty_dir(routing: &Routing,
 
 #[cfg(test)]
 mod tests {
-    use core::{CoreError, DIR_TAG, MDataInfo, utility};
+    use core::{CoreError, DIR_TAG, utility};
     use core::utility::test_utils::{finish, random_client, setup_client};
     use futures::Future;
     use futures::sync::mpsc;

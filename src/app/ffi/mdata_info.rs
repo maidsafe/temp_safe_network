@@ -22,10 +22,43 @@
 use app::App;
 use app::ffi::helper::send_sync;
 use app::object_cache::MDataInfoHandle;
+use core::MDataInfo;
 use routing::XOR_NAME_LEN;
 use std::os::raw::c_void;
 use std::slice;
 use util::ffi::{catch_unwind_cb, u8_vec_to_ptr};
+
+/// Create random, non-encrypted mdata info.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_info_random_public(app: *const App,
+                                                  type_tag: u64,
+                                                  user_data: *mut c_void,
+                                                  o_cb: extern "C" fn(*mut c_void,
+                                                                      i32,
+                                                                      MDataInfoHandle)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        send_sync(app, user_data, o_cb, move |context| {
+            let info = MDataInfo::random_public(type_tag)?;
+            Ok(context.object_cache().insert_mdata_info(info))
+        })
+    })
+}
+
+/// Create random, encrypted mdata info.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_info_random_private(app: *const App,
+                                                   type_tag: u64,
+                                                   user_data: *mut c_void,
+                                                   o_cb: extern "C" fn(*mut c_void,
+                                                                       i32,
+                                                                       MDataInfoHandle)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        send_sync(app, user_data, o_cb, move |context| {
+            let info = MDataInfo::random_private(type_tag)?;
+            Ok(context.object_cache().insert_mdata_info(info))
+        })
+    })
+}
 
 /// Encrypt mdata entry key using the corresponding mdata info.
 #[no_mangle]
@@ -89,4 +122,27 @@ fn mdata_info_extract_name_and_type_tag(app: *const App,
             Ok((info.name.0, info.type_tag))
         })
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use app::test_util::{create_app, run_now};
+    use rand;
+    use super::*;
+    use util::ffi::test_util::call_1;
+
+    #[test]
+    fn create_public() {
+        let app = create_app();
+        let type_tag: u64 = rand::random();
+
+        let info_h =
+            unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(&app, type_tag, ud, cb))) };
+
+        run_now(&app, move |_, context| {
+            let info = unwrap!(context.object_cache().get_mdata_info(info_h));
+            assert_eq!(info.type_tag, type_tag);
+            assert!(info.enc_info.is_none());
+        })
+    }
 }

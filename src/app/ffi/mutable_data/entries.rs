@@ -36,9 +36,9 @@ use util::ffi::callback::Callback;
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_new(app: *const App,
                                            user_data: *mut c_void,
-                                           o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                      i32,
-                                                                      MDataEntriesHandle)) {
+                                           o_cb: extern "C" fn(*mut c_void,
+                                                               i32,
+                                                               MDataEntriesHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_sync(app,
                   user_data,
@@ -56,7 +56,7 @@ pub unsafe extern "C" fn mdata_entries_insert(app: *const App,
                                               value_ptr: *const u8,
                                               value_len: usize,
                                               user_data: *mut c_void,
-                                              o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                              o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
         let value = ffi::u8_ptr_to_vec(value_ptr, value_len);
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn mdata_entries_insert(app: *const App,
 pub unsafe extern "C" fn mdata_entries_len(app: *const App,
                                            entries_h: MDataEntriesHandle,
                                            user_data: *mut c_void,
-                                           o_cb: unsafe extern "C" fn(*mut c_void, i32, usize)) {
+                                           o_cb: extern "C" fn(*mut c_void, i32, usize)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         with_entries(app, entries_h, user_data, o_cb, |entries| Ok(entries.len()))
     })
@@ -93,11 +93,11 @@ pub unsafe extern "C" fn mdata_entries_get(app: *const App,
                                            key_ptr: *const u8,
                                            key_len: usize,
                                            user_data: *mut c_void,
-                                           o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                      i32,
-                                                                      *const u8,
-                                                                      usize,
-                                                                      u64)) {
+                                           o_cb: extern "C" fn(*mut c_void,
+                                                               i32,
+                                                               *const u8,
+                                                               usize,
+                                                               u64)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
 
@@ -122,14 +122,14 @@ pub unsafe extern "C" fn mdata_entries_get(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn mdata_entries_for_each(app: *const App,
                                                 entries_h: MDataEntriesHandle,
-                                                entry_cb: unsafe extern "C" fn(*mut c_void,
-                                                                               *const u8,
-                                                                               usize,
-                                                                               *const u8,
-                                                                               usize,
-                                                                               u64),
+                                                entry_cb: extern "C" fn(*mut c_void,
+                                                                        *const u8,
+                                                                        usize,
+                                                                        *const u8,
+                                                                        usize,
+                                                                        u64),
                                                 user_data: *mut c_void,
-                                                o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                                o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -153,7 +153,7 @@ pub unsafe extern "C" fn mdata_entries_for_each(app: *const App,
 pub unsafe extern "C" fn mdata_entries_free(app: *const App,
                                             entries_h: MDataEntriesHandle,
                                             user_data: *mut c_void,
-                                            o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                            o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |context| {
             let _ = context.object_cache().remove_mdata_entries(entries_h)?;
@@ -167,7 +167,7 @@ pub unsafe extern "C" fn mdata_entries_free(app: *const App,
 pub unsafe extern "C" fn mdata_keys_len(app: *const App,
                                         keys_h: MDataKeysHandle,
                                         user_data: *mut c_void,
-                                        o_cb: unsafe extern "C" fn(*mut c_void, i32, usize)) {
+                                        o_cb: extern "C" fn(*mut c_void, i32, usize)) {
     ffi::catch_unwind_cb(user_data,
                          o_cb,
                          || with_keys(app, keys_h, user_data, o_cb, |keys| Ok(keys.len())))
@@ -186,7 +186,7 @@ pub unsafe extern "C" fn mdata_keys_for_each(app: *const App,
                                                                           *const u8,
                                                                           usize),
                                              user_data: *mut c_void,
-                                             o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                             o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -205,7 +205,7 @@ pub unsafe extern "C" fn mdata_keys_for_each(app: *const App,
 pub unsafe extern "C" fn mdata_keys_free(app: *const App,
                                          keys_h: MDataKeysHandle,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |context| {
             let _ = context.object_cache().remove_mdata_keys(keys_h)?;
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn mdata_keys_free(app: *const App,
 pub unsafe extern "C" fn mdata_values_len(app: *const App,
                                           values_h: MDataValuesHandle,
                                           user_data: *mut c_void,
-                                          o_cb: unsafe extern "C" fn(*mut c_void, i32, usize)) {
+                                          o_cb: extern "C" fn(*mut c_void, i32, usize)) {
     ffi::catch_unwind_cb(user_data,
                          o_cb,
                          || with_values(app, values_h, user_data, o_cb, |values| Ok(values.len())))
@@ -239,7 +239,7 @@ pub unsafe extern "C" fn mdata_values_for_each(app: *const App,
                                                                               usize,
                                                                               u64),
                                                user_data: *mut c_void,
-                                               o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                               o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -261,7 +261,7 @@ pub unsafe extern "C" fn mdata_values_for_each(app: *const App,
 pub unsafe extern "C" fn mdata_values_free(app: *const App,
                                            values_h: MDataValuesHandle,
                                            user_data: *mut c_void,
-                                           o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                           o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |context| {
             let _ = context.object_cache().remove_mdata_values(values_h)?;
@@ -385,26 +385,31 @@ mod tests {
         let (tx, rx) = mpsc::channel::<()>();
         let mut user_data = (tx, BTreeMap::<Vec<u8>, Value>::new());
 
-        unsafe extern "C" fn entry_cb(user_data: *mut c_void,
-                                      key_ptr: *const u8,
-                                      key_len: usize,
-                                      value_ptr: *const u8,
-                                      value_len: usize,
-                                      entry_version: u64) {
-            let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
-            let value = Value {
-                content: ffi::u8_ptr_to_vec(value_ptr, value_len),
-                entry_version: entry_version,
-            };
+        extern "C" fn entry_cb(user_data: *mut c_void,
+                               key_ptr: *const u8,
+                               key_len: usize,
+                               value_ptr: *const u8,
+                               value_len: usize,
+                               entry_version: u64) {
+            unsafe {
+                let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
+                let value = Value {
+                    content: ffi::u8_ptr_to_vec(value_ptr, value_len),
+                    entry_version: entry_version,
+                };
 
-            let user_data = user_data as *mut (Sender<()>, BTreeMap<_, _>);
-            let _ = (*user_data).1.insert(key, value);
+                let user_data = user_data as *mut (Sender<()>, BTreeMap<_, _>);
+                let _ = (*user_data).1.insert(key, value);
+            }
         }
 
-        unsafe extern "C" fn done_cb(user_data: *mut c_void, error_code: i32) {
+        extern "C" fn done_cb(user_data: *mut c_void, error_code: i32) {
             assert_eq!(error_code, 0);
             let user_data = user_data as *mut (Sender<_>, BTreeMap<Vec<u8>, Value>);
-            unwrap!((*user_data).0.send(()));
+
+            unsafe {
+                unwrap!((*user_data).0.send(()));
+            }
         }
 
         unsafe {

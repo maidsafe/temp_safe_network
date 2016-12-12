@@ -46,7 +46,7 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
                                    permissions_h: MDataPermissionsHandle,
                                    entries_h: MDataEntriesHandle,
                                    user_data: *mut c_void,
-                                   o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                   o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
 pub unsafe extern "C" fn mdata_get_version(app: *const App,
                                            info_h: MDataInfoHandle,
                                            user_data: *mut c_void,
-                                           o_cb: unsafe extern "C" fn(*mut c_void, i32, u64)) {
+                                           o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app,
                              info_h,
@@ -122,12 +122,12 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
                                          key_ptr: *const u8,
                                          key_len: usize,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                    i32,
-                                                                    *mut u8,
-                                                                    usize,
-                                                                    usize,
-                                                                    u64)) {
+                                         o_cb: extern "C" fn(*mut c_void,
+                                                             i32,
+                                                             *mut u8,
+                                                             usize,
+                                                             usize,
+                                                             u64)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
 
@@ -146,9 +146,9 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
 pub unsafe extern "C" fn mdata_list_entries(app: *const App,
                                             info_h: MDataInfoHandle,
                                             user_data: *mut c_void,
-                                            o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                       i32,
-                                                                       MDataEntriesHandle)) {
+                                            o_cb: extern "C" fn(*mut c_void,
+                                                                i32,
+                                                                MDataEntriesHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
@@ -163,9 +163,7 @@ pub unsafe extern "C" fn mdata_list_entries(app: *const App,
 pub unsafe extern "C" fn mdata_list_keys(app: *const App,
                                          info_h: MDataInfoHandle,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                    i32,
-                                                                    MDataKeysHandle)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32, MDataKeysHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
@@ -180,9 +178,9 @@ pub unsafe extern "C" fn mdata_list_keys(app: *const App,
 pub unsafe extern "C" fn mdata_list_values(app: *const App,
                                            info_h: MDataInfoHandle,
                                            user_data: *mut c_void,
-                                           o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                      i32,
-                                                                      MDataValuesHandle)) {
+                                           o_cb: extern "C" fn(*mut c_void,
+                                                               i32,
+                                                               MDataValuesHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
@@ -198,7 +196,7 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
                                    info_h: MDataInfoHandle,
                                    actions_h: MDataEntryActionsHandle,
                                    user_data: *mut c_void,
-                                   o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                   o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -227,9 +225,9 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
 pub unsafe fn mdata_list_permissions(app: *const App,
                                      info_h: MDataInfoHandle,
                                      user_data: *mut c_void,
-                                     o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                i32,
-                                                                MDataPermissionsHandle)) {
+                                     o_cb: extern "C" fn(*mut c_void,
+                                                         i32,
+                                                         MDataPermissionsHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
@@ -247,9 +245,9 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
                                           info_h: MDataInfoHandle,
                                           user_h: SignKeyHandle,
                                           user_data: *mut c_void,
-                                          o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                     i32,
-                                                                     MDataPermissionSetHandle)) {
+                                          o_cb: extern "C" fn(*mut c_void,
+                                                              i32,
+                                                              MDataPermissionSetHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -285,7 +283,7 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
                                          permission_set_h: MDataPermissionSetHandle,
                                          version: u64,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -325,7 +323,7 @@ pub unsafe fn mdata_del_user_permissions(app: *const App,
                                          user_h: SignKeyHandle,
                                          version: u64,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -355,7 +353,7 @@ pub unsafe extern "C" fn mdata_change_owner(app: *const App,
                                             new_owner_h: SignKeyHandle,
                                             version: u64,
                                             user_data: *mut c_void,
-                                            o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                            o_cb: extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 

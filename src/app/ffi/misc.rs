@@ -30,9 +30,7 @@ use util::ffi::{OpaqueCtx, catch_unwind_cb};
 pub unsafe extern "C" fn misc_enc_pk_new(app: *const App,
                                          bytes: *const [u8; box_::PUBLICKEYBYTES],
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                    i32,
-                                                                    EncryptKeyHandle)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32, EncryptKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let enc_pk = box_::PublicKey(*bytes);
@@ -50,7 +48,7 @@ pub unsafe extern "C" fn misc_enc_pk_new(app: *const App,
 pub unsafe extern "C" fn misc_enc_pk_free(app: *const App,
                                           handle: EncryptKeyHandle,
                                           user_data: *mut c_void,
-                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                          o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 

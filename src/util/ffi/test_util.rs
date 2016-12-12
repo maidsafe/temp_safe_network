@@ -55,7 +55,7 @@ pub fn as_raw_parts(s: &str) -> FfiStr {
 // Use this if the callback accepts no arguments in addition to user_data
 // and error_code.
 pub fn call_0<F>(f: F) -> Result<(), i32>
-    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, i32))
+    where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32))
 {
     let (tx, rx) = mpsc::channel::<i32>();
     f(sender_as_user_data(&tx), callback_0);
@@ -69,7 +69,7 @@ pub fn call_0<F>(f: F) -> Result<(), i32>
 // Use this if the callback accepts one argument in addition to user_data
 // and error_code.
 pub unsafe fn call_1<F, T>(f: F) -> Result<T, i32>
-    where F: FnOnce(*mut c_void, unsafe extern "C" fn(*mut c_void, i32, T))
+    where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T))
 {
     let (tx, rx) = mpsc::channel::<(i32, SendWrapper<T>)>();
     f(sender_as_user_data(&tx), callback_1::<T>);
@@ -83,8 +83,7 @@ pub unsafe fn call_1<F, T>(f: F) -> Result<T, i32>
 // Use this if the callback accepts three arguments in addition to user_data and
 // error_code.
 pub unsafe fn call_3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), i32>
-    where F: FnOnce(*mut c_void,
-                    unsafe extern "C" fn(*mut c_void, i32, T0, T1, T2))
+    where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T0, T1, T2))
 {
     let (tx, rx) = mpsc::channel::<(i32, SendWrapper<(T0, T1, T2)>)>();
     f(sender_as_user_data(&tx), callback_3::<T0, T1, T2>);
@@ -93,34 +92,20 @@ pub unsafe fn call_3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), i32>
     if error == 0 { Ok(args.0) } else { Err(error) }
 }
 
-/*
-// Call a FFI function and block until its callback gets called, then return
-// the arguments which were passed to that callback converted to Vec<u8>.
-// The callbacks must accept three arguments (in addition to user_data and
-// error_code): pointer to the begining of the data (`*mut u8`), lengths
-// (`usize`) and capacity (`usize`).
-pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
-    where F: FnOnce(*mut c_void,
-                    unsafe extern "C" fn(*mut c_void, i32, *mut u8, usize, usize))
-{
-    call_3(f).map(|(ptr, len, cap)| Vec::from_raw_parts(ptr, len, cap))
-}
-*/
-
-unsafe extern "C" fn callback_0(user_data: *mut c_void, error: i32) {
-    send_via_user_data(user_data, error)
+extern "C" fn callback_0(user_data: *mut c_void, error: i32) {
+    unsafe { send_via_user_data(user_data, error) }
 }
 
-unsafe extern "C" fn callback_1<T>(user_data: *mut c_void, error: i32, arg: T) {
-    send_via_user_data(user_data, (error, SendWrapper(arg)))
+extern "C" fn callback_1<T>(user_data: *mut c_void, error: i32, arg: T) {
+    unsafe { send_via_user_data(user_data, (error, SendWrapper(arg))) }
 }
 
-unsafe extern "C" fn callback_3<T0, T1, T2>(user_data: *mut c_void,
-                                            error: i32,
-                                            arg0: T0,
-                                            arg1: T1,
-                                            arg2: T2) {
-    send_via_user_data(user_data, (error, SendWrapper((arg0, arg1, arg2))))
+extern "C" fn callback_3<T0, T1, T2>(user_data: *mut c_void,
+                                     error: i32,
+                                     arg0: T0,
+                                     arg1: T1,
+                                     arg2: T2) {
+    unsafe { send_via_user_data(user_data, (error, SendWrapper((arg0, arg1, arg2)))) }
 }
 
 // Unsafe wrapper for passing non-Send types through mpsc channels.

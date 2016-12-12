@@ -30,7 +30,7 @@ use util::ffi::{self, OpaqueCtx};
 pub unsafe extern "C" fn xor_name_new(app: *const App,
                                       id: *const [u8; XOR_NAME_LEN],
                                       user_data: *mut c_void,
-                                      o_cb: unsafe extern "C" fn(*mut c_void, i32, XorNameHandle)) {
+                                      o_cb: extern "C" fn(*mut c_void, i32, XorNameHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let xor_name = XorName(*id);
         let user_data = OpaqueCtx(user_data);
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn xor_name_new(app: *const App,
 pub unsafe extern "C" fn xor_name_free(app: *const App,
                                        handle: XorNameHandle,
                                        user_data: *mut c_void,
-                                       o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                       o_cb: extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     ffi::catch_unwind_cb(user_data, o_cb, || {

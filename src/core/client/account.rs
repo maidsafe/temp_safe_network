@@ -19,8 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use core::client::MDataInfo;
 use core::errors::CoreError;
-use core::mdata_info::MDataInfo;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{FullId, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
@@ -154,7 +154,7 @@ impl Into<FullId> for ClientKeys {
 
 #[cfg(test)]
 mod tests {
-    use core::mdata_info::MDataInfo;
+    use core::client::MDataInfo;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::u32;
     use super::*;
