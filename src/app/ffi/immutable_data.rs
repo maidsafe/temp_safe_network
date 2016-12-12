@@ -21,12 +21,11 @@
 
 use app::App;
 use app::errors::AppError;
-use app::object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle,
-                        XorNameHandle};
+use app::object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
 use core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use routing::ImmutableData;
+use routing::{ImmutableData, XOR_NAME_LEN, XorName};
 use self_encryption::{DataMap, SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr, slice};
 use std::os::raw::c_void;
@@ -108,7 +107,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
                                                                         i32,
-                                                                        XorNameHandle)) {
+                                                                        [u8; XOR_NAME_LEN])) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -117,7 +116,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                 match context.object_cache().remove_se_writer(se_h) {
                     Ok(se_wrapper) => se_wrapper.close(),
                     Err(e) => {
-                        o_cb(user_data.0, ffi_error_code!(e), 0);
+                        o_cb(user_data.0, ffi_error_code!(e), Default::default());
                         return None;
                     }
                 }
@@ -127,7 +126,6 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
             let client3 = client.clone();
 
             let context2 = context.clone();
-            let context3 = context.clone();
 
             let fut = fut.map_err(AppError::from)
                 .and_then(move |(data_map, _)| {
@@ -151,12 +149,12 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                 .and_then(move |(name, data)| {
                     client3.put_idata(data)
                         .map_err(AppError::from)
-                        .map(move |_| context3.object_cache().insert_xor_name(name))
+                        .map(move |_| name)
                 })
                 .then(move |result| {
                     match result {
-                        Ok(handle) => o_cb(user_data.0, 0, handle),
-                        Err(e) => o_cb(user_data.0, ffi_error_code!(e), 0),
+                        Ok(name) => o_cb(user_data.0, 0, name.0),
+                        Err(e) => o_cb(user_data.0, ffi_error_code!(e), Default::default()),
                     }
                     Ok(())
                 })
@@ -170,14 +168,15 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
 /// Fetch Self Encryptor
 #[no_mangle]
 pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
-                                                    name_h: XorNameHandle,
+                                                    name: [u8; XOR_NAME_LEN],
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
                                                                         i32,
                                                                         SEReaderHandle)) {
-    let user_data = OpaqueCtx(user_data);
-
     catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let name = XorName(name);
+
         (*app).send(move |client, context| {
             let client2 = client.clone();
             let client3 = client.clone();
@@ -186,17 +185,8 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
             let context2 = context.clone();
             let context3 = context.clone();
 
-            let fut = {
-                match context.object_cache().get_xor_name(name_h) {
-                    Ok(data_id) => client.get_idata(*data_id),
-                    Err(e) => {
-                        o_cb(user_data.0, ffi_error_code!(e), 0);
-                        return None;
-                    }
-                }
-            };
-
-            fut.map_err(AppError::from)
+            client.get_idata(name)
+                .map_err(AppError::from)
                 .and_then(move |raw_immut_data| {
                     let sym_key = context2.sym_enc_key()?;
                     let (asym_pk, asym_sk) = client2.encryption_keypair()?;
@@ -341,7 +331,6 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
 mod tests {
     use app::errors::AppError;
     use app::ffi::cipher_opt::*;
-    use app::ffi::xor_name::*;
     use app::test_util::create_app;
     use core::utility;
     use super::*;
@@ -379,7 +368,7 @@ mod tests {
                                               cb)
             }));
 
-            let name_h = unwrap!(call_1(|ud, cb| {
+            let name = unwrap!(call_1(|ud, cb| {
                 idata_close_self_encryptor(&app, se_writer_h, cipher_opt_h, ud, cb)
             }));
 
@@ -398,8 +387,9 @@ mod tests {
             let res = call_1(|ud, cb| idata_size(&app, se_writer_h, ud, cb));
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.into()));
 
-            let se_reader_h =
-                unwrap!(call_1(|ud, cb| idata_fetch_self_encryptor(&app, name_h, ud, cb)));
+            let se_reader_h = {
+                unwrap!(call_1(|ud, cb| idata_fetch_self_encryptor(&app, name, ud, cb)))
+            };
 
             let size = unwrap!(call_1(|ud, cb| idata_size(&app, se_reader_h, ud, cb)));
             assert_eq!(size, plain_text.len() as u64);
@@ -420,8 +410,6 @@ mod tests {
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.into()));
 
             unwrap!(call_0(|ud, cb| cipher_opt_free(&app, cipher_opt_h, ud, cb)));
-
-            unwrap!(call_0(|ud, cb| xor_name_free(&app, name_h, ud, cb)));
         }
     }
 }

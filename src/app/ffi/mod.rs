@@ -45,8 +45,6 @@ pub mod mdata_info;
 pub mod misc;
 /// Low level manipulation of `MutableData`
 pub mod mutable_data;
-/// `XorName` constructions and freeing
-pub mod xor_name;
 
 mod helper;
 

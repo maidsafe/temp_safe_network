@@ -60,8 +60,6 @@ pub enum AppError {
     InvalidSelfEncryptorHandle,
     /// Invalid sign key handle
     InvalidSignKeyHandle,
-    /// Invalid XorName handle
-    InvalidXorNameHandle,
 
     /// Error while self-encrypting data
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
@@ -169,11 +167,10 @@ impl Into<i32> for AppError {
             AppError::InvalidMDataPermissionSetHandle => APP_ERROR_START_RANGE - 9,
             AppError::InvalidSelfEncryptorHandle => APP_ERROR_START_RANGE - 10,
             AppError::InvalidSignKeyHandle => APP_ERROR_START_RANGE - 11,
-            AppError::InvalidXorNameHandle => APP_ERROR_START_RANGE - 12,
-            AppError::SelfEncryption(_) => APP_ERROR_START_RANGE - 13,
-            AppError::InvalidSelfEncryptorReadOffsets => APP_ERROR_START_RANGE - 14,
-            AppError::IoError(_) => APP_ERROR_START_RANGE - 15,
-            AppError::Unexpected(_) => APP_ERROR_START_RANGE - 16,
+            AppError::SelfEncryption(_) => APP_ERROR_START_RANGE - 12,
+            AppError::InvalidSelfEncryptorReadOffsets => APP_ERROR_START_RANGE - 13,
+            AppError::IoError(_) => APP_ERROR_START_RANGE - 14,
+            AppError::Unexpected(_) => APP_ERROR_START_RANGE - 15,
         }
     }
 }

@@ -22,7 +22,7 @@
 use app::ffi::cipher_opt::CipherOpt;
 use core::{MDataInfo, SelfEncryptionStorage};
 use lru_cache::LruCache;
-use routing::{EntryAction, PermissionSet, Value, XorName};
+use routing::{EntryAction, PermissionSet, Value};
 use rust_sodium::crypto::{box_, sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
@@ -69,8 +69,6 @@ pub type SelfEncryptorReaderHandle = ObjectHandle;
 pub type SelfEncryptorWriterHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type SignKeyHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
-pub type XorNameHandle = ObjectHandle;
 
 /// Contains session object cache
 pub struct ObjectCache {
@@ -87,7 +85,6 @@ pub struct ObjectCache {
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
     sign_key: Store<sign::PublicKey>,
-    xor_name: Store<XorName>,
 }
 
 impl ObjectCache {
@@ -106,7 +103,6 @@ impl ObjectCache {
             se_reader: Store::new(),
             se_writer: Store::new(),
             sign_key: Store::new(),
-            xor_name: Store::new(),
         }
     }
 
@@ -124,7 +120,6 @@ impl ObjectCache {
         self.se_reader.clear();
         self.se_writer.clear();
         self.sign_key.clear();
-        self.xor_name.clear();
     }
 }
 
@@ -238,13 +233,6 @@ impl_cache!(sign_key,
             get_sign_key,
             insert_sign_key,
             remove_sign_key);
-impl_cache!(xor_name,
-            XorName,
-            XorNameHandle,
-            InvalidXorNameHandle,
-            get_xor_name,
-            insert_xor_name,
-            remove_xor_name);
 
 impl Default for ObjectCache {
     fn default() -> Self {
@@ -305,17 +293,18 @@ impl<V> Store<V> {
 
 #[cfg(test)]
 mod tests {
-    use rand;
+    use rust_sodium::crypto::sign;
     use super::*;
 
     #[test]
     fn reset() {
         let object_cache = ObjectCache::new();
+        let (pk, _) = sign::gen_keypair();
 
-        let handle = object_cache.insert_xor_name(rand::random());
-        assert!(object_cache.get_xor_name(handle).is_ok());
+        let handle = object_cache.insert_sign_key(pk);
+        assert!(object_cache.get_sign_key(handle).is_ok());
 
         object_cache.reset();
-        assert!(object_cache.get_xor_name(handle).is_err());
+        assert!(object_cache.get_sign_key(handle).is_err());
     }
 }
