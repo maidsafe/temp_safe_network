@@ -26,7 +26,7 @@ mod object_cache;
 #[cfg(test)]
 mod test_util;
 
-use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, Dir, NetworkEvent, NetworkTx};
+use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, MDataInfo, NetworkEvent, NetworkTx};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
@@ -174,7 +174,7 @@ struct Authorised {
     object_cache: ObjectCache,
     sym_enc_key: secretbox::Key,
     _access_container: AccessContainer,
-    _access_info: Vec<(Dir, ContainerPermissions)>,
+    _access_info: Vec<(MDataInfo, ContainerPermissions)>,
 }
 
 impl AppContext {
@@ -213,8 +213,11 @@ impl AppContext {
         unimplemented!()
     }
 
-    /// Fetch `Dir` by name from the access container.
-    pub fn get_dir<T: Into<String>>(&self, _client: &Client, _dir_name: T) -> Box<AppFuture<Dir>> {
+    /// Fetch mutable data info under the given name from the access container.
+    pub fn get_mdata_info<T: Into<String>>(&self,
+                                           _client: &Client,
+                                           _name: T)
+                                           -> Box<AppFuture<MDataInfo>> {
         unimplemented!()
     }
 

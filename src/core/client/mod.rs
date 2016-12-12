@@ -24,7 +24,7 @@ mod account;
 mod mock;
 mod routing_el;
 
-use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, DIR_TAG, Dir, FutureExt,
+use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, DIR_TAG, FutureExt, MDataInfo,
            NetworkEvent, NetworkTx, utility};
 use futures::{self, Complete, Future};
 use lru_cache::LruCache;
@@ -173,8 +173,8 @@ impl Client {
 
         let (routing, routing_rx) = setup_routing(full_id)?;
 
-        let user_root_dir = Dir::random_private(DIR_TAG)?;
-        let config_dir = Dir::random_private(DIR_TAG)?;
+        let user_root_dir = MDataInfo::random_private(DIR_TAG)?;
+        let config_dir = MDataInfo::random_private(DIR_TAG)?;
         let acc = Account::new(maid_keys, user_root_dir.clone(), config_dir.clone());
 
         let acc_data = btree_map![
@@ -627,46 +627,46 @@ impl Client {
         self.mutate(|routing, dst, msg_id| routing.del_auth_key(dst, key, version, msg_id))
     }
 
-    /// Create an entry for the Root Directory ID for the user into the session
+    /// Create an entry for the Root Directory ID for the user into the account
     /// packet, encrypt and store it. It will be retrieved when the user logs
     /// into their account.  Root directory ID is necessary to fetch all of the
     /// user's data as all further data is encoded as meta-information into the
     /// Root Directory or one of its subdirectories.
-    pub fn set_user_root_dir(&self, dir: Dir) -> Box<CoreFuture<()>> {
+    pub fn set_user_root_dir(&self, dir: MDataInfo) -> Box<CoreFuture<()>> {
         trace!("Setting user root Dir ID.");
         {
             let mut inner = self.inner_mut();
             let mut account = fry!(inner.client_type.acc_mut());
             account.user_root = dir;
         }
-        self.update_session_packet()
+        self.update_account_packet()
     }
 
-    /// Get User's Root Directory ID if available in session packet used for
+    /// Get User's Root Directory ID if available in account packet used for
     /// current login
-    pub fn user_root_dir(&self) -> Result<Dir, CoreError> {
+    pub fn user_root_dir(&self) -> Result<MDataInfo, CoreError> {
         self.inner().client_type.acc().and_then(|account| Ok(account.user_root.clone()))
     }
 
     /// Create an entry for the Maidsafe configuration specific Root Directory
-    /// ID into the session packet, encrypt and store it. It will be retrieved
+    /// ID into the account packet, encrypt and store it. It will be retrieved
     /// when the user logs into their account. Root directory ID is necessary
     /// to fetch all of configuration data as all further data is encoded as
     /// meta-information into the config Root Directory or one of its
     /// subdirectories.
-    pub fn set_config_root_dir(&self, dir: Dir) -> Box<CoreFuture<()>> {
+    pub fn set_config_root_dir(&self, dir: MDataInfo) -> Box<CoreFuture<()>> {
         trace!("Setting configuration root Dir ID.");
         {
             let mut inner = self.inner_mut();
             let mut account = fry!(inner.client_type.acc_mut());
             account.config_root = dir;
         }
-        self.update_session_packet()
+        self.update_account_packet()
     }
 
     /// Get Maidsafe specific configuration's Root Directory ID if available in
-    /// session packet used for current login
-    pub fn config_root_dir(&self) -> Result<Dir, CoreError> {
+    /// account packet used for current login
+    pub fn config_root_dir(&self) -> Result<MDataInfo, CoreError> {
         self.inner().client_type.acc().and_then(|account| Ok(account.config_root.clone()))
     }
 
@@ -711,8 +711,8 @@ impl Client {
         self.inner().client_type.owner_key()
     }
 
-    fn update_session_packet(&self) -> Box<CoreFuture<()>> {
-        trace!("Updating session packet.");
+    fn update_account_packet(&self) -> Box<CoreFuture<()>> {
+        trace!("Updating account packet.");
 
         let data_name = fry!(self.inner().client_type.acc_loc());
 
@@ -1007,7 +1007,7 @@ fn spawn_routing_thread<T>(routing_rx: Receiver<Event>,
 fn create_empty_dir(routing: &Routing,
                     routing_rx: &Receiver<Event>,
                     dst: Authority,
-                    dir: Dir,
+                    dir: MDataInfo,
                     owner_key: sign::PublicKey)
                     -> Result<(), CoreError> {
     let dir_md = MutableData::new(dir.name,
@@ -1032,7 +1032,7 @@ fn create_empty_dir(routing: &Routing,
 
 #[cfg(test)]
 mod tests {
-    use core::{CoreError, DIR_TAG, Dir, utility};
+    use core::{CoreError, DIR_TAG, MDataInfo, utility};
     use core::utility::test_utils::{finish, random_client, setup_client};
     use futures::Future;
     use futures::sync::mpsc;
@@ -1061,7 +1061,7 @@ mod tests {
                 .then(move |res| {
                     let data = unwrap!(res);
                     assert_eq!(data, orig_data);
-                    let dir = unwrap!(Dir::random_private(DIR_TAG));
+                    let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
                     client2.set_user_root_dir(dir)
                 })
                 .then(move |res| {
@@ -1076,7 +1076,7 @@ mod tests {
                         _ => panic!("Unexpected {:?}", e),
                     }
 
-                    let dir = unwrap!(Dir::random_private(DIR_TAG));
+                    let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
                     client3.set_config_root_dir(dir)
                 })
                 .then(|res| {
@@ -1147,7 +1147,7 @@ mod tests {
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir = unwrap!(Dir::random_private(DIR_TAG));
+        let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
         let dir_clone = dir.clone();
 
         setup_client(|el_h, core_tx, net_tx| {
@@ -1171,7 +1171,7 @@ mod tests {
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
 
-        let dir = unwrap!(Dir::random_private(DIR_TAG));
+        let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
         let dir_clone = dir.clone();
 
         setup_client(|el_h, core_tx, net_tx| {

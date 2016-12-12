@@ -19,8 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::dir::Dir;
 use core::errors::CoreError;
+use core::mdata_info::MDataInfo;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{FullId, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
@@ -32,14 +32,14 @@ pub struct Account {
     /// The User Account Keys
     pub maid_keys: ClientKeys,
     /// The users root directory
-    pub user_root: Dir,
+    pub user_root: MDataInfo,
     /// The users configuration directory
-    pub config_root: Dir,
+    pub config_root: MDataInfo,
 }
 
 impl Account {
     /// Create new Account with a provided set of keys
-    pub fn new(keys: ClientKeys, user_root: Dir, config_root: Dir) -> Self {
+    pub fn new(keys: ClientKeys, user_root: MDataInfo, config_root: MDataInfo) -> Self {
         Account {
             maid_keys: keys,
             user_root: user_root,
@@ -154,7 +154,7 @@ impl Into<FullId> for ClientKeys {
 
 #[cfg(test)]
 mod tests {
-    use core::dir::Dir;
+    use core::mdata_info::MDataInfo;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::u32;
     use super::*;
@@ -235,8 +235,8 @@ mod tests {
     }
 
     fn create_account() -> Account {
-        let user_root = unwrap!(Dir::random_private(0));
-        let config_root = unwrap!(Dir::random_private(0));
+        let user_root = unwrap!(MDataInfo::random_private(0));
+        let config_root = unwrap!(MDataInfo::random_private(0));
 
         Account::new(ClientKeys::new(), user_root, config_root)
     }

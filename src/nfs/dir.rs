@@ -20,7 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 
-use core::{Client, CoreError, DIR_TAG, Dir, FutureExt};
+use core::{Client, CoreError, DIR_TAG, FutureExt, MDataInfo};
 // [#use_macros]
 use futures::Future;
 use nfs::{NfsError, NfsFuture};
@@ -28,13 +28,13 @@ use routing::MutableData;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// create a new directory emulation
-pub fn create_dir(client: &Client, is_public: bool) -> Box<NfsFuture<Dir>> {
+pub fn create_dir(client: &Client, is_public: bool) -> Box<NfsFuture<MDataInfo>> {
     match client.owner_key() {
         Ok(pub_key) => {
             let dir = if is_public {
-                fry!(Dir::random_public(DIR_TAG))
+                fry!(MDataInfo::random_public(DIR_TAG))
             } else {
-                fry!(Dir::random_private(DIR_TAG))
+                fry!(MDataInfo::random_private(DIR_TAG))
             };
 
             let mut owners = BTreeSet::new();

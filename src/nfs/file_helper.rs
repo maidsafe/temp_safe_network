@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, CoreFuture, Dir, FutureExt, SelfEncryptionStorage};
+use core::{Client, CoreFuture, FutureExt, MDataInfo, SelfEncryptionStorage};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::{File, Mode, NfsError, Reader, Writer};
@@ -27,7 +27,10 @@ use routing::EntryActions;
 use self_encryption::DataMap;
 
 /// Gets a file from the directory
-pub fn fetch<S: AsRef<str>>(client: Client, parent: Dir, name: S) -> Box<CoreFuture<(u64, File)>> {
+pub fn fetch<S: AsRef<str>>(client: Client,
+                            parent: MDataInfo,
+                            name: S)
+                            -> Box<CoreFuture<(u64, File)>> {
     let key = fry!(parent.enc_entry_key(name.as_ref().as_bytes()));
 
     client.get_mdata_value(parent.name, parent.type_tag, key)
@@ -47,7 +50,7 @@ pub fn read(client: Client, file: &File) -> Result<Reader, NfsError> {
 
 /// Delete a file from the Directory
 pub fn delete<S: AsRef<str>>(client: Client,
-                             parent: Dir,
+                             parent: MDataInfo,
                              name: S,
                              version: u64)
                              -> Box<CoreFuture<()>> {
@@ -65,7 +68,7 @@ pub fn delete<S: AsRef<str>>(client: Client,
 
 /// Updates the file.
 pub fn update<S: AsRef<str>>(client: Client,
-                             parent: Dir,
+                             parent: MDataInfo,
                              name: S,
                              file: File,
                              version: u64)
@@ -89,7 +92,7 @@ pub fn update<S: AsRef<str>>(client: Client,
 /// the network. The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
 pub fn update_content<S: Into<String>>(client: Client,
-                                       parent: Dir,
+                                       parent: MDataInfo,
                                        name: S,
                                        file: File,
                                        version: u64,
@@ -113,7 +116,7 @@ pub fn update_content<S: Into<String>>(client: Client,
 /// The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
 pub fn create<S: Into<String>>(client: Client,
-                               parent: Dir,
+                               parent: MDataInfo,
                                name: S,
                                user_metadata: Vec<u8>)
                                -> Box<CoreFuture<Writer>> {
@@ -131,7 +134,7 @@ pub fn create<S: Into<String>>(client: Client,
 
 #[cfg(test)]
 mod tests {
-    use core::{Client, CoreError, Dir, FutureExt};
+    use core::{Client, CoreError, FutureExt, MDataInfo};
     use core::utility::test_utils::random_client;
     use futures::Future;
     use nfs::{File, Mode, NfsFuture, file_helper};
@@ -140,7 +143,7 @@ mod tests {
     const ORIG_SIZE: usize = 100;
     const NEW_SIZE: usize = 50;
 
-    fn create_test_file(client: Client) -> Box<NfsFuture<(Dir, File)>> {
+    fn create_test_file(client: Client) -> Box<NfsFuture<(MDataInfo, File)>> {
         let user_root = unwrap!(client.user_root_dir());
 
         file_helper::create(client.clone(), user_root.clone(), "hello.txt", Vec::new())

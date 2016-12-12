@@ -44,10 +44,10 @@ pub enum AppError {
 
     /// Invalid CipherOpt handle
     InvalidCipherOptHandle,
-    /// Invalid `Dir` handle
-    InvalidDirHandle,
     /// Invalid encrypt (box_) key handle
     InvalidEncryptKeyHandle,
+    /// Invalid `MDataInfo` handle
+    InvalidMDataInfoHandle,
     /// Invalid MutableData enties handle
     InvalidMDataEntriesHandle,
     /// Invalid MutableData entry actions handle
@@ -161,8 +161,8 @@ impl Into<i32> for AppError {
             AppError::EncodeDecodeError => APP_ERROR_START_RANGE - 1,
             AppError::Forbidden => APP_ERROR_START_RANGE - 2,
             AppError::InvalidCipherOptHandle => APP_ERROR_START_RANGE - 3,
-            AppError::InvalidDirHandle => APP_ERROR_START_RANGE - 4,
-            AppError::InvalidEncryptKeyHandle => APP_ERROR_START_RANGE - 5,
+            AppError::InvalidEncryptKeyHandle => APP_ERROR_START_RANGE - 4,
+            AppError::InvalidMDataInfoHandle => APP_ERROR_START_RANGE - 5,
             AppError::InvalidMDataEntriesHandle => APP_ERROR_START_RANGE - 6,
             AppError::InvalidMDataEntryActionsHandle => APP_ERROR_START_RANGE - 7,
             AppError::InvalidMDataPermissionsHandle => APP_ERROR_START_RANGE - 8,

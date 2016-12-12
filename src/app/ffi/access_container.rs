@@ -20,7 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use app::App;
-use app::object_cache::DirHandle;
+use app::object_cache::MDataInfoHandle;
 use core::FutureExt;
 use futures::Future;
 use ipc::req::ffi::Permission;
@@ -48,24 +48,24 @@ pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
     })
 }
 
-/// Retrieve `Dir` for the given name from the access container.
+/// Retrieve `MDataInfo` for the given name from the access container.
 #[no_mangle]
-pub unsafe extern "C" fn access_container_get_dir(app: *const App,
-                                                  dir_name: FfiString,
-                                                  user_data: *mut c_void,
-                                                  o_cb: extern "C" fn(*mut c_void,
-                                                                      i32,
-                                                                      DirHandle)) {
+pub unsafe extern "C" fn access_container_get_mdata_info(app: *const App,
+                                                         name: FfiString,
+                                                         user_data: *mut c_void,
+                                                         o_cb: extern "C" fn(*mut c_void,
+                                                                             i32,
+                                                                             MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let dir_name = dir_name.to_string()?;
+        let name = name.to_string()?;
 
         (*app).send(move |client, context| {
             let context = context.clone();
 
-            context.get_dir(client, dir_name)
-                .map(move |dir| {
-                    let handle = context.object_cache().insert_dir(dir);
+            context.get_mdata_info(client, name)
+                .map(move |info| {
+                    let handle = context.object_cache().insert_mdata_info(info);
                     o_cb(user_data.0, 0, handle);
                 })
                 .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), 0))

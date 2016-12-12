@@ -20,7 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use app::ffi::cipher_opt::CipherOpt;
-use core::{Dir, SelfEncryptionStorage};
+use core::{MDataInfo, SelfEncryptionStorage};
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, Value, XorName};
 use rust_sodium::crypto::{box_, sign};
@@ -48,9 +48,9 @@ pub type ObjectHandle = u64;
 /// Disambiguating `ObjectHandle`
 pub type CipherOptHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type DirHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
 pub type EncryptKeyHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type MDataInfoHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataEntriesHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
@@ -76,8 +76,8 @@ pub type XorNameHandle = ObjectHandle;
 pub struct ObjectCache {
     handle_gen: HandleGenerator,
     cipher_opt: Store<CipherOpt>,
-    dir: Store<Dir>,
     encrypt_key: Store<box_::PublicKey>,
+    mdata_info: Store<MDataInfo>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
     mdata_values: Store<Vec<Value>>,
@@ -95,8 +95,8 @@ impl ObjectCache {
         ObjectCache {
             handle_gen: HandleGenerator::new(),
             cipher_opt: Store::new(),
-            dir: Store::new(),
             encrypt_key: Store::new(),
+            mdata_info: Store::new(),
             mdata_entries: Store::new(),
             mdata_keys: Store::new(),
             mdata_values: Store::new(),
@@ -113,8 +113,8 @@ impl ObjectCache {
     pub fn reset(&self) {
         self.handle_gen.reset();
         self.cipher_opt.clear();
-        self.dir.clear();
         self.encrypt_key.clear();
+        self.mdata_info.clear();
         self.mdata_entries.clear();
         self.mdata_keys.clear();
         self.mdata_values.clear();
@@ -161,13 +161,6 @@ impl_cache!(cipher_opt,
             get_cipher_opt,
             insert_cipher_opt,
             remove_cipher_opt);
-impl_cache!(dir,
-            Dir,
-            DirHandle,
-            InvalidDirHandle,
-            get_dir,
-            insert_dir,
-            remove_dir);
 impl_cache!(encrypt_key,
             box_::PublicKey,
             EncryptKeyHandle,
@@ -175,6 +168,13 @@ impl_cache!(encrypt_key,
             get_encrypt_key,
             insert_encrypt_key,
             remove_encrypt_key);
+impl_cache!(mdata_info,
+            MDataInfo,
+            MDataInfoHandle,
+            InvalidMDataInfoHandle,
+            get_mdata_info,
+            insert_mdata_info,
+            remove_mdata_info);
 impl_cache!(mdata_entries,
             BTreeMap<Vec<u8>, Value>,
             MDataEntriesHandle,

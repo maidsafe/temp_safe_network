@@ -28,9 +28,8 @@ use super::errors::CoreError;
 use super::utility::{symmetric_decrypt, symmetric_encrypt};
 
 /// Information allowing to locate and access mutable data on the network.
-// TODO: rename to `MDataInfo`.
 #[derive(Clone, Debug, PartialEq, RustcDecodable, RustcEncodable)]
-pub struct Dir {
+pub struct MDataInfo {
     /// Name of the data where the directory is stored.
     pub name: XorName,
     /// Type tag of the data where the directory is stored.
@@ -40,30 +39,30 @@ pub struct Dir {
     pub enc_info: Option<(secretbox::Key, Option<secretbox::Nonce>)>,
 }
 
-impl Dir {
-    /// Generate random, private (encrypted) `Dir` with the given type tag.
+impl MDataInfo {
+    /// Generate random `MDataInfo` for private (encrypted) mutable data.
     pub fn random_private(type_tag: u64) -> Result<Self, CoreError> {
         let mut rng = os_rng()?;
         let enc_info = Some((secretbox::gen_key(), Some(secretbox::gen_nonce())));
 
-        Ok(Dir {
+        Ok(MDataInfo {
             name: rng.gen(),
             type_tag: type_tag,
             enc_info: enc_info,
         })
     }
-    /// Generate a random, publicly accessible `Dir` with the given type tag
+    /// Generate random `MDataInfo` for public mutable data.
     pub fn random_public(type_tag: u64) -> Result<Self, CoreError> {
         let mut rng = os_rng()?;
 
-        Ok(Dir {
+        Ok(MDataInfo {
             name: rng.gen(),
             type_tag: type_tag,
             enc_info: None,
         })
     }
 
-    /// encrypt the the key for the mdata entry of this dir accordingly
+    /// encrypt the the key for the mdata entry accordingly
     pub fn enc_entry_key(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, seed)) = self.enc_info {
             let nonce = match seed {
@@ -111,39 +110,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn random_dir_encrypts() {
-        let dir = unwrap!(Dir::random_private(0));
+    fn private_mdata_info_encrypts() {
+        let info = unwrap!(MDataInfo::random_private(0));
         let key = Vec::from("str of key");
         let val = Vec::from("other is value");
-        let enc_key = unwrap!(dir.enc_entry_key(&key));
-        let enc_val = unwrap!(dir.enc_entry_value(&val));
+        let enc_key = unwrap!(info.enc_entry_key(&key));
+        let enc_val = unwrap!(info.enc_entry_value(&val));
         assert_ne!(enc_key, key);
         assert_ne!(enc_val, val);
-        assert_eq!(unwrap!(dir.decrypt(&enc_key)), key);
-        assert_eq!(unwrap!(dir.decrypt(&enc_val)), val);
+        assert_eq!(unwrap!(info.decrypt(&enc_key)), key);
+        assert_eq!(unwrap!(info.decrypt(&enc_val)), val);
     }
 
     #[test]
-    fn public_dir_doesnt_encrypt() {
-        let dir = unwrap!(Dir::random_public(0));
+    fn public_mdata_info_doesnt_encrypt() {
+        let info = unwrap!(MDataInfo::random_public(0));
         let key = Vec::from("str of key");
         let val = Vec::from("other is value");
-        assert_eq!(unwrap!(dir.enc_entry_key(&key)), key);
-        assert_eq!(unwrap!(dir.enc_entry_value(&val)), val);
-        assert_eq!(unwrap!(dir.decrypt(&val)), val);
+        assert_eq!(unwrap!(info.enc_entry_key(&key)), key);
+        assert_eq!(unwrap!(info.enc_entry_value(&val)), val);
+        assert_eq!(unwrap!(info.decrypt(&val)), val);
     }
 
     #[test]
     fn no_nonce_means_random_nonce() {
-        let dir = Dir {
+        let info = MDataInfo {
             name: rand::random(),
             type_tag: 0,
             enc_info: Some((secretbox::gen_key(), None)),
         };
         let key = Vec::from("str of key");
-        let enc_key = unwrap!(dir.enc_entry_key(&key));
+        let enc_key = unwrap!(info.enc_entry_key(&key));
         assert_ne!(enc_key, key);
         // encrypted is different on every run
-        assert_ne!(unwrap!(dir.enc_entry_key(&key)), key);
+        assert_ne!(unwrap!(info.enc_entry_key(&key)), key);
     }
 }
