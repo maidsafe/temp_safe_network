@@ -51,9 +51,14 @@ macro_rules! btree_map {
 
 /// Symmetric encryption
 pub fn symmetric_encrypt(plain_text: &[u8],
-                         secret_key: &secretbox::Key)
+                         secret_key: &secretbox::Key,
+                         nonce: Option<&secretbox::Nonce>)
                          -> Result<Vec<u8>, CoreError> {
-    let nonce = secretbox::gen_nonce();
+    let nonce = match nonce {
+        Some(nonce) => *nonce,
+        None => secretbox::gen_nonce(),
+    };
+
     let cipher_text = secretbox::seal(plain_text, &nonce, secret_key);
 
     Ok(serialise(&(nonce, cipher_text))?)

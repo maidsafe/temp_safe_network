@@ -83,7 +83,7 @@ impl MDataInfo {
     /// encrypt the value for this mdata entry accordingly
     pub fn enc_entry_value(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, _)) = self.enc_info {
-            symmetric_encrypt(plain_text, key)
+            symmetric_encrypt(plain_text, key, None)
         } else {
             Ok(plain_text.to_vec())
         }

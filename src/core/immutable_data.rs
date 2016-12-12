@@ -53,7 +53,8 @@ pub fn create(client: &Client,
             let serialised_data_map = fry!(serialise(&data_map));
 
             let value = if let Some(key) = encryption_key {
-                let cipher_text = fry!(utility::symmetric_encrypt(&serialised_data_map, &key));
+                let cipher_text =
+                    fry!(utility::symmetric_encrypt(&serialised_data_map, &key, None));
                 fry!(serialise(&DataTypeEncoding::Serialised(cipher_text)))
             } else {
                 fry!(serialise(&DataTypeEncoding::Serialised(serialised_data_map)))

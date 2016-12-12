@@ -41,6 +41,8 @@ pub enum AppError {
     EncodeDecodeError,
     /// Forbidden operation
     Forbidden,
+    /// Container not found
+    NoSuchContainer,
 
     /// Invalid CipherOpt handle
     InvalidCipherOptHandle,
@@ -158,19 +160,20 @@ impl Into<i32> for AppError {
             AppError::IpcError(err) => err.into(),
             AppError::EncodeDecodeError => APP_ERROR_START_RANGE - 1,
             AppError::Forbidden => APP_ERROR_START_RANGE - 2,
-            AppError::InvalidCipherOptHandle => APP_ERROR_START_RANGE - 3,
-            AppError::InvalidEncryptKeyHandle => APP_ERROR_START_RANGE - 4,
-            AppError::InvalidMDataInfoHandle => APP_ERROR_START_RANGE - 5,
-            AppError::InvalidMDataEntriesHandle => APP_ERROR_START_RANGE - 6,
-            AppError::InvalidMDataEntryActionsHandle => APP_ERROR_START_RANGE - 7,
-            AppError::InvalidMDataPermissionsHandle => APP_ERROR_START_RANGE - 8,
-            AppError::InvalidMDataPermissionSetHandle => APP_ERROR_START_RANGE - 9,
-            AppError::InvalidSelfEncryptorHandle => APP_ERROR_START_RANGE - 10,
-            AppError::InvalidSignKeyHandle => APP_ERROR_START_RANGE - 11,
-            AppError::SelfEncryption(_) => APP_ERROR_START_RANGE - 12,
-            AppError::InvalidSelfEncryptorReadOffsets => APP_ERROR_START_RANGE - 13,
-            AppError::IoError(_) => APP_ERROR_START_RANGE - 14,
-            AppError::Unexpected(_) => APP_ERROR_START_RANGE - 15,
+            AppError::NoSuchContainer => APP_ERROR_START_RANGE - 3,
+            AppError::InvalidCipherOptHandle => APP_ERROR_START_RANGE - 4,
+            AppError::InvalidEncryptKeyHandle => APP_ERROR_START_RANGE - 5,
+            AppError::InvalidMDataInfoHandle => APP_ERROR_START_RANGE - 6,
+            AppError::InvalidMDataEntriesHandle => APP_ERROR_START_RANGE - 7,
+            AppError::InvalidMDataEntryActionsHandle => APP_ERROR_START_RANGE - 8,
+            AppError::InvalidMDataPermissionsHandle => APP_ERROR_START_RANGE - 9,
+            AppError::InvalidMDataPermissionSetHandle => APP_ERROR_START_RANGE - 10,
+            AppError::InvalidSelfEncryptorHandle => APP_ERROR_START_RANGE - 11,
+            AppError::InvalidSignKeyHandle => APP_ERROR_START_RANGE - 12,
+            AppError::SelfEncryption(_) => APP_ERROR_START_RANGE - 13,
+            AppError::InvalidSelfEncryptorReadOffsets => APP_ERROR_START_RANGE - 14,
+            AppError::IoError(_) => APP_ERROR_START_RANGE - 15,
+            AppError::Unexpected(_) => APP_ERROR_START_RANGE - 16,
         }
     }
 }

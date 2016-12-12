@@ -48,14 +48,15 @@ pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
     })
 }
 
-/// Retrieve `MDataInfo` for the given name from the access container.
+/// Retrieve `MDataInfo` for the given container name from the access container.
 #[no_mangle]
-pub unsafe extern "C" fn access_container_get_mdata_info(app: *const App,
-                                                         name: FfiString,
-                                                         user_data: *mut c_void,
-                                                         o_cb: extern "C" fn(*mut c_void,
-                                                                             i32,
-                                                                             MDataInfoHandle)) {
+pub unsafe extern "C"
+fn access_container_get_container_mdata_info(app: *const App,
+                                             name: FfiString,
+                                             user_data: *mut c_void,
+                                             o_cb: extern "C" fn(*mut c_void,
+                                                                 i32,
+                                                                 MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = name.to_string()?;
@@ -63,7 +64,7 @@ pub unsafe extern "C" fn access_container_get_mdata_info(app: *const App,
         (*app).send(move |client, context| {
             let context = context.clone();
 
-            context.get_mdata_info(client, name)
+            context.get_container_mdata_info(client, name)
                 .map(move |info| {
                     let handle = context.object_cache().insert_mdata_info(info);
                     o_cb(user_data.0, 0, handle);
@@ -75,10 +76,10 @@ pub unsafe extern "C" fn access_container_get_mdata_info(app: *const App,
     })
 }
 
-/// Check whether the app has the given permission for the given directory.
+/// Check whether the app has the given permission for the given container.
 #[no_mangle]
 pub unsafe extern "C" fn access_container_is_permitted(app: *const App,
-                                                       dir_name: FfiString,
+                                                       name: FfiString,
                                                        permission: Permission,
                                                        user_data: *mut c_void,
                                                        o_cb: extern "C" fn(*mut c_void,
@@ -86,10 +87,10 @@ pub unsafe extern "C" fn access_container_is_permitted(app: *const App,
                                                                            bool)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let dir_name = dir_name.to_string()?;
+        let name = name.to_string()?;
 
         (*app).send(move |client, context| {
-            context.is_permitted(client, dir_name, permission)
+            context.is_permitted(client, name, permission)
                 .map(move |answer| o_cb(user_data.0, 0, answer))
                 .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), false))
                 .into_box()

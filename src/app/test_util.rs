@@ -19,31 +19,31 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::Client;
+use core::{Client, FutureExt, utility};
 use core::utility::test_utils::random_client;
+use futures::{Future, IntoFuture};
 use ipc::{AccessContainer, AppKeys, AuthGranted, Config};
 use rand;
 use rust_sodium::crypto::{box_, secretbox, sign};
 use std::sync::mpsc;
 use super::{App, AppContext};
+use super::errors::AppError;
 
 const ACCESS_CONTAINER_TAG: u64 = 1000;
 
 // Create registered app.
 pub fn create_app() -> App {
+    let app_id = unwrap!(utility::generate_random_string(10));
+
     let enc_key = secretbox::gen_key();
     let (sign_pk, sign_sk) = sign::gen_keypair();
     let (enc_pk, enc_sk) = box_::gen_keypair();
 
     // Create account and authorize the app key.
-    let (tx, rx) = mpsc::channel();
-    random_client(move |client| {
+    let owner_key = random_client(move |client| {
         let owner_key = unwrap!(client.owner_key());
-        unwrap!(tx.send(owner_key));
-
-        client.ins_auth_key(sign_pk, 1)
+        client.ins_auth_key(sign_pk, 1).map(move |_| owner_key)
     });
-    let owner_key = unwrap!(rx.recv());
 
     let app_keys = AppKeys {
         owner_key: owner_key,
@@ -66,7 +66,7 @@ pub fn create_app() -> App {
         access_container: access_container,
     };
 
-    unwrap!(App::registered(auth_granted, |_network_event| ()))
+    unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }
 
 /*
@@ -92,24 +92,23 @@ pub fn run_now<F, R>(app: &App, f: F) -> R
     unwrap!(rx.recv())
 }
 
-/*
-
 // Run the given closure inside the app event loop. The closure should
 // return a future which will then be driven to completion and its result
 // returned.
-pub fn run<F, I, R, E>(app: &App, f: F) -> R
+pub fn run<F, I, T>(app: &App, f: F) -> T
     where F: FnOnce(&Client, &AppContext) -> I + Send + 'static,
-          I: IntoFuture<Item = R, Error = E> + 'static,
-          R: Send + 'static,
-          E: Debug
+          I: IntoFuture<Item = T, Error = AppError> + 'static,
+          T: Send + 'static
 {
     let (tx, rx) = mpsc::channel();
 
     unwrap!(app.send(move |client, app| {
         let future = f(client, app)
             .into_future()
-            .map_err(|err| panic!("{:?}", err))
-            .map(move |result| unwrap!(tx.send(result)))
+            .then(move |result| {
+                unwrap!(tx.send(unwrap!(result)));
+                Ok(())
+            })
             .into_box();
 
         Some(future)
@@ -117,5 +116,3 @@ pub fn run<F, I, R, E>(app: &App, f: F) -> R
 
     unwrap!(rx.recv())
 }
-
-*/

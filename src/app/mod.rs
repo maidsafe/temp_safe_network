@@ -26,16 +26,21 @@ mod object_cache;
 #[cfg(test)]
 mod test_util;
 
-use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, MDataInfo, NetworkEvent, NetworkTx};
-use futures::Future;
+use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
+           NetworkTx};
+use core::utility;
+use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use ipc::{AccessContainer, AppKeys, AuthGranted, ContainerPermissions};
 use ipc::req::ffi::Permission;
+use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
+use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::secretbox;
 use self::errors::AppError;
 use self::object_cache::ObjectCache;
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
@@ -71,7 +76,10 @@ impl App {
     }
 
     /// Create registered app.
-    pub fn registered<N>(auth_granted: AuthGranted, network_observer: N) -> Result<Self, AppError>
+    pub fn registered<N>(app_id: String,
+                         auth_granted: AuthGranted,
+                         network_observer: N)
+                         -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
     {
         let AuthGranted {
@@ -89,7 +97,7 @@ impl App {
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {
             let client = Client::from_keys(client_keys, owner_key, el_h, core_tx, net_tx)?;
-            let context = AppContext::registered(enc_key, access_container);
+            let context = AppContext::registered(app_id, enc_key, access_container);
             Ok((client, context))
         })
     }
@@ -157,83 +165,307 @@ impl Drop for App {
 
 /// Application context (data associated with the app).
 #[derive(Clone)]
-pub struct AppContext {
-    inner: Rc<Inner>,
+pub enum AppContext {
+    /// Context of unregistered app.
+    Unregistered(Rc<Unregistered>),
+    /// Context of registered app.
+    Registered(Rc<Registered>),
 }
 
-enum Inner {
-    Unauthorised(Unauthorised),
-    Authorised(Authorised),
-}
-
-struct Unauthorised {
+#[allow(missing_docs)]
+pub struct Unregistered {
     object_cache: ObjectCache,
 }
 
-struct Authorised {
+#[allow(missing_docs)]
+pub struct Registered {
     object_cache: ObjectCache,
+    app_id: String,
     sym_enc_key: secretbox::Key,
-    _access_container: AccessContainer,
-    _access_info: Vec<(MDataInfo, ContainerPermissions)>,
+    access_container_info: AccessContainer,
+    access_info: RefCell<Vec<(MDataInfo, ContainerPermissions)>>,
 }
 
 impl AppContext {
     fn unregistered() -> Self {
-        AppContext {
-            inner: Rc::new(Inner::Unauthorised(Unauthorised { object_cache: ObjectCache::new() })),
-        }
+        AppContext::Unregistered(Rc::new(Unregistered { object_cache: ObjectCache::new() }))
     }
 
-    fn registered(sym_enc_key: secretbox::Key, access_container: AccessContainer) -> Self {
-        AppContext {
-            inner: Rc::new(Inner::Authorised(Authorised {
-                object_cache: ObjectCache::new(),
-                sym_enc_key: sym_enc_key,
-                _access_container: access_container,
-                _access_info: Vec::new(),
-            })),
-        }
+    fn registered(app_id: String,
+                  sym_enc_key: secretbox::Key,
+                  access_container_info: AccessContainer)
+                  -> Self {
+        AppContext::Registered(Rc::new(Registered {
+            object_cache: ObjectCache::new(),
+            app_id: app_id,
+            sym_enc_key: sym_enc_key,
+            access_container_info: access_container_info,
+            access_info: RefCell::new(Vec::new()),
+        }))
     }
 
     /// Object cache
     pub fn object_cache(&self) -> &ObjectCache {
-        match *self.inner {
-            Inner::Unauthorised(ref context) => &context.object_cache,
-            Inner::Authorised(ref context) => &context.object_cache,
+        match *self {
+            AppContext::Unregistered(ref context) => &context.object_cache,
+            AppContext::Registered(ref context) => &context.object_cache,
         }
     }
 
     /// Symmetric encryption/decryption key.
     pub fn sym_enc_key(&self) -> Result<&secretbox::Key, AppError> {
-        Ok(&self.as_authorised()?.sym_enc_key)
+        Ok(&self.as_registered()?.sym_enc_key)
     }
 
     /// Refresh access info by fetching it from the network.
-    pub fn refresh_access_info(&self, _client: &Client) -> Box<AppFuture<()>> {
-        unimplemented!()
+    pub fn refresh_access_info(&self, client: &Client) -> Box<AppFuture<()>> {
+        let reg = fry!(self.as_registered()).clone();
+        refresh_access_info(reg, client)
     }
 
-    /// Fetch mutable data info under the given name from the access container.
-    pub fn get_mdata_info<T: Into<String>>(&self,
-                                           _client: &Client,
-                                           _name: T)
-                                           -> Box<AppFuture<MDataInfo>> {
-        unimplemented!()
+    /// Fetch mdata_info for the given container name.
+    pub fn get_container_mdata_info<T: Into<String>>(&self,
+                                                     client: &Client,
+                                                     name: T)
+                                                     -> Box<AppFuture<MDataInfo>> {
+        let reg = fry!(self.as_registered()).clone();
+        let name = name.into();
+
+        fetch_access_info(reg.clone(), client)
+            .and_then(move |_| {
+                let access_info = reg.access_info.borrow();
+                access_info.iter()
+                    .find(|&&(_, ref permissions)| permissions.container_key == name)
+                    .map(|&(ref mdata_info, _)| mdata_info.clone())
+                    .ok_or(AppError::NoSuchContainer)
+            })
+            .into_box()
     }
 
     /// Check the given permission for the given directory.
     pub fn is_permitted<T: Into<String>>(&self,
-                                         _client: &Client,
-                                         _dir_name: T,
-                                         _permission: Permission)
+                                         client: &Client,
+                                         name: T,
+                                         permission: Permission)
                                          -> Box<AppFuture<bool>> {
-        unimplemented!()
+        let reg = fry!(self.as_registered()).clone();
+        let name = name.into();
+
+        fetch_access_info(reg.clone(), client)
+            .and_then(move |_| {
+                let access_info = reg.access_info.borrow();
+                access_info.iter()
+                    .find(|&&(_, ref permissions)| permissions.container_key == name)
+                    .map(|&(_, ref permissions)| permissions.access.contains(&permission))
+                    .ok_or(AppError::NoSuchContainer)
+            })
+            .into_box()
     }
 
-    fn as_authorised(&self) -> Result<&Authorised, AppError> {
-        match *self.inner {
-            Inner::Authorised(ref context) => Ok(context),
-            Inner::Unauthorised(_) => Err(AppError::Forbidden),
+    fn as_registered(&self) -> Result<&Rc<Registered>, AppError> {
+        match *self {
+            AppContext::Registered(ref a) => Ok(a),
+            AppContext::Unregistered(_) => Err(AppError::Forbidden),
         }
+    }
+}
+
+fn refresh_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<()>> {
+    let entry_key = {
+        let app_id_hash = sha256::hash(context.app_id.as_bytes()).0;
+        let nonce = context.access_container_info.nonce;
+
+        fry!(utility::symmetric_encrypt(&app_id_hash, &context.sym_enc_key, Some(&nonce)))
+    };
+
+    client.get_mdata_value(context.access_container_info.id,
+                         context.access_container_info.tag,
+                         entry_key)
+        .map_err(AppError::from)
+        .and_then(move |value| {
+            let encoded = utility::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
+            let decoded = deserialise(&encoded)?;
+
+            *context.access_info.borrow_mut() = decoded;
+
+            Ok(())
+        })
+        .into_box()
+}
+
+fn fetch_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<()>> {
+    if context.access_info.borrow().is_empty() {
+        refresh_access_info(context, client)
+    } else {
+        future::ok(()).into_box()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use app::test_util::run;
+    use core::{DIR_TAG, MDataInfo, utility};
+    use core::utility::test_utils::random_client;
+    use futures::Future;
+    use ipc::{AccessContainer, AppKeys, AuthGranted, Config, ContainerPermissions, Permission};
+    use maidsafe_utilities::serialisation::serialise;
+    use rand;
+    use routing::{MutableData, Value};
+    use rust_sodium::crypto::{box_, secretbox, sign};
+    use rust_sodium::crypto::hash::sha256;
+    use super::*;
+
+    const ACCESS_CONTAINER_TAG: u64 = 1000;
+
+    #[test]
+    fn refresh_access_info() {
+        // Shared container
+        let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
+
+        let container_permissions = ContainerPermissions {
+            container_key: "_test".to_string(),
+            access: btree_set![Permission::Read, Permission::Insert],
+        };
+
+        let app = create_app_with_access(&[(container_info.clone(),
+                                            container_permissions.clone())]);
+
+        run(&app, move |client, context| {
+            let reg = unwrap!(context.as_registered()).clone();
+            assert!(reg.access_info.borrow().is_empty());
+
+            context.refresh_access_info(client)
+                .then(move |result| {
+                    unwrap!(result);
+                    let access_info = reg.access_info.borrow();
+                    assert_eq!(access_info.len(), 1);
+                    assert_eq!(access_info[0].0, container_info);
+                    assert_eq!(access_info[0].1, container_permissions);
+
+                    Ok(())
+                })
+        });
+    }
+
+    #[test]
+    fn get_container_mdata_info() {
+        // Shared container
+        let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
+        let container_key = "_test".to_string();
+
+        let container_permissions = ContainerPermissions {
+            container_key: container_key.clone(),
+            access: btree_set![Permission::Read],
+        };
+
+        let app = create_app_with_access(&[(container_info.clone(), container_permissions)]);
+
+        run(&app, move |client, context| {
+            context.get_container_mdata_info(client, container_key)
+                .then(move |res| {
+                    let info = unwrap!(res);
+                    assert_eq!(info, container_info);
+
+                    Ok(())
+                })
+        });
+    }
+
+    #[test]
+    fn is_permitted() {
+        // Shared container
+        let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
+        let container_key = "_test".to_string();
+
+        let container_permissions = ContainerPermissions {
+            container_key: container_key.clone(),
+            access: btree_set![Permission::Read],
+        };
+
+        let app = create_app_with_access(&[(container_info.clone(), container_permissions)]);
+
+        run(&app, move |client, context| {
+            let f1 = context.is_permitted(client, container_key.clone(), Permission::Read)
+                .then(move |res| {
+                    assert!(unwrap!(res));
+                    Ok(())
+                });
+
+            let f2 = context.is_permitted(client, container_key.clone(), Permission::Insert)
+                .then(move |res| {
+                    assert!(!unwrap!(res));
+                    Ok(())
+                });
+
+            f1.join(f2).map(|_| ())
+        });
+
+    }
+
+    // Create app and grant it access to the specified containers.
+    fn create_app_with_access(access_info: &[(MDataInfo, ContainerPermissions)]) -> App {
+        let app_id = unwrap!(utility::generate_random_string(10));
+        let enc_key = secretbox::gen_key();
+        let (sign_pk, sign_sk) = sign::gen_keypair();
+        let (enc_pk, enc_sk) = box_::gen_keypair();
+
+        // Create the access container.
+        let access_container_info = AccessContainer {
+            id: rand::random(),
+            tag: ACCESS_CONTAINER_TAG,
+            nonce: secretbox::gen_nonce(),
+        };
+
+        let access_container_key =
+            unwrap!(utility::symmetric_encrypt(&sha256::hash(app_id.as_bytes()).0,
+                                               &enc_key,
+                                               Some(&access_container_info.nonce)));
+
+        let access_container_value = {
+            let value = unwrap!(serialise(&access_info));
+            unwrap!(utility::symmetric_encrypt(&value, &enc_key, None))
+        };
+
+        let access_container_entries = btree_map![
+            access_container_key => Value {
+                content: access_container_value,
+                entry_version: 0,
+            }
+        ];
+
+        let access_container_name = access_container_info.id;
+        let access_container_type_tag = access_container_info.tag;
+
+        // Put the access container on the network and authorise the app.
+        let owner_key = random_client(move |client| {
+            let owner_key = unwrap!(client.owner_key());
+
+            let access_container = unwrap!(MutableData::new(access_container_name,
+                                                            access_container_type_tag,
+                                                            Default::default(),
+                                                            access_container_entries,
+                                                            btree_set![owner_key]));
+
+            let f1 = client.put_mdata(access_container);
+            let f2 = client.ins_auth_key(sign_pk, 1);
+            f1.join(f2).map(move |_| owner_key)
+        });
+
+        let app_keys = AppKeys {
+            owner_key: owner_key,
+            enc_key: enc_key,
+            sign_pk: sign_pk,
+            sign_sk: sign_sk,
+            enc_pk: enc_pk,
+            enc_sk: enc_sk,
+        };
+
+        let auth_granted = AuthGranted {
+            app_keys: app_keys,
+            bootstrap_config: Config,
+            access_container: access_container_info,
+        };
+
+        unwrap!(App::registered(app_id, auth_granted, |_| ()))
     }
 }
