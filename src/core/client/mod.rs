@@ -24,8 +24,8 @@ mod account;
 mod mock;
 mod routing_el;
 
-use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, DIR_TAG, FutureExt, NetworkEvent,
-           NetworkTx, utility};
+use core::{CoreError, CoreEvent, CoreFuture, CoreMsg, CoreMsgTx, DIR_TAG, Dir, FutureExt,
+           NetworkEvent, NetworkTx, utility};
 use futures::{self, Complete, Future};
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
@@ -36,8 +36,8 @@ use routing::{AccountInfo, Authority, EntryAction, Event, FullId, ImmutableData,
 use routing::Client as Routing;
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
-pub use self::account::{ClientKeys, Dir};
 use self::account::Account;
+pub use self::account::ClientKeys;
 #[cfg(feature = "use-mock-routing")]
 use self::mock::Routing;
 use std::cell::{Ref, RefCell, RefMut};
@@ -1032,7 +1032,7 @@ fn create_empty_dir(routing: &Routing,
 
 #[cfg(test)]
 mod tests {
-    use core::{CoreError, DIR_TAG, utility};
+    use core::{CoreError, DIR_TAG, Dir, utility};
     use core::utility::test_utils::{finish, random_client, setup_client};
     use futures::Future;
     use futures::sync::mpsc;

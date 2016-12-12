@@ -25,12 +25,13 @@ pub mod permissions;
 mod helper;
 
 use app::App;
-use app::object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataKeysHandle,
+use app::object_cache::{DirHandle, MDataEntriesHandle, MDataEntryActionsHandle, MDataKeysHandle,
                         MDataPermissionSetHandle, MDataPermissionsHandle, MDataValuesHandle,
                         SignKeyHandle};
 use core::{CoreError, FutureExt};
 use futures::Future;
-use routing::{MutableData, XOR_NAME_LEN, XorName};
+use routing::MutableData;
+use self::helper::send_with_mdata_info;
 use std::os::raw::c_void;
 use util::ffi::{self, OpaqueCtx};
 
@@ -41,17 +42,16 @@ use util::ffi::{self, OpaqueCtx};
 /// `entries_h` is a handle to entries for the mutable data. If 0, the entries will be empty.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_put(app: *const App,
-                                   name: *const [u8; XOR_NAME_LEN],
-                                   type_tag: u64,
+                                   info_h: DirHandle,
                                    permissions_h: MDataPermissionsHandle,
                                    entries_h: MDataEntriesHandle,
                                    user_data: *mut c_void,
                                    o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = XorName(*name);
 
         (*app).send(move |client, context| {
+            let info = try_cb!(context.object_cache().get_dir(info_h), user_data, o_cb);
             let owner_key = try_cb!(client.owner_key(), user_data, o_cb);
 
             let permissions = if permissions_h != 0 {
@@ -71,8 +71,8 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
                 Default::default()
             };
 
-            let data = try_cb!(MutableData::new(name,
-                                                type_tag,
+            let data = try_cb!(MutableData::new(info.name,
+                                                info.type_tag,
                                                 permissions,
                                                 entries,
                                                 btree_set![owner_key])
@@ -94,17 +94,15 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
 /// Get version of the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_get_version(app: *const App,
-                                           name: *const [u8; XOR_NAME_LEN],
-                                           type_tag: u64,
+                                           info_h: DirHandle,
                                            user_data: *mut c_void,
                                            o_cb: unsafe extern "C" fn(*mut c_void, i32, u64)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        let name = XorName(*name);
-
-        helper::send_async(app,
-                           user_data,
-                           o_cb,
-                           move |client, _| client.get_mdata_version(name, type_tag))
+        send_with_mdata_info(app,
+                             info_h,
+                             user_data,
+                             o_cb,
+                             |client, _, info| client.get_mdata_version(info.name, info.type_tag))
     })
 }
 
@@ -118,8 +116,7 @@ pub unsafe extern "C" fn mdata_get_version(app: *const App,
 ///     6. entry version
 #[no_mangle]
 pub unsafe extern "C" fn mdata_get_value(app: *const App,
-                                         name: *const [u8; XOR_NAME_LEN],
-                                         type_tag: u64,
+                                         info_h: DirHandle,
                                          key_ptr: *const u8,
                                          key_len: usize,
                                          user_data: *mut c_void,
@@ -130,11 +127,10 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
                                                                     usize,
                                                                     u64)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        let name = XorName(*name);
         let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
 
-        helper::send_async(app, user_data, o_cb, move |client, _| {
-            client.get_mdata_value(name, type_tag, key)
+        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, _, info| {
+            client.get_mdata_value(info.name, info.type_tag, key)
                 .map(move |value| {
                     let content = ffi::u8_vec_to_ptr(value.content);
                     (content.0, content.1, content.2, value.entry_version)
@@ -146,18 +142,15 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
 /// Get complete list of entries in the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_entries(app: *const App,
-                                            name: *const [u8; XOR_NAME_LEN],
-                                            type_tag: u64,
+                                            info_h: DirHandle,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void,
                                                                        i32,
                                                                        MDataEntriesHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        let name = XorName(*name);
-
-        helper::send_async(app, user_data, o_cb, move |client, context| {
+        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
-            client.list_mdata_entries(name, type_tag)
+            client.list_mdata_entries(info.name, info.type_tag)
                 .map(move |entries| context.object_cache().insert_mdata_entries(entries))
         })
     })
@@ -166,18 +159,15 @@ pub unsafe extern "C" fn mdata_list_entries(app: *const App,
 /// Get list of keys in the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_keys(app: *const App,
-                                         name: *const [u8; XOR_NAME_LEN],
-                                         type_tag: u64,
+                                         info_h: DirHandle,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void,
                                                                     i32,
                                                                     MDataKeysHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        let name = XorName(*name);
-
-        helper::send_async(app, user_data, o_cb, move |client, context| {
+        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
-            client.list_mdata_keys(name, type_tag)
+            client.list_mdata_keys(info.name, info.type_tag)
                 .map(move |keys| context.object_cache().insert_mdata_keys(keys))
         })
     })
@@ -186,18 +176,15 @@ pub unsafe extern "C" fn mdata_list_keys(app: *const App,
 /// Get list of values in the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_list_values(app: *const App,
-                                           name: *const [u8; XOR_NAME_LEN],
-                                           type_tag: u64,
+                                           info_h: DirHandle,
                                            user_data: *mut c_void,
                                            o_cb: unsafe extern "C" fn(*mut c_void,
                                                                       i32,
                                                                       MDataValuesHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        let name = XorName(*name);
-
-        helper::send_async(app, user_data, o_cb, move |client, context| {
+        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
-            client.list_mdata_values(name, type_tag)
+            client.list_mdata_values(info.name, info.type_tag)
                 .map(move |values| context.object_cache().insert_mdata_values(values))
         })
     })
@@ -206,22 +193,21 @@ pub unsafe extern "C" fn mdata_list_values(app: *const App,
 /// Mutate entries of the mutable data.
 #[no_mangle]
 pub unsafe fn mdata_mutate_entries(app: *const App,
-                                   name: *const [u8; XOR_NAME_LEN],
-                                   type_tag: u64,
+                                   info_h: DirHandle,
                                    actions_h: MDataEntryActionsHandle,
                                    user_data: *mut c_void,
                                    o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = XorName(*name);
 
         (*app).send(move |client, context| {
+            let info = try_cb!(context.object_cache().get_dir(info_h), user_data, o_cb);
             let actions = try_cb!(context.object_cache().get_mdata_entry_actions(actions_h),
                                   user_data,
                                   o_cb)
                 .clone();
 
-            client.mutate_mdata_entries(name, type_tag, actions)
+            client.mutate_mdata_entries(info.name, info.type_tag, actions)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -235,18 +221,15 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
 /// Get list of all permissions set on the mutable data
 #[no_mangle]
 pub unsafe fn mdata_list_permissions(app: *const App,
-                                     name: *const [u8; XOR_NAME_LEN],
-                                     type_tag: u64,
+                                     info_h: DirHandle,
                                      user_data: *mut c_void,
                                      o_cb: unsafe extern "C" fn(*mut c_void,
                                                                 i32,
                                                                 MDataPermissionsHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        let name = XorName(*name);
-
-        helper::send_async(app, user_data, o_cb, move |client, context| {
+        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
-            client.list_mdata_permissions(name, type_tag)
+            client.list_mdata_permissions(info.name, info.type_tag)
                 .map(move |perms| helper::insert_permissions(context.object_cache(), perms))
         })
     })
@@ -257,8 +240,7 @@ pub unsafe fn mdata_list_permissions(app: *const App,
 /// User is either handle to a signing key, or 0 which means "anyone".
 #[no_mangle]
 pub unsafe fn mdata_list_user_permissions(app: *const App,
-                                          name: *const [u8; XOR_NAME_LEN],
-                                          type_tag: u64,
+                                          info_h: DirHandle,
                                           user_h: SignKeyHandle,
                                           user_data: *mut c_void,
                                           o_cb: unsafe extern "C" fn(*mut c_void,
@@ -266,15 +248,16 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
                                                                      MDataPermissionSetHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = XorName(*name);
 
         (*app).send(move |client, context| {
-            let context = context.clone();
+            let info = try_cb!(context.object_cache().get_dir(info_h), user_data, o_cb);
             let user = try_cb!(helper::get_user(context.object_cache(), user_h),
                                user_data,
                                o_cb);
 
-            client.list_mdata_user_permissions(name, type_tag, user)
+            let context = context.clone();
+
+            client.list_mdata_user_permissions(info.name, info.type_tag, user)
                 .map(move |set| {
                     let handle = context.object_cache().insert_mdata_permission_set(set);
                     o_cb(user_data.0, 0, handle);
@@ -291,8 +274,7 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
 /// User is either handle to a signing key, or 0 which means "anyone".
 #[no_mangle]
 pub unsafe fn mdata_set_user_permissions(app: *const App,
-                                         name: *const [u8; XOR_NAME_LEN],
-                                         type_tag: u64,
+                                         info_h: DirHandle,
                                          user_h: SignKeyHandle,
                                          permission_set_h: MDataPermissionSetHandle,
                                          version: u64,
@@ -300,9 +282,9 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = XorName(*name);
 
         (*app).send(move |client, context| {
+            let info = try_cb!(context.object_cache().get_dir(info_h), user_data, o_cb);
             let user = try_cb!(helper::get_user(context.object_cache(), user_h),
                                user_data,
                                o_cb);
@@ -311,7 +293,11 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
                                           user_data,
                                           o_cb);
 
-            client.set_mdata_user_permissions(name, type_tag, user, permission_set, version)
+            client.set_mdata_user_permissions(info.name,
+                                              info.type_tag,
+                                              user,
+                                              permission_set,
+                                              version)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -327,22 +313,21 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
 /// User is either handle to a signing key, or 0 which means "anyone".
 #[no_mangle]
 pub unsafe fn mdata_del_user_permissions(app: *const App,
-                                         name: *const [u8; XOR_NAME_LEN],
-                                         type_tag: u64,
+                                         info_h: DirHandle,
                                          user_h: SignKeyHandle,
                                          version: u64,
                                          user_data: *mut c_void,
                                          o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = XorName(*name);
 
         (*app).send(move |client, context| {
+            let info = try_cb!(context.object_cache().get_dir(info_h), user_data, o_cb);
             let user = try_cb!(helper::get_user(context.object_cache(), user_h),
                                user_data,
                                o_cb);
 
-            client.del_mdata_user_permissions(name, type_tag, user, version)
+            client.del_mdata_user_permissions(info.name, info.type_tag, user, version)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -356,22 +341,21 @@ pub unsafe fn mdata_del_user_permissions(app: *const App,
 /// Change owner of the mutable data.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_change_owner(app: *const App,
-                                            name: *const [u8; XOR_NAME_LEN],
-                                            type_tag: u64,
+                                            info_h: DirHandle,
                                             new_owner_h: SignKeyHandle,
                                             version: u64,
                                             user_data: *mut c_void,
                                             o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = XorName(*name);
 
         (*app).send(move |client, context| {
+            let info = try_cb!(context.object_cache().get_dir(info_h), user_data, o_cb);
             let new_owner = *try_cb!(context.object_cache().get_sign_key(new_owner_h),
                                      user_data,
                                      o_cb);
 
-            client.change_mdata_owner(name, type_tag, new_owner, version)
+            client.change_mdata_owner(info.name, info.type_tag, new_owner, version)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
