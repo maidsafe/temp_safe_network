@@ -21,7 +21,6 @@
 
 use core::errors::CoreError;
 use core::utility::{symmetric_decrypt, symmetric_encrypt};
-use maidsafe_utilities::serialisation::serialise;
 use rand::{OsRng, Rng};
 use routing::XorName;
 use rust_sodium::crypto::hash::sha256;
@@ -74,7 +73,7 @@ impl MDataInfo {
                 }
                 None => secretbox::gen_nonce(),
             };
-            Ok(serialise(&(nonce, secretbox::seal(plain_text, &nonce, key)))?)
+            symmetric_encrypt(plain_text, key, Some(&nonce))
         } else {
             Ok(plain_text.to_vec())
         }

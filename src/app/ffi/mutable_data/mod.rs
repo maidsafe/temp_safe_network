@@ -25,13 +25,13 @@ pub mod permissions;
 mod helper;
 
 use app::App;
+use app::errors::AppError;
 use app::object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle,
                         MDataKeysHandle, MDataPermissionSetHandle, MDataPermissionsHandle,
                         MDataValuesHandle, SignKeyHandle};
 use core::{CoreError, FutureExt};
 use futures::Future;
 use routing::MutableData;
-use self::helper::send_with_mdata_info;
 use std::os::raw::c_void;
 use util::ffi::{self, OpaqueCtx};
 
@@ -65,10 +65,11 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
             };
 
             let entries = if entries_h != 0 {
-                try_cb!(context.object_cache().get_mdata_entries(entries_h),
-                        user_data,
-                        o_cb)
-                    .clone()
+                let entries = try_cb!(context.object_cache().get_mdata_entries(entries_h),
+                                      user_data,
+                                      o_cb);
+
+                try_cb!(helper::encrypt_entries(&*entries, &info), user_data, o_cb)
             } else {
                 Default::default()
             };
@@ -100,11 +101,9 @@ pub unsafe extern "C" fn mdata_get_version(app: *const App,
                                            user_data: *mut c_void,
                                            o_cb: extern "C" fn(*mut c_void, i32, u64)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        send_with_mdata_info(app,
-                             info_h,
-                             user_data,
-                             o_cb,
-                             |client, _, info| client.get_mdata_version(info.name, info.type_tag))
+        helper::send_with_mdata_info(app, info_h, user_data, o_cb, |client, _, info| {
+            client.get_mdata_version(info.name, info.type_tag)
+        })
     })
 }
 
@@ -131,11 +130,13 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
 
-        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, _, info| {
+        helper::send_with_mdata_info(app, info_h, user_data, o_cb, move |client, _, info| {
+            let info = info.clone();
             client.get_mdata_value(info.name, info.type_tag, key)
-                .map(move |value| {
-                    let content = ffi::u8_vec_to_ptr(value.content);
-                    (content.0, content.1, content.2, value.entry_version)
+                .and_then(move |value| {
+                    let content = info.decrypt(&value.content)?;
+                    let content = ffi::u8_vec_to_ptr(content);
+                    Ok((content.0, content.1, content.2, value.entry_version))
                 })
         })
     })
@@ -150,10 +151,16 @@ pub unsafe extern "C" fn mdata_list_entries(app: *const App,
                                                                 i32,
                                                                 MDataEntriesHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
+        helper::send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
+            let info = info.clone();
+
             client.list_mdata_entries(info.name, info.type_tag)
-                .map(move |entries| context.object_cache().insert_mdata_entries(entries))
+                .map_err(AppError::from)
+                .and_then(move |entries| {
+                    let entries = helper::decrypt_entries(&entries, &info)?;
+                    Ok(context.object_cache().insert_mdata_entries(entries))
+                })
         })
     })
 }
@@ -165,10 +172,16 @@ pub unsafe extern "C" fn mdata_list_keys(app: *const App,
                                          user_data: *mut c_void,
                                          o_cb: extern "C" fn(*mut c_void, i32, MDataKeysHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
+        helper::send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
+            let info = info.clone();
+
             client.list_mdata_keys(info.name, info.type_tag)
-                .map(move |keys| context.object_cache().insert_mdata_keys(keys))
+                .map_err(AppError::from)
+                .and_then(move |keys| {
+                    let keys = helper::decrypt_keys(&keys, &info)?;
+                    Ok(context.object_cache().insert_mdata_keys(keys))
+                })
         })
     })
 }
@@ -182,10 +195,16 @@ pub unsafe extern "C" fn mdata_list_values(app: *const App,
                                                                i32,
                                                                MDataValuesHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
+        helper::send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
+            let info = info.clone();
+
             client.list_mdata_values(info.name, info.type_tag)
-                .map(move |values| context.object_cache().insert_mdata_values(values))
+                .map_err(AppError::from)
+                .and_then(move |values| {
+                    let values = helper::decrypt_values(&values, &info)?;
+                    Ok(context.object_cache().insert_mdata_values(values))
+                })
         })
     })
 }
@@ -204,10 +223,14 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
             let info = try_cb!(context.object_cache().get_mdata_info(info_h),
                                user_data,
                                o_cb);
-            let actions = try_cb!(context.object_cache().get_mdata_entry_actions(actions_h),
-                                  user_data,
-                                  o_cb)
-                .clone();
+            let actions = {
+                let actions = try_cb!(context.object_cache().get_mdata_entry_actions(actions_h),
+                                      user_data,
+                                      o_cb);
+                try_cb!(helper::encrypt_entry_actions(&*actions, &info),
+                        user_data,
+                        o_cb)
+            };
 
             client.mutate_mdata_entries(info.name, info.type_tag, actions)
                 .then(move |result| {
@@ -229,7 +252,7 @@ pub unsafe fn mdata_list_permissions(app: *const App,
                                                          i32,
                                                          MDataPermissionsHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
-        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
+        helper::send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
             client.list_mdata_permissions(info.name, info.type_tag)
                 .map(move |perms| helper::insert_permissions(context.object_cache(), perms))

@@ -24,8 +24,8 @@ use app::errors::AppError;
 use app::object_cache::{MDataInfoHandle, MDataPermissionsHandle, ObjectCache, SignKeyHandle};
 use core::{Client, FutureExt, MDataInfo};
 use futures::Future;
-use routing::{PermissionSet, User};
-use std::collections::BTreeMap;
+use routing::{EntryAction, PermissionSet, User, Value};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 use std::os::raw::c_void;
 use util::ffi::OpaqueCtx;
@@ -105,4 +105,94 @@ pub fn get_permissions(object_cache: &ObjectCache,
     }
 
     Ok(output)
+}
+
+// Encrypt the entries (both keys and values) using the `MDataInfo`.
+pub fn encrypt_entries(entries: &BTreeMap<Vec<u8>, Value>,
+                       info: &MDataInfo)
+                       -> Result<BTreeMap<Vec<u8>, Value>, AppError> {
+    let mut output = BTreeMap::new();
+
+    for (key, value) in entries {
+        let encrypted_key = info.enc_entry_key(&key)?;
+        let encrypted_value = encrypt_value(value, info)?;
+        let _ = output.insert(encrypted_key, encrypted_value);
+    }
+
+    Ok(output)
+}
+
+// Encrypt entry actions using the `MDataInfo`. The effect of this is that the entries
+// mutated by the encrypted actions will end up encrypted using the `MDataInfo`.
+pub fn encrypt_entry_actions(actions: &BTreeMap<Vec<u8>, EntryAction>,
+                             info: &MDataInfo)
+                             -> Result<BTreeMap<Vec<u8>, EntryAction>, AppError> {
+    let mut output = BTreeMap::new();
+
+    for (key, action) in actions {
+        let encrypted_key = info.enc_entry_key(&key)?;
+        let encrypted_action = match *action {
+            EntryAction::Ins(ref value) => EntryAction::Ins(encrypt_value(value, info)?),
+            EntryAction::Update(ref value) => EntryAction::Update(encrypt_value(value, info)?),
+            EntryAction::Del(version) => EntryAction::Del(version),
+        };
+
+        let _ = output.insert(encrypted_key, encrypted_action);
+    }
+
+    Ok(output)
+}
+
+// Decrypt entries using the `MDataInfo`.
+pub fn decrypt_entries(entries: &BTreeMap<Vec<u8>, Value>,
+                       info: &MDataInfo)
+                       -> Result<BTreeMap<Vec<u8>, Value>, AppError> {
+    let mut output = BTreeMap::new();
+
+    for (key, value) in entries {
+        let decrypted_key = info.decrypt(&key)?;
+        let decrypted_value = decrypt_value(value, info)?;
+
+        let _ = output.insert(decrypted_key, decrypted_value);
+    }
+
+    Ok(output)
+}
+
+// Decrypt all keys using the `MDataInfo`.
+pub fn decrypt_keys(keys: &BTreeSet<Vec<u8>>,
+                    info: &MDataInfo)
+                    -> Result<BTreeSet<Vec<u8>>, AppError> {
+    let mut output = BTreeSet::new();
+
+    for key in keys {
+        let _ = output.insert(info.decrypt(&key)?);
+    }
+
+    Ok(output)
+}
+
+// Decrypt all values using the `MDataInfo`.
+pub fn decrypt_values(values: &[Value], info: &MDataInfo) -> Result<Vec<Value>, AppError> {
+    let mut output = Vec::with_capacity(values.len());
+
+    for value in values {
+        output.push(decrypt_value(value, info)?);
+    }
+
+    Ok(output)
+}
+
+fn encrypt_value(value: &Value, info: &MDataInfo) -> Result<Value, AppError> {
+    Ok(Value {
+        content: info.enc_entry_value(&value.content)?,
+        entry_version: value.entry_version,
+    })
+}
+
+fn decrypt_value(value: &Value, info: &MDataInfo) -> Result<Value, AppError> {
+    Ok(Value {
+        content: info.decrypt(&value.content)?,
+        entry_version: value.entry_version,
+    })
 }
