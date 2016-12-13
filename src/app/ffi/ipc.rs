@@ -51,10 +51,10 @@ pub unsafe extern "C" fn encode_auth_req(req: FfiAuthReq,
             req: IpcReq::Auth(req),
         };
 
-        let encoded = ipc::encode_msg(&msg)?;
+        let encoded = ipc::encode_msg(&msg, "safe-auth")?;
 
         *o_req_id = req_id;
-        *o_encoded = FfiString::from_string(format!("safe-auth:{}", encoded));
+        *o_encoded = FfiString::from_string(encoded);
 
         Ok(())
     })
@@ -75,10 +75,10 @@ pub unsafe extern "C" fn encode_containers_req(req: FfiContainersReq,
             req: IpcReq::Containers(req),
         };
 
-        let encoded = ipc::encode_msg(&msg)?;
+        let encoded = ipc::encode_msg(&msg, "safe-auth")?;
 
         *o_req_id = req_id;
-        *o_encoded = FfiString::from_string(format!("safe-auth:{}", encoded));
+        *o_encoded = FfiString::from_string(encoded);
 
         Ok(())
     })
@@ -89,11 +89,13 @@ pub unsafe extern "C" fn encode_containers_req(req: FfiContainersReq,
 pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
                                         user_data: *mut c_void,
                                         o_auth: extern "C" fn(*mut c_void, u32, FfiAuthGranted),
-                                        _o_containers: extern "C" fn(*mut c_void, u32),
+                                        o_containers: extern "C" fn(*mut c_void, u32),
                                         o_revoked: extern "C" fn(*mut c_void),
                                         o_err: extern "C" fn(*mut c_void, i32, u32)) {
     catch_unwind_cb(user_data, o_err, || -> Result<_, IpcError> {
-        let msg = ipc::decode_msg(msg.as_str()?)?;
+        let msg = msg.as_str()?;
+        let msg = ipc::decode_msg(msg)?;
+
         match msg {
             IpcMsg::Resp { resp: IpcResp::Auth(res), req_id } => {
                 match res {
@@ -101,12 +103,15 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
                         let auth_granted = auth_granted.into_repr_c();
                         o_auth(user_data, req_id, auth_granted);
                     }
-                    Err(err) => {
-                        o_err(user_data, ffi_error_code!(err), req_id);
-                    }
+                    Err(err) => o_err(user_data, ffi_error_code!(err), req_id),
                 }
             }
-            IpcMsg::Resp { resp: IpcResp::Containers, .. } => unimplemented!(),
+            IpcMsg::Resp { resp: IpcResp::Containers(res), req_id } => {
+                match res {
+                    Ok(()) => o_containers(user_data, req_id),
+                    Err(err) => o_err(user_data, ffi_error_code!(err), req_id),
+                }
+            }
             IpcMsg::Revoked { .. } => o_revoked(user_data),
             _ => {
                 return Err(IpcError::InvalidMsg.into());
@@ -121,7 +126,8 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
 mod tests {
     use core::utility;
     use ipc::{self, AccessContainer, AppExchangeInfo, AppKeys, AuthGranted, AuthReq, Config,
-              IpcMsg, IpcReq, IpcResp};
+              ContainerPermissions, ContainersReq, IpcMsg, IpcReq, IpcResp};
+    use ipc::req::ffi::Permission;
     use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
@@ -133,15 +139,8 @@ mod tests {
 
     #[test]
     fn encode_auth_req_basics() {
-        let app = AppExchangeInfo {
-            id: unwrap!(utility::generate_random_string(10)),
-            scope: None,
-            name: "Test app".to_string(),
-            vendor: "Test vendor".to_string(),
-        };
-
         let req = AuthReq {
-            app: app,
+            app: gen_app_exchange_info(),
             app_container: false,
             containers: Vec::new(),
         };
@@ -162,8 +161,7 @@ mod tests {
         };
 
         assert!(encoded.starts_with("safe-auth:"));
-        let encoded = encoded.trim_left_matches("safe-auth:");
-        let msg = unwrap!(ipc::decode_msg(encoded));
+        let msg = unwrap!(ipc::decode_msg(&encoded));
 
         let (decoded_req_id, decoded_req) = match msg {
             IpcMsg::Req { req_id, req: IpcReq::Auth(req) } => (req_id, req),
@@ -176,11 +174,45 @@ mod tests {
 
     #[test]
     fn encode_containers_req_basics() {
-        // TODO: write this test after `ContainerReq` is implemeted.
+        let container_permissions = ContainerPermissions {
+            container_key: unwrap!(utility::generate_random_string(10)),
+            access: btree_set![Permission::Read],
+        };
+
+        let req = ContainersReq {
+            app: gen_app_exchange_info(),
+            containers: vec![container_permissions],
+        };
+
+        let req_c = req.clone().into_repr_c();
+
+        let mut req_id = 0u32;
+        let mut output = FfiString::default();
+
+        let error_code = unsafe { encode_containers_req(req_c, &mut req_id, &mut output) };
+        assert_eq!(error_code, 0);
+
+        // Decode it and verify it's the same we encoded.
+        let encoded = unsafe {
+            let s = unwrap!(output.to_string());
+            ffi_string_free(output);
+            s
+        };
+
+        assert!(encoded.starts_with("safe-auth:"));
+        let msg = unwrap!(ipc::decode_msg(&encoded));
+
+        let (decoded_req_id, decoded_req) = match msg {
+            IpcMsg::Req { req_id, req: IpcReq::Containers(req) } => (req_id, req),
+            x => panic!("Unexpected {:?}", x),
+        };
+
+        assert_eq!(decoded_req_id, req_id);
+        assert_eq!(decoded_req, req);
     }
 
     #[test]
-    fn decode_ipc_msg_basics() {
+    fn decode_ipc_msg_with_auth_granted() {
         let req_id = gen_req_id();
 
         let access_container = AccessContainer {
@@ -200,7 +232,7 @@ mod tests {
             resp: IpcResp::Auth(Ok(auth_granted.clone())),
         };
 
-        let encoded = unwrap!(ipc::encode_msg(&msg));
+        let encoded = unwrap!(ipc::encode_msg(&msg, "app-id"));
         let encoded = FfiString::from_str(&encoded);
 
         struct Context {
@@ -262,6 +294,70 @@ mod tests {
         assert_eq!(decoded_auth_granted, auth_granted);
     }
 
+    #[test]
+    fn decode_ipc_msg_with_containers_granted() {
+        let req_id = gen_req_id();
+
+        let msg = IpcMsg::Resp {
+            req_id: req_id,
+            resp: IpcResp::Containers(Ok(())),
+        };
+
+        let encoded = unwrap!(ipc::encode_msg(&msg, "app-id"));
+        let encoded = FfiString::from_str(&encoded);
+
+        struct Context {
+            unexpected_cb: bool,
+            req_id: u32,
+        };
+
+        let mut context = Context {
+            unexpected_cb: false,
+            req_id: 0,
+        };
+
+        unsafe {
+            extern "C" fn auth_cb(ctx: *mut c_void, _req_id: u32, _auth_granted: FfiAuthGranted) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).unexpected_cb = true;
+                }
+            }
+
+            extern "C" fn containers_cb(ctx: *mut c_void, req_id: u32) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).req_id = req_id;
+                }
+            }
+
+            extern "C" fn revoked_cb(ctx: *mut c_void) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).unexpected_cb = true;
+                }
+            }
+
+            extern "C" fn err_cb(ctx: *mut c_void, _error_code: i32, _req_id: u32) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).unexpected_cb = true;
+                }
+            }
+
+            let context_ptr: *mut Context = &mut context;
+            decode_ipc_msg(encoded,
+                           context_ptr as *mut c_void,
+                           auth_cb,
+                           containers_cb,
+                           revoked_cb,
+                           err_cb);
+        }
+
+        assert!(!context.unexpected_cb);
+        assert_eq!(context.req_id, req_id);
+    }
+
     fn gen_app_keys() -> AppKeys {
         let (owner_key, _) = sign::gen_keypair();
         let enc_key = secretbox::gen_key();
@@ -275,6 +371,15 @@ mod tests {
             sign_sk: sign_sk,
             enc_pk: enc_pk,
             enc_sk: enc_sk,
+        }
+    }
+
+    fn gen_app_exchange_info() -> AppExchangeInfo {
+        AppExchangeInfo {
+            id: unwrap!(utility::generate_random_string(10)),
+            scope: None,
+            name: unwrap!(utility::generate_random_string(10)),
+            vendor: unwrap!(utility::generate_random_string(10)),
         }
     }
 }

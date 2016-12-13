@@ -23,7 +23,8 @@
 pub mod ffi;
 
 use ipc::errors::IpcError;
-use self::ffi::PermissionAccess;
+use self::ffi::Permission;
+use std::collections::BTreeSet;
 use std::mem;
 use util::ffi::FfiString;
 use util::ffi::string::ffi_string_free;
@@ -47,7 +48,7 @@ pub struct AuthReq {
     /// otherwise.
     pub app_container: bool,
     /// The list of containers it wishes to access (and desired permissions).
-    pub containers: Vec<ContainerPermission>,
+    pub containers: Vec<ContainerPermissions>,
 }
 
 impl AuthReq {
@@ -65,7 +66,7 @@ impl AuthReq {
         ffi::AuthReq {
             app: app.into_repr_c(),
             app_container: app_container,
-            containers: ffi::ContainerPermissionArray::from_vec(containers),
+            containers: ffi::ContainerPermissionsArray::from_vec(containers),
         }
     }
 
@@ -78,7 +79,7 @@ impl AuthReq {
         let ffi::AuthReq { app, app_container, containers } = repr_c;
         let container_results = containers.into_vec()
             .into_iter()
-            .map(|c| ContainerPermission::from_repr_c(c));
+            .map(|c| ContainerPermissions::from_repr_c(c));
 
         let mut containers = Vec::new();
 
@@ -95,12 +96,12 @@ impl AuthReq {
 }
 
 /// Containers request
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(Clone, Eq, PartialEq, RustcEncodable, RustcDecodable, Debug)]
 pub struct ContainersReq {
     /// Exchange info
     pub app: AppExchangeInfo,
     /// Requested containers
-    pub containers: Vec<ContainerPermission>,
+    pub containers: Vec<ContainerPermissions>,
 }
 
 impl ContainersReq {
@@ -116,7 +117,7 @@ impl ContainersReq {
 
         ffi::ContainersReq {
             app: app.into_repr_c(),
-            containers: ffi::ContainerPermissionArray::from_vec(containers),
+            containers: ffi::ContainerPermissionsArray::from_vec(containers),
         }
     }
 
@@ -129,7 +130,7 @@ impl ContainersReq {
         let ffi::ContainersReq { app, containers } = repr_c;
         let container_results = containers.into_vec()
             .into_iter()
-            .map(|c| ContainerPermission::from_repr_c(c));
+            .map(|c| ContainerPermissions::from_repr_c(c));
 
         let mut containers = Vec::new();
 
@@ -211,23 +212,23 @@ impl AppExchangeInfo {
 
 /// Represents the set of permissions for a given container
 #[derive(Clone, Eq, PartialEq, RustcEncodable, RustcDecodable, Debug)]
-pub struct ContainerPermission {
+pub struct ContainerPermissions {
     /// The id
     pub container_key: String,
     /// The permissions
-    pub access: Vec<PermissionAccess>,
+    pub access: BTreeSet<Permission>,
 }
 
-impl ContainerPermission {
+impl ContainerPermissions {
     /// Consumes the object and returns the wrapped raw pointer
     ///
     /// You're now responsible for freeing this memory once you're done.
-    pub fn into_repr_c(self) -> ffi::ContainerPermission {
-        let ContainerPermission { container_key, access } = self;
+    pub fn into_repr_c(self) -> ffi::ContainerPermissions {
+        let ContainerPermissions { container_key, access } = self;
 
-        ffi::ContainerPermission {
+        ffi::ContainerPermissions {
             container_key: FfiString::from_string(container_key),
-            access: ffi::PermissionAccessArray::from_vec(access),
+            access: ffi::PermissionArray::from_vec(access.into_iter().collect()),
         }
     }
 
@@ -236,13 +237,13 @@ impl ContainerPermission {
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
     #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(raw: ffi::ContainerPermission) -> Result<Self, IpcError> {
+    pub unsafe fn from_repr_c(raw: ffi::ContainerPermissions) -> Result<Self, IpcError> {
         let container_key = raw.container_key.to_string();
         ffi_string_free(raw.container_key);
 
-        Ok(ContainerPermission {
+        Ok(ContainerPermissions {
             container_key: container_key?,
-            access: raw.access.into_vec(),
+            access: raw.access.into_vec().into_iter().collect(),
         })
     }
 }
@@ -253,10 +254,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn container_permission() {
-        let cp = ContainerPermission {
+    fn container_permissions() {
+        let cp = ContainerPermissions {
             container_key: "foobar".to_string(),
-            access: vec![],
+            access: Default::default(),
         };
 
         let ffi_cp = cp.into_repr_c();
@@ -266,15 +267,15 @@ mod tests {
             assert_eq!(ffi_cp.access.len, 0);
         }
 
-        let cp = unsafe { unwrap!(ContainerPermission::from_repr_c(ffi_cp)) };
+        let cp = unsafe { unwrap!(ContainerPermissions::from_repr_c(ffi_cp)) };
 
         assert_eq!(cp.container_key, "foobar");
-        assert_eq!(cp.access, vec![]);
+        assert!(cp.access.is_empty());
 
         // If test runs under special mode (e.g. Valgrind) we can detect memory
         // leaks
         unsafe {
-            ffi::container_permission_drop(cp.into_repr_c());
+            ffi::container_permissions_drop(cp.into_repr_c());
         }
     }
 

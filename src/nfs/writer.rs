@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, CoreFuture, Dir, FutureExt, SelfEncryptionStorage};
+use core::{Client, CoreFuture, FutureExt, MDataInfo, SelfEncryptionStorage};
 use futures::Future;
 use maidsafe_utilities::serialisation::serialise;
 use nfs::{File, NfsFuture};
@@ -40,7 +40,7 @@ pub enum Mode {
 pub struct Writer {
     client: Client,
     file: File,
-    parent: Dir,
+    parent: MDataInfo,
     file_name: String,
     self_encryptor: SequentialEncryptor<SelfEncryptionStorage>,
     version: Option<u64>,
@@ -51,7 +51,7 @@ impl Writer {
     pub fn new(client: Client,
                storage: SelfEncryptionStorage,
                mode: Mode,
-               parent: Dir,
+               parent: MDataInfo,
                file: File,
                file_name: String,
                version: Option<u64>)
@@ -108,9 +108,9 @@ impl Writer {
                 file.set_modified_time(::time::now_utc());
                 file.set_size(size);
 
-                let key = fry!(parent.enc_entry_key(file_name.into_bytes()));
+                let key = fry!(parent.enc_entry_key(file_name.as_bytes()));
                 let plaintext = fry!(serialise(&file));
-                let ciphertext = fry!(parent.enc_entry_value(plaintext));
+                let ciphertext = fry!(parent.enc_entry_value(&plaintext));
 
                 let actions = if let Some(version) = version {
                     EntryActions::new().update(key, ciphertext, version)

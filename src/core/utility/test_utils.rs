@@ -27,6 +27,7 @@ use futures::sync::mpsc;
 use rust_sodium::crypto::sign;
 use std::{iter, u8};
 use std::fmt::Debug;
+use std::sync::mpsc as std_mpsc;
 use tokio_core::reactor::{Core, Handle};
 
 /// Generates random public keys
@@ -51,9 +52,10 @@ pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
 
 // Create random registered client and run it inside an event loop. Use this to
 // create Client automatically and randomly,
-pub fn random_client<Run, I, E>(r: Run)
+pub fn random_client<Run, I, T, E>(r: Run) -> T
     where Run: FnOnce(&Client) -> I + Send + 'static,
-          I: IntoFuture<Item = (), Error = E> + 'static,
+          I: IntoFuture<Item = T, Error = E> + 'static,
+          T: Send + 'static,
           E: Debug
 {
     let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
@@ -62,10 +64,11 @@ pub fn random_client<Run, I, E>(r: Run)
 
 // Create random registered client and run it inside an event loop. Use this to
 // create Client automatically and randomly,
-pub fn random_client_with_net_obs<NetObs, Run, I, E>(n: NetObs, r: Run)
+pub fn random_client_with_net_obs<NetObs, Run, I, T, E>(n: NetObs, r: Run) -> T
     where NetObs: FnMut(NetworkEvent) + 'static,
           Run: FnOnce(&Client) -> I + Send + 'static,
-          I: IntoFuture<Item = (), Error = E> + 'static,
+          I: IntoFuture<Item = T, Error = E> + 'static,
+          T: Send + 'static,
           E: Debug
 {
     let c = |el_h, core_tx, net_tx| {
@@ -80,10 +83,11 @@ pub fn random_client_with_net_obs<NetObs, Run, I, E>(n: NetObs, r: Run)
 // to supply credentials explicitly or when Client is to be constructed as
 // unregistered or as a result of successful login. Use this to create Client
 // manually,
-pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
+pub fn setup_client<Create, Run, I, T, E>(c: Create, r: Run) -> T
     where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
           Run: FnOnce(&Client) -> I + Send + 'static,
-          I: IntoFuture<Item = (), Error = E> + 'static,
+          I: IntoFuture<Item = T, Error = E> + 'static,
+          T: Send + 'static,
           E: Debug
 {
     let n = |net_event| panic!("Unexpected NetworkEvent occurred: {:?}", net_event);
@@ -94,11 +98,15 @@ pub fn setup_client<Create, Run, I, E>(c: Create, r: Run)
 // to supply credentials explicitly or when Client is to be constructed as
 // unregistered or as a result of successful login. Use this to create Client
 // manually,
-pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: NetObs, r: Run)
+pub fn setup_client_with_net_obs<Create, NetObs, Run, I, T, E>(c: Create,
+                                                               mut n: NetObs,
+                                                               r: Run)
+                                                               -> T
     where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
           NetObs: FnMut(NetworkEvent) + 'static,
           Run: FnOnce(&Client) -> I + Send + 'static,
-          I: IntoFuture<Item = (), Error = E> + 'static,
+          I: IntoFuture<Item = T, Error = E> + 'static,
+          T: Send + 'static,
           E: Debug
 {
     let el = unwrap!(Core::new());
@@ -113,16 +121,23 @@ pub fn setup_client_with_net_obs<Create, NetObs, Run, I, E>(c: Create, mut n: Ne
     el_h.spawn(net_fut);
 
     let mut core_tx_clone = core_tx.clone();
+    let (result_tx, result_rx) = std_mpsc::channel();
+
     unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
         let fut = r(client).into_future()
             .map_err(|e| panic!("{:?}", e))
-            .map(move |()| unwrap!(core_tx_clone.send(CoreMsg::build_terminator())))
+            .map(move |value| {
+                unwrap!(result_tx.send(value));
+                unwrap!(core_tx_clone.send(CoreMsg::build_terminator()));
+            })
             .into_box();
 
         Some(fut)
     })));
 
     core::run(el, client, (), core_rx);
+
+    unwrap!(result_rx.recv())
 }
 
 /// Convenience for creating a blank runner.

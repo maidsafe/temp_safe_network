@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::{App, AppContext};
+use app::App;
 use app::errors::AppError;
 use app::object_cache::{CipherOptHandle, EncryptKeyHandle};
 use core::CoreError;
@@ -54,11 +54,13 @@ enum WireFormat {
 
 impl CipherOpt {
     /// Encrypt plain text
-    pub fn encrypt(&self, app: &AppContext, plain_text: &[u8]) -> Result<Vec<u8>, AppError> {
+    pub fn encrypt(&self,
+                   plain_text: &[u8],
+                   sym_key: &secretbox::Key)
+                   -> Result<Vec<u8>, AppError> {
         match *self {
             CipherOpt::PlainText => Ok(serialise(&WireFormat::Plain(plain_text.to_owned()))?),
             CipherOpt::Symmetric => {
-                let sym_key = app.sym_enc_key()?;
                 let nonce = secretbox::gen_nonce();
                 let cipher_text = secretbox::seal(plain_text, &nonce, sym_key);
                 let wire_format = WireFormat::Symmetric {
@@ -76,23 +78,24 @@ impl CipherOpt {
     }
 
     /// Decrypt something encrypted by CipherOpt::encrypt()
-    pub fn decrypt(app: &AppContext, raw_data: &[u8]) -> Result<Vec<u8>, AppError> {
-        if raw_data.is_empty() {
+    pub fn decrypt(cipher_text: &[u8],
+                   sym_key: &secretbox::Key,
+                   asym_pk: &box_::PublicKey,
+                   asym_sk: &box_::SecretKey)
+                   -> Result<Vec<u8>, AppError> {
+        if cipher_text.is_empty() {
             return Ok(Vec::new());
         }
 
-        match deserialise::<WireFormat>(raw_data)? {
+        match deserialise::<WireFormat>(cipher_text)? {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {
-                let sym_key = app.sym_enc_key()?;
                 Ok(secretbox::open(&cipher_text, &nonce, sym_key)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)?)
             }
             WireFormat::Asymmetric(cipher_text) => {
-                let pk = app.enc_pk()?;
-                let sk = app.enc_sk()?;
-                Ok(try!(sealedbox::open(&cipher_text, pk, sk)
-                    .map_err(|()| CoreError::SymmetricDecipherFailure)))
+                Ok(sealedbox::open(&cipher_text, asym_pk, asym_sk)
+                    .map_err(|()| CoreError::AsymmetricDecipherFailure)?)
             }
         }
     }
@@ -102,9 +105,9 @@ impl CipherOpt {
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
                                                   user_data: *mut c_void,
-                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             i32,
-                                                                             CipherOptHandle)) {
+                                                  o_cb: extern "C" fn(*mut c_void,
+                                                                      i32,
+                                                                      CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     ffi::catch_unwind_cb(user_data, o_cb, || {
@@ -120,9 +123,9 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
                                                   user_data: *mut c_void,
-                                                  o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                             i32,
-                                                                             CipherOptHandle)) {
+                                                  o_cb: extern "C" fn(*mut c_void,
+                                                                      i32,
+                                                                      CipherOptHandle)) {
     ffi::catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
@@ -138,9 +141,9 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
 pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
                                                    peer_encrypt_key_h: EncryptKeyHandle,
                                                    user_data: *mut c_void,
-                                                   o_cb: unsafe extern "C" fn(*mut c_void,
-                                                                              i32,
-                                                                              CipherOptHandle)) {
+                                                   o_cb: extern "C" fn(*mut c_void,
+                                                                       i32,
+                                                                       CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
     ffi::catch_unwind_cb(user_data, o_cb, || {
@@ -165,7 +168,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
 pub unsafe extern "C" fn cipher_opt_free(app: *const App,
                                          handle: CipherOptHandle,
                                          user_data: *mut c_void,
-                                         o_cb: unsafe extern "C" fn(*mut c_void, i32)) {
+                                         o_cb: extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
     ffi::catch_unwind_cb(user_data, o_cb, || {
@@ -183,6 +186,7 @@ mod tests {
     use app::errors::AppError;
     use app::object_cache::CipherOptHandle;
     use app::test_util::{create_app, run_now};
+    use core::Client;
     use core::utility;
     use rust_sodium::crypto::box_;
     use std::os::raw::c_void;
@@ -205,15 +209,16 @@ mod tests {
         }
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_handle));
-            let cipher_text = unwrap!(cipher_opt.encrypt(context, &plain_text));
+            let enc_key = unwrap!(context.sym_enc_key());
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, enc_key));
             (plain_text, cipher_text)
         });
         assert!(cipher_text != plain_text);
         assert_free(&app_0, cipher_opt_handle, 0);
 
-        run_now(&app_0, move |_, context| {
+        run_now(&app_0, move |client, context| {
             assert!(context.object_cache().get_cipher_opt(cipher_opt_handle).is_err());
-            assert!(decrypt_and_check(context, &cipher_text, &plain_text));
+            assert!(decrypt_and_check(client, context, &cipher_text, &plain_text));
         });
     }
 
@@ -232,15 +237,16 @@ mod tests {
         }
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_handle));
-            let cipher_text = unwrap!(cipher_opt.encrypt(&context, &plain_text));
+            let enc_key = unwrap!(context.sym_enc_key());
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, enc_key));
             (plain_text, cipher_text)
         });
         assert!(cipher_text != plain_text);
         assert_free(&app_0, cipher_opt_handle, 0);
 
-        run_now(&app_0, move |_, context| {
+        run_now(&app_0, move |client, context| {
             assert!(context.object_cache().get_cipher_opt(cipher_opt_handle).is_err());
-            assert!(decrypt_and_check(context, &cipher_text, &plain_text));
+            assert!(decrypt_and_check(client, context, &cipher_text, &plain_text));
         });
     }
 
@@ -254,7 +260,7 @@ mod tests {
         let app_1 = create_app();
 
         // Get encryption public key of App 1.
-        let enc_pk = run_now(&app_1, move |_, context| *unwrap!(context.enc_pk()));
+        let enc_pk = run_now(&app_1, move |client, _| unwrap!(client.public_encryption_key()));
 
         // Insert it into App 0's object cache.
         let enc_pk_h = run_now(&app_0, move |_, context| {
@@ -270,7 +276,8 @@ mod tests {
         let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_h));
-            let cipher_text = unwrap!(cipher_opt.encrypt(context, &plain_text));
+            let sym_key = unwrap!(context.sym_enc_key());
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, sym_key));
             (plain_text, cipher_text)
         });
 
@@ -283,14 +290,14 @@ mod tests {
 
         // App 0 cannot decrypt the ciphertext, because it was encrypted with
         // App 1's public key.
-        let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
-            assert!(!decrypt_and_check(context, &cipher_text, &plain_text));
+        let (plain_text, cipher_text) = run_now(&app_0, move |client, context| {
+            assert!(!decrypt_and_check(client, context, &cipher_text, &plain_text));
             (plain_text, cipher_text)
         });
 
         // App 1 can decrypt it.
-        run_now(&app_1, move |_, context| {
-            assert!(decrypt_and_check(context, &cipher_text, &plain_text));
+        run_now(&app_1, move |client, context| {
+            assert!(decrypt_and_check(client, context, &cipher_text, &plain_text));
         })
     }
 
@@ -351,8 +358,15 @@ mod tests {
         })
     }
 
-    fn decrypt_and_check(context: &AppContext, cipher_text: &[u8], orig_plain_text: &[u8]) -> bool {
-        let plain_text = match CipherOpt::decrypt(context, cipher_text) {
+    fn decrypt_and_check(client: &Client,
+                         context: &AppContext,
+                         cipher_text: &[u8],
+                         orig_plain_text: &[u8])
+                         -> bool {
+        let sym_key = unwrap!(context.sym_enc_key());
+        let (asym_pk, asym_sk) = unwrap!(client.encryption_keypair());
+
+        let plain_text = match CipherOpt::decrypt(cipher_text, sym_key, &asym_pk, &asym_sk) {
             Ok(text) => text,
             Err(_) => return false,
         };
@@ -370,13 +384,16 @@ mod tests {
         }
     }
 
-    unsafe extern "C" fn handle_cb(tx: *mut c_void, error_code: i32, handle: CipherOptHandle) {
+    extern "C" fn handle_cb(tx: *mut c_void, error_code: i32, handle: CipherOptHandle) {
         let tx = tx as *mut mpsc::Sender<Result<CipherOptHandle, i32>>;
         let res = if error_code == 0 {
             Ok(handle)
         } else {
             Err(error_code)
         };
-        unwrap!((*tx).send(res));
+
+        unsafe {
+            unwrap!((*tx).send(res));
+        }
     }
 }

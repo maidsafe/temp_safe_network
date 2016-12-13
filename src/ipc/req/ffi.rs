@@ -22,10 +22,10 @@
 use std::mem;
 use util::ffi::FfiString;
 
-/// The permission type
+/// Permission action
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
-pub enum PermissionAccess {
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, RustcEncodable, RustcDecodable)]
+pub enum Permission {
     /// Read
     Read,
     /// Insert
@@ -48,8 +48,8 @@ pub struct AuthReq {
     /// otherwise.
     pub app_container: bool,
 
-    /// Array of `ContainerPermission`
-    pub containers: ContainerPermissionArray,
+    /// Array of `ContainerPermissions`
+    pub containers: ContainerPermissionsArray,
 }
 
 /// Free memory from the subobjects
@@ -66,7 +66,7 @@ pub struct ContainersReq {
     /// Exchange info
     pub app: AppExchangeInfo,
     /// Requested containers
-    pub containers: ContainerPermissionArray,
+    pub containers: ContainerPermissionsArray,
 }
 
 /// Free memory from the subobjects
@@ -113,52 +113,52 @@ pub unsafe extern "C" fn app_exchange_info_drop(a: AppExchangeInfo) {
 /// Represents the set of permissions for a given container
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct ContainerPermission {
+pub struct ContainerPermissions {
     /// The UTF-8 encoded id
     pub container_key: FfiString,
 
-    /// The `PermissionAccess` array
-    pub access: PermissionAccessArray,
+    /// The `Permission` array
+    pub access: PermissionArray,
 }
 
 /// Free memory
 #[no_mangle]
 #[allow(unsafe_code)]
-pub unsafe extern "C" fn container_permission_drop(cp: ContainerPermission) {
-    let _ = super::ContainerPermission::from_repr_c(cp);
+pub unsafe extern "C" fn container_permissions_drop(cp: ContainerPermissions) {
+    let _ = super::ContainerPermissions::from_repr_c(cp);
 }
 
-/// Wrapper for `ContainerPermission` arrays to be passed across FFI boundary.
+/// Wrapper for `ContainerPermissions` arrays to be passed across FFI boundary.
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct ContainerPermissionArray {
+pub struct ContainerPermissionsArray {
     /// Pointer to first byte
-    pub ptr: *mut ContainerPermission,
+    pub ptr: *mut ContainerPermissions,
     /// Number of elements
     pub len: usize,
     /// Reserved by Rust allocator
     pub cap: usize,
 }
 
-impl ContainerPermissionArray {
-    /// Construct owning `ContainerPermissionArray` from `Vec`. It has to be
-    /// deallocated manually by calling `container_permission_array_free`
-    pub fn from_vec(mut v: Vec<ContainerPermission>) -> Self {
+impl ContainerPermissionsArray {
+    /// Construct owning `ContainerPermissionsArray` from `Vec`. It has to be
+    /// deallocated manually by calling `container_permissions_array_free`
+    pub fn from_vec(mut v: Vec<ContainerPermissions>) -> Self {
         let p = v.as_mut_ptr();
         let len = v.len();
         let cap = v.capacity();
         mem::forget(v);
 
-        ContainerPermissionArray {
+        ContainerPermissionsArray {
             ptr: p,
             len: len,
             cap: cap,
         }
     }
 
-    /// Consumes this `ContainerPermissionArray` into a `Vec`
+    /// Consumes this `ContainerPermissionsArray` into a `Vec`
     #[allow(unsafe_code)]
-    pub unsafe fn into_vec(self) -> Vec<ContainerPermission> {
+    pub unsafe fn into_vec(self) -> Vec<ContainerPermissions> {
         Vec::from_raw_parts(self.ptr, self.len, self.cap)
     }
 }
@@ -166,41 +166,41 @@ impl ContainerPermissionArray {
 /// Free the array from memory.
 #[no_mangle]
 #[allow(unsafe_code)]
-pub unsafe extern "C" fn container_permission_array_free(s: ContainerPermissionArray) {
+pub unsafe extern "C" fn container_permissions_array_free(s: ContainerPermissionsArray) {
     let _ = s.into_vec();
 }
 
-/// Wrapper for `PermissionAccess` arrays to be passed across FFI boundary.
+/// Wrapper for `Permission` arrays to be passed across FFI boundary.
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct PermissionAccessArray {
+pub struct PermissionArray {
     /// Pointer to first byte
-    pub ptr: *mut PermissionAccess,
+    pub ptr: *mut Permission,
     /// Number of elements
     pub len: usize,
     /// Reserved by Rust allocator
     pub cap: usize,
 }
 
-impl PermissionAccessArray {
-    /// Construct owning `PermissionAccessArray` from `Vec`. It has to be
-    /// deallocated manually by calling `container_permission_array_free`
-    pub fn from_vec(mut v: Vec<PermissionAccess>) -> Self {
-        let p = v.as_mut_ptr();
+impl PermissionArray {
+    /// Construct owning `PermissionArray` from `Vec`. It has to be
+    /// deallocated manually by calling `permission_array_free`
+    pub fn from_vec(mut v: Vec<Permission>) -> Self {
+        let ptr = v.as_mut_ptr();
         let len = v.len();
         let cap = v.capacity();
         mem::forget(v);
 
-        PermissionAccessArray {
-            ptr: p,
+        PermissionArray {
+            ptr: ptr,
             len: len,
             cap: cap,
         }
     }
 
-    /// Consumes this `PermissionAccessArray` into a `Vec`
+    /// Consumes this `PermissionArray` into a `Vec`
     #[allow(unsafe_code)]
-    pub unsafe fn into_vec(self) -> Vec<PermissionAccess> {
+    pub unsafe fn into_vec(self) -> Vec<Permission> {
         Vec::from_raw_parts(self.ptr, self.len, self.cap)
     }
 }
@@ -208,6 +208,6 @@ impl PermissionAccessArray {
 /// Free the array from memory.
 #[no_mangle]
 #[allow(unsafe_code)]
-pub unsafe extern "C" fn permission_access_array_free(s: PermissionAccessArray) {
+pub unsafe extern "C" fn permission_array_free(s: PermissionArray) {
     let _ = s.into_vec();
 }

@@ -19,10 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::low_level_api::cipher_opt::CipherOpt;
-use core::SelfEncryptionStorage;
+use app::ffi::cipher_opt::CipherOpt;
+use core::{MDataInfo, SelfEncryptionStorage};
 use lru_cache::LruCache;
-use routing::{EntryAction, PermissionSet, Value, XorName};
+use routing::{EntryAction, PermissionSet, Value};
 use rust_sodium::crypto::{box_, sign};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
@@ -50,6 +50,8 @@ pub type CipherOptHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type EncryptKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
+pub type MDataInfoHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
 pub type MDataEntriesHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataKeysHandle = ObjectHandle;
@@ -67,14 +69,13 @@ pub type SelfEncryptorReaderHandle = ObjectHandle;
 pub type SelfEncryptorWriterHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type SignKeyHandle = ObjectHandle;
-/// Disambiguating `ObjectHandle`
-pub type XorNameHandle = ObjectHandle;
 
 /// Contains session object cache
 pub struct ObjectCache {
     handle_gen: HandleGenerator,
     cipher_opt: Store<CipherOpt>,
     encrypt_key: Store<box_::PublicKey>,
+    mdata_info: Store<MDataInfo>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
     mdata_values: Store<Vec<Value>>,
@@ -84,7 +85,6 @@ pub struct ObjectCache {
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
     sign_key: Store<sign::PublicKey>,
-    xor_name: Store<XorName>,
 }
 
 impl ObjectCache {
@@ -93,6 +93,7 @@ impl ObjectCache {
             handle_gen: HandleGenerator::new(),
             cipher_opt: Store::new(),
             encrypt_key: Store::new(),
+            mdata_info: Store::new(),
             mdata_entries: Store::new(),
             mdata_keys: Store::new(),
             mdata_values: Store::new(),
@@ -102,7 +103,6 @@ impl ObjectCache {
             se_reader: Store::new(),
             se_writer: Store::new(),
             sign_key: Store::new(),
-            xor_name: Store::new(),
         }
     }
 
@@ -110,6 +110,7 @@ impl ObjectCache {
         self.handle_gen.reset();
         self.cipher_opt.clear();
         self.encrypt_key.clear();
+        self.mdata_info.clear();
         self.mdata_entries.clear();
         self.mdata_keys.clear();
         self.mdata_values.clear();
@@ -119,7 +120,6 @@ impl ObjectCache {
         self.se_reader.clear();
         self.se_writer.clear();
         self.sign_key.clear();
-        self.xor_name.clear();
     }
 }
 
@@ -163,6 +163,13 @@ impl_cache!(encrypt_key,
             get_encrypt_key,
             insert_encrypt_key,
             remove_encrypt_key);
+impl_cache!(mdata_info,
+            MDataInfo,
+            MDataInfoHandle,
+            InvalidMDataInfoHandle,
+            get_mdata_info,
+            insert_mdata_info,
+            remove_mdata_info);
 impl_cache!(mdata_entries,
             BTreeMap<Vec<u8>, Value>,
             MDataEntriesHandle,
@@ -226,13 +233,6 @@ impl_cache!(sign_key,
             get_sign_key,
             insert_sign_key,
             remove_sign_key);
-impl_cache!(xor_name,
-            XorName,
-            XorNameHandle,
-            InvalidXorNameHandle,
-            get_xor_name,
-            insert_xor_name,
-            remove_xor_name);
 
 impl Default for ObjectCache {
     fn default() -> Self {
@@ -293,17 +293,18 @@ impl<V> Store<V> {
 
 #[cfg(test)]
 mod tests {
-    use rand;
+    use rust_sodium::crypto::sign;
     use super::*;
 
     #[test]
     fn reset() {
         let object_cache = ObjectCache::new();
+        let (pk, _) = sign::gen_keypair();
 
-        let handle = object_cache.insert_xor_name(rand::random());
-        assert!(object_cache.get_xor_name(handle).is_ok());
+        let handle = object_cache.insert_sign_key(pk);
+        assert!(object_cache.get_sign_key(handle).is_ok());
 
         object_cache.reset();
-        assert!(object_cache.get_xor_name(handle).is_err());
+        assert!(object_cache.get_sign_key(handle).is_err());
     }
 }

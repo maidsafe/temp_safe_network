@@ -19,15 +19,31 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-//! Low Level APIs
+use app::{App, AppContext};
+use app::errors::AppError;
+use std::os::raw::c_void;
+use util::ffi::OpaqueCtx;
+use util::ffi::callback::{Callback, CallbackArgs};
 
-/// Cipher Options
-pub mod cipher_opt;
-/// `XorName` constructions and freeing
-pub mod xor_name;
-/// Low level manipulation of `ImmutableData`
-pub mod immutable_data;
-/// Low level manipulation of `MutableData`
-pub mod mutable_data;
-/// Miscellaneous routines
-pub mod misc;
+// Convenience wrapper around `App::send` which automatically handles the callback
+// boilerplate.
+// Use this if the lambda never returns future.
+pub unsafe fn send_sync<C, F>(app: *const App,
+                              user_data: *mut c_void,
+                              o_cb: C,
+                              f: F)
+                              -> Result<(), AppError>
+    where C: Callback + Copy + Send + 'static,
+          F: FnOnce(&AppContext) -> Result<C::Args, AppError> + Send + 'static
+{
+    let user_data = OpaqueCtx(user_data);
+
+    (*app).send(move |_, context| {
+        match f(context) {
+            Ok(args) => o_cb.call(user_data.0, 0, args),
+            Err(err) => o_cb.call(user_data.0, ffi_error_code!(err), C::Args::default()),
+        }
+
+        None
+    })
+}

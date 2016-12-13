@@ -28,15 +28,15 @@ pub mod futures;
 /// Utility functions
 #[macro_use]
 pub mod utility;
-/// Implements the Self Encryption storage trait
-pub mod self_encryption_storage;
+
 /// Helper functions to handle `ImmutableData` related operations
 pub mod immutable_data;
+/// Implements the Self Encryption storage trait
+pub mod self_encryption_storage;
 
-pub use self::client::{Client, ClientKeys, Dir};
+pub use self::client::{Client, ClientKeys, MDataInfo};
 pub use self::core_el::{CoreMsg, CoreMsgRx, CoreMsgTx, TailFuture, run};
 pub use self::errors::{CORE_ERROR_START_RANGE, CoreError};
-
 pub use self::event::{CoreEvent, NetworkEvent};
 pub use self::futures::FutureExt;
 pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
