@@ -19,21 +19,21 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, CoreFuture, FutureExt, MDataInfo, SelfEncryptionStorage};
+use core::{Client, FutureExt, MDataInfo, SelfEncryptionStorage};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{File, Mode, NfsError, Reader, Writer};
+use nfs::{File, Mode, NfsFuture, Reader, Writer};
 use routing::EntryActions;
-use self_encryption::DataMap;
 
 /// Gets a file from the directory
 pub fn fetch<S: AsRef<str>>(client: Client,
                             parent: MDataInfo,
                             name: S)
-                            -> Box<CoreFuture<(u64, File)>> {
+                            -> Box<NfsFuture<(u64, File)>> {
     let key = fry!(parent.enc_entry_key(name.as_ref().as_bytes()));
 
     client.get_mdata_value(parent.name, parent.type_tag, key)
+        .map_err(From::from)
         .and_then(move |val| {
             let plaintext = parent.decrypt(&val.content)?;
             let file = deserialise::<File>(&plaintext)?;
@@ -43,7 +43,7 @@ pub fn fetch<S: AsRef<str>>(client: Client,
 }
 
 /// Returns a reader for reading the file contents
-pub fn read(client: Client, file: &File) -> Result<Reader, NfsError> {
+pub fn read(client: Client, file: &File) -> Box<NfsFuture<Reader>> {
     trace!("Reading file {:?}", file);
     Reader::new(client.clone(), SelfEncryptionStorage::new(client), file)
 }
@@ -53,17 +53,19 @@ pub fn delete<S: AsRef<str>>(client: Client,
                              parent: MDataInfo,
                              name: S,
                              version: u64)
-                             -> Box<CoreFuture<()>> {
+                             -> Box<NfsFuture<()>> {
     let name = name.as_ref();
     trace!("Deleting file with name {}.", name);
 
     let key = fry!(parent.enc_entry_key(name.as_bytes()));
 
     client.mutate_mdata_entries(parent.name,
-                                parent.type_tag,
-                                EntryActions::new()
-                                    .del(key, version)
-                                    .into())
+                              parent.type_tag,
+                              EntryActions::new()
+                                  .del(key, version)
+                                  .into())
+        .map_err(From::from)
+        .into_box()
 }
 
 /// Updates the file.
@@ -72,7 +74,7 @@ pub fn update<S: AsRef<str>>(client: Client,
                              name: S,
                              file: File,
                              version: u64)
-                             -> Box<CoreFuture<()>> {
+                             -> Box<NfsFuture<()>> {
     let name = name.as_ref();
     trace!("Updating file with name '{}'", name);
 
@@ -81,10 +83,12 @@ pub fn update<S: AsRef<str>>(client: Client,
     let ciphertext = fry!(parent.enc_entry_value(&plaintext));
 
     client.mutate_mdata_entries(parent.name,
-                                parent.type_tag,
-                                EntryActions::new()
-                                    .update(key, ciphertext, version)
-                                    .into())
+                              parent.type_tag,
+                              EntryActions::new()
+                                  .update(key, ciphertext, version)
+                                  .into())
+        .map_err(From::from)
+        .into_box()
 }
 
 /// Helper function to Update content of a file in a directory. A writer
@@ -97,7 +101,7 @@ pub fn update_content<S: Into<String>>(client: Client,
                                        file: File,
                                        version: u64,
                                        mode: Mode)
-                                       -> Box<CoreFuture<Writer>> {
+                                       -> Box<NfsFuture<Writer>> {
     let name = name.into();
     trace!("Updating content in file with name {}", name);
 
@@ -119,7 +123,7 @@ pub fn create<S: Into<String>>(client: Client,
                                parent: MDataInfo,
                                name: S,
                                user_metadata: Vec<u8>)
-                               -> Box<CoreFuture<Writer>> {
+                               -> Box<NfsFuture<Writer>> {
     let name = name.into();
     trace!("Creating file with name {}.", name);
 
@@ -127,7 +131,7 @@ pub fn create<S: Into<String>>(client: Client,
                 SelfEncryptionStorage::new(client),
                 Mode::Overwrite,
                 parent,
-                File::new(user_metadata, DataMap::None),
+                File::new(user_metadata),
                 name,
                 None)
 }
@@ -165,7 +169,10 @@ mod tests {
             create_test_file(client.clone())
                 .then(move |res| {
                     let (_dir, file) = unwrap!(res);
-                    let reader = unwrap!(file_helper::read(c2, &file));
+                    file_helper::read(c2, &file)
+                })
+                .then(|res| {
+                    let reader = unwrap!(res);
                     let size = reader.size();
                     println!("reading {} bytes", size);
                     reader.read(0, size)
@@ -195,13 +202,15 @@ mod tests {
                 })
                 .then(move |res| {
                     let file = unwrap!(res);
-
-                    let reader = unwrap!(file_helper::read(c3, &file));
+                    file_helper::read(c3, &file)
+                })
+                .then(|res| {
+                    let reader = unwrap!(res);
                     let size = reader.size();
                     println!("reading {} bytes", size);
                     reader.read(0, size)
                 })
-                .map(move |data| {
+                .map(|data| {
                     assert_eq!(data, vec![1u8; 50]);
                 })
         });
@@ -226,8 +235,10 @@ mod tests {
                 })
                 .then(move |res| {
                     let file = unwrap!(res);
-
-                    let reader = unwrap!(file_helper::read(c3, &file));
+                    file_helper::read(c3, &file)
+                })
+                .then(|res| {
+                    let reader = unwrap!(res);
                     let size = reader.size();
                     reader.read(0, size)
                         .map(move |data| {
