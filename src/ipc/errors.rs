@@ -20,8 +20,10 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use core::CORE_ERROR_START_RANGE;
+use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use rustc_serialize::base64::FromBase64Error;
+use std::error::Error;
 use std::str::Utf8Error;
 
 const IPC_ERROR_START_RANGE: i32 = CORE_ERROR_START_RANGE - 1000;
@@ -37,9 +39,19 @@ pub enum IpcError {
     InvalidMsg,
     /// Generic encoding / decoding failure.
     EncodeDecodeError,
+    /// App is already authorised
+    AlreadyAuthorised,
+    /// App is not registered
+    UnknownApp,
 
     /// Unexpected error
     Unexpected(String),
+}
+
+impl<T: 'static> From<SendError<T>> for IpcError {
+    fn from(error: SendError<T>) -> IpcError {
+        IpcError::Unexpected(error.description().to_owned())
+    }
 }
 
 impl From<Utf8Error> for IpcError {
@@ -79,6 +91,8 @@ impl Into<i32> for IpcError {
             IpcError::ContainersDenied => IPC_ERROR_START_RANGE - 2,
             IpcError::InvalidMsg => IPC_ERROR_START_RANGE - 3,
             IpcError::EncodeDecodeError => IPC_ERROR_START_RANGE - 4,
+            IpcError::AlreadyAuthorised => IPC_ERROR_START_RANGE - 5,
+            IpcError::UnknownApp => IPC_ERROR_START_RANGE - 6,
             IpcError::Unexpected(_) => IPC_ERROR_START_RANGE - 100,
         }
     }

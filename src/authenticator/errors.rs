@@ -22,6 +22,8 @@
 //! Errors thrown by Authenticator routines
 
 use core::CoreError;
+use futures::sync::mpsc::SendError;
+use ipc::IpcError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use nfs::errors::NfsError;
 use std::error::Error;
@@ -47,6 +49,18 @@ pub enum AuthError {
     NfsError(NfsError),
     /// Serialisation error
     SerialisationError(SerialisationError),
+    /// IPC error
+    IpcError(IpcError),
+}
+
+impl Into<IpcError> for AuthError {
+    fn into(self) -> IpcError {
+        match self {
+            AuthError::Unexpected(desc) => IpcError::Unexpected(desc),
+            AuthError::IpcError(err) => err,
+            err => IpcError::Unexpected(format!("{:?}", err)),
+        }
+    }
 }
 
 impl Into<i32> for AuthError {
@@ -57,13 +71,26 @@ impl Into<i32> for AuthError {
             AuthError::CoreError(error) => error.into(),
             AuthError::NfsError(error) => error.into(),
             AuthError::SerialisationError(_) => AUTH_ERROR_START_RANGE - 3,
+            AuthError::IpcError(_) => AUTH_ERROR_START_RANGE - 4,
         }
+    }
+}
+
+impl<T: 'static> From<SendError<T>> for AuthError {
+    fn from(error: SendError<T>) -> AuthError {
+        AuthError::Unexpected(error.description().to_owned())
     }
 }
 
 impl From<CoreError> for AuthError {
     fn from(error: CoreError) -> AuthError {
         AuthError::CoreError(error)
+    }
+}
+
+impl From<IpcError> for AuthError {
+    fn from(error: IpcError) -> AuthError {
+        AuthError::IpcError(error)
     }
 }
 
@@ -110,6 +137,7 @@ impl Debug for AuthError {
             AuthError::IoError(ref error) => write!(f, "AuthError::IoError -> {:?}", error),
             AuthError::Unexpected(ref s) => write!(f, "AuthError::Unexpected{{{:?}}}", s),
             AuthError::NfsError(ref error) => write!(f, "AuthError::NfsError -> {:?}", error),
+            AuthError::IpcError(ref error) => write!(f, "AuthError::IpcError -> {:?}", error),
             AuthError::SerialisationError(ref error) => {
                 write!(f, "AuthError::SerialisationError -> {:?}", error)
             }
