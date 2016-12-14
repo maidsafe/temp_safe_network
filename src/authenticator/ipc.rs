@@ -29,7 +29,7 @@ use ipc::req::ffi::ContainersReq as FfiContainersReq;
 use ipc::req::ffi::Permission;
 use ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{self, File, Mode, file_helper};
+use nfs;
 use routing::{Action, ClientError, EntryActions, PermissionSet, User};
 use rust_sodium::crypto::{secretbox, sign};
 use rust_sodium::crypto::hash::sha256;
@@ -39,7 +39,7 @@ use super::{AuthError, AuthFuture, Authenticator};
 use util;
 use util::ffi::{FfiString, OpaqueCtx, catch_unwind_cb};
 
-const CONFIG_FILE: &'static str = "authenticator-config";
+const CONFIG_FILE: &'static [u8] = b"authenticator-config";
 
 type AccessContInfoEntry = HashMap<String, (MDataInfo, ContainerPermissions)>;
 
@@ -93,11 +93,11 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *mut Authenticator,
 
                 (*auth).send(move |client| {
                         let c2 = client.clone();
-                        let c3 = client.clone();
 
-                        get_config_file(client.clone())
-                            .and_then(move |(_config_version, file)| get_config(c2, file))
-                            .and_then(move |config| is_app_registered(c3, config, app_id))
+                        get_config(client.clone())
+                            .and_then(move |(_config_version, config)| {
+                                is_app_registered(c2, config, app_id)
+                            })
                             .and_then(move |is_registered| {
                                 if is_registered {
                                     // App is already registered, calling err callback
@@ -134,50 +134,46 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *mut Authenticator,
 }
 
 /// Retrieves the authenticator configuration file
-fn get_config_file(client: Client) -> Box<AuthFuture<(u64, File)>> {
+fn get_config(client: Client) -> Box<AuthFuture<(u64, HashMap<sha256::Digest, AppInfo>)>> {
     let parent = fry!(client.config_root_dir());
-    file_helper::fetch(client, parent, CONFIG_FILE)
-        .map_err(From::from)
-        .into_box()
-}
+    let key = fry!(parent.enc_entry_key(CONFIG_FILE));
 
-/// Retrieves the authenticator configuration
-pub fn get_config(client: Client, file: File) -> Box<AuthFuture<HashMap<sha256::Digest, AppInfo>>> {
-    fry!(file_helper::read(client, &file))
-        .read(0, file.size())
-        .map_err(From::from)
-        .and_then(move |content| -> Result<HashMap<sha256::Digest, AppInfo>, _> {
-            Ok(deserialise(&content)?)
+    client.get_mdata_value(parent.name, parent.type_tag, key)
+        .and_then(move |val| {
+            let plaintext = parent.decrypt(&val.content)?;
+            let file = deserialise::<HashMap<sha256::Digest, AppInfo>>(&plaintext)?;
+            Ok((val.entry_version, file))
         })
+        .map_err(From::from)
         .into_box()
 }
 
 /// Retrieves an app info by the given key from the config file
 pub fn app_info(client: Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>>> {
-    let c2 = client.clone();
     let app_id_hash = sha256::hash(app_id.as_bytes());
-
-    get_config_file(client)
-        .and_then(move |(_, file)| get_config(c2, file))
-        .and_then(move |config| Ok(config.get(&app_id_hash).cloned()))
+    get_config(client)
+        .and_then(move |(_, config)| Ok(config.get(&app_id_hash).cloned()))
         .into_box()
 }
 
 /// Updates the authenticator configuration file and returns the updated `File` struct.
 fn update_config(client: Client,
-                 file: File,
-                 version: u64,
+                 version: Option<u64>,
                  auth_cfg: HashMap<sha256::Digest, AppInfo>)
-                 -> Box<AuthFuture<File>> {
+                 -> Box<AuthFuture<()>> {
     let parent = fry!(client.config_root_dir());
-    file_helper::update_content(client, parent, CONFIG_FILE, file, version, Mode::Overwrite)
-        .map_err(From::from)
-        .and_then(move |writer| {
-            let content = fry!(serialise(&auth_cfg));
-            writer.write(&content)
-                .and_then(move |_| writer.close())
-                .into_box()
-        })
+
+    let key = fry!(parent.enc_entry_key(CONFIG_FILE));
+    let plaintext = fry!(serialise(&auth_cfg));
+    let ciphertext = fry!(parent.enc_entry_value(&plaintext));
+
+    let actions = if let Some(version) = version {
+        EntryActions::new().update(key, ciphertext, version)
+    } else {
+        EntryActions::new().ins(key, ciphertext, 0)
+    };
+
+    client.mutate_mdata_entries(parent.name, parent.type_tag, actions.into())
         .map_err(From::from)
         .into_box()
 }
@@ -260,19 +256,14 @@ fn put_access_container_entry(client: Client,
 /// Adds the given app info to the configuration file
 fn insert_app_to_config(client: Client, app: AppInfo) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
-    let c3 = client.clone();
     let app_id_hash = sha256::hash(app.info.id.as_bytes());
 
-    get_config_file(client.clone())
-        .and_then(move |(version, file)| {
+    get_config(client.clone())
+        .and_then(move |(version, mut auth_cfg)| {
             // Add app info to the authenticator config
-            get_config(c2, file.clone()).map(move |auth_cfg| (version, file, auth_cfg))
-        })
-        .and_then(move |(version, file, mut auth_cfg)| {
             let _ = auth_cfg.insert(app_id_hash, app);
-            update_config(c3, file, version + 1, auth_cfg)
+            update_config(c2, Some(version + 1), auth_cfg)
         })
-        .map(move |_| ())
         .into_box()
 }
 
