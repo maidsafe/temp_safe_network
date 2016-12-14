@@ -19,11 +19,21 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use app::App;
+use app::errors::AppError;
+use app::ffi::helper::send_with_mdata_info;
+use app::object_cache::MDataInfoHandle;
+use futures::Future;
 use nfs::File as NativeFile;
+use nfs::file_helper;
 use routing::{XOR_NAME_LEN, XorName};
+use std::os::raw::c_void;
+use std::ptr;
 use std::slice;
+use time;
 use time::Tm;
-use util::ffi::u8_vec_to_ptr;
+use util::ffi::{FfiString, catch_unwind_cb, u8_vec_to_ptr};
+use util::ffi::callback::CallbackArgs;
 
 /// FFI-wrapper for `File`.
 #[repr(C)]
@@ -91,8 +101,221 @@ impl File {
     }
 }
 
+impl CallbackArgs for File {
+    fn default() -> Self {
+        let tm = time::now_utc();
+
+        File {
+            size: 0,
+            created: tm,
+            modified: tm,
+            user_metadata_ptr: ptr::null_mut(),
+            user_metadata_len: 0,
+            user_metadata_cap: 0,
+            data_map_name: Default::default(),
+        }
+    }
+}
+
 /// Free the file from memory.
 #[no_mangle]
 pub unsafe extern "C" fn file_free(file: File) {
     let _ = file.into_native();
+}
+
+/// Retrieve file with the given name, and its version, from the directory.
+#[no_mangle]
+pub unsafe extern "C" fn file_fetch(app: *const App,
+                                    parent_h: MDataInfoHandle,
+                                    file_name: FfiString,
+                                    user_data: *mut c_void,
+                                    o_cb: extern "C" fn(*mut c_void, i32, File, u64)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let file_name = file_name.to_string()?;
+
+        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
+            file_helper::fetch(client.clone(), parent.clone(), file_name)
+                .map(|(version, file)| (File::from_native(file), version))
+                .map_err(AppError::from)
+        })
+    })
+}
+
+/// Insert the file into the parent directory.
+#[no_mangle]
+pub unsafe extern "C" fn file_insert(app: *const App,
+                                     parent_h: MDataInfoHandle,
+                                     file_name: FfiString,
+                                     file: File,
+                                     user_data: *mut c_void,
+                                     o_cb: extern "C" fn(*mut c_void, i32)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let file = file.to_native();
+        let file_name = file_name.to_string()?;
+
+        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
+            file_helper::insert(client.clone(), parent.clone(), file_name, file)
+        })
+    })
+}
+
+/// Update (replace) file at the given name with the new file.
+/// If `version` is 0, the correct version is obtained automatically.
+#[no_mangle]
+pub unsafe extern "C" fn file_update(app: *const App,
+                                     parent_h: MDataInfoHandle,
+                                     file_name: FfiString,
+                                     file: File,
+                                     version: u64,
+                                     user_data: *mut c_void,
+                                     o_cb: extern "C" fn(*mut c_void, i32)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let file = file.to_native();
+        let file_name = file_name.to_string()?;
+
+        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
+            file_helper::update(client.clone(), parent.clone(), file_name, file, version)
+        })
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use app::App;
+    use app::errors::AppError;
+    use app::ffi::cipher_opt::CipherOpt;
+    use app::ffi::immutable_data::*;
+    use app::object_cache::CipherOptHandle;
+    use app::test_util::{create_app_with_access, run_now};
+    use core::{DIR_TAG, MDataInfo};
+    use ipc::{ContainerPermissions, Permission};
+    use nfs::File as NativeFile;
+    use nfs::NfsError;
+    use routing::{XOR_NAME_LEN, XorName};
+    use super::*;
+    use util::ffi::FfiString;
+    use util::ffi::test_util::{call_0, call_1, call_2, call_3};
+
+    #[test]
+    fn basics() {
+        let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
+
+        let container_permissions = ContainerPermissions {
+            container_key: "_test".to_string(),
+            access: btree_set![Permission::Read,
+                               Permission::Insert,
+                               Permission::Update,
+                               Permission::Delete],
+        };
+
+        let app = create_app_with_access(vec![(container_info.clone(), container_permissions)],
+                                         true);
+
+        let container_info_h = run_now(&app, move |_, context| {
+            context.object_cache().insert_mdata_info(container_info)
+        });
+
+        let file_name0 = "file0.txt";
+        let ffi_file_name0 = FfiString::from_string(file_name0);
+
+        // fetching non-existing file fails.
+        let res =
+            unsafe { call_2(|ud, cb| file_fetch(&app, container_info_h, ffi_file_name0, ud, cb)) };
+
+        match res {
+            Err(code) if code == AppError::from(NfsError::FileNotFound).into() => (),
+            Err(x) => panic!("Unexpected: {:?}", x),
+            Ok(_) => panic!("Unexpected success"),
+        }
+
+        // Create empty file.
+        let user_metadata = b"metadata".to_vec();
+        let file = NativeFile::new(user_metadata.clone());
+        let ffi_file = File::from_native(file);
+
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                file_insert(&app, container_info_h, ffi_file_name0, ffi_file, ud, cb)
+            }))
+        }
+
+        // Fetch it back.
+        let (retrieved_file, retrieved_version) = {
+            unsafe {
+                let (file, version) = unwrap!(call_2(|ud, cb| {
+                    file_fetch(&app, container_info_h, ffi_file_name0, ud, cb)
+                }));
+                (file.into_native(), version)
+            }
+        };
+        assert_eq!(retrieved_file.user_metadata(), &user_metadata[..]);
+        assert_eq!(retrieved_file.size(), 0);
+        assert_eq!(retrieved_version, 0);
+
+        // Create non-empty file.
+        let cipher_opt_h = run_now(&app, |_, context| {
+            context.object_cache().insert_cipher_opt(CipherOpt::PlainText)
+        });
+
+        let content = b"hello world";
+        let content_name = unsafe { put_file_content(&app, content, cipher_opt_h) };
+
+        let mut file = NativeFile::new(Vec::new());
+        file.set_data_map_name(content_name);
+        let ffi_file = File::from_native(file);
+
+        let file_name1 = "file1.txt";
+        let ffi_file_name1 = FfiString::from_string(file_name1);
+
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                file_insert(&app, container_info_h, ffi_file_name1, ffi_file, ud, cb)
+            }))
+        }
+
+        // Fetch it back.
+        let (ffi_file, _) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| file_fetch(&app, container_info_h, ffi_file_name1, ud, cb)))
+            }
+        };
+
+        // Read the content.
+        let retrieved_content = unsafe { get_file_content(&app, ffi_file.data_map_name) };
+        assert_eq!(retrieved_content, content);
+    }
+
+    // FIXME: rustfmt is choking on this.
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    unsafe fn put_file_content(app: &App,
+                               content: &[u8],
+                               cipher_opt_h: CipherOptHandle)
+                               -> XorName {
+        let writer_h = unwrap!(call_1(|ud, cb| idata_new_self_encryptor(app, ud, cb)));
+        unwrap!(call_0(|ud, cb| {
+            idata_write_to_self_encryptor(app, writer_h, content.as_ptr(), content.len(), ud, cb)
+        }));
+        let name = unwrap!(call_1(|ud, cb| {
+            idata_close_self_encryptor(app, writer_h, cipher_opt_h, ud, cb)
+        }));
+
+        XorName(name)
+    }
+
+    // FIXME: rustfmt is choking on this.
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    unsafe fn get_file_content(app: &App, name: [u8; XOR_NAME_LEN]) -> Vec<u8> {
+        let reader_h = unwrap!(call_1(|ud, cb| {
+            idata_fetch_self_encryptor(app, name, ud, cb)
+        }));
+        let size = unwrap!(call_1(|ud, cb| {
+            idata_size(app, reader_h, ud, cb)
+        }));
+
+        let (ptr, len, cap) = unwrap!(call_3(|ud, cb| {
+            idata_read_from_self_encryptor(app, reader_h, 0, size, ud, cb)
+        }));
+
+        Vec::from_raw_parts(ptr, len, cap)
+    }
 }

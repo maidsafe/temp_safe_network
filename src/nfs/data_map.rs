@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-//! DataMap utilities
+//! `DataMap` utilities
 
 use core::{Client, FutureExt, immutable_data};
 use futures::{Future, future};

@@ -19,26 +19,56 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, FutureExt, MDataInfo, SelfEncryptionStorage};
-use futures::Future;
+use core::{Client, CoreError, FutureExt, MDataInfo, SelfEncryptionStorage};
+use futures::{Future, IntoFuture};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs::{File, Mode, NfsFuture, Reader, Writer};
-use routing::EntryActions;
+use nfs::{File, Mode, NfsError, NfsFuture, Reader, Writer};
+use routing::{ClientError, EntryActions};
+
+/// Insert the file into the directory.
+pub fn insert<T: AsRef<str>>(client: Client,
+                             parent: MDataInfo,
+                             name: T,
+                             file: File)
+                             -> Box<NfsFuture<()>> {
+    let name = name.as_ref();
+    trace!("Inserting file with name '{}'", name);
+
+    serialise(&file)
+        .map_err(From::from)
+        .and_then(|encoded| {
+            let key = parent.enc_entry_key(name.as_bytes())?;
+            let value = parent.enc_entry_value(&encoded)?;
+
+            Ok((key, value))
+        })
+        .into_future()
+        .and_then(move |(key, value)| {
+            client.mutate_mdata_entries(parent.name,
+                                        parent.type_tag,
+                                        EntryActions::new().ins(key, value, 0).into())
+        })
+        .map_err(From::from)
+        .into_box()
+}
 
 /// Gets a file from the directory
 pub fn fetch<S: AsRef<str>>(client: Client,
                             parent: MDataInfo,
                             name: S)
                             -> Box<NfsFuture<(u64, File)>> {
-    let key = fry!(parent.enc_entry_key(name.as_ref().as_bytes()));
-
-    client.get_mdata_value(parent.name, parent.type_tag, key)
-        .map_err(From::from)
-        .and_then(move |val| {
-            let plaintext = parent.decrypt(&val.content)?;
-            let file = deserialise::<File>(&plaintext)?;
-            Ok((val.entry_version, file))
+    parent.enc_entry_key(name.as_ref().as_bytes())
+        .into_future()
+        .and_then(move |key| {
+            client.get_mdata_value(parent.name, parent.type_tag, key)
+                .map(move |value| (value, parent))
         })
+        .and_then(move |(value, parent)| {
+            let plaintext = parent.decrypt(&value.content)?;
+            let file = deserialise(&plaintext)?;
+            Ok((value.entry_version, file))
+        })
+        .map_err(convert_error)
         .into_box()
 }
 
@@ -64,11 +94,13 @@ pub fn delete<S: AsRef<str>>(client: Client,
                               EntryActions::new()
                                   .del(key, version)
                                   .into())
-        .map_err(From::from)
+        .map_err(convert_error)
         .into_box()
 }
 
 /// Updates the file.
+/// If `version` is 0, the current version is first retrieved from the network,
+/// and that version incremented by one is then used as the actual version.
 pub fn update<S: AsRef<str>>(client: Client,
                              parent: MDataInfo,
                              name: S,
@@ -78,16 +110,34 @@ pub fn update<S: AsRef<str>>(client: Client,
     let name = name.as_ref();
     trace!("Updating file with name '{}'", name);
 
-    let key = fry!(parent.enc_entry_key(name.as_bytes()));
-    let plaintext = fry!(serialise(&file));
-    let ciphertext = fry!(parent.enc_entry_value(&plaintext));
+    let client2 = client.clone();
 
-    client.mutate_mdata_entries(parent.name,
-                              parent.type_tag,
-                              EntryActions::new()
-                                  .update(key, ciphertext, version)
-                                  .into())
+    serialise(&file)
         .map_err(From::from)
+        .and_then(|encoded| {
+            let key = parent.enc_entry_key(name.as_bytes())?;
+            let content = parent.enc_entry_value(&encoded)?;
+
+            Ok((key, content))
+        })
+        .into_future()
+        .and_then(move |(key, content)| {
+            if version != 0 {
+                Ok((key, content, version, parent)).into_future().into_box()
+            } else {
+                client.get_mdata_value(parent.name, parent.type_tag, key.clone())
+                    .map(move |value| (key, content, value.entry_version + 1, parent))
+                    .into_box()
+            }
+        })
+        .and_then(move |(key, content, version, parent)| {
+            client2.mutate_mdata_entries(parent.name,
+                                         parent.type_tag,
+                                         EntryActions::new()
+                                             .update(key, content, version)
+                                             .into())
+        })
+        .map_err(convert_error)
         .into_box()
 }
 
@@ -134,6 +184,16 @@ pub fn create<S: Into<String>>(client: Client,
                 File::new(user_metadata),
                 name,
                 None)
+}
+
+// This is different from `impl From<CoreError> for NfsError`, because it maps
+// `NoSuchEntry` to `FileNotFound`.
+// TODO:  consider performing such conversion directly in the mentioned `impl From`.
+fn convert_error(err: CoreError) -> NfsError {
+    match err {
+        CoreError::RoutingClientError(ClientError::NoSuchEntry) => NfsError::FileNotFound,
+        _ => NfsError::from(err),
+    }
 }
 
 #[cfg(test)]
