@@ -32,7 +32,7 @@ use core::utility;
 use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
-use ipc::{AccessContainer, AppKeys, AuthGranted, ContainerPermissions};
+use ipc::{AccessContInfo, AppKeys, AuthGranted, ContainerPermissions};
 use ipc::req::ffi::Permission;
 use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
@@ -182,7 +182,7 @@ pub struct Registered {
     object_cache: ObjectCache,
     app_id: String,
     sym_enc_key: secretbox::Key,
-    access_container_info: AccessContainer,
+    access_container_info: AccessContInfo,
     access_info: RefCell<Vec<(MDataInfo, ContainerPermissions)>>,
 }
 
@@ -193,7 +193,7 @@ impl AppContext {
 
     fn registered(app_id: String,
                   sym_enc_key: secretbox::Key,
-                  access_container_info: AccessContainer)
+                  access_container_info: AccessContInfo)
                   -> Self {
         AppContext::Registered(Rc::new(Registered {
             object_cache: ObjectCache::new(),
@@ -307,7 +307,7 @@ mod tests {
     use core::{DIR_TAG, MDataInfo, utility};
     use core::utility::test_utils::random_client;
     use futures::Future;
-    use ipc::{AccessContainer, AppKeys, AuthGranted, Config, ContainerPermissions, Permission};
+    use ipc::{AccessContInfo, AppKeys, AuthGranted, Config, ContainerPermissions, Permission};
     use maidsafe_utilities::serialisation::serialise;
     use rand;
     use routing::{MutableData, Value};
@@ -410,7 +410,7 @@ mod tests {
         let (enc_pk, enc_sk) = box_::gen_keypair();
 
         // Create the access container.
-        let access_container_info = AccessContainer {
+        let access_container_info = AccessContInfo {
             id: rand::random(),
             tag: ACCESS_CONTAINER_TAG,
             nonce: secretbox::gen_nonce(),

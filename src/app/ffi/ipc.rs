@@ -125,7 +125,7 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
 #[cfg(test)]
 mod tests {
     use core::utility;
-    use ipc::{self, AccessContainer, AppExchangeInfo, AppKeys, AuthGranted, AuthReq, Config,
+    use ipc::{self, AccessContInfo, AppExchangeInfo, AppKeys, AuthGranted, AuthReq, Config,
               ContainerPermissions, ContainersReq, IpcMsg, IpcReq, IpcResp};
     use ipc::req::ffi::Permission;
     use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
@@ -215,7 +215,7 @@ mod tests {
     fn decode_ipc_msg_with_auth_granted() {
         let req_id = gen_req_id();
 
-        let access_container = AccessContainer {
+        let access_container = AccessContInfo {
             id: rand::random(),
             tag: rand::random(),
             nonce: secretbox::gen_nonce(),

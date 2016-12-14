@@ -30,7 +30,7 @@ pub struct AuthGranted {
     /// The access keys.
     pub app_keys: AppKeys,
     /// Access container
-    pub access_container: AccessContainer,
+    pub access_container: AccessContInfo,
 }
 
 /// Free memory
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn app_keys_drop(a: AppKeys) {
 /// Access container
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct AccessContainer {
+pub struct AccessContInfo {
     /// ID
     pub id: [u8; XOR_NAME_LEN],
     /// Type tag
@@ -106,6 +106,6 @@ pub struct AccessContainer {
 /// Free memory
 #[no_mangle]
 #[allow(unsafe_code)]
-pub unsafe extern "C" fn access_container_drop(a: AccessContainer) {
-    let _ = super::AccessContainer::from_repr_c(a);
+pub unsafe extern "C" fn access_container_drop(a: AccessContInfo) {
+    let _ = super::AccessContInfo::from_repr_c(a);
 }

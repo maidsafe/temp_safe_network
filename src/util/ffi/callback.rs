@@ -24,6 +24,7 @@
 use routing::XOR_NAME_LEN;
 use std::os::raw::c_void;
 use std::ptr;
+use super::string::FfiString;
 
 /// This trait allows us to treat callbacks with different number and type of
 /// arguments uniformly.
@@ -132,6 +133,12 @@ impl<T> CallbackArgs for *mut T {
 impl CallbackArgs for [u8; XOR_NAME_LEN] {
     fn default() -> Self {
         [0; XOR_NAME_LEN]
+    }
+}
+
+impl CallbackArgs for FfiString {
+    fn default() -> Self {
+        Default::default()
     }
 }
 

@@ -114,7 +114,7 @@ pub fn encrypt_entries(entries: &BTreeMap<Vec<u8>, Value>,
     let mut output = BTreeMap::new();
 
     for (key, value) in entries {
-        let encrypted_key = info.enc_entry_key(&key)?;
+        let encrypted_key = info.enc_entry_key(key)?;
         let encrypted_value = encrypt_value(value, info)?;
         let _ = output.insert(encrypted_key, encrypted_value);
     }
@@ -130,7 +130,7 @@ pub fn encrypt_entry_actions(actions: &BTreeMap<Vec<u8>, EntryAction>,
     let mut output = BTreeMap::new();
 
     for (key, action) in actions {
-        let encrypted_key = info.enc_entry_key(&key)?;
+        let encrypted_key = info.enc_entry_key(key)?;
         let encrypted_action = match *action {
             EntryAction::Ins(ref value) => EntryAction::Ins(encrypt_value(value, info)?),
             EntryAction::Update(ref value) => EntryAction::Update(encrypt_value(value, info)?),
@@ -150,7 +150,7 @@ pub fn decrypt_entries(entries: &BTreeMap<Vec<u8>, Value>,
     let mut output = BTreeMap::new();
 
     for (key, value) in entries {
-        let decrypted_key = info.decrypt(&key)?;
+        let decrypted_key = info.decrypt(key)?;
         let decrypted_value = decrypt_value(value, info)?;
 
         let _ = output.insert(decrypted_key, decrypted_value);
@@ -166,7 +166,7 @@ pub fn decrypt_keys(keys: &BTreeSet<Vec<u8>>,
     let mut output = BTreeSet::new();
 
     for key in keys {
-        let _ = output.insert(info.decrypt(&key)?);
+        let _ = output.insert(info.decrypt(key)?);
     }
 
     Ok(output)

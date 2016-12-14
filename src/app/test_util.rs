@@ -22,7 +22,7 @@
 use core::{Client, FutureExt, utility};
 use core::utility::test_utils::random_client;
 use futures::{Future, IntoFuture};
-use ipc::{AccessContainer, AppKeys, AuthGranted, Config};
+use ipc::{AccessContInfo, AppKeys, AuthGranted, Config};
 use rand;
 use rust_sodium::crypto::{box_, secretbox, sign};
 use std::sync::mpsc;
@@ -54,7 +54,7 @@ pub fn create_app() -> App {
         enc_sk: enc_sk,
     };
 
-    let access_container = AccessContainer {
+    let access_container = AccessContInfo {
         id: rand::random(),
         tag: ACCESS_CONTAINER_TAG,
         nonce: secretbox::gen_nonce(),

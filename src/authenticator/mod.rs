@@ -21,13 +21,15 @@
 
 #![allow(unsafe_code)]
 
+/// Authenticator communication with apps
+pub mod ipc;
 /// Authenticator errors
 mod errors;
 
 use core::{self, Client, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent};
 use futures::Future;
 use futures::stream::Stream;
-use futures::sync::mpsc;
+use futures::sync::mpsc::{self, SendError};
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::{self, Joiner};
 use nfs::{create_dir, create_std_dirs};
@@ -39,6 +41,9 @@ use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
 use tokio_core::reactor::Core;
 use util::ffi::{FfiString, OpaqueCtx, catch_unwind_error_code};
+
+/// Future type specialised with `AuthError` as an error type
+pub type AuthFuture<T> = Future<Item = T, Error = AuthError>;
 
 macro_rules! try_tx {
     ($result:expr, $tx:ident) => {
@@ -57,6 +62,15 @@ pub struct Authenticator {
 }
 
 impl Authenticator {
+    /// Send a message to the authenticator event loop
+    pub fn send<F>(&self, f: F) -> Result<(), SendError<CoreMsg<()>>>
+        where F: FnOnce(&Client) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static
+    {
+        let msg = CoreMsg::new(|client, _| f(client));
+        let mut core_tx = unwrap!(self.core_tx.lock());
+        core_tx.send(msg)
+    }
+
     /// Create a new account
     pub fn create_acc<S, NetObs>(locator: S,
                                  password: S,

@@ -22,6 +22,7 @@
 /// Ffi module
 pub mod ffi;
 
+use core::MDataInfo;
 use ipc::{Config, IpcError};
 use routing::XorName;
 use rust_sodium::crypto::{box_, secretbox, sign};
@@ -46,7 +47,7 @@ pub struct AuthGranted {
     /// Useful to reuse bootstrap nodes and speed up access.
     pub bootstrap_config: Config,
     /// Access container
-    pub access_container: AccessContainer,
+    pub access_container: AccessContInfo,
 }
 
 impl AuthGranted {
@@ -71,7 +72,7 @@ impl AuthGranted {
         AuthGranted {
             app_keys: AppKeys::from_repr_c(app_keys),
             bootstrap_config: Config,
-            access_container: AccessContainer::from_repr_c(access_container),
+            access_container: AccessContInfo::from_repr_c(access_container),
         }
     }
 }
@@ -96,6 +97,21 @@ pub struct AppKeys {
 }
 
 impl AppKeys {
+    /// Generate random keys
+    pub fn random(owner_key: sign::PublicKey) -> AppKeys {
+        let (enc_pk, enc_sk) = box_::gen_keypair();
+        let (sign_pk, sign_sk) = sign::gen_keypair();
+
+        AppKeys {
+            owner_key: owner_key,
+            enc_key: secretbox::gen_key(),
+            sign_pk: sign_pk,
+            sign_sk: sign_sk,
+            enc_pk: enc_pk,
+            enc_sk: enc_sk,
+        }
+    }
+
     /// Consumes the object and returns the wrapped raw pointer
     ///
     /// You're now responsible for freeing this memory once you're done.
@@ -130,7 +146,7 @@ impl AppKeys {
 
 /// Access container
 #[derive(Clone, RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
-pub struct AccessContainer {
+pub struct AccessContInfo {
     /// ID
     pub id: XorName,
     /// Type tag
@@ -139,13 +155,13 @@ pub struct AccessContainer {
     pub nonce: secretbox::Nonce,
 }
 
-impl AccessContainer {
+impl AccessContInfo {
     /// Consumes the object and returns the wrapped raw pointer
     ///
     /// You're now responsible for freeing this memory once you're done.
-    pub fn into_repr_c(self) -> ffi::AccessContainer {
-        let AccessContainer { id, tag, nonce } = self;
-        ffi::AccessContainer {
+    pub fn into_repr_c(self) -> ffi::AccessContInfo {
+        let AccessContInfo { id, tag, nonce } = self;
+        ffi::AccessContInfo {
             id: id.0,
             tag: tag,
             nonce: nonce.0,
@@ -157,11 +173,24 @@ impl AccessContainer {
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
     #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(repr_c: ffi::AccessContainer) -> Self {
-        AccessContainer {
+    pub unsafe fn from_repr_c(repr_c: ffi::AccessContInfo) -> Self {
+        AccessContInfo {
             id: XorName(repr_c.id),
             tag: repr_c.tag,
             nonce: secretbox::Nonce(repr_c.nonce),
+        }
+    }
+
+    /// Creates an `AccessContInfo` from a given `MDataInfo`
+    pub fn from_mdata_info(md: MDataInfo) -> Result<AccessContInfo, IpcError> {
+        if let Some((_, Some(nonce))) = md.enc_info {
+            Ok(AccessContInfo {
+                id: md.name,
+                tag: md.type_tag,
+                nonce: nonce,
+            })
+        } else {
+            Err(IpcError::Unexpected("MDataInfo doesn't contain nonce".to_owned()))
         }
     }
 }
@@ -188,7 +217,7 @@ mod tests {
             enc_pk: ourpk,
             enc_sk: oursk,
         };
-        let ac = AccessContainer {
+        let ac = AccessContInfo {
             id: XorName([2; XOR_NAME_LEN]),
             tag: 681,
             nonce: secretbox::gen_nonce(),
@@ -259,7 +288,7 @@ mod tests {
     #[test]
     fn access_container() {
         let nonce = secretbox::gen_nonce();
-        let a = AccessContainer {
+        let a = AccessContInfo {
             id: XorName([2; XOR_NAME_LEN]),
             tag: 681,
             nonce: nonce,
@@ -272,7 +301,7 @@ mod tests {
         assert_eq!(ffi.nonce.iter().collect::<Vec<_>>(),
                    nonce.0.iter().collect::<Vec<_>>());
 
-        let a = unsafe { AccessContainer::from_repr_c(ffi) };
+        let a = unsafe { AccessContInfo::from_repr_c(ffi) };
 
         assert_eq!(a.id.0.iter().sum::<u8>() as usize, 2 * XOR_NAME_LEN);
         assert_eq!(a.tag, 681);
