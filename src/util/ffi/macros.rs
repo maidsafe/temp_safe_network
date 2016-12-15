@@ -34,7 +34,7 @@ macro_rules! ffi_error_code {
         #[allow(unused)]
         use $crate::util::ffi::ErrorCode;
 
-        let err = $err;
+        let err = &$err;
         let err_str = format!("{:?}", err);
         let err_code = err.error_code();
 

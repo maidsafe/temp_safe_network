@@ -484,9 +484,9 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *mut Authenticator,
                                                     },
                                                     app_id)?))
                         })
-                        .or_else(move |e| -> Result<(), IpcError> {
+                        .or_else(move |e| -> Result<(), AuthError> {
                             Ok(o_cb(user_data.0,
-                                    0, // TODO(nbaksalyar) put proper error code here
+                                    ffi_error_code!(e),
                                     encode_response(&IpcMsg::Resp {
                                                         req_id: req_id,
                                                         resp: IpcResp::Auth(Err(e.into())),
@@ -583,9 +583,9 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *mut Authenticator,
                             o_cb(user_data.0, 0, encode_response(&resp, cont_req.app.id)?);
                             Ok(())
                         })
-                        .or_else(move |e| -> Result<(), IpcError> {
+                        .or_else(move |e| -> Result<(), AuthError> {
                             Ok(o_cb(user_data.0,
-                                    0, // TODO(nbaksalyar) put proper error code here
+                                    ffi_error_code!(e),
                                     encode_response(&IpcMsg::Resp {
                                                         req_id: req_id,
                                                         resp: IpcResp::Containers(Err(e.into())),
