@@ -23,7 +23,8 @@ pub mod entry_actions;
 pub mod entries;
 pub mod permissions;
 mod helper;
-
+#[cfg(test)]
+mod tests;
 
 use app::App;
 use app::errors::AppError;
