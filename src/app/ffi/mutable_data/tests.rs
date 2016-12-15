@@ -29,9 +29,9 @@ use routing::{Action, ClientError, EntryAction, MutableData, PermissionSet, User
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc;
 
-/// MD created by App. App lists it's own sign_pk in owners field: Put should
-/// fail - Rejected by MaidManagers. Should pass when it lists the owner's
-/// sign_pk instead
+// MD created by App. App lists it's own sign_pk in owners field: Put should
+// fail - Rejected by MaidManagers. Should pass when it lists the owner's
+// sign_pk instead
 #[test]
 fn md_created_by_app_1() {
     let app = create_app();
@@ -41,19 +41,23 @@ fn md_created_by_app_1() {
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.public_signing_key()));
-        let mdata =
-            unwrap!(MutableData::new(rng.gen(), DIR_TAG, BTreeMap::new(), BTreeMap::new(), owners));
+        let name: XorName = rng.gen();
+        let mdata = unwrap!(MutableData::new(name.clone(),
+                                             DIR_TAG,
+                                             BTreeMap::new(),
+                                             BTreeMap::new(),
+                                             owners));
         let cl2 = client.clone();
         client.put_mdata(mdata)
-            .map(|()| panic!("Put should be rejected by MaidManagers"))
-            .or_else(move |e| {
-                match e {
-                    CoreError::RoutingClientError(ClientError::InvalidOwners) => (),
-                    _ => panic!("Expected RoutingClientError"),
+            .then(move |res| {
+                match res {
+                    Ok(()) => panic!("Put should be rejected by MaidManagers"),
+                    Err(CoreError::RoutingClientError(ClientError::InvalidOwners)) => (),
+                    Err(x) => panic!("Expected ClientError::InvalidOwners. Got {:?}", x),
                 }
                 let mut owners = BTreeSet::new();
                 owners.insert(unwrap!(cl2.owner_key()));
-                let mdata = unwrap!(MutableData::new(rng.gen(),
+                let mdata = unwrap!(MutableData::new(name,
                                                      DIR_TAG,
                                                      BTreeMap::new(),
                                                      BTreeMap::new(),
@@ -67,12 +71,12 @@ fn md_created_by_app_1() {
     unwrap!(rx.recv());
 }
 
-/// MD created by App properly: Should pass. App tries to change ownership -
-/// Should Fail by MaidManagers. App creates it's own account with the
-/// maid-managers. Now it tries changing ownership by routing it through it's MM
-/// instead of owners. It should still fail as DataManagers should enforce that
-/// the request is coming from MM of the owner (listed in the owners field of
-/// the stored MD).
+// MD created by App properly: Should pass. App tries to change ownership -
+// Should Fail by MaidManagers. App creates it's own account with the
+// maid-managers. Now it tries changing ownership by routing it through it's MM
+// instead of owners. It should still fail as DataManagers should enforce that
+// the request is coming from MM of the owner (listed in the owners field of the
+// stored MD).
 #[test]
 fn md_created_by_app_2() {
     let app = create_app();
@@ -98,34 +102,36 @@ fn md_created_by_app_2() {
         let name2 = name.clone();
         let cl2 = client.clone();
         client.put_mdata(mdata)
-            .map_err(|e| panic!("{:?}", e))
-            .and_then(move |()| {
+            .then(move |res| {
+                unwrap!(res);
                 cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 2)
             })
-            .map(|()| panic!("It should fail"))
-            .map_err(move |e| {
-                match e {
-                    CoreError::RoutingClientError(ClientError::AccessDenied) => (),
-                    _ => panic!("Expected RoutingClientError"),
+            .then(move |res| -> Result<_, ()> {
+                match res {
+                    Ok(()) => panic!("It should fail"),
+                    Err(CoreError::RoutingClientError(ClientError::AccessDenied)) => (),
+                    Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
-                unwrap!(alt_client_tx.send((name2, sign_pk)))
+                unwrap!(alt_client_tx.send((name2, sign_pk)));
+                Ok(())
             })
             .into_box()
             .into()
     }));
-    let _joiner = thread::named("", || {
+    let _joiner = thread::named("Alt client", || {
         random_client(move |client| {
             let (name, sign_pk) = unwrap!(alt_client_rx.recv());
             let cl2 = client.clone();
             client.ins_auth_key(sign_pk, 1)
-                .and_then(move |()| {
+                .then(move |res| {
+                    unwrap!(res);
                     cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 2)
                 })
-                .map(|()| panic!("It should fail"))
-                .or_else(move |e| -> Result<(), ()> {
-                    match e {
-                        CoreError::RoutingClientError(ClientError::AccessDenied) => (),
-                        _ => panic!("Expected RoutingClientError"),
+                .then(move |res| -> Result<(), ()> {
+                    match res {
+                        Ok(()) => panic!("It should fail"),
+                        Err(CoreError::RoutingClientError(ClientError::AccessDenied)) => (),
+                        Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                     }
                     unwrap!(tx.send(()));
                     Ok(())
@@ -135,10 +141,10 @@ fn md_created_by_app_2() {
     unwrap!(rx.recv());
 }
 
-/// MD created by owner and given to a permitted App. Owner has listed that app
-/// is allowed to insert only. App tries to insert -should pass. App tries to
-/// update - should fail. App tries to change permission to allow itself to
-/// update - should fail to change permissions.
+// MD created by owner and given to a permitted App. Owner has listed that app
+// is allowed to insert only. App tries to insert -should pass. App tries to
+// update - should fail. App tries to change permission to allow itself to
+// update - should fail to change permissions.
 #[test]
 fn md_created_by_app_3() {
     let app = create_app();
@@ -159,8 +165,8 @@ fn md_created_by_app_3() {
         let cl3 = client.clone();
         let name2 = name.clone();
         client.mutate_mdata_entries(name.clone(), DIR_TAG, actions)
-            .map_err(|e| panic!("{:?}", e))
-            .and_then(move |()| {
+            .then(move |res| {
+                unwrap!(res);
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![1, 2, 3, 4],
                                        EntryAction::Update(Value {
@@ -169,29 +175,30 @@ fn md_created_by_app_3() {
                                        }));
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
-            .map(|()| panic!("It should fail"))
-            .or_else(move |e| {
-                match e {
-                    CoreError::RoutingClientError(ClientError::AccessDenied) => (),
-                    _ => panic!("Expected RoutingClientError"),
+            .then(move |res| {
+                match res {
+                    Ok(()) => panic!("It should fail"),
+                    Err(CoreError::RoutingClientError(ClientError::AccessDenied)) => (),
+                    Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let user = User::Key(sign_pk);
                 let mut permissions = PermissionSet::new();
                 let _ = permissions.allow(Action::Update);
-                cl3.set_mdata_user_permissions(name2, DIR_TAG, user,
-                                               permissions, 2)
+                cl3.set_mdata_user_permissions(name2, DIR_TAG, user, permissions, 2)
             })
-            .map_err(move |e| {
-                match e {
-                    CoreError::RoutingClientError(ClientError::AccessDenied) => (),
-                    _ => panic!("Expected RoutingClientError"),
+            .then(move |res| -> Result<_, ()> {
+                match res {
+                    Ok(()) => panic!("It should fail"),
+                    Err(CoreError::RoutingClientError(ClientError::AccessDenied)) => (),
+                    Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 unwrap!(tx.send(()));
+                Ok(())
             })
             .into_box()
             .into()
     }));
-    let _joiner = thread::named("", || {
+    let _joiner = thread::named("Alt client", || {
         random_client(move |client| {
             let app_sign_pk = unwrap!(app_sign_pk_rx.recv());
             let mut rng = unwrap!(OsRng::new());
@@ -225,12 +232,12 @@ fn md_created_by_app_3() {
     unwrap!(rx.recv());
 }
 
-/// MD created by owner and given to a permitted App. Owner has listed that app
-/// is allowed to manage-permissions only. App tries to insert -should fail. App
-/// tries to update - should fail. App tries to change permission to allow
-/// itself to insert and delete - should pass to change permissions. Now App
-/// tires to insert again - should pass. App tries to update. Should fail. App
-/// tries to delete - should pass.
+// MD created by owner and given to a permitted App. Owner has listed that app
+// is allowed to manage-permissions only. App tries to insert -should fail. App
+// tries to update - should fail. App tries to change permission to allow itself
+// to insert and delete - should pass to change permissions. Now App tires to
+// insert again - should pass. App tries to update. Should fail. App tries to
+// delete - should pass.
 #[test]
 fn md_created_by_app_4() {
     let app = create_app();
@@ -257,11 +264,11 @@ fn md_created_by_app_4() {
         let name4 = name.clone();
         let name5 = name.clone();
         client.mutate_mdata_entries(name.clone(), DIR_TAG, actions)
-            .map(|()| panic!("It should fail"))
-            .or_else(move |e| {
-                match e {
-                    CoreError::RoutingClientError(ClientError::AccessDenied) => (),
-                    _ => panic!("Expected RoutingClientError"),
+            .then(move |res| {
+                match res {
+                    Ok(()) => panic!("It should fail"),
+                    Err(CoreError::RoutingClientError(ClientError::AccessDenied)) => (),
+                    Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![1, 8, 3, 4],
@@ -271,11 +278,11 @@ fn md_created_by_app_4() {
                                        }));
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
-            .map(|()| panic!("It should fail"))
-            .or_else(move |e| {
-                match e {
-                    CoreError::RoutingClientError(ClientError::AccessDenied) => (),
-                    _ => panic!("Expected RoutingClientError"),
+            .then(move |res| {
+                match res {
+                    Ok(()) => panic!("It should fail"),
+                    Err(CoreError::RoutingClientError(ClientError::AccessDenied)) => (),
+                    Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let user = User::Key(sign_pk);
                 let mut permissions = PermissionSet::new();
@@ -283,8 +290,8 @@ fn md_created_by_app_4() {
                 cl3.set_mdata_user_permissions(name2, DIR_TAG, user,
                                                permissions, 1)
             })
-            .map_err(move |e| panic!("{:?}", e))
-            .and_then(move |()| {
+            .then(move |res| {
+                unwrap!(res);
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![1, 2, 3, 4],
                                        EntryAction::Ins(Value {
@@ -293,8 +300,8 @@ fn md_created_by_app_4() {
                                        }));
                 cl4.mutate_mdata_entries(name3, DIR_TAG, actions)
             })
-            .map_err(|e| panic!("{:?}", e))
-            .and_then(move |()| {
+            .then(move |res| {
+                unwrap!(res);
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![1, 2, 3, 4],
                                        EntryAction::Update(Value {
@@ -303,11 +310,11 @@ fn md_created_by_app_4() {
                                        }));
                 cl5.mutate_mdata_entries(name4, DIR_TAG, actions)
             })
-            .map(|()| panic!("It should fail"))
-            .or_else(move |e| {
-                match e {
-                    CoreError::RoutingClientError(ClientError::AccessDenied) => (),
-                    _ => panic!("Expected RoutingClientError"),
+            .then(move |res| {
+                match res {
+                    Ok(()) => panic!("It should fail"),
+                    Err(CoreError::RoutingClientError(ClientError::AccessDenied)) => (),
+                    Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![1, 2, 3, 4],
@@ -319,7 +326,7 @@ fn md_created_by_app_4() {
             .into_box()
             .into()
     }));
-    let _joiner = thread::named("", || {
+    let _joiner = thread::named("Alt client", || {
         random_client(move |client| {
             let app_sign_pk = unwrap!(app_sign_pk_rx.recv());
             let mut rng = unwrap!(OsRng::new());
