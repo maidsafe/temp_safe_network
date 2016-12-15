@@ -192,6 +192,7 @@ mod tests {
     use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
+    use util::ffi::ErrorCode;
     use util::ffi::test_util::{call_0, call_1};
 
     #[test]
@@ -324,7 +325,7 @@ mod tests {
             cipher_opt_new_symmetric(&app, tx, handle_cb);
             cipher_opt_handle_sym = unwrap!(unwrap!(rx.recv()));
 
-            let err_code = AppError::InvalidEncryptKeyHandle.into();
+            let err_code = AppError::InvalidEncryptKeyHandle.error_code();
             cipher_opt_new_asymmetric(&app, 29293290, tx, handle_cb);
             let res = unwrap!(rx.recv());
             assert!(res.is_err());
@@ -345,7 +346,7 @@ mod tests {
         assert_free(&app, cipher_opt_handle_sym, 0);
         assert_free(&app, cipher_opt_handle_asym, 0);
 
-        let err_code = AppError::InvalidCipherOptHandle.into();
+        let err_code = AppError::InvalidCipherOptHandle.error_code();
         assert_free(&app, cipher_opt_handle_pt, err_code);
         assert_free(&app, cipher_opt_handle_sym, err_code);
         assert_free(&app, cipher_opt_handle_asym, err_code);

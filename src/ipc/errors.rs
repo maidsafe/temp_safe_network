@@ -19,14 +19,11 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::CORE_ERROR_START_RANGE;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use rustc_serialize::base64::FromBase64Error;
 use std::error::Error;
 use std::str::Utf8Error;
-
-const IPC_ERROR_START_RANGE: i32 = CORE_ERROR_START_RANGE - 1000;
 
 /// Ipc error
 #[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
@@ -81,19 +78,5 @@ impl<'a> From<&'a str> for IpcError {
 impl From<String> for IpcError {
     fn from(s: String) -> Self {
         IpcError::Unexpected(s)
-    }
-}
-
-impl Into<i32> for IpcError {
-    fn into(self) -> i32 {
-        match self {
-            IpcError::AuthDenied => IPC_ERROR_START_RANGE - 1,
-            IpcError::ContainersDenied => IPC_ERROR_START_RANGE - 2,
-            IpcError::InvalidMsg => IPC_ERROR_START_RANGE - 3,
-            IpcError::EncodeDecodeError => IPC_ERROR_START_RANGE - 4,
-            IpcError::AlreadyAuthorised => IPC_ERROR_START_RANGE - 5,
-            IpcError::UnknownApp => IPC_ERROR_START_RANGE - 6,
-            IpcError::Unexpected(_) => IPC_ERROR_START_RANGE - 100,
-        }
     }
 }

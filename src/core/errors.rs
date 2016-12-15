@@ -28,14 +28,10 @@ use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::mpsc;
 
-/// Intended for converting Client Errors into numeric codes for propagating
-/// some error information across FFI boundaries and specially to C.
-pub const CORE_ERROR_START_RANGE: i32 = -1;
-
 /// Client Errors
 pub enum CoreError {
     /// Could not Serialise or Deserialise
-    UnsuccessfulEncodeDecode(SerialisationError),
+    EncodeDecodeError(SerialisationError),
     /// Asymmetric Key Decryption Failed
     AsymmetricDecipherFailure,
     /// Symmetric Key Decryption Failed
@@ -47,11 +43,11 @@ pub enum CoreError {
     /// No such data found in local version cache
     VersionCacheMiss,
     /// Cannot overwrite a root directory if it already exists
-    RootDirectoryAlreadyExists,
+    RootDirectoryExists,
     /// Unable to obtain generator for random data
     RandomDataGenerationFailure,
-    /// Forbidden operation requested for this Client
-    OperationForbiddenForClient,
+    /// Forbidden operation
+    OperationForbidden,
     /// Unexpected - Probably a Logic error
     Unexpected(String),
     /// Routing Error
@@ -84,7 +80,7 @@ impl<'a> From<&'a str> for CoreError {
 
 impl From<SerialisationError> for CoreError {
     fn from(error: SerialisationError) -> CoreError {
-        CoreError::UnsuccessfulEncodeDecode(error)
+        CoreError::EncodeDecodeError(error)
     }
 }
 
@@ -124,53 +120,12 @@ impl From<SelfEncryptionError<SelfEncryptionStorageError>> for CoreError {
     }
 }
 
-impl Into<i32> for CoreError {
-    fn into(self) -> i32 {
-        match self {
-            CoreError::UnsuccessfulEncodeDecode(_) => CORE_ERROR_START_RANGE - 1,
-            CoreError::AsymmetricDecipherFailure => CORE_ERROR_START_RANGE - 2,
-            CoreError::SymmetricDecipherFailure => CORE_ERROR_START_RANGE - 3,
-            CoreError::ReceivedUnexpectedData => CORE_ERROR_START_RANGE - 4,
-            CoreError::VersionCacheMiss => CORE_ERROR_START_RANGE - 5,
-            CoreError::RootDirectoryAlreadyExists => CORE_ERROR_START_RANGE - 6,
-            CoreError::RandomDataGenerationFailure => CORE_ERROR_START_RANGE - 7,
-            CoreError::OperationForbiddenForClient => CORE_ERROR_START_RANGE - 8,
-            CoreError::Unexpected(_) => CORE_ERROR_START_RANGE - 9,
-            CoreError::RoutingError(_) => CORE_ERROR_START_RANGE - 10,
-            CoreError::RoutingInterfaceError(_) => CORE_ERROR_START_RANGE - 11,
-            CoreError::RoutingClientError(..) => CORE_ERROR_START_RANGE - 12,
-            CoreError::UnsupportedSaltSizeForPwHash => CORE_ERROR_START_RANGE - 13,
-            CoreError::UnsuccessfulPwHash => CORE_ERROR_START_RANGE - 14,
-            CoreError::OperationAborted => CORE_ERROR_START_RANGE - 15,
-            CoreError::MpidMessagingError(_) => CORE_ERROR_START_RANGE - 16,
-            CoreError::SelfEncryption(
-                SelfEncryptionError::Compression::<SelfEncryptionStorageError>) => {
-                CORE_ERROR_START_RANGE - 29
-            }
-            CoreError::SelfEncryption(
-                SelfEncryptionError::Decryption::<SelfEncryptionStorageError>) => {
-                CORE_ERROR_START_RANGE - 30
-            }
-            CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
-                CORE_ERROR_START_RANGE - 31
-            }
-            CoreError::RequestTimeout => CORE_ERROR_START_RANGE - 34,
-            CoreError::SelfEncryption(
-                SelfEncryptionError::Storage::<SelfEncryptionStorageError>(
-                    SelfEncryptionStorageError(err))) => (*err).into(),
-            CoreError::ReceivedUnexpectedEvent => CORE_ERROR_START_RANGE - 36,
-        }
-    }
-}
-
 impl Debug for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{} - ", self.description())?;
         match *self {
-            CoreError::UnsuccessfulEncodeDecode(ref error) => {
-                write!(formatter,
-                       "CoreError::UnsuccessfulEncodeDecode -> {:?}",
-                       error)
+            CoreError::EncodeDecodeError(ref error) => {
+                write!(formatter, "CoreError::EncodeDecodeError -> {:?}", error)
             }
             CoreError::AsymmetricDecipherFailure => {
                 write!(formatter, "CoreError::AsymmetricDecipherFailure")
@@ -185,15 +140,11 @@ impl Debug for CoreError {
                 write!(formatter, "CoreError::ReceivedUnexpectedEvent")
             }
             CoreError::VersionCacheMiss => write!(formatter, "CoreError::VersionCacheMiss"),
-            CoreError::RootDirectoryAlreadyExists => {
-                write!(formatter, "CoreError::RootDirectoryAlreadyExists")
-            }
+            CoreError::RootDirectoryExists => write!(formatter, "CoreError::RootDirectoryExists"),
             CoreError::RandomDataGenerationFailure => {
                 write!(formatter, "CoreError::RandomDataGenerationFailure")
             }
-            CoreError::OperationForbiddenForClient => {
-                write!(formatter, "CoreError::OperationForbiddenForClient")
-            }
+            CoreError::OperationForbidden => write!(formatter, "CoreError::OperationForbidden"),
             CoreError::Unexpected(ref error) => {
                 write!(formatter, "CoreError::Unexpected::{{{:?}}}", error)
             }
@@ -214,23 +165,6 @@ impl Debug for CoreError {
             CoreError::MpidMessagingError(ref error) => {
                 write!(formatter, "CoreError::MpidMessagingError -> {:?}", error)
             }
-            // CoreError::GetFailure { ref data_id, ref reason } => {
-            //     write!(formatter,
-            //            "CoreError::GetFailure::{{ reason: {:?}, data_id: {:?}}}",
-            //            reason,
-            //            data_id)
-            // }
-            // CoreError::GetAccountInfoFailure { ref reason } => {
-            //     write!(formatter,
-            //            "CoreError::GetAccountInfoFailure::{{ reason: {:?}}}",
-            //            reason)
-            // }
-            // CoreError::MutationFailure { ref data_id, ref reason } => {
-            //     write!(formatter,
-            //            "CoreError::MutationFailure::{{ reason: {:?}, data_id: {:?}}}",
-            //            reason,
-            //            data_id)
-            // }
             CoreError::SelfEncryption(ref error) => {
                 write!(formatter, "CoreError::SelfEncryption -> {:?}", error)
             }
@@ -242,7 +176,7 @@ impl Debug for CoreError {
 impl Display for CoreError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         match *self {
-            CoreError::UnsuccessfulEncodeDecode(ref error) => {
+            CoreError::EncodeDecodeError(ref error) => {
                 write!(formatter,
                        "Error while serialising/deserialising: {}",
                        error)
@@ -256,16 +190,14 @@ impl Display for CoreError {
             CoreError::VersionCacheMiss => {
                 write!(formatter, "No such data found in local version cache")
             }
-            CoreError::RootDirectoryAlreadyExists => {
+            CoreError::RootDirectoryExists => {
                 write!(formatter,
                        "Cannot overwrite a root directory if it already exists")
             }
             CoreError::RandomDataGenerationFailure => {
                 write!(formatter, "Unable to obtain generator for random data")
             }
-            CoreError::OperationForbiddenForClient => {
-                write!(formatter, "Forbidden operation requested for this Client")
-            }
+            CoreError::OperationForbidden => write!(formatter, "Forbidden operation requested"),
             CoreError::Unexpected(ref error) => {
                 write!(formatter, "Unexpected (probably a logic error): {}", error)
             }
@@ -292,19 +224,6 @@ impl Display for CoreError {
             CoreError::MpidMessagingError(ref error) => {
                 write!(formatter, "Mpid messaging error: {}", error)
             }
-            // CoreError::GetFailure { ref reason, .. } => {
-            //     write!(formatter, "Failed to Get from network: {}", reason)
-            // }
-            // CoreError::GetAccountInfoFailure { ref reason } => {
-            //     write!(formatter,
-            //            "Failed to get account info from network: {}",
-            //            reason)
-            // }
-            // CoreError::MutationFailure { ref reason, .. } => {
-            //     write!(formatter,
-            //            "Failed to Put/Post/Delete on network: {}",
-            //            reason)
-            // }
             CoreError::SelfEncryption(ref error) => {
                 write!(formatter, "Self-encryption error: {}", error)
             }
@@ -316,15 +235,15 @@ impl Display for CoreError {
 impl Error for CoreError {
     fn description(&self) -> &str {
         match *self {
-            CoreError::UnsuccessfulEncodeDecode(_) => "Serialisation error",
+            CoreError::EncodeDecodeError(_) => "Serialisation error",
             CoreError::AsymmetricDecipherFailure => "Asymmetric decryption failure",
             CoreError::SymmetricDecipherFailure => "Symmetric decryption failure",
             CoreError::ReceivedUnexpectedData => "Received unexpected data",
             CoreError::ReceivedUnexpectedEvent => "Received unexpected event",
             CoreError::VersionCacheMiss => "Version cache miss",
-            CoreError::RootDirectoryAlreadyExists => "Root directory already exists",
+            CoreError::RootDirectoryExists => "Root directory already exists",
             CoreError::RandomDataGenerationFailure => "Cannot obtain RNG",
-            CoreError::OperationForbiddenForClient => "Operation forbidden",
+            CoreError::OperationForbidden => "Operation forbidden",
             CoreError::Unexpected(_) => "Unexpected error",
             // TODO - use `error.description()` once `RoutingError` implements `std::error::Error`.
             CoreError::RoutingError(_) => "Routing internal error",
@@ -335,9 +254,6 @@ impl Error for CoreError {
             CoreError::UnsuccessfulPwHash => "Failed while password hashing",
             CoreError::OperationAborted => "Operation aborted",
             CoreError::MpidMessagingError(_) => "Mpid messaging error",
-            // CoreError::GetFailure { ref reason, .. } |
-            // CoreError::GetAccountInfoFailure { ref reason } => reason.description(),
-            // CoreError::MutationFailure { ref reason, .. } => reason.description(),
             CoreError::SelfEncryption(ref error) => error.description(),
             CoreError::RequestTimeout => "Request has timed out",
         }
@@ -345,13 +261,12 @@ impl Error for CoreError {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
-            // TODO - add `RoutingError` and `InternalError` once they implement `std::error::Error`
-            CoreError::UnsuccessfulEncodeDecode(ref error) => Some(error),
-            CoreError::MpidMessagingError(ref error) => Some(error),
-            // CoreError::GetFailure { ref reason, .. } |
-            // CoreError::GetAccountInfoFailure { ref reason } => Some(reason),
-            // CoreError::MutationFailure { ref reason, .. } => Some(reason),
-            CoreError::SelfEncryption(ref error) => Some(error),
+            CoreError::EncodeDecodeError(ref err) => Some(err),
+            CoreError::MpidMessagingError(ref err) => Some(err),
+            // CoreError::RoutingError(ref err) => Some(err),
+            // CoreError::RoutingInterfaceError(ref err) => Some(err),
+            CoreError::RoutingClientError(ref err) => Some(err),
+            CoreError::SelfEncryption(ref err) => Some(err),
             _ => None,
         }
     }

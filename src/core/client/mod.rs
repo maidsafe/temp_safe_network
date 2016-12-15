@@ -900,7 +900,7 @@ impl ClientType {
         match *self {
             ClientType::Registered { ref acc, .. } => Ok(acc),
             ClientType::FromKeys { .. } |
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -908,7 +908,7 @@ impl ClientType {
         match *self {
             ClientType::Registered { ref mut acc, .. } => Ok(acc),
             ClientType::FromKeys { .. } |
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -916,7 +916,7 @@ impl ClientType {
         match *self {
             ClientType::Registered { acc_loc, .. } => Ok(acc_loc),
             ClientType::FromKeys { .. } |
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -924,7 +924,7 @@ impl ClientType {
         match *self {
             ClientType::Registered { ref user_cred, .. } => Ok(user_cred),
             ClientType::FromKeys { .. } |
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -932,7 +932,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref cm_addr, .. } |
             ClientType::Registered { ref cm_addr, .. } => Ok(cm_addr),
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -940,7 +940,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { owner_key, .. } => Ok(owner_key),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_pk),
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -948,7 +948,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.sign_pk),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_pk),
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -956,7 +956,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.sign_sk.clone()),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_sk.clone()),
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -964,7 +964,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.enc_pk),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.enc_pk),
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -972,7 +972,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.enc_sk.clone()),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.enc_sk.clone()),
-            ClientType::Unregistered => Err(CoreError::OperationForbiddenForClient),
+            ClientType::Unregistered => Err(CoreError::OperationForbidden),
         }
     }
 }
@@ -1074,7 +1074,7 @@ mod tests {
                         Err(e) => e,
                     };
                     match e {
-                        CoreError::OperationForbiddenForClient => (),
+                        CoreError::OperationForbidden => (),
                         _ => panic!("Unexpected {:?}", e),
                     }
 
@@ -1090,7 +1090,7 @@ mod tests {
                         Err(e) => e,
                     };
                     match e {
-                        CoreError::OperationForbiddenForClient => (),
+                        CoreError::OperationForbidden => (),
                         _ => panic!("Unexpected {:?}", e),
                     }
                     finish()

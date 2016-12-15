@@ -26,6 +26,7 @@ mod object_cache;
 #[cfg(test)]
 mod test_util;
 
+
 use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
            NetworkTx};
 use core::utility;
@@ -38,7 +39,7 @@ use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::secretbox;
-use self::errors::AppError;
+pub use self::errors::*;
 use self::object_cache::ObjectCache;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -265,7 +266,7 @@ impl AppContext {
     fn as_registered(&self) -> Result<&Rc<Registered>, AppError> {
         match *self {
             AppContext::Registered(ref a) => Ok(a),
-            AppContext::Unregistered(_) => Err(AppError::Forbidden),
+            AppContext::Unregistered(_) => Err(AppError::OperationForbidden),
         }
     }
 }

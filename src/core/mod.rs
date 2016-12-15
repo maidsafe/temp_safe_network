@@ -36,7 +36,7 @@ pub mod self_encryption_storage;
 
 pub use self::client::{Client, ClientKeys, MDataInfo};
 pub use self::core_el::{CoreMsg, CoreMsgRx, CoreMsgTx, TailFuture, run};
-pub use self::errors::{CORE_ERROR_START_RANGE, CoreError};
+pub use self::errors::CoreError;
 pub use self::event::{CoreEvent, NetworkEvent};
 pub use self::futures::FutureExt;
 pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
