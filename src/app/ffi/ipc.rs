@@ -21,6 +21,7 @@
 
 //! App-related IPC utilities.
 
+use app::errors::AppError;
 use ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};
 use ipc::req::ffi::AuthReq as FfiAuthReq;
 use ipc::req::ffi::ContainersReq as FfiContainersReq;
@@ -42,7 +43,7 @@ pub unsafe extern "C" fn encode_auth_req(req: FfiAuthReq,
                                          o_req_id: *mut u32,
                                          o_encoded: *mut FfiString)
                                          -> i32 {
-    catch_unwind_error_code(|| -> Result<_, IpcError> {
+    catch_unwind_error_code(|| -> Result<_, AppError> {
         let req = AuthReq::from_repr_c(req)?;
         let req_id = gen_req_id();
 
@@ -66,7 +67,7 @@ pub unsafe extern "C" fn encode_containers_req(req: FfiContainersReq,
                                                o_req_id: *mut u32,
                                                o_encoded: *mut FfiString)
                                                -> i32 {
-    catch_unwind_error_code(|| -> Result<_, IpcError> {
+    catch_unwind_error_code(|| -> Result<_, AppError> {
         let req = ContainersReq::from_repr_c(req)?;
         let req_id = gen_req_id();
 
@@ -92,7 +93,7 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
                                         o_containers: extern "C" fn(*mut c_void, u32),
                                         o_revoked: extern "C" fn(*mut c_void),
                                         o_err: extern "C" fn(*mut c_void, i32, u32)) {
-    catch_unwind_cb(user_data, o_err, || -> Result<_, IpcError> {
+    catch_unwind_cb(user_data, o_err, || -> Result<_, AppError> {
         let msg = msg.as_str()?;
         let msg = ipc::decode_msg(msg)?;
 
@@ -103,13 +104,13 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
                         let auth_granted = auth_granted.into_repr_c();
                         o_auth(user_data, req_id, auth_granted);
                     }
-                    Err(err) => o_err(user_data, ffi_error_code!(err), req_id),
+                    Err(err) => o_err(user_data, ffi_error_code!(AppError::from(err)), req_id),
                 }
             }
             IpcMsg::Resp { resp: IpcResp::Containers(res), req_id } => {
                 match res {
                     Ok(()) => o_containers(user_data, req_id),
-                    Err(err) => o_err(user_data, ffi_error_code!(err), req_id),
+                    Err(err) => o_err(user_data, ffi_error_code!(AppError::from(err)), req_id),
                 }
             }
             IpcMsg::Revoked { .. } => o_revoked(user_data),

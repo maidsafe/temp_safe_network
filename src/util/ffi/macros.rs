@@ -30,9 +30,15 @@ macro_rules! ffi_result_code {
 
 macro_rules! ffi_error_code {
     ($err:expr) => {{
+        #[cfg_attr(feature = "clippy", allow(useless_attribute))]
+        #[allow(unused)]
+        use $crate::util::ffi::ErrorCode;
+
+        let err = $err;
+        let err_str = format!("{:?}", err);
+        let err_code = err.error_code();
+
         let decorator = ::std::iter::repeat('-').take(50).collect::<String>();
-        let err_str = format!("{:?}", $err);
-        let err_code: i32 = $err.into();
         info!("\nFFI cross-boundary error propagation:\n {}\n| **ERRNO: {}** {}\n {}\n\n",
               decorator, err_code, err_str, decorator);
         err_code

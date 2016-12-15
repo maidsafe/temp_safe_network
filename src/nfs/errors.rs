@@ -20,14 +20,10 @@
 // and limitations relating to use of the SAFE Network Software.
 
 
-use core::{CORE_ERROR_START_RANGE, CoreError, SelfEncryptionStorageError};
+use core::{CoreError, SelfEncryptionStorageError};
 use maidsafe_utilities::serialisation::SerialisationError;
 use self_encryption::SelfEncryptionError;
 use std::fmt;
-
-/// Intended for converting NFS Errors into numeric codes for propagating some
-/// error information across FFI boundaries and specially to C.
-pub const NFS_ERROR_START_RANGE: i32 = CORE_ERROR_START_RANGE - 500;
 
 /// NFS Errors
 #[allow(variant_size_differences)] // TODO
@@ -35,25 +31,25 @@ pub enum NfsError {
     /// Client Error
     CoreError(CoreError),
     /// If Directory already exists with the same name in the same level
-    DirectoryAlreadyExistsWithSameName,
+    DirectoryExists,
     /// Destination is Same as the Source
     DestinationAndSourceAreSame,
     /// Directory not found
     DirectoryNotFound,
     /// File Already exists with the same name in a directory
-    FileAlreadyExistsWithSameName,
+    FileExists,
     /// File does not match with the existing file in the directory listing
     FileDoesNotMatch,
     /// File not found
     FileNotFound,
     /// Invalid byte range specified
-    InvalidRangeSpecified,
+    InvalidRange,
     /// Validation error - if the field passed as parameter is not valid
-    ParameterIsNotValid,
+    InvalidParameter,
     /// Unexpected error
     Unexpected(String),
     /// Unsuccessful Serialisation or Deserialisation
-    UnsuccessfulEncodeDecode(SerialisationError),
+    EncodeDecodeError(SerialisationError),
     /// Error while self-encrypting/-decrypting data
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
 }
@@ -66,7 +62,7 @@ impl From<CoreError> for NfsError {
 
 impl From<SerialisationError> for NfsError {
     fn from(error: SerialisationError) -> NfsError {
-        NfsError::UnsuccessfulEncodeDecode(error)
+        NfsError::EncodeDecodeError(error)
     }
 }
 
@@ -82,60 +78,23 @@ impl From<SelfEncryptionError<SelfEncryptionStorageError>> for NfsError {
     }
 }
 
-impl Into<i32> for NfsError {
-    fn into(self) -> i32 {
-        match self {
-            NfsError::CoreError(error) => error.into(),
-            NfsError::DirectoryAlreadyExistsWithSameName => NFS_ERROR_START_RANGE - 1,
-            NfsError::DestinationAndSourceAreSame => NFS_ERROR_START_RANGE - 2,
-            NfsError::DirectoryNotFound => NFS_ERROR_START_RANGE - 3,
-            NfsError::FileAlreadyExistsWithSameName => NFS_ERROR_START_RANGE - 4,
-            NfsError::FileDoesNotMatch => NFS_ERROR_START_RANGE - 5,
-            NfsError::FileNotFound => NFS_ERROR_START_RANGE - 6,
-            NfsError::InvalidRangeSpecified => NFS_ERROR_START_RANGE - 7,
-            NfsError::ParameterIsNotValid => NFS_ERROR_START_RANGE - 8,
-            NfsError::Unexpected(_) => NFS_ERROR_START_RANGE - 9,
-            NfsError::UnsuccessfulEncodeDecode(_) => NFS_ERROR_START_RANGE - 10,
-            NfsError::SelfEncryption(SelfEncryptionError
-                                      ::Compression::<SelfEncryptionStorageError>) => {
-                NFS_ERROR_START_RANGE - 11
-            }
-            NfsError::SelfEncryption(SelfEncryptionError
-                                      ::Decryption::<SelfEncryptionStorageError>) => {
-                NFS_ERROR_START_RANGE - 12
-            }
-            NfsError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
-                NFS_ERROR_START_RANGE - 13
-            }
-            NfsError::SelfEncryption(SelfEncryptionError
-                                      ::Storage
-                                      ::<SelfEncryptionStorageError>(
-                                          SelfEncryptionStorageError(err))) => (*err).into(),
-        }
-    }
-}
-
 impl fmt::Debug for NfsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             NfsError::CoreError(ref error) => write!(f, "NfsError::CoreError -> {:?}", error),
-            NfsError::DirectoryAlreadyExistsWithSameName => {
-                write!(f, "NfsError::DirectoryAlreadyExistsWithSameName")
-            }
+            NfsError::DirectoryExists => write!(f, "NfsError::DirectoryExists"),
             NfsError::DestinationAndSourceAreSame => {
                 write!(f, "NfsError::DestinationAndSourceAreSame")
             }
             NfsError::DirectoryNotFound => write!(f, "NfsError::DirectoryNotFound"),
-            NfsError::FileAlreadyExistsWithSameName => {
-                write!(f, "NfsError::FileAlreadyExistsWithSameName")
-            }
+            NfsError::FileExists => write!(f, "NfsError::FileExists"),
             NfsError::FileDoesNotMatch => write!(f, "NfsError::FileDoesNotMatch"),
             NfsError::FileNotFound => write!(f, "NfsError::FileNotFound"),
-            NfsError::InvalidRangeSpecified => write!(f, "NfsError::InvalidRangeSpecified"),
-            NfsError::ParameterIsNotValid => write!(f, "NfsError::ParameterIsNotValid"),
+            NfsError::InvalidRange => write!(f, "NfsError::InvalidRange"),
+            NfsError::InvalidParameter => write!(f, "NfsError::InvalidParameter"),
             NfsError::Unexpected(ref error) => write!(f, "NfsError::Unexpected -> {:?}", error),
-            NfsError::UnsuccessfulEncodeDecode(ref error) => {
-                write!(f, "NfsError::UnsuccessfulEncodeDecode -> {:?}", error)
+            NfsError::EncodeDecodeError(ref error) => {
+                write!(f, "NfsError::EncodeDecodeError -> {:?}", error)
             }
             NfsError::SelfEncryption(ref error) => {
                 write!(f, "NfsError::SelfEncrpytion -> {:?}", error)

@@ -193,7 +193,7 @@ mod tests {
     use nfs::NfsError;
     use routing::{XOR_NAME_LEN, XorName};
     use super::*;
-    use util::ffi::FfiString;
+    use util::ffi::{ErrorCode, FfiString};
     use util::ffi::test_util::{call_0, call_1, call_2, call_3};
 
     #[test]
@@ -223,7 +223,7 @@ mod tests {
             unsafe { call_2(|ud, cb| file_fetch(&app, container_info_h, ffi_file_name0, ud, cb)) };
 
         match res {
-            Err(code) if code == AppError::from(NfsError::FileNotFound).into() => (),
+            Err(code) if code == AppError::from(NfsError::FileNotFound).error_code() => (),
             Err(x) => panic!("Unexpected: {:?}", x),
             Ok(_) => panic!("Unexpected success"),
         }

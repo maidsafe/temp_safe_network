@@ -56,7 +56,7 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
             let info = try_cb!(context.object_cache().get_mdata_info(info_h),
                                user_data,
                                o_cb);
-            let owner_key = try_cb!(client.owner_key(), user_data, o_cb);
+            let owner_key = try_cb!(client.owner_key().map_err(AppError::from), user_data, o_cb);
 
             let permissions = if permissions_h != 0 {
                 try_cb!(helper::get_permissions(context.object_cache(), permissions_h),
@@ -81,11 +81,13 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
                                                 permissions,
                                                 entries,
                                                 btree_set![owner_key])
-                                   .map_err(CoreError::from),
+                                   .map_err(CoreError::from)
+                                   .map_err(AppError::from),
                                user_data,
                                o_cb);
 
             client.put_mdata(data)
+                .map_err(AppError::from)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -237,6 +239,7 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
             };
 
             client.mutate_mdata_entries(info.name, info.type_tag, actions)
+                .map_err(AppError::from)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -293,6 +296,7 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
                     let handle = context.object_cache().insert_mdata_permission_set(set);
                     o_cb(user_data.0, 0, handle);
                 })
+                .map_err(AppError::from)
                 .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), 0))
                 .into_box()
                 .into()
@@ -331,6 +335,7 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
                                               user,
                                               permission_set,
                                               version)
+                .map_err(AppError::from)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -363,6 +368,7 @@ pub unsafe fn mdata_del_user_permissions(app: *const App,
                                o_cb);
 
             client.del_mdata_user_permissions(info.name, info.type_tag, user, version)
+                .map_err(AppError::from)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())
@@ -393,6 +399,7 @@ pub unsafe extern "C" fn mdata_change_owner(app: *const App,
                                      o_cb);
 
             client.change_mdata_owner(info.name, info.type_tag, new_owner, version)
+                .map_err(AppError::from)
                 .then(move |result| {
                     o_cb(user_data.0, ffi_result_code!(result));
                     Ok(())

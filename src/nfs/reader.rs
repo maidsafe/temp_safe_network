@@ -62,7 +62,7 @@ impl Reader {
                length);
 
         if (position + length) > self.size() {
-            err!(NfsError::InvalidRangeSpecified)
+            err!(NfsError::InvalidRange)
         } else {
             debug!("Reading {len} bytes of data from file starting at offset of {pos} bytes ...",
                    len = length,

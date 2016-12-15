@@ -317,6 +317,7 @@ mod tests {
     use app::test_util::create_app;
     use core::utility;
     use super::*;
+    use util::ffi::ErrorCode;
     use util::ffi::test_util::{call_0, call_1, call_3};
 
     #[test]
@@ -337,7 +338,7 @@ mod tests {
                                               ud,
                                               cb)
             });
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.into()));
+            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             unwrap!(call_0(|ud, cb| {
                 idata_write_to_self_encryptor(&app,
@@ -356,16 +357,16 @@ mod tests {
             {
                 let res =
                     call_0(|ud, cb| idata_self_encryptor_writer_free(&app, se_writer_h, ud, cb));
-                assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.into()));
+                assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
             }
 
             // Invalid Self encryptor reader.
             let res = call_1(|ud, cb| idata_size(&app, 0, ud, cb));
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.into()));
+            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             // Invalid Self encryptor reader.
             let res = call_1(|ud, cb| idata_size(&app, se_writer_h, ud, cb));
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.into()));
+            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             let se_reader_h = {
                 unwrap!(call_1(|ud, cb| idata_fetch_self_encryptor(&app, name, ud, cb)))
@@ -376,7 +377,8 @@ mod tests {
 
             let res =
                 call_3(|ud, cb| idata_read_from_self_encryptor(&app, se_reader_h, 1, size, ud, cb));
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorReadOffsets.into()));
+            assert_eq!(res,
+                       Err(AppError::InvalidSelfEncryptorReadOffsets.error_code()));
 
             let (data_ptr, data_size, data_cap) = unwrap!(call_3(|ud, cb| {
                 idata_read_from_self_encryptor(&app, se_reader_h, 0, size, ud, cb)
@@ -387,7 +389,7 @@ mod tests {
             unwrap!(call_0(|ud, cb| idata_self_encryptor_reader_free(&app, se_reader_h, ud, cb)));
 
             let res = call_0(|ud, cb| idata_self_encryptor_reader_free(&app, se_reader_h, ud, cb));
-            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.into()));
+            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             unwrap!(call_0(|ud, cb| cipher_opt_free(&app, cipher_opt_h, ud, cb)));
         }

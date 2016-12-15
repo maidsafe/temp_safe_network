@@ -46,6 +46,12 @@ impl Into<*mut c_void> for OpaqueCtx {
     }
 }
 
+/// Trait for types that can be converted to integer error code.
+pub trait ErrorCode {
+    /// Return the error code corresponding to this instance.
+    fn error_code(&self) -> i32;
+}
+
 fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
     where F: FnOnce() -> Result<T, E>,
           E: Debug + From<&'a str>
@@ -59,7 +65,7 @@ fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
 /// Catch panics. On error return the error code.
 pub fn catch_unwind_error_code<'a, F, E>(f: F) -> i32
     where F: FnOnce() -> Result<(), E>,
-          E: Debug + Into<i32> + From<&'a str>
+          E: Debug + ErrorCode + From<&'a str>
 {
     ffi_result_code!(catch_unwind_result(f))
 }
@@ -69,7 +75,7 @@ pub fn catch_unwind_cb<'a, U, C, F, E>(user_data: U, cb: C, f: F)
     where U: Into<*mut c_void>,
           C: Callback,
           F: FnOnce() -> Result<(), E>,
-          E: Debug + Into<i32> + From<&'a str>
+          E: Debug + ErrorCode + From<&'a str>
 {
     if let Err(err) = catch_unwind_result(f) {
         cb.call(user_data.into(),

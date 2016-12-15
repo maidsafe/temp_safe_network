@@ -84,7 +84,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *mut Authenticator,
                                              o_err: extern "C" fn(*mut c_void, i32, FfiString)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(user_data.0, o_err, || -> Result<_, IpcError> {
+    catch_unwind_cb(user_data.0, o_err, || -> Result<_, AuthError> {
         let msg = decode_msg(msg.as_str()?)?;
         match msg {
             IpcMsg::Req { req: IpcReq::Auth(auth_req), req_id } => {
@@ -102,13 +102,13 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *mut Authenticator,
                                 if is_registered {
                                     // App is already registered, calling err callback
                                     let resp = encode_response(&IpcMsg::Resp {
-                                    req_id: req_id,
-                                    resp: IpcResp::Auth(Err(IpcError::AlreadyAuthorised))
-                                }, app_id2)?;
+                                        req_id: req_id,
+                                        resp: IpcResp::Auth(Err(IpcError::AlreadyAuthorised))
+                                    }, app_id2)?;
 
-                                    o_err(user_data.0,
-                                          ffi_error_code!(IpcError::AlreadyAuthorised),
-                                          resp);
+                                    let err = AuthError::from(IpcError::AlreadyAuthorised);
+
+                                    o_err(user_data.0, ffi_error_code!(err), resp);
                                 } else {
                                     // App is not registered yet
                                     o_auth(user_data.0, req_id, auth_req.into_repr_c());
@@ -456,18 +456,15 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *mut Authenticator,
                                            resp: IpcResp::Auth(Err(IpcError::AuthDenied)),
                                        },
                                        auth_req.app.id)?;
-            o_cb(user_data.0, ffi_error_code!(IpcError::AuthDenied), resp);
+            o_cb(user_data.0,
+                 ffi_error_code!(AuthError::from(IpcError::AuthDenied)),
+                 resp);
         } else {
             let permissions = auth_req.containers.clone();
 
             (*auth).send(move |client| {
-                    let owner_key = match client.owner_key() {
-                        Ok(key) => key,
-                        Err(e) => {
-                            o_cb(user_data.0, ffi_error_code!(e), FfiString::default());
-                            return None;
-                        }
-                    };
+                    let owner_key =
+                        try_cb!(client.owner_key().map_err(AuthError::from), user_data, o_cb);
                     let keys = AppKeys::random(owner_key);
 
                     let app = AppInfo {
@@ -525,7 +522,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *mut Authenticator,
                 resp: IpcResp::Containers(Err(IpcError::AuthDenied)),
             };
             o_cb(user_data.0,
-                 ffi_error_code!(IpcError::AuthDenied),
+                 ffi_error_code!(AuthError::from(IpcError::AuthDenied)),
                  encode_response(&resp, cont_req.app.id)?);
         } else {
             let permissions = cont_req.containers.clone();
