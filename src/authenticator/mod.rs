@@ -21,21 +21,24 @@
 
 #![allow(unsafe_code)]
 
+/// FFI routines
+pub mod ffi;
 /// Authenticator communication with apps
 pub mod ipc;
 /// Authenticator errors
 mod errors;
 
-use core::{self, Client, CoreMsg, CoreMsgTx, FutureExt, NetworkEvent};
+use core::{self, Client, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc::{self, SendError};
+use ipc::Permission;
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::{self, Joiner};
 use nfs::{create_dir, create_std_dirs};
 use routing::{EntryAction, Value};
 pub use self::errors::AuthError;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::os::raw::c_void;
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
@@ -44,6 +47,9 @@ use util::ffi::{FfiString, OpaqueCtx, catch_unwind_error_code};
 
 /// Future type specialised with `AuthError` as an error type
 pub type AuthFuture<T> = Future<Item = T, Error = AuthError>;
+
+/// Represents an entry for a single app in the access container
+pub type AccessContainerEntry = HashMap<String, (MDataInfo, BTreeSet<Permission>)>;
 
 macro_rules! try_tx {
     ($result:expr, $tx:ident) => {

@@ -23,7 +23,7 @@ use core::{Client, CoreError, FutureExt, MDataInfo};
 use core::utility::{symmetric_decrypt, symmetric_encrypt};
 use futures::{Future, future};
 use ipc::{self, Config, IpcError, IpcMsg, decode_msg};
-use ipc::req::{AppExchangeInfo, AuthReq, ContainerPermissions, ContainersReq, IpcReq};
+use ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 use ipc::req::ffi::AuthReq as FfiAuthReq;
 use ipc::req::ffi::ContainersReq as FfiContainersReq;
 use ipc::req::ffi::Permission;
@@ -35,19 +35,19 @@ use rust_sodium::crypto::{secretbox, sign};
 use rust_sodium::crypto::hash::sha256;
 use std::collections::{BTreeSet, HashMap};
 use std::os::raw::c_void;
-use super::{AuthError, AuthFuture, Authenticator};
+use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
 use util;
 use util::ffi::{FfiString, OpaqueCtx, catch_unwind_cb};
 
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
 
-type AccessContInfoEntry = HashMap<String, (MDataInfo, ContainerPermissions)>;
-
-/// App data stored in the authenticator configuration file
+/// App data stored in the authenticator configuration
 #[derive(Clone, RustcEncodable, RustcDecodable)]
 pub struct AppInfo {
-    info: AppExchangeInfo,
-    keys: AppKeys,
+    /// Application info (id, name, vendor, etc.)
+    pub info: AppExchangeInfo,
+    /// Application keys
+    pub keys: AppKeys,
 }
 
 /// Returns true if app is already registered (meaning it has an entry
@@ -134,7 +134,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *mut Authenticator,
 }
 
 /// Retrieves the authenticator configuration file
-fn get_config(client: Client) -> Box<AuthFuture<(u64, HashMap<sha256::Digest, AppInfo>)>> {
+pub fn get_config(client: Client) -> Box<AuthFuture<(u64, HashMap<sha256::Digest, AppInfo>)>> {
     let parent = fry!(client.config_root_dir());
     let key = fry!(parent.enc_entry_key(CONFIG_FILE));
 
@@ -178,10 +178,11 @@ fn update_config(client: Client,
         .into_box()
 }
 
-fn access_container_key(dir: &MDataInfo,
-                        app_id: &str,
-                        app_keys: &AppKeys)
-                        -> Result<Vec<u8>, AuthError> {
+/// Encrypts and serialises an access container key using given app ID and app keys
+pub fn access_container_key(dir: &MDataInfo,
+                            app_id: &str,
+                            app_keys: &AppKeys)
+                            -> Result<Vec<u8>, AuthError> {
     let dir_nonce = if let Some((_, Some(dir_nonce))) = dir.enc_info {
         dir_nonce
     } else {
@@ -218,7 +219,7 @@ pub fn access_container_entry(client: Client,
                               dir: &MDataInfo,
                               app_id: &str,
                               app_keys: AppKeys)
-                              -> Box<AuthFuture<(u64, AccessContInfoEntry)>> {
+                              -> Box<AuthFuture<(u64, AccessContainerEntry)>> {
     let key = fry!(access_container_key(dir, &app_id, &app_keys));
 
     client.get_mdata_value(dir.name, dir.type_tag, key)
@@ -235,7 +236,7 @@ fn put_access_container_entry(client: Client,
                               dir: &MDataInfo,
                               app_id: &str,
                               app_keys: &AppKeys,
-                              permissions: AccessContInfoEntry,
+                              permissions: AccessContainerEntry,
                               version: Option<u64>)
                               -> Box<AuthFuture<()>> {
     let key = fry!(access_container_key(dir, app_id, app_keys));
@@ -269,15 +270,15 @@ fn insert_app_to_config(client: Client, app: AppInfo) -> Box<AuthFuture<()>> {
 
 /// Updates containers permissions
 fn update_container_perms(client: Client,
-                          permissions: Vec<ContainerPermissions>,
+                          permissions: HashMap<String, BTreeSet<Permission>>,
                           sign_pk: sign::PublicKey)
-                          -> Box<AuthFuture<Vec<(MDataInfo, ContainerPermissions)>>> {
+                          -> Box<AuthFuture<AccessContainerEntry>> {
     let root = fry!(client.user_root_dir());
     let mut reqs = Vec::new();
 
-    for perm in permissions {
-        let key = fry!(root.enc_entry_key(perm.container_key.as_bytes()));
-        let perm_set = convert_permission_set(&perm.access);
+    for (container_key, access) in permissions {
+        let key = fry!(root.enc_entry_key(container_key.as_bytes()));
+        let perm_set = convert_permission_set(&access);
 
         let c2 = client.clone();
         let c3 = client.clone();
@@ -299,18 +300,26 @@ fn update_container_perms(client: Client,
                                                 User::Key(sign_pk),
                                                 perm_set,
                                                 version + 1)
-                    .map(move |_| (dir, perm))
+                    .map(move |_| (container_key, dir, access))
             })
             .map_err(AuthError::from));
     }
 
-    future::join_all(reqs).map_err(AuthError::from).into_box()
+    future::join_all(reqs)
+        .map(|perms| {
+            perms.into_iter().fold(HashMap::new(), |mut map, (container_key, dir, access)| {
+                let _ = map.insert(container_key, (dir, access));
+                map
+            })
+        })
+        .map_err(AuthError::from)
+        .into_box()
 }
 
 fn encode_auth_resp_impl(client: Client,
                          app: AppInfo,
                          app_container: bool,
-                         permissions: Vec<ContainerPermissions>)
+                         permissions: HashMap<String, BTreeSet<Permission>>)
                          -> Box<AuthFuture<AuthGranted>> {
     let c2 = client.clone();
     let c3 = client.clone();
@@ -340,11 +349,7 @@ fn encode_auth_resp_impl(client: Client,
             // Update access_container
             access_container(c5).map(move |dir| (dir, app_container, perms))
         })
-        .and_then(move |(dir, app_container, perms)| {
-            let mut perms = perms.into_iter().fold(HashMap::new(), |mut map, (dir, access)| {
-                let _ = map.insert(access.container_key.clone(), (dir, access));
-                map
-            });
+        .and_then(move |(dir, app_container, mut perms)| {
             if let Some(mdata_info) = app_container {
                 // Store info about the app's dedicated container in the access container
                 let mut access = BTreeSet::new();
@@ -354,12 +359,7 @@ fn encode_auth_resp_impl(client: Client,
                 let _ = access.insert(Permission::Delete);
                 let _ = access.insert(Permission::ManagePermissions);
 
-                let _ = perms.insert(app_info.id.clone(),
-                                     (mdata_info,
-                                      ContainerPermissions {
-                                          container_key: app_info.id.clone(),
-                                          access: access,
-                                      }));
+                let _ = perms.insert(app_info.id.clone(), (mdata_info, access));
             };
             put_access_container_entry(c6, &dir, &app_info.id, &app_keys, perms, None)
                 .map(move |_| (dir, app_keys))
@@ -551,12 +551,6 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *mut Authenticator,
                             access_container(c3).map(move |dir| (dir, app, perms))
                         })
                         .and_then(move |(dir, app, perms)| {
-                            let perms = perms.into_iter()
-                                .fold(HashMap::new(), |mut map, (dir, access)| {
-                                    let _ = map.insert(access.container_key.clone(), (dir, access));
-                                    map
-                                });
-
                             let app_keys = app.keys;
 
                             access_container_entry(c4, &dir, &app_id, app_keys.clone())

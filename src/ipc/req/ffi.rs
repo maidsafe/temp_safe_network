@@ -20,7 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use std::mem;
-use util::ffi::FfiString;
+use util::ffi::{FfiString, string};
 
 /// Permission action
 #[repr(C)]
@@ -125,7 +125,8 @@ pub struct ContainerPermissions {
 #[no_mangle]
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn container_permissions_drop(cp: ContainerPermissions) {
-    let _ = super::ContainerPermissions::from_repr_c(cp);
+    string::ffi_string_free(cp.container_key);
+    permission_array_free(cp.access);
 }
 
 /// Wrapper for `ContainerPermissions` arrays to be passed across FFI boundary.

@@ -28,7 +28,7 @@ mod errors;
 
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 pub use self::errors::IpcError;
-pub use self::req::{AppExchangeInfo, AuthReq, ContainerPermissions, ContainersReq, IpcReq};
+pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 pub use self::req::ffi::Permission;
 pub use self::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
 use util;

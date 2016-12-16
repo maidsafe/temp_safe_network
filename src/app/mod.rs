@@ -33,7 +33,7 @@ use core::utility;
 use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
-use ipc::{AccessContInfo, AppKeys, AuthGranted, ContainerPermissions};
+use ipc::{AccessContInfo, AppKeys, AuthGranted};
 use ipc::req::ffi::Permission;
 use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
@@ -42,6 +42,7 @@ use rust_sodium::crypto::secretbox;
 pub use self::errors::*;
 use self::object_cache::ObjectCache;
 use std::cell::RefCell;
+use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
@@ -184,7 +185,7 @@ pub struct Registered {
     app_id: String,
     sym_enc_key: secretbox::Key,
     access_container_info: AccessContInfo,
-    access_info: RefCell<Vec<(MDataInfo, ContainerPermissions)>>,
+    access_info: RefCell<HashMap<String, (MDataInfo, BTreeSet<Permission>)>>,
 }
 
 impl AppContext {
@@ -201,7 +202,7 @@ impl AppContext {
             app_id: app_id,
             sym_enc_key: sym_enc_key,
             access_container_info: access_container_info,
-            access_info: RefCell::new(Vec::new()),
+            access_info: RefCell::new(HashMap::new()),
         }))
     }
 
@@ -235,8 +236,7 @@ impl AppContext {
         fetch_access_info(reg.clone(), client)
             .and_then(move |_| {
                 let access_info = reg.access_info.borrow();
-                access_info.iter()
-                    .find(|&&(_, ref permissions)| permissions.container_key == name)
+                access_info.get(&name)
                     .map(|&(ref mdata_info, _)| mdata_info.clone())
                     .ok_or(AppError::NoSuchContainer)
             })
@@ -255,9 +255,8 @@ impl AppContext {
         fetch_access_info(reg.clone(), client)
             .and_then(move |_| {
                 let access_info = reg.access_info.borrow();
-                access_info.iter()
-                    .find(|&&(_, ref permissions)| permissions.container_key == name)
-                    .map(|&(_, ref permissions)| permissions.access.contains(&permission))
+                access_info.get(&name)
+                    .map(|&(_, ref permissions)| permissions.contains(&permission))
                     .ok_or(AppError::NoSuchContainer)
             })
             .into_box()
@@ -307,21 +306,20 @@ mod tests {
     use app::test_util::{create_app_with_access, run};
     use core::{DIR_TAG, MDataInfo};
     use futures::Future;
-    use ipc::{ContainerPermissions, Permission};
+    use ipc::Permission;
+    use std::collections::HashMap;
 
     #[test]
     fn refresh_access_info() {
         // Shared container
         let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
 
-        let container_permissions = ContainerPermissions {
-            container_key: "_test".to_string(),
-            access: btree_set![Permission::Read, Permission::Insert],
-        };
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert("_test".to_string(),
+                                             (container_info.clone(),
+                                              btree_set![Permission::Read, Permission::Insert]));
 
-        let app = create_app_with_access(vec![(container_info.clone(),
-                                               container_permissions.clone())],
-                                         false);
+        let app = create_app_with_access(container_permissions.clone(), false);
 
         run(&app, move |client, context| {
             let reg = unwrap!(context.as_registered()).clone();
@@ -332,8 +330,9 @@ mod tests {
                     unwrap!(result);
                     let access_info = reg.access_info.borrow();
                     assert_eq!(access_info.len(), 1);
-                    assert_eq!(access_info[0].0, container_info);
-                    assert_eq!(access_info[0].1, container_permissions);
+                    assert_eq!(unwrap!(access_info.get("_test")).0, container_info);
+                    assert_eq!(unwrap!(access_info.get("_test")).1,
+                               unwrap!(container_permissions.get("_test")).1);
 
                     Ok(())
                 })
@@ -346,13 +345,12 @@ mod tests {
         let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
         let container_key = "_test".to_string();
 
-        let container_permissions = ContainerPermissions {
-            container_key: container_key.clone(),
-            access: btree_set![Permission::Read],
-        };
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert(container_key.clone(),
+                                             (container_info.clone(),
+                                              btree_set![Permission::Read]));
 
-        let app = create_app_with_access(vec![(container_info.clone(), container_permissions)],
-                                         false);
+        let app = create_app_with_access(container_permissions, false);
 
         run(&app, move |client, context| {
             context.get_container_mdata_info(client, container_key)
@@ -371,13 +369,12 @@ mod tests {
         let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
         let container_key = "_test".to_string();
 
-        let container_permissions = ContainerPermissions {
-            container_key: container_key.clone(),
-            access: btree_set![Permission::Read],
-        };
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert(container_key.clone(),
+                                             (container_info.clone(),
+                                              btree_set![Permission::Read]));
 
-        let app = create_app_with_access(vec![(container_info.clone(), container_permissions)],
-                                         false);
+        let app = create_app_with_access(container_permissions, false);
 
         run(&app, move |client, context| {
             let f1 = context.is_permitted(client, container_key.clone(), Permission::Read)

@@ -22,12 +22,13 @@
 use core::{Client, CoreFuture, FutureExt, MDataInfo, utility};
 use core::utility::test_utils::random_client;
 use futures::{Future, IntoFuture, future};
-use ipc::{AccessContInfo, AppKeys, AuthGranted, Config, ContainerPermissions};
+use ipc::{AccessContInfo, AppKeys, AuthGranted, Config, Permission};
 use maidsafe_utilities::serialisation::serialise;
 use rand;
 use routing::{Action, MutableData, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, secretbox, sign};
 use rust_sodium::crypto::hash::sha256;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
 use super::{App, AppContext};
 use super::errors::AppError;
@@ -123,7 +124,7 @@ pub fn create_unregistered_app() -> App {
 // Create app and grant it access to the specified containers.
 // If `create_containers` is true, also create all the containers specified in
 // the `access_info` and set their permissions accordingly.
-pub fn create_app_with_access(access_info: Vec<(MDataInfo, ContainerPermissions)>,
+pub fn create_app_with_access(access_info: HashMap<String, (MDataInfo, BTreeSet<Permission>)>,
                               create_containers: bool)
                               -> App {
     let app_id = unwrap!(utility::generate_random_string(10));
@@ -158,7 +159,7 @@ pub fn create_app_with_access(access_info: Vec<(MDataInfo, ContainerPermissions)
     let access_container_name = access_container_info.id;
     let access_container_type_tag = access_container_info.tag;
 
-    let container_infos: Vec<_> = access_info.into_iter().map(|(info, _)| info).collect();
+    let container_infos: Vec<_> = access_info.into_iter().map(|(_key, (info, _))| info).collect();
 
     // Put the access container on the network and authorise the app.
     let owner_key = random_client(move |client| {
