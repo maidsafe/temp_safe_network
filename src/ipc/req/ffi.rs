@@ -115,7 +115,7 @@ pub unsafe extern "C" fn app_exchange_info_drop(a: AppExchangeInfo) {
 #[derive(Clone, Copy)]
 pub struct ContainerPermissions {
     /// The UTF-8 encoded id
-    pub container_key: FfiString,
+    pub cont_name: FfiString,
 
     /// The `Permission` array
     pub access: PermissionArray,
@@ -125,7 +125,7 @@ pub struct ContainerPermissions {
 #[no_mangle]
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn container_permissions_drop(cp: ContainerPermissions) {
-    string::ffi_string_free(cp.container_key);
+    string::ffi_string_free(cp.cont_name);
     permission_array_free(cp.access);
 }
 

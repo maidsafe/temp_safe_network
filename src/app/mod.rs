@@ -343,17 +343,17 @@ mod tests {
     fn get_container_mdata_info() {
         // Shared container
         let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
-        let container_key = "_test".to_string();
+        let cont_name = "_test".to_string();
 
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert(container_key.clone(),
+        let _ = container_permissions.insert(cont_name.clone(),
                                              (container_info.clone(),
                                               btree_set![Permission::Read]));
 
         let app = create_app_with_access(container_permissions, false);
 
         run(&app, move |client, context| {
-            context.get_container_mdata_info(client, container_key)
+            context.get_container_mdata_info(client, cont_name)
                 .then(move |res| {
                     let info = unwrap!(res);
                     assert_eq!(info, container_info);
@@ -367,23 +367,23 @@ mod tests {
     fn is_permitted() {
         // Shared container
         let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
-        let container_key = "_test".to_string();
+        let cont_name = "_test".to_string();
 
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert(container_key.clone(),
+        let _ = container_permissions.insert(cont_name.clone(),
                                              (container_info.clone(),
                                               btree_set![Permission::Read]));
 
         let app = create_app_with_access(container_permissions, false);
 
         run(&app, move |client, context| {
-            let f1 = context.is_permitted(client, container_key.clone(), Permission::Read)
+            let f1 = context.is_permitted(client, cont_name.clone(), Permission::Read)
                 .then(move |res| {
                     assert!(unwrap!(res));
                     Ok(())
                 });
 
-            let f2 = context.is_permitted(client, container_key.clone(), Permission::Insert)
+            let f2 = context.is_permitted(client, cont_name.clone(), Permission::Insert)
                 .then(move |res| {
                     assert!(!unwrap!(res));
                     Ok(())

@@ -54,11 +54,11 @@ pub struct AuthReq {
 /// Converts a container name + a set of permissions into an FFI
 /// representation `ContainerPermissions`. You're now responsible for
 /// freeing this memory once you're done.
-pub fn container_perm_into_repr_c(container_key: String,
+pub fn container_perm_into_repr_c(cont_name: String,
                                   access: BTreeSet<Permission>)
                                   -> ffi::ContainerPermissions {
     ffi::ContainerPermissions {
-        container_key: FfiString::from_string(container_key),
+        cont_name: FfiString::from_string(cont_name),
         access: ffi::PermissionArray::from_vec(access.into_iter().collect()),
     }
 }
@@ -86,10 +86,10 @@ pub unsafe fn containers_from_repr_c(raw: ffi::ContainerPermissionsArray)
     let vec = raw.into_vec();
 
     for raw in vec {
-        let container_key = raw.container_key.to_string();
-        ffi_string_free(raw.container_key);
+        let cont_name = raw.cont_name.to_string();
+        ffi_string_free(raw.cont_name);
 
-        let _ = result.insert(container_key?, raw.access.into_vec().into_iter().collect());
+        let _ = result.insert(cont_name?, raw.access.into_vec().into_iter().collect());
     }
 
     Ok(result)

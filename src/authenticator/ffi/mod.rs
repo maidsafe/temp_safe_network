@@ -22,7 +22,8 @@
 use core::FutureExt;
 use core::utility::symmetric_decrypt;
 use futures::Future;
-use ipc::Permission;
+use ipc::req::ffi::{ContainerPermissions, ContainerPermissionsArray, PermissionArray,
+                    container_permissions_array_free};
 use maidsafe_utilities::serialisation::deserialise;
 use std::{mem, ptr};
 use std::os::raw::c_void;
@@ -37,24 +38,7 @@ pub struct RegisteredApp {
     /// Unique application identifier
     pub app_id: FfiString,
     /// List of containers that this application has access to
-    pub containers: *mut Container,
-    /// Length of containers vector
-    pub containers_len: usize,
-    /// Capacity of containers vector
-    pub containers_cap: usize,
-}
-
-/// Container and a list of permissions given to an app
-#[repr(C)]
-pub struct Container {
-    /// Name of the container
-    pub name: FfiString,
-    /// Vector of available permissions
-    pub permissions_ptr: *mut Permission,
-    /// Length of permissions vector
-    pub permissions_len: usize,
-    /// Capacity of permissions vector
-    pub permissions_cap: usize,
+    pub containers: ContainerPermissionsArray,
 }
 
 /// Get a list of apps registered in authenticator
@@ -99,30 +83,17 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *mut Authenticator,
                                 let mut containers = Vec::new();
 
                                 for (key, (_, perms)) in app_access {
-                                    let mut perms = perms.iter().cloned().collect::<Vec<_>>();
-                                    let ptr = perms.as_mut_ptr();
-                                    let len = perms.len();
-                                    let cap = perms.capacity();
-                                    mem::forget(perms);
+                                    let perms = perms.iter().cloned().collect::<Vec<_>>();
 
-                                    containers.push(Container {
-                                        name: FfiString::from_string(key),
-                                        permissions_ptr: ptr,
-                                        permissions_len: len,
-                                        permissions_cap: cap,
+                                    containers.push(ContainerPermissions {
+                                        cont_name: FfiString::from_string(key),
+                                        access: PermissionArray::from_vec(perms),
                                     });
                                 }
 
-                                let p = containers.as_mut_ptr();
-                                let len = containers.len();
-                                let cap = containers.capacity();
-                                mem::forget(containers);
-
                                 let reg_app = RegisteredApp {
                                     app_id: FfiString::from_string(app.info.id.clone()),
-                                    containers: p,
-                                    containers_len: len,
-                                    containers_cap: cap,
+                                    containers: ContainerPermissionsArray::from_vec(containers),
                                 };
 
                                 apps.push(reg_app);
@@ -155,16 +126,7 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *mut Authenticator,
 pub unsafe extern "C" fn registered_app_free(app: *mut RegisteredApp) {
     let app = Box::from_raw(app);
     ffi_string_free(app.app_id);
-
-    let containers = Vec::from_raw_parts(app.containers, app.containers_len, app.containers_cap);
-
-    for cont in containers {
-        ffi_string_free(cont.name);
-
-        let _ = Vec::from_raw_parts(cont.permissions_ptr,
-                                    cont.permissions_len,
-                                    cont.permissions_cap);
-    }
+    container_permissions_array_free(app.containers);
 }
 
 /// Free memory allocated to a vector of registered applications
