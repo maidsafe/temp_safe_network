@@ -23,10 +23,10 @@ use app::App;
 use app::errors::AppError;
 use app::object_cache::{CipherOptHandle, EncryptKeyHandle};
 use core::CoreError;
+use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
 use std::os::raw::c_void;
-use util::ffi::{self, OpaqueCtx};
 
 /// Cipher Options
 #[derive(Debug)]
@@ -110,7 +110,7 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
                                                                       CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    ffi::catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
             let handle = context.object_cache().insert_cipher_opt(CipherOpt::PlainText);
             o_cb(user_data.0, 0, handle);
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
                                                   o_cb: extern "C" fn(*mut c_void,
                                                                       i32,
                                                                       CipherOptHandle)) {
-    ffi::catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
             let handle = context.object_cache().insert_cipher_opt(CipherOpt::Symmetric);
@@ -146,7 +146,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
                                                                        CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
-    ffi::catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
             let pk = match context.object_cache().get_encrypt_key(peer_encrypt_key_h) {
                 Ok(pk) => *pk,
@@ -171,7 +171,7 @@ pub unsafe extern "C" fn cipher_opt_free(app: *const App,
                                          o_cb: extern "C" fn(*mut c_void, i32)) {
     let user_data = OpaqueCtx(user_data);
 
-    ffi::catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
             let res = context.object_cache().remove_cipher_opt(handle);
             o_cb(user_data.0, ffi_result_code!(res));
@@ -188,12 +188,12 @@ mod tests {
     use app::test_util::{create_app, run_now};
     use core::Client;
     use core::utility;
+    use ffi_utils::ErrorCode;
+    use ffi_utils::test_utils::{call_0, call_1};
     use rust_sodium::crypto::box_;
     use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
-    use util::ffi::ErrorCode;
-    use util::ffi::test_util::{call_0, call_1};
 
     #[test]
     fn app_0_to_app_0_plain() {

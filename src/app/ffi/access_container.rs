@@ -22,10 +22,10 @@
 use app::App;
 use app::object_cache::MDataInfoHandle;
 use core::FutureExt;
+use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb};
 use futures::Future;
 use ipc::req::ffi::Permission;
 use std::os::raw::c_void;
-use util::ffi::{FfiString, OpaqueCtx, catch_unwind_cb};
 
 /// Fetch access info from the network.
 #[no_mangle]

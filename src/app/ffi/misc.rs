@@ -21,9 +21,9 @@
 
 use app::App;
 use app::object_cache::EncryptKeyHandle;
+use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use rust_sodium::crypto::box_;
 use std::os::raw::c_void;
-use util::ffi::{OpaqueCtx, catch_unwind_cb};
 
 /// Create new public encryption key given its content as a byte array.
 #[no_mangle]

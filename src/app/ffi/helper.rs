@@ -23,11 +23,11 @@ use app::{App, AppContext};
 use app::errors::AppError;
 use app::object_cache::MDataInfoHandle;
 use core::{Client, FutureExt, MDataInfo};
+use ffi_utils::OpaqueCtx;
+use ffi_utils::callback::{Callback, CallbackArgs};
 use futures::Future;
 use std::fmt::Debug;
 use std::os::raw::c_void;
-use util::ffi::OpaqueCtx;
-use util::ffi::callback::{Callback, CallbackArgs};
 
 // Convenience wrapper around `App::send` which automatically handles the callback
 // boilerplate.

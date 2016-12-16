@@ -29,6 +29,7 @@ pub mod ipc;
 mod errors;
 
 use core::{self, Client, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent};
+use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc::{self, SendError};
@@ -43,7 +44,6 @@ use std::os::raw::c_void;
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
 use tokio_core::reactor::Core;
-use util::ffi::{FfiString, OpaqueCtx, catch_unwind_error_code};
 
 /// Future type specialised with `AuthError` as an error type
 pub type AuthFuture<T> = Future<Item = T, Error = AuthError>;
@@ -292,10 +292,10 @@ pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
 #[cfg(test)]
 mod tests {
     use core::utility;
+    use ffi_utils::FfiString;
     use std::os::raw::c_void;
     use std::ptr;
     use super::*;
-    use util::ffi::FfiString;
 
     #[test]
     fn create_account_and_login() {

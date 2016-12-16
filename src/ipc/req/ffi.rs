@@ -19,8 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use ffi_utils::{FfiString, ffi_string_free};
 use std::mem;
-use util::ffi::{FfiString, string};
 
 /// Permission action
 #[repr(C)]
@@ -125,7 +125,7 @@ pub struct ContainerPermissions {
 #[no_mangle]
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn container_permissions_drop(cp: ContainerPermissions) {
-    string::ffi_string_free(cp.cont_name);
+    ffi_string_free(cp.cont_name);
     permission_array_free(cp.access);
 }
 

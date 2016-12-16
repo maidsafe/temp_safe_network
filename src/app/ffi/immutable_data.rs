@@ -23,6 +23,7 @@ use app::App;
 use app::errors::AppError;
 use app::object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
 use core::{FutureExt, SelfEncryptionStorage, immutable_data};
+use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{XOR_NAME_LEN, XorName};
@@ -30,7 +31,6 @@ use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr, slice};
 use std::os::raw::c_void;
 use super::cipher_opt::CipherOpt;
-use util::ffi::{OpaqueCtx, catch_unwind_cb};
 
 type SEWriterHandle = SelfEncryptorWriterHandle;
 type SEReaderHandle = SelfEncryptorReaderHandle;
@@ -316,9 +316,9 @@ mod tests {
     use app::ffi::cipher_opt::*;
     use app::test_util::create_app;
     use core::utility;
+    use ffi_utils::ErrorCode;
+    use ffi_utils::test_utils::{call_0, call_1, call_3};
     use super::*;
-    use util::ffi::ErrorCode;
-    use util::ffi::test_util::{call_0, call_1, call_3};
 
     #[test]
     fn immut_data_operations() {

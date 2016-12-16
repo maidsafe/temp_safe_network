@@ -22,6 +22,7 @@
 //! Errors thrown by Authenticator routines
 
 use core::CoreError;
+use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;
 use ipc::IpcError;
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -33,7 +34,6 @@ use std::fmt::{self, Debug, Formatter};
 use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::sync::mpsc::RecvError;
-use util::ffi::ErrorCode;
 
 mod codes {
     // Core errors

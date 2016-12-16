@@ -24,12 +24,12 @@
 #![allow(unsafe_code)]
 
 use core::NetworkEvent;
+use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
 use ipc::AuthGranted;
 use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use std::os::raw::c_void;
 use super::App;
 use super::errors::AppError;
-use util::ffi::{FfiString, OpaqueCtx, catch_unwind_error_code};
 
 /// Access container
 pub mod access_container;

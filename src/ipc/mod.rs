@@ -26,12 +26,12 @@ pub mod resp;
 
 mod errors;
 
+use ffi_utils::{base64_decode, base64_encode};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 pub use self::errors::IpcError;
 pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 pub use self::req::ffi::Permission;
 pub use self::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
-use util;
 
 // TODO: replace with `crust::Config`
 /// Placeholder for `crust::Config`
@@ -66,7 +66,7 @@ pub enum IpcMsg {
 
 /// Encode `IpcMsg` into string, using base64 encoding.
 pub fn encode_msg(msg: &IpcMsg, prefix: &str) -> Result<String, IpcError> {
-    let payload = util::base64_encode(&serialise(msg)?);
+    let payload = base64_encode(&serialise(msg)?);
     Ok(format!("{}:{}", prefix, payload))
 }
 
@@ -79,5 +79,5 @@ pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
         encoded
     };
 
-    Ok(deserialise(&util::base64_decode(payload)?)?)
+    Ok(deserialise(&base64_decode(payload)?)?)
 }

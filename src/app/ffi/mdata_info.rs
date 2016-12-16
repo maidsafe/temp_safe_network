@@ -23,10 +23,10 @@ use app::App;
 use app::ffi::helper::send_sync;
 use app::object_cache::MDataInfoHandle;
 use core::MDataInfo;
+use ffi_utils::{catch_unwind_cb, u8_vec_to_ptr};
 use routing::XOR_NAME_LEN;
 use std::os::raw::c_void;
 use std::slice;
-use util::ffi::{catch_unwind_cb, u8_vec_to_ptr};
 
 /// Create random, non-encrypted mdata info.
 #[no_mangle]
@@ -127,9 +127,9 @@ fn mdata_info_extract_name_and_type_tag(app: *const App,
 #[cfg(test)]
 mod tests {
     use app::test_util::{create_app, run_now};
+    use ffi_utils::test_utils::call_1;
     use rand;
     use super::*;
-    use util::ffi::test_util::call_1;
 
     #[test]
     fn create_public() {

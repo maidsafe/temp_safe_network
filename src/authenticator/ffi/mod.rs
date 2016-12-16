@@ -21,6 +21,7 @@
 
 use core::FutureExt;
 use core::utility::symmetric_decrypt;
+use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb, ffi_string_free};
 use futures::Future;
 use ipc::req::ffi::{ContainerPermissions, ContainerPermissionsArray, PermissionArray,
                     container_permissions_array_free};
@@ -29,8 +30,6 @@ use std::{mem, ptr};
 use std::os::raw::c_void;
 use super::{AccessContainerEntry, AuthError, Authenticator};
 use super::ipc::{access_container, access_container_key, get_config};
-use util::ffi::{FfiString, OpaqueCtx, catch_unwind_cb};
-use util::ffi::string::ffi_string_free;
 
 /// Application registered in the authenticator
 #[repr(C)]

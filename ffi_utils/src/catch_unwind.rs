@@ -19,38 +19,11 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-#![allow(unsafe_code)]
-
-pub mod callback;
-#[macro_use]
-mod macros;
-pub mod string;
-#[cfg(test)]
-pub mod test_util;
-
-use self::callback::{Callback, CallbackArgs};
-pub use self::string::FfiString;
-use std::{mem, slice, str};
 use std::fmt::Debug;
 use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};
-
-/// Type that holds opaque user data handed into FFI functions
-#[derive(Clone, Copy)]
-pub struct OpaqueCtx(pub *mut c_void);
-unsafe impl Send for OpaqueCtx {}
-
-impl Into<*mut c_void> for OpaqueCtx {
-    fn into(self) -> *mut c_void {
-        self.0
-    }
-}
-
-/// Trait for types that can be converted to integer error code.
-pub trait ErrorCode {
-    /// Return the error code corresponding to this instance.
-    fn error_code(&self) -> i32;
-}
+use super::ErrorCode;
+use super::callback::{Callback, CallbackArgs};
 
 fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
     where F: FnOnce() -> Result<T, E>,
@@ -83,30 +56,3 @@ pub fn catch_unwind_cb<'a, U, C, F, E>(user_data: U, cb: C, f: F)
                 CallbackArgs::default());
     }
 }
-
-/// Converts a byte pointer to Vec<u8>
-pub unsafe fn u8_ptr_to_vec(ptr: *const u8, len: usize) -> Vec<u8> {
-    slice::from_raw_parts(ptr, len).to_owned()
-}
-
-/// Converts null pointer to None and a valid pointer to Some(Vec<u8>)
-pub unsafe fn u8_ptr_to_opt_vec(ptr: *const u8, len: usize) -> Option<Vec<u8>> {
-    if ptr.is_null() {
-        None
-    } else {
-        Some(u8_ptr_to_vec(ptr, len))
-    }
-}
-
-/// Converts Vec<u8> to (byte pointer, size, capacity)
-pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
-    v.shrink_to_fit();
-    let ptr = v.as_mut_ptr();
-    let len = v.len();
-    let cap = v.capacity();
-    mem::forget(v);
-    (ptr, len, cap)
-}
-
-#[cfg(test)]
-mod tests {}

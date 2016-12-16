@@ -19,6 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+#[macro_export]
 macro_rules! ffi_result_code {
     ($res:expr) => {
         match $res {
@@ -28,11 +29,12 @@ macro_rules! ffi_result_code {
     }
 }
 
+#[macro_export]
 macro_rules! ffi_error_code {
     ($err:expr) => {{
         #[cfg_attr(feature = "clippy", allow(useless_attribute))]
         #[allow(unused)]
-        use $crate::util::ffi::ErrorCode;
+        use $crate::ErrorCode;
 
         let err = &$err;
         let err_str = format!("{:?}", err);
@@ -45,6 +47,7 @@ macro_rules! ffi_error_code {
     }}
 }
 
+#[macro_export]
 macro_rules! try_cb {
     ($result:expr, $user_data:expr, $cb:expr) => {
         match $result {
@@ -52,7 +55,7 @@ macro_rules! try_cb {
             Err(err) => {
                 #[cfg_attr(feature = "clippy", allow(useless_attribute))]
                 #[allow(unused)]
-                use $crate::util::ffi::callback::{Callback, CallbackArgs};
+                use $crate::callback::{Callback, CallbackArgs};
                 $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());
                 return None;
             }

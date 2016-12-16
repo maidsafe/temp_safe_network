@@ -19,8 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-//! #Safe-Core Library
-//! [Project github page](https://github.com/maidsafe/safe_core)
+//! FFI utilities
 
 #![doc(html_logo_url =
            "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
@@ -35,7 +34,7 @@
 #![deny(bad_style, deprecated, improper_ctypes, missing_docs,
         non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
         private_no_mangle_fns, private_no_mangle_statics, stable_features,
-        unconditional_recursion, unknown_lints, unsafe_code, unused,
+        unconditional_recursion, unknown_lints, unused,
         unused_allocation, unused_attributes, unused_comparisons, unused_features,
         unused_parens, while_true)]
 #![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
@@ -50,33 +49,40 @@
 #![cfg_attr(feature="clippy", allow(use_debug, too_many_arguments))]
 
 #[macro_use]
-extern crate ffi_utils;
-extern crate futures;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate log;
-extern crate lru_cache;
-#[macro_use]
-extern crate maidsafe_utilities;
-extern crate rand;
-extern crate routing;
 extern crate rustc_serialize;
-extern crate rust_sodium;
-extern crate self_encryption;
-extern crate time;
-extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
 
-/// Core module
 #[macro_use]
-pub mod core;
-/// Application functions;
-pub mod app;
-/// Authenticator module;
-pub mod authenticator;
-/// Ipc module;
-pub mod ipc;
-/// Nfs module;
-pub mod nfs;
+mod macros;
+mod base64;
+mod catch_unwind;
+mod byte_vec;
+pub mod callback;
+mod string;
+pub mod test_utils;
+
+pub use self::base64::{base64_decode, base64_encode};
+pub use self::byte_vec::{u8_ptr_to_vec, u8_vec_to_ptr};
+pub use self::catch_unwind::{catch_unwind_cb, catch_unwind_error_code};
+pub use self::string::{FfiString, ffi_string_free};
+
+use std::os::raw::c_void;
+
+/// Type that holds opaque user data handed into FFI functions
+#[derive(Clone, Copy)]
+pub struct OpaqueCtx(pub *mut c_void);
+unsafe impl Send for OpaqueCtx {}
+
+impl Into<*mut c_void> for OpaqueCtx {
+    fn into(self) -> *mut c_void {
+        self.0
+    }
+}
+
+/// Trait for types that can be converted to integer error code.
+pub trait ErrorCode {
+    /// Return the error code corresponding to this instance.
+    fn error_code(&self) -> i32;
+}

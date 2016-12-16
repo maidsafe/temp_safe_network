@@ -23,6 +23,8 @@ use app::App;
 use app::errors::AppError;
 use app::ffi::helper::send_with_mdata_info;
 use app::object_cache::MDataInfoHandle;
+use ffi_utils::{FfiString, catch_unwind_cb, u8_vec_to_ptr};
+use ffi_utils::callback::CallbackArgs;
 use futures::Future;
 use nfs::File as NativeFile;
 use nfs::file_helper;
@@ -32,8 +34,6 @@ use std::ptr;
 use std::slice;
 use time;
 use time::Tm;
-use util::ffi::{FfiString, catch_unwind_cb, u8_vec_to_ptr};
-use util::ffi::callback::CallbackArgs;
 
 /// FFI-wrapper for `File`.
 #[repr(C)]
@@ -188,14 +188,14 @@ mod tests {
     use app::object_cache::CipherOptHandle;
     use app::test_util::{create_app_with_access, run_now};
     use core::{DIR_TAG, MDataInfo};
+    use ffi_utils::{ErrorCode, FfiString};
+    use ffi_utils::test_utils::{call_0, call_1, call_2, call_3};
     use ipc::Permission;
     use nfs::File as NativeFile;
     use nfs::NfsError;
     use routing::{XOR_NAME_LEN, XorName};
     use std::collections::HashMap;
     use super::*;
-    use util::ffi::{ErrorCode, FfiString};
-    use util::ffi::test_util::{call_0, call_1, call_2, call_3};
 
     #[test]
     fn basics() {

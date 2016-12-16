@@ -19,9 +19,20 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-/// FFI-related helper functions
-#[macro_use]
-pub mod ffi;
-mod base64;
+use std::mem;
+use std::slice;
 
-pub use self::base64::{base64_decode, base64_encode};
+/// Converts a byte pointer to Vec<u8>
+pub unsafe fn u8_ptr_to_vec(ptr: *const u8, len: usize) -> Vec<u8> {
+    slice::from_raw_parts(ptr, len).to_owned()
+}
+
+/// Converts Vec<u8> to (byte pointer, size, capacity)
+pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
+    v.shrink_to_fit();
+    let ptr = v.as_mut_ptr();
+    let len = v.len();
+    let cap = v.capacity();
+    mem::forget(v);
+    (ptr, len, cap)
+}

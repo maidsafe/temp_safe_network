@@ -21,6 +21,7 @@
 
 use core::{Client, CoreError, FutureExt, MDataInfo};
 use core::utility::{symmetric_decrypt, symmetric_encrypt};
+use ffi_utils::{FfiString, OpaqueCtx, base64_encode, catch_unwind_cb};
 use futures::{Future, future};
 use ipc::{self, Config, IpcError, IpcMsg, decode_msg};
 use ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
@@ -36,8 +37,7 @@ use rust_sodium::crypto::hash::sha256;
 use std::collections::{BTreeSet, HashMap};
 use std::os::raw::c_void;
 use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
-use util;
-use util::ffi::{FfiString, OpaqueCtx, catch_unwind_cb};
+
 
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
 
@@ -597,7 +597,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *mut Authenticator,
 }
 
 fn encode_response(msg: &IpcMsg, app_id: String) -> Result<FfiString, IpcError> {
-    let app_id = util::base64_encode(app_id.as_bytes());
+    let app_id = base64_encode(app_id.as_bytes());
     let resp = ipc::encode_msg(msg, "safe-auth")?;
     Ok(FfiString::from_string(format!("safe-{}:{}", app_id, resp)))
 }

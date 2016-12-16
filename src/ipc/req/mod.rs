@@ -22,12 +22,11 @@
 /// Ffi module
 pub mod ffi;
 
+use ffi_utils::{FfiString, ffi_string_free};
 use ipc::errors::IpcError;
 use self::ffi::Permission;
 use std::collections::{BTreeSet, HashMap};
 use std::mem;
-use util::ffi::FfiString;
-use util::ffi::string::ffi_string_free;
 
 /// IPC request
 // TODO: `TransOwnership` variant

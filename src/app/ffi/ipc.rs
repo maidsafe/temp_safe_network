@@ -22,6 +22,7 @@
 //! App-related IPC utilities.
 
 use app::errors::AppError;
+use ffi_utils::{FfiString, catch_unwind_cb, catch_unwind_error_code};
 use ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};
 use ipc::req::ffi::AuthReq as FfiAuthReq;
 use ipc::req::ffi::ContainersReq as FfiContainersReq;
@@ -29,7 +30,6 @@ use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use rand::{self, Rng};
 use std::os::raw::c_void;
 use std::u32;
-use util::ffi::{FfiString, catch_unwind_cb, catch_unwind_error_code};
 
 /// Generate unique request ID.
 pub fn gen_req_id() -> u32 {
@@ -126,6 +126,7 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
 #[cfg(test)]
 mod tests {
     use core::utility;
+    use ffi_utils::{FfiString, ffi_string_free};
     use ipc::{self, AccessContInfo, AppExchangeInfo, AppKeys, AuthGranted, AuthReq, Config,
               ContainersReq, IpcMsg, IpcReq, IpcResp};
     use ipc::req::ffi::Permission;
@@ -136,8 +137,6 @@ mod tests {
     use std::mem;
     use std::os::raw::c_void;
     use super::*;
-    use util::ffi::FfiString;
-    use util::ffi::string::ffi_string_free;
 
     #[test]
     fn encode_auth_req_basics() {

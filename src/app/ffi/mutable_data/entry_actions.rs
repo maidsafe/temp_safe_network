@@ -24,9 +24,9 @@
 use app::App;
 use app::ffi::helper::send_sync;
 use app::object_cache::MDataEntryActionsHandle;
+use ffi_utils::{catch_unwind_cb, u8_ptr_to_vec};
 use routing::{EntryAction, Value};
 use std::os::raw::c_void;
-use util::ffi;
 
 /// Create new entry actions.
 #[no_mangle]
@@ -35,7 +35,7 @@ pub unsafe extern "C" fn mdata_entry_actions_new(app: *const App,
                                                  o_cb: extern "C" fn(*mut c_void,
                                                                      i32,
                                                                      MDataEntryActionsHandle)) {
-    ffi::catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |context| {
             let actions = Default::default();
             Ok(context.object_cache().insert_mdata_entry_actions(actions))
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(app: *const App,
                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Ins(Value {
-            content: ffi::u8_ptr_to_vec(value_ptr, value_len),
+            content: u8_ptr_to_vec(value_ptr, value_len),
             entry_version: 0,
         })
     })
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn mdata_entry_actions_update(app: *const App,
                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
-            content: ffi::u8_ptr_to_vec(value_ptr, value_len),
+            content: u8_ptr_to_vec(value_ptr, value_len),
             entry_version: entry_version,
         })
     })
@@ -104,7 +104,7 @@ pub unsafe extern "C" fn mdata_entry_actions_free(app: *const App,
                                                   actions_h: MDataEntryActionsHandle,
                                                   user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void, i32)) {
-    ffi::catch_unwind_cb(user_data, o_cb, || {
+    catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |context| {
             let _ = context.object_cache().remove_mdata_entry_actions(actions_h)?;
             Ok(())
@@ -123,8 +123,8 @@ unsafe fn add_action<F>(app: *const App,
                         f: F)
     where F: FnOnce() -> EntryAction
 {
-    ffi::catch_unwind_cb(user_data, o_cb, || {
-        let key = ffi::u8_ptr_to_vec(key_ptr, key_len);
+    catch_unwind_cb(user_data, o_cb, || {
+        let key = u8_ptr_to_vec(key_ptr, key_len);
         let action = f();
 
         send_sync(app, user_data, o_cb, move |context| {
@@ -139,9 +139,9 @@ unsafe fn add_action<F>(app: *const App,
 mod tests {
     use app::test_util::{create_app, run_now};
     use core::utility;
+    use ffi_utils::test_utils::{call_0, call_1};
     use routing::{EntryAction, Value};
     use super::*;
-    use util::ffi::test_util::{call_0, call_1};
 
     #[test]
     fn basics() {

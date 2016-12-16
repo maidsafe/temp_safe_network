@@ -19,17 +19,19 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+//! Test utilities.
+
 use std::os::raw::c_void;
 use std::sync::mpsc::{self, Sender};
 
-// Convert a `mpsc::Sender<T>` to a void ptr which can be passed as user data to
-// ffi functions
+/// Convert a `mpsc::Sender<T>` to a void ptr which can be passed as user data to
+/// ffi functions
 pub fn sender_as_user_data<T>(tx: &Sender<T>) -> *mut c_void {
     let ptr: *const _ = tx;
     ptr as *mut c_void
 }
 
-// Send through a `mpsc::Sender` pointed to by the user data pointer.
+/// Send through a `mpsc::Sender` pointed to by the user data pointer.
 pub unsafe fn send_via_user_data<T>(user_data: *mut c_void, value: T)
     where T: Send
 {
@@ -37,9 +39,9 @@ pub unsafe fn send_via_user_data<T>(user_data: *mut c_void, value: T)
     unwrap!((*tx).send(value));
 }
 
-// Call a FFI function and block until its callback gets called.
-// Use this if the callback accepts no arguments in addition to user_data
-// and error_code.
+/// Call a FFI function and block until its callback gets called.
+/// Use this if the callback accepts no arguments in addition to user_data
+/// and error_code.
 pub fn call_0<F>(f: F) -> Result<(), i32>
     where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32))
 {
@@ -50,10 +52,10 @@ pub fn call_0<F>(f: F) -> Result<(), i32>
     if error == 0 { Ok(()) } else { Err(error) }
 }
 
-// Call a FFI function and block until its callback gets called, then return
-// the argument which were passed to that callback.
-// Use this if the callback accepts one argument in addition to user_data
-// and error_code.
+/// Call a FFI function and block until its callback gets called, then return
+/// the argument which were passed to that callback.
+/// Use this if the callback accepts one argument in addition to user_data
+/// and error_code.
 pub unsafe fn call_1<F, T>(f: F) -> Result<T, i32>
     where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T))
 {
@@ -64,10 +66,10 @@ pub unsafe fn call_1<F, T>(f: F) -> Result<T, i32>
     if error == 0 { Ok(args.0) } else { Err(error) }
 }
 
-// Call a FFI function and block until its callback gets called, then return
-// the argument which were passed to that callback.
-// Use this if the callback accepts two arguments in addition to user_data
-// and error_code.
+/// Call a FFI function and block until its callback gets called, then return
+/// the argument which were passed to that callback.
+/// Use this if the callback accepts two arguments in addition to user_data
+/// and error_code.
 pub unsafe fn call_2<F, T0, T1>(f: F) -> Result<(T0, T1), i32>
     where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T0, T1))
 {
@@ -78,10 +80,10 @@ pub unsafe fn call_2<F, T0, T1>(f: F) -> Result<(T0, T1), i32>
     if error == 0 { Ok(args.0) } else { Err(error) }
 }
 
-// Call a FFI function and block until its callback gets called, then return
-// the arguments which were passed to that callback in a tuple.
-// Use this if the callback accepts three arguments in addition to user_data and
-// error_code.
+/// Call a FFI function and block until its callback gets called, then return
+/// the arguments which were passed to that callback in a tuple.
+/// Use this if the callback accepts three arguments in addition to user_data and
+/// error_code.
 pub unsafe fn call_3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), i32>
     where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T0, T1, T2))
 {
