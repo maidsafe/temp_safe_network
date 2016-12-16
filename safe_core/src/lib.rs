@@ -19,8 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-//! #Safe-Core Library
-//! [Project github page](https://github.com/maidsafe/safe_core)
+//! SAFE core
 
 #![doc(html_logo_url =
            "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
@@ -49,7 +48,6 @@
                                    option_unwrap_used))]
 #![cfg_attr(feature="clippy", allow(use_debug, too_many_arguments))]
 
-#[macro_use]
 extern crate ffi_utils;
 extern crate futures;
 #[macro_use]
@@ -63,15 +61,38 @@ extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate rust_sodium;
-#[macro_use]
-extern crate safe_core;
 extern crate self_encryption;
 extern crate time;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
 
-/// Application functions;
-pub mod app;
-/// Authenticator module;
-pub mod authenticator;
+/// Utility functions
+#[macro_use]
+pub mod utils;
+/// Event loop handling
+pub mod event_loop;
+/// Helper functions to handle `ImmutableData` related operations
+pub mod immutable_data;
+/// Inter-Process Communication utilities
+pub mod ipc;
+/// NFS utilities
+pub mod nfs;
+/// Implements the Self Encryption storage trait
+pub mod self_encryption_storage;
+
+mod client;
+mod errors;
+mod event;
+
+pub use self::client::{Client, ClientKeys, MDataInfo};
+pub use self::errors::CoreError;
+pub use self::event::{CoreEvent, NetworkEvent, NetworkRx, NetworkTx};
+pub use self::event_loop::{CoreFuture, CoreMsg, CoreMsgRx, CoreMsgTx};
+pub use self::self_encryption_storage::{SelfEncryptionStorage, SelfEncryptionStorageError};
+pub use self::utils::FutureExt;
+
+/// All Maidsafe tagging should positive-offset from this
+pub const MAIDSAFE_TAG: u64 = 5483_000;
+/// `MutableData` type tag for a directory
+pub const DIR_TAG: u64 = 15000;

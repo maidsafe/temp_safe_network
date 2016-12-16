@@ -20,10 +20,10 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use app::ffi::cipher_opt::CipherOpt;
-use core::{MDataInfo, SelfEncryptionStorage};
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, Value};
 use rust_sodium::crypto::{box_, sign};
+use safe_core::{MDataInfo, SelfEncryptionStorage};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet};

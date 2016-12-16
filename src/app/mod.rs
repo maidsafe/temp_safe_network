@@ -24,21 +24,18 @@ pub mod ffi;
 mod errors;
 mod object_cache;
 #[cfg(test)]
-mod test_util;
+mod test_utils;
 
-
-use core::{self, Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
-           NetworkTx};
-use core::utility;
 use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
-use ipc::{AccessContInfo, AppKeys, AuthGranted};
-use ipc::req::ffi::Permission;
 use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::secretbox;
+use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
+                NetworkTx, event_loop, utils};
+use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Permission};
 pub use self::errors::*;
 use self::object_cache::ObjectCache;
 use std::cell::RefCell;
@@ -126,7 +123,7 @@ impl App {
             let (client, context) = try_tx!(setup(el_h, core_tx_clone, net_tx), tx);
             unwrap!(tx.send(Ok(core_tx)));
 
-            core::run(el, client, context, core_rx);
+            event_loop::run(el, client, context, core_rx);
         });
 
         let core_tx = rx.recv()??;
@@ -275,7 +272,7 @@ fn refresh_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFutur
         let app_id_hash = sha256::hash(context.app_id.as_bytes()).0;
         let nonce = context.access_container_info.nonce;
 
-        fry!(utility::symmetric_encrypt(&app_id_hash, &context.sym_enc_key, Some(&nonce)))
+        fry!(utils::symmetric_encrypt(&app_id_hash, &context.sym_enc_key, Some(&nonce)))
     };
 
     client.get_mdata_value(context.access_container_info.id,
@@ -283,7 +280,7 @@ fn refresh_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFutur
                          entry_key)
         .map_err(AppError::from)
         .and_then(move |value| {
-            let encoded = utility::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
+            let encoded = utils::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
             let decoded = deserialise(&encoded)?;
 
             *context.access_info.borrow_mut() = decoded;
@@ -303,10 +300,10 @@ fn fetch_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<
 
 #[cfg(test)]
 mod tests {
-    use app::test_util::{create_app_with_access, run};
-    use core::{DIR_TAG, MDataInfo};
+    use app::test_utils::{create_app_with_access, run};
     use futures::Future;
-    use ipc::Permission;
+    use safe_core::{DIR_TAG, MDataInfo};
+    use safe_core::ipc::Permission;
     use std::collections::HashMap;
 
     #[test]

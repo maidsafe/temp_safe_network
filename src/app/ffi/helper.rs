@@ -22,10 +22,10 @@
 use app::{App, AppContext};
 use app::errors::AppError;
 use app::object_cache::MDataInfoHandle;
-use core::{Client, FutureExt, MDataInfo};
 use ffi_utils::OpaqueCtx;
 use ffi_utils::callback::{Callback, CallbackArgs};
 use futures::Future;
+use safe_core::{Client, FutureExt, MDataInfo};
 use std::fmt::Debug;
 use std::os::raw::c_void;
 

@@ -25,10 +25,10 @@ use app::App;
 use app::errors::AppError;
 use app::ffi::helper::send_sync;
 use app::object_cache::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle};
-use core::CoreError;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb, u8_ptr_to_vec};
 use ffi_utils::callback::Callback;
 use routing::{ClientError, Value};
+use safe_core::CoreError;
 use std::collections::{BTreeMap, BTreeSet};
 use std::os::raw::c_void;
 
@@ -319,11 +319,11 @@ unsafe fn with_values<C, F>(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::test_util::{create_app, run_now};
-    use core::utility;
+    use app::test_utils::{create_app, run_now};
     use ffi_utils::test_utils::{call_1, call_3};
     use ffi_utils::u8_ptr_to_vec;
     use routing::Value;
+    use safe_core::utils;
     use std::collections::BTreeMap;
     use std::os::raw::c_void;
     use std::slice;
@@ -338,12 +338,12 @@ mod tests {
         let key1 = b"key1".to_vec();
 
         let value0 = Value {
-            content: unwrap!(utility::generate_random_vector(10)),
+            content: unwrap!(utils::generate_random_vector(10)),
             entry_version: 0,
         };
 
         let value1 = Value {
-            content: unwrap!(utility::generate_random_vector(10)),
+            content: unwrap!(utils::generate_random_vector(10)),
             entry_version: 2,
         };
 

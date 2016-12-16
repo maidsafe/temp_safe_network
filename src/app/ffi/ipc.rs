@@ -23,11 +23,11 @@
 
 use app::errors::AppError;
 use ffi_utils::{FfiString, catch_unwind_cb, catch_unwind_error_code};
-use ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};
-use ipc::req::ffi::AuthReq as FfiAuthReq;
-use ipc::req::ffi::ContainersReq as FfiContainersReq;
-use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use rand::{self, Rng};
+use safe_core::ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};
+use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
+use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
+use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use std::os::raw::c_void;
 use std::u32;
 
@@ -125,14 +125,14 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
 
 #[cfg(test)]
 mod tests {
-    use core::utility;
     use ffi_utils::{FfiString, ffi_string_free};
-    use ipc::{self, AccessContInfo, AppExchangeInfo, AppKeys, AuthGranted, AuthReq, Config,
-              ContainersReq, IpcMsg, IpcReq, IpcResp};
-    use ipc::req::ffi::Permission;
-    use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
+    use safe_core::ipc::{self, AccessContInfo, AppExchangeInfo, AppKeys, AuthGranted, AuthReq,
+                         Config, ContainersReq, IpcMsg, IpcReq, IpcResp};
+    use safe_core::ipc::req::ffi::Permission;
+    use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
+    use safe_core::utils;
     use std::collections::HashMap;
     use std::mem;
     use std::os::raw::c_void;
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn encode_containers_req_basics() {
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert(unwrap!(utility::generate_random_string(10)),
+        let _ = container_permissions.insert(unwrap!(utils::generate_random_string(10)),
                                              btree_set![Permission::Read]);
 
         let req = ContainersReq {
@@ -376,10 +376,10 @@ mod tests {
 
     fn gen_app_exchange_info() -> AppExchangeInfo {
         AppExchangeInfo {
-            id: unwrap!(utility::generate_random_string(10)),
+            id: unwrap!(utils::generate_random_string(10)),
             scope: None,
-            name: unwrap!(utility::generate_random_string(10)),
-            vendor: unwrap!(utility::generate_random_string(10)),
+            name: unwrap!(utils::generate_random_string(10)),
+            vendor: unwrap!(utils::generate_random_string(10)),
         }
     }
 }

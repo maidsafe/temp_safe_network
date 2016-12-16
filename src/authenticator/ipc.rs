@@ -19,21 +19,20 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use core::{Client, CoreError, FutureExt, MDataInfo};
-use core::utility::{symmetric_decrypt, symmetric_encrypt};
 use ffi_utils::{FfiString, OpaqueCtx, base64_encode, catch_unwind_cb};
 use futures::{Future, future};
-use ipc::{self, Config, IpcError, IpcMsg, decode_msg};
-use ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
-use ipc::req::ffi::AuthReq as FfiAuthReq;
-use ipc::req::ffi::ContainersReq as FfiContainersReq;
-use ipc::req::ffi::Permission;
-use ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use nfs;
 use routing::{Action, ClientError, EntryActions, PermissionSet, User};
 use rust_sodium::crypto::{secretbox, sign};
 use rust_sodium::crypto::hash::sha256;
+use safe_core::{Client, CoreError, FutureExt, MDataInfo, nfs};
+use safe_core::ipc::{self, Config, IpcError, IpcMsg, decode_msg};
+use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
+use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
+use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
+use safe_core::ipc::req::ffi::Permission;
+use safe_core::ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
+use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use std::collections::{BTreeSet, HashMap};
 use std::os::raw::c_void;
 use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};

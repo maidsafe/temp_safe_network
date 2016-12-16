@@ -22,11 +22,11 @@
 use app::App;
 use app::errors::AppError;
 use app::object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
-use core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{XOR_NAME_LEN, XorName};
+use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr, slice};
 use std::os::raw::c_void;
@@ -314,17 +314,17 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
 mod tests {
     use app::errors::AppError;
     use app::ffi::cipher_opt::*;
-    use app::test_util::create_app;
-    use core::utility;
+    use app::test_utils::create_app;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_3};
+    use safe_core::utils;
     use super::*;
 
     #[test]
     fn immut_data_operations() {
         let app = create_app();
 
-        let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
+        let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
 
         unsafe {
             let cipher_opt_h = unwrap!(call_1(|ud, cb| cipher_opt_new_symmetric(&app, ud, cb)));

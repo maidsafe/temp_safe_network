@@ -22,10 +22,10 @@
 use app::App;
 use app::errors::AppError;
 use app::object_cache::{CipherOptHandle, EncryptKeyHandle};
-use core::CoreError;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
+use safe_core::CoreError;
 use std::os::raw::c_void;
 
 /// Cipher Options
@@ -185,12 +185,11 @@ mod tests {
     use app::{App, AppContext};
     use app::errors::AppError;
     use app::object_cache::CipherOptHandle;
-    use app::test_util::{create_app, run_now};
-    use core::Client;
-    use core::utility;
+    use app::test_utils::{create_app, run_now};
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1};
     use rust_sodium::crypto::box_;
+    use safe_core::{Client, utils};
     use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
@@ -202,7 +201,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
         let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
 
-        let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
+        let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
         let cipher_opt_handle: CipherOptHandle;
         unsafe {
             cipher_opt_new_plaintext(&app_0, tx, handle_cb);
@@ -230,7 +229,7 @@ mod tests {
         let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
         let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
 
-        let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
+        let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
         let cipher_opt_handle: CipherOptHandle;
         unsafe {
             cipher_opt_new_symmetric(&app_0, tx, handle_cb);
@@ -274,7 +273,7 @@ mod tests {
         };
 
         // Encrypt the plaintext on App 0's end.
-        let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
+        let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_h));
             let sym_key = unwrap!(context.sym_enc_key());

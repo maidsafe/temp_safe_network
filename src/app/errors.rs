@@ -20,14 +20,13 @@
 // and limitations relating to use of the SAFE Network Software.
 
 
-use core::CoreError;
-use core::SelfEncryptionStorageError;
 use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;
-use ipc::IpcError;
 use maidsafe_utilities::serialisation::SerialisationError;
-use nfs::NfsError;
 use routing::ClientError;
+use safe_core::{CoreError, SelfEncryptionStorageError};
+use safe_core::ipc::IpcError;
+use safe_core::nfs::NfsError;
 pub use self::codes::*;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;

@@ -28,16 +28,16 @@ pub mod ipc;
 /// Authenticator errors
 mod errors;
 
-use core::{self, Client, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent};
 use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc::{self, SendError};
-use ipc::Permission;
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::{self, Joiner};
-use nfs::{create_dir, create_std_dirs};
 use routing::{EntryAction, Value};
+use safe_core::{Client, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent, event_loop};
+use safe_core::ipc::Permission;
+use safe_core::nfs::{create_dir, create_std_dirs};
 pub use self::errors::AuthError;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::os::raw::c_void;
@@ -145,7 +145,7 @@ impl Authenticator {
                 }).into_box().into()
             })));
 
-            core::run(el, client, (), core_rx);
+            event_loop::run(el, client, (), core_rx);
         });
 
         let core_tx = rx.recv()??;
@@ -186,7 +186,7 @@ impl Authenticator {
 
             unwrap!(tx.send(Ok(core_tx)));
 
-            core::run(el, client, (), core_rx);
+            event_loop::run(el, client, (), core_rx);
         });
 
         let core_tx = rx.recv()??;
@@ -291,16 +291,16 @@ pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
 
 #[cfg(test)]
 mod tests {
-    use core::utility;
     use ffi_utils::FfiString;
+    use safe_core::utils;
     use std::os::raw::c_void;
     use std::ptr;
     use super::*;
 
     #[test]
     fn create_account_and_login() {
-        let acc_locator = unwrap!(utility::generate_random_string(10));
-        let acc_password = unwrap!(utility::generate_random_string(10));
+        let acc_locator = unwrap!(utils::generate_random_string(10));
+        let acc_password = unwrap!(utils::generate_random_string(10));
 
         {
             let mut auth_h: *mut Authenticator = ptr::null_mut();

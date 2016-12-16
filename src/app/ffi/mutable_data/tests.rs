@@ -19,13 +19,13 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::test_util::create_app;
-use core::{CoreError, DIR_TAG, FutureExt};
-use core::utility::test_utils::random_client;
+use app::test_utils::create_app;
 use futures::Future;
 use maidsafe_utilities::thread;
 use rand::{OsRng, Rng};
 use routing::{Action, ClientError, EntryAction, MutableData, PermissionSet, User, Value, XorName};
+use safe_core::{CoreError, DIR_TAG, FutureExt};
+use safe_core::utils::test_utils::random_client;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc;
 

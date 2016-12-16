@@ -137,10 +137,10 @@ unsafe fn add_action<F>(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::test_util::{create_app, run_now};
-    use core::utility;
+    use app::test_utils::{create_app, run_now};
     use ffi_utils::test_utils::{call_0, call_1};
     use routing::{EntryAction, Value};
+    use safe_core::utils;
     use super::*;
 
     #[test]
@@ -158,8 +158,8 @@ mod tests {
         let key1 = b"key1".to_vec();
         let key2 = b"key2".to_vec();
 
-        let value0 = unwrap!(utility::generate_random_vector(10));
-        let value1 = unwrap!(utility::generate_random_vector(10));
+        let value0 = unwrap!(utils::generate_random_vector(10));
+        let value1 = unwrap!(utils::generate_random_vector(10));
 
         let version1 = 4;
         let version2 = 8;

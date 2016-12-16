@@ -21,13 +21,13 @@
 
 //! Errors thrown by Authenticator routines
 
-use core::CoreError;
 use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;
-use ipc::IpcError;
 use maidsafe_utilities::serialisation::SerialisationError;
-use nfs::errors::NfsError;
 use routing::ClientError;
+use safe_core::CoreError;
+use safe_core::ipc::IpcError;
+use safe_core::nfs::NfsError;
 pub use self::codes::*;
 use std::error::Error;
 use std::fmt::{self, Debug, Formatter};

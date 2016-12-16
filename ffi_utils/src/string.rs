@@ -97,12 +97,13 @@ pub unsafe extern "C" fn ffi_string_free(s: FfiString) {
 
 #[cfg(test)]
 mod tests {
-    use core::utility;
+    extern crate rand;
+    use self::rand::{Rng, thread_rng};
     use super::*;
 
     #[test]
     fn conversion() {
-        let in_string = unwrap!(utility::generate_random_string(100));
+        let in_string = random_string(100);
         let ffi_string = FfiString::from_str(&in_string);
 
         let out_string = unsafe { unwrap!(ffi_string.to_string()) };
@@ -110,5 +111,10 @@ mod tests {
 
         assert_eq!(in_string, out_string);
         assert_eq!(in_string.as_str(), out_str);
+    }
+
+    fn random_string(len: usize) -> String {
+        let mut rng = thread_rng();
+        (0..len).map(|_| rng.gen::<char>()).collect()
     }
 }

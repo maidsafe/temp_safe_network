@@ -22,9 +22,9 @@
 use app::App;
 use app::ffi::helper::send_sync;
 use app::object_cache::MDataInfoHandle;
-use core::MDataInfo;
 use ffi_utils::{catch_unwind_cb, u8_vec_to_ptr};
 use routing::XOR_NAME_LEN;
+use safe_core::MDataInfo;
 use std::os::raw::c_void;
 use std::slice;
 
@@ -126,7 +126,7 @@ fn mdata_info_extract_name_and_type_tag(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::test_util::{create_app, run_now};
+    use app::test_utils::{create_app, run_now};
     use ffi_utils::test_utils::call_1;
     use rand;
     use super::*;

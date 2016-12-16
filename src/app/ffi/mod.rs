@@ -23,10 +23,10 @@
 
 #![allow(unsafe_code)]
 
-use core::NetworkEvent;
 use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
-use ipc::AuthGranted;
-use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
+use safe_core::NetworkEvent;
+use safe_core::ipc::AuthGranted;
+use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use std::os::raw::c_void;
 use super::App;
 use super::errors::AppError;

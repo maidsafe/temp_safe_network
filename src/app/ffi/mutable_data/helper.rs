@@ -21,8 +21,8 @@
 
 use app::errors::AppError;
 use app::object_cache::{MDataPermissionsHandle, ObjectCache, SignKeyHandle};
-use core::MDataInfo;
 use routing::{EntryAction, PermissionSet, User, Value};
+use safe_core::MDataInfo;
 use std::collections::{BTreeMap, BTreeSet};
 
 // Retrieve the sign key corresponding to the handle from the object cache and wrap it
