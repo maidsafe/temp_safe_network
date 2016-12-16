@@ -348,11 +348,11 @@ fn fetch_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<
 
 #[cfg(test)]
 mod tests {
-    use app::test_utils::{create_app_with_access, run};
     use futures::Future;
     use safe_core::{DIR_TAG, MDataInfo};
     use safe_core::ipc::Permission;
     use std::collections::HashMap;
+    use test_utils::{create_app_with_access, run};
 
     #[test]
     fn refresh_access_info() {

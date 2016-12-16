@@ -19,7 +19,6 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::test_utils::create_app;
 use futures::Future;
 use maidsafe_utilities::thread;
 use rand::{OsRng, Rng};
@@ -28,6 +27,7 @@ use safe_core::{CoreError, DIR_TAG, FutureExt};
 use safe_core::utils::test_utils::random_client;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc;
+use test_utils::create_app;
 
 // MD created by App. App lists it's own sign_pk in owners field: Put should
 // fail - Rejected by MaidManagers. Should pass when it lists the owner's
