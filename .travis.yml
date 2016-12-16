@@ -25,6 +25,33 @@ script:
   - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
       (
         set -x;
+        cd ffi_utils &&
+        cargo fmt -- --write-mode=diff &&
+        cargo test  --verbose --release
+      );
+    fi
+  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
+      (
+        set -x;
+        cd safe_core &&
+        cargo fmt -- --write-mode=diff &&
+        cargo rustc --verbose --release -- --test -Zno-trans &&
+        cargo test  --verbose --release --features use-mock-routing
+      );
+    fi
+  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
+      (
+        set -x;
+        cd safe_app &&
+        cargo fmt -- --write-mode=diff &&
+        cargo rustc --verbose --release -- --test -Zno-trans &&
+        cargo test  --verbose --release --features use-mock-routing
+      );
+    fi
+  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
+      (
+        set -x;
+        cd safe_authenticator &&
         cargo fmt -- --write-mode=diff &&
         cargo rustc --verbose --release -- --test -Zno-trans &&
         cargo test  --verbose --release --features use-mock-routing
