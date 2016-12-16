@@ -127,11 +127,12 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: FfiString,
 mod tests {
     use core::utility;
     use ipc::{self, AccessContInfo, AppExchangeInfo, AppKeys, AuthGranted, AuthReq, Config,
-              ContainerPermissions, ContainersReq, IpcMsg, IpcReq, IpcResp};
+              ContainersReq, IpcMsg, IpcReq, IpcResp};
     use ipc::req::ffi::Permission;
     use ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
+    use std::collections::HashMap;
     use std::mem;
     use std::os::raw::c_void;
     use super::*;
@@ -143,7 +144,7 @@ mod tests {
         let req = AuthReq {
             app: gen_app_exchange_info(),
             app_container: false,
-            containers: Vec::new(),
+            containers: HashMap::new(),
         };
 
         let req_c = req.clone().into_repr_c();
@@ -175,14 +176,13 @@ mod tests {
 
     #[test]
     fn encode_containers_req_basics() {
-        let container_permissions = ContainerPermissions {
-            container_key: unwrap!(utility::generate_random_string(10)),
-            access: btree_set![Permission::Read],
-        };
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert(unwrap!(utility::generate_random_string(10)),
+                                             btree_set![Permission::Read]);
 
         let req = ContainersReq {
             app: gen_app_exchange_info(),
-            containers: vec![container_permissions],
+            containers: container_permissions,
         };
 
         let req_c = req.clone().into_repr_c();

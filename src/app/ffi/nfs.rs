@@ -188,10 +188,11 @@ mod tests {
     use app::object_cache::CipherOptHandle;
     use app::test_util::{create_app_with_access, run_now};
     use core::{DIR_TAG, MDataInfo};
-    use ipc::{ContainerPermissions, Permission};
+    use ipc::Permission;
     use nfs::File as NativeFile;
     use nfs::NfsError;
     use routing::{XOR_NAME_LEN, XorName};
+    use std::collections::HashMap;
     use super::*;
     use util::ffi::{ErrorCode, FfiString};
     use util::ffi::test_util::{call_0, call_1, call_2, call_3};
@@ -200,16 +201,15 @@ mod tests {
     fn basics() {
         let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
 
-        let container_permissions = ContainerPermissions {
-            container_key: "_test".to_string(),
-            access: btree_set![Permission::Read,
-                               Permission::Insert,
-                               Permission::Update,
-                               Permission::Delete],
-        };
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert("_test".to_string(),
+                                             (container_info.clone(),
+                                              btree_set![Permission::Read,
+                                                         Permission::Insert,
+                                                         Permission::Update,
+                                                         Permission::Delete]));
 
-        let app = create_app_with_access(vec![(container_info.clone(), container_permissions)],
-                                         true);
+        let app = create_app_with_access(container_permissions, true);
 
         let container_info_h = run_now(&app, move |_, context| {
             context.object_cache().insert_mdata_info(container_info)

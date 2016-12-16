@@ -24,7 +24,7 @@ pub mod ffi;
 
 use ipc::errors::IpcError;
 use self::ffi::Permission;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::mem;
 use util::ffi::FfiString;
 use util::ffi::string::ffi_string_free;
@@ -48,7 +48,51 @@ pub struct AuthReq {
     /// otherwise.
     pub app_container: bool,
     /// The list of containers it wishes to access (and desired permissions).
-    pub containers: Vec<ContainerPermissions>,
+    pub containers: HashMap<String, BTreeSet<Permission>>,
+}
+
+/// Converts a container name + a set of permissions into an FFI
+/// representation `ContainerPermissions`. You're now responsible for
+/// freeing this memory once you're done.
+pub fn container_perm_into_repr_c(cont_name: String,
+                                  access: BTreeSet<Permission>)
+                                  -> ffi::ContainerPermissions {
+    ffi::ContainerPermissions {
+        cont_name: FfiString::from_string(cont_name),
+        access: ffi::PermissionArray::from_vec(access.into_iter().collect()),
+    }
+}
+
+/// Consumes the object and returns the wrapped raw pointer
+///
+/// You're now responsible for freeing this memory once you're done.
+pub fn containers_into_repr_c(containers: HashMap<String, BTreeSet<Permission>>)
+                              -> ffi::ContainerPermissionsArray {
+    let mut container_perms = Vec::new();
+    for (key, access) in containers {
+        container_perms.push(container_perm_into_repr_c(key, access));
+    }
+    ffi::ContainerPermissionsArray::from_vec(container_perms)
+}
+
+/// Constructs the object from a raw pointer.
+///
+/// After calling this function, the raw pointer is owned by the resulting
+/// object.
+#[allow(unsafe_code)]
+pub unsafe fn containers_from_repr_c(raw: ffi::ContainerPermissionsArray)
+                                     -> Result<HashMap<String, BTreeSet<Permission>>, IpcError> {
+    let mut result = HashMap::new();
+    let vec = raw.into_vec();
+
+    for raw in vec {
+        let cont_name = raw.cont_name.to_string();
+        ffi_string_free(raw.cont_name);
+
+        let _ = result.insert(cont_name?, raw.access.into_vec().into_iter().collect());
+    }
+
+    Ok(result)
 }
 
 impl AuthReq {
@@ -59,14 +103,12 @@ impl AuthReq {
     pub fn into_repr_c(self) -> ffi::AuthReq {
         let AuthReq { app, app_container, containers } = self;
 
-        let containers: Vec<_> = containers.into_iter()
-            .map(|c| c.into_repr_c())
-            .collect();
+        let containers = containers_into_repr_c(containers);
 
         ffi::AuthReq {
             app: app.into_repr_c(),
             app_container: app_container,
-            containers: ffi::ContainerPermissionsArray::from_vec(containers),
+            containers: containers,
         }
     }
 
@@ -77,20 +119,11 @@ impl AuthReq {
     #[allow(unsafe_code)]
     pub unsafe fn from_repr_c(repr_c: ffi::AuthReq) -> Result<Self, IpcError> {
         let ffi::AuthReq { app, app_container, containers } = repr_c;
-        let container_results = containers.into_vec()
-            .into_iter()
-            .map(|c| ContainerPermissions::from_repr_c(c));
-
-        let mut containers = Vec::new();
-
-        for result in container_results {
-            containers.push(result?);
-        }
 
         Ok(AuthReq {
             app: AppExchangeInfo::from_repr_c(app)?,
             app_container: app_container,
-            containers: containers,
+            containers: containers_from_repr_c(containers)?,
         })
     }
 }
@@ -101,7 +134,7 @@ pub struct ContainersReq {
     /// Exchange info
     pub app: AppExchangeInfo,
     /// Requested containers
-    pub containers: Vec<ContainerPermissions>,
+    pub containers: HashMap<String, BTreeSet<Permission>>,
 }
 
 impl ContainersReq {
@@ -111,13 +144,10 @@ impl ContainersReq {
     /// done.
     pub fn into_repr_c(self) -> ffi::ContainersReq {
         let ContainersReq { app, containers } = self;
-        let containers: Vec<_> = containers.into_iter()
-            .map(|c| c.into_repr_c())
-            .collect();
 
         ffi::ContainersReq {
             app: app.into_repr_c(),
-            containers: ffi::ContainerPermissionsArray::from_vec(containers),
+            containers: containers_into_repr_c(containers),
         }
     }
 
@@ -128,19 +158,9 @@ impl ContainersReq {
     #[allow(unsafe_code)]
     pub unsafe fn from_repr_c(repr_c: ffi::ContainersReq) -> Result<Self, IpcError> {
         let ffi::ContainersReq { app, containers } = repr_c;
-        let container_results = containers.into_vec()
-            .into_iter()
-            .map(|c| ContainerPermissions::from_repr_c(c));
-
-        let mut containers = Vec::new();
-
-        for result in container_results {
-            containers.push(result?);
-        }
-
         Ok(ContainersReq {
             app: AppExchangeInfo::from_repr_c(app)?,
-            containers: containers,
+            containers: containers_from_repr_c(containers)?,
         })
     }
 }
@@ -210,72 +230,29 @@ impl AppExchangeInfo {
     }
 }
 
-/// Represents the set of permissions for a given container
-#[derive(Clone, Eq, PartialEq, RustcEncodable, RustcDecodable, Debug)]
-pub struct ContainerPermissions {
-    /// The id
-    pub container_key: String,
-    /// The permissions
-    pub access: BTreeSet<Permission>,
-}
-
-impl ContainerPermissions {
-    /// Consumes the object and returns the wrapped raw pointer
-    ///
-    /// You're now responsible for freeing this memory once you're done.
-    pub fn into_repr_c(self) -> ffi::ContainerPermissions {
-        let ContainerPermissions { container_key, access } = self;
-
-        ffi::ContainerPermissions {
-            container_key: FfiString::from_string(container_key),
-            access: ffi::PermissionArray::from_vec(access.into_iter().collect()),
-        }
-    }
-
-    /// Constructs the object from a raw pointer.
-    ///
-    /// After calling this function, the raw pointer is owned by the resulting
-    /// object.
-    #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(raw: ffi::ContainerPermissions) -> Result<Self, IpcError> {
-        let container_key = raw.container_key.to_string();
-        ffi_string_free(raw.container_key);
-
-        Ok(ContainerPermissions {
-            container_key: container_key?,
-            access: raw.access.into_vec().into_iter().collect(),
-        })
-    }
-}
-
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
+    use std::collections::HashMap;
     use super::*;
 
     #[test]
     fn container_permissions() {
-        let cp = ContainerPermissions {
-            container_key: "foobar".to_string(),
-            access: Default::default(),
-        };
+        let mut cp = HashMap::new();
+        let _ = cp.insert("foobar".to_string(), Default::default());
 
-        let ffi_cp = cp.into_repr_c();
+        let ffi_cp = containers_into_repr_c(cp);
+        assert_eq!(ffi_cp.len, 1);
 
-        unsafe {
-            assert_eq!(unwrap!(ffi_cp.container_key.as_str()), "foobar");
-            assert_eq!(ffi_cp.access.len, 0);
-        }
+        let cp = unsafe { unwrap!(containers_from_repr_c(ffi_cp)) };
 
-        let cp = unsafe { unwrap!(ContainerPermissions::from_repr_c(ffi_cp)) };
-
-        assert_eq!(cp.container_key, "foobar");
-        assert!(cp.access.is_empty());
+        assert!(cp.contains_key("foobar"));
+        assert!(unwrap!(cp.get("foobar")).is_empty());
 
         // If test runs under special mode (e.g. Valgrind) we can detect memory
         // leaks
         unsafe {
-            ffi::container_permissions_drop(cp.into_repr_c());
+            ffi::container_permissions_array_free(containers_into_repr_c(cp));
         }
     }
 
@@ -332,7 +309,7 @@ mod tests {
         let a = AuthReq {
             app: app,
             app_container: false,
-            containers: vec![],
+            containers: HashMap::new(),
         };
 
         let ffi = a.into_repr_c();
@@ -363,7 +340,7 @@ mod tests {
 
         let a = ContainersReq {
             app: app,
-            containers: vec![],
+            containers: HashMap::new(),
         };
 
         let ffi = a.into_repr_c();

@@ -20,7 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use std::mem;
-use util::ffi::FfiString;
+use util::ffi::{FfiString, string};
 
 /// Permission action
 #[repr(C)]
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn app_exchange_info_drop(a: AppExchangeInfo) {
 #[derive(Clone, Copy)]
 pub struct ContainerPermissions {
     /// The UTF-8 encoded id
-    pub container_key: FfiString,
+    pub cont_name: FfiString,
 
     /// The `Permission` array
     pub access: PermissionArray,
@@ -125,7 +125,8 @@ pub struct ContainerPermissions {
 #[no_mangle]
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn container_permissions_drop(cp: ContainerPermissions) {
-    let _ = super::ContainerPermissions::from_repr_c(cp);
+    string::ffi_string_free(cp.cont_name);
+    permission_array_free(cp.access);
 }
 
 /// Wrapper for `ContainerPermissions` arrays to be passed across FFI boundary.
