@@ -5,7 +5,7 @@ homepage = "http://maidsafe.net"
 license = "GPL-3.0"
 name = "safe_authenticator"
 readme = "README.md"
-repository = "https://github.com/maidsafe/safe_core"
+repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.22.0"
 
 [dependencies]
