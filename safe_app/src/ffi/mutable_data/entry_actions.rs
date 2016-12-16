@@ -21,10 +21,10 @@
 
 //! FFI for mutable data entry actions.
 
-use app::App;
-use app::ffi::helper::send_sync;
-use app::object_cache::MDataEntryActionsHandle;
+use App;
+use ffi::helper::send_sync;
 use ffi_utils::{catch_unwind_cb, u8_ptr_to_vec};
+use object_cache::MDataEntryActionsHandle;
 use routing::{EntryAction, Value};
 use std::os::raw::c_void;
 
@@ -137,11 +137,11 @@ unsafe fn add_action<F>(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::test_utils::{create_app, run_now};
     use ffi_utils::test_utils::{call_0, call_1};
     use routing::{EntryAction, Value};
     use safe_core::utils;
     use super::*;
+    use test_utils::{create_app, run_now};
 
     #[test]
     fn basics() {

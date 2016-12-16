@@ -21,12 +21,12 @@
 
 //! FFI for mutable data entries, keys and values.
 
-use app::App;
-use app::errors::AppError;
-use app::ffi::helper::send_sync;
-use app::object_cache::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle};
+use App;
+use errors::AppError;
+use ffi::helper::send_sync;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb, u8_ptr_to_vec};
 use ffi_utils::callback::Callback;
+use object_cache::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle};
 use routing::{ClientError, Value};
 use safe_core::CoreError;
 use std::collections::{BTreeMap, BTreeSet};
@@ -319,7 +319,6 @@ unsafe fn with_values<C, F>(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::test_utils::{create_app, run_now};
     use ffi_utils::test_utils::{call_1, call_3};
     use ffi_utils::u8_ptr_to_vec;
     use routing::Value;
@@ -329,6 +328,7 @@ mod tests {
     use std::slice;
     use std::sync::mpsc::{self, Sender};
     use super::*;
+    use test_utils::{create_app, run_now};
 
     #[test]
     fn entries() {

@@ -19,12 +19,13 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::{App, AppContext};
-use app::errors::AppError;
-use app::object_cache::MDataInfoHandle;
+use App;
+use AppContext;
+use errors::AppError;
 use ffi_utils::OpaqueCtx;
 use ffi_utils::callback::{Callback, CallbackArgs};
 use futures::Future;
+use object_cache::MDataInfoHandle;
 use safe_core::{Client, FutureExt, MDataInfo};
 use std::fmt::Debug;
 use std::os::raw::c_void;

@@ -21,11 +21,11 @@
 
 //! FFI for mutable data permissions and permission sets.
 
-use app::App;
-use app::errors::AppError;
-use app::ffi::helper::send_sync;
-use app::object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle, SignKeyHandle};
+use App;
+use errors::AppError;
+use ffi::helper::send_sync;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
+use object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle, SignKeyHandle};
 use routing::{Action, PermissionSet};
 use std::os::raw::c_void;
 

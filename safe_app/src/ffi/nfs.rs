@@ -19,13 +19,13 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::App;
-use app::errors::AppError;
-use app::ffi::helper::send_with_mdata_info;
-use app::object_cache::MDataInfoHandle;
+use App;
+use errors::AppError;
+use ffi::helper::send_with_mdata_info;
 use ffi_utils::{FfiString, catch_unwind_cb, u8_vec_to_ptr};
 use ffi_utils::callback::CallbackArgs;
 use futures::Future;
+use object_cache::MDataInfoHandle;
 use routing::{XOR_NAME_LEN, XorName};
 use safe_core::nfs::File as NativeFile;
 use safe_core::nfs::file_helper;
@@ -181,14 +181,13 @@ pub unsafe extern "C" fn file_update(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::App;
-    use app::errors::AppError;
-    use app::ffi::cipher_opt::CipherOpt;
-    use app::ffi::immutable_data::*;
-    use app::object_cache::CipherOptHandle;
-    use app::test_utils::{create_app_with_access, run_now};
+    use App;
+    use errors::AppError;
+    use ffi::cipher_opt::CipherOpt;
+    use ffi::immutable_data::*;
     use ffi_utils::{ErrorCode, FfiString};
     use ffi_utils::test_utils::{call_0, call_1, call_2, call_3};
+    use object_cache::CipherOptHandle;
     use routing::{XOR_NAME_LEN, XorName};
     use safe_core::{DIR_TAG, MDataInfo};
     use safe_core::ipc::Permission;
@@ -196,6 +195,7 @@ mod tests {
     use safe_core::nfs::NfsError;
     use std::collections::HashMap;
     use super::*;
+    use test_utils::{create_app_with_access, run_now};
 
     #[test]
     fn basics() {

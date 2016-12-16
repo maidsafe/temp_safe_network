@@ -19,10 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::App;
-use app::ffi::helper::send_sync;
-use app::object_cache::MDataInfoHandle;
+use App;
+use ffi::helper::send_sync;
 use ffi_utils::{catch_unwind_cb, u8_vec_to_ptr};
+use object_cache::MDataInfoHandle;
 use routing::XOR_NAME_LEN;
 use safe_core::MDataInfo;
 use std::os::raw::c_void;
@@ -126,10 +126,10 @@ fn mdata_info_extract_name_and_type_tag(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::test_utils::{create_app, run_now};
     use ffi_utils::test_utils::call_1;
     use rand;
     use super::*;
+    use test_utils::{create_app, run_now};
 
     #[test]
     fn create_public() {

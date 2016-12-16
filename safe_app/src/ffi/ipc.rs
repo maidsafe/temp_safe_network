@@ -21,7 +21,7 @@
 
 //! App-related IPC utilities.
 
-use app::errors::AppError;
+use errors::AppError;
 use ffi_utils::{FfiString, catch_unwind_cb, catch_unwind_error_code};
 use rand::{self, Rng};
 use safe_core::ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};

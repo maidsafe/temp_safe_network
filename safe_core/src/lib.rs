@@ -55,7 +55,6 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate lru_cache;
-#[macro_use]
 extern crate maidsafe_utilities;
 extern crate rand;
 extern crate routing;

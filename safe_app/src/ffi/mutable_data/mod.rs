@@ -26,14 +26,14 @@ mod helper;
 #[cfg(test)]
 mod tests;
 
-use app::App;
-use app::errors::AppError;
-use app::ffi::helper::send_with_mdata_info;
-use app::object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle,
-                        MDataKeysHandle, MDataPermissionSetHandle, MDataPermissionsHandle,
-                        MDataValuesHandle, SignKeyHandle};
+use App;
+use errors::AppError;
+use ffi::helper::send_with_mdata_info;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb, u8_ptr_to_vec, u8_vec_to_ptr};
 use futures::Future;
+use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle, MDataKeysHandle,
+                   MDataPermissionSetHandle, MDataPermissionsHandle, MDataValuesHandle,
+                   SignKeyHandle};
 use routing::MutableData;
 use safe_core::{CoreError, FutureExt};
 use std::os::raw::c_void;

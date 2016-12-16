@@ -19,12 +19,12 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::App;
-use app::errors::AppError;
-use app::object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
+use App;
+use errors::AppError;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
+use object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
 use routing::{XOR_NAME_LEN, XorName};
 use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
@@ -312,13 +312,13 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::errors::AppError;
-    use app::ffi::cipher_opt::*;
-    use app::test_utils::create_app;
+    use errors::AppError;
+    use ffi::cipher_opt::*;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_3};
     use safe_core::utils;
     use super::*;
+    use test_utils::create_app;
 
     #[test]
     fn immut_data_operations() {

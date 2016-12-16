@@ -19,10 +19,58 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+//! SAFE App
+
+#![doc(html_logo_url =
+           "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
+       html_favicon_url = "http://maidsafe.net/img/favicon.ico",
+       html_root_url = "http://maidsafe.github.io/safe_core")]
+
+// For explanation of lint checks, run `rustc -W help` or see
+// https://github.
+// com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
+#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
+          unknown_crate_types, warnings)]
+#![deny(bad_style, deprecated, improper_ctypes, missing_docs,
+        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
+        private_no_mangle_fns, private_no_mangle_statics, stable_features,
+        unconditional_recursion, unknown_lints, unsafe_code, unused,
+        unused_allocation, unused_attributes, unused_comparisons, unused_features,
+        unused_parens, while_true)]
+#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+        unused_qualifications, unused_results)]
+#![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
+         missing_debug_implementations, variant_size_differences)]
+
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
+                                   option_unwrap_used))]
+#![cfg_attr(feature="clippy", allow(use_debug, too_many_arguments))]
+
+#[macro_use]
+extern crate ffi_utils;
+extern crate futures;
+#[macro_use]
+extern crate log;
+extern crate lru_cache;
+extern crate maidsafe_utilities;
+extern crate rand;
+extern crate routing;
+extern crate rustc_serialize;
+extern crate rust_sodium;
+#[macro_use]
+extern crate safe_core;
+extern crate self_encryption;
+extern crate time;
+extern crate tokio_core;
+#[macro_use]
+extern crate unwrap;
+
 pub mod ffi;
+pub mod object_cache;
 
 mod errors;
-mod object_cache;
 #[cfg(test)]
 mod test_utils;
 

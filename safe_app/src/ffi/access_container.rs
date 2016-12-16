@@ -19,10 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::App;
-use app::object_cache::MDataInfoHandle;
+use ::App;
 use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb};
 use futures::Future;
+use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
 use safe_core::ipc::req::ffi::Permission;
 use std::os::raw::c_void;

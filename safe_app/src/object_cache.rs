@@ -19,7 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::ffi::cipher_opt::CipherOpt;
+//! This module implements storage (cache) for objects that have to be passed
+//! across FFI boundaries.
+
+use ffi::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, Value};
 use rust_sodium::crypto::{box_, sign};
@@ -88,6 +91,7 @@ pub struct ObjectCache {
 }
 
 impl ObjectCache {
+    /// Construct object cache.
     pub fn new() -> Self {
         ObjectCache {
             handle_gen: HandleGenerator::new(),
@@ -106,6 +110,7 @@ impl ObjectCache {
         }
     }
 
+    /// Reset the object cache by removing all objects stored in it.
     pub fn reset(&self) {
         self.handle_gen.reset();
         self.cipher_opt.clear();
@@ -132,16 +137,19 @@ macro_rules! impl_cache {
      $insert:ident,
      $remove:ident) => {
         impl ObjectCache {
+            /// Insert object into the object cache, returning a new handle to it.
             pub fn $insert(&self, value: $ty) -> $handle {
                 let handle = self.handle_gen.gen();
                 self.$name.insert(handle, value);
                 handle
             }
 
+            /// Retrieve object from the object cache, returning mutable reference to it.
             pub fn $get(&self, handle: $handle) -> Result<RefMut<$ty>, AppError> {
                 self.$name.get(handle).ok_or(AppError::$error)
             }
 
+            /// Remove object from the object cache and return it.
             pub fn $remove(&self, handle: $handle) -> Result<$ty, AppError> {
                 self.$name.remove(handle).ok_or(AppError::$error)
             }

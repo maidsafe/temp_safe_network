@@ -56,22 +56,15 @@ extern crate futures;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate lru_cache;
-#[macro_use]
 extern crate maidsafe_utilities;
-extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate rust_sodium;
 #[macro_use]
 extern crate safe_core;
-extern crate self_encryption;
-extern crate time;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
 
-/// Application functions;
-pub mod app;
 /// Authenticator module;
 pub mod authenticator;

@@ -19,9 +19,9 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::App;
-use app::object_cache::EncryptKeyHandle;
+use App;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
+use object_cache::EncryptKeyHandle;
 use rust_sodium::crypto::box_;
 use std::os::raw::c_void;
 

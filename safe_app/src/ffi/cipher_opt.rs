@@ -19,11 +19,11 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::App;
-use app::errors::AppError;
-use app::object_cache::{CipherOptHandle, EncryptKeyHandle};
+use ::App;
+use errors::AppError;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
+use object_cache::{CipherOptHandle, EncryptKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
 use safe_core::CoreError;
 use std::os::raw::c_void;
@@ -182,17 +182,17 @@ pub unsafe extern "C" fn cipher_opt_free(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use app::{App, AppContext};
-    use app::errors::AppError;
-    use app::object_cache::CipherOptHandle;
-    use app::test_utils::{create_app, run_now};
+    use ::{App, AppContext};
+    use errors::AppError;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1};
+    use object_cache::CipherOptHandle;
     use rust_sodium::crypto::box_;
     use safe_core::{Client, utils};
     use std::os::raw::c_void;
     use std::sync::mpsc;
     use super::*;
+    use test_utils::{create_app, run_now};
 
     #[test]
     fn app_0_to_app_0_plain() {

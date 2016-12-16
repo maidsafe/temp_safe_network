@@ -19,8 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use app::errors::AppError;
-use app::object_cache::{MDataPermissionsHandle, ObjectCache, SignKeyHandle};
+use errors::AppError;
+use object_cache::{MDataPermissionsHandle, ObjectCache, SignKeyHandle};
 use routing::{EntryAction, PermissionSet, User, Value};
 use safe_core::MDataInfo;
 use std::collections::{BTreeMap, BTreeSet};
