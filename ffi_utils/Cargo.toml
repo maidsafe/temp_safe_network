@@ -1,18 +1,22 @@
 [package]
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "FFI utilities"
+documentation = "https://docs.rs/ffi_utils"
 homepage = "http://maidsafe.net"
 license = "GPL-3.0"
 name = "ffi_utils"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_client_libs"
-version = "0.22.0"
+version = "0.1.0"
 
 [dependencies]
 clippy = { version = "=0.0.99", optional = true }
 log = "~0.3.6"
+# TODO rand is only used by tests but putting it as dev-dependency fails to compile with
+# cargo rustc --release --features clippy --verbose -- --test -Zno-trans
+# cargo rustc --release -- --test -Zno-trans
+# See if this is a bug with using `cargo rustc` instead of normal cargo tests and if so
+# file a bug report and track it.
+rand = "~0.3.14"
 rustc-serialize = "~0.3.22"
 unwrap = "~1.1.0"
-
-[dev-dependencies]
-rand = "~0.3.14"

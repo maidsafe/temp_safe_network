@@ -98,7 +98,8 @@ pub unsafe extern "C" fn ffi_string_free(s: FfiString) {
 #[cfg(test)]
 mod tests {
     extern crate rand;
-    use self::rand::{Rng, thread_rng};
+
+    use self::rand::Rng;
     use super::*;
 
     #[test]
@@ -114,7 +115,7 @@ mod tests {
     }
 
     fn random_string(len: usize) -> String {
-        let mut rng = thread_rng();
+        let mut rng = rand::thread_rng();
         (0..len).map(|_| rng.gen::<char>()).collect()
     }
 }

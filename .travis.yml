@@ -1,6 +1,6 @@
 env:
   global:
-    - Features=use-mock-routing
+    - Feature=use-mock-routing
     - RUST_BACKTRACE=1
     - PATH=$PATH:$HOME/.cargo/bin
 os:
@@ -23,40 +23,37 @@ before_script:
   - (which cargo-prune && cargo install-update cargo-prune) || cargo install cargo-prune
 script:
   - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
-      (
-        set -x;
-        cd ffi_utils &&
-        cargo fmt -- --write-mode=diff &&
-        cargo test  --verbose --release
-      );
+        (
+            set -x;
+            cd ffi_utils &&
+            cargo fmt -- --write-mode=diff &&
+            cargo test  --verbose --release &&
+            cd ../safe_core &&
+            cargo fmt -- --write-mode=diff &&
+            cargo rustc --verbose --release -- --test -Zno-trans &&
+            cargo test  --verbose --release --features "$Feature" &&
+            cd ../safe_app &&
+            cargo fmt -- --write-mode=diff &&
+            cargo rustc --verbose --release -- --test -Zno-trans &&
+            cargo test  --verbose --release --features "$Feature" &&
+            cd ../safe_authenticator &&
+            cargo fmt -- --write-mode=diff &&
+            cargo rustc --verbose --release -- --test -Zno-trans &&
+            cargo test  --verbose --release --features "$Feature";
+        );
+    elif [ "${TRAVIS_RUST_VERSION}" = nightly -a "${TRAVIS_OS_NAME}" = linux ]; then
+        (
+            set -x;
+            sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=nightly-2016-11-17 -y --disable-sudo;
+            rustc --version;
+            cd ffi_utils && cargo rustc --features clippy -- --test -Zno-trans &&
+            cd ../safe_core && cargo rustc --features clippy -- --test -Zno-trans &&
+            cd ../safe_app && cargo rustc --features clippy -- --test -Zno-trans &&
+            cd ../safe_authenticator && cargo rustc --features clippy -- --test -Zno-trans &&
+            cd ../safe_core && cargo rustc --features "clippy $Feature" -- --test -Zno-trans &&
+            cd ../safe_app && cargo rustc --features "clippy $Feature" -- --test -Zno-trans &&
+            cd ../safe_authenticator && cargo rustc --features "clippy $Feature" -- --test -Zno-trans;
+        );
     fi
-  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
-      (
-        set -x;
-        cd safe_core &&
-        cargo fmt -- --write-mode=diff &&
-        cargo rustc --verbose --release -- --test -Zno-trans &&
-        cargo test  --verbose --release --features use-mock-routing
-      );
-    fi
-  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
-      (
-        set -x;
-        cd safe_app &&
-        cargo fmt -- --write-mode=diff &&
-        cargo rustc --verbose --release -- --test -Zno-trans &&
-        cargo test  --verbose --release --features use-mock-routing
-      );
-    fi
-  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
-      (
-        set -x;
-        cd safe_authenticator &&
-        cargo fmt -- --write-mode=diff &&
-        cargo rustc --verbose --release -- --test -Zno-trans &&
-        cargo test  --verbose --release --features use-mock-routing
-      );
-    fi
-  - curl -sSL https://github.com/maidsafe/QA/raw/master/bash_scripts/travis/run_clippy.sh | bash
 before_cache:
   - cargo prune

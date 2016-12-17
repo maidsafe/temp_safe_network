@@ -24,11 +24,10 @@
 #![doc(html_logo_url =
            "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
        html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-       html_root_url = "http://maidsafe.github.io/safe_core")]
+       html_root_url = "http://maidsafe.github.io/ffi_utils")]
 
 // For explanation of lint checks, run `rustc -W help` or see
-// https://github.
-// com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
+// https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 #![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
           unknown_crate_types, warnings)]
 #![deny(bad_style, deprecated, improper_ctypes, missing_docs,
@@ -59,8 +58,9 @@ mod macros;
 mod base64;
 mod catch_unwind;
 mod byte_vec;
-pub mod callback;
 mod string;
+
+pub mod callback;
 pub mod test_utils;
 
 pub use self::base64::{base64_decode, base64_encode};

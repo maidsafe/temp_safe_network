@@ -40,8 +40,8 @@ pub unsafe fn send_via_user_data<T>(user_data: *mut c_void, value: T)
 }
 
 /// Call a FFI function and block until its callback gets called.
-/// Use this if the callback accepts no arguments in addition to user_data
-/// and error_code.
+/// Use this if the callback accepts no arguments in addition to `user_data`
+/// and `error_code`.
 pub fn call_0<F>(f: F) -> Result<(), i32>
     where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32))
 {
@@ -54,8 +54,8 @@ pub fn call_0<F>(f: F) -> Result<(), i32>
 
 /// Call a FFI function and block until its callback gets called, then return
 /// the argument which were passed to that callback.
-/// Use this if the callback accepts one argument in addition to user_data
-/// and error_code.
+/// Use this if the callback accepts one argument in addition to `user_data`
+/// and `error_code`.
 pub unsafe fn call_1<F, T>(f: F) -> Result<T, i32>
     where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T))
 {
@@ -68,8 +68,8 @@ pub unsafe fn call_1<F, T>(f: F) -> Result<T, i32>
 
 /// Call a FFI function and block until its callback gets called, then return
 /// the argument which were passed to that callback.
-/// Use this if the callback accepts two arguments in addition to user_data
-/// and error_code.
+/// Use this if the callback accepts two arguments in addition to `user_data`
+/// and `error_code`.
 pub unsafe fn call_2<F, T0, T1>(f: F) -> Result<(T0, T1), i32>
     where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T0, T1))
 {
@@ -82,8 +82,8 @@ pub unsafe fn call_2<F, T0, T1>(f: F) -> Result<(T0, T1), i32>
 
 /// Call a FFI function and block until its callback gets called, then return
 /// the arguments which were passed to that callback in a tuple.
-/// Use this if the callback accepts three arguments in addition to user_data and
-/// error_code.
+/// Use this if the callback accepts three arguments in addition to `user_data` and
+/// `error_code`.
 pub unsafe fn call_3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), i32>
     where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T0, T1, T2))
 {

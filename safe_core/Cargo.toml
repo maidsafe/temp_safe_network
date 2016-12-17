@@ -1,6 +1,7 @@
 [package]
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "SAFE core"
+documentation = "https://docs.rs/safe_core"
 homepage = "http://maidsafe.net"
 license = "GPL-3.0"
 name = "safe_core"
@@ -10,7 +11,7 @@ version = "0.22.0"
 
 [dependencies]
 clippy = { version = "=0.0.99", optional = true }
-ffi_utils = { path = "../ffi_utils" }
+ffi_utils = { path = "../ffi_utils", version = "~0.1.0" }
 futures = "~0.1.6"
 lazy_static = "~0.2.1"
 log = "~0.3.6"
