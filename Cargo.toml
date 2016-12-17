@@ -1,71 +1,22 @@
-[package]
-authors = ["MaidSafe Developers <dev@maidsafe.net>"]
-description = "SAFE Core API library"
-documentation = "http://docs.maidsafe.net/safe_core/latest"
-homepage = "http://maidsafe.net"
-license = "GPL-3.0"
-name = "safe_core"
-readme = "README.md"
-repository = "https://github.com/maidsafe/safe_core"
-version = "0.22.0"
+# Copyright 2016 MaidSafe.net limited.
+#
+# This SAFE Network Software is licensed to you under (1) the MaidSafe.net
+# Commercial License, version 1.0 or later, or (2) The General Public License
+# (GPL), version 3, depending on which licence you accepted on initial access
+# to the Software (the "Licences").
+#
+# By contributing code to the SAFE Network Software, or to this project
+# generally, you agree to be bound by the terms of the MaidSafe Contributor
+# Agreement, version 1.0.  This, along with the Licenses can be found in the
+# root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+#
+# Unless required by applicable law or agreed to in writing, the SAFE Network
+# Software distributed under the GPL Licence is distributed on an "AS IS"
+# BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+#
+# Please review the Licences for the specific language governing permissions
+# and limitations relating to use of the SAFE Network Software.
 
-[dependencies]
-clippy = { version = "=0.0.99", optional = true }
-config_file_handler = "~0.4.0"
-futures = "~0.1.6"
-lazy_static = "~0.2.1"
-log = "~0.3.6"
-lru-cache = "~0.1.0"
-maidsafe_utilities = "~0.10.0"
-rand = "~0.3.14"
-# routing = "~0.27.1"
-# routing = { git = "https://github.com/maidsafe/routing.git", branch = "mutable-data" }
-routing = { git = "https://github.com/madadam/routing.git", branch = "mutable-data" }
-rust_sodium = "~0.1.2"
-rustc-serialize = "~0.3.22"
-self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "dev" }
-time = "~0.1.35"
-tokio-core = "~0.1.1"
-unwrap = "~1.1.0"
-
-[dev-dependencies]
-crossbeam = "~0.2.10"
-docopt = "~0.6.86"
-regex = "~0.1.80"
-
-[[example]]
-bench = false
-test = true
-name = "email_stress_test"
-
-[[example]]
-bench = false
-test = true
-name = "client_stress_test"
-
-[[example]]
-bench = false
-test = true
-name = "self_authentication"
-
-[[example]]
-bench = false
-test = true
-name = "nfs_api"
-
-[[example]]
-bench = false
-test = true
-name = "simulate_browser"
-
-[[example]]
-bench = false
-test = true
-name = "email"
-
-[features]
-use-mock-routing = []
-
-[lib]
-crate_type = ["staticlib", "rlib", "cdylib"]
-name = "safe_core"
+[workspace]
+members = ["ffi_utils", "safe_app", "safe_authenticator", "safe_core"]
