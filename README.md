@@ -4,10 +4,10 @@
 
 |Crate|Linux/OS X|Windows|Issues|
 |:---:|:--------:|:-----:|:----:|
-|[![](http://meritbadge.herokuapp.com/safe_client_libs)](https://crates.io/crates/safe_client_libs)|[![Build Status](https://travis-ci.org/maidsafe/safe_client_libs.svg?branch=master)](https://travis-ci.org/maidsafe/safe_client_libs)|[![Build status](https://ci.appveyor.com/api/projects/status/qyvxnojplcwcey4l/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-client-libs/branch/master)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_client_libs.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_client_libs)|
+|[![](http://meritbadge.herokuapp.com/safe_client_libs)](https://crates.io/crates/safe_client_libs)|[![Build Status](https://travis-ci.org/maidsafe/safe_client_libs.svg?branch=dev)](https://travis-ci.org/maidsafe/safe_client_libs)|[![Build status](https://ci.appveyor.com/api/projects/status/qyvxnojplcwcey4l/branch/dev?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-client-libs/branch/dev)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_client_libs.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_client_libs)|
 
-| [API Docs - master branch](http://docs.maidsafe.net/safe_client_libs/master) | [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
-|:------:|:-------:|:-------:|:-------:|
+| [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
+|:-------:|:-------:|:-------:|
 
 This is the project workspace. Please refer to individual members for details:
 

@@ -2,7 +2,7 @@
 
 **Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
 
-[Documentation](https://docs.rs/safe_core)
+[![Documentation](https://docs.rs/safe_core/badge.svg)](https://docs.rs/safe_core)
 
 ## Build Instructions
 
