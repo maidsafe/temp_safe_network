@@ -1,6 +1,6 @@
 env:
   global:
-    - Feature=use-mock-routing
+    - Features=use-mock-routing
     - RUST_BACKTRACE=1
     - PATH=$PATH:$HOME/.cargo/bin
 os:
@@ -25,34 +25,43 @@ script:
   - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
         (
             set -x;
+            echo "--- Check format ---" &&
             cd ffi_utils &&
             cargo fmt -- --write-mode=diff &&
-            cargo test  --verbose --release &&
             cd ../safe_core &&
             cargo fmt -- --write-mode=diff &&
-            cargo rustc --verbose --release -- --test -Zno-trans &&
-            cargo test  --verbose --release --features "$Feature" &&
             cd ../safe_app &&
             cargo fmt -- --write-mode=diff &&
-            cargo rustc --verbose --release -- --test -Zno-trans &&
-            cargo test  --verbose --release --features "$Feature" &&
             cd ../safe_authenticator &&
             cargo fmt -- --write-mode=diff &&
+            echo "--- Test ffi_utils ---" &&
+            cd ../ffi_utils &&
+            cargo test  --verbose --release &&
+            echo "--- Check compilation against actual routing ---" &&
+            cd ../safe_core &&
+            cargo rustc --verbose --release &&
             cargo rustc --verbose --release -- --test -Zno-trans &&
-            cargo test  --verbose --release --features "$Feature";
+            cd ../safe_app &&
+            cargo rustc --verbose --release -- --test -Zno-trans &&
+            cd ../safe_authenticator &&
+            cargo rustc --verbose --release -- --test -Zno-trans &&
+            echo "--- Test against mock ---" &&
+            cd ../safe_core &&
+            cargo test --verbose --release --features "$Features" &&
+            cd ../safe_app &&
+            cargo test --verbose --release --features "$Features" &&
+            cd ../safe_authenticator &&
+            cargo test --verbose --release --features "$Features";
         );
-    elif [ "${TRAVIS_RUST_VERSION}" = nightly -a "${TRAVIS_OS_NAME}" = linux ]; then
+    else
         (
             set -x;
-            sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=nightly-2016-11-17 -y --disable-sudo;
-            rustc --version;
-            cd ffi_utils && cargo rustc --features clippy -- --test -Zno-trans &&
-            cd ../safe_core && cargo rustc --features clippy -- --test -Zno-trans &&
-            cd ../safe_app && cargo rustc --features clippy -- --test -Zno-trans &&
-            cd ../safe_authenticator && cargo rustc --features clippy -- --test -Zno-trans &&
-            cd ../safe_core && cargo rustc --features "clippy $Feature" -- --test -Zno-trans &&
-            cd ../safe_app && cargo rustc --features "clippy $Feature" -- --test -Zno-trans &&
-            cd ../safe_authenticator && cargo rustc --features "clippy $Feature" -- --test -Zno-trans;
+            curl -sSL -o run_clippy.sh https://github.com/maidsafe/QA/raw/master/bash_scripts/travis/run_clippy.sh &&
+
+            cd ffi_utils && unset Features && bash ../run_clippy.sh && export Features=use-mock-routing &&
+            cd ../safe_core && bash ../run_clippy.sh &&
+            cd ../safe_app && bash ../run_clippy.sh &&
+            cd ../safe_authenticator && bash ../run_clippy.sh;
         );
     fi
 before_cache:
