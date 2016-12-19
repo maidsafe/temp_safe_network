@@ -68,6 +68,8 @@ pub mod ffi;
 pub mod ipc;
 /// Authenticator errors
 mod errors;
+/// Helper functions to fetch and mutate access container entries
+mod access_container;
 
 use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
 use futures::Future;
