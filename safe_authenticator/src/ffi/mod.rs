@@ -29,7 +29,8 @@ use safe_core::utils::symmetric_decrypt;
 use std::{mem, ptr};
 use std::os::raw::c_void;
 use super::{AccessContainerEntry, AuthError, Authenticator};
-use super::ipc::{access_container, access_container_key, get_config};
+use super::access_container::{access_container, access_container_key};
+use super::ipc::get_config;
 
 /// Application registered in the authenticator
 #[repr(C)]
@@ -57,7 +58,7 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *mut Authenticator,
                 let c2 = client.clone();
                 let c3 = client.clone();
 
-                get_config(client.clone())
+                get_config(client)
                     .and_then(move |(_, auth_cfg)| {
                         access_container(c2)
                             .map(move |access_container| (access_container, auth_cfg))
