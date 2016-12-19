@@ -148,7 +148,42 @@ pub unsafe extern "C" fn decode_ipc_msg(auth: *mut Authenticator,
                     })?;
             }
             IpcMsg::Req { req: IpcReq::Containers(cont_req), req_id } => {
-                o_containers(user_data.0, req_id, cont_req.into_repr_c());
+                let app_id = cont_req.app.id.clone();
+                let app_id2 = app_id.clone();
+
+                (*auth).send(move |client| {
+                        let c2 = client.clone();
+
+                        get_config(client)
+                            .and_then(move |(_config_version, config)| {
+                                app_state(c2, &config, app_id)
+                            })
+                            .and_then(move |app_state| {
+                                match app_state {
+                                    AppState::Authenticated => {
+                                        o_containers(user_data.0, req_id, cont_req.into_repr_c());
+                                    }
+                                    AppState::Revoked |
+                                    AppState::NotAuthenticated => {
+                                        // App is not authenticated
+                                        let resp = encode_response(&IpcMsg::Resp {
+                                            req_id: req_id,
+                                            resp: IpcResp::Auth(Err(IpcError::UnknownApp))
+                                        }, app_id2)?;
+
+                                        let err = AuthError::from(IpcError::UnknownApp);
+
+                                        o_err(user_data.0, ffi_error_code!(err), resp);
+                                    }
+                                }
+                                Ok(())
+                            })
+                            .map_err(move |e| {
+                                o_err(user_data.0, ffi_error_code!(e), FfiString::default())
+                            })
+                            .into_box()
+                            .into()
+                    })?;
             }
             _ => {
                 return Err(IpcError::InvalidMsg.into());
@@ -510,6 +545,7 @@ fn encode_auth_resp_impl(client: Client,
     let app_info = app.info.clone();
     let app_id = app_info.id.clone();
 
+    // !! TODO(nbaksalyar) !! use appropriate version here
     client.ins_auth_key(app.keys.sign_pk, 0)
         .map_err(AuthError::from)
         .and_then(move |_| update_container_perms(c2, permissions, sign_pk))
