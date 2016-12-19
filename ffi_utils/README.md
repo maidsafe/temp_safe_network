@@ -2,7 +2,7 @@
 
 **Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
 
-| [![](http://meritbadge.herokuapp.com/safe_core)](https://crates.io/crates/ffi_utils) | [![Documentation](https://docs.rs/ffi_utils/badge.svg)](https://docs.rs/ffi_utils) |
+| [![](http://meritbadge.herokuapp.com/ffi_utils)](https://crates.io/crates/ffi_utils) | [![Documentation](https://docs.rs/ffi_utils/badge.svg)](https://docs.rs/ffi_utils) |
 |:----------:|:----------:|
 
 This crate contains utilities to be consumed by crates interfacing with other languages via FFI. It also contains utilities for testing in FFI scenario which gets compiled only during testing.
