@@ -2,7 +2,9 @@
 
 **Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
 
-[![Documentation](https://docs.rs/safe_authenticator/badge.svg)](https://docs.rs/safe_authenticator)
+| [![](http://meritbadge.herokuapp.com/safe_authenticator)](https://crates.io/crates/safe_authenticator) | [![Documentation](https://docs.rs/safe_authenticator/badge.svg)](https://docs.rs/safe_authenticator) |
+|:----------:|:----------:|
+
 
 This is the crate for interfacing with `Authenticator` frontend. It contains the business logic for the `Authenticator` UI and code for building the URI for communicating with [safe_app](../safe_app).
 
