@@ -22,6 +22,7 @@
 use App;
 use ffi::helper::send_sync;
 use ffi_utils::{catch_unwind_cb, u8_vec_to_ptr};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::MDataInfoHandle;
 use routing::XOR_NAME_LEN;
 use safe_core::MDataInfo;
@@ -37,7 +38,7 @@ pub unsafe extern "C" fn mdata_info_random_public(app: *const App,
                                                                       i32,
                                                                       MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |_, context| {
             let info = MDataInfo::random_public(type_tag)?;
             Ok(context.object_cache().insert_mdata_info(info))
         })
@@ -53,7 +54,7 @@ pub unsafe extern "C" fn mdata_info_random_private(app: *const App,
                                                                        i32,
                                                                        MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |_, context| {
             let info = MDataInfo::random_private(type_tag)?;
             Ok(context.object_cache().insert_mdata_info(info))
         })
@@ -75,7 +76,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         let input = slice::from_raw_parts(input_ptr, input_len).to_vec();
 
-        send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;
             let output = info.enc_entry_key(&input)?;
             Ok(u8_vec_to_ptr(output))
@@ -98,7 +99,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         let input = slice::from_raw_parts(input_ptr, input_len).to_vec();
 
-        send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;
             let output = info.enc_entry_value(&input)?;
             Ok(u8_vec_to_ptr(output))
@@ -117,17 +118,56 @@ fn mdata_info_extract_name_and_type_tag(app: *const App,
                                                             [u8; XOR_NAME_LEN],
                                                             u64)) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |context| {
+        send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;
             Ok((info.name.0, info.type_tag))
         })
     })
 }
 
+/// Serialise `MDataInfo`.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_info_serialise(app: *const App,
+                                              info_h: MDataInfoHandle,
+                                              user_data: *mut c_void,
+                                              o_cb: extern "C" fn(*mut c_void,
+                                                                  i32,
+                                                                  *mut u8,
+                                                                  usize,
+                                                                  usize)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        send_sync(app, user_data, o_cb, move |_, context| {
+            let info = context.object_cache().get_mdata_info(info_h)?;
+            let encoded = serialise(&*info)?;
+            Ok(u8_vec_to_ptr(encoded))
+        })
+    })
+}
+
+/// Deserialise `MDataInfo`.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_info_deserialise(app: *const App,
+                                                ptr: *const u8,
+                                                len: usize,
+                                                user_data: *mut c_void,
+                                                o_cb: extern "C" fn(*mut c_void,
+                                                                    i32,
+                                                                    MDataInfoHandle)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let encoded = slice::from_raw_parts(ptr, len).to_vec();
+
+        send_sync(app, user_data, o_cb, move |_, context| {
+            let info = deserialise(&encoded)?;
+            Ok(context.object_cache().insert_mdata_info(info))
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use ffi_utils::test_utils::call_1;
+    use ffi_utils::test_utils::{call_1, call_3};
     use rand;
+    use safe_core::MDataInfo;
     use super::*;
     use test_utils::{create_app, run_now};
 
@@ -144,5 +184,37 @@ mod tests {
             assert_eq!(info.type_tag, type_tag);
             assert!(info.enc_info.is_none());
         })
+    }
+
+    #[test]
+    fn serialise_deserialise() {
+        let app = create_app();
+        let info1 = unwrap!(MDataInfo::random_private(1000));
+
+        let info1_h = {
+            let info = info1.clone();
+            run_now(&app,
+                    move |_, context| context.object_cache().insert_mdata_info(info))
+        };
+
+        let encoded = unsafe {
+            let res = call_3(|ud, cb| mdata_info_serialise(&app, info1_h, ud, cb));
+            let (ptr, len, cap) = unwrap!(res);
+            Vec::from_raw_parts(ptr, len, cap)
+        };
+
+        let info2_h = unsafe {
+            let res = call_1(|ud, cb| {
+                mdata_info_deserialise(&app, encoded.as_ptr(), encoded.len(), ud, cb)
+            });
+
+            unwrap!(res)
+        };
+
+        let info2 = run_now(&app, move |_, context| {
+            unwrap!(context.object_cache().remove_mdata_info(info2_h))
+        });
+
+        assert_eq!(info1, info2);
     }
 }

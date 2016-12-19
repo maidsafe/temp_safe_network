@@ -39,12 +39,12 @@ pub unsafe fn send_sync<C, F>(app: *const App,
                               f: F)
                               -> Result<(), AppError>
     where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&AppContext) -> Result<C::Args, AppError> + Send + 'static
+          F: FnOnce(&Client, &AppContext) -> Result<C::Args, AppError> + Send + 'static
 {
     let user_data = OpaqueCtx(user_data);
 
-    (*app).send(move |_, context| {
-        match f(context) {
+    (*app).send(move |client, context| {
+        match f(client, context) {
             Ok(args) => o_cb.call(user_data.0, 0, args),
             Err(err) => o_cb.call(user_data.0, ffi_error_code!(err), C::Args::default()),
         }

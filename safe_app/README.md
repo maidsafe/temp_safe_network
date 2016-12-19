@@ -2,7 +2,8 @@
 
 **Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
 
-[![Documentation](https://docs.rs/safe_app/badge.svg)](https://docs.rs/safe_app)
+| [![](http://meritbadge.herokuapp.com/safe_app)](https://crates.io/crates/safe_app) | [![Documentation](https://docs.rs/safe_app/badge.svg)](https://docs.rs/safe_app) |
+|:----------:|:----------:|
 
 This is the crate for interfacing with application frontends. It contains code for applications to manipulate SAFE data-types on behalf of the owner and code for building the URI for communicating with [safe_authenticator](../safe_authenticator).
 
