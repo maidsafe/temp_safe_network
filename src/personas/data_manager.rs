@@ -60,8 +60,10 @@ struct PendingWrite {
     dst: Authority<XorName>,
     message_id: MessageId,
     mutate_type: PendingMutationType,
+    rejected: bool,
 }
 
+#[derive(Clone, RustcEncodable)]
 enum PendingMutationType {
     Append,
     Put,
@@ -312,10 +314,16 @@ impl Cache {
                             mutate_type: PendingMutationType,
                             src: Authority<XorName>,
                             dst: Authority<XorName>,
-                            msg_id: MessageId)
+                            msg_id: MessageId,
+                            rejected: bool)
                             -> Option<RefreshData> {
-        let hash = maidsafe_utilities::big_endian_sip_hash(&data);
+        let hash_pair = match serialisation::serialise(&(data.clone(), mutate_type.clone())) {
+            Err(_) => return None,
+            Ok(serialised) => serialised,
+        };
+        let hash = maidsafe_utilities::big_endian_sip_hash(&hash_pair);
         let (data_id, version) = id_and_version_of(&data);
+
         let pending_write = PendingWrite {
             hash: hash,
             data: data,
@@ -324,15 +332,15 @@ impl Cache {
             dst: dst,
             message_id: msg_id,
             mutate_type: mutate_type,
+            rejected: rejected,
         };
-        let mut result = None;
-        self.pending_writes
-            .entry(data_id)
-            .or_insert_with(|| {
-                result = Some(RefreshData((data_id, version), hash));
-                Vec::new()
-            })
-            .insert(0, pending_write);
+        let mut writes = self.pending_writes.entry(data_id).or_insert_with(Vec::new);
+        let result = if !rejected && writes.iter().all(|pending_write| pending_write.rejected) {
+            Some(RefreshData((data_id, version), hash))
+        } else {
+            None
+        };
+        writes.insert(0, pending_write);
         result
     }
 
@@ -482,7 +490,7 @@ impl DataManager {
             }
         }
 
-        self.update_pending_writes(data, PendingMutationType::Put, src, dst, message_id, valid)
+        self.update_pending_writes(data, PendingMutationType::Put, src, dst, message_id, !valid)
     }
 
     /// Handles a Post request for structured or appendable data.
@@ -562,7 +570,7 @@ impl DataManager {
                                    src,
                                    dst,
                                    message_id,
-                                   error_opt.is_none())
+                                   error_opt.is_some())
     }
 
     /// The structured_data in the delete request must be a valid updating version of the target
@@ -588,7 +596,7 @@ impl DataManager {
                                            src,
                                            dst,
                                            message_id,
-                                           error_opt.is_none())?;
+                                           error_opt.is_some())?;
                 error_opt
             }
             Ok(_) => Some(MutationError::InvalidOperation),
@@ -655,7 +663,7 @@ impl DataManager {
                                        src,
                                        dst,
                                        message_id,
-                                       true)
+                                       false)
         } else {
             trace!("DM sending append_failure for: {:?} with {:?}",
                    data_id,
@@ -805,7 +813,7 @@ impl DataManager {
         let RefreshData((data_id, version), refresh_hash) =
             serialisation::deserialise(serialised_refresh)?;
         let mut success = false;
-        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in
+        for PendingWrite { data, mutate_type, src, dst, message_id, hash, rejected, .. } in
             self.cache.take_pending_writes(&data_id) {
             if hash == refresh_hash {
                 let already_existed = self.chunk_store.has(&data_id);
@@ -848,7 +856,7 @@ impl DataManager {
                     let _ = self.send_refresh(Authority::NaeManager(*data_id.name()), data_list);
                     success = true;
                 }
-            } else {
+            } else if !rejected {
                 trace!("{:?} did not accumulate. Sending failure", data_id);
                 let error = MutationError::NetworkOther("Concurrent modification.".to_owned());
                 self.send_failure(mutate_type, src, dst, data.identifier(), message_id, error)?;
@@ -897,7 +905,7 @@ impl DataManager {
                              src: Authority<XorName>,
                              dst: Authority<XorName>,
                              message_id: MessageId,
-                             refresh: bool)
+                             rejected: bool)
                              -> Result<(), InternalError> {
         for PendingWrite { mutate_type, src, dst, data, message_id, .. } in
             self.cache.remove_expired_writes() {
@@ -909,10 +917,8 @@ impl DataManager {
         let data_name = *data.name();
 
         if let Some(refresh_data) =
-            self.cache.insert_pending_write(data, mutate_type, src, dst, message_id) {
-            if refresh {
-                let _ = self.send_group_refresh(data_name, refresh_data, message_id);
-            }
+            self.cache.insert_pending_write(data, mutate_type, src, dst, message_id, rejected) {
+            let _ = self.send_group_refresh(data_name, refresh_data, message_id);
         }
         Ok(())
     }
