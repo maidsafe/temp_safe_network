@@ -66,15 +66,19 @@ extern crate unwrap;
 pub mod ffi;
 /// Authenticator communication with apps
 pub mod ipc;
-/// Authenticator errors
+/// Public ID routines
+pub mod public_id;
+
 mod errors;
-/// Helper functions to fetch and mutate access container entries
 mod access_container;
+
+#[cfg(test)]
+mod test_utils;
 
 use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
 use futures::Future;
 use futures::stream::Stream;
-use futures::sync::mpsc::{self, SendError};
+use futures::sync::mpsc;
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::{EntryAction, Value};
@@ -112,12 +116,12 @@ pub struct Authenticator {
 
 impl Authenticator {
     /// Send a message to the authenticator event loop
-    pub fn send<F>(&self, f: F) -> Result<(), SendError<CoreMsg<()>>>
+    pub fn send<F>(&self, f: F) -> Result<(), AuthError>
         where F: FnOnce(&Client) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static
     {
         let msg = CoreMsg::new(|client, _| f(client));
         let mut core_tx = unwrap!(self.core_tx.lock());
-        core_tx.send(msg)
+        core_tx.send(msg).map_err(AuthError::from)
     }
 
     /// Create a new account
