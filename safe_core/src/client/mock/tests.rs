@@ -452,9 +452,7 @@ fn mutable_data_permissions() {
                     ClientError::AccessDenied);
 
     // App can't grant itself permission to update.
-    let mut perms = PermissionSet::new();
-    let _ = perms.allow(Action::Update);
-
+    let perms = PermissionSet::new().allow(Action::Update);
     let msg_id = MessageId::new();
     unwrap!(app_routing.set_mdata_user_permissions(client_mgr,
                                                    name,
@@ -480,9 +478,7 @@ fn mutable_data_permissions() {
                     ClientError::AccessDenied);
 
     // Grant insert permission for app.
-    let mut perms = PermissionSet::new();
-    let _ = perms.allow(Action::Insert);
-
+    let perms = PermissionSet::new().allow(Action::Insert);
     let msg_id = MessageId::new();
     unwrap!(routing.set_mdata_user_permissions(client_mgr,
                                                name,
@@ -530,9 +526,7 @@ fn mutable_data_permissions() {
     expect_success!(app_routing_rx, msg_id, Response::MutateMDataEntries);
 
     // Attempt to modify permissions without proper version bump fails
-    let mut perms = PermissionSet::new();
-    let _ = perms.allow(Action::Insert).allow(Action::Update);
-
+    let perms = PermissionSet::new().allow(Action::Insert).allow(Action::Update);
     let msg_id = MessageId::new();
     unwrap!(routing.set_mdata_user_permissions(client_mgr,
                                                name,
@@ -548,9 +542,7 @@ fn mutable_data_permissions() {
                     ClientError::InvalidSuccessor);
 
     // Modifing permissions with version bump succeeds.
-    let mut perms = PermissionSet::new();
-    let _ = perms.allow(Action::Insert).allow(Action::Update);
-
+    let perms = PermissionSet::new().allow(Action::Insert).allow(Action::Update);
     let msg_id = MessageId::new();
     unwrap!(routing.set_mdata_user_permissions(client_mgr,
                                                name,
@@ -597,9 +589,7 @@ fn mutable_data_permissions() {
                     ClientError::AccessDenied);
 
     // Grant the app permission to manage permissions.
-    let mut perms = PermissionSet::new();
-    let _ = perms.allow(Action::ManagePermissions);
-
+    let perms = PermissionSet::new().allow(Action::ManagePermissions);
     let msg_id = MessageId::new();
     unwrap!(routing.set_mdata_user_permissions(client_mgr,
                                                name,
@@ -622,9 +612,7 @@ fn mutable_data_permissions() {
                     ClientError::AccessDenied);
 
     // App can modify its own permission.
-    let mut perms = PermissionSet::new();
-    let _ = perms.allow(Action::Update);
-
+    let perms = PermissionSet::new().allow(Action::Update);
     let msg_id = MessageId::new();
     unwrap!(app_routing.set_mdata_user_permissions(client_mgr,
                                                    name,
@@ -648,7 +636,7 @@ fn mutable_data_permissions() {
     let app2_sign_key = *app2_full_id.public_id().signing_public_key();
 
     let msg_id = MessageId::new();
-    unwrap!(routing.ins_auth_key(client_mgr, app2_sign_key, 1, msg_id));
+    unwrap!(routing.ins_auth_key(client_mgr, app2_sign_key, 2, msg_id));
     expect_success!(routing_rx, msg_id, Response::InsAuthKey);
 
     // The new app can't mutate entries
@@ -668,9 +656,7 @@ fn mutable_data_permissions() {
                     ClientError::AccessDenied);
 
     // Grant insert permission for anyone.
-    let mut perms = PermissionSet::new();
-    let _ = perms.allow(Action::Insert);
-
+    let perms = PermissionSet::new().allow(Action::Insert);
     let msg_id = MessageId::new();
     unwrap!(routing.set_mdata_user_permissions(client_mgr,
                                                name,
@@ -803,6 +789,75 @@ fn mutable_data_ownership() {
                                            msg_id,
                                            owner_key));
     expect_success!(owner_routing_rx, msg_id, Response::ChangeMDataOwner);
+}
+
+#[test]
+fn auth_keys() {
+    let (routing, routing_rx, full_id) = setup();
+    let owner_key = *full_id.public_id().signing_public_key();
+    let client_mgr = create_account(&routing, &routing_rx, owner_key);
+
+    let (auth_key1, _) = sign::gen_keypair();
+    let (auth_key2, _) = sign::gen_keypair();
+
+    // Initially, the list of auth keys should be empty and the version should be zero.
+    let msg_id = MessageId::new();
+    unwrap!(routing.list_auth_keys_and_version(client_mgr, msg_id));
+    let (auth_keys, version) =
+        expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
+    assert!(auth_keys.is_empty());
+    assert_eq!(version, 0);
+
+    // Attempt to insert an auth key without proper version bump fails.
+    let msg_id = MessageId::new();
+    unwrap!(routing.ins_auth_key(client_mgr, auth_key1, 0, msg_id));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::InsAuthKey,
+                    ClientError::InvalidSuccessor);
+
+    // Insert an auth key with proper version bump succeeds.
+    let msg_id = MessageId::new();
+    unwrap!(routing.ins_auth_key(client_mgr, auth_key1, 1, msg_id));
+    expect_success!(routing_rx, msg_id, Response::InsAuthKey);
+
+    // Retrieve the list of auth keys and version
+    let msg_id = MessageId::new();
+    unwrap!(routing.list_auth_keys_and_version(client_mgr, msg_id));
+    let (auth_keys, version) =
+        expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
+    assert_eq!(auth_keys.len(), 1);
+    assert!(auth_keys.contains(&auth_key1));
+    assert_eq!(version, 1);
+
+    // Attempt to delete auth key without proper version bump fails.
+    let msg_id = MessageId::new();
+    unwrap!(routing.del_auth_key(client_mgr, auth_key1, 1, msg_id));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::DelAuthKey,
+                    ClientError::InvalidSuccessor);
+
+    // Attempt to delete non-existing key fails.
+    let msg_id = MessageId::new();
+    unwrap!(routing.del_auth_key(client_mgr, auth_key2, 2, msg_id));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::DelAuthKey,
+                    ClientError::NoSuchKey);
+
+    // Delete auth key with proper version bump succeeds.
+    let msg_id = MessageId::new();
+    unwrap!(routing.del_auth_key(client_mgr, auth_key1, 2, msg_id));
+    expect_success!(routing_rx, msg_id, Response::DelAuthKey);
+
+    // Retrieve the list of auth keys and version
+    let msg_id = MessageId::new();
+    unwrap!(routing.list_auth_keys_and_version(client_mgr, msg_id));
+    let (auth_keys, version) =
+        expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
+    assert!(auth_keys.is_empty());
+    assert_eq!(version, 2);
 }
 
 fn setup() -> (Routing, Receiver<Event>, FullId) {

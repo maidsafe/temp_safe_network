@@ -204,8 +204,8 @@ fn create_all_mdata(client: Client, infos: Vec<MDataInfo>) -> Box<CoreFuture<()>
 
     // Allow everything for anyone.
     let permissions = {
-        let mut set = PermissionSet::new();
-        let _ = set.allow(Action::Insert).allow(Action::Update).allow(Action::Delete);
+        let set =
+            PermissionSet::new().allow(Action::Insert).allow(Action::Update).allow(Action::Delete);
         btree_map![User::Anyone => set]
     };
 

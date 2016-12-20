@@ -53,7 +53,7 @@ pub enum CoreEvent {
     /// Result of getting a list of permissions in `MutableData` for a single user
     ListMDataUserPermissions(Result<PermissionSet, CoreError>),
     /// Result of getting a list of authorised keys
-    ListAuthKeysAndVersion(Result<BTreeSet<sign::PublicKey>, CoreError>),
+    ListAuthKeysAndVersion(Result<(BTreeSet<sign::PublicKey>, u64), CoreError>),
 }
 
 /// Netowork Events that Client Modules need to deal with

@@ -608,13 +608,13 @@ impl Client {
     }
 
     /// Fetches a list of authorised keys and version in MaidManager
-    pub fn list_auth_keys(&self) -> Box<CoreFuture<BTreeSet<sign::PublicKey>>> {
+    pub fn list_auth_keys_and_version(&self) -> Box<CoreFuture<(BTreeSet<sign::PublicKey>, u64)>> {
         trace!("ListAuthKeysAndVersion");
 
         let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
 
         self.get(CoreEvent::ListAuthKeysAndVersion,
-                 |routing, msg_id| routing.list_auth_keys(dst, msg_id))
+                 |routing, msg_id| routing.list_auth_keys_and_version(dst, msg_id))
             .and_then(|event| match_event!(event, CoreEvent::ListAuthKeysAndVersion))
             .into_box()
     }

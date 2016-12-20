@@ -84,11 +84,8 @@ fn md_created_by_app_2() {
         let sign_pk = unwrap!(client.public_signing_key());
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Key(sign_pk), {
-            let mut s = PermissionSet::new();
-            let _ = s.allow(Action::ManagePermissions);
-            s
-        });
+        let _ = permissions.insert(User::Key(sign_pk),
+                                   PermissionSet::new().allow(Action::ManagePermissions));
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.owner_key()));
@@ -179,8 +176,7 @@ fn md_created_by_app_3() {
                     Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let user = User::Key(sign_pk);
-                let mut permissions = PermissionSet::new();
-                let _ = permissions.allow(Action::Update);
+                let permissions = PermissionSet::new().allow(Action::Update);
                 cl3.set_mdata_user_permissions(name2, DIR_TAG, user, permissions, 2)
             })
             .then(move |res| -> Result<_, ()> {
@@ -201,11 +197,8 @@ fn md_created_by_app_3() {
             let mut rng = unwrap!(OsRng::new());
 
             let mut permissions = BTreeMap::new();
-            let _ = permissions.insert(User::Key(app_sign_pk), {
-                let mut s = PermissionSet::new();
-                let _ = s.allow(Action::Insert);
-                s
-            });
+            let _ = permissions.insert(User::Key(app_sign_pk),
+                                       PermissionSet::new().allow(Action::Insert));
 
             let mut owners = BTreeSet::new();
             owners.insert(unwrap!(client.owner_key()));
@@ -282,8 +275,7 @@ fn md_created_by_app_4() {
                     Err(x) => panic!("Expected ClientError::AccessDenied. Got {:?}", x),
                 }
                 let user = User::Key(sign_pk);
-                let mut permissions = PermissionSet::new();
-                let _ = permissions.allow(Action::Insert).allow(Action::Delete);
+                let permissions = PermissionSet::new().allow(Action::Insert).allow(Action::Delete);
                 cl3.set_mdata_user_permissions(name2, DIR_TAG, user,
                                                permissions, 1)
             })
@@ -329,11 +321,8 @@ fn md_created_by_app_4() {
             let mut rng = unwrap!(OsRng::new());
 
             let mut permissions = BTreeMap::new();
-            let _ = permissions.insert(User::Key(app_sign_pk), {
-                let mut s = PermissionSet::new();
-                let _ = s.allow(Action::ManagePermissions);
-                s
-            });
+            let _ = permissions.insert(User::Key(app_sign_pk),
+                                       PermissionSet::new().allow(Action::ManagePermissions));
 
             let mut data = BTreeMap::new();
             let _ = data.insert(vec![1, 8, 3, 4],
@@ -381,16 +370,9 @@ fn multiple_apps() {
         let sign_pk = unwrap!(client.public_signing_key());
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Anyone, {
-            let mut s = PermissionSet::new();
-            let _ = s.allow(Action::Insert);
-            s
-        });
-        let _ = permissions.insert(User::Key(sign_pk), {
-            let mut s = PermissionSet::new();
-            let _ = s.allow(Action::ManagePermissions);
-            s
-        });
+        let _ = permissions.insert(User::Anyone, PermissionSet::new().allow(Action::Insert));
+        let _ = permissions.insert(User::Key(sign_pk),
+                                   PermissionSet::new().allow(Action::ManagePermissions));
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.owner_key()));
@@ -497,11 +479,8 @@ fn permissions_and_version() {
         let (random_key, _) = sign::gen_keypair();
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Key(sign_pk), {
-            let mut s = PermissionSet::new();
-            let _ = s.allow(Action::ManagePermissions);
-            s
-        });
+        let _ = permissions.insert(User::Key(sign_pk),
+                                   PermissionSet::new().allow(Action::ManagePermissions));
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.owner_key()));
@@ -518,8 +497,7 @@ fn permissions_and_version() {
         client.put_mdata(mdata)
             .then(move |res| {
                 unwrap!(res);
-                let mut permissions = PermissionSet::new();
-                let _ = permissions.allow(Action::Update);
+                let permissions = PermissionSet::new().allow(Action::Update);
                 cl2.set_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), permissions, 1)
             })
             .then(move |res| {
@@ -606,11 +584,8 @@ fn permissions_crud() {
         let (random_key_b, _) = sign::gen_keypair();
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Key(sign_pk), {
-            let mut s = PermissionSet::new();
-            let _ = s.allow(Action::ManagePermissions);
-            s
-        });
+        let _ = permissions.insert(User::Key(sign_pk),
+                                   PermissionSet::new().allow(Action::ManagePermissions));
 
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.owner_key()));
@@ -631,9 +606,7 @@ fn permissions_crud() {
         client.put_mdata(mdata)
             .then(move |res| {
                 unwrap!(res);
-                let mut permissions = PermissionSet::new();
-                let _ = permissions.allow(Action::Insert);
-                let _ = permissions.allow(Action::Delete);
+                let permissions = PermissionSet::new().allow(Action::Insert).allow(Action::Delete);
                 cl2.set_mdata_user_permissions(name,
                                                DIR_TAG,
                                                User::Key(random_key_a),
@@ -674,8 +647,7 @@ fn permissions_crud() {
                                None);
                 }
 
-                let mut permissions = PermissionSet::new();
-                let _ = permissions.deny(Action::Insert);
+                let permissions = PermissionSet::new().deny(Action::Insert);
                 cl4.set_mdata_user_permissions(name,
                                                DIR_TAG,
                                                User::Key(random_key_b),
@@ -728,8 +700,7 @@ fn permissions_crud() {
                                None);
                 }
 
-                let mut permissions = PermissionSet::new();
-                let _ = permissions.deny(Action::Insert);
+                let permissions = PermissionSet::new().deny(Action::Insert);
                 cl6.set_mdata_user_permissions(name,
                                                DIR_TAG,
                                                User::Key(random_key_b),
@@ -774,8 +745,7 @@ fn permissions_crud() {
                                None);
                 }
 
-                let mut permissions = PermissionSet::new();
-                let _ = permissions.deny(Action::Insert).deny(Action::Delete);
+                let permissions = PermissionSet::new().deny(Action::Insert).deny(Action::Delete);
                 cl9.set_mdata_user_permissions(name,
                                                DIR_TAG,
                                                User::Key(random_key_b),
@@ -835,11 +805,11 @@ fn entries_crud() {
         let sign_pk = unwrap!(client.public_signing_key());
 
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(User::Key(sign_pk), {
-            let mut s = PermissionSet::new();
-            let _ = s.allow(Action::Insert).allow(Action::Update).allow(Action::Delete);
-            s
-        });
+        let _ = permissions.insert(User::Key(sign_pk),
+                                   PermissionSet::new()
+                                       .allow(Action::Insert)
+                                       .allow(Action::Update)
+                                       .allow(Action::Delete));
 
         let mut data = BTreeMap::new();
         let _ = data.insert(vec![0, 0, 1],

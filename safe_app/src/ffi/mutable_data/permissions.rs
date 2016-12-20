@@ -77,7 +77,7 @@ pub unsafe extern "C" fn mdata_permissions_set_allow(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
-            let _ = set.allow(action.into());
+            *set = set.allow(action.into());
             Ok(())
         })
     })
@@ -93,7 +93,7 @@ pub unsafe extern "C" fn mdata_permissions_set_deny(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
-            let _ = set.deny(action.into());
+            *set = set.deny(action.into());
             Ok(())
         })
     })
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn mdata_permissions_set_clear(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
-            let _ = set.clear(action.into());
+            *set = set.clear(action.into());
             Ok(())
         })
     })
