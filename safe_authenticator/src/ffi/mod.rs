@@ -19,6 +19,9 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+/// Public ID routines.
+pub mod public_id;
+
 use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb, ffi_string_free};
 use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
