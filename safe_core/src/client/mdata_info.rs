@@ -39,26 +39,35 @@ pub struct MDataInfo {
 }
 
 impl MDataInfo {
+    /// Construct `MDataInfo` for private (encrypted) data.
+    pub fn new_private(name: XorName, type_tag: u64) -> Self {
+        let enc_info = Some((secretbox::gen_key(), Some(secretbox::gen_nonce())));
+
+        MDataInfo {
+            name: name,
+            type_tag: type_tag,
+            enc_info: enc_info,
+        }
+    }
+
+    /// Construct `MDataInfo` for public data.
+    pub fn new_public(name: XorName, type_tag: u64) -> Self {
+        MDataInfo {
+            name: name,
+            type_tag: type_tag,
+            enc_info: None,
+        }
+    }
+
     /// Generate random `MDataInfo` for private (encrypted) mutable data.
     pub fn random_private(type_tag: u64) -> Result<Self, CoreError> {
         let mut rng = os_rng()?;
-        let enc_info = Some((secretbox::gen_key(), Some(secretbox::gen_nonce())));
-
-        Ok(MDataInfo {
-            name: rng.gen(),
-            type_tag: type_tag,
-            enc_info: enc_info,
-        })
+        Ok(Self::new_private(rng.gen(), type_tag))
     }
     /// Generate random `MDataInfo` for public mutable data.
     pub fn random_public(type_tag: u64) -> Result<Self, CoreError> {
         let mut rng = os_rng()?;
-
-        Ok(MDataInfo {
-            name: rng.gen(),
-            type_tag: type_tag,
-            enc_info: None,
-        })
+        Ok(Self::new_public(rng.gen(), type_tag))
     }
 
     /// encrypt the the key for the mdata entry accordingly
