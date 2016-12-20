@@ -65,7 +65,7 @@ mod codes {
     pub const ERR_NO_SUCH_ENTRY: i32 = -106;
     pub const ERR_ENTRY_EXISTS: i32 = -107;
     pub const ERR_TOO_MANY_ENTRIES: i32 = -108;
-    pub const ERR_NO_SUCH_USER: i32 = -109;
+    pub const ERR_NO_SUCH_KEY: i32 = -109;
     pub const ERR_INVALID_OWNERS: i32 = -110;
     pub const ERR_INVALID_SUCCESSOR: i32 = -111;
     pub const ERR_INVALID_OPERATION: i32 = -112;
@@ -315,7 +315,7 @@ fn core_error_code(err: &CoreError) -> i32 {
                 ClientError::NoSuchEntry => ERR_NO_SUCH_ENTRY,
                 ClientError::EntryExists => ERR_ENTRY_EXISTS,
                 ClientError::TooManyEntries => ERR_TOO_MANY_ENTRIES,
-                ClientError::NoSuchUser => ERR_NO_SUCH_USER,
+                ClientError::NoSuchKey => ERR_NO_SUCH_KEY,
                 ClientError::InvalidOwners => ERR_INVALID_OWNERS,
                 ClientError::InvalidSuccessor => ERR_INVALID_SUCCESSOR,
                 ClientError::InvalidOperation => ERR_INVALID_OPERATION,

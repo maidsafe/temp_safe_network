@@ -19,10 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use routing::{AccountInfo, Authority, ImmutableData, MutableData, XorName};
+use routing::{AccountInfo, Authority, ClientError, ImmutableData, MutableData, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 pub const DEFAULT_MAX_MUTATIONS: u64 = 100;
 
@@ -47,30 +47,14 @@ impl Vault {
         self.client_manager.get(name)
     }
 
+    // Get mutable reference to account for the client manager name.
+    pub fn get_account_mut(&mut self, name: &XorName) -> Option<&mut Account> {
+        self.client_manager.get_mut(name)
+    }
+
     // Create account for the given client manager name.
     pub fn insert_account(&mut self, name: XorName) {
         let _ = self.client_manager.insert(name, Account::new());
-    }
-
-    // Increment the counter of mutation operations in the account under the given name.
-    pub fn increment_account_mutations_counter(&mut self, name: &XorName) -> bool {
-        if let Some(account) = self.client_manager.get_mut(name) {
-            account.account_info.mutations_done += 1;
-            account.account_info.mutations_available -= 1;
-
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn ins_account_auth_key(&mut self, name: &XorName, key: sign::PublicKey) -> bool {
-        if let Some(account) = self.client_manager.get_mut(name) {
-            account.ins_auth_key(key);
-            true
-        } else {
-            false
-        }
     }
 
     // Authorise read (non-mutation) operation.
@@ -139,7 +123,8 @@ pub enum Data {
 #[derive(RustcDecodable, RustcEncodable)]
 pub struct Account {
     account_info: AccountInfo,
-    auth_keys: HashSet<sign::PublicKey>,
+    auth_keys: BTreeSet<sign::PublicKey>,
+    version: u64,
 }
 
 impl Account {
@@ -149,16 +134,57 @@ impl Account {
                 mutations_done: 0,
                 mutations_available: DEFAULT_MAX_MUTATIONS,
             },
-            auth_keys: HashSet::new(),
+            auth_keys: Default::default(),
+            version: 0,
         }
+    }
+
+    pub fn version(&self) -> u64 {
+        self.version
     }
 
     pub fn account_info(&self) -> &AccountInfo {
         &self.account_info
     }
 
-    pub fn ins_auth_key(&mut self, key: sign::PublicKey) {
+    // Insert new auth key and bump the version. Returns false if the given version
+    // is not one more than the current version.
+    pub fn ins_auth_key(&mut self, key: sign::PublicKey, version: u64) -> Result<(), ClientError> {
+        self.validate_version(version)?;
+
         let _ = self.auth_keys.insert(key);
+        self.version = version;
+        Ok(())
+    }
+
+    // Remove the auth key and bump the version. Returns false if the given version
+    // is not one more than the current version.
+    pub fn del_auth_key(&mut self, key: &sign::PublicKey, version: u64) -> Result<(), ClientError> {
+        self.validate_version(version)?;
+
+        if self.auth_keys.remove(key) {
+            self.version = version;
+            Ok(())
+        } else {
+            Err(ClientError::NoSuchKey)
+        }
+    }
+
+    pub fn auth_keys(&self) -> &BTreeSet<sign::PublicKey> {
+        &self.auth_keys
+    }
+
+    pub fn increment_mutations_counter(&mut self) {
+        self.account_info.mutations_done += 1;
+        self.account_info.mutations_available -= 1;
+    }
+
+    fn validate_version(&self, version: u64) -> Result<(), ClientError> {
+        if version == self.version + 1 {
+            Ok(())
+        } else {
+            Err(ClientError::InvalidSuccessor)
+        }
     }
 }
 

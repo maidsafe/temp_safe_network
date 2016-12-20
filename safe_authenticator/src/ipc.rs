@@ -611,8 +611,8 @@ fn create_app_container(client: Client,
                 .into_box()
         })
         .and_then(move |dir| {
-            let mut ps = PermissionSet::new();
-            let _ = ps.allow(Action::Insert)
+            let ps = PermissionSet::new()
+                .allow(Action::Insert)
                 .allow(Action::Update)
                 .allow(Action::Delete)
                 .allow(Action::ManagePermissions);
@@ -865,16 +865,16 @@ fn convert_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
         match *access {
             Permission::Read => {}
             Permission::Insert => {
-                let _ = ps.allow(Action::Insert);
+                ps = ps.allow(Action::Insert);
             }
             Permission::Update => {
-                let _ = ps.allow(Action::Update);
+                ps = ps.allow(Action::Update);
             }
             Permission::Delete => {
-                let _ = ps.allow(Action::Delete);
+                ps = ps.allow(Action::Delete);
             }
             Permission::ManagePermissions => {
-                let _ = ps.allow(Action::ManagePermissions);
+                ps = ps.allow(Action::ManagePermissions);
             }
         }
     }

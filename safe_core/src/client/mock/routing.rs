@@ -52,7 +52,9 @@ const GET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const SET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const CHANGE_MDATA_OWNER_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 
+const LIST_AUTH_KEYS_AND_VERSION_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const INS_AUTH_KEY_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+const DEL_AUTH_KEY_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 
 lazy_static! {
     static ref VAULT: Mutex<Vault> = Mutex::new(Vault::new());
@@ -451,12 +453,7 @@ impl Routing {
                         msg_id,
                         "list_mdata_user_permissions",
                         GET_MDATA_PERMISSIONS_DELAY_MS,
-                        |data| {
-                            // TODO: better ClientError variant
-                            data.user_permissions(&user)
-                                .cloned()
-                                .ok_or_else(|| ClientError::from("User not found"))
-                        },
+                        |data| data.user_permissions(&user).map(|p| *p),
                         |res| {
                             Response::ListMDataUserPermissions {
                                 res: res,
@@ -548,18 +545,46 @@ impl Routing {
     }
 
     /// Fetches a list of authorised keys and version in MaidManager
-    pub fn list_auth_keys(&self,
-                          _dst: Authority,
-                          _message_id: MessageId)
-                          -> Result<(), InterfaceError> {
-        unimplemented!();
+    pub fn list_auth_keys_and_version(&self,
+                                      dst: Authority,
+                                      msg_id: MessageId)
+                                      -> Result<(), InterfaceError> {
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
+        let res = if let Err(err) =
+            self.verify_network_limits(msg_id, "list_auth_keys_and_version") {
+            Err(err)
+        } else {
+            let name = match dst {
+                Authority::ClientManager(name) => name,
+                x => panic!("Unexpected authority: {:?}", x),
+            };
+
+            let vault = unwrap!(VAULT.lock());
+            if let Some(account) = vault.get_account(&name) {
+                Ok((account.auth_keys().clone(), account.version()))
+            } else {
+                Err(ClientError::NoSuchAccount)
+            }
+        };
+
+        self.send_response(LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
+                           dst,
+                           self.client_auth,
+                           Response::ListAuthKeysAndVersion {
+                               res: res,
+                               msg_id: msg_id,
+                           });
+        Ok(())
     }
 
     /// Adds a new authorised key to MaidManager
     pub fn ins_auth_key(&self,
                         dst: Authority,
                         key: sign::PublicKey,
-                        _version: u64,
+                        version: u64,
                         msg_id: MessageId)
                         -> Result<(), InterfaceError> {
         if self.timeout_simulation {
@@ -575,14 +600,19 @@ impl Routing {
             };
 
             let mut vault = unwrap!(VAULT.lock());
-            if vault.ins_account_auth_key(&name, key) {
-                vault.sync();
-                Ok(())
+            let res = if let Some(account) = vault.get_account_mut(&name) {
+                account.ins_auth_key(key, version)
             } else {
-                // TODO: is this the right error to return here?
                 Err(ClientError::NoSuchAccount)
+            };
+
+            if res.is_ok() {
+                vault.sync();
             }
+
+            res
         };
+
 
         self.send_response(INS_AUTH_KEY_DELAY_MS,
                            dst,
@@ -596,12 +626,45 @@ impl Routing {
 
     /// Removes an authorised key from MaidManager
     pub fn del_auth_key(&self,
-                        _dst: Authority,
-                        _key: sign::PublicKey,
-                        _version: u64,
-                        _message_id: MessageId)
+                        dst: Authority,
+                        key: sign::PublicKey,
+                        version: u64,
+                        msg_id: MessageId)
                         -> Result<(), InterfaceError> {
-        unimplemented!();
+        if self.timeout_simulation {
+            return Ok(());
+        }
+
+        let res = if let Err(err) = self.verify_network_limits(msg_id, "del_auth_key") {
+            Err(err)
+        } else {
+            let name = match dst {
+                Authority::ClientManager(name) => name,
+                x => panic!("Unexpected authority: {:?}", x),
+            };
+
+            let mut vault = unwrap!(VAULT.lock());
+            let res = if let Some(account) = vault.get_account_mut(&name) {
+                account.del_auth_key(&key, version)
+            } else {
+                Err(ClientError::NoSuchAccount)
+            };
+
+            if res.is_ok() {
+                vault.sync();
+            }
+
+            res
+        };
+
+        self.send_response(DEL_AUTH_KEY_DELAY_MS,
+                           dst,
+                           self.client_auth,
+                           Response::DelAuthKey {
+                               res: res,
+                               msg_id: msg_id,
+                           });
+        Ok(())
     }
 
     fn send_response(&self, delay_ms: u64, src: Authority, dst: Authority, response: Response) {
@@ -738,7 +801,12 @@ impl Routing {
 
     fn commit_mutation(&self, dst: &Authority) {
         let mut vault = unwrap!(VAULT.lock());
-        assert!(vault.increment_account_mutations_counter(dst.name()));
+
+        {
+            let account = unwrap!(vault.get_account_mut(dst.name()));
+            account.increment_mutations_counter();
+        }
+
         vault.sync();
     }
 
