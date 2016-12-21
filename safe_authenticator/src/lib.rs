@@ -255,3 +255,36 @@ impl Drop for Authenticator {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    /*
+    use safe_core::utils;
+    use super::*;
+
+    #[test]
+    fn std_dirs() {
+        let authenticator = create_account_and_login();
+        let std_dir_names: Vec<_> =
+            DEFAULT_PRIVATE_DIRS.iter().chain(DEFAULT_PUBLIC_DIRS).collect();
+
+        run(&authenticator, |client| {
+            let user_root_dir = unwrap!(client.user_root_dir());
+            client.list_mdata_entries(user_root_dir.name, user_root_dir.type_tag)
+                .then(|res| {
+                    let entries = unwrap!(res);
+
+                })
+
+        })
+    }
+
+    fn create_account_and_login() -> Authenticator {
+        let locator = unwrap!(utils::generate_random_string(10));
+        let password = unwrap!(utils::generate_random_string(10));
+
+        let _ = unwrap!(Authenticator::create_acc(locator.clone(), password.clone(), |_| ()));
+        unwrap!(Authenticator::login(locator, password, |_| ()))
+    }
+    */
+}

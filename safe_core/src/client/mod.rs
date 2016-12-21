@@ -19,8 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+/// `MDataInfo` utilities.
+pub mod mdata_info;
+
 mod account;
-mod mdata_info;
 #[cfg(feature = "use-mock-routing")]
 mod mock;
 mod routing_event_loop;
