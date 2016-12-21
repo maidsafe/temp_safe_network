@@ -21,7 +21,7 @@
 
 use App;
 use ffi::helper::send_sync;
-use ffi_utils::{catch_unwind_cb, u8_vec_to_ptr};
+use ffi_utils::{catch_unwind_cb, vec_into_raw_parts};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::MDataInfoHandle;
 use routing::{XOR_NAME_LEN, XorName};
@@ -117,7 +117,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(app: *const App,
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;
             let output = info.enc_entry_key(&input)?;
-            Ok(u8_vec_to_ptr(output))
+            Ok(vec_into_raw_parts(output))
         })
     })
 }
@@ -140,7 +140,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(app: *const App,
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;
             let output = info.enc_entry_value(&input)?;
-            Ok(u8_vec_to_ptr(output))
+            Ok(vec_into_raw_parts(output))
         })
     })
 }
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn mdata_info_serialise(app: *const App,
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;
             let encoded = serialise(&*info)?;
-            Ok(u8_vec_to_ptr(encoded))
+            Ok(vec_into_raw_parts(encoded))
         })
     })
 }

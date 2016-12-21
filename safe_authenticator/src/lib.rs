@@ -75,7 +75,6 @@ mod access_container;
 #[cfg(test)]
 mod test_utils;
 
-use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
@@ -87,7 +86,6 @@ use safe_core::ipc::Permission;
 use safe_core::nfs::{create_dir, create_std_dirs};
 pub use self::errors::AuthError;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::os::raw::c_void;
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
 use tokio_core::reactor::Core;
@@ -254,140 +252,6 @@ impl Drop for Authenticator {
 
         if let Err(e) = core_tx.send(msg) {
             info!("Unexpected error in drop: {:?}", e);
-        }
-    }
-}
-
-/// Create a registered client. This or any one of the other companion
-/// functions to get an authenticator instance must be called before initiating any
-/// operation allowed by this module. `auth_handle` is a pointer to a pointer and must
-/// point to a valid pointer not junk, else the consequences are undefined.
-#[no_mangle]
-pub unsafe extern "C" fn create_acc(account_locator: FfiString,
-                                    account_password: FfiString,
-                                    auth_handle: *mut *mut Authenticator,
-                                    user_data: *mut c_void,
-                                    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
-                                    -> i32 {
-    let user_data = OpaqueCtx(user_data);
-
-    catch_unwind_error_code(|| -> Result<(), AuthError> {
-        trace!("Authenticator - create a client account.");
-
-        let acc_locator = account_locator.as_str()?;
-        let acc_password = account_password.as_str()?;
-
-        let authenticator =
-            Authenticator::create_acc(acc_locator, acc_password, move |net_event| {
-                let user_data: *mut c_void = user_data.into();
-
-                match net_event {
-                    Ok(event) => o_network_obs_cb(user_data, 0, event.into()),
-                    Err(()) => o_network_obs_cb(user_data, -1, 0),
-                }
-            })?;
-
-        *auth_handle = Box::into_raw(Box::new(authenticator));
-
-        Ok(())
-    })
-}
-
-/// Log into a registered account. This or any one of the other companion
-/// functions to get an authenticator instance must be called before initiating
-/// any operation allowed for authenticator. `auth_handle` is a pointer to a pointer
-/// and must point to a valid pointer not junk, else the consequences are undefined.
-#[no_mangle]
-pub unsafe extern "C" fn login(account_locator: FfiString,
-                               account_password: FfiString,
-                               auth_handle: *mut *mut Authenticator,
-                               user_data: *mut c_void,
-                               o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
-                               -> i32 {
-    let user_data = OpaqueCtx(user_data);
-
-    catch_unwind_error_code(|| -> Result<(), AuthError> {
-        trace!("Authenticator - log in a registererd client.");
-
-        let acc_locator = account_locator.as_str()?;
-        let acc_password = account_password.as_str()?;
-
-        let authenticator = Authenticator::login(acc_locator, acc_password, move |net_event| {
-            let user_data: *mut c_void = user_data.into();
-
-            match net_event {
-                Ok(event) => o_network_obs_cb(user_data, 0, event.into()),
-                Err(()) => o_network_obs_cb(user_data, -1, 0),
-            }
-        })?;
-
-        *auth_handle = Box::into_raw(Box::new(authenticator));
-
-        Ok(())
-    })
-}
-
-/// Discard and clean up the previously allocated authenticator instance.
-/// Use this only if the authenticator is obtained from one of the auth
-/// functions in this crate (`create_acc`, `login`, `create_unregistered`).
-/// Using `auth` after a call to this functions is undefined behaviour.
-#[no_mangle]
-pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
-    let _ = Box::from_raw(auth);
-}
-
-#[cfg(test)]
-mod tests {
-    use ffi_utils::FfiString;
-    use safe_core::utils;
-    use std::os::raw::c_void;
-    use std::ptr;
-    use super::*;
-
-    #[test]
-    fn create_account_and_login() {
-        let acc_locator = unwrap!(utils::generate_random_string(10));
-        let acc_password = unwrap!(utils::generate_random_string(10));
-
-        {
-            let mut auth_h: *mut Authenticator = ptr::null_mut();
-
-            unsafe {
-                let auth_h_ptr = &mut auth_h;
-
-                assert_eq!(create_acc(FfiString::from_str(&acc_locator),
-                                      FfiString::from_str(&acc_password),
-                                      auth_h_ptr,
-                                      ptr::null_mut(),
-                                      net_event_cb),
-                           0);
-            }
-
-            assert!(!auth_h.is_null());
-
-            unsafe { authenticator_free(auth_h) };
-        }
-
-        {
-            let mut auth_h: *mut Authenticator = ptr::null_mut();
-
-            unsafe {
-                let auth_h_ptr = &mut auth_h;
-
-                assert_eq!(login(FfiString::from_str(&acc_locator),
-                                 FfiString::from_str(&acc_password),
-                                 auth_h_ptr,
-                                 ptr::null_mut(),
-                                 net_event_cb),
-                           0);
-            }
-
-            assert!(!auth_h.is_null());
-            unsafe { authenticator_free(auth_h) };
-        }
-
-        unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
-            assert_eq!(err_code, 0);
         }
     }
 }

@@ -29,7 +29,7 @@ mod tests;
 use App;
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, u8_ptr_to_vec, u8_vec_to_ptr};
+use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts, vec_into_raw_parts};
 use futures::Future;
 use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle, MDataKeysHandle,
                    MDataPermissionSetHandle, MDataPermissionsHandle, MDataValuesHandle,
@@ -135,14 +135,14 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
                                                              usize,
                                                              u64)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let key = u8_ptr_to_vec(key_ptr, key_len);
+        let key = vec_clone_from_raw_parts(key_ptr, key_len);
 
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, _, info| {
             let info = info.clone();
             client.get_mdata_value(info.name, info.type_tag, key)
                 .and_then(move |value| {
                     let content = info.decrypt(&value.content)?;
-                    let content = u8_vec_to_ptr(content);
+                    let content = vec_into_raw_parts(content);
                     Ok((content.0, content.1, content.2, value.entry_version))
                 })
         })
