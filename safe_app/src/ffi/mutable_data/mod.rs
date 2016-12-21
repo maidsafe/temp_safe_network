@@ -167,7 +167,7 @@ pub unsafe extern "C" fn mdata_list_entries(app: *const App,
             client.list_mdata_entries(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |entries| {
-                    let entries = mdata_info::decrypt_entries(&entries, &info)?;
+                    let entries = mdata_info::decrypt_entries(&info, &entries)?;
                     Ok(context.object_cache().insert_mdata_entries(entries))
                 })
         })

@@ -22,7 +22,7 @@
 use AccessContainerEntry;
 use AuthError;
 use Authenticator;
-use access_container::{access_container, access_container_key};
+use access_container::{access_container, access_container_key, access_container_nonce};
 use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb, ffi_string_free, vec_into_raw_parts};
 use futures::Future;
 use ipc::get_config;
@@ -83,8 +83,8 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *mut Authenticator,
                         let mut apps = Vec::new();
 
                         for app in auth_cfg.values() {
-                            let key =
-                                access_container_key(&access_container, &app.info.id, &app.keys)?;
+                            let nonce = access_container_nonce(&access_container)?;
+                            let key = access_container_key(&app.info.id, &app.keys, nonce);
 
                             if let Some(entry) = entries.get(&key) {
                                 let plaintext = symmetric_decrypt(&entry.content,

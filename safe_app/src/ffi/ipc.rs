@@ -23,19 +23,11 @@
 
 use errors::AppError;
 use ffi_utils::{FfiString, catch_unwind_cb, catch_unwind_error_code};
-use rand::{self, Rng};
 use safe_core::ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use std::os::raw::c_void;
-use std::u32;
-
-/// Generate unique request ID.
-pub fn gen_req_id() -> u32 {
-    // Generate the number in range 1..MAX inclusive.
-    rand::thread_rng().gen_range(0, u32::MAX) + 1
-}
 
 /// Encode `AuthReq`.
 #[no_mangle]
@@ -45,7 +37,7 @@ pub unsafe extern "C" fn encode_auth_req(req: FfiAuthReq,
                                          -> i32 {
     catch_unwind_error_code(|| -> Result<_, AppError> {
         let req = AuthReq::from_repr_c(req)?;
-        let req_id = gen_req_id();
+        let req_id = ipc::gen_req_id();
 
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -69,7 +61,7 @@ pub unsafe extern "C" fn encode_containers_req(req: FfiContainersReq,
                                                -> i32 {
     catch_unwind_error_code(|| -> Result<_, AppError> {
         let req = ContainersReq::from_repr_c(req)?;
-        let req_id = gen_req_id();
+        let req_id = ipc::gen_req_id();
 
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -213,7 +205,7 @@ mod tests {
 
     #[test]
     fn decode_ipc_msg_with_auth_granted() {
-        let req_id = gen_req_id();
+        let req_id = ipc::gen_req_id();
 
         let access_container = AccessContInfo {
             id: rand::random(),
@@ -296,7 +288,7 @@ mod tests {
 
     #[test]
     fn decode_ipc_msg_with_containers_granted() {
-        let req_id = gen_req_id();
+        let req_id = ipc::gen_req_id();
 
         let msg = IpcMsg::Resp {
             req_id: req_id,

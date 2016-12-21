@@ -56,9 +56,7 @@ impl FfiString {
     }
 
     /// Construct non-owning `FfiSting` from `&str`.
-    pub fn from_str<T: AsRef<str>>(s: T) -> Self {
-        let s = s.as_ref();
-
+    pub fn from_str(s: &str) -> Self {
         FfiString {
             ptr: s.as_ptr() as *mut _,
             len: s.len(),
@@ -77,6 +75,12 @@ impl FfiString {
         let s = slice::from_raw_parts(self.ptr, self.len);
         str::from_utf8(s)
     }
+
+    /// Deallocate the string.
+    /// Warning: use this only if the data is owned.
+    pub unsafe fn deallocate(self) {
+        let _ = String::from_raw_parts(self.ptr, self.len, self.cap);
+    }
 }
 
 impl Default for FfiString {
@@ -92,7 +96,7 @@ impl Default for FfiString {
 /// Free the string from memory.
 #[no_mangle]
 pub unsafe extern "C" fn ffi_string_free(s: FfiString) {
-    let _ = String::from_raw_parts(s.ptr, s.len, s.cap);
+    s.deallocate()
 }
 
 #[cfg(test)]

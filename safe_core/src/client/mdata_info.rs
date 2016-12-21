@@ -149,8 +149,8 @@ pub fn encrypt_entry_actions(info: &MDataInfo,
 }
 
 /// Decrypt entries using the `MDataInfo`.
-pub fn decrypt_entries(entries: &BTreeMap<Vec<u8>, Value>,
-                       info: &MDataInfo)
+pub fn decrypt_entries(info: &MDataInfo,
+                       entries: &BTreeMap<Vec<u8>, Value>)
                        -> Result<BTreeMap<Vec<u8>, Value>, CoreError> {
     let mut output = BTreeMap::new();
 

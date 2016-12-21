@@ -74,18 +74,21 @@ mod access_container;
 
 #[cfg(test)]
 mod test_utils;
+#[cfg(test)]
+mod tests;
 
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::{EntryAction, Value};
-use safe_core::{Client, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent, event_loop};
+use routing::EntryActions;
+use safe_core::{Client, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent, event_loop,
+                mdata_info};
 use safe_core::ipc::Permission;
 use safe_core::nfs::{create_dir, create_std_dirs};
 pub use self::errors::AuthError;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;
 use tokio_core::reactor::Core;
@@ -154,32 +157,20 @@ impl Authenticator {
             let tx2 = tx.clone();
             let core_tx2 = core_tx.clone();
             unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
-                let cl2 = client.clone();
+                let client = client.clone();
                 create_std_dirs(client.clone()).map_err(AuthError::from).and_then(move |()| {
-                    let cl3 = cl2.clone();
-                    create_dir(&cl2, false).map_err(AuthError::from).and_then(move |dir| {
-                        let config_dir = unwrap!(cl3.config_root_dir());
-                        let mut actions = BTreeMap::new();
-                        let encrypted_key
-                            = config_dir.enc_entry_key(b"authenticator-config")?;
-                        let _ = actions.insert(encrypted_key,
-                                               EntryAction::Ins(Value {
-                                                   content: vec![],
-                                                   entry_version: 0,
-                                               }));
+                    create_dir(&client, false).map_err(AuthError::from).and_then(move |dir| {
+                        let config_dir = unwrap!(client.config_root_dir());
 
-                        let serialised_dir = serialise(&dir)?;
-                        let encrypted_key = config_dir
-                            .enc_entry_key(b"access-container")?;
-                        let encrypted_value = config_dir.enc_entry_value(&serialised_dir)?;
+                        let actions = EntryActions::new()
+                            .ins(b"authenticator-config".to_vec(), Vec::new(), 0)
+                            .ins(b"access-container".to_vec(), serialise(&dir)?, 0)
+                            .into();
+                        let actions = mdata_info::encrypt_entry_actions(&config_dir, &actions)?;
 
-                        let _ = actions.insert(encrypted_key,
-                                               EntryAction::Ins(Value {
-                                                   content: encrypted_value,
-                                                   entry_version: 0,
-                                               }));
-
-                        Ok(cl3.mutate_mdata_entries(dir.name, dir.type_tag, actions))
+                        Ok(client.mutate_mdata_entries(config_dir.name,
+                                                       config_dir.type_tag,
+                                                       actions))
                     }).and_then(move |fut| {
                         fut.map_err(AuthError::from)
                     }).map(move |()| {
@@ -254,37 +245,4 @@ impl Drop for Authenticator {
             info!("Unexpected error in drop: {:?}", e);
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    /*
-    use safe_core::utils;
-    use super::*;
-
-    #[test]
-    fn std_dirs() {
-        let authenticator = create_account_and_login();
-        let std_dir_names: Vec<_> =
-            DEFAULT_PRIVATE_DIRS.iter().chain(DEFAULT_PUBLIC_DIRS).collect();
-
-        run(&authenticator, |client| {
-            let user_root_dir = unwrap!(client.user_root_dir());
-            client.list_mdata_entries(user_root_dir.name, user_root_dir.type_tag)
-                .then(|res| {
-                    let entries = unwrap!(res);
-
-                })
-
-        })
-    }
-
-    fn create_account_and_login() -> Authenticator {
-        let locator = unwrap!(utils::generate_random_string(10));
-        let password = unwrap!(utils::generate_random_string(10));
-
-        let _ = unwrap!(Authenticator::create_acc(locator.clone(), password.clone(), |_| ()));
-        unwrap!(Authenticator::login(locator, password, |_| ()))
-    }
-    */
 }
