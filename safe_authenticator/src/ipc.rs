@@ -470,10 +470,10 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
 }
 
 /// Updates the authenticator configuration file and returns the updated `File` struct.
-fn update_config(client: Client,
-                 version: Option<u64>,
-                 auth_cfg: HashMap<sha256::Digest, AppInfo>)
-                 -> Box<AuthFuture<()>> {
+pub fn update_config(client: Client,
+                     version: Option<u64>,
+                     auth_cfg: HashMap<sha256::Digest, AppInfo>)
+                     -> Box<AuthFuture<()>> {
     let parent = fry!(client.config_root_dir());
 
     let key = fry!(parent.enc_entry_key(CONFIG_FILE));
@@ -787,6 +787,57 @@ fn create_app_container(client: Client,
         .into_box()
 }
 
+/// Removes an app's dedicated container if it's available and stored in the user's root dir.
+/// Returns `true` if it was removed successfully and `false` if it wasn't found in the parent dir.
+pub fn remove_app_container(client: Client, app_id: String) -> Box<AuthFuture<bool>> {
+    let root = fry!(client.user_root_dir());
+    let app_cont_name = format!("apps/{}", app_id);
+    let key = fry!(root.enc_entry_key(app_cont_name.as_bytes()));
+
+    let c2 = client.clone();
+
+    client.get_mdata_value(root.name, root.type_tag, key.clone())
+        .then(move |res| {
+            match res {
+                Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => {
+                    // App container doesn't exist
+                    ok!(false)
+                }
+                Err(e) => err!(e),
+                Ok(val) => {
+                    let decrypted = fry!(root.decrypt(&val.content));
+                    let mdata_info = fry!(deserialise::<MDataInfo>(&decrypted));
+
+                    let c3 = c2.clone();
+
+                    c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
+                        .and_then(move |entries| {
+                            // Remove all entries in MData
+                            let actions = entries.iter()
+                                .fold(EntryActions::new(), |actions, (entry_name, val)| {
+                                    actions.del(entry_name.clone(), val.entry_version + 1)
+                                });
+                            c3.mutate_mdata_entries(mdata_info.name,
+                                                    mdata_info.type_tag,
+                                                    actions.into())
+                        })
+                        .and_then(move |_| {
+                            // Remove MData itself
+                            let actions = EntryActions::new().del(key, val.entry_version + 1);
+                            client.mutate_mdata_entries(root.name, root.type_tag, actions.into())
+
+                            // TODO(nbaksalyar): when MData deletion is implemented properly,
+                            // also delete the actual MutableData related to app
+                        })
+                        .map_err(From::from)
+                        .map(move |_| true)
+                        .into_box()
+                }
+            }
+        })
+        .into_box()
+}
+
 /// Checks if an app's dedicated container is available and stored in the user's root dir.
 /// If `Some(MDataInfo)` is returned then the container has been created or previously existed.
 fn check_app_container(client: Client,
@@ -850,7 +901,7 @@ fn convert_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
 
 /// Represents current app state
 #[derive(Debug)]
-enum AppState {
+pub enum AppState {
     /// Exists in the authenticator config, access container, and registered in MaidManagers
     Authenticated,
     /// Exists in the authenticator config but not in access container and MaidManagers
@@ -859,12 +910,14 @@ enum AppState {
     NotAuthenticated,
 }
 
-/// Returns true if app is already registered (meaning it has an entry
-/// in the config file AND the access container).
-fn app_state(client: Client,
-             config: &HashMap<sha256::Digest, AppInfo>,
-             app_id: String)
-             -> Box<AuthFuture<AppState>> {
+/// Returns a current app state (`Authenticated` if it has an entry
+/// in the config file AND the access container, `Revoked` if it has
+/// an entry in the config but not in the access container, and `NotAuthenticated`
+/// if it's not registered anywhere).
+pub fn app_state(client: Client,
+                 config: &HashMap<sha256::Digest, AppInfo>,
+                 app_id: String)
+                 -> Box<AuthFuture<AppState>> {
     let c2 = client.clone();
     let app_id_hash = sha256::hash(app_id.clone().as_bytes());
 
