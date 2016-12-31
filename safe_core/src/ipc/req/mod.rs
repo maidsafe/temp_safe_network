@@ -22,11 +22,13 @@
 /// Ffi module
 pub mod ffi;
 
+use errors::CoreError;
 use ffi_utils::{FfiString, ffi_string_free};
 use ipc::errors::IpcError;
 use self::ffi::Permission;
 use std::collections::{BTreeSet, HashMap};
 use std::mem;
+use utils;
 
 /// IPC request
 // TODO: `TransOwnership` variant
@@ -178,6 +180,16 @@ pub struct AppExchangeInfo {
 }
 
 impl AppExchangeInfo {
+    /// Creates a random AppExchangeInfo
+    pub fn rand() -> Result<AppExchangeInfo, CoreError> {
+        Ok(AppExchangeInfo {
+            id: utils::generate_random_string(10)?,
+            scope: None,
+            name: utils::generate_random_string(10)?,
+            vendor: utils::generate_random_string(10)?,
+        })
+    }
+
     /// Consumes the object and returns the wrapped raw pointer
     ///
     /// You're now responsible for freeing this memory once you're done.

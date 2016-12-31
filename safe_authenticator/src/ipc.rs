@@ -28,9 +28,9 @@ use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, nfs};
 use safe_core::ipc::{self, Config, IpcError, IpcMsg, decode_msg};
 use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
+use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::ipc::req::ffi::Permission;
 use safe_core::ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -182,8 +182,8 @@ pub unsafe extern "C" fn decode_ipc_msg(auth: *const Authenticator,
 /// Revoke app access
 #[no_mangle]
 pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
-                                                  user_data: *mut c_void,
                                                   app_id: FfiString,
+                                                  user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
                                                                       i32,
                                                                       FfiString)) {
@@ -200,6 +200,7 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                 let c6 = client.clone();
                 let c7 = client.clone();
                 let c8 = client.clone();
+                let c9 = client.clone();
 
                 app_info(client, &app_id)
                     .and_then(move |app| {
@@ -211,6 +212,7 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                         })
                     })
                     .and_then(move |(access_container, app)| {
+                        // Get an access container entry for the app being revoked
                         access_container_entry(c3,
                                                &access_container,
                                                &app.info.id,
@@ -226,34 +228,43 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                             access_container_key(&app.info.id, &app.keys, nonce)
                         };
 
-                        let del = EntryActions::new().del(app_entry_name, version + 1);
+                        let del = EntryActions::new().del(app_entry_name.clone(), version + 1);
 
                         c4.mutate_mdata_entries(access_container.name,
                                                   access_container.type_tag,
                                                   del.into())
-                            .map(move |_| (app, permissions, access_container))
+                            .map(move |_| (app, app_entry_name, permissions, access_container))
                             .map_err(From::from)
                             .into_box()
                     })
-                    .and_then(move |(app, permissions, access_container)| {
+                    .and_then(move |(app, app_entry_name, permissions, access_container)| {
                         // Remove app key from container permissions
                         revoke_container_perms(c5.clone(), permissions.clone(), app.keys.sign_pk)
-                            .map(move |_| (app, permissions, access_container))
+                            .map(move |_| (app, app_entry_name, permissions, access_container))
                     })
-                    .and_then(move |(app, permissions, access_container)| {
+                    .and_then(move |(app, app_entry_name, permissions, access_container)| {
                         // Re-encrypt private containers
                         c6.list_mdata_entries(access_container.name, access_container.type_tag)
                             .map_err(From::from)
-                            .map(move |entries| (app, permissions, access_container, entries))
+                            .map(move |mut entries| {
+                                // Remove the revoked app entry from the access container
+                                // because we don't need it to be reencrypted.
+                                let _ = entries.remove(&app_entry_name);
+                                (app, permissions, access_container, entries)
+                            })
                     })
                     .and_then(move |(app, permissions, access_container, entries)| {
                         reencrypt_private_containers(c7, permissions, access_container, entries)
                             .map(move |_| app)
                     })
                     .and_then(move |app| {
+                        c8.list_auth_keys_and_version()
+                            .map_err(From::from)
+                            .map(move |(_, version)| (version, app))
+                    })
+                    .and_then(move |(version, app)| {
                         // Remove app key from MaidManagers
-                        // !! TODO(nbaksalyar) !! use appropriate version here
-                        c8.del_auth_key(app.keys.sign_pk, 0)
+                        c9.del_auth_key(app.keys.sign_pk, version + 1)
                             .map_err(From::from)
                             .map(move |_| app.info.id)
                     })
@@ -423,17 +434,29 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                         .and_then(move |(app, perms)| {
                             access_container(c3).map(move |dir| (dir, app, perms))
                         })
-                        .and_then(move |(dir, app, perms)| {
+                        .and_then(move |(dir, app, mut perms)| {
                             let app_keys = app.keys;
 
                             access_container_entry(c4, &dir, &app_id, app_keys.clone())
                                 .then(move |res| {
                                     let version = match res {
-                                        Ok((version, _)) => Some(version),
+                                        // Updating an existing entry
+                                        Ok((version, mut existing_perms)) => {
+                                            for (key, val) in perms {
+                                                let _ = existing_perms.insert(key, val);
+                                            }
+                                            perms = existing_perms;
+
+                                            Some(version + 1)
+                                        }
+
                                         // Adding a new access container entry
                                         Err(AuthError::CoreError(
                                         CoreError::RoutingClientError(
                                             ClientError::NoSuchEntry))) => None,
+
+                                        // Error has occurred while trying to get an
+                                        // existing entry
                                         Err(e) => return err!(e),
                                     };
                                     ok!((version, app_id, app_keys, dir, perms))
@@ -518,6 +541,7 @@ fn reencrypt_private_containers(client: Client,
     let c5 = client.clone();
 
     for (container, (mdata_info, _)) in permissions {
+        // Check if the container is encrypted
         if mdata_info.enc_info.is_some() {
             let c3 = client.clone();
             let old_mdata = mdata_info.clone();
@@ -528,14 +552,17 @@ fn reencrypt_private_containers(client: Client,
                 .and_then(move |entries| {
                     let mut mutations = EntryActions::new();
 
-                    for (key, val) in entries {
-                        let key = fry!(old_mdata.decrypt(&key));
+                    for (old_key, val) in entries {
+                        let key = fry!(old_mdata.decrypt(&old_key));
                         let content = fry!(old_mdata.decrypt(&val.content));
 
                         let new_key = fry!(new_mdata.enc_entry_key(&key));
                         let new_content = fry!(new_mdata.enc_entry_value(&content));
 
-                        mutations = mutations.update(new_key, new_content, val.entry_version + 1);
+                        // Delete the old entry with the old key and
+                        // insert the re-encrypted entry with a new key
+                        mutations = mutations.del(old_key, val.entry_version + 1)
+                            .ins(new_key, new_content, 0);
                     }
 
                     c3.mutate_mdata_entries(new_mdata.name, new_mdata.type_tag, mutations.into())
@@ -590,7 +617,6 @@ fn reencrypt_private_containers(client: Client,
                 let entry_name = access_container_key(&app.info.id, &app.keys, nonce);
 
                 if let Some(raw) = access_cont_entries.get(&entry_name) {
-                    let version = raw.entry_version;
                     let plaintext = fry!(symmetric_decrypt(&raw.content, &app.keys.enc_key));
                     let mut access_cont_entry =
                         fry!(deserialise::<AccessContainerEntry>(&plaintext));
@@ -609,7 +635,7 @@ fn reencrypt_private_containers(client: Client,
                     let ciphertext =
                         fry!(symmetric_encrypt(&updated_plaintext, &app.keys.enc_key, None));
 
-                    mutations = mutations.update(entry_name, ciphertext, version + 1);
+                    mutations = mutations.update(entry_name, ciphertext, raw.entry_version + 1);
                 }
             }
 
@@ -735,7 +761,7 @@ fn encode_auth_resp_impl(client: Client,
                 let _ = access.insert(Permission::Delete);
                 let _ = access.insert(Permission::ManagePermissions);
 
-                let _ = perms.insert(app_info.id.clone(), (mdata_info, access));
+                let _ = perms.insert(format!("apps/{}", app_info.id), (mdata_info, access));
             };
             put_access_container_entry(c6, &dir, &app_info.id, &app_keys, perms, None)
                 .map(move |_| (dir, app_keys))
@@ -871,32 +897,6 @@ fn encode_response(msg: &IpcMsg, app_id: String) -> Result<FfiString, IpcError> 
     let app_id = base64_encode(app_id.as_bytes());
     let resp = ipc::encode_msg(msg, &format!("safe-{}", app_id))?;
     Ok(FfiString::from_string(resp))
-}
-
-fn convert_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
-    where Iter: IntoIterator<Item = &'a Permission>
-{
-    let mut ps = PermissionSet::new();
-
-    for access in permissions {
-        match *access {
-            Permission::Read => {}
-            Permission::Insert => {
-                ps = ps.allow(Action::Insert);
-            }
-            Permission::Update => {
-                ps = ps.allow(Action::Update);
-            }
-            Permission::Delete => {
-                ps = ps.allow(Action::Delete);
-            }
-            Permission::ManagePermissions => {
-                ps = ps.allow(Action::ManagePermissions);
-            }
-        }
-    }
-
-    ps
 }
 
 /// Represents current app state

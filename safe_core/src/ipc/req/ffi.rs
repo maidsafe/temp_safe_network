@@ -21,6 +21,7 @@
 
 use ffi_utils::{FfiString, ffi_string_free};
 use ffi_utils::callback::CallbackArgs;
+use routing::{Action, PermissionSet};
 use std::{mem, ptr};
 
 /// Permission action
@@ -37,6 +38,25 @@ pub enum Permission {
     Delete,
     /// Modify permissions
     ManagePermissions,
+}
+
+/// Transforms a `Permission` collection into `routing::PermissionSet`
+pub fn convert_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
+    where Iter: IntoIterator<Item = &'a Permission>
+{
+    let mut ps = PermissionSet::new();
+
+    for access in permissions {
+        ps = match *access {
+            Permission::Read => ps,
+            Permission::Insert => ps.allow(Action::Insert),
+            Permission::Update => ps.allow(Action::Update),
+            Permission::Delete => ps.allow(Action::Delete),
+            Permission::ManagePermissions => ps.allow(Action::ManagePermissions),
+        };
+    }
+
+    ps
 }
 
 /// Represents an authorization request

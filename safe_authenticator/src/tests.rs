@@ -20,25 +20,26 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use Authenticator;
-use access_container::access_container_key;
-use errors::{AuthError, ERR_ALREADY_AUTHORISED};
+use access_container::access_container_entry;
+use errors::{AuthError, ERR_ALREADY_AUTHORISED, ERR_UNKNOWN_APP};
 use ffi_utils::{FfiString, base64_encode};
 use ffi_utils::test_utils::{call_1, send_via_user_data, sender_as_user_data};
 use futures::{Future, future};
-use ipc::{encode_auth_resp, get_config};
+use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp, get_config};
 use maidsafe_utilities::serialisation::deserialise;
-use routing::{Action, PermissionSet, User};
+use routing::User;
 use rust_sodium::crypto::hash::sha256;
-use safe_core::{MDataInfo, mdata_info, utils};
-use safe_core::ipc::{self, AppExchangeInfo, AuthReq, ContainersReq, IpcMsg, IpcReq, IpcResp,
-                     Permission};
+use safe_core::{CoreError, MDataInfo, mdata_info, utils};
+use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, ContainersReq, IpcError, IpcMsg,
+                     IpcReq, IpcResp, Permission};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
+use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, NfsError, file_helper};
 use std::collections::{BTreeSet, HashMap};
 use std::os::raw::c_void;
 use std::sync::mpsc;
-use test_utils::run;
+use std::time::Duration;
+use test_utils::{access_container, compare_access_container_entries, run};
 
 // Test creation and content of std dirs after account creation.
 #[test]
@@ -128,29 +129,13 @@ fn app_authentication() {
     let authenticator = create_account_and_login();
 
     let req_id = ipc::gen_req_id();
-    let app_id = unwrap!(utils::generate_random_string(10));
-    let app_exchange_info = AppExchangeInfo {
-        id: app_id.clone(),
-        scope: None,
-        name: unwrap!(utils::generate_random_string(10)),
-        vendor: unwrap!(utils::generate_random_string(10)),
-    };
+    let app_exchange_info = unwrap!(AppExchangeInfo::rand());
+    let app_id = app_exchange_info.id.clone();
 
-    let auth_req = {
-        let mut containers = HashMap::new();
-        let _ = containers.insert("_documents".to_string(), btree_set![Permission::Insert]);
-        let _ = containers.insert("_videos".to_string(),
-                                  btree_set![Permission::Read,
-                                             Permission::Insert,
-                                             Permission::Update,
-                                             Permission::Delete,
-                                             Permission::ManagePermissions]);
-
-        AuthReq {
-            app: app_exchange_info.clone(),
-            app_container: true,
-            containers: containers,
-        }
+    let auth_req = AuthReq {
+        app: app_exchange_info.clone(),
+        app_container: true,
+        containers: create_containers_req(),
     };
 
     let msg = IpcMsg::Req {
@@ -195,68 +180,26 @@ fn app_authentication() {
         x => panic!("Unexpected {:?}", x),
     };
 
-    let ac_info = auth_granted.access_container;
+    let mut expected = create_containers_req();
+    let _ = expected.insert(format!("apps/{}", app_id),
+                            btree_set![Permission::Read,
+                                       Permission::Insert,
+                                       Permission::Update,
+                                       Permission::Delete,
+                                       Permission::ManagePermissions]);
+
+    let mut access_container = access_container(&authenticator, &app_id, auth_granted.clone());
+    assert_eq!(access_container.len(), 3);
+
     let app_keys = auth_granted.app_keys;
     let app_sign_pk = app_keys.sign_pk;
-    let app_enc_key = app_keys.enc_key.clone();
 
-    // Fetch the access container entry for the app.
-    let ac_app_entry_key = access_container_key(&app_id, &app_keys, &ac_info.nonce);
-    let mut access_container = {
-        let encrypted = run(&authenticator, move |client| {
-            client.get_mdata_value(ac_info.id, ac_info.tag, ac_app_entry_key)
-                .map(|value| value.content)
-                .map_err(AuthError::from)
-        });
+    compare_access_container_entries(&authenticator,
+                                     app_sign_pk,
+                                     access_container.clone(),
+                                     expected);
 
-        let encoded = unwrap!(utils::symmetric_decrypt(&encrypted, &app_enc_key));
-        unwrap!(deserialise::<HashMap<String, (MDataInfo, BTreeSet<Permission>)>>(&encoded))
-    };
-
-    assert_eq!(access_container.len(), 3);
-    let (documents_info, documents_permissions) = unwrap!(access_container.remove("_documents"));
-    let (videos_info, videos_permissions) = unwrap!(access_container.remove("_videos"));
-    let (app_dir_info, app_dir_permissions) = unwrap!(access_container.remove(&app_id));
-
-    // Check the requested permissions in the access container.
-    let all = btree_set![Permission::Read,
-                         Permission::Insert,
-                         Permission::Update,
-                         Permission::Delete,
-                         Permission::ManagePermissions];
-    assert_eq!(documents_permissions, btree_set![Permission::Insert]);
-    assert_eq!(videos_permissions, all);
-    assert_eq!(app_dir_permissions, all);
-
-    // Check the permission on the the mutable data for each of the above directories.
-    let (documents_permissions, videos_permissions, app_dir_permissions) = {
-        let app_dir_info = app_dir_info.clone();
-
-        run(&authenticator, move |client| {
-            let user = User::Key(app_sign_pk);
-            let documents = client.list_mdata_user_permissions(documents_info.name,
-                                                               documents_info.type_tag,
-                                                               user.clone());
-            let videos =
-                client.list_mdata_user_permissions(videos_info.name,
-                                                   videos_info.type_tag,
-                                                   user.clone());
-            let app_dir =
-                client.list_mdata_user_permissions(app_dir_info.name, app_dir_info.type_tag, user);
-
-            documents.join3(videos, app_dir).map_err(AuthError::from)
-        })
-    };
-
-    let all = PermissionSet::new()
-        .allow(Action::Insert)
-        .allow(Action::Update)
-        .allow(Action::Delete)
-        .allow(Action::ManagePermissions);
-    assert_eq!(documents_permissions,
-               PermissionSet::new().allow(Action::Insert));
-    assert_eq!(videos_permissions, all);
-    assert_eq!(app_dir_permissions, all);
+    let (app_dir_info, _) = unwrap!(access_container.remove(&format!("apps/{}", app_id)));
 
     // Check the app info is present in the config file.
     let config = run(&authenticator,
@@ -298,16 +241,8 @@ fn app_authentication() {
 fn authenticated_app_cannot_be_authenticated_again() {
     let authenticator = create_account_and_login();
 
-    let app_id = unwrap!(utils::generate_random_string(10));
-    let app_exchange_info = AppExchangeInfo {
-        id: app_id.clone(),
-        scope: None,
-        name: unwrap!(utils::generate_random_string(10)),
-        vendor: unwrap!(utils::generate_random_string(10)),
-    };
-
     let auth_req = AuthReq {
-        app: app_exchange_info.clone(),
+        app: unwrap!(AppExchangeInfo::rand()),
         app_container: false,
         containers: Default::default(),
     };
@@ -333,7 +268,6 @@ fn authenticated_app_cannot_be_authenticated_again() {
                              ud,
                              cb)
         }));
-
         resp.deallocate();
     };
 
@@ -346,11 +280,318 @@ fn authenticated_app_cannot_be_authenticated_again() {
     let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
 
     match decode_ipc_msg(&authenticator, &encoded_msg) {
-        Err(code) if code == ERR_ALREADY_AUTHORISED => (),
+        Err((code,
+             Some(IpcMsg::Resp { resp: IpcResp::Auth(Err(IpcError::AlreadyAuthorised)), .. })))
+            if code == ERR_ALREADY_AUTHORISED => (),
         x => panic!("Unexpected {:?}", x),
     };
 }
 
+#[test]
+fn containers_unknown_app() {
+    let authenticator = create_account_and_login();
+
+    // Create IpcMsg::Req { req: IpcReq::Containers } for a random App (random id, name, vendor etc)
+    let req_id = ipc::gen_req_id();
+    let msg = IpcMsg::Req {
+        req_id: req_id,
+        req: IpcReq::Containers(ContainersReq {
+            app: unwrap!(AppExchangeInfo::rand()),
+            containers: create_containers_req(),
+        }),
+    };
+
+    // Serialise the request as base64 payload in "safe-auth:payload"
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+
+    // Invoke Authenticator's decode_ipc_msg and expect to get Failure back via
+    // callback with error code for IpcError::UnknownApp
+    // Check that the returned FfiString is "safe_<app-id-base64>:payload" where payload is
+    // IpcMsg::Resp(IpcResp::Auth(Err(UnknownApp)))"
+    match decode_ipc_msg(&authenticator, &encoded_msg) {
+        Err((code, Some(IpcMsg::Resp { resp: IpcResp::Auth(Err(IpcError::UnknownApp)), .. })))
+            if code == ERR_UNKNOWN_APP => (),
+        x => panic!("Unexpected {:?}", x),
+    };
+}
+
+#[test]
+fn containers_access_request() {
+    let authenticator = create_account_and_login();
+
+    // Create IpcMsg::AuthReq for a random App (random id, name, vendor etc), ask for app_container
+    // and containers "documents with permission to insert", "videos with all the permissions
+    // possible",
+    let auth_req = AuthReq {
+        app: unwrap!(AppExchangeInfo::rand()),
+        app_container: true,
+        containers: create_containers_req(),
+    };
+    let app_id = auth_req.app.id.clone();
+    let base64_app_id = base64_encode(app_id.as_bytes());
+
+    let auth_granted = authorise_app(&authenticator, &auth_req);
+
+    // Give one Containers request to authenticator for the same app asking for "downloads with
+    // permission to update only"
+    let req_id = ipc::gen_req_id();
+    let cont_req = ContainersReq {
+        app: auth_req.app.clone(),
+        containers: {
+            let mut containers = HashMap::new();
+            let _ = containers.insert("_downloads".to_string(), btree_set![Permission::Update]);
+            containers
+        },
+    };
+
+    // The callback should be invoked
+    let encoded_containers_resp = unsafe {
+        // Call `encode_auth_resp` with is_granted = true
+        let ffi_resp = unwrap!(call_1(|ud, cb| {
+            encode_containers_resp(&authenticator,
+                                   cont_req.into_repr_c(),
+                                   req_id,
+                                   true, // is_granted
+                                   ud,
+                                   cb)
+        }));
+
+        assert!(!ffi_resp.is_null());
+        let resp = unwrap!(ffi_resp.to_string());
+
+        ffi_resp.deallocate();
+        resp
+    };
+
+    // Check the FfiString to contain "safe-<app-id-base64>:payload" where payload is
+    // IpcMsg::Resp(IpcResp::Auth(Containers(Ok())))".
+    assert!(encoded_containers_resp.starts_with(&format!("safe-{}", base64_app_id)));
+
+    match ipc::decode_msg(&encoded_containers_resp) {
+        Ok(IpcMsg::Resp { resp: IpcResp::Containers(Ok(())), .. }) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Using the access container from AuthGranted check if "app-id", "documents", "videos",
+    // "downloads" are all mentioned and using MDataInfo for each check the permissions are
+    // what had been asked for.
+    let mut expected = create_containers_req();
+    let _ = expected.insert("_downloads".to_owned(), btree_set![Permission::Update]);
+
+    let app_sign_pk = auth_granted.app_keys.sign_pk;
+    let access_container = access_container(&authenticator, &app_id, auth_granted);
+    compare_access_container_entries(&authenticator, app_sign_pk, access_container, expected);
+}
+
+#[test]
+fn revoke_app() {
+    let authenticator = create_account_and_login();
+
+    // Create IpcMsg::AuthReq for a random App (random id, name, vendor etc), ask for app_container
+    // and containers "documents with permission to insert", "videos with all the permissions
+    // possible",
+    let auth_req = AuthReq {
+        app: unwrap!(AppExchangeInfo::rand()),
+        app_container: true,
+        containers: create_containers_req(),
+    };
+
+    let auth_granted = authorise_app(&authenticator, &auth_req);
+    let app_id = auth_req.app.id.clone();
+
+    // Put some entries into videos folder before revoking the app
+    let mut ac_entries = access_container(&authenticator, &app_id, auth_granted.clone());
+    let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+    let videos_md2 = videos_md.clone();
+
+    let _ = run(&authenticator, move |client| {
+        file_helper::create(client.clone(), videos_md2, "video.mp4", Vec::new())
+            .and_then(move |writer| {
+                writer.write(&[1u8; 10])
+                    .and_then(move |_| writer.close())
+            })
+            .map_err(From::from)
+    });
+
+    // Invoke `authenticator_revoke_app` for the app-id
+    revoke(&authenticator, &app_id);
+
+    // Search the access container, the entry corresponding to app-id should no longer be there.
+    let app_keys = auth_granted.app_keys;
+    let app_sign_pk = app_keys.sign_pk;
+
+    let ac_md_info = auth_granted.access_container.into_mdata_info(app_keys.enc_key.clone());
+    run(&authenticator, move |client| {
+        access_container_entry(client.clone(), &ac_md_info, &app_id, app_keys).then(move |res| {
+            match res {
+                Err(AuthError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+                x => panic!("Unexpected {:?}", x),
+            }
+        })
+    });
+
+    // Use the previous MDataInfo for images to check if the permissions
+    // related to app-sign_pk are still present, they should not be present.
+    let videos_md3 = videos_md.clone();
+    let perms = run(&authenticator, move |client| {
+        client.list_mdata_permissions(videos_md3.name, videos_md3.type_tag).map_err(From::from)
+    });
+    assert!(!perms.contains_key(&User::Key(app_sign_pk)));
+
+    // Try reading the entries of images folder, should not be able to read as everything
+    // is reencrypted using new keys.
+    run(&authenticator, move |client| {
+        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| {
+            match res {
+                Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+                x => panic!("Unexpected {:?}", x),
+            }
+        })
+    });
+}
+
+// Modifies `revoke_app` to involve two apps - and do the same thing for one of them.
+#[test]
+fn revoke_app_reencryption() {
+    let authenticator = create_account_and_login();
+
+    let auth_req1 = AuthReq {
+        app: unwrap!(AppExchangeInfo::rand()),
+        app_container: true,
+        containers: create_containers_req(),
+    };
+
+    let auth_req2 = AuthReq {
+        app: unwrap!(AppExchangeInfo::rand()),
+        app_container: true,
+        containers: create_containers_req(),
+    };
+
+    let app_id1 = auth_req1.app.id.clone();
+    let app_id2 = auth_req2.app.id.clone();
+
+    let auth_granted1 = authorise_app(&authenticator, &auth_req1);
+    let auth_granted2 = authorise_app(&authenticator, &auth_req2);
+
+    // Put some entries into videos folder before revoking the first app
+    let mut ac_entries = access_container(&authenticator, &app_id2, auth_granted2.clone());
+    let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+    let videos_md2 = videos_md.clone();
+
+    let _ = run(&authenticator, move |client| {
+        file_helper::create(client.clone(), videos_md2, "video.mp4", vec![1, 2, 3])
+            .and_then(move |writer| {
+                writer.write(&[1u8; 10])
+                    .and_then(move |_| writer.close())
+            })
+            .map_err(From::from)
+    });
+
+    // Invoke `authenticator_revoke_app` for the first app
+    revoke(&authenticator, &app_id1);
+
+    // Use the previous MDataInfo for images to check if the permissions
+    // related to the 2nd app are still present but not present for the revoked app.
+    let videos_md3 = videos_md.clone();
+    let perms = run(&authenticator, move |client| {
+        client.list_mdata_permissions(videos_md3.name, videos_md3.type_tag).map_err(From::from)
+    });
+    assert!(!perms.contains_key(&User::Key(auth_granted1.app_keys.sign_pk)));
+    assert!(perms.contains_key(&User::Key(auth_granted2.app_keys.sign_pk)));
+
+    // Try reading the entries of images folder, should not be able to read as everything
+    // is reencrypted using new keys.
+    run(&authenticator, move |client| {
+        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| {
+            match res {
+                Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+                x => panic!("Unexpected {:?}", x),
+            }
+        })
+    });
+
+    // The second app can still read its entry in access-container to update its
+    // information about new MDataInfo for images.
+    let mut ac_entries = access_container(&authenticator, &app_id2, auth_granted2.clone());
+    let (new_videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+
+    // With new information, try to re-read the images container entires.
+    let (_version, file) = run(&authenticator, move |client| {
+        file_helper::fetch(client.clone(), new_videos_md, "video.mp4").map_err(From::from)
+    });
+    assert_eq!(file.size(), 10);
+    assert_eq!(file.user_metadata().to_owned(), vec![1u8, 2u8, 3u8]);
+}
+
+fn revoke(authenticator: &Authenticator, app_id: &str) {
+    let base64_app_id = base64_encode(app_id.as_bytes());
+
+    let revoke_resp = unsafe {
+        let app_id = FfiString::from_str(app_id);
+        let ffi_resp =
+            unwrap!(call_1(|ud, cb| authenticator_revoke_app(authenticator, app_id, ud, cb)));
+        assert!(!ffi_resp.is_null());
+        let resp = unwrap!(ffi_resp.to_string());
+        ffi_resp.deallocate();
+        resp
+    };
+
+    // Assert the callback is called with error-code 0 and FfiString contains
+    // "safe_<app-id-b64>:payload" where payload is b64 encoded IpcMsg::Revoked.
+    assert!(revoke_resp.starts_with(&format!("safe-{}", base64_app_id)));
+
+    match ipc::decode_msg(&revoke_resp) {
+        Ok(IpcMsg::Revoked { .. }) => (),
+        x => panic!("Unexpected {:?}", x),
+    };
+}
+
+fn authorise_app(authenticator: &Authenticator, auth_req: &AuthReq) -> AuthGranted {
+    let base64_app_id = base64_encode(auth_req.app.id.as_bytes());
+
+    let req_id = ipc::gen_req_id();
+    let msg = IpcMsg::Req {
+        req_id: req_id,
+        req: IpcReq::Auth(auth_req.clone()),
+    };
+
+    // Serialise it as base64 payload in "safe_auth:payload"
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+
+    // Invoke Authenticator's `decode_ipc_msg` and expect to get C-AuthReq back via callback.
+    match unwrap!(decode_ipc_msg(authenticator, &encoded_msg)) {
+        IpcMsg::Req { req: IpcReq::Auth(_), .. } => (),
+        x => panic!("Unexpected {:?}", x),
+    };
+
+    let encoded_auth_resp = unsafe {
+        // Call `encode_auth_resp` with is_granted = true
+        let ffi_resp = unwrap!(call_1(|ud, cb| {
+            encode_auth_resp(authenticator,
+                             auth_req.clone().into_repr_c(),
+                             req_id,
+                             true, // is_granted
+                             ud,
+                             cb)
+        }));
+
+        assert!(!ffi_resp.is_null());
+        let resp = unwrap!(ffi_resp.to_string());
+
+        ffi_resp.deallocate();
+        resp
+    };
+
+    assert!(encoded_auth_resp.starts_with(&format!("safe-{}", base64_app_id)));
+
+    match ipc::decode_msg(&encoded_auth_resp) {
+        Ok(IpcMsg::Resp { resp: IpcResp::Auth(Ok(auth_granted)), .. }) => auth_granted,
+        x => panic!("Unexpected {:?}", x),
+    }
+}
+
+// Create a random authenticator - should be successful.
+// Login using same credentials - should be successful.
 fn create_account_and_login() -> Authenticator {
     let locator = unwrap!(utils::generate_random_string(10));
     let password = unwrap!(utils::generate_random_string(10));
@@ -359,38 +600,79 @@ fn create_account_and_login() -> Authenticator {
     unwrap!(Authenticator::login(locator, password, |_| ()))
 }
 
+// Creates a containers request asking for "documents with permission to
+// insert", and "images with all the permissions possible",
+fn create_containers_req() -> HashMap<String, BTreeSet<Permission>> {
+    let mut containers = HashMap::new();
+    let _ = containers.insert("_documents".to_owned(), btree_set![Permission::Insert]);
+    let _ = containers.insert("_videos".to_owned(),
+                              btree_set![Permission::Read,
+                                         Permission::Insert,
+                                         Permission::Update,
+                                         Permission::Delete,
+                                         Permission::ManagePermissions]);
+    containers
+}
+
 // Helper to decode IpcMsg.
 // TODO: there should be a public function with a signature like this, and the
 //       FFI function `ipc::decode_ipc_msg` should be only wrapper over it.
-fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> Result<IpcMsg, i32> {
-    let (tx, rx) = mpsc::channel::<Result<IpcMsg, i32>>();
+fn decode_ipc_msg(authenticator: &Authenticator,
+                  msg: &str)
+                  -> Result<IpcMsg, (i32, Option<IpcMsg>)> {
+    let (tx, rx) = mpsc::channel::<Result<IpcMsg, (i32, Option<IpcMsg>)>>();
 
     extern "C" fn auth_cb(user_data: *mut c_void, req_id: u32, req: FfiAuthReq) {
         unsafe {
-            let req = unwrap!(AuthReq::from_repr_c(req));
+            let req = match AuthReq::from_repr_c(req) {
+                Ok(req) => req,
+                Err(_) => {
+                    return send_via_user_data(user_data,
+                                              Err::<IpcMsg, (i32, Option<IpcMsg>)>((-2, None)))
+                }
+            };
+
             let msg = IpcMsg::Req {
                 req_id: req_id,
                 req: IpcReq::Auth(req),
             };
 
-            send_via_user_data(user_data, Ok::<_, i32>(msg))
+            send_via_user_data(user_data, Ok::<_, (i32, Option<IpcMsg>)>(msg))
         }
     }
 
     extern "C" fn containers_cb(user_data: *mut c_void, req_id: u32, req: FfiContainersReq) {
         unsafe {
-            let req = unwrap!(ContainersReq::from_repr_c(req));
+            let req = match ContainersReq::from_repr_c(req) {
+                Ok(req) => req,
+                Err(_) => {
+                    return send_via_user_data(user_data,
+                                              Err::<IpcMsg, (i32, Option<IpcMsg>)>((-2, None)))
+                }
+            };
+
             let msg = IpcMsg::Req {
                 req_id: req_id,
                 req: IpcReq::Containers(req),
             };
 
-            send_via_user_data(user_data, Ok::<_, i32>(msg))
+            send_via_user_data(user_data, Ok::<_, (i32, Option<IpcMsg>)>(msg))
         }
     }
 
-    extern "C" fn err_cb(user_data: *mut c_void, error_code: i32, _: FfiString) {
-        unsafe { send_via_user_data(user_data, Err::<IpcMsg, _>(error_code)) }
+    extern "C" fn err_cb(user_data: *mut c_void, error_code: i32, response: FfiString) {
+        unsafe {
+            let ipc_resp = if response.is_null() {
+                None
+            } else {
+                match ipc::decode_msg(unwrap!(response.as_str())) {
+                    Ok(ipc_resp) => Some(ipc_resp),
+                    Err(_) => None,
+                }
+            };
+
+            send_via_user_data(user_data, Err::<IpcMsg, _>((error_code, ipc_resp)))
+        }
     }
 
     let ffi_msg = FfiString::from_str(msg);
@@ -405,5 +687,8 @@ fn decode_ipc_msg(authenticator: &Authenticator, msg: &str) -> Result<IpcMsg, i3
                        err_cb);
     };
 
-    unwrap!(rx.recv())
+    match rx.recv_timeout(Duration::from_secs(15)) {
+        Ok(r) => r,
+        Err(_) => Err((-1, None)),
+    }
 }

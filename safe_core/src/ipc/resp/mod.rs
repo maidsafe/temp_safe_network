@@ -181,6 +181,15 @@ impl AccessContInfo {
         }
     }
 
+    /// Creates `MDataInfo` from this `AccessContInfo`
+    pub fn into_mdata_info(self, enc_key: secretbox::Key) -> MDataInfo {
+        MDataInfo {
+            name: self.id,
+            type_tag: self.tag,
+            enc_info: Some((enc_key, Some(self.nonce))),
+        }
+    }
+
     /// Creates an `AccessContInfo` from a given `MDataInfo`
     pub fn from_mdata_info(md: MDataInfo) -> Result<AccessContInfo, IpcError> {
         if let Some((_, Some(nonce))) = md.enc_info {
