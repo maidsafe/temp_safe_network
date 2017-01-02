@@ -20,7 +20,9 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use ffi_utils::{FfiString, ffi_string_free};
-use std::mem;
+use ffi_utils::callback::CallbackArgs;
+use routing::{Action, PermissionSet};
+use std::{mem, ptr};
 
 /// Permission action
 #[repr(C)]
@@ -36,6 +38,25 @@ pub enum Permission {
     Delete,
     /// Modify permissions
     ManagePermissions,
+}
+
+/// Transforms a `Permission` collection into `routing::PermissionSet`
+pub fn convert_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
+    where Iter: IntoIterator<Item = &'a Permission>
+{
+    let mut ps = PermissionSet::new();
+
+    for access in permissions {
+        ps = match *access {
+            Permission::Read => ps,
+            Permission::Insert => ps.allow(Action::Insert),
+            Permission::Update => ps.allow(Action::Update),
+            Permission::Delete => ps.allow(Action::Delete),
+            Permission::ManagePermissions => ps.allow(Action::ManagePermissions),
+        };
+    }
+
+    ps
 }
 
 /// Represents an authorization request
@@ -169,6 +190,58 @@ impl ContainerPermissionsArray {
 #[allow(unsafe_code)]
 pub unsafe extern "C" fn container_permissions_array_free(s: ContainerPermissionsArray) {
     let _ = s.into_vec();
+}
+
+/// Wrapper for `AppExchangeInfo` arrays to be passed across FFI boundary.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AppExchangeInfoArray {
+    /// Pointer to first byte
+    pub ptr: *mut AppExchangeInfo,
+    /// Number of elements
+    pub len: usize,
+    /// Reserved by Rust allocator
+    pub cap: usize,
+}
+
+impl CallbackArgs for AppExchangeInfoArray {
+    fn default() -> AppExchangeInfoArray {
+        AppExchangeInfoArray {
+            ptr: ptr::null_mut(),
+            len: 0,
+            cap: 0,
+        }
+    }
+}
+
+impl AppExchangeInfoArray {
+    /// Construct owning `AppExchangeInfoArray` from `Vec`. It has to be
+    /// deallocated manually by calling `app_exchange_info_array_free`
+    pub fn from_vec(mut v: Vec<AppExchangeInfo>) -> Self {
+        let p = v.as_mut_ptr();
+        let len = v.len();
+        let cap = v.capacity();
+        mem::forget(v);
+
+        AppExchangeInfoArray {
+            ptr: p,
+            len: len,
+            cap: cap,
+        }
+    }
+
+    /// Consumes this `AppExchangeInfoArray` into a `Vec`
+    #[allow(unsafe_code)]
+    pub unsafe fn into_vec(self) -> Vec<AppExchangeInfo> {
+        Vec::from_raw_parts(self.ptr, self.len, self.cap)
+    }
+}
+
+/// Free the array from memory.
+#[no_mangle]
+#[allow(unsafe_code)]
+pub unsafe extern "C" fn app_exchange_info_array_free(a: AppExchangeInfoArray) {
+    let _ = a.into_vec();
 }
 
 /// Wrapper for `Permission` arrays to be passed across FFI boundary.

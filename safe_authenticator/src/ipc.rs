@@ -28,9 +28,9 @@ use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, nfs};
 use safe_core::ipc::{self, Config, IpcError, IpcMsg, decode_msg};
 use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
+use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::ipc::req::ffi::Permission;
 use safe_core::ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -182,8 +182,8 @@ pub unsafe extern "C" fn decode_ipc_msg(auth: *const Authenticator,
 /// Revoke app access
 #[no_mangle]
 pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
-                                                  user_data: *mut c_void,
                                                   app_id: FfiString,
+                                                  user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
                                                                       i32,
                                                                       FfiString)) {
@@ -200,6 +200,7 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                 let c6 = client.clone();
                 let c7 = client.clone();
                 let c8 = client.clone();
+                let c9 = client.clone();
 
                 app_info(client, &app_id)
                     .and_then(move |app| {
@@ -211,6 +212,7 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                         })
                     })
                     .and_then(move |(access_container, app)| {
+                        // Get an access container entry for the app being revoked
                         access_container_entry(c3,
                                                &access_container,
                                                &app.info.id,
@@ -226,34 +228,43 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                             access_container_key(&app.info.id, &app.keys, nonce)
                         };
 
-                        let del = EntryActions::new().del(app_entry_name, version + 1);
+                        let del = EntryActions::new().del(app_entry_name.clone(), version + 1);
 
                         c4.mutate_mdata_entries(access_container.name,
                                                   access_container.type_tag,
                                                   del.into())
-                            .map(move |_| (app, permissions, access_container))
+                            .map(move |_| (app, app_entry_name, permissions, access_container))
                             .map_err(From::from)
                             .into_box()
                     })
-                    .and_then(move |(app, permissions, access_container)| {
+                    .and_then(move |(app, app_entry_name, permissions, access_container)| {
                         // Remove app key from container permissions
                         revoke_container_perms(c5.clone(), permissions.clone(), app.keys.sign_pk)
-                            .map(move |_| (app, permissions, access_container))
+                            .map(move |_| (app, app_entry_name, permissions, access_container))
                     })
-                    .and_then(move |(app, permissions, access_container)| {
+                    .and_then(move |(app, app_entry_name, permissions, access_container)| {
                         // Re-encrypt private containers
                         c6.list_mdata_entries(access_container.name, access_container.type_tag)
                             .map_err(From::from)
-                            .map(move |entries| (app, permissions, access_container, entries))
+                            .map(move |mut entries| {
+                                // Remove the revoked app entry from the access container
+                                // because we don't need it to be reencrypted.
+                                let _ = entries.remove(&app_entry_name);
+                                (app, permissions, access_container, entries)
+                            })
                     })
                     .and_then(move |(app, permissions, access_container, entries)| {
                         reencrypt_private_containers(c7, permissions, access_container, entries)
                             .map(move |_| app)
                     })
                     .and_then(move |app| {
+                        c8.list_auth_keys_and_version()
+                            .map_err(From::from)
+                            .map(move |(_, version)| (version, app))
+                    })
+                    .and_then(move |(version, app)| {
                         // Remove app key from MaidManagers
-                        // !! TODO(nbaksalyar) !! use appropriate version here
-                        c8.del_auth_key(app.keys.sign_pk, 0)
+                        c9.del_auth_key(app.keys.sign_pk, version + 1)
                             .map_err(From::from)
                             .map(move |_| app.info.id)
                     })
@@ -423,20 +434,32 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                         .and_then(move |(app, perms)| {
                             access_container(c3).map(move |dir| (dir, app, perms))
                         })
-                        .and_then(move |(dir, app, perms)| {
+                        .and_then(move |(dir, app, mut perms)| {
                             let app_keys = app.keys;
 
                             access_container_entry(c4, &dir, &app_id, app_keys.clone())
                                 .then(move |res| {
                                     let version = match res {
-                                        Ok((version, _)) => Some(version),
+                                        // Updating an existing entry
+                                        Ok((version, mut existing_perms)) => {
+                                            for (key, val) in perms {
+                                                let _ = existing_perms.insert(key, val);
+                                            }
+                                            perms = existing_perms;
+
+                                            Some(version + 1)
+                                        }
+
                                         // Adding a new access container entry
                                         Err(AuthError::CoreError(
                                         CoreError::RoutingClientError(
                                             ClientError::NoSuchEntry))) => None,
-                                        Err(e) => return err!(e),
+
+                                        // Error has occurred while trying to get an
+                                        // existing entry
+                                        Err(e) => return Err(e),
                                     };
-                                    ok!((version, app_id, app_keys, dir, perms))
+                                    Ok((version, app_id, app_keys, dir, perms))
                                 })
                         })
                         .and_then(move |(version, app_id, app_keys, dir, perms)| {
@@ -470,10 +493,10 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
 }
 
 /// Updates the authenticator configuration file and returns the updated `File` struct.
-fn update_config(client: Client,
-                 version: Option<u64>,
-                 auth_cfg: HashMap<sha256::Digest, AppInfo>)
-                 -> Box<AuthFuture<()>> {
+pub fn update_config(client: Client,
+                     version: Option<u64>,
+                     auth_cfg: HashMap<sha256::Digest, AppInfo>)
+                     -> Box<AuthFuture<()>> {
     let parent = fry!(client.config_root_dir());
 
     let key = fry!(parent.enc_entry_key(CONFIG_FILE));
@@ -518,6 +541,7 @@ fn reencrypt_private_containers(client: Client,
     let c5 = client.clone();
 
     for (container, (mdata_info, _)) in permissions {
+        // Check if the container is encrypted
         if mdata_info.enc_info.is_some() {
             let c3 = client.clone();
             let old_mdata = mdata_info.clone();
@@ -528,20 +552,25 @@ fn reencrypt_private_containers(client: Client,
                 .and_then(move |entries| {
                     let mut mutations = EntryActions::new();
 
-                    for (key, val) in entries {
-                        let key = fry!(old_mdata.decrypt(&key));
-                        let content = fry!(old_mdata.decrypt(&val.content));
+                    for (old_key, val) in entries {
+                        let key = old_mdata.decrypt(&old_key)?;
+                        let content = old_mdata.decrypt(&val.content)?;
 
-                        let new_key = fry!(new_mdata.enc_entry_key(&key));
-                        let new_content = fry!(new_mdata.enc_entry_value(&content));
+                        let new_key = new_mdata.enc_entry_key(&key)?;
+                        let new_content = new_mdata.enc_entry_value(&content)?;
 
-                        mutations = mutations.update(new_key, new_content, val.entry_version + 1);
+                        // Delete the old entry with the old key and
+                        // insert the re-encrypted entry with a new key
+                        mutations = mutations.del(old_key, val.entry_version + 1)
+                            .ins(new_key, new_content, 0);
                     }
 
+                    Ok((new_mdata, mutations))
+                })
+                .and_then(move |(new_mdata, mutations)| {
                     c3.mutate_mdata_entries(new_mdata.name, new_mdata.type_tag, mutations.into())
                         .map_err(From::from)
                         .map(move |_| (container, new_mdata))
-                        .into_box()
                 })
                 .map_err(From::from));
         }
@@ -590,7 +619,6 @@ fn reencrypt_private_containers(client: Client,
                 let entry_name = access_container_key(&app.info.id, &app.keys, nonce);
 
                 if let Some(raw) = access_cont_entries.get(&entry_name) {
-                    let version = raw.entry_version;
                     let plaintext = fry!(symmetric_decrypt(&raw.content, &app.keys.enc_key));
                     let mut access_cont_entry =
                         fry!(deserialise::<AccessContainerEntry>(&plaintext));
@@ -609,7 +637,7 @@ fn reencrypt_private_containers(client: Client,
                     let ciphertext =
                         fry!(symmetric_encrypt(&updated_plaintext, &app.keys.enc_key, None));
 
-                    mutations = mutations.update(entry_name, ciphertext, version + 1);
+                    mutations = mutations.update(entry_name, ciphertext, raw.entry_version + 1);
                 }
             }
 
@@ -735,7 +763,7 @@ fn encode_auth_resp_impl(client: Client,
                 let _ = access.insert(Permission::Delete);
                 let _ = access.insert(Permission::ManagePermissions);
 
-                let _ = perms.insert(app_info.id.clone(), (mdata_info, access));
+                let _ = perms.insert(format!("apps/{}", app_info.id), (mdata_info, access));
             };
             put_access_container_entry(c6, &dir, &app_info.id, &app_keys, perms, None)
                 .map(move |_| (dir, app_keys))
@@ -787,6 +815,57 @@ fn create_app_container(client: Client,
         .into_box()
 }
 
+/// Removes an app's dedicated container if it's available and stored in the user's root dir.
+/// Returns `true` if it was removed successfully and `false` if it wasn't found in the parent dir.
+pub fn remove_app_container(client: Client, app_id: String) -> Box<AuthFuture<bool>> {
+    let root = fry!(client.user_root_dir());
+    let app_cont_name = format!("apps/{}", app_id);
+    let key = fry!(root.enc_entry_key(app_cont_name.as_bytes()));
+
+    let c2 = client.clone();
+
+    client.get_mdata_value(root.name, root.type_tag, key.clone())
+        .then(move |res| {
+            match res {
+                Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => {
+                    // App container doesn't exist
+                    ok!(false)
+                }
+                Err(e) => err!(e),
+                Ok(val) => {
+                    let decrypted = fry!(root.decrypt(&val.content));
+                    let mdata_info = fry!(deserialise::<MDataInfo>(&decrypted));
+
+                    let c3 = c2.clone();
+
+                    c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
+                        .and_then(move |entries| {
+                            // Remove all entries in MData
+                            let actions = entries.iter()
+                                .fold(EntryActions::new(), |actions, (entry_name, val)| {
+                                    actions.del(entry_name.clone(), val.entry_version + 1)
+                                });
+                            c3.mutate_mdata_entries(mdata_info.name,
+                                                    mdata_info.type_tag,
+                                                    actions.into())
+                        })
+                        .and_then(move |_| {
+                            // Remove MData itself
+                            let actions = EntryActions::new().del(key, val.entry_version + 1);
+                            client.mutate_mdata_entries(root.name, root.type_tag, actions.into())
+
+                            // TODO(nbaksalyar): when MData deletion is implemented properly,
+                            // also delete the actual MutableData related to app
+                        })
+                        .map_err(From::from)
+                        .map(move |_| true)
+                        .into_box()
+                }
+            }
+        })
+        .into_box()
+}
+
 /// Checks if an app's dedicated container is available and stored in the user's root dir.
 /// If `Some(MDataInfo)` is returned then the container has been created or previously existed.
 fn check_app_container(client: Client,
@@ -822,35 +901,9 @@ fn encode_response(msg: &IpcMsg, app_id: String) -> Result<FfiString, IpcError> 
     Ok(FfiString::from_string(resp))
 }
 
-fn convert_permission_set<'a, Iter>(permissions: Iter) -> PermissionSet
-    where Iter: IntoIterator<Item = &'a Permission>
-{
-    let mut ps = PermissionSet::new();
-
-    for access in permissions {
-        match *access {
-            Permission::Read => {}
-            Permission::Insert => {
-                ps = ps.allow(Action::Insert);
-            }
-            Permission::Update => {
-                ps = ps.allow(Action::Update);
-            }
-            Permission::Delete => {
-                ps = ps.allow(Action::Delete);
-            }
-            Permission::ManagePermissions => {
-                ps = ps.allow(Action::ManagePermissions);
-            }
-        }
-    }
-
-    ps
-}
-
 /// Represents current app state
 #[derive(Debug)]
-enum AppState {
+pub enum AppState {
     /// Exists in the authenticator config, access container, and registered in MaidManagers
     Authenticated,
     /// Exists in the authenticator config but not in access container and MaidManagers
@@ -859,12 +912,14 @@ enum AppState {
     NotAuthenticated,
 }
 
-/// Returns true if app is already registered (meaning it has an entry
-/// in the config file AND the access container).
-fn app_state(client: Client,
-             config: &HashMap<sha256::Digest, AppInfo>,
-             app_id: String)
-             -> Box<AuthFuture<AppState>> {
+/// Returns a current app state (`Authenticated` if it has an entry
+/// in the config file AND the access container, `Revoked` if it has
+/// an entry in the config but not in the access container, and `NotAuthenticated`
+/// if it's not registered anywhere).
+pub fn app_state(client: Client,
+                 config: &HashMap<sha256::Digest, AppInfo>,
+                 app_id: String)
+                 -> Box<AuthFuture<AppState>> {
     let c2 = client.clone();
     let app_id_hash = sha256::hash(app_id.clone().as_bytes());
 

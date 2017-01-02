@@ -74,7 +74,7 @@ pub fn encode_msg(msg: &IpcMsg, prefix: &str) -> Result<String, IpcError> {
 
 /// Decode `IpcMsg` encoded with base64 encoding.
 pub fn decode_msg(encoded: &str) -> Result<IpcMsg, IpcError> {
-    // stip prefix.
+    // strip prefix.
     let payload = if let Some(index) = encoded.find(':') {
         encoded.split_at(index + 1).1
     } else {

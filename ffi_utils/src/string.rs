@@ -39,6 +39,11 @@ pub struct FfiString {
 }
 
 impl FfiString {
+    /// Check if we have a null string
+    pub fn is_null(&self) -> bool {
+        self.ptr.is_null() || self.len == 0
+    }
+
     /// Construct owning `FfiString` from `String`. It has to be deallocated
     /// manually by calling `ffi_string_free`.
     pub fn from_string<T: Into<String>>(s: T) -> Self {

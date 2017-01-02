@@ -20,10 +20,18 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use Authenticator;
+use access_container::access_container_entry;
 use errors::AuthError;
 use futures::{Future, IntoFuture};
-use safe_core::{Client, FutureExt, utils};
+use futures::future;
+use routing::User;
+use rust_sodium::crypto::sign;
+use safe_core::{Client, CoreError, FutureExt, utils};
+use safe_core::ipc::{AppExchangeInfo, AuthGranted, Permission};
+use safe_core::ipc::req::ffi::convert_permission_set;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
+use super::AccessContainerEntry;
 
 pub fn create_authenticator() -> Authenticator {
     let locator = unwrap!(utils::generate_random_string(10));
@@ -55,4 +63,62 @@ pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
     }));
 
     unwrap!(unwrap!(rx.recv()))
+}
+
+/// Creates a random `AppExchangeInfo`
+pub fn rand_app() -> Result<AppExchangeInfo, CoreError> {
+    Ok(AppExchangeInfo {
+        id: utils::generate_random_string(10)?,
+        scope: None,
+        name: utils::generate_random_string(10)?,
+        vendor: utils::generate_random_string(10)?,
+    })
+}
+
+/// Fetch the access container entry for the app.
+pub fn access_container<S: Into<String>>(authenticator: &Authenticator,
+                                         app_id: S,
+                                         auth_granted: AuthGranted)
+                                         -> AccessContainerEntry {
+    let app_keys = auth_granted.app_keys;
+    let ac_md_info = auth_granted.access_container.into_mdata_info(app_keys.enc_key.clone());
+    let app_id = app_id.into();
+    run(authenticator, move |client| {
+        access_container_entry(client.clone(), &ac_md_info, &app_id, app_keys)
+            .map(move |(_, ac_entry)| ac_entry)
+    })
+}
+
+/// Check that the given permission set is contained in the access container
+pub fn compare_access_container_entries(authenticator: &Authenticator,
+                                        app_sign_pk: sign::PublicKey,
+                                        mut access_container: AccessContainerEntry,
+                                        expected: HashMap<String, BTreeSet<Permission>>) {
+    let results = run(authenticator, move |client| {
+        let mut reqs = Vec::new();
+        let user = User::Key(app_sign_pk);
+
+        for (container, expected_perms) in expected {
+            // Check the requested permissions in the access container.
+            let expected_perm_set = convert_permission_set(&expected_perms);
+            let (md_info, perms) = unwrap!(access_container.remove(&container),
+                                           "No '{}' in access container {:?}",
+                                           container,
+                                           access_container);
+            assert_eq!(perms, expected_perms);
+
+            let fut =
+                client.list_mdata_user_permissions(md_info.name, md_info.type_tag, user.clone())
+                    .map(move |perms| (perms, expected_perm_set));
+
+            reqs.push(fut);
+        }
+
+        future::join_all(reqs).map_err(AuthError::from)
+    });
+
+    // Check the permission on the the mutable data for each of the above directories.
+    for (perms, expected) in results {
+        assert_eq!(perms, expected);
+    }
 }
