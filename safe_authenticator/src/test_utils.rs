@@ -26,8 +26,8 @@ use futures::{Future, IntoFuture};
 use futures::future;
 use routing::User;
 use rust_sodium::crypto::sign;
-use safe_core::{Client, FutureExt, utils};
-use safe_core::ipc::{AuthGranted, Permission};
+use safe_core::{Client, CoreError, FutureExt, utils};
+use safe_core::ipc::{AppExchangeInfo, AuthGranted, Permission};
 use safe_core::ipc::req::ffi::convert_permission_set;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
@@ -65,14 +65,24 @@ pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
     unwrap!(unwrap!(rx.recv()))
 }
 
+/// Creates a random `AppExchangeInfo`
+pub fn rand_app() -> Result<AppExchangeInfo, CoreError> {
+    Ok(AppExchangeInfo {
+        id: utils::generate_random_string(10)?,
+        scope: None,
+        name: utils::generate_random_string(10)?,
+        vendor: utils::generate_random_string(10)?,
+    })
+}
+
 /// Fetch the access container entry for the app.
-pub fn access_container<S: AsRef<str>>(authenticator: &Authenticator,
-                                       app_id: S,
-                                       auth_granted: AuthGranted)
-                                       -> AccessContainerEntry {
+pub fn access_container<S: Into<String>>(authenticator: &Authenticator,
+                                         app_id: S,
+                                         auth_granted: AuthGranted)
+                                         -> AccessContainerEntry {
     let app_keys = auth_granted.app_keys;
     let ac_md_info = auth_granted.access_container.into_mdata_info(app_keys.enc_key.clone());
-    let app_id = app_id.as_ref().to_owned();
+    let app_id = app_id.into();
     run(authenticator, move |client| {
         access_container_entry(client.clone(), &ac_md_info, &app_id, app_keys)
             .map(move |(_, ac_entry)| ac_entry)

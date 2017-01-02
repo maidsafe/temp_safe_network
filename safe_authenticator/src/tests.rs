@@ -30,8 +30,8 @@ use maidsafe_utilities::serialisation::deserialise;
 use routing::User;
 use rust_sodium::crypto::hash::sha256;
 use safe_core::{CoreError, MDataInfo, mdata_info, utils};
-use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, ContainersReq, IpcError, IpcMsg,
-                     IpcReq, IpcResp, Permission};
+use safe_core::ipc::{self, AuthGranted, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp,
+                     Permission};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, NfsError, file_helper};
@@ -39,7 +39,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::os::raw::c_void;
 use std::sync::mpsc;
 use std::time::Duration;
-use test_utils::{access_container, compare_access_container_entries, run};
+use test_utils::{access_container, compare_access_container_entries, rand_app, run};
 
 // Test creation and content of std dirs after account creation.
 #[test]
@@ -129,7 +129,7 @@ fn app_authentication() {
     let authenticator = create_account_and_login();
 
     let req_id = ipc::gen_req_id();
-    let app_exchange_info = unwrap!(AppExchangeInfo::rand());
+    let app_exchange_info = unwrap!(rand_app());
     let app_id = app_exchange_info.id.clone();
 
     let auth_req = AuthReq {
@@ -188,7 +188,8 @@ fn app_authentication() {
                                        Permission::Delete,
                                        Permission::ManagePermissions]);
 
-    let mut access_container = access_container(&authenticator, &app_id, auth_granted.clone());
+    let mut access_container =
+        access_container(&authenticator, app_id.clone(), auth_granted.clone());
     assert_eq!(access_container.len(), 3);
 
     let app_keys = auth_granted.app_keys;
@@ -242,7 +243,7 @@ fn authenticated_app_cannot_be_authenticated_again() {
     let authenticator = create_account_and_login();
 
     let auth_req = AuthReq {
-        app: unwrap!(AppExchangeInfo::rand()),
+        app: unwrap!(rand_app()),
         app_container: false,
         containers: Default::default(),
     };
@@ -296,7 +297,7 @@ fn containers_unknown_app() {
     let msg = IpcMsg::Req {
         req_id: req_id,
         req: IpcReq::Containers(ContainersReq {
-            app: unwrap!(AppExchangeInfo::rand()),
+            app: unwrap!(rand_app()),
             containers: create_containers_req(),
         }),
     };
@@ -323,7 +324,7 @@ fn containers_access_request() {
     // and containers "documents with permission to insert", "videos with all the permissions
     // possible",
     let auth_req = AuthReq {
-        app: unwrap!(AppExchangeInfo::rand()),
+        app: unwrap!(rand_app()),
         app_container: true,
         containers: create_containers_req(),
     };
@@ -379,7 +380,7 @@ fn containers_access_request() {
     let _ = expected.insert("_downloads".to_owned(), btree_set![Permission::Update]);
 
     let app_sign_pk = auth_granted.app_keys.sign_pk;
-    let access_container = access_container(&authenticator, &app_id, auth_granted);
+    let access_container = access_container(&authenticator, app_id, auth_granted);
     compare_access_container_entries(&authenticator, app_sign_pk, access_container, expected);
 }
 
@@ -391,7 +392,7 @@ fn revoke_app() {
     // and containers "documents with permission to insert", "videos with all the permissions
     // possible",
     let auth_req = AuthReq {
-        app: unwrap!(AppExchangeInfo::rand()),
+        app: unwrap!(rand_app()),
         app_container: true,
         containers: create_containers_req(),
     };
@@ -400,7 +401,7 @@ fn revoke_app() {
     let app_id = auth_req.app.id.clone();
 
     // Put some entries into videos folder before revoking the app
-    let mut ac_entries = access_container(&authenticator, &app_id, auth_granted.clone());
+    let mut ac_entries = access_container(&authenticator, app_id.clone(), auth_granted.clone());
     let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
     let videos_md2 = videos_md.clone();
 
@@ -456,13 +457,13 @@ fn revoke_app_reencryption() {
     let authenticator = create_account_and_login();
 
     let auth_req1 = AuthReq {
-        app: unwrap!(AppExchangeInfo::rand()),
+        app: unwrap!(rand_app()),
         app_container: true,
         containers: create_containers_req(),
     };
 
     let auth_req2 = AuthReq {
-        app: unwrap!(AppExchangeInfo::rand()),
+        app: unwrap!(rand_app()),
         app_container: true,
         containers: create_containers_req(),
     };
@@ -474,7 +475,7 @@ fn revoke_app_reencryption() {
     let auth_granted2 = authorise_app(&authenticator, &auth_req2);
 
     // Put some entries into videos folder before revoking the first app
-    let mut ac_entries = access_container(&authenticator, &app_id2, auth_granted2.clone());
+    let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
     let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
     let videos_md2 = videos_md.clone();
 
@@ -512,7 +513,7 @@ fn revoke_app_reencryption() {
 
     // The second app can still read its entry in access-container to update its
     // information about new MDataInfo for images.
-    let mut ac_entries = access_container(&authenticator, &app_id2, auth_granted2.clone());
+    let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
     let (new_videos_md, _) = unwrap!(ac_entries.remove("_videos"));
 
     // With new information, try to re-read the images container entires.

@@ -457,9 +457,9 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
 
                                         // Error has occurred while trying to get an
                                         // existing entry
-                                        Err(e) => return err!(e),
+                                        Err(e) => return Err(e),
                                     };
-                                    ok!((version, app_id, app_keys, dir, perms))
+                                    Ok((version, app_id, app_keys, dir, perms))
                                 })
                         })
                         .and_then(move |(version, app_id, app_keys, dir, perms)| {
@@ -553,11 +553,11 @@ fn reencrypt_private_containers(client: Client,
                     let mut mutations = EntryActions::new();
 
                     for (old_key, val) in entries {
-                        let key = fry!(old_mdata.decrypt(&old_key));
-                        let content = fry!(old_mdata.decrypt(&val.content));
+                        let key = old_mdata.decrypt(&old_key)?;
+                        let content = old_mdata.decrypt(&val.content)?;
 
-                        let new_key = fry!(new_mdata.enc_entry_key(&key));
-                        let new_content = fry!(new_mdata.enc_entry_value(&content));
+                        let new_key = new_mdata.enc_entry_key(&key)?;
+                        let new_content = new_mdata.enc_entry_value(&content)?;
 
                         // Delete the old entry with the old key and
                         // insert the re-encrypted entry with a new key
@@ -565,10 +565,12 @@ fn reencrypt_private_containers(client: Client,
                             .ins(new_key, new_content, 0);
                     }
 
+                    Ok((new_mdata, mutations))
+                })
+                .and_then(move |(new_mdata, mutations)| {
                     c3.mutate_mdata_entries(new_mdata.name, new_mdata.type_tag, mutations.into())
                         .map_err(From::from)
                         .map(move |_| (container, new_mdata))
-                        .into_box()
                 })
                 .map_err(From::from));
         }

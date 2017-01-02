@@ -81,26 +81,25 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
                 })
                 .and_then(move |(app_state, auth_cfg, cfg_version)| {
                     match app_state {
-                        AppState::Revoked => ok!((auth_cfg, cfg_version)),
-                        AppState::Authenticated => {
-                            err!(AuthError::Unexpected("App is not revoked".to_owned()))
-                        }
+                        AppState::Revoked => Ok((auth_cfg, cfg_version)),
+                        AppState::Authenticated => Err(AuthError::from("App is not revoked")),
                         AppState::NotAuthenticated => {
-                            err!(AuthError::IpcError(IpcError::UnknownApp))
+                            Err(AuthError::IpcError(IpcError::UnknownApp))
                         }
                     }
                 })
                 .and_then(move |(mut auth_cfg, cfg_version)| {
                     let _app = fry!(auth_cfg.remove(&app_id_hash)
-                        .ok_or(AuthError::Unexpected("Logical error: app isn't found in \
-                                                      authenticator config"
-                            .to_owned())));
+                        .ok_or(AuthError::from("Logical error: app isn't found in \
+                                                authenticator config")));
 
                     update_config(c3, Some(cfg_version + 1), auth_cfg)
                 })
                 .and_then(move |_| remove_app_container(c4, app_id2))
-                .map(move |_| o_cb(user_data.0, 0))
-                .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e)))
+                .then(move |res| {
+                    o_cb(user_data.0, ffi_result_code!(res));
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
