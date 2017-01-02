@@ -22,13 +22,13 @@
 use std::mem;
 use std::slice;
 
-/// Converts a byte pointer to Vec<u8>
-pub unsafe fn u8_ptr_to_vec(ptr: *const u8, len: usize) -> Vec<u8> {
-    slice::from_raw_parts(ptr, len).to_owned()
+/// Converts a pointer and lengts to Vec<T> by cloning the contents.
+pub unsafe fn vec_clone_from_raw_parts<T: Clone>(ptr: *const T, len: usize) -> Vec<T> {
+    slice::from_raw_parts(ptr, len).to_vec()
 }
 
-/// Converts Vec<u8> to (byte pointer, size, capacity)
-pub fn u8_vec_to_ptr(mut v: Vec<u8>) -> (*mut u8, usize, usize) {
+/// Converts a Vec<T> to (pointer, size, capacity)
+pub fn vec_into_raw_parts<T>(mut v: Vec<T>) -> (*mut T, usize, usize) {
     v.shrink_to_fit();
     let ptr = v.as_mut_ptr();
     let len = v.len();

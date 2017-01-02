@@ -29,13 +29,13 @@ mod tests;
 use App;
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, u8_ptr_to_vec, u8_vec_to_ptr};
+use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts, vec_into_raw_parts};
 use futures::Future;
 use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle, MDataKeysHandle,
                    MDataPermissionSetHandle, MDataPermissionsHandle, MDataValuesHandle,
                    SignKeyHandle};
 use routing::MutableData;
-use safe_core::{CoreError, FutureExt};
+use safe_core::{CoreError, FutureExt, mdata_info};
 use std::os::raw::c_void;
 
 /// Create new mutable data and put it on the network.
@@ -72,7 +72,9 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
                                       user_data,
                                       o_cb);
 
-                try_cb!(helper::encrypt_entries(&*entries, &info), user_data, o_cb)
+                try_cb!(mdata_info::encrypt_entries(&info, &*entries).map_err(AppError::from),
+                        user_data,
+                        o_cb)
             } else {
                 Default::default()
             };
@@ -135,14 +137,14 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
                                                              usize,
                                                              u64)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let key = u8_ptr_to_vec(key_ptr, key_len);
+        let key = vec_clone_from_raw_parts(key_ptr, key_len);
 
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, _, info| {
             let info = info.clone();
             client.get_mdata_value(info.name, info.type_tag, key)
                 .and_then(move |value| {
                     let content = info.decrypt(&value.content)?;
-                    let content = u8_vec_to_ptr(content);
+                    let content = vec_into_raw_parts(content);
                     Ok((content.0, content.1, content.2, value.entry_version))
                 })
         })
@@ -165,7 +167,7 @@ pub unsafe extern "C" fn mdata_list_entries(app: *const App,
             client.list_mdata_entries(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |entries| {
-                    let entries = helper::decrypt_entries(&entries, &info)?;
+                    let entries = mdata_info::decrypt_entries(&info, &entries)?;
                     Ok(context.object_cache().insert_mdata_entries(entries))
                 })
         })
@@ -186,7 +188,7 @@ pub unsafe extern "C" fn mdata_list_keys(app: *const App,
             client.list_mdata_keys(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |keys| {
-                    let keys = helper::decrypt_keys(&keys, &info)?;
+                    let keys = mdata_info::decrypt_keys(&info, &keys)?;
                     Ok(context.object_cache().insert_mdata_keys(keys))
                 })
         })
@@ -209,7 +211,7 @@ pub unsafe extern "C" fn mdata_list_values(app: *const App,
             client.list_mdata_values(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |values| {
-                    let values = helper::decrypt_values(&values, &info)?;
+                    let values = mdata_info::decrypt_values(&info, &values)?;
                     Ok(context.object_cache().insert_mdata_values(values))
                 })
         })
@@ -234,7 +236,7 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
                 let actions = try_cb!(context.object_cache().get_mdata_entry_actions(actions_h),
                                       user_data,
                                       o_cb);
-                try_cb!(helper::encrypt_entry_actions(&*actions, &info),
+                try_cb!(mdata_info::encrypt_entry_actions(&info, &*actions).map_err(AppError::from),
                         user_data,
                         o_cb)
             };

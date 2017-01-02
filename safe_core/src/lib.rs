@@ -84,7 +84,7 @@ mod client;
 mod errors;
 mod event;
 
-pub use self::client::{Client, ClientKeys, MDataInfo};
+pub use self::client::{Client, ClientKeys, MDataInfo, mdata_info};
 pub use self::errors::CoreError;
 pub use self::event::{CoreEvent, NetworkEvent, NetworkRx, NetworkTx};
 pub use self::event_loop::{CoreFuture, CoreMsg, CoreMsgRx, CoreMsgTx};

@@ -158,6 +158,12 @@ impl<'a> From<&'a str> for AuthError {
     }
 }
 
+impl From<String> for AuthError {
+    fn from(error: String) -> AuthError {
+        AuthError::Unexpected(error)
+    }
+}
+
 impl From<Utf8Error> for AuthError {
     fn from(error: Utf8Error) -> AuthError {
         AuthError::Unexpected(error.description().to_owned())

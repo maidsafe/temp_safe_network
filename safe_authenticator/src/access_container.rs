@@ -38,31 +38,34 @@ pub fn access_container(client: Client) -> Box<AuthFuture<MDataInfo>> {
         .map_err(From::from)
         .and_then(move |val| {
             let content = parent.decrypt(&val.content)?;
-            deserialise::<MDataInfo>(&content).map_err(From::from)
+            deserialise(&content).map_err(From::from)
         })
         .into_box()
 }
 
-/// Encrypts and serialises an access container key using given app ID and app keys
-pub fn access_container_key(access_container: &MDataInfo,
-                            app_id: &str,
-                            app_keys: &AppKeys)
-                            -> Result<Vec<u8>, AuthError> {
-    let nonce = if let Some((_, Some(nonce))) = access_container.enc_info {
-        nonce
+/// Gets the nonce from the access container mdata info.
+pub fn access_container_nonce(access_container: &MDataInfo)
+                              -> Result<&secretbox::Nonce, AuthError> {
+    if let Some((_, Some(ref nonce))) = access_container.enc_info {
+        Ok(nonce)
     } else {
         // No valid nonce for the MDataInfo could be found
-        return Err(AuthError::Unexpected("No valid nonce for access container".to_owned()));
-    };
+        Err(AuthError::from("No valid nonce for access container"))
+    }
+}
 
+/// Encrypts and serialises an access container key using given app ID and app keys
+pub fn access_container_key(app_id: &str,
+                            app_keys: &AppKeys,
+                            access_container_nonce: &secretbox::Nonce)
+                            -> Vec<u8> {
     let key = app_id.as_bytes();
-
     let mut key_pt = key.to_vec();
-    key_pt.extend_from_slice(&nonce[..]);
+    key_pt.extend_from_slice(&access_container_nonce[..]);
 
     let key_nonce =
         unwrap!(secretbox::Nonce::from_slice(&sha256::hash(&key_pt)[..secretbox::NONCEBYTES]));
-    Ok(secretbox::seal(key, &key_nonce, &app_keys.enc_key))
+    secretbox::seal(key, &key_nonce, &app_keys.enc_key)
 }
 
 /// Gets an access container entry
@@ -71,7 +74,8 @@ pub fn access_container_entry(client: Client,
                               app_id: &str,
                               app_keys: AppKeys)
                               -> Box<AuthFuture<(u64, AccessContainerEntry)>> {
-    let key = fry!(access_container_key(access_container, &app_id, &app_keys));
+    let nonce = fry!(access_container_nonce(access_container));
+    let key = access_container_key(app_id, &app_keys, nonce);
 
     client.get_mdata_value(access_container.name, access_container.type_tag, key)
         .and_then(move |value| {
@@ -90,7 +94,8 @@ pub fn put_access_container_entry(client: Client,
                                   permissions: AccessContainerEntry,
                                   version: Option<u64>)
                                   -> Box<AuthFuture<()>> {
-    let key = fry!(access_container_key(access_container, app_id, app_keys));
+    let nonce = fry!(access_container_nonce(access_container));
+    let key = access_container_key(app_id, app_keys, nonce);
     let plaintext = fry!(serialise(&permissions));
     let ciphertext = fry!(symmetric_encrypt(&plaintext, &app_keys.enc_key, None));
 

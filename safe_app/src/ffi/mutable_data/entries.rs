@@ -24,7 +24,7 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, u8_ptr_to_vec};
+use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
 use ffi_utils::callback::Callback;
 use object_cache::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle};
 use routing::{ClientError, Value};
@@ -58,8 +58,8 @@ pub unsafe extern "C" fn mdata_entries_insert(app: *const App,
                                               user_data: *mut c_void,
                                               o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let key = u8_ptr_to_vec(key_ptr, key_len);
-        let value = u8_ptr_to_vec(value_ptr, value_len);
+        let key = vec_clone_from_raw_parts(key_ptr, key_len);
+        let value = vec_clone_from_raw_parts(value_ptr, value_len);
 
         with_entries(app, entries_h, user_data, o_cb, |entries| {
             let _ = entries.insert(key,
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn mdata_entries_get(app: *const App,
                                                                usize,
                                                                u64)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let key = u8_ptr_to_vec(key_ptr, key_len);
+        let key = vec_clone_from_raw_parts(key_ptr, key_len);
 
         with_entries(app, entries_h, user_data, o_cb, move |entries| {
             let value = entries.get(&key)
@@ -320,7 +320,7 @@ unsafe fn with_values<C, F>(app: *const App,
 #[cfg(test)]
 mod tests {
     use ffi_utils::test_utils::{call_1, call_3};
-    use ffi_utils::u8_ptr_to_vec;
+    use ffi_utils::vec_clone_from_raw_parts;
     use routing::Value;
     use safe_core::utils;
     use std::collections::BTreeMap;
@@ -392,9 +392,9 @@ mod tests {
                                value_len: usize,
                                entry_version: u64) {
             unsafe {
-                let key = u8_ptr_to_vec(key_ptr, key_len);
+                let key = vec_clone_from_raw_parts(key_ptr, key_len);
                 let value = Value {
-                    content: u8_ptr_to_vec(value_ptr, value_len),
+                    content: vec_clone_from_raw_parts(value_ptr, value_len),
                     entry_version: entry_version,
                 };
 

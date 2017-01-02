@@ -21,121 +21,145 @@
 
 /// Public ID routines.
 pub mod public_id;
+/// Apps management.
+pub mod apps;
 
-use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb, ffi_string_free};
-use futures::Future;
-use maidsafe_utilities::serialisation::deserialise;
-use safe_core::FutureExt;
-use safe_core::ipc::req::ffi::{ContainerPermissions, ContainerPermissionsArray, PermissionArray,
-                               container_permissions_array_free};
-use safe_core::utils::symmetric_decrypt;
-use std::{mem, ptr};
+use Authenticator;
+use errors::AuthError;
+use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
 use std::os::raw::c_void;
-use super::{AccessContainerEntry, AuthError, Authenticator};
-use super::access_container::{access_container, access_container_key};
-use super::ipc::get_config;
 
-/// Application registered in the authenticator
-#[repr(C)]
-pub struct RegisteredApp {
-    /// Unique application identifier
-    pub app_id: FfiString,
-    /// List of containers that this application has access to
-    pub containers: ContainerPermissionsArray,
-}
-
-/// Get a list of apps registered in authenticator
+/// Create a registered client. This or any one of the other companion
+/// functions to get an authenticator instance must be called before initiating any
+/// operation allowed by this module. `auth_handle` is a pointer to a pointer and must
+/// point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
-pub unsafe extern "C" fn authenticator_registered_apps(auth: *mut Authenticator,
-                                                       user_data: *mut c_void,
-                                                       o_cb: extern "C" fn(*mut c_void,
-                                                                           i32,
-                                                                           *mut RegisteredApp,
-                                                                           usize,
-                                                                           usize))
-                                                       -> i32 {
+pub unsafe extern "C" fn create_acc(account_locator: FfiString,
+                                    account_password: FfiString,
+                                    auth_handle: *mut *mut Authenticator,
+                                    user_data: *mut c_void,
+                                    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
+                                    -> i32 {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
-        (*auth).send(move |client| {
-                let c2 = client.clone();
-                let c3 = client.clone();
+    catch_unwind_error_code(|| -> Result<(), AuthError> {
+        trace!("Authenticator - create a client account.");
 
-                get_config(client)
-                    .and_then(move |(_, auth_cfg)| {
-                        access_container(c2)
-                            .map(move |access_container| (access_container, auth_cfg))
-                    })
-                    .and_then(move |(access_container, auth_cfg)| {
-                        c3.list_mdata_entries(access_container.name, access_container.type_tag)
-                            .map_err(From::from)
-                            .map(move |entries| (access_container, entries, auth_cfg))
-                    })
-                    .and_then(move |(access_container, entries, auth_cfg)| {
-                        let mut apps = Vec::new();
+        let acc_locator = account_locator.as_str()?;
+        let acc_password = account_password.as_str()?;
 
-                        for app in auth_cfg.values() {
-                            let key =
-                                access_container_key(&access_container, &app.info.id, &app.keys)?;
+        let authenticator =
+            Authenticator::create_acc(acc_locator, acc_password, move |net_event| {
+                let user_data: *mut c_void = user_data.into();
 
-                            if let Some(entry) = entries.get(&key) {
-                                let plaintext = symmetric_decrypt(&entry.content,
-                                                                  &app.keys.enc_key)?;
-                                let app_access = deserialise::<AccessContainerEntry>(&plaintext)?;
-
-                                let mut containers = Vec::new();
-
-                                for (key, (_, perms)) in app_access {
-                                    let perms = perms.iter().cloned().collect::<Vec<_>>();
-
-                                    containers.push(ContainerPermissions {
-                                        cont_name: FfiString::from_string(key),
-                                        access: PermissionArray::from_vec(perms),
-                                    });
-                                }
-
-                                let reg_app = RegisteredApp {
-                                    app_id: FfiString::from_string(app.info.id.clone()),
-                                    containers: ContainerPermissionsArray::from_vec(containers),
-                                };
-
-                                apps.push(reg_app);
-                            }
-                        }
-
-                        let p = apps.as_mut_ptr();
-                        let len = apps.len();
-                        let cap = apps.capacity();
-                        mem::forget(apps);
-
-                        o_cb(user_data.0, 0, p, len, cap);
-                        Ok(())
-                    })
-                    .map_err(move |e| {
-                        o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0)
-                    })
-                    .into_box()
-                    .into()
+                match net_event {
+                    Ok(event) => o_network_obs_cb(user_data, 0, event.into()),
+                    Err(()) => o_network_obs_cb(user_data, -1, 0),
+                }
             })?;
 
+        *auth_handle = Box::into_raw(Box::new(authenticator));
+
         Ok(())
-    });
-
-    0
+    })
 }
 
-/// Free memory allocated for a `RegisteredApp` structure
+/// Log into a registered account. This or any one of the other companion
+/// functions to get an authenticator instance must be called before initiating
+/// any operation allowed for authenticator. `auth_handle` is a pointer to a pointer
+/// and must point to a valid pointer not junk, else the consequences are undefined.
 #[no_mangle]
-pub unsafe extern "C" fn registered_app_free(app: *mut RegisteredApp) {
-    let app = Box::from_raw(app);
-    ffi_string_free(app.app_id);
-    container_permissions_array_free(app.containers);
+pub unsafe extern "C" fn login(account_locator: FfiString,
+                               account_password: FfiString,
+                               auth_handle: *mut *mut Authenticator,
+                               user_data: *mut c_void,
+                               o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
+                               -> i32 {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_error_code(|| -> Result<(), AuthError> {
+        trace!("Authenticator - log in a registererd client.");
+
+        let acc_locator = account_locator.as_str()?;
+        let acc_password = account_password.as_str()?;
+
+        let authenticator = Authenticator::login(acc_locator, acc_password, move |net_event| {
+            let user_data: *mut c_void = user_data.into();
+
+            match net_event {
+                Ok(event) => o_network_obs_cb(user_data, 0, event.into()),
+                Err(()) => o_network_obs_cb(user_data, -1, 0),
+            }
+        })?;
+
+        *auth_handle = Box::into_raw(Box::new(authenticator));
+
+        Ok(())
+    })
 }
 
-/// Free memory allocated to a vector of registered applications
+/// Discard and clean up the previously allocated authenticator instance.
+/// Use this only if the authenticator is obtained from one of the auth
+/// functions in this crate (`create_acc`, `login`, `create_unregistered`).
+/// Using `auth` after a call to this functions is undefined behaviour.
 #[no_mangle]
-pub unsafe extern "C" fn authenticator_registered_apps_free(apps: *mut RegisteredApp,
-                                                            len: usize,
-                                                            cap: usize) {
-    let _ = Vec::from_raw_parts(apps, len, cap);
+pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
+    let _ = Box::from_raw(auth);
+}
+
+#[cfg(test)]
+mod tests {
+    use Authenticator;
+    use ffi_utils::FfiString;
+    use safe_core::utils;
+    use std::os::raw::c_void;
+    use std::ptr;
+    use super::*;
+
+    #[test]
+    fn create_account_and_login() {
+        let acc_locator = unwrap!(utils::generate_random_string(10));
+        let acc_password = unwrap!(utils::generate_random_string(10));
+
+        {
+            let mut auth_h: *mut Authenticator = ptr::null_mut();
+
+            unsafe {
+                let auth_h_ptr = &mut auth_h;
+
+                assert_eq!(create_acc(FfiString::from_str(&acc_locator),
+                                      FfiString::from_str(&acc_password),
+                                      auth_h_ptr,
+                                      ptr::null_mut(),
+                                      net_event_cb),
+                           0);
+            }
+
+            assert!(!auth_h.is_null());
+
+            unsafe { authenticator_free(auth_h) };
+        }
+
+        {
+            let mut auth_h: *mut Authenticator = ptr::null_mut();
+
+            unsafe {
+                let auth_h_ptr = &mut auth_h;
+
+                assert_eq!(login(FfiString::from_str(&acc_locator),
+                                 FfiString::from_str(&acc_password),
+                                 auth_h_ptr,
+                                 ptr::null_mut(),
+                                 net_event_cb),
+                           0);
+            }
+
+            assert!(!auth_h.is_null());
+            unsafe { authenticator_free(auth_h) };
+        }
+
+        unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
+            assert_eq!(err_code, 0);
+        }
+    }
 }

@@ -65,7 +65,7 @@ pub fn run<F, I, T>(app: &App, f: F) -> T
         let future = f(client, app)
             .into_future()
             .then(move |result| {
-                unwrap!(tx.send(unwrap!(result)));
+                unwrap!(tx.send(result));
                 Ok(())
             })
             .into_box();
@@ -73,7 +73,7 @@ pub fn run<F, I, T>(app: &App, f: F) -> T
         Some(future)
     }));
 
-    unwrap!(rx.recv())
+    unwrap!(unwrap!(rx.recv()))
 }
 
 // Create registered app.

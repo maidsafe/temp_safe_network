@@ -23,7 +23,7 @@
 
 use App;
 use ffi::helper::send_sync;
-use ffi_utils::{catch_unwind_cb, u8_ptr_to_vec};
+use ffi_utils::{catch_unwind_cb, vec_clone_from_raw_parts};
 use object_cache::MDataEntryActionsHandle;
 use routing::{EntryAction, Value};
 use std::os::raw::c_void;
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(app: *const App,
                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Ins(Value {
-            content: u8_ptr_to_vec(value_ptr, value_len),
+            content: vec_clone_from_raw_parts(value_ptr, value_len),
             entry_version: 0,
         })
     })
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn mdata_entry_actions_update(app: *const App,
                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
-            content: u8_ptr_to_vec(value_ptr, value_len),
+            content: vec_clone_from_raw_parts(value_ptr, value_len),
             entry_version: entry_version,
         })
     })
@@ -124,7 +124,7 @@ unsafe fn add_action<F>(app: *const App,
     where F: FnOnce() -> EntryAction
 {
     catch_unwind_cb(user_data, o_cb, || {
-        let key = u8_ptr_to_vec(key_ptr, key_len);
+        let key = vec_clone_from_raw_parts(key_ptr, key_len);
         let action = f();
 
         send_sync(app, user_data, o_cb, move |_, context| {

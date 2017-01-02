@@ -22,7 +22,7 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{FfiString, catch_unwind_cb, u8_vec_to_ptr};
+use ffi_utils::{FfiString, catch_unwind_cb, vec_into_raw_parts};
 use ffi_utils::callback::CallbackArgs;
 use futures::Future;
 use object_cache::MDataInfoHandle;
@@ -60,7 +60,7 @@ impl File {
         // TODO: move the metadata, not clone.
         let user_metadata = file.user_metadata().to_vec();
         let (user_metadata_ptr, user_metadata_len, user_metadata_cap) =
-            u8_vec_to_ptr(user_metadata);
+            vec_into_raw_parts(user_metadata);
 
         File {
             size: file.size(),

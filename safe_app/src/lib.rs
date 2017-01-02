@@ -54,6 +54,7 @@ extern crate futures;
 extern crate log;
 extern crate lru_cache;
 extern crate maidsafe_utilities;
+#[cfg(test)]
 extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
