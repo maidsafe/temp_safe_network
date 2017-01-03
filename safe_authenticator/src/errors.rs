@@ -30,9 +30,9 @@ use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
 pub use self::codes::*;
 use std::error::Error;
-use std::fmt::{self, Debug, Formatter};
 use std::io::Error as IoError;
 use std::str::Utf8Error;
+use std::string::FromUtf8Error;
 use std::sync::mpsc::RecvError;
 
 mod codes {
@@ -92,10 +92,13 @@ mod codes {
 
     // Authenticator errors
     pub const ERR_IO_ERROR: i32 = -1013;
+    pub const ERR_NO_SUCH_PUBLIC_ID: i32 = -1014;
+    pub const ERR_PUBLIC_ID_EXISTS: i32 = -1015;
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
 
 /// Authenticator errors
+#[derive(Debug)]
 pub enum AuthError {
     /// Unexpected - Probably a Logic error
     Unexpected(String),
@@ -107,9 +110,13 @@ pub enum AuthError {
     /// NFS error
     NfsError(NfsError),
     /// Serialisation error
-    SerialisationError(SerialisationError),
+    EncodeDecodeError,
     /// IPC error
     IpcError(IpcError),
+    /// Public ID not found
+    NoSuchPublicId,
+    /// Public ID already exists
+    PublicIdExists,
 }
 
 impl Into<IpcError> for AuthError {
@@ -164,12 +171,6 @@ impl From<String> for AuthError {
     }
 }
 
-impl From<Utf8Error> for AuthError {
-    fn from(error: Utf8Error) -> AuthError {
-        AuthError::Unexpected(error.description().to_owned())
-    }
-}
-
 impl From<NfsError> for AuthError {
     fn from(error: NfsError) -> AuthError {
         AuthError::NfsError(error)
@@ -177,23 +178,20 @@ impl From<NfsError> for AuthError {
 }
 
 impl From<SerialisationError> for AuthError {
-    fn from(error: SerialisationError) -> AuthError {
-        AuthError::SerialisationError(error)
+    fn from(_err: SerialisationError) -> AuthError {
+        AuthError::EncodeDecodeError
     }
 }
 
-impl Debug for AuthError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            AuthError::CoreError(ref error) => write!(f, "AuthError::CoreError -> {:?}", error),
-            AuthError::IoError(ref error) => write!(f, "AuthError::IoError -> {:?}", error),
-            AuthError::Unexpected(ref s) => write!(f, "AuthError::Unexpected{{{:?}}}", s),
-            AuthError::NfsError(ref error) => write!(f, "AuthError::NfsError -> {:?}", error),
-            AuthError::IpcError(ref error) => write!(f, "AuthError::IpcError -> {:?}", error),
-            AuthError::SerialisationError(ref error) => {
-                write!(f, "AuthError::SerialisationError -> {:?}", error)
-            }
-        }
+impl From<Utf8Error> for AuthError {
+    fn from(_err: Utf8Error) -> Self {
+        AuthError::EncodeDecodeError
+    }
+}
+
+impl From<FromUtf8Error> for AuthError {
+    fn from(_err: FromUtf8Error) -> Self {
+        AuthError::EncodeDecodeError
     }
 }
 
@@ -228,8 +226,10 @@ impl ErrorCode for AuthError {
                     NfsError::Unexpected(_) => ERR_UNEXPECTED,
                 }
             }
-            AuthError::SerialisationError(_) => ERR_ENCODE_DECODE_ERROR,
+            AuthError::EncodeDecodeError => ERR_ENCODE_DECODE_ERROR,
             AuthError::IoError(_) => ERR_IO_ERROR,
+            AuthError::NoSuchPublicId => ERR_NO_SUCH_PUBLIC_ID,
+            AuthError::PublicIdExists => ERR_PUBLIC_ID_EXISTS,
             AuthError::Unexpected(_) => ERR_UNEXPECTED,
         }
     }

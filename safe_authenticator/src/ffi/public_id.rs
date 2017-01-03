@@ -28,16 +28,16 @@ use std::os::raw::c_void;
 
 /// Create Public ID.
 #[no_mangle]
-pub unsafe extern "C" fn public_id_create(auth: *const Authenticator,
-                                          public_id: FfiString,
-                                          user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, i32)) {
+pub unsafe extern "C" fn authenticator_public_id_create(auth: *const Authenticator,
+                                                        public_id: FfiString,
+                                                        user_data: *mut c_void,
+                                                        o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let public_id = public_id.to_string()?;
 
         (*auth).send(move |client| {
-            public_id::create(client, &public_id)
+            public_id::create(client, public_id)
                 .then(move |res| {
                     o_cb(user_data.0, ffi_result_code!(res));
                     Ok(())
@@ -48,12 +48,32 @@ pub unsafe extern "C" fn public_id_create(auth: *const Authenticator,
     })
 }
 
+/// Retrieve the Public ID.
+#[no_mangle]
+pub unsafe extern "C" fn authenticator_public_id(auth: *const Authenticator,
+                                                 user_data: *mut c_void,
+                                                 o_cb: extern "C" fn(*mut c_void, i32, FfiString)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+
+        (*auth).send(move |client| {
+            public_id::get(client)
+                .map(move |public_id| o_cb(user_data.0, 0, FfiString::from_string(public_id)))
+                .map_err(move |err| {
+                    o_cb(user_data.0, ffi_error_code!(err), FfiString::default())
+                })
+                .into_box()
+                .into()
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use errors::ERR_ENTRY_EXISTS;
+    use errors::{ERR_NO_SUCH_PUBLIC_ID, ERR_PUBLIC_ID_EXISTS};
 
     use ffi_utils::FfiString;
-    use ffi_utils::test_utils::call_0;
+    use ffi_utils::test_utils::{call_0, call_1};
     use safe_core::utils;
     use super::*;
     use test_utils::create_authenticator;
@@ -64,17 +84,56 @@ mod tests {
         let public_id = unwrap!(utils::generate_random_string(10));
         let ffi_public_id = FfiString::from_str(&public_id);
 
-        // Create public first time succeeds.
-        unsafe { unwrap!(call_0(|ud, cb| public_id_create(&authenticator, ffi_public_id, ud, cb))) }
+        // Create public id first time succeeds.
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                authenticator_public_id_create(&authenticator, ffi_public_id, ud, cb)
+            }))
+        }
 
         // Attempt to create already existing public id fails.
-        let res =
-            unsafe { call_0(|ud, cb| public_id_create(&authenticator, ffi_public_id, ud, cb)) };
+        let res = unsafe {
+            call_0(|ud, cb| authenticator_public_id_create(&authenticator, ffi_public_id, ud, cb))
+        };
 
         match res {
-            Err(code) if code == ERR_ENTRY_EXISTS => (),
+            Err(code) if code == ERR_PUBLIC_ID_EXISTS => (),
             Err(err) => panic!("Unexpected {:?}", err),
             Ok(_) => panic!("Unexpected success"),
         }
+    }
+
+    #[test]
+    fn get() {
+        let authenticator = create_authenticator();
+
+        // There is no Public ID yet, so attempt to retrieve it fails.
+        let res = unsafe { call_1(|ud, cb| authenticator_public_id(&authenticator, ud, cb)) };
+
+        match res {
+            Err(code) if code == ERR_NO_SUCH_PUBLIC_ID => (),
+            Err(err) => panic!("Unexpected {:?}", err),
+            Ok(_) => panic!("Unexpected success"),
+        }
+
+        // Create public ID.
+        let public_id = unwrap!(utils::generate_random_string(10));
+        let ffi_public_id = FfiString::from_str(&public_id);
+
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                authenticator_public_id_create(&authenticator, ffi_public_id, ud, cb)
+            }))
+        }
+
+        // Now retrieving it succeeds.
+        let retrieved_public_id = unsafe {
+            let ffi = unwrap!(call_1(|ud, cb| authenticator_public_id(&authenticator, ud, cb)));
+            let native = unwrap!(ffi.to_string());
+            ffi.deallocate();
+            native
+        };
+
+        assert_eq!(retrieved_public_id, public_id);
     }
 }
