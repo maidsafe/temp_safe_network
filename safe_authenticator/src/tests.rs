@@ -22,8 +22,9 @@
 use Authenticator;
 use access_container::access_container_entry;
 use errors::{AuthError, ERR_ALREADY_AUTHORISED, ERR_UNKNOWN_APP};
+use ffi::apps::*;
 use ffi_utils::{FfiString, base64_encode};
-use ffi_utils::test_utils::{call_1, send_via_user_data, sender_as_user_data};
+use ffi_utils::test_utils::{call_1, call_3, send_via_user_data, sender_as_user_data};
 use futures::{Future, future};
 use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp, get_config};
 use maidsafe_utilities::serialisation::deserialise;
@@ -331,7 +332,7 @@ fn containers_access_request() {
     let app_id = auth_req.app.id.clone();
     let base64_app_id = base64_encode(app_id.as_bytes());
 
-    let auth_granted = authorise_app(&authenticator, &auth_req);
+    let auth_granted = register_app(&authenticator, &auth_req);
 
     // Give one Containers request to authenticator for the same app asking for "downloads with
     // permission to update only"
@@ -397,7 +398,7 @@ fn revoke_app() {
         containers: create_containers_req(),
     };
 
-    let auth_granted = authorise_app(&authenticator, &auth_req);
+    let auth_granted = register_app(&authenticator, &auth_req);
     let app_id = auth_req.app.id.clone();
 
     // Put some entries into videos folder before revoking the app
@@ -471,8 +472,8 @@ fn revoke_app_reencryption() {
     let app_id1 = auth_req1.app.id.clone();
     let app_id2 = auth_req2.app.id.clone();
 
-    let auth_granted1 = authorise_app(&authenticator, &auth_req1);
-    let auth_granted2 = authorise_app(&authenticator, &auth_req2);
+    let auth_granted1 = register_app(&authenticator, &auth_req1);
+    let auth_granted2 = register_app(&authenticator, &auth_req2);
 
     // Put some entries into videos folder before revoking the first app
     let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
@@ -524,6 +525,75 @@ fn revoke_app_reencryption() {
     assert_eq!(file.user_metadata().to_owned(), vec![1u8, 2u8, 3u8]);
 }
 
+#[test]
+fn lists_of_registered_and_revoked_apps() {
+    let authenticator = create_account_and_login();
+
+    // Initially, there are no registered or revoked apps.
+    let registered = unsafe {
+        let (ptr, len, cap) =
+            unwrap!(call_3(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)));
+        Vec::from_raw_parts(ptr, len, cap)
+    };
+
+    let revoked = unsafe {
+        let array = unwrap!(call_1(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb)));
+        array.into_vec()
+    };
+
+    assert!(registered.is_empty());
+    assert!(revoked.is_empty());
+
+    // Register two apps.
+    let auth_req1 = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: false,
+        containers: Default::default(),
+    };
+
+    let auth_req2 = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: false,
+        containers: Default::default(),
+    };
+
+    let _ = register_app(&authenticator, &auth_req1);
+    let _ = register_app(&authenticator, &auth_req2);
+
+    // There are now two registered apps, but no revoked apps.
+    let registered = unsafe {
+        let (ptr, len, cap) =
+            unwrap!(call_3(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)));
+        Vec::from_raw_parts(ptr, len, cap)
+    };
+
+    let revoked = unsafe {
+        let array = unwrap!(call_1(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb)));
+        array.into_vec()
+    };
+
+    assert_eq!(registered.len(), 2);
+    assert!(revoked.is_empty());
+
+    // Revoke the first app.
+    revoke(&authenticator, &auth_req1.app.id);
+
+    // There is now one registered and one revoked app.
+    let registered = unsafe {
+        let (ptr, len, cap) =
+            unwrap!(call_3(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)));
+        Vec::from_raw_parts(ptr, len, cap)
+    };
+
+    let revoked = unsafe {
+        let array = unwrap!(call_1(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb)));
+        array.into_vec()
+    };
+
+    assert_eq!(registered.len(), 1);
+    assert_eq!(revoked.len(), 1);
+}
+
 fn revoke(authenticator: &Authenticator, app_id: &str) {
     let base64_app_id = base64_encode(app_id.as_bytes());
 
@@ -547,7 +617,7 @@ fn revoke(authenticator: &Authenticator, app_id: &str) {
     };
 }
 
-fn authorise_app(authenticator: &Authenticator, auth_req: &AuthReq) -> AuthGranted {
+fn register_app(authenticator: &Authenticator, auth_req: &AuthReq) -> AuthGranted {
     let base64_app_id = base64_encode(auth_req.app.id.as_bytes());
 
     let req_id = ipc::gen_req_id();

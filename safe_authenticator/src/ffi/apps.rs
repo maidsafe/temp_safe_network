@@ -111,8 +111,7 @@ pub unsafe extern "C" fn authenticator_revoked_apps(auth: *const Authenticator,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
                                                                         i32,
-                                                                        AppExchangeInfoArray))
-                                                    -> i32 {
+                                                                        AppExchangeInfoArray)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
@@ -137,8 +136,13 @@ pub unsafe extern "C" fn authenticator_revoked_apps(auth: *const Authenticator,
                             let nonce = access_container_nonce(&access_container)?;
                             let key = access_container_key(&app.info.id, &app.keys, nonce);
 
-                            if !entries.contains_key(&key) {
-                                // If the app is not in access container, then it's revoked
+                            // If the app is not in the access container, or if the app entry has
+                            // been deleted (is empty), then it's revoked.
+                            let revoked = entries.get(&key)
+                                .map(|entry| entry.content.is_empty())
+                                .unwrap_or(true);
+
+                            if revoked {
                                 apps.push(app.info.clone().into_repr_c());
                             }
                         }
@@ -157,9 +161,7 @@ pub unsafe extern "C" fn authenticator_revoked_apps(auth: *const Authenticator,
             })?;
 
         Ok(())
-    });
-
-    0
+    })
 }
 
 /// Get a list of apps registered in authenticator
@@ -170,8 +172,7 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
                                                                            i32,
                                                                            *mut RegisteredApp,
                                                                            usize,
-                                                                           usize))
-                                                       -> i32 {
+                                                                           usize)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
@@ -196,7 +197,13 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
                             let nonce = access_container_nonce(&access_container)?;
                             let key = access_container_key(&app.info.id, &app.keys, nonce);
 
-                            if let Some(entry) = entries.get(&key) {
+                            // Empty entry means it has been deleted.
+                            let entry = match entries.get(&key) {
+                                Some(entry) if !entry.content.is_empty() => Some(entry),
+                                _ => None,
+                            };
+
+                            if let Some(entry) = entry {
                                 let plaintext = symmetric_decrypt(&entry.content,
                                                                   &app.keys.enc_key)?;
                                 let app_access = deserialise::<AccessContainerEntry>(&plaintext)?;
@@ -233,9 +240,7 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
             })?;
 
         Ok(())
-    });
-
-    0
+    })
 }
 
 /// Free memory allocated for a `RegisteredApp` structure
