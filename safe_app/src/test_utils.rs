@@ -24,9 +24,9 @@ use maidsafe_utilities::serialisation::serialise;
 use rand;
 use routing::{Action, MutableData, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, secretbox, sign};
-use rust_sodium::crypto::hash::sha256;
 use safe_core::{Client, CoreFuture, FutureExt, MDataInfo, utils};
-use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Config, Permission};
+use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Config, Permission,
+                     access_container_enc_key};
 use safe_core::utils::test_utils::random_client;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
@@ -139,9 +139,8 @@ pub fn create_app_with_access(access_info: HashMap<String, (MDataInfo, BTreeSet<
         nonce: secretbox::gen_nonce(),
     };
 
-    let access_container_key = unwrap!(utils::symmetric_encrypt(&sha256::hash(app_id.as_bytes()).0,
-                                           &enc_key,
-                                           Some(&access_container_info.nonce)));
+    let access_container_key =
+        unwrap!(access_container_enc_key(&app_id, &enc_key, &access_container_info.nonce));
 
     let access_container_value = {
         let value = unwrap!(serialise(&access_info));

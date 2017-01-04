@@ -22,7 +22,7 @@
 use AccessContainerEntry;
 use AuthError;
 use Authenticator;
-use access_container::{access_container, access_container_key, access_container_nonce};
+use access_container::{access_container, access_container_nonce};
 use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb, vec_into_raw_parts};
 use ffi_utils::callback::CallbackArgs;
 use futures::Future;
@@ -30,7 +30,7 @@ use ipc::{AppState, app_state, get_config, remove_app_container, update_config};
 use maidsafe_utilities::serialisation::deserialise;
 use rust_sodium::crypto::hash::sha256;
 use safe_core::FutureExt;
-use safe_core::ipc::IpcError;
+use safe_core::ipc::{IpcError, access_container_enc_key};
 use safe_core::ipc::req::ffi::{AppExchangeInfo, AppExchangeInfoArray, ContainerPermissions,
                                ContainerPermissionsArray, PermissionArray, app_exchange_info_drop,
                                container_permissions_array_free};
@@ -134,7 +134,8 @@ pub unsafe extern "C" fn authenticator_revoked_apps(auth: *const Authenticator,
 
                         for app in auth_cfg.values() {
                             let nonce = access_container_nonce(&access_container)?;
-                            let key = access_container_key(&app.info.id, &app.keys, nonce);
+                            let key =
+                                access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
 
                             // If the app is not in the access container, or if the app entry has
                             // been deleted (is empty), then it's revoked.
@@ -195,7 +196,8 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
 
                         for app in auth_cfg.values() {
                             let nonce = access_container_nonce(&access_container)?;
-                            let key = access_container_key(&app.info.id, &app.keys, nonce);
+                            let key =
+                                access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce)?;
 
                             // Empty entry means it has been deleted.
                             let entry = match entries.get(&key) {

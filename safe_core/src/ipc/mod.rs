@@ -32,7 +32,7 @@ use rand::{self, Rng};
 pub use self::errors::IpcError;
 pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 pub use self::req::ffi::Permission;
-pub use self::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
+pub use self::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp, access_container_enc_key};
 use std::u32;
 
 // TODO: replace with `crust::Config`
