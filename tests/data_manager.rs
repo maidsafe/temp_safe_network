@@ -1039,7 +1039,7 @@ fn caching_with_data_close_to_proxy_node() {
 fn gen_random_immutable_data_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> Data {
     loop {
         let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
-        if node.routing_table().is_closest(&data.name(), GROUP_SIZE) {
+        if node.routing_table().is_closest(data.name(), GROUP_SIZE) {
             return data;
         }
     }
@@ -1048,7 +1048,7 @@ fn gen_random_immutable_data_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> D
 fn gen_random_immutable_data_not_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> Data {
     loop {
         let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
-        if !node.routing_table().is_closest(&data.name(), GROUP_SIZE) {
+        if !node.routing_table().is_closest(data.name(), GROUP_SIZE) {
             return data;
         }
     }
