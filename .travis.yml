@@ -34,6 +34,8 @@ script:
             cargo fmt -- --write-mode=diff &&
             cd ../safe_authenticator &&
             cargo fmt -- --write-mode=diff &&
+            cd ../tests &&
+            cargo fmt -- --write-mode=diff &&
             echo "--- Test ffi_utils ---" &&
             cd ../ffi_utils &&
             cargo test  --verbose --release &&
@@ -52,6 +54,8 @@ script:
             cargo test --verbose --release --features "$Features" &&
             cd ../safe_authenticator &&
             cargo test --verbose --release --features "$Features";
+            cd ../tests &&
+            cargo test --verbose --release --features "$Features";
         );
     else
         (
@@ -61,7 +65,8 @@ script:
             cd ffi_utils && unset Features && bash ../run_clippy.sh && export Features=use-mock-routing &&
             cd ../safe_core && bash ../run_clippy.sh &&
             cd ../safe_app && bash ../run_clippy.sh &&
-            cd ../safe_authenticator && bash ../run_clippy.sh;
+            cd ../safe_authenticator && bash ../run_clippy.sh &&
+            cd ../tests && bash ../run_clippy.sh;
         );
     fi
 before_cache:
