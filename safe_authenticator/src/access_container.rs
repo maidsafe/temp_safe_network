@@ -22,10 +22,10 @@
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::EntryActions;
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::secretbox;
 use safe_core::{Client, FutureExt, MDataInfo};
 use safe_core::ipc::AppKeys;
+use safe_core::ipc::resp::access_container_enc_key;
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use super::{AccessContainerEntry, AuthError, AuthFuture};
 
@@ -54,20 +54,6 @@ pub fn access_container_nonce(access_container: &MDataInfo)
     }
 }
 
-/// Encrypts and serialises an access container key using given app ID and app keys
-pub fn access_container_key(app_id: &str,
-                            app_keys: &AppKeys,
-                            access_container_nonce: &secretbox::Nonce)
-                            -> Vec<u8> {
-    let key = app_id.as_bytes();
-    let mut key_pt = key.to_vec();
-    key_pt.extend_from_slice(&access_container_nonce[..]);
-
-    let key_nonce =
-        unwrap!(secretbox::Nonce::from_slice(&sha256::hash(&key_pt)[..secretbox::NONCEBYTES]));
-    secretbox::seal(key, &key_nonce, &app_keys.enc_key)
-}
-
 /// Gets an access container entry
 pub fn access_container_entry(client: Client,
                               access_container: &MDataInfo,
@@ -75,7 +61,7 @@ pub fn access_container_entry(client: Client,
                               app_keys: AppKeys)
                               -> Box<AuthFuture<(u64, AccessContainerEntry)>> {
     let nonce = fry!(access_container_nonce(access_container));
-    let key = access_container_key(app_id, &app_keys, nonce);
+    let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
 
     client.get_mdata_value(access_container.name, access_container.type_tag, key)
         .and_then(move |value| {
@@ -95,7 +81,7 @@ pub fn put_access_container_entry(client: Client,
                                   version: Option<u64>)
                                   -> Box<AuthFuture<()>> {
     let nonce = fry!(access_container_nonce(access_container));
-    let key = access_container_key(app_id, app_keys, nonce);
+    let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
     let plaintext = fry!(serialise(&permissions));
     let ciphertext = fry!(symmetric_encrypt(&plaintext, &app_keys.enc_key, None));
 

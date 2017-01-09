@@ -31,13 +31,13 @@ use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
+use safe_core::ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp, access_container_enc_key};
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::os::raw::c_void;
 use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
-use super::access_container::{access_container, access_container_entry, access_container_key,
-                              access_container_nonce, put_access_container_entry};
+use super::access_container::{access_container, access_container_entry, access_container_nonce,
+                              put_access_container_entry};
 
 
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
@@ -81,14 +81,14 @@ pub fn app_info(client: &Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>
 
 /// Decodes a given encoded IPC message and calls a corresponding callback
 #[no_mangle]
-pub unsafe extern "C" fn decode_ipc_msg(auth: *const Authenticator,
-                                        msg: FfiString,
-                                        user_data: *mut c_void,
-                                        o_auth: extern "C" fn(*mut c_void, u32, FfiAuthReq),
-                                        o_containers: extern "C" fn(*mut c_void,
-                                                                    u32,
-                                                                    FfiContainersReq),
-                                        o_err: extern "C" fn(*mut c_void, i32, FfiString)) {
+pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
+                                             msg: FfiString,
+                                             user_data: *mut c_void,
+                                             o_auth: extern "C" fn(*mut c_void, u32, FfiAuthReq),
+                                             o_containers: extern "C" fn(*mut c_void,
+                                                                         u32,
+                                                                         FfiContainersReq),
+                                             o_err: extern "C" fn(*mut c_void, i32, FfiString)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_err, || -> Result<_, AuthError> {
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                         // Remove the revoked app from the access container
                         let app_entry_name = {
                             let nonce = fry!(access_container_nonce(&access_container));
-                            access_container_key(&app.info.id, &app.keys, nonce)
+                            fry!(access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce))
                         };
 
                         let del = EntryActions::new().del(app_entry_name.clone(), version + 1);
@@ -616,7 +616,8 @@ fn reencrypt_private_containers(client: Client,
 
             for app in config.values() {
                 let nonce = fry!(access_container_nonce(&access_cont));
-                let entry_name = access_container_key(&app.info.id, &app.keys, nonce);
+                let entry_name =
+                    fry!(access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce));
 
                 if let Some(raw) = access_cont_entries.get(&entry_name) {
                     let plaintext = fry!(symmetric_decrypt(&raw.content, &app.keys.enc_key));

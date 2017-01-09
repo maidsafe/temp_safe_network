@@ -101,7 +101,7 @@ pub unsafe extern "C" fn login(account_locator: FfiString,
 /// Discard and clean up the previously allocated authenticator instance.
 /// Use this only if the authenticator is obtained from one of the auth
 /// functions in this crate (`create_acc`, `login`, `create_unregistered`).
-/// Using `auth` after a call to this functions is undefined behaviour.
+/// Using `auth` after a call to this function is undefined behaviour.
 #[no_mangle]
 pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
     let _ = Box::from_raw(auth);

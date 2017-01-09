@@ -25,7 +25,7 @@ pub mod ffi;
 use client::MDataInfo;
 use ipc::{Config, IpcError};
 use routing::XorName;
-use rust_sodium::crypto::{box_, secretbox, sign};
+use rust_sodium::crypto::{box_, hash, secretbox, sign};
 
 /// IPC response
 // TODO: `TransOwnership` variant
@@ -202,6 +202,22 @@ impl AccessContInfo {
             Err(IpcError::Unexpected("MDataInfo doesn't contain nonce".to_owned()))
         }
     }
+}
+
+/// Encrypts and serialises an access container key using given app ID and app key
+pub fn access_container_enc_key(app_id: &str,
+                                app_enc_key: &secretbox::Key,
+                                access_container_nonce: &secretbox::Nonce)
+                                -> Result<Vec<u8>, IpcError> {
+    let key = app_id.as_bytes();
+    let mut key_pt = key.to_vec();
+    key_pt.extend_from_slice(&access_container_nonce[..]);
+
+    let key_nonce =
+        secretbox::Nonce::from_slice(&hash::sha256::hash(&key_pt)[..secretbox::NONCEBYTES])
+            .ok_or(IpcError::EncodeDecodeError)?;
+
+    Ok(secretbox::seal(key, &key_nonce, app_enc_key))
 }
 
 #[cfg(test)]

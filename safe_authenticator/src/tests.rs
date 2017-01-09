@@ -749,13 +749,13 @@ fn decode_ipc_msg(authenticator: &Authenticator,
     let ffi_msg = FfiString::from_str(msg);
 
     unsafe {
-        use ipc::decode_ipc_msg;
-        decode_ipc_msg(authenticator,
-                       ffi_msg,
-                       sender_as_user_data(&tx),
-                       auth_cb,
-                       containers_cb,
-                       err_cb);
+        use ipc::auth_decode_ipc_msg;
+        auth_decode_ipc_msg(authenticator,
+                            ffi_msg,
+                            sender_as_user_data(&tx),
+                            auth_cb,
+                            containers_cb,
+                            err_cb);
     };
 
     match rx.recv_timeout(Duration::from_secs(15)) {

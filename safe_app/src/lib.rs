@@ -79,11 +79,11 @@ use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
 use maidsafe_utilities::serialisation::deserialise;
 use maidsafe_utilities::thread::{self, Joiner};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::secretbox;
 use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
                 NetworkTx, event_loop, utils};
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Permission};
+use safe_core::ipc::resp::access_container_enc_key;
 pub use self::errors::*;
 use self::object_cache::ObjectCache;
 use std::cell::RefCell;
@@ -316,12 +316,9 @@ impl AppContext {
 }
 
 fn refresh_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<()>> {
-    let entry_key = {
-        let app_id_hash = sha256::hash(context.app_id.as_bytes()).0;
-        let nonce = context.access_container_info.nonce;
-
-        fry!(utils::symmetric_encrypt(&app_id_hash, &context.sym_enc_key, Some(&nonce)))
-    };
+    let entry_key = fry!(access_container_enc_key(&context.app_id,
+                                                  &context.sym_enc_key,
+                                                  &context.access_container_info.nonce));
 
     client.get_mdata_value(context.access_container_info.id,
                          context.access_container_info.tag,

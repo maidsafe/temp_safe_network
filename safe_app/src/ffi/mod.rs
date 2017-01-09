@@ -96,6 +96,15 @@ pub unsafe extern "C" fn app_registered(app_id: FfiString,
     })
 }
 
+/// Discard and clean up the previously allocated app instance.
+/// Use this only if the app is obtained from one of the auth
+/// functions in this crate. Using `app` after a call to this
+/// function is undefined behaviour.
+#[no_mangle]
+pub unsafe extern "C" fn app_free(app: *mut App) {
+    let _ = Box::from_raw(app);
+}
+
 unsafe fn call_network_observer(event: Result<NetworkEvent, AppError>,
                                 user_data: *mut c_void,
                                 cb: unsafe extern "C" fn(*mut c_void, i32, i32)) {
