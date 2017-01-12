@@ -74,22 +74,26 @@ pub unsafe extern "C" fn appendable_data_new_pub(app: *const App,
         let client = (*app).get_client();
         let name = XorName(*name);
 
-        let (owner_key, sign_key) = {
+        let (owner_key, private_signing_key) = {
             let client = unwrap!(client.lock());
             let owner_key = *ffi_try!(client.get_public_signing_key());
-            let sign_key = ffi_try!(client.get_secret_signing_key()).clone();
-            (owner_key, sign_key)
+            let private_signing_key = ffi_try!(client.get_secret_signing_key()).clone();
+            (owner_key, private_signing_key)
         };
 
-        let data = PubAppendableData::new(name,
-                                          0,
-                                          vec![owner_key],
-                                          Default::default(),
-                                          Default::default(),
-                                          Filter::black_list(iter::empty()),
-                                          Some(&sign_key));
-        let data = AppendableData::Pub(ffi_try!(data.map_err(CoreError::from)));
-        let handle = unwrap!(object_cache()).insert_ad(data);
+        let mut owners = BTreeSet::new();
+        owners.insert(owner_key);
+
+        let mut data = ffi_try!(PubAppendableData::new(name,
+                                                       0,
+                                                       owners,
+                                                       Default::default(),
+                                                       Filter::black_list(iter::empty()))
+            .map_err(CoreError::from));
+        let _ = ffi_try!(data.add_signature(&(owner_key, private_signing_key))
+            .map_err(CoreError::from));
+
+        let handle = unwrap!(object_cache()).insert_ad(AppendableData::Pub(data));
 
         ptr::write(o_handle, handle);
         0
@@ -107,23 +111,27 @@ pub unsafe extern "C" fn appendable_data_new_priv(app: *const App,
         let client = app.get_client();
         let name = XorName(*name);
 
-        let (owner_key, sign_key) = {
+        let (owner_key, private_signing_key) = {
             let client = unwrap!(client.lock());
             let owner_key = *ffi_try!(client.get_public_signing_key());
-            let sign_key = ffi_try!(client.get_secret_signing_key()).clone();
-            (owner_key, sign_key)
+            let private_signing_key = ffi_try!(client.get_secret_signing_key()).clone();
+            (owner_key, private_signing_key)
         };
 
-        let data = PrivAppendableData::new(name,
-                                           0,
-                                           vec![owner_key],
-                                           Default::default(),
-                                           Default::default(),
-                                           Filter::black_list(iter::empty()),
-                                           ffi_try!(app.asym_keys()).0,
-                                           Some(&sign_key));
-        let data = AppendableData::Priv(ffi_try!(data.map_err(CoreError::from)));
-        let handle = unwrap!(object_cache()).insert_ad(data);
+        let mut owners = BTreeSet::new();
+        owners.insert(owner_key);
+
+        let mut data = ffi_try!(PrivAppendableData::new(name,
+                                                        0,
+                                                        owners,
+                                                        Default::default(),
+                                                        Filter::black_list(iter::empty()),
+                                                        ffi_try!(app.asym_keys()).0)
+            .map_err(CoreError::from));
+        let _ = ffi_try!(data.add_signature(&(owner_key, private_signing_key))
+            .map_err(CoreError::from));
+
+        let handle = unwrap!(object_cache()).insert_ad(AppendableData::Priv(data));
 
         ptr::write(o_handle, handle);
         0
@@ -202,33 +210,39 @@ pub unsafe extern "C" fn appendable_data_post(app: *const App,
             match *ad {
                 AppendableData::Pub(ref old_data) => {
                     let mut new_data = ffi_try!(PubAppendableData::new(old_data.name,
-                                                        old_data.version + 1,
-                                                        old_data.current_owner_keys.clone(),
-                                                        old_data.previous_owner_keys.clone(),
-                                                        old_data.deleted_data.clone(),
-                                                        old_data.filter.clone(),
-                                                        Some(ffi_try!(unwrap!(client.lock())
-                                                                      .get_secret_signing_key())))
-                            .map_err(CoreError::from));
+                                                                       old_data.version + 1,
+                                                                       old_data.owners.clone(),
+                                                                       old_data.deleted_data
+                                                                           .clone(),
+                                                                       old_data.filter.clone())
+                        .map_err(CoreError::from));
                     if include_data {
                         new_data.data = old_data.data.clone();
                     }
+                    let owner_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
+                    let private_signing_key =
+                        ffi_try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+                    let _ = ffi_try!(new_data.add_signature(&(owner_key, private_signing_key))
+                        .map_err(CoreError::from));
                     AppendableData::Pub(new_data)
                 }
                 AppendableData::Priv(ref old_data) => {
-                    let mut new_data = ffi_try!(PrivAppendableData::new(old_data.name,
+                    let mut new_data =
+                        ffi_try!(PrivAppendableData::new(old_data.name,
                                                          old_data.version + 1,
-                                                         old_data.current_owner_keys.clone(),
-                                                         old_data.previous_owner_keys.clone(),
+                                                         old_data.owners.clone(),
                                                          old_data.deleted_data.clone(),
                                                          old_data.filter.clone(),
-                                                         old_data.encrypt_key.clone(),
-                                                         Some(ffi_try!(unwrap!(client.lock())
-                                                                       .get_secret_signing_key())))
+                                                         old_data.encrypt_key.clone())
                             .map_err(CoreError::from));
                     if include_data {
                         new_data.data = old_data.data.clone();
                     }
+                    let owner_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
+                    let private_signing_key =
+                        ffi_try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+                    let _ = ffi_try!(new_data.add_signature(&(owner_key, private_signing_key))
+                        .map_err(CoreError::from));
                     AppendableData::Priv(new_data)
                 }
             }
@@ -748,8 +762,8 @@ pub unsafe extern "C" fn appendable_data_is_owned(app: *const App,
         let my_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
 
         *o_is_owned = match *ffi_try!(unwrap!(object_cache()).get_ad(handle)) {
-            AppendableData::Pub(ref mut elt) => elt.get_owner_keys().contains(&my_key),
-            AppendableData::Priv(ref mut elt) => elt.get_owner_keys().contains(&my_key),
+            AppendableData::Pub(ref mut elt) => elt.get_owners().contains(&my_key),
+            AppendableData::Priv(ref mut elt) => elt.get_owners().contains(&my_key),
         };
 
         0

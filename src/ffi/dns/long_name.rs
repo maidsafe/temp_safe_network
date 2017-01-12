@@ -25,6 +25,7 @@ use ffi::helper;
 use ffi::string_list::{self, StringList};
 use libc::int32_t;
 use rust_sodium::crypto::box_;
+use std::collections::BTreeSet;
 
 /// Register DNS long name (for calling via FFI).
 #[no_mangle]
@@ -50,16 +51,24 @@ pub fn register_long_name(app: &App, long_name: String) -> Result<(), FfiError> 
     let (msg_public_key, msg_secret_key) = box_::gen_keypair();
     let services = vec![];
     let client = app.get_client();
-    let public_signing_key = *try!(unwrap!(client.lock()).get_public_signing_key());
-    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    let dns_operation = try!(DnsOperations::new(client));
 
+    let (owners, private_signing_key) = {
+        let client_guard = unwrap!(client.lock());
+
+        let mut owners = BTreeSet::new();
+        owners.insert(*try!(client_guard.get_public_signing_key()));
+
+        let private_signing_key = try!(client_guard.get_secret_signing_key()).clone();
+        (owners, private_signing_key)
+    };
+
+    let dns_operation = try!(DnsOperations::new(client.clone()));
     try!(dns_operation.register_dns(long_name,
                                     &msg_public_key,
                                     &msg_secret_key,
                                     &services,
-                                    vec![public_signing_key],
-                                    &secret_signing_key,
+                                    owners,
+                                    &private_signing_key,
                                     None));
 
     Ok(())

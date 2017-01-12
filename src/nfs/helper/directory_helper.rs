@@ -25,6 +25,7 @@ use nfs::directory_listing::DirectoryListing;
 use nfs::errors::NfsError;
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 /// DirectoryHelper provides helper functions to perform Operations on Directory
@@ -92,15 +93,18 @@ impl DirectoryHelper {
         trace!("Deleting directory with name: {}", directory_to_delete);
 
         let dir_meta = try!(parent_directory.remove_sub_directory(directory_to_delete));
-        let sd = try!(self.get_structured_data(dir_meta.get_id(), dir_meta.get_type_tag()));
         let sign_key = try!(unwrap!(self.client.lock()).get_secret_signing_key()).clone();
-        let delete_sd = try!(StructuredData::new(sd.get_type_tag(),
-                                                 *sd.name(),
-                                                 sd.get_version() + 1,
-                                                 vec![],
-                                                 vec![],
-                                                 sd.get_owner_keys().clone(),
-                                                 Some(&sign_key))
+        let sd = try!(self.get_structured_data(dir_meta.get_id(), dir_meta.get_type_tag()));
+        let mut delete_sd = try!(StructuredData::new(sd.get_type_tag(),
+                                                     *sd.name(),
+                                                     sd.get_version() + 1,
+                                                     vec![],
+                                                     sd.get_owners().clone())
+            .map_err(CoreError::from));
+        let _ = try!(delete_sd.add_signature(&(unwrap!(sd.get_owners().iter().nth(0),
+                                     "Logic error: SD doesn't have any owners")
+                                 .clone(),
+                             sign_key))
             .map_err(CoreError::from));
         try!(Client::delete_recover(self.client.clone(), Data::Structured(delete_sd), None));
         parent_directory.get_mut_metadata().set_modified_time(::time::now_utc());
@@ -290,12 +294,16 @@ impl DirectoryHelper {
     fn save_directory_listing(&self,
                               directory: &DirectoryListing)
                               -> Result<StructuredData, NfsError> {
-        let signing_key = try!(unwrap!(self.client.lock()).get_secret_signing_key()).clone();
         let owner_key = *try!(unwrap!(self.client.lock()).get_public_signing_key());
+        let signing_key = try!(unwrap!(self.client.lock()).get_secret_signing_key()).clone();
+
         let access_level = directory.get_key().get_access_level();
         let versioned = directory.get_key().is_versioned();
 
-        if versioned {
+        let mut owners = BTreeSet::new();
+        owners.insert(owner_key);
+
+        let sd = if versioned {
             trace!("Converting directory listing to a versioned StructuredData.");
 
             let serialised_data = match *access_level {
@@ -303,14 +311,12 @@ impl DirectoryHelper {
                 AccessLevel::Public => try!(serialise(&directory)),
             };
             let version = try!(self.save_as_immutable_data(serialised_data));
-            Ok(try!(versioned::create(self.client.clone(),
-                                      version,
-                                      directory.get_key().get_type_tag(),
-                                      directory.get_key().get_id().clone(),
-                                      0,
-                                      vec![owner_key],
-                                      Vec::new(),
-                                      &signing_key)))
+            versioned::create(self.client.clone(),
+                              version,
+                              directory.get_key().get_type_tag(),
+                              directory.get_key().get_id().clone(),
+                              0,
+                              owners)
         } else {
             trace!("Converting directory listing to an unversioned StructuredData.");
 
@@ -323,16 +329,17 @@ impl DirectoryHelper {
                 AccessLevel::Private => Some((&private_key, &secret_key, &nonce)),
                 AccessLevel::Public => None,
             };
-            Ok(try!(unversioned::create(self.client.clone(),
-                                        directory.get_key().get_type_tag(),
-                                        directory.get_key().get_id().clone(),
-                                        0,
-                                        serialised_data,
-                                        vec![owner_key.clone()],
-                                        Vec::new(),
-                                        &signing_key,
-                                        encryption_keys)))
-        }
+            unversioned::create(self.client.clone(),
+                                directory.get_key().get_type_tag(),
+                                directory.get_key().get_id().clone(),
+                                0,
+                                serialised_data,
+                                owners,
+                                encryption_keys)
+        };
+        let mut sd = try!(sd);
+        let _ = try!(sd.add_signature(&(owner_key, signing_key)).map_err(CoreError::from));
+        Ok(sd)
     }
 
     fn update_directory_listing(&self, directory: &DirectoryListing) -> Result<(), NfsError> {
@@ -344,7 +351,7 @@ impl DirectoryHelper {
         let access_level = directory.get_key().get_access_level();
         let versioned = directory.get_key().is_versioned();
 
-        let updated_structured_data = if versioned {
+        let mut updated_structured_data = if versioned {
             trace!("Updating directory listing with a new one (will convert DL to a versioned \
                     StructuredData).");
 
@@ -371,16 +378,20 @@ impl DirectoryHelper {
                 AccessLevel::Private => Some((&private_key, &secret_key, &nonce)),
                 AccessLevel::Public => None,
             };
+            let mut owners = BTreeSet::new();
+            owners.insert(owner_key.clone());
             try!(unversioned::create(self.client.clone(),
                                      directory.get_key().get_type_tag(),
                                      directory.get_key().get_id().clone(),
                                      structured_data.get_version() + 1,
                                      serialised_data,
-                                     vec![owner_key.clone()],
-                                     Vec::new(),
-                                     &signing_key,
+                                     owners,
                                      encryption_keys))
         };
+
+        let _ = try!(updated_structured_data.add_signature(&(owner_key, signing_key))
+            .map_err(CoreError::from));
+
         debug!("Posting updated structured data to the network ...");
         try!(try!(unwrap!(self.client.lock())
                 .post(Data::Structured(updated_structured_data), None))

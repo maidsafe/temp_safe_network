@@ -44,9 +44,6 @@ extern crate maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
 
-use maidsafe_utilities::serialisation::deserialise;
-
-use routing::{Data, XorName};
 use routing::messaging::MpidMessageWrapper;
 use rust_sodium::crypto::hash::sha256;
 use safe_core::core::client::Client;
@@ -125,7 +122,7 @@ fn main() {
                         println!("Messaging feature has been skipped as mock routing is being \
                                   used !!");
                     } else {
-                        messaging(&mut client);
+                        // messaging(&mut client);
                     }
                     break;
                 }
@@ -135,73 +132,73 @@ fn main() {
     }
 }
 
-fn messaging(client: &mut Client) {
-    println!("\nDo you want to continue with the mpid messaging feature (enter Y for yes) ?");
-    let mut messaging_option = String::new();
-    let _ = std::io::stdin().read_line(&mut messaging_option);
-    messaging_option = messaging_option.trim().to_string();
-    if messaging_option != "Y" && messaging_option != "y" {
-        return;
-    }
+// fn messaging(client: &mut Client) {
+//     println!("\nDo you want to continue with the mpid messaging feature (enter Y for yes) ?");
+//     let mut messaging_option = String::new();
+//     let _ = std::io::stdin().read_line(&mut messaging_option);
+//     messaging_option = messaging_option.trim().to_string();
+//     if messaging_option != "Y" && messaging_option != "y" {
+//         return;
+//     }
 
-    println!("\n------------ Creating mpid account, enter a memorable name ---------------");
-    let mut account_name = String::new();
-    let _ = std::io::stdin().read_line(&mut account_name);
-    let mpid_account = XorName(sha256::hash(&account_name.into_bytes()).0);
-    let response_getter = unwrap!(client.register_online(mpid_account));
+//     println!("\n------------ Creating mpid account, enter a memorable name ---------------");
+//     let mut account_name = String::new();
+//     let _ = std::io::stdin().read_line(&mut account_name);
+//     let mpid_account = XorName(sha256::hash(&account_name.into_bytes()).0);
+//     let response_getter = unwrap!(client.register_online(mpid_account));
 
-    loop {
-        println!("\n------- messaging options: r for receive, s for send, t for terminate -------");
-        let mut operation = String::new();
-        let _ = std::io::stdin().read_line(&mut operation);
-        operation = operation.trim().to_string();
-        if operation == "r" {
-            receive_mpid_message(&response_getter);
-        } else if operation == "s" {
-            send_mpid_message(client, mpid_account);
-        } else if operation == "t" {
-            break;
-        }
-    }
-}
+//     loop {
+//         println!("\n------- messaging options: r for receive, s for send, t for terminate -------");
+//         let mut operation = String::new();
+//         let _ = std::io::stdin().read_line(&mut operation);
+//         operation = operation.trim().to_string();
+//         if operation == "r" {
+//             receive_mpid_message(&response_getter);
+//         } else if operation == "s" {
+//             send_mpid_message(client, mpid_account);
+//         } else if operation == "t" {
+//             break;
+//         }
+//     }
+// }
 
-fn receive_mpid_message(response_getter: &GetResponseGetter) {
-    loop {
-        if let Ok(data) = response_getter.get() {
-            match data {
-                Data::Plain(plain_data) => {
-                    let mpid_message_wrapper: MpidMessageWrapper =
-                        unwrap!(deserialise(plain_data.value()));
-                    match mpid_message_wrapper {
-                        MpidMessageWrapper::PutMessage(mpid_message) => {
-                            println!("received mpid message {:?}", mpid_message);
-                            break;
-                        }
-                        _ => println!("unknown received mpid_message_wrapper"),
-                    }
-                }
-                _ => println!("unknown received data"),
-            }
-        }
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-    }
-}
+// fn receive_mpid_message(response_getter: &GetResponseGetter) {
+//     loop {
+//         if let Ok(data) = response_getter.get() {
+//             match data {
+//                 Data::Plain(plain_data) => {
+//                     let mpid_message_wrapper: MpidMessageWrapper =
+//                         unwrap!(deserialise(plain_data.value()));
+//                     match mpid_message_wrapper {
+//                         MpidMessageWrapper::PutMessage(mpid_message) => {
+//                             println!("received mpid message {:?}", mpid_message);
+//                             break;
+//                         }
+//                         _ => println!("unknown received mpid_message_wrapper"),
+//                     }
+//                 }
+//                 _ => println!("unknown received data"),
+//             }
+//         }
+//         std::thread::sleep(std::time::Duration::from_millis(1000));
+//     }
+// }
 
-fn send_mpid_message(client: &mut Client, mpid_account: XorName) {
-    let mut receiver_name = String::new();
-    let mut msg_metadata = String::new();
-    let mut msg_content = String::new();
-    println!("\n------------ enter receiver's memorable name ---------------");
-    let _ = std::io::stdin().read_line(&mut receiver_name);
-    let receiver_account = XorName(sha256::hash(&receiver_name.into_bytes()).0);
-    println!("\n------------ enter metadata of the message ---------------");
-    let _ = std::io::stdin().read_line(&mut msg_metadata);
-    println!("\n------------ enter content of the message ---------------");
-    let _ = std::io::stdin().read_line(&mut msg_content);
-    let secret_key = unwrap!(client.get_secret_signing_key()).clone();
-    let _ = client.send_message(mpid_account,
-                                msg_metadata.into_bytes(),
-                                msg_content.into_bytes(),
-                                receiver_account,
-                                &secret_key);
-}
+// fn send_mpid_message(client: &mut Client, mpid_account: XorName) {
+//     let mut receiver_name = String::new();
+//     let mut msg_metadata = String::new();
+//     let mut msg_content = String::new();
+//     println!("\n------------ enter receiver's memorable name ---------------");
+//     let _ = std::io::stdin().read_line(&mut receiver_name);
+//     let receiver_account = XorName(sha256::hash(&receiver_name.into_bytes()).0);
+//     println!("\n------------ enter metadata of the message ---------------");
+//     let _ = std::io::stdin().read_line(&mut msg_metadata);
+//     println!("\n------------ enter content of the message ---------------");
+//     let _ = std::io::stdin().read_line(&mut msg_content);
+//     let secret_key = unwrap!(client.get_secret_signing_key()).clone();
+//     let _ = client.send_message(mpid_account,
+//                                 msg_metadata.into_bytes(),
+//                                 msg_content.into_bytes(),
+//                                 receiver_account,
+//                                 &secret_key);
+// }

@@ -27,6 +27,7 @@ use routing::TYPE_TAG_DNS_PACKET;
 use routing::client_errors::{GetError, MutationError};
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256;
+use std::collections::BTreeSet;
 use std::convert::From;
 use std::sync::{Arc, Mutex};
 
@@ -62,7 +63,7 @@ impl DnsOperations {
                         public_messaging_encryption_key: &box_::PublicKey,
                         secret_messaging_encryption_key: &box_::SecretKey,
                         services: &[(String, DirectoryKey)],
-                        owners: Vec<sign::PublicKey>,
+                        owners: BTreeSet<sign::PublicKey>,
                         private_signing_key: &sign::SecretKey,
                         data_encryption_keys: Option<(&box_::PublicKey,
                                                       &box_::SecretKey,
@@ -83,15 +84,20 @@ impl DnsOperations {
                 encryption_key: *public_messaging_encryption_key,
             };
 
-            let struct_data = try!(unversioned::create(self.client.clone(),
-                                                       TYPE_TAG_DNS_PACKET,
-                                                       identifier,
-                                                       0,
-                                                       try!(serialise(&dns_record)),
-                                                       owners,
-                                                       vec![],
-                                                       private_signing_key,
-                                                       data_encryption_keys));
+            let mut struct_data = try!(unversioned::create(self.client.clone(),
+                                                           TYPE_TAG_DNS_PACKET,
+                                                           identifier,
+                                                           0,
+                                                           try!(serialise(&dns_record)),
+                                                           owners.clone(),
+                                                           data_encryption_keys));
+            let _ = try!(struct_data.add_signature(&(try!(owners.iter()
+                                         .nth(0)
+                                         .ok_or_else(|| CoreError::ReceivedUnexpectedData))
+                                     .clone(),
+                                 private_signing_key.clone()))
+                .map_err(CoreError::from));
+
             match Client::put_recover(self.client.clone(), Data::Structured(struct_data), None) {
                 Ok(()) => (),
                 Err(CoreError::MutationFailure { reason: MutationError::DataExists, .. }) => {
@@ -128,16 +134,17 @@ impl DnsOperations {
 
         match self.get_housing_structured_data(long_name) {
             Ok(prev_struct_data) => {
-                let struct_data = try!(unversioned::create(self.client.clone(),
-                                             TYPE_TAG_DNS_PACKET,
-                                             *prev_struct_data.name(),
-                                             prev_struct_data.get_version() + 1,
-                                             vec![],
-                                             prev_struct_data.get_owner_keys().clone(),
-                                             prev_struct_data.get_previous_owner_keys()
-                                                 .clone(),
-                                             private_signing_key,
-                                             None));
+                let mut struct_data = try!(unversioned::create(self.client.clone(),
+                                                               TYPE_TAG_DNS_PACKET,
+                                                               *prev_struct_data.name(),
+                                                               prev_struct_data.get_version() + 1,
+                                                               vec![],
+                                                               prev_struct_data.get_owners()
+                                                                   .clone(),
+                                                               None));
+                let owner_key = try!(unwrap!(self.client.lock()).get_public_signing_key()).clone();
+                let _ = try!(struct_data.add_signature(&(owner_key, private_signing_key.clone()))
+                    .map_err(CoreError::from));
                 try!(Client::delete_recover(self.client.clone(),
                                             Data::Structured(struct_data),
                                             None));
@@ -293,16 +300,19 @@ impl DnsOperations {
                 let _ = dns_record.services.remove(&service.0);
             }
 
-            let struct_data = try!(unversioned::create(self.client.clone(),
-                                                       TYPE_TAG_DNS_PACKET,
-                                                       *prev_struct_data.name(),
-                                                       prev_struct_data.get_version() + 1,
-                                                       try!(serialise(&dns_record)),
-                                                       prev_struct_data.get_owner_keys().clone(),
-                                                       prev_struct_data.get_previous_owner_keys()
-                                                           .clone(),
-                                                       private_signing_key,
-                                                       data_encryption_decryption_keys));
+            let mut struct_data = try!(unversioned::create(self.client.clone(),
+                                                           TYPE_TAG_DNS_PACKET,
+                                                           *prev_struct_data.name(),
+                                                           prev_struct_data.get_version() + 1,
+                                                           try!(serialise(&dns_record)),
+                                                           prev_struct_data.get_owners().clone(),
+                                                           data_encryption_decryption_keys));
+            let owner_key = unwrap!(prev_struct_data.get_owners().iter().nth(0),
+                                    "Logic error: SD doesn't have any owners")
+                .clone();
+            let _ = try!(struct_data.add_signature(&(owner_key, private_signing_key.clone()))
+                .map_err(CoreError::from));
+
             let resp_getter = try!(unwrap!(self.client.lock())
                 .post(Data::Structured(struct_data), None));
             try!(resp_getter.get());
@@ -355,6 +365,7 @@ mod test {
     use nfs::metadata::directory_key::DirectoryKey;
     use routing::{XOR_NAME_LEN, XorName};
     use rust_sodium::crypto::box_;
+    use std::collections::BTreeSet;
     use std::sync::{Arc, Mutex};
     use super::*;
 
@@ -365,7 +376,8 @@ mod test {
 
         let dns_name = unwrap!(generate_random_string(10));
         let messaging_keypair = box_::gen_keypair();
-        let owners = vec![unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone()];
+        let mut owners = BTreeSet::new();
+        owners.insert(unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone());
 
         let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
 
@@ -463,7 +475,8 @@ mod test {
             let dns_operations = unwrap!(DnsOperations::new(new_client.clone()));
 
             let messaging_keypair = box_::gen_keypair();
-            let owners = vec![unwrap!(unwrap!(new_client.lock()).get_public_signing_key()).clone()];
+            let mut owners = BTreeSet::new();
+            owners.insert(unwrap!(unwrap!(new_client.lock()).get_public_signing_key()).clone());
 
             let secret_signing_key = unwrap!(unwrap!(new_client.lock()).get_secret_signing_key())
                 .clone();
@@ -519,7 +532,8 @@ mod test {
                                                    false,
                                                    AccessLevel::Public))];
 
-        let owners = vec![unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone()];
+        let mut owners = BTreeSet::new();
+        owners.insert(unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone());
 
         let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
 
@@ -616,7 +630,8 @@ mod test {
         let dns_operations = unwrap!(DnsOperations::new(client.clone()));
         let dns_name = unwrap!(generate_random_string(10));
         let messaging_keypair = box_::gen_keypair();
-        let owners = vec![unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone()];
+        let mut owners = BTreeSet::new();
+        owners.insert(unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone());
         let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
 
         // Limit of `Some(2)` would prevent the mutation to happen. We want one

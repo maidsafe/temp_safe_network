@@ -18,7 +18,7 @@ log = "~0.3.6"
 lru-cache = "~0.0.7"
 maidsafe_utilities = "~0.10.0"
 rand = "~0.3.14"
-routing = "~0.27.1"
+routing = { git = "https://github.com/maidsafe/routing.git", branch = "master" }
 rust_sodium = "~0.1.2"
 rustc-serialize = "~0.3.19"
 self_encryption = "~0.7.1"
@@ -42,9 +42,9 @@ name = "client_stress_test"
 bench = false
 name = "self_authentication"
 
-[[example]]
-bench = false
-name = "safe_client"
+# [[example]]
+# bench = false
+# name = "safe_client"
 
 [[example]]
 bench = false

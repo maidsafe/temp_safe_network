@@ -51,8 +51,9 @@ extern crate unwrap;
 use docopt::Docopt;
 use rand::{Rng, SeedableRng};
 use routing::{Data, ImmutableData, StructuredData};
-use rust_sodium::crypto::sign::{PublicKey, SecretKey};
+use rust_sodium::crypto::sign::PublicKey;
 use safe_core::core::client::Client;
+use std::collections::BTreeSet;
 
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -81,16 +82,15 @@ struct Args {
 
 fn random_structured_data<R: Rng>(type_tag: u64,
                                   public_key: &PublicKey,
-                                  secret_key: &SecretKey,
                                   rng: &mut R)
                                   -> StructuredData {
+    let mut owners = BTreeSet::new();
+    owners.insert(public_key.clone());
     unwrap!(StructuredData::new(type_tag,
                                 rng.gen(),
                                 0,
                                 rng.gen_iter().take(10).collect(),
-                                vec![public_key.clone()],
-                                vec![],
-                                Some(secret_key)))
+                                owners))
 }
 
 
@@ -122,7 +122,6 @@ fn main() {
     };
     println!("Logged in successfully !!");
     let public_key = *unwrap!(client.get_public_signing_key());
-    let secret_key = unwrap!(client.get_secret_signing_key()).clone();
 
     if !args.flag_get_only {
         // Put and Get ImmutableData chunks
@@ -158,7 +157,7 @@ fn main() {
     }
     for i in immutable_data_count..(immutable_data_count + structured_data_count) {
         // Construct data
-        let structured_data = random_structured_data(100000, &public_key, &secret_key, &mut rng);
+        let structured_data = random_structured_data(100000, &public_key, &mut rng);
         let data = Data::Structured(structured_data.clone());
         if !args.flag_get_only {
             // Put the data to the network and block until we get a response
@@ -189,9 +188,7 @@ fn main() {
                                         *sd.name(),
                                         sd.get_version() + 1,
                                         rng.gen_iter().take(10).collect(),
-                                        sd.get_owner_keys().clone(),
-                                        vec![],
-                                        Some(&secret_key)))
+                                        sd.get_owners().clone()))
         } else {
             continue; // Skip non-structured data.
         };

@@ -242,7 +242,8 @@ mod tests {
     use ffi::test_utils;
     use rand;
     use routing::DataIdentifier;
-    use std::hash::{Hash, Hasher, SipHasher};
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
     use std::ptr;
     use super::*;
 
@@ -525,7 +526,7 @@ mod tests {
     }
 
     fn hash<T: Hash>(t: &T) -> u64 {
-        let mut s = SipHasher::new();
+        let mut s = DefaultHasher::new();
         t.hash(&mut s);
         s.finish()
     }
