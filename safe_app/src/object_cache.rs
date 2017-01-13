@@ -22,7 +22,6 @@
 //! This module implements storage (cache) for objects that have to be passed
 //! across FFI boundaries.
 
-use super::errors::AppError;
 use ffi::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, Value};
@@ -32,6 +31,7 @@ use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet};
 use std::u64;
+use super::errors::AppError;
 
 const DEFAULT_CAPACITY: usize = 100;
 
@@ -301,8 +301,8 @@ impl<V> Store<V> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rust_sodium::crypto::sign;
+    use super::*;
 
     #[test]
     fn reset() {

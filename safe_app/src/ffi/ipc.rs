@@ -100,8 +100,14 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
             IpcMsg::Resp { resp: IpcResp::Auth(res), req_id } => {
                 match res {
                     Ok(auth_granted) => {
-                        let auth_granted = auth_granted.into_repr_c();
-                        o_auth(user_data, req_id, &auth_granted);
+                        match auth_granted.into_repr_c() {
+                            Ok(auth_granted) => {
+                                o_auth(user_data, req_id, &auth_granted);
+                            }
+                            Err(err) => {
+                                o_err(user_data, ffi_error_code!(AppError::from(err)), req_id);
+                            }
+                        }
                     }
                     Err(err) => o_err(user_data, ffi_error_code!(AppError::from(err)), req_id),
                 }
@@ -124,12 +130,11 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ffi_utils::test_utils::call_2;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
-    use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, Config, ContainersReq,
-                         IpcMsg, IpcReq, IpcResp};
+    use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, BootstrapConfig,
+                         ContainersReq, IpcMsg, IpcReq, IpcResp};
     use safe_core::ipc::req::ffi::Permission;
     use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use safe_core::utils;
@@ -137,6 +142,7 @@ mod tests {
     use std::ffi::CString;
     use std::mem;
     use std::os::raw::c_void;
+    use super::*;
     use test_utils::gen_app_exchange_info;
 
     #[test]
@@ -206,7 +212,7 @@ mod tests {
 
         let auth_granted = AuthGranted {
             app_keys: gen_app_keys(),
-            bootstrap_config: Config,
+            bootstrap_config: BootstrapConfig::default(),
             access_container: access_container,
         };
 
@@ -237,7 +243,7 @@ mod tests {
                 unsafe {
                     let ctx = ctx as *mut Context;
                     (*ctx).req_id = req_id;
-                    (*ctx).auth_granted = AuthGranted::from_repr_c(auth_granted);
+                    (*ctx).auth_granted = unwrap!(AuthGranted::from_repr_c(auth_granted));
                 }
             }
 

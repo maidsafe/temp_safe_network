@@ -83,12 +83,12 @@ pub unsafe extern "C" fn authenticator_public_id(auth: *const Authenticator,
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use errors::{ERR_NO_SUCH_PUBLIC_ID, ERR_PUBLIC_ID_EXISTS};
 
     use ffi_utils::test_utils::{call_0, call_1};
     use safe_core::utils;
     use std::ffi::CString;
+    use super::*;
     use test_utils::create_authenticator;
 
     #[test]

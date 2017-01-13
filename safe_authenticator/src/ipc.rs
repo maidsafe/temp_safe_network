@@ -19,9 +19,6 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
-use super::access_container::{access_container, access_container_entry, access_container_nonce,
-                              put_access_container_entry};
 use ffi_utils::{OpaqueCtx, ReprC, StringError, base64_encode, catch_unwind_cb, from_c_str};
 use futures::{Future, future};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -29,7 +26,7 @@ use routing::{Action, ClientError, EntryActions, PermissionSet, User, Value};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, nfs};
-use safe_core::ipc::{self, Config, IpcError, IpcMsg, decode_msg};
+use safe_core::ipc::{self, IpcError, IpcMsg, decode_msg};
 use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
@@ -40,6 +37,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::ptr;
+use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
+use super::access_container::{access_container, access_container_entry, access_container_nonce,
+                              put_access_container_entry};
 
 
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
@@ -247,7 +247,9 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                         Ok(app.ok_or(AuthError::IpcError(IpcError::UnknownApp))?)
                     })
                     .and_then(move |app| {
-                        access_container(c2).map(move |access_container| (access_container, app))
+                        access_container(c2).map(move |access_container| {
+                            (access_container, app)
+                        })
                     })
                     .and_then(move |(access_container, app)| {
                         // Get an access container entry for the app being revoked
@@ -769,6 +771,7 @@ fn encode_auth_resp_impl(client: Client,
     let c4 = client.clone();
     let c5 = client.clone();
     let c6 = client.clone();
+    let c7 = client.clone();
 
     let sign_pk = app.keys.sign_pk;
     let app_keys = app.keys.clone();
@@ -808,7 +811,7 @@ fn encode_auth_resp_impl(client: Client,
         .and_then(move |(dir, app_keys)| {
             Ok(AuthGranted {
                 app_keys: app_keys,
-                bootstrap_config: Config {},
+                bootstrap_config: c7.bootstrap_config(),
                 access_container: AccessContInfo::from_mdata_info(dir)?,
             })
         })

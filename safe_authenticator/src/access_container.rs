@@ -19,7 +19,6 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use super::{AccessContainerEntry, AuthError, AuthFuture};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::EntryActions;
@@ -28,6 +27,7 @@ use safe_core::{Client, FutureExt, MDataInfo};
 use safe_core::ipc::AppKeys;
 use safe_core::ipc::resp::access_container_enc_key;
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
+use super::{AccessContainerEntry, AuthError, AuthFuture};
 
 /// Retrieves the authenticator configuration file
 pub fn access_container(client: Client) -> Box<AuthFuture<MDataInfo>> {

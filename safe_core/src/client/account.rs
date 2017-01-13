@@ -154,10 +154,10 @@ impl Into<FullId> for ClientKeys {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use client::MDataInfo;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::u32;
+    use super::*;
 
     #[test]
     fn generate_network_id() {

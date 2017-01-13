@@ -137,10 +137,10 @@ unsafe fn add_action<F>(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ffi_utils::test_utils::{call_0, call_1};
     use routing::{EntryAction, Value};
     use safe_core::utils;
+    use super::*;
     use test_utils::{create_app, run_now};
 
     #[test]

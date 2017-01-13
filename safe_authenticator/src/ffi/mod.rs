@@ -109,12 +109,12 @@ pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use Authenticator;
     use safe_core::utils;
     use std::ffi::CString;
     use std::os::raw::c_void;
     use std::ptr;
+    use super::*;
 
     #[test]
     fn create_account_and_login() {

@@ -19,16 +19,16 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use super::routing::Routing;
-use super::vault::DEFAULT_MAX_MUTATIONS;
 use rand;
-use routing::{AccountInfo, Action, Authority, ClientError, EntryAction, EntryActions, Event, FullId,
-              ImmutableData, MessageId, MutableData, PermissionSet, Response,
+use routing::{AccountInfo, Action, Authority, ClientError, EntryAction, EntryActions, Event,
+              FullId, ImmutableData, MessageId, MutableData, PermissionSet, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
+use super::routing::Routing;
+use super::vault::DEFAULT_MAX_MUTATIONS;
 use utils;
 
 // Helper macro to receive a routing event and assert it's a response
@@ -863,7 +863,7 @@ fn auth_keys() {
 fn setup() -> (Routing, Receiver<Event>, FullId) {
     let full_id = FullId::new();
     let (routing_tx, routing_rx) = mpsc::channel();
-    let routing = unwrap!(Routing::new(routing_tx, Some(full_id.clone())));
+    let routing = unwrap!(Routing::new(routing_tx, Some(full_id.clone()), None));
 
     // Wait until connection is established.
     match unwrap!(routing_rx.recv_timeout(Duration::from_secs(10))) {

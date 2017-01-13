@@ -74,8 +74,6 @@ mod errors;
 #[cfg(any(test, feature="testing"))]
 pub mod test_utils;
 
-pub use self::errors::*;
-use self::object_cache::ObjectCache;
 use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
@@ -86,6 +84,8 @@ use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, Ne
                 NetworkTx, event_loop, utils};
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Permission};
 use safe_core::ipc::resp::access_container_enc_key;
+pub use self::errors::*;
+use self::object_cache::ObjectCache;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
@@ -145,7 +145,7 @@ impl App {
         };
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {
-            let client = Client::from_keys(client_keys, owner_key, el_h, core_tx, net_tx)?;
+            let client = Client::from_keys(client_keys, owner_key, el_h, core_tx, net_tx, None)?;
             let context = AppContext::registered(app_id, enc_key, access_container);
             Ok((client, context))
         })
@@ -190,14 +190,14 @@ impl App {
                  + Send + 'static
     {
         let msg = CoreMsg::new(f);
-        let core_tx = unwrap!(self.core_tx.lock());
+        let mut core_tx = unwrap!(self.core_tx.lock());
         core_tx.send(msg).map_err(AppError::from)
     }
 }
 
 impl Drop for App {
     fn drop(&mut self) {
-        let core_tx = match self.core_tx.lock() {
+        let mut core_tx = match self.core_tx.lock() {
             Ok(core_tx) => core_tx,
             Err(err) => {
                 info!("Unexpected error in drop: {:?}", err);

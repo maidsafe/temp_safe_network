@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use super::vault::{Data, Vault};
+use ipc::BootstrapConfig;
 use maidsafe_utilities::thread;
 use rand;
 use routing::{Authority, ClientError, EntryAction, Event, FullId, ImmutableData, InterfaceError,
@@ -33,6 +33,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
+use super::vault::{Data, Vault};
 
 const CONNECT_THREAD_NAME: &'static str = "Mock routing connect";
 const DELAY_THREAD_NAME: &'static str = "Mock routing delay";
@@ -69,7 +70,10 @@ pub struct Routing {
 }
 
 impl Routing {
-    pub fn new(sender: Sender<Event>, id: Option<FullId>) -> Result<Self, RoutingError> {
+    pub fn new(sender: Sender<Event>,
+               id: Option<FullId>,
+               _config: Option<BootstrapConfig>)
+               -> Result<Self, RoutingError> {
         ::rust_sodium::init();
 
         let cloned_sender = sender.clone();
@@ -858,6 +862,10 @@ impl Routing {
     #[cfg(test)]
     pub fn set_simulate_timeout(&mut self, enable: bool) {
         self.timeout_simulation = enable;
+    }
+
+    pub fn bootstrap_config(&self) -> BootstrapConfig {
+        BootstrapConfig::default()
     }
 
     fn verify_network_limits(&self, msg_id: MessageId, op: &str) -> Result<(), ClientError> {

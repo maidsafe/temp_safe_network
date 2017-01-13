@@ -201,12 +201,12 @@ mod sync {
 
 #[cfg(not(test))]
 mod sync {
-    use super::Vault;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::env;
     use std::fs::File;
     use std::io::{Read, Write};
     use std::path::PathBuf;
+    use super::Vault;
 
     const FILE_NAME: &'static str = "MockVault";
 
