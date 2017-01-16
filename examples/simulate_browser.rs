@@ -56,6 +56,7 @@ use safe_core::nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG};
 use safe_core::nfs::helper::directory_helper::DirectoryHelper;
 
 use safe_core::nfs::helper::file_helper::FileHelper;
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 const DEFAULT_SERVICE: &'static str = "www";
@@ -107,8 +108,9 @@ fn create_dns_record(client: Arc<Mutex<Client>>,
 
     println!("Registering Dns...");
 
-    let owners = vec![try!(unwrap!(client.lock()).get_public_signing_key()).clone()];
     let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+    let mut owners = BTreeSet::new();
+    owners.insert(try!(unwrap!(client.lock()).get_public_signing_key()).clone());
     dns_operations.register_dns(long_name,
                                 &public_messaging_encryption_key,
                                 &secret_messaging_encryption_key,

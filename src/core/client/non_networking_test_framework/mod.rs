@@ -54,12 +54,15 @@ lazy_static! {
 
 pub struct RoutingMock {
     sender: Sender<Event>,
-    client_auth: Authority,
+    client_auth: Authority<XorName>,
     max_ops_countdown: Option<Cell<u64>>,
 }
 
 impl RoutingMock {
-    pub fn new(sender: Sender<Event>, _id: Option<FullId>) -> Result<RoutingMock, RoutingError> {
+    pub fn new(sender: Sender<Event>,
+               _id: Option<FullId>,
+               _min_section_size: usize)
+               -> Result<RoutingMock, RoutingError> {
         ::rust_sodium::init();
 
         let cloned_sender = sender.clone();
@@ -84,7 +87,7 @@ impl RoutingMock {
     // data to wherever they want. It is only the requirement of maidsafe-routing that GET's should
     // go to MaidManagers etc.
     pub fn send_get_request(&mut self,
-                            _dst: Authority,
+                            _dst: Authority<XorName>,
                             data_id: DataIdentifier,
                             msg_id: MessageId)
                             -> Result<(), InterfaceError> {
@@ -154,7 +157,7 @@ impl RoutingMock {
     }
 
     pub fn send_put_request(&self,
-                            _dst: Authority,
+                            _dst: Authority<XorName>,
                             data: Data,
                             msg_id: MessageId)
                             -> Result<(), InterfaceError> {
@@ -239,7 +242,7 @@ impl RoutingMock {
     }
 
     pub fn send_post_request(&self,
-                             _dst: Authority,
+                             _dst: Authority<XorName>,
                              data: Data,
                              msg_id: MessageId)
                              -> Result<(), InterfaceError> {
@@ -325,7 +328,7 @@ impl RoutingMock {
     }
 
     pub fn send_delete_request(&self,
-                               _dst: Authority,
+                               _dst: Authority<XorName>,
                                data: Data,
                                msg_id: MessageId)
                                -> Result<(), InterfaceError> {
@@ -387,7 +390,7 @@ impl RoutingMock {
     }
 
     pub fn send_get_account_info_request(&mut self,
-                                         dst: Authority,
+                                         dst: Authority<XorName>,
                                          msg_id: MessageId)
                                          -> Result<(), InterfaceError> {
         let cloned_sender = self.sender.clone();
@@ -446,7 +449,7 @@ impl RoutingMock {
     }
 
     pub fn send_append_request(&self,
-                               _dst: Authority,
+                               _dst: Authority<XorName>,
                                wrapper: AppendWrapper,
                                msg_id: MessageId)
                                -> Result<(), InterfaceError> {
@@ -528,8 +531,8 @@ impl RoutingMock {
     }
 
     fn send_failure_resp<E: Encodable>(sender: &Sender<Event>,
-                                       src: Authority,
-                                       dst: Authority,
+                                       src: Authority<XorName>,
+                                       dst: Authority<XorName>,
                                        request: Request,
                                        err: E) {
         let ext_err = match serialise(&err) {
@@ -640,7 +643,7 @@ mod test {
                   XOR_NAME_LEN, XorName};
     use routing::client_errors::{GetError, MutationError};
     use rust_sodium::crypto::sign;
-    use std::collections::HashMap;
+    use std::collections::{BTreeSet, HashMap};
     use std::iter;
     use std::sync::{Arc, Mutex};
     use std::sync::mpsc;
@@ -667,7 +670,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -777,7 +780,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -786,6 +789,10 @@ mod test {
 
         let owner_key = account_packet.get_public_maid().public_keys().0.clone();
         let sign_key = &account_packet.get_maid().secret_keys().0;
+        let signature = (owner_key, sign_key.clone());
+
+        let mut owners = BTreeSet::new();
+        owners.insert(owner_key.clone());
 
         // Construct ImmutableData
         let orig_immutable_data = generate_random_immutable_data();
@@ -802,10 +809,9 @@ mod test {
                                                   user_id,
                                                   0,
                                                   unwrap!(serialise(&vec![orig_data.name()])),
-                                                  vec![owner_key.clone()],
-                                                  Vec::new(),
-                                                  Some(sign_key));
+                                                  owners.clone());
         let mut account_version = unwrap!(account_ver_res);
+        let _ = unwrap!(account_version.add_signature(&signature));
         let mut data_account_version = Data::Structured(account_version);
 
 
@@ -876,36 +882,22 @@ mod test {
                        new_data.clone()));
 
         // Construct StructuredData, 2nd version, for this ImmutableData - INVALID Versioning
-        let invalid_version_account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                                          user_id,
-                                                                          0,
-                                                                          Vec::new(),
-                                                                          vec![owner_key.clone()],
-                                                                          Vec::new(),
-                                                                          Some(sign_key)));
+        let invalid_version_account_version =
+            unwrap!(StructuredData::new(TYPE_TAG, user_id, 0, Vec::new(), owners.clone()));
         let invalid_version_data_account_version =
             Data::Structured(invalid_version_account_version);
 
         // Construct StructuredData, 2nd version, for this ImmutableData - INVALID Signature
-        let invalid_signature_account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                        user_id,
-                                        1,
-                                        Vec::new(),
-                                        vec![owner_key.clone()],
-                                        Vec::new(),
-                                        Some(&account_packet.get_mpid().secret_keys().0)));
+        let invalid_signature_account_version =
+            unwrap!(StructuredData::new(TYPE_TAG, user_id, 1, Vec::new(), owners.clone()));
         let invalid_signature_data_account_version =
             Data::Structured(invalid_signature_account_version);
 
         let data_for_version_2 = unwrap!(serialise(&vec![orig_data.name(), new_data.name()]));
         // Construct StructuredData, 2nd version, for this ImmutableData - Valid
-        account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id,
-                                                      1,
-                                                      data_for_version_2,
-                                                      vec![owner_key.clone()],
-                                                      Vec::new(),
-                                                      Some(sign_key)));
+        account_version =
+            unwrap!(StructuredData::new(TYPE_TAG, user_id, 1, data_for_version_2, owners.clone()));
+        let _ = unwrap!(account_version.add_signature(&signature));
         data_account_version = Data::Structured(account_version);
 
         // Subsequent PUTs for same StructuredData should fail
@@ -1026,13 +1018,9 @@ mod test {
         }
 
         // Construct StructuredData, 3rd version, for DELETE - Valid
-        account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id,
-                                                      2,
-                                                      Vec::new(),
-                                                      vec![owner_key.clone()],
-                                                      Vec::new(),
-                                                      Some(sign_key)));
+        account_version =
+            unwrap!(StructuredData::new(TYPE_TAG, user_id, 2, Vec::new(), owners.clone()));
+        let _ = unwrap!(account_version.add_signature(&signature));
         data_account_version = Data::Structured(account_version);
 
         // DELETE of Structured Data with version bump should pass
@@ -1055,17 +1043,13 @@ mod test {
             };
 
             assert!(data.get_data().is_empty());
-            assert!(data.get_owner_keys().is_empty());
+            assert!(data.get_owners().is_empty());
         }
 
         // PUT after DELETE without version bump fails
-        account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id,
-                                                      0,
-                                                      vec![],
-                                                      vec![owner_key.clone()],
-                                                      vec![],
-                                                      Some(sign_key)));
+        account_version =
+            unwrap!(StructuredData::new(TYPE_TAG, user_id, 0, vec![], owners.clone()));
+        let _ = unwrap!(account_version.add_signature(&signature));
         data_account_version = Data::Structured(account_version);
 
         let result = do_put(&mut mock_routing,
@@ -1080,13 +1064,9 @@ mod test {
         }
 
         // Repeated DELETE fails
-        account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id,
-                                                      3,
-                                                      vec![],
-                                                      vec![owner_key.clone()],
-                                                      vec![],
-                                                      Some(sign_key)));
+        account_version =
+            unwrap!(StructuredData::new(TYPE_TAG, user_id, 3, vec![], owners.clone()));
+        let _ = unwrap!(account_version.add_signature(&signature));
         data_account_version = Data::Structured(account_version);
 
         let result = do_delete(&mut mock_routing,
@@ -1101,13 +1081,8 @@ mod test {
         }
 
         // PUT after DELETE with version bump restores data
-        account_version = unwrap!(StructuredData::new(TYPE_TAG,
-                                                      user_id,
-                                                      3,
-                                                      vec![],
-                                                      vec![owner_key.clone()],
-                                                      vec![],
-                                                      Some(sign_key)));
+        account_version =
+            unwrap!(StructuredData::new(TYPE_TAG, user_id, 3, vec![], owners.clone()));
         data_account_version = Data::Structured(account_version);
 
         unwrap!(do_put(&mut mock_routing,
@@ -1140,7 +1115,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -1149,6 +1124,10 @@ mod test {
 
         let owner_key = account_packet.get_public_maid().public_keys().0.clone();
         let signing_key = account_packet.get_maid().secret_keys().0.clone();
+        let signature = (owner_key.clone(), signing_key.clone());
+
+        let mut owners = BTreeSet::new();
+        owners.insert(owner_key);
 
         // Construct some immutable data to be later appended to an appendable data.
         let immut_data_0 = Data::Immutable(generate_random_immutable_data());
@@ -1173,11 +1152,9 @@ mod test {
 
         let appendable_data = unwrap!(PubAppendableData::new(appendable_data_name,
                                                              0,
-                                                             vec![owner_key],
-                                                             vec![],
+                                                             owners.clone(),
                                                              Default::default(),
-                                                             Filter::black_list(iter::empty()),
-                                                             Some(&signing_key)));
+                                                             Filter::black_list(iter::empty())));
 
         let appendable_data_id = appendable_data.identifier();
 
@@ -1262,14 +1239,13 @@ mod test {
         // POST with modified filter.
         let (blacklisted_pk, blacklisted_sk) = sign::gen_keypair();
         let filter = Filter::black_list(iter::once(blacklisted_pk));
-        let appendable_data =
-            unwrap!(PubAppendableData::new(appendable_data.name,
-                                           appendable_data.version + 1,
-                                           appendable_data.current_owner_keys.clone(),
-                                           appendable_data.previous_owner_keys.clone(),
-                                           appendable_data.deleted_data.clone(),
-                                           filter,
-                                           Some(&signing_key)));
+        let mut appendable_data = unwrap!(PubAppendableData::new(appendable_data.name,
+                                                                 appendable_data.version + 1,
+                                                                 appendable_data.owners.clone(),
+                                                                 appendable_data.deleted_data
+                                                                     .clone(),
+                                                                 filter));
+        let _ = unwrap!(appendable_data.add_signature(&signature));
 
         unwrap!(do_post(&mut mock_routing,
                         message_queue.clone(),
@@ -1329,12 +1305,11 @@ mod test {
         let appendable_data_nae_mgr = Authority::NaeManager(appendable_data_name);
 
         let mut appendable_data = unwrap!(PubAppendableData::new(appendable_data_name,
-                                                                 0,
-                                                                 vec![owner_key],
-                                                                 vec![],
-                                                                 Default::default(),
-                                                                 Filter::black_list(iter::empty()),
-                                                                 Some(&signing_key)));
+                                           0,
+                                           owners.clone(),
+                                           Default::default(),
+                                           Filter::black_list(iter::empty())));
+        let _ = unwrap!(appendable_data.add_signature(&signature));
 
         let appendable_data_id = appendable_data.identifier();
 
@@ -1386,7 +1361,7 @@ mod test {
     // Do a GET request and wait for the response.
     fn do_get(routing: &mut RoutingMock,
               message_queue: Arc<Mutex<MessageQueue>>,
-              dst: Authority,
+              dst: Authority<XorName>,
               data_id: DataIdentifier)
               -> Result<Data, CoreError> {
         let (tx, rx) = mpsc::channel();
@@ -1402,7 +1377,7 @@ mod test {
     // Do a PUT request and wait for the response.
     fn do_put(routing: &mut RoutingMock,
               message_queue: Arc<Mutex<MessageQueue>>,
-              dst: Authority,
+              dst: Authority<XorName>,
               data: Data)
               -> Result<(), CoreError> {
         do_mutation_request(message_queue,
@@ -1412,7 +1387,7 @@ mod test {
     // Do a POST request and wait for the response.
     fn do_post(routing: &mut RoutingMock,
                message_queue: Arc<Mutex<MessageQueue>>,
-               dst: Authority,
+               dst: Authority<XorName>,
                data: Data)
                -> Result<(), CoreError> {
         do_mutation_request(message_queue,
@@ -1422,7 +1397,7 @@ mod test {
     // Do a DELETE request and wait for the response.
     fn do_delete(routing: &mut RoutingMock,
                  message_queue: Arc<Mutex<MessageQueue>>,
-                 dst: Authority,
+                 dst: Authority<XorName>,
                  data: Data)
                  -> Result<(), CoreError> {
         do_mutation_request(message_queue,
@@ -1432,7 +1407,7 @@ mod test {
     // Do an APPEND request and wait for the response.
     fn do_append(routing: &mut RoutingMock,
                  message_queue: Arc<Mutex<MessageQueue>>,
-                 dst: Authority,
+                 dst: Authority<XorName>,
                  append_wrapper: AppendWrapper)
                  -> Result<(), CoreError> {
         do_mutation_request(message_queue, |message_id| {
@@ -1443,7 +1418,7 @@ mod test {
     // Do a GetAccountInfo request and wait for the response.
     fn do_get_account_info(routing: &mut RoutingMock,
                            message_queue: Arc<Mutex<MessageQueue>>,
-                           dst: Authority)
+                           dst: Authority<XorName>)
                            -> Result<(u64, u64), CoreError> {
         let (tx, rx) = mpsc::channel();
         let message_id = MessageId::new();

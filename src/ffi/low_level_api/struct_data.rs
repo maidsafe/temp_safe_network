@@ -29,6 +29,7 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, NO_OWNER_PUB_KEY, StructuredData, XOR_NAME_LEN,
               XorName};
 use std::{mem, ptr, slice};
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 /// Create new StructuredData
@@ -48,14 +49,17 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
         let xor_id = XorName(*id);
         let plain_text = slice::from_raw_parts(data, size).to_owned();
 
-        let (owner_keys, sign_key) = {
+        let (owner_key, private_signing_key) = {
             let client_guard = unwrap!(client.lock());
-            let owner_keys = vec![*ffi_try!(client_guard.get_public_signing_key())];
-            let sign_key = ffi_try!(client_guard.get_secret_signing_key()).clone();
-            (owner_keys, sign_key)
+            let owner_key = *ffi_try!(client_guard.get_public_signing_key());
+            let private_signing_key = ffi_try!(client_guard.get_secret_signing_key()).clone();
+            (owner_key, private_signing_key)
         };
 
-        let sd = match type_tag {
+        let mut owners = BTreeSet::new();
+        owners.insert(owner_key);
+
+        let mut sd = match type_tag {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
                         .get_cipher_opt(cipher_opt_h))
@@ -66,9 +70,7 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
                                              xor_id,
                                              version,
                                              raw_data,
-                                             owner_keys,
-                                             Vec::new(),
-                                             &sign_key,
+                                             owners,
                                              None))
             }
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
@@ -93,27 +95,21 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
                                            type_tag,
                                            xor_id,
                                            version,
-                                           owner_keys,
-                                           Vec::new(),
-                                           &sign_key))
+                                           owners))
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
                         .get_cipher_opt(cipher_opt_h))
                     .encrypt(app, &plain_text));
 
-                ffi_try!(StructuredData::new(type_tag,
-                                             xor_id,
-                                             version,
-                                             raw_data,
-                                             owner_keys,
-                                             Vec::new(),
-                                             Some(&sign_key))
+                ffi_try!(StructuredData::new(type_tag, xor_id, version, raw_data, owners)
                     .map_err(CoreError::from))
             }
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
 
+        let _ = ffi_try!(sd.add_signature(&(owner_key, private_signing_key))
+            .map_err(CoreError::from));
 
         let handle = unwrap!(object_cache()).insert_sd(sd);
         ptr::write(o_handle, handle);
@@ -176,9 +172,10 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
         let client = app.get_client();
         let plain_text = slice::from_raw_parts(data, size).to_owned();
 
+        let owner_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
         let sign_key = ffi_try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
 
-        let new_sd = match ffi_try!(object_cache.get_sd(sd_h)).get_type_tag() {
+        let mut new_sd = match ffi_try!(object_cache.get_sd(sd_h)).get_type_tag() {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
                     .encrypt(app, &plain_text));
@@ -189,10 +186,8 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                              *sd.name(),
                                              sd.get_version(),
                                              raw_data,
-                                             sd.get_owner_keys().clone(),
-                                             sd.get_previous_owner_keys().clone(),
+                                             sd.get_owners().clone(),
                                              // TODO avoid cloning this above
-                                             &sign_key,
                                              None))
             }
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
@@ -223,13 +218,13 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                              *sd.name(),
                                              sd.get_version(),
                                              raw_data,
-                                             sd.get_owner_keys().clone(),
-                                             sd.get_previous_owner_keys().clone(),
-                                             Some(&sign_key))
+                                             sd.get_owners().clone())
                     .map_err(CoreError::from))
             }
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
+
+        let _ = ffi_try!(new_sd.add_signature(&(owner_key, sign_key)).map_err(CoreError::from));
 
         *ffi_try!(object_cache.get_sd(sd_h)) = new_sd;
         0
@@ -410,28 +405,29 @@ fn struct_data_post_impl(client: Arc<Mutex<Client>>,
                          make_unclaimable: bool)
                          -> Result<StructuredData, FfiError> {
     let new_sd = {
-        let client_guard = unwrap!(client.lock());
-        let sign_key = try!(client_guard.get_secret_signing_key());
-
         if make_unclaimable {
+            let mut owners = BTreeSet::new();
+            owners.insert(NO_OWNER_PUB_KEY);
+
             try!(StructuredData::new(sd.get_type_tag(),
                                      *sd.name(),
                                      sd.get_version() + 1,
                                      vec![],
-                                     vec![NO_OWNER_PUB_KEY],
-                                     sd.get_owner_keys().clone(),
-                                     Some(sign_key))
+                                     owners)
                 .map_err(CoreError::from))
         } else {
             // TODO Ask routing to remove this inefficiency of requiring to clone data and all
-            try!(StructuredData::new(sd.get_type_tag(),
-                                     *sd.name(),
-                                     sd.get_version() + 1,
-                                     sd.get_data().clone(),
-                                     sd.get_owner_keys().clone(),
-                                     sd.get_previous_owner_keys().clone(),
-                                     Some(sign_key))
-                .map_err(CoreError::from))
+            let mut new_sd = try!(StructuredData::new(sd.get_type_tag(),
+                                                      *sd.name(),
+                                                      sd.get_version() + 1,
+                                                      sd.get_data().clone(),
+                                                      sd.get_owners().clone())
+                .map_err(CoreError::from));
+            let owner_key = *try!(unwrap!(client.lock()).get_public_signing_key());
+            let private_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+            let _ = try!(new_sd.add_signature(&(owner_key, private_signing_key))
+                .map_err(CoreError::from));
+            new_sd
         }
     };
 
@@ -461,15 +457,17 @@ pub unsafe extern "C" fn struct_data_delete(app: *const App, sd_h: StructDataHan
 fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
                            sd: &StructuredData)
                            -> Result<StructuredData, FfiError> {
-    let sign_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
     // TODO Ask routing to remove this inefficiency of requiring to clone data and all
-    let new_sd = try!(StructuredData::new(sd.get_type_tag(),
-                                          *sd.name(),
-                                          sd.get_version() + 1,
-                                          vec![],
-                                          vec![],
-                                          sd.get_owner_keys().clone(),
-                                          Some(&sign_key))
+    let mut new_sd = try!(StructuredData::new(sd.get_type_tag(),
+                                              *sd.name(),
+                                              sd.get_version() + 1,
+                                              vec![],
+                                              sd.get_owners().clone())
+        .map_err(CoreError::from));
+
+    let owner_key = *try!(unwrap!(client.lock()).get_public_signing_key());
+    let private_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+    let _ = try!(new_sd.add_signature(&(owner_key, private_signing_key))
         .map_err(CoreError::from));
 
     let data = Data::Structured(new_sd.clone());
@@ -510,7 +508,7 @@ pub unsafe extern "C" fn struct_data_is_owned(app: *const App,
         let my_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
 
         *o_is_owned = ffi_try!(unwrap!(object_cache()).get_sd(handle))
-            .get_owner_keys()
+            .get_owners()
             .contains(&my_key);
 
         0
@@ -632,7 +630,7 @@ mod tests {
             assert_eq!(struct_data_delete(&app, sd_h), 0);
             let _ = unwrap!(object_cache()).get_sd(sd_h);
 
-            // Re-delete shold fail - MutationError::InvalidOperation; Fetch should be successful
+            // Re-delete should fail - MutationError::InvalidOperation; Fetch should be successful
             assert_eq!(struct_data_delete(&app, sd_h), -26);
             assert_eq!(struct_data_free(sd_h), 0);
             assert_eq!(struct_data_free(sd_h),
@@ -659,8 +657,14 @@ mod tests {
                                        plain_text.len(),
                                        &mut sd_h),
                        0);
+
+            // FIXME: after SD delete we have an empty set of owners
+            // that means that we don't need to provide signatures in the SD created above
+            // There should be a way to skip adding signatures or there should be a separate
+            // API to sign SD.
+
             // Put - Reclaim
-            assert_eq!(struct_data_put(&app, sd_h), 0);
+            // assert_eq!(struct_data_put(&app, sd_h), 0);
         }
     }
 

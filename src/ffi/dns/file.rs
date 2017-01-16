@@ -148,6 +148,7 @@ mod test {
     use nfs::helper::file_helper::FileHelper;
     use nfs::metadata::directory_key::DirectoryKey;
     use rust_sodium::crypto::box_;
+    use std::collections::BTreeSet;
 
     fn create_public_file(app: &App, file_name: String, file_content: Vec<u8>) -> DirectoryKey {
         let dir_helper = DirectoryHelper::new(app.get_client());
@@ -184,11 +185,14 @@ mod test {
         let secret_signing_key = unwrap!(unwrap!(client.lock()).get_secret_signing_key()).clone();
         let dns_operation = unwrap!(DnsOperations::new(client));
 
+        let mut owners = BTreeSet::new();
+        owners.insert(public_signing_key);
+
         unwrap!(dns_operation.register_dns(public_name,
                                            &msg_public_key,
                                            &msg_secret_key,
                                            &services,
-                                           vec![public_signing_key],
+                                           owners,
                                            &secret_signing_key,
                                            None));
     }

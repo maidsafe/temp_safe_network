@@ -18,6 +18,7 @@ use core::client::Client;
 use core::errors::CoreError;
 use core::utility;
 use rust_sodium::crypto::sign;
+use std::collections::BTreeSet;
 
 /// Generates a random mock client for testing
 pub fn get_client() -> Result<Client, CoreError> {
@@ -27,7 +28,7 @@ pub fn get_client() -> Result<Client, CoreError> {
 }
 
 /// Generates random public keys
-pub fn generate_public_keys(len: usize) -> Vec<sign::PublicKey> {
+pub fn generate_public_keys(len: usize) -> BTreeSet<sign::PublicKey> {
     (0..len).map(|_| sign::gen_keypair().0).collect()
 }
 
@@ -37,7 +38,7 @@ pub fn generate_secret_keys(len: usize) -> Vec<sign::SecretKey> {
 }
 
 /// Generates public keys of maximum size
-pub fn get_max_sized_public_keys(len: usize) -> Vec<sign::PublicKey> {
+pub fn get_max_sized_public_keys(len: usize) -> BTreeSet<sign::PublicKey> {
     ::std::iter::repeat(sign::PublicKey([::std::u8::MAX; sign::PUBLICKEYBYTES])).take(len).collect()
 }
 

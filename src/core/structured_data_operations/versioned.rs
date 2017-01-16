@@ -22,6 +22,7 @@ use core::structured_data_operations::{DataFitResult, check_if_data_can_fit_in_s
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 use rust_sodium::crypto::sign;
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 /// All fields updated whenever a version is appended/removed
@@ -42,9 +43,7 @@ pub fn create(client: Arc<Mutex<Client>>,
               tag_type: u64,
               name: XorName,
               version: u64,
-              owner_keys: Vec<sign::PublicKey>,
-              prev_owner_keys: Vec<sign::PublicKey>,
-              private_signing_key: &sign::SecretKey)
+              owners: BTreeSet<sign::PublicKey>)
               -> Result<StructuredData, CoreError> {
     trace!("Creating versioned StructuredData.");
 
@@ -53,9 +52,7 @@ pub fn create(client: Arc<Mutex<Client>>,
                 tag_type,
                 name,
                 version,
-                owner_keys,
-                prev_owner_keys,
-                private_signing_key)
+                owners)
 }
 
 /// Get the complete version list
@@ -72,7 +69,7 @@ pub fn get_all_versions(client: Arc<Mutex<Client>>,
 pub fn append_version(client: Arc<Mutex<Client>>,
                       struct_data: StructuredData,
                       version_to_append: XorName,
-                      private_signing_key: &sign::SecretKey,
+                      _private_signing_key: &sign::SecretKey,
                       increment_version_number: bool)
                       -> Result<StructuredData, CoreError> {
     trace!("Appending version to versioned StructuredData.");
@@ -90,9 +87,7 @@ pub fn append_version(client: Arc<Mutex<Client>>,
                 struct_data.get_type_tag(),
                 *struct_data.name(),
                 new_version_number,
-                struct_data.get_owner_keys().clone(),
-                struct_data.get_previous_owner_keys().clone(),
-                private_signing_key)
+                struct_data.get_owners().clone())
 }
 
 #[cfg_attr(feature="clippy", allow(too_many_arguments))]
@@ -101,9 +96,7 @@ fn create_impl(client: Arc<Mutex<Client>>,
                tag_type: u64,
                name: XorName,
                version: u64,
-               owner_keys: Vec<sign::PublicKey>,
-               prev_owner_keys: Vec<sign::PublicKey>,
-               private_signing_key: &sign::SecretKey)
+               owners: BTreeSet<sign::PublicKey>)
                -> Result<StructuredData, CoreError> {
     let immutable_data = ImmutableData::new(try!(serialise(&version_names_to_store)));
     let name_of_immutable_data = *immutable_data.name();
@@ -117,22 +110,14 @@ fn create_impl(client: Arc<Mutex<Client>>,
 
     let encoded = try!(serialise(&versions_info));
 
-    match try!(check_if_data_can_fit_in_structured_data(&encoded,
-                                                        owner_keys.clone(),
-                                                        prev_owner_keys.clone())) {
+    match try!(check_if_data_can_fit_in_structured_data(&encoded, owners.clone())) {
         DataFitResult::DataFits => {
             trace!("Name of ImmutableData containing versions fits in StructuredData.");
 
             let data = Data::Immutable(immutable_data);
             try!(Client::put_recover(client, data, None));
 
-            Ok(try!(StructuredData::new(tag_type,
-                                        name,
-                                        version,
-                                        encoded,
-                                        owner_keys,
-                                        prev_owner_keys,
-                                        Some(private_signing_key))))
+            Ok(try!(StructuredData::new(tag_type, name, version, encoded, owners)))
         }
         _ => {
             trace!("Name of ImmutableData containing versions does not fit in StructuredData.");
@@ -186,7 +171,6 @@ mod test {
 
         let id: XorName = rand::random();
         let owners = utility::test_utils::generate_public_keys(1);
-        let prev_owners = Vec::new();
         let secret_key = &utility::test_utils::generate_secret_keys(1)[0];
 
         let version_0: XorName = rand::random();
@@ -196,9 +180,7 @@ mod test {
                                                 ::VERSIONED_STRUCT_DATA_TYPE_TAG,
                                                 id,
                                                 0,
-                                                owners,
-                                                prev_owners,
-                                                secret_key);
+                                                owners);
 
         let mut structured_data = unwrap!(structured_data_result);
         let mut versions_res = get_all_versions(client.clone(), &structured_data);
