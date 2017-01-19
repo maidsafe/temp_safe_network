@@ -184,11 +184,16 @@ fn main() {
     for (i, data) in stored_data.iter_mut().enumerate() {
         // Construct data
         let structured_data = if let Data::Structured(sd) = data.clone() {
-            unwrap!(StructuredData::new(sd.get_type_tag(),
-                                        *sd.name(),
-                                        sd.get_version() + 1,
-                                        rng.gen_iter().take(10).collect(),
-                                        sd.get_owners().clone()))
+            let mut sd = unwrap!(StructuredData::new(sd.get_type_tag(),
+                                                     *sd.name(),
+                                                     sd.get_version() + 1,
+                                                     rng.gen_iter().take(10).collect(),
+                                                     sd.get_owners().clone()));
+            let pk = *unwrap!(client.get_public_signing_key());
+            let sk = unwrap!(client.get_secret_signing_key()).clone();
+
+            let _ = unwrap!(sd.add_signature(&(pk, sk)));
+            sd
         } else {
             continue; // Skip non-structured data.
         };
