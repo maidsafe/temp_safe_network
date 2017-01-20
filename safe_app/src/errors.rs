@@ -30,6 +30,7 @@ use safe_core::nfs::NfsError;
 pub use self::codes::*;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
+use std::ffi::NulError;
 use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::sync::mpsc::{RecvError, RecvTimeoutError};
@@ -222,6 +223,12 @@ impl From<String> for AppError {
 
 impl<T: 'static> From<SendError<T>> for AppError {
     fn from(err: SendError<T>) -> Self {
+        AppError::from(err.description())
+    }
+}
+
+impl From<NulError> for AppError {
+    fn from(err: NulError) -> Self {
         AppError::from(err.description())
     }
 }

@@ -33,13 +33,6 @@ pub struct AuthGranted {
     pub access_container: AccessContInfo,
 }
 
-/// Free memory
-#[no_mangle]
-#[allow(unsafe_code)]
-pub unsafe extern "C" fn auth_granted_drop(a: AuthGranted) {
-    let _ = super::AuthGranted::from_repr_c(a);
-}
-
 /// Represents the needed keys to work with the data
 #[repr(C)]
 #[derive(Copy)]
@@ -84,13 +77,6 @@ impl Clone for AppKeys {
     }
 }
 
-/// Free memory
-#[no_mangle]
-#[allow(unsafe_code)]
-pub unsafe extern "C" fn app_keys_drop(a: AppKeys) {
-    let _ = super::AppKeys::from_repr_c(a);
-}
-
 /// Access container
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -101,11 +87,4 @@ pub struct AccessContInfo {
     pub tag: u64,
     /// Nonce
     pub nonce: [u8; secretbox::NONCEBYTES],
-}
-
-/// Free memory
-#[no_mangle]
-#[allow(unsafe_code)]
-pub unsafe extern "C" fn access_container_drop(a: AccessContInfo) {
-    let _ = super::AccessContInfo::from_repr_c(a);
 }

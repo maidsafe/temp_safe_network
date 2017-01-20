@@ -23,7 +23,6 @@
 
 use std::os::raw::c_void;
 use std::ptr;
-use super::string::FfiString;
 
 /// This trait allows us to treat callbacks with different number and type of
 /// arguments uniformly.
@@ -132,12 +131,6 @@ impl<T> CallbackArgs for *mut T {
 impl CallbackArgs for [u8; 32] {
     fn default() -> Self {
         [0; 32]
-    }
-}
-
-impl CallbackArgs for FfiString {
-    fn default() -> Self {
-        Default::default()
     }
 }
 

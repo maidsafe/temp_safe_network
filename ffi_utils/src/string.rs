@@ -98,12 +98,6 @@ impl Default for FfiString {
     }
 }
 
-/// Free the string from memory.
-#[no_mangle]
-pub unsafe extern "C" fn ffi_string_free(s: FfiString) {
-    s.deallocate()
-}
-
 #[cfg(test)]
 mod tests {
     extern crate rand;

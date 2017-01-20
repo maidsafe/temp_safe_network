@@ -22,14 +22,14 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{FfiString, catch_unwind_cb, vec_into_raw_parts};
+use ffi_utils::{catch_unwind_cb, from_c_str, vec_into_raw_parts};
 use ffi_utils::callback::CallbackArgs;
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use routing::{XOR_NAME_LEN, XorName};
 use safe_core::nfs::File as NativeFile;
 use safe_core::nfs::file_helper;
-use std::os::raw::c_void;
+use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::slice;
 use time;
@@ -127,11 +127,11 @@ pub unsafe extern "C" fn file_free(file: File) {
 #[no_mangle]
 pub unsafe extern "C" fn file_fetch(app: *const App,
                                     parent_h: MDataInfoHandle,
-                                    file_name: FfiString,
+                                    file_name: *const c_char,
                                     user_data: *mut c_void,
                                     o_cb: extern "C" fn(*mut c_void, i32, File, u64)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let file_name = file_name.to_string()?;
+        let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
             file_helper::fetch(client.clone(), parent.clone(), file_name)
@@ -145,13 +145,13 @@ pub unsafe extern "C" fn file_fetch(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn file_insert(app: *const App,
                                      parent_h: MDataInfoHandle,
-                                     file_name: FfiString,
+                                     file_name: *const c_char,
                                      file: File,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = file.to_native();
-        let file_name = file_name.to_string()?;
+        let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
             file_helper::insert(client.clone(), parent.clone(), file_name, file)
@@ -164,14 +164,14 @@ pub unsafe extern "C" fn file_insert(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn file_update(app: *const App,
                                      parent_h: MDataInfoHandle,
-                                     file_name: FfiString,
+                                     file_name: *const c_char,
                                      file: File,
                                      version: u64,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = file.to_native();
-        let file_name = file_name.to_string()?;
+        let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
             file_helper::update(client.clone(), parent.clone(), file_name, file, version)
@@ -185,7 +185,7 @@ mod tests {
     use errors::AppError;
     use ffi::cipher_opt::CipherOpt;
     use ffi::immutable_data::*;
-    use ffi_utils::{ErrorCode, FfiString};
+    use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_2, call_3};
     use object_cache::CipherOptHandle;
     use routing::{XOR_NAME_LEN, XorName};
@@ -194,6 +194,7 @@ mod tests {
     use safe_core::nfs::File as NativeFile;
     use safe_core::nfs::NfsError;
     use std::collections::HashMap;
+    use std::ffi::CString;
     use super::*;
     use test_utils::{create_app_with_access, run_now};
 
@@ -216,11 +217,12 @@ mod tests {
         });
 
         let file_name0 = "file0.txt";
-        let ffi_file_name0 = FfiString::from_string(file_name0);
+        let ffi_file_name0 = unwrap!(CString::new(file_name0));
 
         // fetching non-existing file fails.
-        let res =
-            unsafe { call_2(|ud, cb| file_fetch(&app, container_info_h, ffi_file_name0, ud, cb)) };
+        let res = unsafe {
+            call_2(|ud, cb| file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb))
+        };
 
         match res {
             Err(code) if code == AppError::from(NfsError::FileNotFound).error_code() => (),
@@ -235,7 +237,12 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                file_insert(&app, container_info_h, ffi_file_name0, ffi_file, ud, cb)
+                file_insert(&app,
+                            container_info_h,
+                            ffi_file_name0.as_ptr(),
+                            ffi_file,
+                            ud,
+                            cb)
             }))
         }
 
@@ -243,7 +250,7 @@ mod tests {
         let (retrieved_file, retrieved_version) = {
             unsafe {
                 let (file, version) = unwrap!(call_2(|ud, cb| {
-                    file_fetch(&app, container_info_h, ffi_file_name0, ud, cb)
+                    file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
                 }));
                 (file.into_native(), version)
             }
@@ -265,18 +272,25 @@ mod tests {
         let ffi_file = File::from_native(file);
 
         let file_name1 = "file1.txt";
-        let ffi_file_name1 = FfiString::from_string(file_name1);
+        let ffi_file_name1 = unwrap!(CString::new(file_name1));
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                file_insert(&app, container_info_h, ffi_file_name1, ffi_file, ud, cb)
+                file_insert(&app,
+                            container_info_h,
+                            ffi_file_name1.as_ptr(),
+                            ffi_file,
+                            ud,
+                            cb)
             }))
         }
 
         // Fetch it back.
         let (ffi_file, _) = {
             unsafe {
-                unwrap!(call_2(|ud, cb| file_fetch(&app, container_info_h, ffi_file_name1, ud, cb)))
+                unwrap!(call_2(|ud, cb| {
+                    file_fetch(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
+                }))
             }
         };
 

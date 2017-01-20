@@ -67,12 +67,11 @@ impl AuthGranted {
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
     #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(repr_c: ffi::AuthGranted) -> Self {
-        let ffi::AuthGranted { app_keys, access_container } = repr_c;
+    pub unsafe fn from_repr_c(repr_c: *const ffi::AuthGranted) -> Self {
         AuthGranted {
-            app_keys: AppKeys::from_repr_c(app_keys),
+            app_keys: AppKeys::from_repr_c((*repr_c).app_keys),
             bootstrap_config: Config,
-            access_container: AccessContInfo::from_repr_c(access_container),
+            access_container: AccessContInfo::from_repr_c((*repr_c).access_container),
         }
     }
 }
@@ -257,11 +256,9 @@ mod tests {
 
         assert_eq!(ffi.access_container.tag, 681);
 
-        let ag = unsafe { AuthGranted::from_repr_c(ffi) };
+        let ag = unsafe { AuthGranted::from_repr_c(&ffi) };
 
         assert_eq!(ag.access_container.tag, 681);
-
-        unsafe { ffi::auth_granted_drop(ag.into_repr_c()) };
     }
 
     #[test]
@@ -302,12 +299,6 @@ mod tests {
         assert_eq!(ak.sign_sk, sk);
         assert_eq!(ak.enc_pk, ourpk);
         assert_eq!(ak.enc_sk, oursk);
-
-        // If test runs under special mode (e.g. Valgrind) we can detect memory
-        // leaks
-        unsafe {
-            ffi::app_keys_drop(ak.into_repr_c());
-        }
     }
 
     #[test]
@@ -331,7 +322,5 @@ mod tests {
         assert_eq!(a.id.0.iter().sum::<u8>() as usize, 2 * XOR_NAME_LEN);
         assert_eq!(a.tag, 681);
         assert_eq!(a.nonce, nonce);
-
-        unsafe { ffi::access_container_drop(a.into_repr_c()) };
     }
 }

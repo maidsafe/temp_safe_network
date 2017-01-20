@@ -20,12 +20,12 @@
 // and limitations relating to use of the SAFE Network Software.
 
 use ::App;
-use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb};
+use ffi_utils::{OpaqueCtx, catch_unwind_cb, from_c_str};
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
 use safe_core::ipc::req::ffi::Permission;
-use std::os::raw::c_void;
+use std::os::raw::{c_char, c_void};
 
 /// Fetch access info from the network.
 #[no_mangle]
@@ -52,14 +52,14 @@ pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
 #[no_mangle]
 pub unsafe extern "C"
 fn access_container_get_container_mdata_info(app: *const App,
-                                             name: FfiString,
+                                             name: *const c_char,
                                              user_data: *mut c_void,
                                              o_cb: extern "C" fn(*mut c_void,
                                                                  i32,
                                                                  MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = name.to_string()?;
+        let name = from_c_str(name)?;
 
         (*app).send(move |client, context| {
             let context = context.clone();
@@ -79,7 +79,7 @@ fn access_container_get_container_mdata_info(app: *const App,
 /// Check whether the app has the given permission for the given container.
 #[no_mangle]
 pub unsafe extern "C" fn access_container_is_permitted(app: *const App,
-                                                       name: FfiString,
+                                                       name: *const c_char,
                                                        permission: Permission,
                                                        user_data: *mut c_void,
                                                        o_cb: extern "C" fn(*mut c_void,
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn access_container_is_permitted(app: *const App,
                                                                            bool)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = name.to_string()?;
+        let name = from_c_str(name)?;
 
         (*app).send(move |client, context| {
             context.is_permitted(client, name, permission)

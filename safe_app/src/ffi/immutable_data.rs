@@ -21,14 +21,14 @@
 
 use App;
 use errors::AppError;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb};
+use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
 use routing::{XOR_NAME_LEN, XorName};
 use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
-use std::{mem, ptr, slice};
+use std::{mem, ptr};
 use std::os::raw::c_void;
 use super::cipher_opt::CipherOpt;
 
@@ -76,12 +76,12 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
-        let data_slice = slice::from_raw_parts(data, size);
+        let data_slice = vec_clone_from_raw_parts(data, size);
 
         (*app).send(move |_, context| {
             let fut = {
                 match context.object_cache().get_se_writer(se_h) {
-                    Ok(writer) => writer.write(data_slice),
+                    Ok(writer) => writer.write(&data_slice),
                     Err(e) => {
                         o_cb(user_data.0, ffi_error_code!(e));
                         return None;

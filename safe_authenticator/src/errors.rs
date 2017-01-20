@@ -30,6 +30,7 @@ use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
 pub use self::codes::*;
 use std::error::Error;
+use std::ffi::NulError;
 use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
@@ -149,7 +150,13 @@ impl From<IpcError> for AuthError {
 
 impl From<RecvError> for AuthError {
     fn from(error: RecvError) -> AuthError {
-        AuthError::Unexpected(error.description().to_owned())
+        AuthError::from(error.description())
+    }
+}
+
+impl From<NulError> for AuthError {
+    fn from(error: NulError) -> AuthError {
+        AuthError::from(error.description())
     }
 }
 

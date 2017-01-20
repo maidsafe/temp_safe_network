@@ -23,6 +23,7 @@ use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use rustc_serialize::base64::FromBase64Error;
 use std::error::Error;
+use std::ffi::NulError;
 use std::str::Utf8Error;
 
 /// Ipc error
@@ -66,6 +67,12 @@ impl From<FromBase64Error> for IpcError {
 impl From<SerialisationError> for IpcError {
     fn from(_err: SerialisationError) -> Self {
         IpcError::EncodeDecodeError
+    }
+}
+
+impl From<NulError> for IpcError {
+    fn from(err: NulError) -> Self {
+        IpcError::Unexpected(err.description().to_owned())
     }
 }
 

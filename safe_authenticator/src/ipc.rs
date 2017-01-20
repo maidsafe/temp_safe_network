@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use ffi_utils::{FfiString, OpaqueCtx, base64_encode, catch_unwind_cb};
+use ffi_utils::{OpaqueCtx, base64_encode, catch_unwind_cb, from_c_str};
 use futures::{Future, future};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Action, ClientError, EntryActions, PermissionSet, User, Value};
@@ -34,7 +34,9 @@ use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp, access_container_enc_key};
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::os::raw::c_void;
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_void};
+use std::ptr;
 use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
 use super::access_container::{access_container, access_container_entry, access_container_nonce,
                               put_access_container_entry};
@@ -82,17 +84,22 @@ pub fn app_info(client: &Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>
 /// Decodes a given encoded IPC message and calls a corresponding callback
 #[no_mangle]
 pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
-                                             msg: FfiString,
+                                             msg: *const c_char,
                                              user_data: *mut c_void,
-                                             o_auth: extern "C" fn(*mut c_void, u32, FfiAuthReq),
+                                             o_auth: extern "C" fn(*mut c_void,
+                                                                   u32,
+                                                                   *const FfiAuthReq),
                                              o_containers: extern "C" fn(*mut c_void,
                                                                          u32,
-                                                                         FfiContainersReq),
-                                             o_err: extern "C" fn(*mut c_void, i32, FfiString)) {
+                                                                         *const FfiContainersReq),
+                                             o_err: extern "C" fn(*mut c_void,
+                                                                  i32,
+                                                                  *const c_char)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_err, || -> Result<_, AuthError> {
-        let msg = decode_msg(msg.as_str()?)?;
+        let msg_raw = CStr::from_ptr(msg).to_str()?;
+        let msg = decode_msg(msg_raw)?;
         match msg {
             IpcMsg::Req { req: IpcReq::Auth(auth_req), req_id } => {
                 let app_id = auth_req.app.id.clone();
@@ -116,18 +123,18 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
 
                                         let err = AuthError::from(IpcError::AlreadyAuthorised);
 
-                                        o_err(user_data.0, ffi_error_code!(err), resp);
+                                        o_err(user_data.0, ffi_error_code!(err), resp.as_ptr());
                                     }
                                     AppState::NotAuthenticated |
                                     AppState::Revoked => {
                                         // App is not registered yet or was previously registered
-                                        o_auth(user_data.0, req_id, auth_req.into_repr_c());
+                                        o_auth(user_data.0, req_id, &auth_req.into_repr_c()?);
                                     }
                                 }
                                 Ok(())
                             })
                             .map_err(move |e| {
-                                o_err(user_data.0, ffi_error_code!(e), FfiString::default())
+                                o_err(user_data.0, ffi_error_code!(e), ptr::null())
                             })
                             .into_box()
                             .into()
@@ -147,7 +154,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                             .and_then(move |app_state| {
                                 match app_state {
                                     AppState::Authenticated => {
-                                        o_containers(user_data.0, req_id, cont_req.into_repr_c());
+                                        o_containers(user_data.0, req_id, &cont_req.into_repr_c()?);
                                     }
                                     AppState::Revoked |
                                     AppState::NotAuthenticated => {
@@ -159,13 +166,13 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
 
                                         let err = AuthError::from(IpcError::UnknownApp);
 
-                                        o_err(user_data.0, ffi_error_code!(err), resp);
+                                        o_err(user_data.0, ffi_error_code!(err), resp.as_ptr());
                                     }
                                 }
                                 Ok(())
                             })
                             .map_err(move |e| {
-                                o_err(user_data.0, ffi_error_code!(e), FfiString::default())
+                                o_err(user_data.0, ffi_error_code!(e), ptr::null())
                             })
                             .into_box()
                             .into()
@@ -182,15 +189,15 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
 /// Revoke app access
 #[no_mangle]
 pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
-                                                  app_id: FfiString,
+                                                  app_id: *const c_char,
                                                   user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
                                                                       i32,
-                                                                      FfiString)) {
+                                                                      *const c_char)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
-        let app_id = FfiString::to_string(&app_id)?;
+        let app_id = from_c_str(app_id)?;
 
         (*auth).send(move |client| {
                 let c2 = client.clone();
@@ -271,10 +278,10 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                     .and_then(move |app_id| {
                         let resp = encode_response(&IpcMsg::Revoked { app_id: app_id.clone() },
                                                    app_id)?;
-                        o_cb(user_data.0, 0, resp);
+                        o_cb(user_data.0, 0, resp.as_ptr());
                         Ok(())
                     })
-                    .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), Default::default()))
+                    .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null()))
                     .into_box()
                     .into()
             })?;
@@ -286,11 +293,11 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
 /// Provides and encodes an Authenticator response
 #[no_mangle]
 pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
-                                          req: FfiAuthReq,
+                                          req: *const FfiAuthReq,
                                           req_id: u32,
                                           is_granted: bool,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, i32, FfiString)) {
+                                          o_cb: extern "C" fn(*mut c_void, i32, *const c_char)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
@@ -304,7 +311,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                        auth_req.app.id)?;
             o_cb(user_data.0,
                  ffi_error_code!(AuthError::from(IpcError::AuthDenied)),
-                 resp);
+                 resp.as_ptr());
         } else {
             let permissions = auth_req.containers.clone();
 
@@ -356,28 +363,26 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                         .and_then(move |app| {
                             encode_auth_resp_impl(c4, app, app_container, permissions)
                                 .and_then(move |auth_granted| {
-                                    Ok(o_cb(user_data.0,
-                                            0,
-                                            encode_response(&IpcMsg::Resp {
-                                                                req_id: req_id,
-                                                                resp:
-                                                                    IpcResp::Auth(Ok(auth_granted)),
-                                                            },
-                                                            app_id2)?))
+                                    let resp =
+                                        encode_response(&IpcMsg::Resp {
+                                                            req_id: req_id,
+                                                            resp: IpcResp::Auth(Ok(auth_granted)),
+                                                        },
+                                                        app_id2)?;
+                                    Ok(o_cb(user_data.0, 0, resp.as_ptr()))
                                 })
                                 .or_else(move |e| -> Result<(), AuthError> {
-                                    Ok(o_cb(user_data.0,
-                                            ffi_error_code!(e),
-                                            encode_response(&IpcMsg::Resp {
-                                                                req_id: req_id,
-                                                                resp: IpcResp::Auth(Err(e.into())),
-                                                            },
-                                                            app_id3)?))
+                                    let err_code = ffi_error_code!(e);
+                                    let resp = encode_response(&IpcMsg::Resp {
+                                                                   req_id: req_id,
+                                                                   resp:
+                                                                       IpcResp::Auth(Err(e.into())),
+                                                               },
+                                                               app_id3)?;
+                                    Ok(o_cb(user_data.0, err_code, resp.as_ptr()))
                                 })
                         })
-                        .map_err(move |e| {
-                            o_cb(user_data.0, ffi_error_code!(e), FfiString::default())
-                        })
+                        .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null()))
                         .into_box()
                         .into()
                 })?;
@@ -390,24 +395,27 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
 /// Update containers permissions for an App
 #[no_mangle]
 pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
-                                                req: FfiContainersReq,
+                                                req: *const FfiContainersReq,
                                                 req_id: u32,
                                                 is_granted: bool,
                                                 user_data: *mut c_void,
-                                                o_cb: extern "C" fn(*mut c_void, i32, FfiString)) {
+                                                o_cb: extern "C" fn(*mut c_void,
+                                                                    i32,
+                                                                    *const c_char)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
         let cont_req = ContainersReq::from_repr_c(req)?;
 
         if !is_granted {
-            let resp = IpcMsg::Resp {
-                req_id: req_id,
-                resp: IpcResp::Containers(Err(IpcError::AuthDenied)),
-            };
+            let resp = encode_response(&IpcMsg::Resp {
+                                           req_id: req_id,
+                                           resp: IpcResp::Containers(Err(IpcError::AuthDenied)),
+                                       },
+                                       cont_req.app.id)?;
             o_cb(user_data.0,
                  ffi_error_code!(AuthError::from(IpcError::AuthDenied)),
-                 encode_response(&resp, cont_req.app.id)?);
+                 resp.as_ptr());
         } else {
             let permissions = cont_req.containers.clone();
             let app_id = cont_req.app.id.clone();
@@ -466,21 +474,22 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                             put_access_container_entry(c5, &dir, &app_id, &app_keys, perms, version)
                         })
                         .and_then(move |_| {
-                            let resp = IpcMsg::Resp {
-                                req_id: req_id,
-                                resp: IpcResp::Containers(Ok(())),
-                            };
-                            o_cb(user_data.0, 0, encode_response(&resp, cont_req.app.id)?);
+                            let resp = encode_response(&IpcMsg::Resp {
+                                                           req_id: req_id,
+                                                           resp: IpcResp::Containers(Ok(())),
+                                                       },
+                                                       cont_req.app.id)?;
+                            o_cb(user_data.0, 0, resp.as_ptr());
                             Ok(())
                         })
                         .or_else(move |e| -> Result<(), AuthError> {
-                            Ok(o_cb(user_data.0,
-                                    ffi_error_code!(e),
-                                    encode_response(&IpcMsg::Resp {
-                                                        req_id: req_id,
-                                                        resp: IpcResp::Containers(Err(e.into())),
-                                                    },
-                                                    app_id2)?))
+                            let err_code = ffi_error_code!(e);
+                            let resp = encode_response(&IpcMsg::Resp {
+                                                           req_id: req_id,
+                                                           resp: IpcResp::Containers(Err(e.into())),
+                                                       },
+                                                       app_id2)?;
+                            Ok(o_cb(user_data.0, err_code, resp.as_ptr()))
                         })
                         .map_err(move |e| debug!("Unexpected error: {:?}", e))
                         .into_box()
@@ -896,10 +905,10 @@ fn check_app_container(client: Client,
         .into_box()
 }
 
-fn encode_response(msg: &IpcMsg, app_id: String) -> Result<FfiString, IpcError> {
+fn encode_response(msg: &IpcMsg, app_id: String) -> Result<CString, IpcError> {
     let app_id = base64_encode(app_id.as_bytes());
     let resp = ipc::encode_msg(msg, &format!("safe-{}", app_id))?;
-    Ok(FfiString::from_string(resp))
+    Ok(CString::new(resp)?)
 }
 
 /// Represents current app state
