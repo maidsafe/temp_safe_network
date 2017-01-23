@@ -109,8 +109,9 @@ fn handle_response(response: Response, mut queue_guard: MutexGuard<MessageQueue>
         }
         Response::GetAccountInfoSuccess { id, data_stored, space_available } => {
             if let Some(response_observer) = queue_guard.response_observers.remove(&id) {
-                let _ = response_observer.send(
-                    ResponseEvent::GetAccountInfoResp(Ok((data_stored, space_available))));
+                let _ =
+                    response_observer.send(ResponseEvent::GetAccountInfoResp(Ok((data_stored,
+                                                                    space_available))));
             }
         }
         Response::GetAccountInfoFailure { id, external_error_indicator } => {
@@ -145,44 +146,49 @@ impl MessageQueue {
         }));
 
         let message_queue_cloned = message_queue.clone();
-        let receiver_joiner = thread::named(EVENT_RECEIVER_THREAD_NAME, move || {
-            for it in routing_event_receiver.iter() {
-                trace!("{} received: {:?}", EVENT_RECEIVER_THREAD_NAME, it);
+        let receiver_joiner =
+            thread::named(EVENT_RECEIVER_THREAD_NAME,
+                          move || for it in routing_event_receiver.iter() {
+                              trace!("{} received: {:?}", EVENT_RECEIVER_THREAD_NAME, it);
 
-                match it {
-                    Event::Response { response, .. } => {
-                        handle_response(response, unwrap!(message_queue_cloned.lock()));
-                    }
-                    Event::Connected => {
-                        let mut dead_sender_positions = Vec::<usize>::new();
-                        let mut queue_guard = unwrap!(message_queue_cloned.lock());
-                        for it in queue_guard.network_event_observers.iter().enumerate() {
-                            if it.1.send(NetworkEvent::Connected).is_err() {
-                                dead_sender_positions.push(it.0);
-                            }
-                        }
+                              match it {
+                                  Event::Response { response, .. } => {
+                                      handle_response(response,
+                                                      unwrap!(message_queue_cloned.lock()));
+                                  }
+                                  Event::Connected => {
+                                      let mut dead_sender_positions = Vec::<usize>::new();
+                                      let mut queue_guard = unwrap!(message_queue_cloned.lock());
+                                      for it in queue_guard.network_event_observers
+                                          .iter()
+                                          .enumerate() {
+                                          if it.1.send(NetworkEvent::Connected).is_err() {
+                                              dead_sender_positions.push(it.0);
+                                          }
+                                      }
 
-                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
+                                      MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
                                                          dead_sender_positions);
-                    }
-                    Event::Terminate => {
-                        let mut dead_sender_positions = Vec::<usize>::new();
-                        let mut queue_guard = unwrap!(message_queue_cloned.lock());
-                        info!("Received a Terminate event. Informing {} observers.",
-                              queue_guard.network_event_observers.len());
-                        for it in queue_guard.network_event_observers.iter().enumerate() {
-                            if it.1.send(NetworkEvent::Disconnected).is_err() {
-                                dead_sender_positions.push(it.0);
-                            }
-                        }
+                                  }
+                                  Event::Terminate => {
+                                      let mut dead_sender_positions = Vec::<usize>::new();
+                                      let mut queue_guard = unwrap!(message_queue_cloned.lock());
+                                      info!("Received a Terminate event. Informing {} observers.",
+                                            queue_guard.network_event_observers.len());
+                                      for it in queue_guard.network_event_observers
+                                          .iter()
+                                          .enumerate() {
+                                          if it.1.send(NetworkEvent::Disconnected).is_err() {
+                                              dead_sender_positions.push(it.0);
+                                          }
+                                      }
 
-                        MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
+                                      MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
                                                          dead_sender_positions);
-                    }
-                    _ => debug!("Received unsupported routing event: {:?}.", it),
-                }
-            }
-        });
+                                  }
+                                  _ => debug!("Received unsupported routing event: {:?}.", it),
+                              }
+                          });
 
         (message_queue, receiver_joiner)
     }

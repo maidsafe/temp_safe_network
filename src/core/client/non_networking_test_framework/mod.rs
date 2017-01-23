@@ -15,7 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![cfg_attr(feature="clippy", allow(map_entry))]  // TODO: Look to enable this lint check.
+// TODO: Look to enable this lint check.
+#![cfg_attr(feature="clippy", allow(map_entry))]
 
 mod storage;
 
@@ -59,10 +60,7 @@ pub struct RoutingMock {
 }
 
 impl RoutingMock {
-    pub fn new(sender: Sender<Event>,
-               _id: Option<FullId>,
-               _min_section_size: usize)
-               -> Result<RoutingMock, RoutingError> {
+    pub fn new(sender: Sender<Event>, _id: Option<FullId>) -> Result<RoutingMock, RoutingError> {
         ::rust_sodium::init();
 
         let cloned_sender = sender.clone();
