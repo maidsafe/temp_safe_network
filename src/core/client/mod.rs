@@ -51,8 +51,6 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
-const MIN_SECTION_SIZE: usize = 8;
-
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
 /// essentially a non-blocking Client with upper layers having an option to either block and wait
@@ -85,7 +83,7 @@ impl Client {
 
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                              vec![network_event_sender]);
-        let routing = try!(Routing::new(routing_sender, None, MIN_SECTION_SIZE));
+        let routing = try!(Routing::new(routing_sender, None));
 
         trace!("Waiting to get connected to the Network...");
         match try!(network_event_receiver.recv()) {
@@ -131,7 +129,7 @@ impl Client {
 
         let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                              vec![network_event_sender]);
-        let routing = try!(Routing::new(routing_sender, Some(id_packet), MIN_SECTION_SIZE));
+        let routing = try!(Routing::new(routing_sender, Some(id_packet)));
 
         trace!("Waiting to get connected to the Network...");
         match try!(network_event_receiver.recv()) {
@@ -225,7 +223,7 @@ impl Client {
 
             let (message_queue, raii_joiner) = MessageQueue::new(routing_receiver,
                                                                  vec![network_event_sender]);
-            let routing = try!(Routing::new(routing_sender, Some(id_packet), MIN_SECTION_SIZE));
+            let routing = try!(Routing::new(routing_sender, Some(id_packet)));
 
             trace!("Waiting to get connected to the Network...");
             match try!(network_event_receiver.recv()) {

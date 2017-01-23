@@ -15,7 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![cfg_attr(feature="clippy", allow(map_entry))]  // TODO: Look to enable this lint check.
+// TODO: Look to enable this lint check.
+#![cfg_attr(feature="clippy", allow(map_entry))]
 
 mod storage;
 
@@ -59,10 +60,7 @@ pub struct RoutingMock {
 }
 
 impl RoutingMock {
-    pub fn new(sender: Sender<Event>,
-               _id: Option<FullId>,
-               _min_section_size: usize)
-               -> Result<RoutingMock, RoutingError> {
+    pub fn new(sender: Sender<Event>, _id: Option<FullId>) -> Result<RoutingMock, RoutingError> {
         ::rust_sodium::init();
 
         let cloned_sender = sender.clone();
@@ -670,7 +668,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -780,7 +778,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -1115,7 +1113,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),

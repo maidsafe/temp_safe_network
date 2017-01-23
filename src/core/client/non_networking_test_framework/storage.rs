@@ -56,9 +56,7 @@ impl Storage {
     // Save the data to the storage.
     pub fn put_data(&mut self, name: XorName, data: Data) -> Result<(), StorageError> {
         serialise(&data)
-            .map(|data| {
-                let _ = self.data_store.insert(name, data);
-            })
+            .map(|data| { let _ = self.data_store.insert(name, data); })
             .map_err(StorageError::SerialisationError)
     }
 
