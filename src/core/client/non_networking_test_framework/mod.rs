@@ -668,7 +668,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -778,7 +778,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
@@ -1113,7 +1113,7 @@ mod test {
 
         let (message_queue, _raii_joiner) = MessageQueue::new(routing_receiver,
                                                               vec![network_event_sender]);
-        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet), 8));
+        let mut mock_routing = unwrap!(RoutingMock::new(routing_sender, Some(id_packet)));
 
         match unwrap!(network_event_receiver.recv()) {
             NetworkEvent::Connected => (),
