@@ -23,13 +23,13 @@
 
 #![allow(unsafe_code)]
 
-use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_error_code};
+use super::App;
+use super::errors::AppError;
+use ffi_utils::{OpaqueCtx, catch_unwind_error_code, from_c_str};
 use safe_core::NetworkEvent;
 use safe_core::ipc::AuthGranted;
 use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
-use std::os::raw::c_void;
-use super::App;
-use super::errors::AppError;
+use std::os::raw::{c_char, c_void};
 
 /// Access container
 pub mod access_container;
@@ -73,8 +73,8 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
 
 /// Create registered app.
 #[no_mangle]
-pub unsafe extern "C" fn app_registered(app_id: FfiString,
-                                        auth_granted: FfiAuthGranted,
+pub unsafe extern "C" fn app_registered(app_id: *const c_char,
+                                        auth_granted: *const FfiAuthGranted,
                                         user_data: *mut c_void,
                                         network_observer_cb: unsafe extern "C" fn(*mut c_void,
                                                                                   i32,
@@ -83,7 +83,7 @@ pub unsafe extern "C" fn app_registered(app_id: FfiString,
                                         -> i32 {
     catch_unwind_error_code(|| -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
-        let app_id = app_id.to_string()?;
+        let app_id = from_c_str(app_id)?;
         let auth_granted = AuthGranted::from_repr_c(auth_granted);
 
         let app = App::registered(app_id, auth_granted, move |event| {

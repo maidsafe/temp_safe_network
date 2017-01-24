@@ -20,8 +20,12 @@
 // and limitations relating to use of the SAFE Network Software.
 
 
+use ffi_utils::{ReprC, vec_into_raw_parts};
+use nfs::errors::NfsError;
+use nfs::ffi::File as FfiFile;
 use routing::XorName;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
+use std::slice;
 use time::{self, Timespec, Tm};
 
 /// Representation of a File to be put into the network. Could be any kind of
@@ -44,6 +48,24 @@ impl File {
             modified: time::now_utc(),
             user_metadata: user_metadata,
             data_map_name: XorName::default(),
+        }
+    }
+
+    /// Construct FFI wrapper for the native rust `File`, consuming the file.
+    pub fn into_repr_c(self) -> FfiFile {
+        // TODO: move the metadata, not clone.
+        let user_metadata = self.user_metadata().to_vec();
+        let (user_metadata_ptr, user_metadata_len, user_metadata_cap) =
+            vec_into_raw_parts(user_metadata);
+
+        FfiFile {
+            size: self.size(),
+            created: *self.created_time(),
+            modified: *self.modified_time(),
+            user_metadata_ptr: user_metadata_ptr,
+            user_metadata_len: user_metadata_len,
+            user_metadata_cap: user_metadata_cap,
+            data_map_name: self.data_map_name().0,
         }
     }
 
@@ -98,6 +120,30 @@ impl File {
     }
 }
 
+impl ReprC for File {
+    type C = *const FfiFile;
+    type Error = NfsError;
+
+    /// Convert to the native rust equivalent by cloning the internal data, preserving self.
+    #[allow(unsafe_code)]
+    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    fn from_repr_c_cloned(repr_c: *const FfiFile) -> Result<File, NfsError> {
+        let user_metadata = unsafe {
+                slice::from_raw_parts((*repr_c).user_metadata_ptr, (*repr_c).user_metadata_len)
+            }
+            .to_vec();
+
+        let mut file = File::new(user_metadata);
+        unsafe {
+            file.set_size((*repr_c).size);
+            file.set_created_time((*repr_c).created);
+            file.set_modified_time((*repr_c).modified);
+            file.set_data_map_name(XorName((*repr_c).data_map_name));
+        }
+        Ok(file)
+    }
+}
+
 impl Encodable for File {
     fn encode<E: Encoder>(&self, e: &mut E) -> Result<(), E::Error> {
         let created_time = self.created.to_timespec();
@@ -139,8 +185,8 @@ impl Decodable for File {
 
 #[cfg(test)]
 mod tests {
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use super::*;
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
 
     #[test]
     fn serialise_deserialise() {

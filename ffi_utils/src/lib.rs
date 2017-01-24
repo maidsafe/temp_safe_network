@@ -58,16 +58,17 @@ mod macros;
 mod base64;
 mod catch_unwind;
 mod vec;
-mod string;
 
 pub mod callback;
 pub mod test_utils;
+pub mod ffi_repr;
+pub mod string;
 
 pub use self::base64::{base64_decode, base64_encode};
 pub use self::catch_unwind::{catch_unwind_cb, catch_unwind_error_code};
-pub use self::string::{FfiString, ffi_string_free};
+pub use self::ffi_repr::ReprC;
+pub use self::string::{StringError, from_c_str};
 pub use self::vec::{vec_clone_from_raw_parts, vec_into_raw_parts};
-
 use std::os::raw::c_void;
 
 /// Type that holds opaque user data handed into FFI functions

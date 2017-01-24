@@ -34,4 +34,3 @@ test_script:
     cd ..\safe_core && cargo test --verbose --release --features use-mock-routing
     cd ..\safe_app && cargo test --verbose --release --features use-mock-routing
     cd ..\safe_authenticator && cargo test --verbose --release --features use-mock-routing
-    cd ..\tests && cargo test --verbose --release --features use-mock-routing

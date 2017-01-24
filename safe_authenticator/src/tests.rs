@@ -23,8 +23,8 @@ use Authenticator;
 use access_container::access_container_entry;
 use errors::{AuthError, ERR_ALREADY_AUTHORISED, ERR_UNKNOWN_APP};
 use ffi::apps::*;
-use ffi_utils::{FfiString, base64_encode};
-use ffi_utils::test_utils::{call_1, call_3, send_via_user_data, sender_as_user_data};
+use ffi_utils::{ReprC, StringError, base64_encode, from_c_str};
+use ffi_utils::test_utils::{call_1, call_vec, send_via_user_data, sender_as_user_data};
 use futures::{Future, future};
 use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp, get_config};
 use maidsafe_utilities::serialisation::deserialise;
@@ -33,11 +33,13 @@ use rust_sodium::crypto::hash::sha256;
 use safe_core::{CoreError, MDataInfo, mdata_info, utils};
 use safe_core::ipc::{self, AuthGranted, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp,
                      Permission};
+use safe_core::ipc::req::ffi::AppExchangeInfo as FfiAppExchangeInfo;
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, NfsError, file_helper};
 use std::collections::{BTreeSet, HashMap};
-use std::os::raw::c_void;
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_void};
 use std::sync::mpsc;
 use std::time::Duration;
 use test_utils::{access_container, compare_access_container_entries, rand_app, run};
@@ -155,19 +157,16 @@ fn app_authentication() {
     assert_eq!(received_req_id, req_id);
     assert_eq!(received_auth_req, auth_req);
 
-    let encoded_auth_resp = unsafe {
-        let ffi_resp = unwrap!(call_1(|ud, cb| {
+    let encoded_auth_resp: String = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            let auth_req = unwrap!(auth_req.into_repr_c());
             encode_auth_resp(&authenticator,
-                             auth_req.into_repr_c(),
+                             &auth_req,
                              req_id,
                              true, // is_granted
                              ud,
                              cb)
-        }));
-
-        let resp = unwrap!(ffi_resp.to_string());
-        ffi_resp.deallocate();
-        resp
+        }))
     };
 
     let base64_app_id = base64_encode(app_id.as_bytes());
@@ -261,16 +260,16 @@ fn authenticated_app_cannot_be_authenticated_again() {
         x => panic!("Unexpected {:?}", x),
     };
 
-    unsafe {
-        let resp = unwrap!(call_1(|ud, cb| {
+    let _resp: String = unsafe {
+        unwrap!(call_1(|ud, cb| {
+            let auth_req = unwrap!(auth_req.clone().into_repr_c());
             encode_auth_resp(&authenticator,
-                             auth_req.clone().into_repr_c(),
+                             &auth_req,
                              req_id,
                              true, // is_granted
                              ud,
                              cb)
-        }));
-        resp.deallocate();
+        }))
     };
 
     // Second authentication fails.
@@ -347,22 +346,17 @@ fn containers_access_request() {
     };
 
     // The callback should be invoked
-    let encoded_containers_resp = unsafe {
+    let encoded_containers_resp: String = unsafe {
         // Call `encode_auth_resp` with is_granted = true
-        let ffi_resp = unwrap!(call_1(|ud, cb| {
+        unwrap!(call_1(|ud, cb| {
+            let cont_req = unwrap!(cont_req.into_repr_c());
             encode_containers_resp(&authenticator,
-                                   cont_req.into_repr_c(),
+                                   &cont_req,
                                    req_id,
                                    true, // is_granted
                                    ud,
                                    cb)
-        }));
-
-        assert!(!ffi_resp.is_null());
-        let resp = unwrap!(ffi_resp.to_string());
-
-        ffi_resp.deallocate();
-        resp
+        }))
     };
 
     // Check the FfiString to contain "safe-<app-id-base64>:payload" where payload is
@@ -424,12 +418,11 @@ fn revoke_app() {
 
     let ac_md_info = auth_granted.access_container.into_mdata_info(app_keys.enc_key.clone());
     run(&authenticator, move |client| {
-        access_container_entry(client.clone(), &ac_md_info, &app_id, app_keys).then(move |res| {
-            match res {
+        access_container_entry(client.clone(), &ac_md_info, &app_id, app_keys)
+            .then(move |res| match res {
                 Err(AuthError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
                 x => panic!("Unexpected {:?}", x),
-            }
-        })
+            })
     });
 
     // Use the previous MDataInfo for images to check if the permissions
@@ -443,11 +436,9 @@ fn revoke_app() {
     // Try reading the entries of images folder, should not be able to read as everything
     // is reencrypted using new keys.
     run(&authenticator, move |client| {
-        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| {
-            match res {
-                Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
-                x => panic!("Unexpected {:?}", x),
-            }
+        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
+            Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+            x => panic!("Unexpected {:?}", x),
         })
     });
 }
@@ -504,11 +495,9 @@ fn revoke_app_reencryption() {
     // Try reading the entries of images folder, should not be able to read as everything
     // is reencrypted using new keys.
     run(&authenticator, move |client| {
-        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| {
-            match res {
-                Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
-                x => panic!("Unexpected {:?}", x),
-            }
+        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
+            Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+            x => panic!("Unexpected {:?}", x),
         })
     });
 
@@ -525,21 +514,38 @@ fn revoke_app_reencryption() {
     assert_eq!(file.user_metadata().to_owned(), vec![1u8, 2u8, 3u8]);
 }
 
+struct RegisteredAppId(String);
+impl ReprC for RegisteredAppId {
+    type C = *const RegisteredApp;
+    type Error = StringError;
+
+    fn from_repr_c_cloned(ffi: *const RegisteredApp) -> Result<RegisteredAppId, StringError> {
+        Ok(RegisteredAppId(unsafe { from_c_str((*ffi).app_info.id)? }))
+    }
+}
+
+struct RevokedAppId(String);
+impl ReprC for RevokedAppId {
+    type C = *const FfiAppExchangeInfo;
+    type Error = StringError;
+
+    fn from_repr_c_cloned(app_info: *const FfiAppExchangeInfo)
+                          -> Result<RevokedAppId, StringError> {
+        Ok(RevokedAppId(unsafe { from_c_str((*app_info).id)? }))
+    }
+}
+
 #[test]
 fn lists_of_registered_and_revoked_apps() {
     let authenticator = create_account_and_login();
 
     // Initially, there are no registered or revoked apps.
-    let registered = unsafe {
-        let (ptr, len, cap) =
-            unwrap!(call_3(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)));
-        Vec::from_raw_parts(ptr, len, cap)
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
     };
 
-    let revoked = unsafe {
-        let array = unwrap!(call_1(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb)));
-        array.into_vec()
-    };
+    let revoked: Vec<RevokedAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
 
     assert!(registered.is_empty());
     assert!(revoked.is_empty());
@@ -561,16 +567,12 @@ fn lists_of_registered_and_revoked_apps() {
     let _ = register_app(&authenticator, &auth_req2);
 
     // There are now two registered apps, but no revoked apps.
-    let registered = unsafe {
-        let (ptr, len, cap) =
-            unwrap!(call_3(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)));
-        Vec::from_raw_parts(ptr, len, cap)
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
     };
 
-    let revoked = unsafe {
-        let array = unwrap!(call_1(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb)));
-        array.into_vec()
-    };
+    let revoked: Vec<RevokedAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
 
     assert_eq!(registered.len(), 2);
     assert!(revoked.is_empty());
@@ -579,16 +581,12 @@ fn lists_of_registered_and_revoked_apps() {
     revoke(&authenticator, &auth_req1.app.id);
 
     // There is now one registered and one revoked app.
-    let registered = unsafe {
-        let (ptr, len, cap) =
-            unwrap!(call_3(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)));
-        Vec::from_raw_parts(ptr, len, cap)
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
     };
 
-    let revoked = unsafe {
-        let array = unwrap!(call_1(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb)));
-        array.into_vec()
-    };
+    let revoked: Vec<RevokedAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
 
     assert_eq!(registered.len(), 1);
     assert_eq!(revoked.len(), 1);
@@ -597,14 +595,9 @@ fn lists_of_registered_and_revoked_apps() {
 fn revoke(authenticator: &Authenticator, app_id: &str) {
     let base64_app_id = base64_encode(app_id.as_bytes());
 
-    let revoke_resp = unsafe {
-        let app_id = FfiString::from_str(app_id);
-        let ffi_resp =
-            unwrap!(call_1(|ud, cb| authenticator_revoke_app(authenticator, app_id, ud, cb)));
-        assert!(!ffi_resp.is_null());
-        let resp = unwrap!(ffi_resp.to_string());
-        ffi_resp.deallocate();
-        resp
+    let revoke_resp: String = unsafe {
+        let app_id = unwrap!(CString::new(app_id));
+        unwrap!(call_1(|ud, cb| authenticator_revoke_app(authenticator, app_id.as_ptr(), ud, cb)))
     };
 
     // Assert the callback is called with error-code 0 and FfiString contains
@@ -635,22 +628,17 @@ fn register_app(authenticator: &Authenticator, auth_req: &AuthReq) -> AuthGrante
         x => panic!("Unexpected {:?}", x),
     };
 
-    let encoded_auth_resp = unsafe {
+    let encoded_auth_resp: String = unsafe {
         // Call `encode_auth_resp` with is_granted = true
-        let ffi_resp = unwrap!(call_1(|ud, cb| {
+        unwrap!(call_1(|ud, cb| {
+            let auth_req = unwrap!(auth_req.clone().into_repr_c());
             encode_auth_resp(authenticator,
-                             auth_req.clone().into_repr_c(),
+                             &auth_req,
                              req_id,
                              true, // is_granted
                              ud,
                              cb)
-        }));
-
-        assert!(!ffi_resp.is_null());
-        let resp = unwrap!(ffi_resp.to_string());
-
-        ffi_resp.deallocate();
-        resp
+        }))
     };
 
     assert!(encoded_auth_resp.starts_with(&format!("safe-{}", base64_app_id)));
@@ -693,9 +681,9 @@ fn decode_ipc_msg(authenticator: &Authenticator,
                   -> Result<IpcMsg, (i32, Option<IpcMsg>)> {
     let (tx, rx) = mpsc::channel::<Result<IpcMsg, (i32, Option<IpcMsg>)>>();
 
-    extern "C" fn auth_cb(user_data: *mut c_void, req_id: u32, req: FfiAuthReq) {
+    extern "C" fn auth_cb(user_data: *mut c_void, req_id: u32, req: *const FfiAuthReq) {
         unsafe {
-            let req = match AuthReq::from_repr_c(req) {
+            let req = match AuthReq::from_repr_c_cloned(req) {
                 Ok(req) => req,
                 Err(_) => {
                     return send_via_user_data(user_data,
@@ -712,9 +700,11 @@ fn decode_ipc_msg(authenticator: &Authenticator,
         }
     }
 
-    extern "C" fn containers_cb(user_data: *mut c_void, req_id: u32, req: FfiContainersReq) {
+    extern "C" fn containers_cb(user_data: *mut c_void,
+                                req_id: u32,
+                                req: *const FfiContainersReq) {
         unsafe {
-            let req = match ContainersReq::from_repr_c(req) {
+            let req = match ContainersReq::from_repr_c_cloned(req) {
                 Ok(req) => req,
                 Err(_) => {
                     return send_via_user_data(user_data,
@@ -731,12 +721,13 @@ fn decode_ipc_msg(authenticator: &Authenticator,
         }
     }
 
-    extern "C" fn err_cb(user_data: *mut c_void, error_code: i32, response: FfiString) {
+    extern "C" fn err_cb(user_data: *mut c_void, error_code: i32, response: *const c_char) {
         unsafe {
             let ipc_resp = if response.is_null() {
                 None
             } else {
-                match ipc::decode_msg(unwrap!(response.as_str())) {
+                let response = CStr::from_ptr(response);
+                match ipc::decode_msg(unwrap!(response.to_str())) {
                     Ok(ipc_resp) => Some(ipc_resp),
                     Err(_) => None,
                 }
@@ -746,12 +737,12 @@ fn decode_ipc_msg(authenticator: &Authenticator,
         }
     }
 
-    let ffi_msg = FfiString::from_str(msg);
+    let ffi_msg = unwrap!(CString::new(msg));
 
     unsafe {
         use ipc::auth_decode_ipc_msg;
         auth_decode_ipc_msg(authenticator,
-                            ffi_msg,
+                            ffi_msg.as_ptr(),
                             sender_as_user_data(&tx),
                             auth_cb,
                             containers_cb,

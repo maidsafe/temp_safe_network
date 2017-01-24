@@ -161,8 +161,8 @@ pub unsafe extern "C" fn misc_object_cache_reset(session: *const Session,
 
 #[cfg(test)]
 mod tests {
-    use ffi_utils::test_utils::call_1;
     use super::*;
+    use ffi_utils::test_utils::call_1;
     use test_utils::{create_app, run_now};
 
     #[test]

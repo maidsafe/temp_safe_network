@@ -21,6 +21,7 @@
 
 //! Errors thrown by Authenticator routines
 
+pub use self::codes::*;
 use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -28,8 +29,8 @@ use routing::ClientError;
 use safe_core::CoreError;
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
-pub use self::codes::*;
 use std::error::Error;
+use std::ffi::NulError;
 use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
@@ -79,6 +80,7 @@ mod codes {
     pub const ERR_INVALID_MSG: i32 = -202;
     pub const ERR_ALREADY_AUTHORISED: i32 = -203;
     pub const ERR_UNKNOWN_APP: i32 = -204;
+    pub const ERR_STRING_ERROR: i32 = -205;
 
     // NFS errors.
     pub const ERR_DIRECTORY_EXISTS: i32 = -300;
@@ -149,7 +151,13 @@ impl From<IpcError> for AuthError {
 
 impl From<RecvError> for AuthError {
     fn from(error: RecvError) -> AuthError {
-        AuthError::Unexpected(error.description().to_owned())
+        AuthError::from(error.description())
+    }
+}
+
+impl From<NulError> for AuthError {
+    fn from(error: NulError) -> AuthError {
+        AuthError::from(error.description())
     }
 }
 
@@ -208,6 +216,7 @@ impl ErrorCode for AuthError {
                     IpcError::AlreadyAuthorised => ERR_ALREADY_AUTHORISED,
                     IpcError::UnknownApp => ERR_UNKNOWN_APP,
                     IpcError::Unexpected(_) => ERR_UNEXPECTED,
+                    IpcError::StringError(_) => ERR_STRING_ERROR,
                 }
             }
             AuthError::NfsError(ref err) => {

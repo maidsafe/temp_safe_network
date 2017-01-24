@@ -23,49 +23,53 @@ use AccessContainerEntry;
 use AuthError;
 use Authenticator;
 use access_container::{access_container, access_container_nonce};
-use ffi_utils::{FfiString, OpaqueCtx, catch_unwind_cb, vec_into_raw_parts};
-use ffi_utils::callback::CallbackArgs;
+use ffi_utils::{OpaqueCtx, catch_unwind_cb, from_c_str, vec_into_raw_parts};
 use futures::Future;
 use ipc::{AppState, app_state, get_config, remove_app_container, update_config};
 use maidsafe_utilities::serialisation::deserialise;
 use rust_sodium::crypto::hash::sha256;
 use safe_core::FutureExt;
 use safe_core::ipc::{IpcError, access_container_enc_key};
-use safe_core::ipc::req::ffi::{AppExchangeInfo, AppExchangeInfoArray, ContainerPermissions,
-                               ContainerPermissionsArray, PermissionArray, app_exchange_info_drop,
-                               container_permissions_array_free};
+use safe_core::ipc::req::ffi::{self, ContainerPermissions};
 use safe_core::utils::symmetric_decrypt;
-use std::os::raw::c_void;
+use std::ffi::CString;
+use std::os::raw::{c_char, c_void};
 use std::ptr;
 
 /// Application registered in the authenticator
 #[repr(C)]
 pub struct RegisteredApp {
     /// Unique application identifier
-    pub app_info: AppExchangeInfo,
+    pub app_info: ffi::AppExchangeInfo,
     /// List of containers that this application has access to
-    pub containers: ContainerPermissionsArray,
+    pub containers: *const ContainerPermissions,
+    /// Length of the containers array
+    pub containers_len: usize,
+    /// Capacity of the containers array. Internal data required
+    /// for the Rust allocator.
+    pub containers_cap: usize,
 }
 
 impl Drop for RegisteredApp {
     fn drop(&mut self) {
         unsafe {
-            app_exchange_info_drop(self.app_info);
-            container_permissions_array_free(self.containers);
+            let _ = Vec::from_raw_parts(self.containers as *mut ContainerPermissions,
+                                        self.containers_len,
+                                        self.containers_cap);
         }
     }
 }
 
 /// Removes a revoked app from the authenticator config
 pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator,
-                                                      app_id: FfiString,
+                                                      app_id: *const c_char,
                                                       user_data: *mut c_void,
                                                       o_cb: extern "C" fn(*mut c_void, i32)) {
 
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
-        let app_id = app_id.to_string()?;
+        let app_id = from_c_str(app_id)?;
         let app_id2 = app_id.clone();
         let app_id_hash = sha256::hash(app_id.clone().as_bytes());
 
@@ -79,14 +83,10 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
                     app_state(c2, &auth_cfg, app_id)
                         .map(move |app_state| (app_state, auth_cfg, cfg_version))
                 })
-                .and_then(move |(app_state, auth_cfg, cfg_version)| {
-                    match app_state {
-                        AppState::Revoked => Ok((auth_cfg, cfg_version)),
-                        AppState::Authenticated => Err(AuthError::from("App is not revoked")),
-                        AppState::NotAuthenticated => {
-                            Err(AuthError::IpcError(IpcError::UnknownApp))
-                        }
-                    }
+                .and_then(move |(app_state, auth_cfg, cfg_version)| match app_state {
+                    AppState::Revoked => Ok((auth_cfg, cfg_version)),
+                    AppState::Authenticated => Err(AuthError::from("App is not revoked")),
+                    AppState::NotAuthenticated => Err(AuthError::IpcError(IpcError::UnknownApp)),
                 })
                 .and_then(move |(mut auth_cfg, cfg_version)| {
                     let _app = fry!(auth_cfg.remove(&app_id_hash)
@@ -111,7 +111,8 @@ pub unsafe extern "C" fn authenticator_revoked_apps(auth: *const Authenticator,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
                                                                         i32,
-                                                                        AppExchangeInfoArray)) {
+                                                                        *const ffi::AppExchangeInfo,
+                                                                        usize)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
@@ -144,19 +145,15 @@ pub unsafe extern "C" fn authenticator_revoked_apps(auth: *const Authenticator,
                                 .unwrap_or(true);
 
                             if revoked {
-                                apps.push(app.info.clone().into_repr_c());
+                                apps.push(app.info.clone().into_repr_c()?);
                             }
                         }
 
-                        o_cb(user_data.0, 0, AppExchangeInfoArray::from_vec(apps));
+                        o_cb(user_data.0, 0, apps.as_ptr(), apps.len());
 
                         Ok(())
                     })
-                    .map_err(move |e| {
-                        o_cb(user_data.0,
-                             ffi_error_code!(e),
-                             AppExchangeInfoArray::default())
-                    })
+                    .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0))
                     .into_box()
                     .into()
             })?;
@@ -171,8 +168,7 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
                                                        user_data: *mut c_void,
                                                        o_cb: extern "C" fn(*mut c_void,
                                                                            i32,
-                                                                           *mut RegisteredApp,
-                                                                           usize,
+                                                                           *const RegisteredApp,
                                                                            usize)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -214,47 +210,37 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
 
                                 for (key, (_, perms)) in app_access {
                                     let perms = perms.iter().cloned().collect::<Vec<_>>();
+                                    let (access_ptr, len, cap) = vec_into_raw_parts(perms);
 
                                     containers.push(ContainerPermissions {
-                                        cont_name: FfiString::from_string(key),
-                                        access: PermissionArray::from_vec(perms),
+                                        cont_name: CString::new(key)?.into_raw(),
+                                        access: access_ptr,
+                                        access_len: len,
+                                        access_cap: cap,
                                     });
                                 }
 
+                                let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
                                 let reg_app = RegisteredApp {
-                                    app_info: app.info.clone().into_repr_c(),
-                                    containers: ContainerPermissionsArray::from_vec(containers),
+                                    app_info: app.info.clone().into_repr_c()?,
+                                    containers: containers_ptr,
+                                    containers_len: len,
+                                    containers_cap: cap,
                                 };
 
                                 apps.push(reg_app);
                             }
                         }
 
-                        let (ptr, len, cap) = vec_into_raw_parts(apps);
-                        o_cb(user_data.0, 0, ptr, len, cap);
+                        o_cb(user_data.0, 0, apps.as_ptr(), apps.len());
+
                         Ok(())
                     })
-                    .map_err(move |e| {
-                        o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0)
-                    })
+                    .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0))
                     .into_box()
                     .into()
             })?;
 
         Ok(())
     })
-}
-
-/// Free memory allocated for a `RegisteredApp` structure
-#[no_mangle]
-pub unsafe extern "C" fn authenticator_registered_app_free(app: *mut RegisteredApp) {
-    let _ = Box::from_raw(app);
-}
-
-/// Free memory allocated to a vector of registered applications
-#[no_mangle]
-pub unsafe extern "C" fn authenticator_registered_apps_free(apps: *mut RegisteredApp,
-                                                            len: usize,
-                                                            cap: usize) {
-    let _ = Vec::from_raw_parts(apps, len, cap);
 }

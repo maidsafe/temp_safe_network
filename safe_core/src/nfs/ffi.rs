@@ -1,4 +1,4 @@
-// Copyright 2016 MaidSafe.net limited.
+// Copyright 2017 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net
 // Commercial License, version 1.0 or later, or (2) The General Public License
@@ -19,34 +19,35 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-/// FFI representation of NFS structures
-pub mod ffi;
-/// `FileHelper` provides functions for CRUD on file
-pub mod file_helper;
+use routing::XOR_NAME_LEN;
+use time::Tm;
 
-mod errors;
-mod data_map;
-mod dir;
-mod file;
-mod std_dirs;
-mod reader;
-mod writer;
+/// FFI-wrapper for `File`.
+#[repr(C)]
+pub struct File {
+    /// File size in bytes.
+    pub size: u64,
+    /// Creation time.
+    pub created: Tm,
+    /// Modification time.
+    pub modified: Tm,
+    /// Pointer to the user metadata.
+    pub user_metadata_ptr: *mut u8,
+    /// Size of the user metadata.
+    pub user_metadata_len: usize,
+    /// Capacity of the user metadata (internal field).
+    pub user_metadata_cap: usize,
+    /// Name of the `ImmutableData` containing the content of this file.
+    pub data_map_name: [u8; XOR_NAME_LEN],
+}
 
-pub use self::dir::create_dir;
-pub use self::errors::NfsError;
-pub use self::file::File;
-pub use self::reader::Reader;
-pub use self::std_dirs::create_std_dirs;
-pub use self::writer::{Mode, Writer};
-use futures::Future;
-
-/// Helper type for futures that can result in `NfsError`
-pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;
-
-lazy_static!{
-/// Default Directories to be created at registration
-    pub static ref DEFAULT_PRIVATE_DIRS: Vec<&'static str> = vec!["_documents",
-            "_downloads", "_music", "_videos", "_publicNames"];
-    ///publicly accessible default directories to be created upon registration
-    pub static ref DEFAULT_PUBLIC_DIRS: Vec<&'static str> = vec!["_public"];
+impl Drop for File {
+    #[allow(unsafe_code)]
+    fn drop(&mut self) {
+        let _ = unsafe {
+            Vec::from_raw_parts(self.user_metadata_ptr,
+                                self.user_metadata_len,
+                                self.user_metadata_cap)
+        };
+    }
 }

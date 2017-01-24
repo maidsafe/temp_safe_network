@@ -23,7 +23,6 @@
 
 use std::os::raw::c_void;
 use std::ptr;
-use super::string::FfiString;
 
 /// This trait allows us to treat callbacks with different number and type of
 /// arguments uniformly.
@@ -67,7 +66,8 @@ impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs, T3: CallbackArgs> Callback
-    for extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2, a3: T3) {
+    for
+    extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2, a3: T3) {
     type Args = (T0, T1, T2, T3);
     fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
         self(user_data, error, args.0, args.1, args.2, args.3)
@@ -132,12 +132,6 @@ impl<T> CallbackArgs for *mut T {
 impl CallbackArgs for [u8; 32] {
     fn default() -> Self {
         [0; 32]
-    }
-}
-
-impl CallbackArgs for FfiString {
-    fn default() -> Self {
-        Default::default()
     }
 }
 

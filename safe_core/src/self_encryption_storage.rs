@@ -19,12 +19,12 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use super::{Client, CoreError, FutureExt};
 use futures::{self, Future};
 use routing::{ImmutableData, XOR_NAME_LEN, XorName};
 use self_encryption::{Storage, StorageError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
-use super::{Client, CoreError, FutureExt};
 
 /// Network storage is the concrete type which self-encryption crate will use
 /// to put or get data from the network

@@ -124,14 +124,12 @@ pub fn update<S: AsRef<str>>(client: Client,
             Ok((key, content))
         })
         .into_future()
-        .and_then(move |(key, content)| {
-            if version != 0 {
-                Ok((key, content, version, parent)).into_future().into_box()
-            } else {
-                client.get_mdata_value(parent.name, parent.type_tag, key.clone())
-                    .map(move |value| (key, content, value.entry_version + 1, parent))
-                    .into_box()
-            }
+        .and_then(move |(key, content)| if version != 0 {
+            Ok((key, content, version, parent)).into_future().into_box()
+        } else {
+            client.get_mdata_value(parent.name, parent.type_tag, key.clone())
+                .map(move |value| (key, content, value.entry_version + 1, parent))
+                .into_box()
         })
         .and_then(move |(key, content, version, parent)| {
             client2.mutate_mdata_entries(parent.name,

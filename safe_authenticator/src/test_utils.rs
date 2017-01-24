@@ -19,6 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use super::AccessContainerEntry;
 use Authenticator;
 use access_container::access_container_entry;
 use errors::AuthError;
@@ -31,7 +32,6 @@ use safe_core::ipc::{AppExchangeInfo, AuthGranted, Permission};
 use safe_core::ipc::req::ffi::convert_permission_set;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
-use super::AccessContainerEntry;
 
 pub fn create_authenticator() -> Authenticator {
     let locator = unwrap!(utils::generate_random_string(10));

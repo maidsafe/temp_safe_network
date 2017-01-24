@@ -148,9 +148,9 @@ fn unpack(client: Client, data: ImmutableData) -> Box<CoreFuture<Vec<u8>>> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use futures::Future;
     use rust_sodium::crypto::secretbox;
-    use super::*;
     use utils;
     use utils::test_utils::{finish, random_client};
 

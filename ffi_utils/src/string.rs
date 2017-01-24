@@ -21,110 +21,56 @@
 
 //! Utilities for passing strings across FFI boundaries.
 
-use std::mem;
-use std::ptr;
-use std::slice;
-use std::str::{self, Utf8Error};
+use ffi_repr::ReprC;
+use std::error::Error;
+use std::ffi::{CStr, IntoStringError, NulError};
+use std::os::raw::c_char;
+use std::str::Utf8Error;
 
-/// Wrapper for strings to be passed across FFI boundary.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct FfiString {
-    /// Pointer to first byte
-    pub ptr: *mut u8,
-    /// Length in bytes
-    pub len: usize,
-    /// Capacity in bytes
-    pub cap: usize,
-}
+impl ReprC for String {
+    type C = *const c_char;
+    type Error = StringError;
 
-impl FfiString {
-    /// Check if we have a null string
-    pub fn is_null(&self) -> bool {
-        self.ptr.is_null() || self.len == 0
-    }
-
-    /// Construct owning `FfiString` from `String`. It has to be deallocated
-    /// manually by calling `ffi_string_free`.
-    pub fn from_string<T: Into<String>>(s: T) -> Self {
-        let s = s.into();
-        let ptr = s.as_ptr();
-        let len = s.len();
-        let cap = s.capacity();
-        mem::forget(s);
-
-        FfiString {
-            ptr: ptr as *mut _,
-            len: len,
-            cap: cap,
-        }
-    }
-
-    /// Construct non-owning `FfiSting` from `&str`.
-    pub fn from_str(s: &str) -> Self {
-        FfiString {
-            ptr: s.as_ptr() as *mut _,
-            len: s.len(),
-            cap: s.len(),
-        }
-    }
-
-    /// Convert this `FfiString` to rust `String` by cloning the data.
-    pub unsafe fn to_string(&self) -> Result<String, Utf8Error> {
-        let s = slice::from_raw_parts(self.ptr, self.len);
-        String::from_utf8(s.to_vec()).map_err(|e| e.utf8_error())
-    }
-
-    /// Borrow this `FfiString` as `&str`.
-    pub unsafe fn as_str(&self) -> Result<&str, Utf8Error> {
-        let s = slice::from_raw_parts(self.ptr, self.len);
-        str::from_utf8(s)
-    }
-
-    /// Deallocate the string.
-    /// Warning: use this only if the data is owned.
-    pub unsafe fn deallocate(self) {
-        let _ = String::from_raw_parts(self.ptr, self.len, self.cap);
+    fn from_repr_c_cloned(c_repr: Self::C) -> Result<String, StringError> {
+        Ok(if c_repr.is_null() {
+            "".to_owned()
+        } else {
+            unsafe { from_c_str(c_repr)? }
+        })
     }
 }
 
-impl Default for FfiString {
-    fn default() -> Self {
-        FfiString {
-            ptr: ptr::null_mut(),
-            len: 0,
-            cap: 0,
-        }
+/// Error type for strings
+#[derive(RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
+pub enum StringError {
+    /// UTF8 error
+    Utf8(String),
+    /// Null error
+    Null(String),
+    /// IntoString error
+    IntoString(String),
+}
+
+impl From<Utf8Error> for StringError {
+    fn from(e: Utf8Error) -> Self {
+        StringError::Utf8(e.description().to_owned())
     }
 }
 
-/// Free the string from memory.
-#[no_mangle]
-pub unsafe extern "C" fn ffi_string_free(s: FfiString) {
-    s.deallocate()
+impl From<NulError> for StringError {
+    fn from(e: NulError) -> Self {
+        StringError::Null(e.description().to_owned())
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    extern crate rand;
-
-    use self::rand::Rng;
-    use super::*;
-
-    #[test]
-    fn conversion() {
-        let in_string = random_string(100);
-        let ffi_string = FfiString::from_str(&in_string);
-
-        let out_string = unsafe { unwrap!(ffi_string.to_string()) };
-        let out_str = unsafe { unwrap!(ffi_string.as_str()) };
-
-        assert_eq!(in_string, out_string);
-        assert_eq!(in_string.as_str(), out_str);
+impl From<IntoStringError> for StringError {
+    fn from(e: IntoStringError) -> Self {
+        StringError::IntoString(e.description().to_owned())
     }
+}
 
-    fn random_string(len: usize) -> String {
-        let mut rng = rand::thread_rng();
-        (0..len).map(|_| rng.gen::<char>()).collect()
-    }
+/// Copies memory from a provided pointer and allocates a new `String`.
+#[inline]
+pub unsafe fn from_c_str(ptr: *const c_char) -> Result<String, Utf8Error> {
+    Ok(CStr::from_ptr(ptr).to_str()?.to_owned())
 }

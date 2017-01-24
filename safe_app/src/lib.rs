@@ -62,7 +62,6 @@ extern crate rust_sodium;
 #[macro_use]
 extern crate safe_core;
 extern crate self_encryption;
-extern crate time;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
@@ -74,6 +73,8 @@ mod errors;
 #[cfg(test)]
 mod test_utils;
 
+pub use self::errors::*;
+use self::object_cache::ObjectCache;
 use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
@@ -84,8 +85,6 @@ use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, Ne
                 NetworkTx, event_loop, utils};
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Permission};
 use safe_core::ipc::resp::access_container_enc_key;
-pub use self::errors::*;
-use self::object_cache::ObjectCache;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
@@ -188,14 +187,14 @@ impl App {
                  + Send + 'static
     {
         let msg = CoreMsg::new(f);
-        let mut core_tx = unwrap!(self.core_tx.lock());
+        let core_tx = unwrap!(self.core_tx.lock());
         core_tx.send(msg).map_err(AppError::from)
     }
 }
 
 impl Drop for App {
     fn drop(&mut self) {
-        let mut core_tx = match self.core_tx.lock() {
+        let core_tx = match self.core_tx.lock() {
             Ok(core_tx) => core_tx,
             Err(err) => {
                 info!("Unexpected error in drop: {:?}", err);

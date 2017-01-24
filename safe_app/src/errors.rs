@@ -20,6 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 
+pub use self::codes::*;
 use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -27,9 +28,9 @@ use routing::ClientError;
 use safe_core::{CoreError, SelfEncryptionStorageError};
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
-pub use self::codes::*;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
+use std::ffi::NulError;
 use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::sync::mpsc::{RecvError, RecvTimeoutError};
@@ -79,6 +80,7 @@ mod codes {
     pub const ERR_INVALID_MSG: i32 = -202;
     pub const ERR_ALREADY_AUTHORISED: i32 = -203;
     pub const ERR_UNKNOWN_APP: i32 = -204;
+    pub const ERR_STRING_ERROR: i32 = -205;
 
     // NFS errors.
     pub const ERR_DIRECTORY_EXISTS: i32 = -300;
@@ -226,6 +228,12 @@ impl<T: 'static> From<SendError<T>> for AppError {
     }
 }
 
+impl From<NulError> for AppError {
+    fn from(err: NulError) -> Self {
+        AppError::from(err.description())
+    }
+}
+
 impl From<RecvError> for AppError {
     fn from(err: RecvError) -> Self {
         AppError::from(err.description())
@@ -253,6 +261,7 @@ impl ErrorCode for AppError {
                     IpcError::AlreadyAuthorised => ERR_ALREADY_AUTHORISED,
                     IpcError::UnknownApp => ERR_UNKNOWN_APP,
                     IpcError::Unexpected(_) => ERR_UNEXPECTED,
+                    IpcError::StringError(_) => ERR_STRING_ERROR,
                 }
             }
             AppError::NfsError(ref err) => {

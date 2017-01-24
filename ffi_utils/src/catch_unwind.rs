@@ -19,11 +19,11 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use super::ErrorCode;
+use super::callback::{Callback, CallbackArgs};
 use std::fmt::Debug;
 use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};
-use super::ErrorCode;
-use super::callback::{Callback, CallbackArgs};
 
 fn catch_unwind_result<'a, F, T, E>(f: F) -> Result<T, E>
     where F: FnOnce() -> Result<T, E>,
