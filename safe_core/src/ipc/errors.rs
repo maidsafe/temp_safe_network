@@ -19,11 +19,11 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use ffi_utils::StringError;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use rustc_serialize::base64::FromBase64Error;
 use std::error::Error;
-use std::ffi::NulError;
 use std::str::Utf8Error;
 
 /// Ipc error
@@ -37,6 +37,8 @@ pub enum IpcError {
     InvalidMsg,
     /// Generic encoding / decoding failure.
     EncodeDecodeError,
+    /// String conversion error
+    StringError(StringError),
     /// App is already authorised
     AlreadyAuthorised,
     /// App is not registered
@@ -70,9 +72,9 @@ impl From<SerialisationError> for IpcError {
     }
 }
 
-impl From<NulError> for IpcError {
-    fn from(err: NulError) -> Self {
-        IpcError::Unexpected(err.description().to_owned())
+impl From<StringError> for IpcError {
+    fn from(err: StringError) -> Self {
+        IpcError::StringError(err)
     }
 }
 

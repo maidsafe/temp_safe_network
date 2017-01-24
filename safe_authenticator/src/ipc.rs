@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use ffi_utils::{OpaqueCtx, base64_encode, catch_unwind_cb, from_c_str};
+use ffi_utils::{OpaqueCtx, ReprC, StringError, base64_encode, catch_unwind_cb, from_c_str};
 use futures::{Future, future};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Action, ClientError, EntryActions, PermissionSet, User, Value};
@@ -301,7 +301,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
-        let auth_req = AuthReq::from_repr_c(req)?;
+        let auth_req = AuthReq::from_repr_c_cloned(req)?;
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
@@ -405,7 +405,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
-        let cont_req = ContainersReq::from_repr_c(req)?;
+        let cont_req = ContainersReq::from_repr_c_cloned(req)?;
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
@@ -908,7 +908,7 @@ fn check_app_container(client: Client,
 fn encode_response(msg: &IpcMsg, app_id: String) -> Result<CString, IpcError> {
     let app_id = base64_encode(app_id.as_bytes());
     let resp = ipc::encode_msg(msg, &format!("safe-{}", app_id))?;
-    Ok(CString::new(resp)?)
+    Ok(CString::new(resp).map_err(StringError::from)?)
 }
 
 /// Represents current app state

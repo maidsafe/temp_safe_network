@@ -354,7 +354,8 @@ mod tests {
             context.object_cache().insert_mdata_entries(entries)
         });
 
-        let len = unsafe { unwrap!(call_1(|ud, cb| mdata_entries_len(&app, handle, ud, cb))) };
+        let len: usize =
+            unsafe { unwrap!(call_1(|ud, cb| mdata_entries_len(&app, handle, ud, cb))) };
         assert_eq!(len, 2);
 
         // key 0

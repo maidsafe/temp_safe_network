@@ -61,13 +61,15 @@ mod vec;
 
 pub mod callback;
 pub mod test_utils;
+pub mod ffi_repr;
+pub mod string;
 
 pub use self::base64::{base64_decode, base64_encode};
 pub use self::catch_unwind::{catch_unwind_cb, catch_unwind_error_code};
+pub use self::ffi_repr::ReprC;
+pub use self::string::{StringError, from_c_str};
 pub use self::vec::{vec_clone_from_raw_parts, vec_into_raw_parts};
-use std::ffi::CStr;
-use std::os::raw::{c_char, c_void};
-use std::str::Utf8Error;
+use std::os::raw::c_void;
 
 /// Type that holds opaque user data handed into FFI functions
 #[derive(Clone, Copy)]
@@ -84,10 +86,4 @@ impl Into<*mut c_void> for OpaqueCtx {
 pub trait ErrorCode {
     /// Return the error code corresponding to this instance.
     fn error_code(&self) -> i32;
-}
-
-/// Copies memory from a provided pointer and allocates a new `String`.
-#[inline]
-pub unsafe fn from_c_str(ptr: *const c_char) -> Result<String, Utf8Error> {
-    Ok(CStr::from_ptr(ptr).to_str()?.to_owned())
 }

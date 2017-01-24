@@ -85,7 +85,7 @@ pub unsafe extern "C" fn authenticator_public_id(auth: *const Authenticator,
 mod tests {
     use errors::{ERR_NO_SUCH_PUBLIC_ID, ERR_PUBLIC_ID_EXISTS};
 
-    use ffi_utils::test_utils::{call_0, call_1, call_str};
+    use ffi_utils::test_utils::{call_0, call_1};
     use safe_core::utils;
     use std::ffi::CString;
     use super::*;
@@ -123,7 +123,8 @@ mod tests {
         let authenticator = create_authenticator();
 
         // There is no Public ID yet, so attempt to retrieve it fails.
-        let res = unsafe { call_1(|ud, cb| authenticator_public_id(&authenticator, ud, cb)) };
+        let res: Result<String, _> =
+            unsafe { call_1(|ud, cb| authenticator_public_id(&authenticator, ud, cb)) };
 
         match res {
             Err(code) if code == ERR_NO_SUCH_PUBLIC_ID => (),
@@ -142,10 +143,8 @@ mod tests {
         }
 
         // Now retrieving it succeeds.
-        let retrieved_public_id = unsafe {
-            let ffi = unwrap!(call_str(|ud, cb| authenticator_public_id(&authenticator, ud, cb)));
-            unwrap!(ffi.into_string())
-        };
+        let retrieved_public_id: String =
+            unsafe { unwrap!(call_1(|ud, cb| authenticator_public_id(&authenticator, ud, cb))) };
 
         assert_eq!(retrieved_public_id, public_id);
     }

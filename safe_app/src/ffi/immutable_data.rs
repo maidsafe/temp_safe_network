@@ -361,11 +361,11 @@ mod tests {
             }
 
             // Invalid Self encryptor reader.
-            let res = call_1(|ud, cb| idata_size(&app, 0, ud, cb));
+            let res: Result<u64, _> = call_1(|ud, cb| idata_size(&app, 0, ud, cb));
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             // Invalid Self encryptor reader.
-            let res = call_1(|ud, cb| idata_size(&app, se_writer_h, ud, cb));
+            let res: Result<u64, _> = call_1(|ud, cb| idata_size(&app, se_writer_h, ud, cb));
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             let se_reader_h = {

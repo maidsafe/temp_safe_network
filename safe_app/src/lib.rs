@@ -62,7 +62,6 @@ extern crate rust_sodium;
 #[macro_use]
 extern crate safe_core;
 extern crate self_encryption;
-extern crate time;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;

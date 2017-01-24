@@ -19,34 +19,43 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-/// FFI representation of NFS structures
-pub mod ffi;
-/// `FileHelper` provides functions for CRUD on file
-pub mod file_helper;
+//! FFI tools
 
-mod errors;
-mod data_map;
-mod dir;
-mod file;
-mod std_dirs;
-mod reader;
-mod writer;
+/// Trait to convert between FFI and Rust representations of types
+pub trait ReprC {
+    /// C representation of the type
+    type C;
+    /// Error type
+    type Error;
 
-use futures::Future;
-pub use self::dir::create_dir;
-pub use self::errors::NfsError;
-pub use self::file::File;
-pub use self::reader::Reader;
-pub use self::std_dirs::create_std_dirs;
-pub use self::writer::{Mode, Writer};
+    /// Converts from a raw type into an owned type by cloning data
+    fn from_repr_c_cloned(c_repr: Self::C) -> Result<Self, Self::Error> where Self: Sized;
+}
 
-/// Helper type for futures that can result in `NfsError`
-pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;
+impl ReprC for u64 {
+    type C = u64;
+    type Error = ();
 
-lazy_static!{
-/// Default Directories to be created at registration
-    pub static ref DEFAULT_PRIVATE_DIRS: Vec<&'static str> = vec!["_documents",
-            "_downloads", "_music", "_videos", "_publicNames"];
-    ///publicly accessible default directories to be created upon registration
-    pub static ref DEFAULT_PUBLIC_DIRS: Vec<&'static str> = vec!["_public"];
+    fn from_repr_c_cloned(c_repr: u64) -> Result<u64, ()> {
+        Ok(c_repr)
+    }
+}
+
+impl ReprC for usize {
+    type C = usize;
+    type Error = ();
+
+    fn from_repr_c_cloned(c_repr: usize) -> Result<usize, ()> {
+        Ok(c_repr)
+    }
+}
+
+/// `XorName`
+impl ReprC for [u8; 32] {
+    type C = [u8; 32];
+    type Error = ();
+
+    fn from_repr_c_cloned(c_repr: [u8; 32]) -> Result<[u8; 32], ()> {
+        Ok(c_repr)
+    }
 }

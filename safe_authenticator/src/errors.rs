@@ -80,6 +80,7 @@ mod codes {
     pub const ERR_INVALID_MSG: i32 = -202;
     pub const ERR_ALREADY_AUTHORISED: i32 = -203;
     pub const ERR_UNKNOWN_APP: i32 = -204;
+    pub const ERR_STRING_ERROR: i32 = -205;
 
     // NFS errors.
     pub const ERR_DIRECTORY_EXISTS: i32 = -300;
@@ -215,6 +216,7 @@ impl ErrorCode for AuthError {
                     IpcError::AlreadyAuthorised => ERR_ALREADY_AUTHORISED,
                     IpcError::UnknownApp => ERR_UNKNOWN_APP,
                     IpcError::Unexpected(_) => ERR_UNEXPECTED,
+                    IpcError::StringError(_) => ERR_STRING_ERROR,
                 }
             }
             AuthError::NfsError(ref err) => {

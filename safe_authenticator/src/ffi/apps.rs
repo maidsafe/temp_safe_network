@@ -30,7 +30,7 @@ use maidsafe_utilities::serialisation::deserialise;
 use rust_sodium::crypto::hash::sha256;
 use safe_core::FutureExt;
 use safe_core::ipc::{IpcError, access_container_enc_key};
-use safe_core::ipc::req::ffi::{AppExchangeInfo, ContainerPermissions};
+use safe_core::ipc::req::ffi::{self, ContainerPermissions};
 use safe_core::utils::symmetric_decrypt;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
@@ -40,7 +40,7 @@ use std::ptr;
 #[repr(C)]
 pub struct RegisteredApp {
     /// Unique application identifier
-    pub app_info: AppExchangeInfo,
+    pub app_info: ffi::AppExchangeInfo,
     /// List of containers that this application has access to
     pub containers: *const ContainerPermissions,
     /// Length of the containers array
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn authenticator_revoked_apps(auth: *const Authenticator,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
                                                                         i32,
-                                                                        *const AppExchangeInfo,
+                                                                        *const ffi::AppExchangeInfo,
                                                                         usize)) {
     let user_data = OpaqueCtx(user_data);
 

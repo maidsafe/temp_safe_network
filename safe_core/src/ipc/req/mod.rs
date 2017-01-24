@@ -22,7 +22,7 @@
 /// Ffi module
 pub mod ffi;
 
-use ffi_utils::{from_c_str, vec_into_raw_parts};
+use ffi_utils::{ReprC, StringError, from_c_str, vec_into_raw_parts};
 use ipc::errors::IpcError;
 use self::ffi::Permission;
 use std::{ptr, slice};
@@ -89,7 +89,7 @@ pub unsafe fn containers_from_repr_c(raw: *const ffi::ContainerPermissions,
                                      len: usize)
                                      -> Result<HashMap<String, BTreeSet<Permission>>, IpcError> {
     let mut result = HashMap::new();
-    let vec = slice::from_raw_parts(raw, len).to_owned();
+    let vec = slice::from_raw_parts(raw, len);
 
     for raw in vec {
         let cont_name = from_c_str(raw.cont_name)?;
@@ -105,10 +105,10 @@ impl AuthReq {
     ///
     /// You're now responsible for freeing the subobjects memory once you're
     /// done.
-    pub fn into_repr_c(self) -> Result<ffi::AuthReq, NulError> {
+    pub fn into_repr_c(self) -> Result<ffi::AuthReq, IpcError> {
         let AuthReq { app, app_container, containers } = self;
 
-        let containers = containers_into_vec(containers)?;
+        let containers = containers_into_vec(containers).map_err(StringError::from)?;
         let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
 
         Ok(ffi::AuthReq {
@@ -119,20 +119,26 @@ impl AuthReq {
             containers_cap: cap,
         })
     }
+}
+
+impl ReprC for AuthReq {
+    type C = *const ffi::AuthReq;
+    type Error = IpcError;
 
     /// Constructs the object from the FFI counterpart.
     ///
     /// After calling this function, the subobjects memory is owned by the
     /// resulting object.
     #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(repr_c: *const ffi::AuthReq) -> Result<Self, IpcError> {
-        let ffi::AuthReq { ref app, app_container, containers, containers_len, .. } = *repr_c;
-
-        Ok(AuthReq {
-            app: AppExchangeInfo::from_repr_c(app)?,
-            app_container: app_container,
-            containers: containers_from_repr_c(containers, containers_len)?,
-        })
+    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    fn from_repr_c_cloned(repr_c: *const ffi::AuthReq) -> Result<Self, IpcError> {
+        unsafe {
+            Ok(AuthReq {
+                app: AppExchangeInfo::from_repr_c_cloned(&(*repr_c).app)?,
+                app_container: (*repr_c).app_container,
+                containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
+            })
+        }
     }
 }
 
@@ -150,10 +156,10 @@ impl ContainersReq {
     ///
     /// You're now responsible for freeing the subobjects memory once you're
     /// done.
-    pub fn into_repr_c(self) -> Result<ffi::ContainersReq, NulError> {
+    pub fn into_repr_c(self) -> Result<ffi::ContainersReq, IpcError> {
         let ContainersReq { app, containers } = self;
 
-        let containers = containers_into_vec(containers)?;
+        let containers = containers_into_vec(containers).map_err(StringError::from)?;
         let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
 
         Ok(ffi::ContainersReq {
@@ -163,18 +169,25 @@ impl ContainersReq {
             containers_cap: cap,
         })
     }
+}
+
+impl ReprC for ContainersReq {
+    type C = *const ffi::ContainersReq;
+    type Error = IpcError;
 
     /// Constructs the object from the FFI counterpart.
     ///
     /// After calling this functions, the subobjects memory is owned by the
     /// resulting object.
     #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(repr_c: *const ffi::ContainersReq) -> Result<Self, IpcError> {
-        let ffi::ContainersReq { ref app, containers, containers_len, .. } = *repr_c;
-        Ok(ContainersReq {
-            app: AppExchangeInfo::from_repr_c(app)?,
-            containers: containers_from_repr_c(containers, containers_len)?,
-        })
+    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    fn from_repr_c_cloned(repr_c: *const ffi::ContainersReq) -> Result<Self, IpcError> {
+        unsafe {
+            Ok(ContainersReq {
+                app: AppExchangeInfo::from_repr_c_cloned(&(*repr_c).app)?,
+                containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
+            })
+        }
     }
 }
 
@@ -195,43 +208,52 @@ impl AppExchangeInfo {
     /// Consumes the object and returns the wrapped raw pointer
     ///
     /// You're now responsible for freeing this memory once you're done.
-    pub fn into_repr_c(self) -> Result<ffi::AppExchangeInfo, NulError> {
+    pub fn into_repr_c(self) -> Result<ffi::AppExchangeInfo, IpcError> {
         let AppExchangeInfo { id, scope, name, vendor } = self;
 
         Ok(ffi::AppExchangeInfo {
-            id: CString::new(id)?.into_raw(),
+            id: CString::new(id).map_err(StringError::from)?.into_raw(),
             scope: if let Some(scope) = scope {
-                CString::new(scope)?.into_raw()
+                CString::new(scope).map_err(StringError::from)?.into_raw()
             } else {
                 ptr::null()
             },
-            name: CString::new(name)?.into_raw(),
-            vendor: CString::new(vendor)?.into_raw(),
+            name: CString::new(name).map_err(StringError::from)?.into_raw(),
+            vendor: CString::new(vendor).map_err(StringError::from)?.into_raw(),
         })
     }
+}
+
+impl ReprC for AppExchangeInfo {
+    type C = *const ffi::AppExchangeInfo;
+    type Error = IpcError;
 
     /// Constructs the object from a raw pointer.
     ///
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
     #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(raw: *const ffi::AppExchangeInfo) -> Result<Self, IpcError> {
-        Ok(AppExchangeInfo {
-            id: from_c_str((*raw).id)?,
-            scope: if (*raw).scope.is_null() {
-                None
-            } else {
-                Some(from_c_str((*raw).scope)?)
-            },
-            name: from_c_str((*raw).name)?,
-            vendor: from_c_str((*raw).vendor)?,
-        })
+    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    fn from_repr_c_cloned(raw: *const ffi::AppExchangeInfo) -> Result<Self, IpcError> {
+        unsafe {
+            Ok(AppExchangeInfo {
+                id: from_c_str((*raw).id).map_err(StringError::from)?,
+                scope: if (*raw).scope.is_null() {
+                    None
+                } else {
+                    Some(from_c_str((*raw).scope).map_err(StringError::from)?)
+                },
+                name: from_c_str((*raw).name).map_err(StringError::from)?,
+                vendor: from_c_str((*raw).vendor).map_err(StringError::from)?,
+            })
+        }
     }
 }
 
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
+    use ffi_utils::ReprC;
     use std::collections::HashMap;
     use std::ffi::CStr;
     use super::*;
@@ -268,7 +290,7 @@ mod tests {
             assert_eq!(unwrap!(CStr::from_ptr(ffi_a.vendor).to_str()), "hey girl");
         }
 
-        let mut a = unsafe { unwrap!(AppExchangeInfo::from_repr_c(&ffi_a)) };
+        let mut a = unwrap!(AppExchangeInfo::from_repr_c_cloned(&ffi_a));
 
         assert_eq!(a.id, "myid");
         assert_eq!(a.scope, Some("hi".to_string()));
@@ -307,7 +329,7 @@ mod tests {
         assert_eq!(ffi.app_container, false);
         assert_eq!(ffi.containers_len, 0);
 
-        let a = unsafe { unwrap!(AuthReq::from_repr_c(&ffi)) };
+        let a = unwrap!(AuthReq::from_repr_c_cloned(&ffi));
 
         assert_eq!(a.app.id, "1");
         assert_eq!(a.app.scope, Some("2".to_string()));
@@ -335,7 +357,7 @@ mod tests {
 
         assert_eq!(ffi.containers_len, 0);
 
-        let a = unsafe { unwrap!(ContainersReq::from_repr_c(&ffi)) };
+        let a = unwrap!(ContainersReq::from_repr_c_cloned(&ffi));
 
         assert_eq!(a.app.id, "1");
         assert_eq!(a.app.scope, Some("2".to_string()));

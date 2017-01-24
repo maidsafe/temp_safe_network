@@ -22,106 +22,15 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{catch_unwind_cb, from_c_str, vec_into_raw_parts};
-use ffi_utils::callback::CallbackArgs;
+use ffi_utils::{OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use futures::Future;
 use object_cache::MDataInfoHandle;
-use routing::{XOR_NAME_LEN, XorName};
+use safe_core::FutureExt;
 use safe_core::nfs::File as NativeFile;
+use safe_core::nfs::ffi::File;
 use safe_core::nfs::file_helper;
 use std::os::raw::{c_char, c_void};
 use std::ptr;
-use std::slice;
-use time;
-use time::Tm;
-
-/// FFI-wrapper for `File`.
-#[repr(C)]
-pub struct File {
-    /// File size in bytes.
-    pub size: u64,
-    /// Creation time.
-    pub created: Tm,
-    /// Modification time.
-    pub modified: Tm,
-    /// Pointer to the user metadata.
-    pub user_metadata_ptr: *mut u8,
-    /// Size of the user metadata.
-    pub user_metadata_len: usize,
-    /// Capacity of the user metadata (internal field).
-    pub user_metadata_cap: usize,
-    /// Name of the `ImmutableData` containing the content of this file.
-    pub data_map_name: [u8; XOR_NAME_LEN],
-}
-
-impl File {
-    /// Construct FFI wrapper for the native rust `File`, consuming the file.
-    pub fn from_native(file: NativeFile) -> Self {
-        // TODO: move the metadata, not clone.
-        let user_metadata = file.user_metadata().to_vec();
-        let (user_metadata_ptr, user_metadata_len, user_metadata_cap) =
-            vec_into_raw_parts(user_metadata);
-
-        File {
-            size: file.size(),
-            created: *file.created_time(),
-            modified: *file.modified_time(),
-            user_metadata_ptr: user_metadata_ptr,
-            user_metadata_len: user_metadata_len,
-            user_metadata_cap: user_metadata_cap,
-            data_map_name: file.data_map_name().0,
-        }
-    }
-
-    /// Convert to the native rust equivalent, consuming self.
-    pub unsafe fn into_native(self) -> NativeFile {
-        let user_metadata = Vec::from_raw_parts(self.user_metadata_ptr,
-                                                self.user_metadata_len,
-                                                self.user_metadata_cap);
-
-        let mut file = NativeFile::new(user_metadata);
-        file.set_size(self.size);
-        file.set_created_time(self.created);
-        file.set_modified_time(self.modified);
-        file.set_data_map_name(XorName(self.data_map_name));
-        file
-    }
-
-    /// Convert to the native rust equivalent by cloning the internal data, preserving self.
-    pub unsafe fn to_native(&self) -> NativeFile {
-        let user_metadata = slice::from_raw_parts(self.user_metadata_ptr, self.user_metadata_len)
-            .to_vec();
-
-        let mut file = NativeFile::new(user_metadata);
-        file.set_size(self.size);
-        file.set_created_time(self.created);
-        file.set_modified_time(self.modified);
-        file.set_data_map_name(XorName(self.data_map_name));
-        file
-    }
-}
-
-impl CallbackArgs for File {
-    fn default() -> Self {
-        let tm = time::now_utc();
-
-        File {
-            size: 0,
-            created: tm,
-            modified: tm,
-            user_metadata_ptr: ptr::null_mut(),
-            user_metadata_len: 0,
-            user_metadata_cap: 0,
-            data_map_name: Default::default(),
-        }
-    }
-}
-
-/// Free the file from memory.
-#[no_mangle]
-pub unsafe extern "C" fn file_free(file: File) {
-    let _ = file.into_native();
-}
 
 /// Retrieve file with the given name, and its version, from the directory.
 #[no_mangle]
@@ -129,14 +38,25 @@ pub unsafe extern "C" fn file_fetch(app: *const App,
                                     parent_h: MDataInfoHandle,
                                     file_name: *const c_char,
                                     user_data: *mut c_void,
-                                    o_cb: extern "C" fn(*mut c_void, i32, File, u64)) {
+                                    o_cb: extern "C" fn(*mut c_void, i32, *const File, u64)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file_name = from_c_str(file_name)?;
+        let user_data = OpaqueCtx(user_data);
 
-        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
+        (*app).send(move |client, context| {
+            let parent = try_cb!(context.object_cache().get_mdata_info(parent_h),
+                                 user_data.0,
+                                 o_cb);
+
             file_helper::fetch(client.clone(), parent.clone(), file_name)
-                .map(|(version, file)| (File::from_native(file), version))
+                .map(move |(version, file)| {
+                    let ffi_file = file.into_repr_c();
+                    o_cb(user_data.0, 0, &ffi_file, version)
+                })
                 .map_err(AppError::from)
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null(), 0))
+                .into_box()
+                .into()
         })
     })
 }
@@ -146,11 +66,11 @@ pub unsafe extern "C" fn file_fetch(app: *const App,
 pub unsafe extern "C" fn file_insert(app: *const App,
                                      parent_h: MDataInfoHandle,
                                      file_name: *const c_char,
-                                     file: File,
+                                     file: *const File,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let file = file.to_native();
+        let file = NativeFile::from_repr_c_cloned(file)?;
         let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
@@ -165,12 +85,12 @@ pub unsafe extern "C" fn file_insert(app: *const App,
 pub unsafe extern "C" fn file_update(app: *const App,
                                      parent_h: MDataInfoHandle,
                                      file_name: *const c_char,
-                                     file: File,
+                                     file: *const File,
                                      version: u64,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let file = file.to_native();
+        let file = NativeFile::from_repr_c_cloned(file)?;
         let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
@@ -220,7 +140,7 @@ mod tests {
         let ffi_file_name0 = unwrap!(CString::new(file_name0));
 
         // fetching non-existing file fails.
-        let res = unsafe {
+        let res: Result<(NativeFile, u64), i32> = unsafe {
             call_2(|ud, cb| file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb))
         };
 
@@ -233,27 +153,24 @@ mod tests {
         // Create empty file.
         let user_metadata = b"metadata".to_vec();
         let file = NativeFile::new(user_metadata.clone());
-        let ffi_file = File::from_native(file);
+        let ffi_file = file.into_repr_c();
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
                 file_insert(&app,
                             container_info_h,
                             ffi_file_name0.as_ptr(),
-                            ffi_file,
+                            &ffi_file,
                             ud,
                             cb)
             }))
         }
 
         // Fetch it back.
-        let (retrieved_file, retrieved_version) = {
-            unsafe {
-                let (file, version) = unwrap!(call_2(|ud, cb| {
-                    file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
-                }));
-                (file.into_native(), version)
-            }
+        let (retrieved_file, retrieved_version): (NativeFile, u64) = unsafe {
+            unwrap!(call_2(|ud, cb| {
+                file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
+            }))
         };
         assert_eq!(retrieved_file.user_metadata(), &user_metadata[..]);
         assert_eq!(retrieved_file.size(), 0);
@@ -269,7 +186,7 @@ mod tests {
 
         let mut file = NativeFile::new(Vec::new());
         file.set_data_map_name(content_name);
-        let ffi_file = File::from_native(file);
+        let ffi_file = file.into_repr_c();
 
         let file_name1 = "file1.txt";
         let ffi_file_name1 = unwrap!(CString::new(file_name1));
@@ -279,14 +196,14 @@ mod tests {
                 file_insert(&app,
                             container_info_h,
                             ffi_file_name1.as_ptr(),
-                            ffi_file,
+                            &ffi_file,
                             ud,
                             cb)
             }))
         }
 
         // Fetch it back.
-        let (ffi_file, _) = {
+        let (file, _version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
                     file_fetch(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
@@ -295,7 +212,7 @@ mod tests {
         };
 
         // Read the content.
-        let retrieved_content = unsafe { get_file_content(&app, ffi_file.data_map_name) };
+        let retrieved_content = unsafe { get_file_content(&app, file.data_map_name().0) };
         assert_eq!(retrieved_content, content);
     }
 
