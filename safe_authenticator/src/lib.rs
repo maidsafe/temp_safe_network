@@ -77,6 +77,7 @@ mod test_utils;
 #[cfg(test)]
 mod tests;
 
+pub use self::errors::AuthError;
 use futures::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc;
@@ -87,7 +88,6 @@ use safe_core::{Client, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent, 
                 mdata_info};
 use safe_core::ipc::Permission;
 use safe_core::nfs::{create_dir, create_std_dirs};
-pub use self::errors::AuthError;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::sync::mpsc::sync_channel;

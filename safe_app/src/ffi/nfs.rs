@@ -101,6 +101,7 @@ pub unsafe extern "C" fn file_update(app: *const App,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use App;
     use errors::AppError;
     use ffi::cipher_opt::CipherOpt;
@@ -115,7 +116,6 @@ mod tests {
     use safe_core::nfs::NfsError;
     use std::collections::HashMap;
     use std::ffi::CString;
-    use super::*;
     use test_utils::{create_app_with_access, run_now};
 
     #[test]

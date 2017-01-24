@@ -24,12 +24,12 @@ mod futures;
 /// Common utility functions for writting test cases
 pub mod test_utils;
 
+pub use self::futures::FutureExt;
 use errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::Rng;
 use rust_sodium::crypto::hash::sha512::{self, DIGESTBYTES, Digest};
 use rust_sodium::crypto::secretbox;
-pub use self::futures::FutureExt;
 
 #[macro_export]
 macro_rules! btree_set {

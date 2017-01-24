@@ -319,6 +319,7 @@ unsafe fn with_values<C, F>(app: *const App,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ffi_utils::test_utils::{call_1, call_3};
     use ffi_utils::vec_clone_from_raw_parts;
     use routing::Value;
@@ -327,7 +328,6 @@ mod tests {
     use std::os::raw::c_void;
     use std::slice;
     use std::sync::mpsc::{self, Sender};
-    use super::*;
     use test_utils::{create_app, run_now};
 
     #[test]

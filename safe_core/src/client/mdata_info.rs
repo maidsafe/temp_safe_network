@@ -78,8 +78,8 @@ impl MDataInfo {
                 Some(secretbox::Nonce(ref dir_nonce)) => {
                     let mut pt = plain_text.to_vec();
                     pt.extend_from_slice(&dir_nonce[..]);
-                    unwrap!(secretbox::Nonce::from_slice(
-                        &sha256::hash(&pt)[..secretbox::NONCEBYTES]))
+                    unwrap!(secretbox::Nonce::from_slice(&sha256::hash(&pt)
+                                                              [..secretbox::NONCEBYTES]))
                 }
                 None => secretbox::gen_nonce(),
             };
@@ -204,9 +204,9 @@ fn decrypt_value(info: &MDataInfo, value: &Value) -> Result<Value, CoreError> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use rand;
     use rust_sodium::crypto::secretbox;
-    use super::*;
 
     #[test]
     fn private_mdata_info_encrypts() {

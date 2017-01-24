@@ -22,9 +22,9 @@
 /// Ffi module
 pub mod ffi;
 
+use self::ffi::Permission;
 use ffi_utils::{ReprC, StringError, from_c_str, vec_into_raw_parts};
 use ipc::errors::IpcError;
-use self::ffi::Permission;
 use std::{ptr, slice};
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CString, NulError};
@@ -253,10 +253,10 @@ impl ReprC for AppExchangeInfo {
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
+    use super::*;
     use ffi_utils::ReprC;
     use std::collections::HashMap;
     use std::ffi::CStr;
-    use super::*;
 
     #[test]
     fn container_permissions() {

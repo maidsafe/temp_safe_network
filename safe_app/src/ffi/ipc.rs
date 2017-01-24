@@ -122,6 +122,7 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ffi_utils::from_c_str;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
@@ -134,7 +135,6 @@ mod tests {
     use std::ffi::CString;
     use std::mem;
     use std::os::raw::{c_char, c_void};
-    use super::*;
 
     struct EncodedCtx {
         req_id: u32,

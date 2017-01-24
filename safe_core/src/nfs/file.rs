@@ -185,8 +185,8 @@ impl Decodable for File {
 
 #[cfg(test)]
 mod tests {
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use super::*;
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
 
     #[test]
     fn serialise_deserialise() {

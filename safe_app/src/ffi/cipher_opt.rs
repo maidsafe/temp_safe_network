@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use ::App;
+use App;
 use errors::AppError;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -182,7 +182,8 @@ pub unsafe extern "C" fn cipher_opt_free(app: *const App,
 
 #[cfg(test)]
 mod tests {
-    use ::{App, AppContext};
+    use super::*;
+    use {App, AppContext};
     use errors::AppError;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1};
@@ -191,7 +192,6 @@ mod tests {
     use safe_core::{Client, utils};
     use std::os::raw::c_void;
     use std::sync::mpsc;
-    use super::*;
     use test_utils::{create_app, run_now};
 
     #[test]

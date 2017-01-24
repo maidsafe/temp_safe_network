@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use ::App;
+use App;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb, from_c_str};
 use futures::Future;
 use object_cache::MDataInfoHandle;

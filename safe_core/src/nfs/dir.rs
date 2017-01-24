@@ -20,7 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 
-use ::DIR_TAG;
+use DIR_TAG;
 use client::{Client, MDataInfo};
 use errors::CoreError;
 use futures::Future;

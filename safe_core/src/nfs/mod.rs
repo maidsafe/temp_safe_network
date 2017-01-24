@@ -32,13 +32,13 @@ mod std_dirs;
 mod reader;
 mod writer;
 
-use futures::Future;
 pub use self::dir::create_dir;
 pub use self::errors::NfsError;
 pub use self::file::File;
 pub use self::reader::Reader;
 pub use self::std_dirs::create_std_dirs;
 pub use self::writer::{Mode, Writer};
+use futures::Future;
 
 /// Helper type for futures that can result in `NfsError`
 pub type NfsFuture<T> = Future<Item = T, Error = NfsError>;

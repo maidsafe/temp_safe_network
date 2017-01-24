@@ -135,13 +135,11 @@ pub fn get(client: &Client) -> Box<AuthFuture<String>> {
         .into_future()
         .and_then(move |(config_root_dir, key)| {
             client.get_mdata_value(config_root_dir.name, config_root_dir.type_tag, key)
-                .map_err(|err| {
-                    match err {
-                        CoreError::RoutingClientError(ClientError::NoSuchEntry) => {
-                            AuthError::NoSuchPublicId
-                        }
-                        _ => AuthError::from(err),
+                .map_err(|err| match err {
+                    CoreError::RoutingClientError(ClientError::NoSuchEntry) => {
+                        AuthError::NoSuchPublicId
                     }
+                    _ => AuthError::from(err),
                 })
                 .map(move |value| (config_root_dir, value))
         })

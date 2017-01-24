@@ -418,12 +418,11 @@ fn revoke_app() {
 
     let ac_md_info = auth_granted.access_container.into_mdata_info(app_keys.enc_key.clone());
     run(&authenticator, move |client| {
-        access_container_entry(client.clone(), &ac_md_info, &app_id, app_keys).then(move |res| {
-            match res {
+        access_container_entry(client.clone(), &ac_md_info, &app_id, app_keys)
+            .then(move |res| match res {
                 Err(AuthError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
                 x => panic!("Unexpected {:?}", x),
-            }
-        })
+            })
     });
 
     // Use the previous MDataInfo for images to check if the permissions
@@ -437,11 +436,9 @@ fn revoke_app() {
     // Try reading the entries of images folder, should not be able to read as everything
     // is reencrypted using new keys.
     run(&authenticator, move |client| {
-        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| {
-            match res {
-                Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
-                x => panic!("Unexpected {:?}", x),
-            }
+        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
+            Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+            x => panic!("Unexpected {:?}", x),
         })
     });
 }
@@ -498,11 +495,9 @@ fn revoke_app_reencryption() {
     // Try reading the entries of images folder, should not be able to read as everything
     // is reencrypted using new keys.
     run(&authenticator, move |client| {
-        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| {
-            match res {
-                Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
-                x => panic!("Unexpected {:?}", x),
-            }
+        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
+            Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+            x => panic!("Unexpected {:?}", x),
         })
     });
 

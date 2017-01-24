@@ -20,7 +20,7 @@
 // and limitations relating to use of the SAFE Network Software.
 
 
-use ::DIR_TAG;
+use DIR_TAG;
 use client::Client;
 use futures::{Future, future};
 use maidsafe_utilities::serialisation::serialise;
@@ -69,10 +69,10 @@ pub fn create_std_dirs(client: Client) -> Box<NfsFuture<()>> {
 
 #[cfg(test)]
 mod tests {
-    use ::DIR_TAG;
+    use super::*;
+    use DIR_TAG;
     use futures::Future;
     use nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS};
-    use super::*;
     use utils::test_utils::{finish, random_client};
 
     #[test]

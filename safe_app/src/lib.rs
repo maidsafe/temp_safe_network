@@ -73,6 +73,8 @@ mod errors;
 #[cfg(test)]
 mod test_utils;
 
+pub use self::errors::*;
+use self::object_cache::ObjectCache;
 use futures::{Future, future};
 use futures::stream::Stream;
 use futures::sync::mpsc as futures_mpsc;
@@ -83,8 +85,6 @@ use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, Ne
                 NetworkTx, event_loop, utils};
 use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Permission};
 use safe_core::ipc::resp::access_container_enc_key;
-pub use self::errors::*;
-use self::object_cache::ObjectCache;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;

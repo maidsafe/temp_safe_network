@@ -19,6 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use super::vault::{Data, Vault};
 use maidsafe_utilities::thread;
 use rand;
 use routing::{Authority, ClientError, EntryAction, Event, FullId, ImmutableData, InterfaceError,
@@ -32,7 +33,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
-use super::vault::{Data, Vault};
 
 const CONNECT_THREAD_NAME: &'static str = "Mock routing connect";
 const DELAY_THREAD_NAME: &'static str = "Mock routing delay";

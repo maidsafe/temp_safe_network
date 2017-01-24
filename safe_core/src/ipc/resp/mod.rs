@@ -222,10 +222,10 @@ pub fn access_container_enc_key(app_id: &str,
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
+    use super::*;
     use ipc::Config;
     use routing::{XOR_NAME_LEN, XorName};
     use rust_sodium::crypto::{box_, secretbox, sign};
-    use super::*;
 
     #[test]
     fn auth_granted() {

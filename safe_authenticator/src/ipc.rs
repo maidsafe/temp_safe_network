@@ -19,6 +19,9 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
+use super::access_container::{access_container, access_container_entry, access_container_nonce,
+                              put_access_container_entry};
 use ffi_utils::{OpaqueCtx, ReprC, StringError, base64_encode, catch_unwind_cb, from_c_str};
 use futures::{Future, future};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -37,9 +40,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::ptr;
-use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
-use super::access_container::{access_container, access_container_entry, access_container_nonce,
-                              put_access_container_entry};
 
 
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
@@ -133,9 +133,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                 }
                                 Ok(())
                             })
-                            .map_err(move |e| {
-                                o_err(user_data.0, ffi_error_code!(e), ptr::null())
-                            })
+                            .map_err(move |e| o_err(user_data.0, ffi_error_code!(e), ptr::null()))
                             .into_box()
                             .into()
                     })?;
@@ -171,9 +169,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                 }
                                 Ok(())
                             })
-                            .map_err(move |e| {
-                                o_err(user_data.0, ffi_error_code!(e), ptr::null())
-                            })
+                            .map_err(move |e| o_err(user_data.0, ffi_error_code!(e), ptr::null()))
                             .into_box()
                             .into()
                     })?;
@@ -214,9 +210,7 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                         Ok(app.ok_or(AuthError::IpcError(IpcError::UnknownApp))?)
                     })
                     .and_then(move |app| {
-                        access_container(c2).map(move |access_container| {
-                            (access_container, app)
-                        })
+                        access_container(c2).map(move |access_container| (access_container, app))
                     })
                     .and_then(move |(access_container, app)| {
                         // Get an access container entry for the app being revoked
@@ -428,16 +422,14 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                     let c5 = client.clone();
 
                     app_info(client, &app_id)
-                        .and_then(move |app| {
-                            match app {
-                                Some(app) => {
-                                    let sign_pk = app.keys.sign_pk;
-                                    update_container_perms(c2, permissions, sign_pk)
-                                        .map(move |perms| (app, perms))
-                                        .into_box()
-                                }
-                                None => err!(IpcError::UnknownApp),
+                        .and_then(move |app| match app {
+                            Some(app) => {
+                                let sign_pk = app.keys.sign_pk;
+                                update_container_perms(c2, permissions, sign_pk)
+                                    .map(move |perms| (app, perms))
+                                    .into_box()
                             }
+                            None => err!(IpcError::UnknownApp),
                         })
                         .and_then(move |(app, perms)| {
                             access_container(c3).map(move |dir| (dir, app, perms))
@@ -750,14 +742,12 @@ fn encode_auth_resp_impl(client: Client,
         .and_then(move |(_, version)| c2.ins_auth_key(app.keys.sign_pk, version + 1))
         .map_err(AuthError::from)
         .and_then(move |_| update_container_perms(c3, permissions, sign_pk))
-        .and_then(move |perms| {
-            if app_container {
-                check_app_container(c4, app_id, sign_pk)
-                    .map(move |mdata_info| (mdata_info, perms))
-                    .into_box()
-            } else {
-                ok!((None, perms))
-            }
+        .and_then(move |perms| if app_container {
+            check_app_container(c4, app_id, sign_pk)
+                .map(move |mdata_info| (mdata_info, perms))
+                .into_box()
+        } else {
+            ok!((None, perms))
         })
         .and_then(move |(app_container, perms)| {
             // Update access_container

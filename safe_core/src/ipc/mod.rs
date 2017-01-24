@@ -26,13 +26,13 @@ pub mod resp;
 
 mod errors;
 
-use ffi_utils::{base64_decode, base64_encode};
-use maidsafe_utilities::serialisation::{deserialise, serialise};
-use rand::{self, Rng};
 pub use self::errors::IpcError;
 pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 pub use self::req::ffi::Permission;
 pub use self::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp, access_container_enc_key};
+use ffi_utils::{base64_decode, base64_encode};
+use maidsafe_utilities::serialisation::{deserialise, serialise};
+use rand::{self, Rng};
 use std::u32;
 
 // TODO: replace with `crust::Config`

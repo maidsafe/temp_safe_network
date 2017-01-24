@@ -147,14 +147,14 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(app: *const App,
 
 /// Extract name and type tag from the mdata info.
 #[no_mangle]
-pub unsafe extern "C"
-fn mdata_info_extract_name_and_type_tag(app: *const App,
-                                        info_h: MDataInfoHandle,
-                                        user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void,
-                                                            i32,
-                                                            [u8; XOR_NAME_LEN],
-                                                            u64)) {
+pub unsafe extern "C" fn mdata_info_extract_name_and_type_tag(app: *const App,
+                                                              info_h: MDataInfoHandle,
+                                                              user_data: *mut c_void,
+                                                              o_cb: extern "C" fn(*mut c_void,
+                                                                                  i32,
+                                                                                  [u8;
+                                                                                   XOR_NAME_LEN],
+                                                                                  u64)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;
@@ -203,10 +203,10 @@ pub unsafe extern "C" fn mdata_info_deserialise(app: *const App,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ffi_utils::test_utils::{call_1, call_3};
     use rand;
     use safe_core::MDataInfo;
-    use super::*;
     use test_utils::{create_app, run_now};
 
     #[test]

@@ -83,14 +83,10 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
                     app_state(c2, &auth_cfg, app_id)
                         .map(move |app_state| (app_state, auth_cfg, cfg_version))
                 })
-                .and_then(move |(app_state, auth_cfg, cfg_version)| {
-                    match app_state {
-                        AppState::Revoked => Ok((auth_cfg, cfg_version)),
-                        AppState::Authenticated => Err(AuthError::from("App is not revoked")),
-                        AppState::NotAuthenticated => {
-                            Err(AuthError::IpcError(IpcError::UnknownApp))
-                        }
-                    }
+                .and_then(move |(app_state, auth_cfg, cfg_version)| match app_state {
+                    AppState::Revoked => Ok((auth_cfg, cfg_version)),
+                    AppState::Authenticated => Err(AuthError::from("App is not revoked")),
+                    AppState::NotAuthenticated => Err(AuthError::IpcError(IpcError::UnknownApp)),
                 })
                 .and_then(move |(mut auth_cfg, cfg_version)| {
                     let _app = fry!(auth_cfg.remove(&app_id_hash)
