@@ -34,6 +34,7 @@ use std::os::raw::c_void;
 
 type SEWriterHandle = SelfEncryptorWriterHandle;
 type SEReaderHandle = SelfEncryptorReaderHandle;
+type XorNamePtr = *const [u8; XOR_NAME_LEN];
 
 /// Get a Self Encryptor
 #[no_mangle]
@@ -105,7 +106,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
                                                                         i32,
-                                                                        [u8; XOR_NAME_LEN])) {
+                                                                        XorNamePtr)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -142,8 +143,8 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                 })
                 .then(move |result| {
                     match result {
-                        Ok(name) => o_cb(user_data.0, 0, name.0),
-                        Err(e) => o_cb(user_data.0, ffi_error_code!(e), Default::default()),
+                        Ok(name) => o_cb(user_data.0, 0, &name.0),
+                        Err(e) => o_cb(user_data.0, ffi_error_code!(e), ptr::null()),
                     }
                     Ok(())
                 })
@@ -156,14 +157,14 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
 /// Fetch Self Encryptor
 #[no_mangle]
 pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
-                                                    name: [u8; XOR_NAME_LEN],
+                                                    name: XorNamePtr,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
                                                                         i32,
                                                                         SEReaderHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let name = XorName(name);
+        let name = XorName(*name);
 
         (*app).send(move |client, context| {
             let client2 = client.clone();
@@ -311,6 +312,7 @@ mod tests {
     use ffi::cipher_opt::*;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_3};
+    use routing::XOR_NAME_LEN;
     use safe_core::utils;
     use test_utils::create_app;
 
@@ -343,7 +345,7 @@ mod tests {
                                               cb)
             }));
 
-            let name = unwrap!(call_1(|ud, cb| {
+            let name: [u8; XOR_NAME_LEN] = unwrap!(call_1(|ud, cb| {
                 idata_close_self_encryptor(&app, se_writer_h, cipher_opt_h, ud, cb)
             }));
 
@@ -363,7 +365,7 @@ mod tests {
             assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             let se_reader_h = {
-                unwrap!(call_1(|ud, cb| idata_fetch_self_encryptor(&app, name, ud, cb)))
+                unwrap!(call_1(|ud, cb| idata_fetch_self_encryptor(&app, &name, ud, cb)))
             };
 
             let size = unwrap!(call_1(|ud, cb| idata_size(&app, se_reader_h, ud, cb)));

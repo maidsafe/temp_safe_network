@@ -52,10 +52,12 @@ impl ReprC for usize {
 
 /// `XorName`
 impl ReprC for [u8; 32] {
-    type C = [u8; 32];
+    type C = *const [u8; 32];
     type Error = ();
 
-    fn from_repr_c_cloned(c_repr: [u8; 32]) -> Result<[u8; 32], ()> {
-        Ok(c_repr)
+    #[allow(unsafe_code)]
+    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    fn from_repr_c_cloned(c_repr: *const [u8; 32]) -> Result<[u8; 32], ()> {
+        unsafe { Ok(*c_repr) }
     }
 }

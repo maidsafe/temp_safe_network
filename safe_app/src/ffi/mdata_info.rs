@@ -32,14 +32,14 @@ use std::slice;
 /// Create non-encrypted mdata info with explicit data name.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_new_public(app: *const App,
-                                               name: [u8; XOR_NAME_LEN],
+                                               name: *const [u8; XOR_NAME_LEN],
                                                type_tag: u64,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
                                                                    i32,
                                                                    MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let name = XorName(name);
+        let name = XorName(*name);
 
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = MDataInfo::new_public(name, type_tag);
@@ -51,14 +51,14 @@ pub unsafe extern "C" fn mdata_info_new_public(app: *const App,
 /// Create encrypted mdata info with explicit data name.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_new_private(app: *const App,
-                                                name: [u8; XOR_NAME_LEN],
+                                                name: *const [u8; XOR_NAME_LEN],
                                                 type_tag: u64,
                                                 user_data: *mut c_void,
                                                 o_cb: extern "C" fn(*mut c_void,
                                                                     i32,
                                                                     MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let name = XorName(name);
+        let name = XorName(*name);
 
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = MDataInfo::new_private(name, type_tag);
@@ -152,13 +152,13 @@ pub unsafe extern "C" fn mdata_info_extract_name_and_type_tag(app: *const App,
                                                               user_data: *mut c_void,
                                                               o_cb: extern "C" fn(*mut c_void,
                                                                                   i32,
-                                                                                  [u8;
+                                                                                  *const [u8;
                                                                                    XOR_NAME_LEN],
                                                                                   u64)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;
-            Ok((info.name.0, info.type_tag))
+            Ok((&info.name.0, info.type_tag))
         })
     })
 }

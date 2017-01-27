@@ -42,14 +42,15 @@ pub unsafe extern "C" fn app_pub_sign_key(app: *const App,
 /// Create new public signing key from raw array.
 #[no_mangle]
 pub unsafe extern "C" fn sign_key_new(app: *const App,
-                                      data: [u8; sign::PUBLICKEYBYTES],
+                                      data: *const [u8; sign::PUBLICKEYBYTES],
                                       user_data: *mut c_void,
                                       o_cb: extern "C" fn(*mut c_void, i32, SignKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |_, context| {
-            let key = sign::PublicKey(data);
-            Ok(context.object_cache().insert_sign_key(key))
-        })
+        let key = sign::PublicKey(*data);
+        send_sync(app,
+                  user_data,
+                  o_cb,
+                  move |_, context| Ok(context.object_cache().insert_sign_key(key)))
     })
 }
 
@@ -60,11 +61,11 @@ pub unsafe extern "C" fn sign_key_get(app: *const App,
                                       user_data: *mut c_void,
                                       o_cb: extern "C" fn(*mut c_void,
                                                           i32,
-                                                          [u8; sign::PUBLICKEYBYTES])) {
+                                                          *const [u8; sign::PUBLICKEYBYTES])) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let key = context.object_cache().get_sign_key(handle)?;
-            Ok(key.0)
+            Ok(&key.0)
         })
     })
 }
@@ -99,14 +100,15 @@ pub unsafe extern "C" fn app_pub_enc_key(app: *const App,
 /// Create new public encryption key from raw array.
 #[no_mangle]
 pub unsafe extern "C" fn enc_key_new(app: *const App,
-                                     data: [u8; box_::PUBLICKEYBYTES],
+                                     data: *const [u8; box_::PUBLICKEYBYTES],
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32, EncryptKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |_, context| {
-            let key = box_::PublicKey(data);
-            Ok(context.object_cache().insert_encrypt_key(key))
-        })
+        let key = box_::PublicKey(*data);
+        send_sync(app,
+                  user_data,
+                  o_cb,
+                  move |_, context| Ok(context.object_cache().insert_encrypt_key(key)))
     })
 }
 
@@ -117,11 +119,11 @@ pub unsafe extern "C" fn enc_key_get(app: *const App,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void,
                                                          i32,
-                                                         [u8; box_::PUBLICKEYBYTES])) {
+                                                         *const [u8; box_::PUBLICKEYBYTES])) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let key = context.object_cache().get_encrypt_key(handle)?;
-            Ok(key.0)
+            Ok(&key.0)
         })
     })
 }
@@ -163,6 +165,7 @@ pub unsafe extern "C" fn misc_object_cache_reset(session: *const Session,
 mod tests {
     use super::*;
     use ffi_utils::test_utils::call_1;
+    use routing::XOR_NAME_LEN;
     use test_utils::{create_app, run_now};
 
     #[test]
@@ -178,11 +181,11 @@ mod tests {
             app_sign_key1
         });
 
-        let app_sign_key1_raw =
+        let app_sign_key1_raw: [u8; XOR_NAME_LEN] =
             unsafe { unwrap!(call_1(|ud, cb| sign_key_get(&app, app_sign_key1_h, ud, cb))) };
 
         let app_sign_key2_h =
-            unsafe { unwrap!(call_1(|ud, cb| sign_key_new(&app, app_sign_key1_raw, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| sign_key_new(&app, &app_sign_key1_raw, ud, cb))) };
 
         let app_sign_key2 = run_now(&app, move |_, context| {
             *unwrap!(context.object_cache().get_sign_key(app_sign_key2_h))
@@ -204,11 +207,11 @@ mod tests {
             app_enc_key1
         });
 
-        let app_enc_key1_raw =
+        let app_enc_key1_raw: [u8; XOR_NAME_LEN] =
             unsafe { unwrap!(call_1(|ud, cb| enc_key_get(&app, app_enc_key1_h, ud, cb))) };
 
         let app_enc_key2_h =
-            unsafe { unwrap!(call_1(|ud, cb| enc_key_new(&app, app_enc_key1_raw, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| enc_key_new(&app, &app_enc_key1_raw, ud, cb))) };
 
         let app_enc_key2 = run_now(&app, move |_, context| {
             *unwrap!(context.object_cache().get_encrypt_key(app_enc_key2_h))

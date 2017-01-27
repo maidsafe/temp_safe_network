@@ -237,7 +237,7 @@ mod tests {
     #[cfg_attr(rustfmt, rustfmt_skip)]
     unsafe fn get_file_content(app: &App, name: [u8; XOR_NAME_LEN]) -> Vec<u8> {
         let reader_h = unwrap!(call_1(|ud, cb| {
-            idata_fetch_self_encryptor(app, name, ud, cb)
+            idata_fetch_self_encryptor(app, &name, ud, cb)
         }));
         let size = unwrap!(call_1(|ud, cb| {
             idata_size(app, reader_h, ud, cb)
