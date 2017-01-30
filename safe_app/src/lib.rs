@@ -59,6 +59,8 @@ extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate rust_sodium;
+#[cfg(feature = "testing")]
+extern crate safe_authenticator;
 #[macro_use]
 extern crate safe_core;
 extern crate self_encryption;
@@ -70,8 +72,9 @@ pub mod ffi;
 pub mod object_cache;
 
 mod errors;
-#[cfg(test)]
-mod test_utils;
+/// Utility functions to test apps functionality
+#[cfg(any(test, feature = "testing"))]
+pub mod test_utils;
 
 pub use self::errors::*;
 use self::object_cache::ObjectCache;
@@ -90,6 +93,8 @@ use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
+#[cfg(feature = "testing")]
+pub use test_utils::{test_create_app, test_create_app_with_access};
 use tokio_core::reactor::{Core, Handle};
 
 macro_rules! try_tx {
@@ -345,7 +350,6 @@ fn fetch_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<
 #[cfg(test)]
 mod tests {
     use futures::Future;
-    use safe_core::{DIR_TAG, MDataInfo};
     use safe_core::ipc::Permission;
     use std::collections::HashMap;
     use test_utils::{create_app_with_access, run};
@@ -353,14 +357,11 @@ mod tests {
     #[test]
     fn refresh_access_info() {
         // Shared container
-        let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
-
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert("_test".to_string(),
-                                             (container_info.clone(),
-                                              btree_set![Permission::Read, Permission::Insert]));
+        let _ = container_permissions.insert("_videos".to_string(),
+                                             btree_set![Permission::Read, Permission::Insert]);
 
-        let app = create_app_with_access(container_permissions.clone(), false);
+        let app = create_app_with_access(container_permissions.clone());
 
         run(&app, move |client, context| {
             let reg = unwrap!(context.as_registered()).clone();
@@ -370,10 +371,8 @@ mod tests {
                 .then(move |result| {
                     unwrap!(result);
                     let access_info = reg.access_info.borrow();
-                    assert_eq!(access_info.len(), 1);
-                    assert_eq!(unwrap!(access_info.get("_test")).0, container_info);
-                    assert_eq!(unwrap!(access_info.get("_test")).1,
-                               unwrap!(container_permissions.get("_test")).1);
+                    assert_eq!(unwrap!(access_info.get("_videos")).1,
+                               *unwrap!(container_permissions.get("_videos")));
 
                     Ok(())
                 })
@@ -383,22 +382,17 @@ mod tests {
     #[test]
     fn get_container_mdata_info() {
         // Shared container
-        let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
-        let cont_name = "_test".to_string();
+        let cont_name = "_videos".to_string();
 
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert(cont_name.clone(),
-                                             (container_info.clone(),
-                                              btree_set![Permission::Read]));
+        let _ = container_permissions.insert(cont_name.clone(), btree_set![Permission::Read]);
 
-        let app = create_app_with_access(container_permissions, false);
+        let app = create_app_with_access(container_permissions);
 
         run(&app, move |client, context| {
             context.get_container_mdata_info(client, cont_name)
                 .then(move |res| {
-                    let info = unwrap!(res);
-                    assert_eq!(info, container_info);
-
+                    let _info = unwrap!(res);
                     Ok(())
                 })
         });
@@ -407,15 +401,12 @@ mod tests {
     #[test]
     fn is_permitted() {
         // Shared container
-        let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
-        let cont_name = "_test".to_string();
+        let cont_name = "_videos".to_string();
 
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert(cont_name.clone(),
-                                             (container_info.clone(),
-                                              btree_set![Permission::Read]));
+        let _ = container_permissions.insert(cont_name.clone(), btree_set![Permission::Read]);
 
-        let app = create_app_with_access(container_permissions, false);
+        let app = create_app_with_access(container_permissions);
 
         run(&app, move |client, context| {
             let f1 = context.is_permitted(client, cont_name.clone(), Permission::Read)

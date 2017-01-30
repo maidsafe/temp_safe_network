@@ -23,16 +23,21 @@ use super::AccessContainerEntry;
 use Authenticator;
 use access_container::access_container_entry;
 use errors::AuthError;
+use ffi_utils::base64_encode;
+use ffi_utils::test_utils::call_1;
 use futures::{Future, IntoFuture};
 use futures::future;
+use ipc::{decode_ipc_msg, encode_auth_resp};
 use routing::User;
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, utils};
-use safe_core::ipc::{AppExchangeInfo, AuthGranted, Permission};
+use safe_core::ipc::{self, AppExchangeInfo, AuthGranted, AuthReq, IpcMsg, IpcReq, IpcResp,
+                     Permission};
 use safe_core::ipc::req::ffi::convert_permission_set;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
 
+/// Creates a new random account for authenticator
 pub fn create_authenticator() -> Authenticator {
     let locator = unwrap!(utils::generate_random_string(10));
     let password = unwrap!(utils::generate_random_string(10));
@@ -40,9 +45,63 @@ pub fn create_authenticator() -> Authenticator {
     unwrap!(Authenticator::create_acc(locator, password, |_| ()))
 }
 
-// Run the given closure inside the event loop of the authenticator. The closure
-// should return a future which will then be driven to completion and its result
-// returned.
+/// Create a random authenticator and login using the same credentials.
+pub fn create_account_and_login() -> Authenticator {
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+
+    let _ = unwrap!(Authenticator::create_acc(locator.clone(), password.clone(), |_| ()));
+    unwrap!(Authenticator::login(locator, password, |_| ()))
+}
+
+/// Registers a mock application using a given `AuthReq`.
+pub fn register_app(authenticator: &Authenticator,
+                    auth_req: &AuthReq)
+                    -> Result<AuthGranted, AuthError> {
+    let base64_app_id = base64_encode(auth_req.app.id.as_bytes());
+
+    let req_id = ipc::gen_req_id();
+    let msg = IpcMsg::Req {
+        req_id: req_id,
+        req: IpcReq::Auth(auth_req.clone()),
+    };
+
+    // Serialise it as base64 payload in "safe_auth:payload"
+    let encoded_msg = ipc::encode_msg(&msg, "safe-auth")?;
+
+    // Invoke `decode_ipc_msg` and expect to get AuthReq back.
+    let ipc_req = run(authenticator,
+                      move |client| decode_ipc_msg(client, &encoded_msg));
+    match ipc_req {
+        Ok(IpcMsg::Req { req: IpcReq::Auth(_), .. }) => (),
+        x => return Err(AuthError::Unexpected(format!("Unexpected {:?}", x))),
+    }
+
+    let encoded_auth_resp: String = unsafe {
+        // Call `encode_auth_resp` with is_granted = true
+        unwrap!(call_1(|ud, cb| {
+            let auth_req = unwrap!(auth_req.clone().into_repr_c());
+            encode_auth_resp(authenticator,
+                             &auth_req,
+                             req_id,
+                             true, // is_granted
+                             ud,
+                             cb)
+        }))
+    };
+
+    assert!(encoded_auth_resp.starts_with(&format!("safe-{}", base64_app_id)));
+
+    match ipc::decode_msg(&encoded_auth_resp) {
+        Ok(IpcMsg::Resp { resp: IpcResp::Auth(Ok(auth_granted)), .. }) => Ok(auth_granted),
+        Ok(x) => Err(AuthError::Unexpected(format!("Unexpected {:?}", x))),
+        Err(x) => Err(AuthError::from(x)),
+    }
+}
+
+/// Run the given closure inside the event loop of the authenticator. The closure
+/// should return a future which will then be driven to completion and its result
+/// returned.
 pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
     where F: FnOnce(&Client) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = AuthError> + 'static,

@@ -30,9 +30,8 @@ use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp, ge
 use maidsafe_utilities::serialisation::deserialise;
 use routing::User;
 use rust_sodium::crypto::hash::sha256;
-use safe_core::{CoreError, MDataInfo, mdata_info, utils};
-use safe_core::ipc::{self, AuthGranted, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp,
-                     Permission};
+use safe_core::{CoreError, MDataInfo, mdata_info};
+use safe_core::ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp, Permission};
 use safe_core::ipc::req::ffi::AppExchangeInfo as FfiAppExchangeInfo;
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
@@ -42,7 +41,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::sync::mpsc;
 use std::time::Duration;
-use test_utils::{access_container, compare_access_container_entries, rand_app, run};
+use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
+                 rand_app, register_app, run};
 
 // Test creation and content of std dirs after account creation.
 #[test]
@@ -331,7 +331,7 @@ fn containers_access_request() {
     let app_id = auth_req.app.id.clone();
     let base64_app_id = base64_encode(app_id.as_bytes());
 
-    let auth_granted = register_app(&authenticator, &auth_req);
+    let auth_granted = unwrap!(register_app(&authenticator, &auth_req));
 
     // Give one Containers request to authenticator for the same app asking for "downloads with
     // permission to update only"
@@ -392,7 +392,7 @@ fn revoke_app() {
         containers: create_containers_req(),
     };
 
-    let auth_granted = register_app(&authenticator, &auth_req);
+    let auth_granted = unwrap!(register_app(&authenticator, &auth_req));
     let app_id = auth_req.app.id.clone();
 
     // Put some entries into videos folder before revoking the app
@@ -463,8 +463,8 @@ fn revoke_app_reencryption() {
     let app_id1 = auth_req1.app.id.clone();
     let app_id2 = auth_req2.app.id.clone();
 
-    let auth_granted1 = register_app(&authenticator, &auth_req1);
-    let auth_granted2 = register_app(&authenticator, &auth_req2);
+    let auth_granted1 = unwrap!(register_app(&authenticator, &auth_req1));
+    let auth_granted2 = unwrap!(register_app(&authenticator, &auth_req2));
 
     // Put some entries into videos folder before revoking the first app
     let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
@@ -563,8 +563,8 @@ fn lists_of_registered_and_revoked_apps() {
         containers: Default::default(),
     };
 
-    let _ = register_app(&authenticator, &auth_req1);
-    let _ = register_app(&authenticator, &auth_req2);
+    let _ = unwrap!(register_app(&authenticator, &auth_req1));
+    let _ = unwrap!(register_app(&authenticator, &auth_req2));
 
     // There are now two registered apps, but no revoked apps.
     let registered: Vec<RegisteredAppId> = unsafe {
@@ -608,55 +608,6 @@ fn revoke(authenticator: &Authenticator, app_id: &str) {
         Ok(IpcMsg::Revoked { .. }) => (),
         x => panic!("Unexpected {:?}", x),
     };
-}
-
-fn register_app(authenticator: &Authenticator, auth_req: &AuthReq) -> AuthGranted {
-    let base64_app_id = base64_encode(auth_req.app.id.as_bytes());
-
-    let req_id = ipc::gen_req_id();
-    let msg = IpcMsg::Req {
-        req_id: req_id,
-        req: IpcReq::Auth(auth_req.clone()),
-    };
-
-    // Serialise it as base64 payload in "safe_auth:payload"
-    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
-
-    // Invoke Authenticator's `decode_ipc_msg` and expect to get C-AuthReq back via callback.
-    match unwrap!(decode_ipc_msg(authenticator, &encoded_msg)) {
-        IpcMsg::Req { req: IpcReq::Auth(_), .. } => (),
-        x => panic!("Unexpected {:?}", x),
-    };
-
-    let encoded_auth_resp: String = unsafe {
-        // Call `encode_auth_resp` with is_granted = true
-        unwrap!(call_1(|ud, cb| {
-            let auth_req = unwrap!(auth_req.clone().into_repr_c());
-            encode_auth_resp(authenticator,
-                             &auth_req,
-                             req_id,
-                             true, // is_granted
-                             ud,
-                             cb)
-        }))
-    };
-
-    assert!(encoded_auth_resp.starts_with(&format!("safe-{}", base64_app_id)));
-
-    match ipc::decode_msg(&encoded_auth_resp) {
-        Ok(IpcMsg::Resp { resp: IpcResp::Auth(Ok(auth_granted)), .. }) => auth_granted,
-        x => panic!("Unexpected {:?}", x),
-    }
-}
-
-// Create a random authenticator - should be successful.
-// Login using same credentials - should be successful.
-fn create_account_and_login() -> Authenticator {
-    let locator = unwrap!(utils::generate_random_string(10));
-    let password = unwrap!(utils::generate_random_string(10));
-
-    let _ = unwrap!(Authenticator::create_acc(locator.clone(), password.clone(), |_| ()));
-    unwrap!(Authenticator::login(locator, password, |_| ()))
 }
 
 // Creates a containers request asking for "documents with permission to

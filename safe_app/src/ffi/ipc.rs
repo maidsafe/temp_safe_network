@@ -126,8 +126,8 @@ mod tests {
     use ffi_utils::from_c_str;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
-    use safe_core::ipc::{self, AccessContInfo, AppExchangeInfo, AppKeys, AuthGranted, AuthReq,
-                         Config, ContainersReq, IpcMsg, IpcReq, IpcResp};
+    use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, Config, ContainersReq,
+                         IpcMsg, IpcReq, IpcResp};
     use safe_core::ipc::req::ffi::Permission;
     use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use safe_core::utils;
@@ -135,6 +135,7 @@ mod tests {
     use std::ffi::CString;
     use std::mem;
     use std::os::raw::{c_char, c_void};
+    use test_utils::gen_app_exchange_info;
 
     struct EncodedCtx {
         req_id: u32,
@@ -383,15 +384,6 @@ mod tests {
             sign_sk: sign_sk,
             enc_pk: enc_pk,
             enc_sk: enc_sk,
-        }
-    }
-
-    fn gen_app_exchange_info() -> AppExchangeInfo {
-        AppExchangeInfo {
-            id: unwrap!(utils::generate_random_string(10)),
-            scope: None,
-            name: unwrap!(utils::generate_random_string(10)),
-            vendor: unwrap!(utils::generate_random_string(10)),
         }
     }
 }

@@ -72,8 +72,9 @@ pub mod public_id;
 mod errors;
 mod access_container;
 
-#[cfg(test)]
-mod test_utils;
+/// Provides utilities to test the authenticator functionality
+#[cfg(any(test, feature = "testing"))]
+pub mod test_utils;
 #[cfg(test)]
 mod tests;
 

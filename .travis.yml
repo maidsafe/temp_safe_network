@@ -1,6 +1,6 @@
 env:
   global:
-    - Features=use-mock-routing
+    - Features="use-mock-routing testing"
     - RUST_BACKTRACE=1
     - PATH=$PATH:$HOME/.cargo/bin
 os:
