@@ -24,9 +24,9 @@ platform:
 build_script:
   - |-
     cd ffi_utils && cargo build --verbose --release
-    cd ..\safe_core && cargo rustc --verbose --release -- --test -Zno-trans
-    cd ..\safe_app && cargo rustc --verbose --release -- --test -Zno-trans
-    cd ..\safe_authenticator && cargo rustc --verbose --release -- --test -Zno-trans
+    cd ..\safe_core && cargo rustc --verbose --release --features testing -- --test -Zno-trans
+    cd ..\safe_app && cargo rustc --verbose --release --features testing -- --test -Zno-trans
+    cd ..\safe_authenticator && cargo rustc --verbose --features testing --release -- --test -Zno-trans
 
 test_script:
   - |-
