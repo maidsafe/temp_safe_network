@@ -41,6 +41,15 @@ impl ReprC for u64 {
     }
 }
 
+impl ReprC for u32 {
+    type C = u32;
+    type Error = ();
+
+    fn from_repr_c_cloned(c_repr: u32) -> Result<u32, ()> {
+        Ok(c_repr)
+    }
+}
+
 impl ReprC for usize {
     type C = usize;
     type Error = ();
