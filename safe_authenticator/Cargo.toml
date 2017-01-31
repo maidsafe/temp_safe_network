@@ -10,7 +10,6 @@ repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.1.0"
 
 [dependencies]
-clippy = { version = "=0.0.99", optional = true }
 ffi_utils = { path = "../ffi_utils", version = "~0.1.0" }
 futures = "~0.1.6"
 log = "~0.3.6"

@@ -83,12 +83,12 @@ pub fn run<F, I, T>(app: &App, f: F) -> T
 
 /// Create registered app.
 pub fn create_app() -> App {
-    let authenticator = authenticator::create_account_and_login();
+    let auth = authenticator::create_account_and_login();
 
     let app_info = gen_app_exchange_info();
     let app_id = app_info.id.clone();
 
-    let auth_granted = unwrap!(authenticator::register_app(&authenticator,
+    let auth_granted = unwrap!(authenticator::register_app(&auth,
                                                            &AuthReq {
                                                                app: app_info,
                                                                app_container: false,
@@ -102,12 +102,12 @@ pub fn create_app() -> App {
 /// If `create_containers` is true, also create all the containers specified in
 /// the `access_info` and set their permissions accordingly.
 pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>) -> App {
-    let authenticator = authenticator::create_account_and_login();
+    let auth = authenticator::create_account_and_login();
 
     let app_info = gen_app_exchange_info();
     let app_id = app_info.id.clone();
 
-    let auth_granted = unwrap!(authenticator::register_app(&authenticator,
+    let auth_granted = unwrap!(authenticator::register_app(&auth,
                                                            &AuthReq {
                                                                app: app_info,
                                                                app_container: true,
@@ -118,9 +118,9 @@ pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>
 }
 
 /// Creates a random app instance for testing
-#[cfg(feature = "testing")]
 #[no_mangle]
 #[allow(unsafe_code)]
+#[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
 pub extern "C" fn test_create_app(o_app: *mut *mut App) -> i32 {
     catch_unwind_error_code(|| -> Result<(), AppError> {
         let app = create_app();
@@ -132,9 +132,9 @@ pub extern "C" fn test_create_app(o_app: *mut *mut App) -> i32 {
 }
 
 /// Create a random app instance for testing, with access to containers
-#[cfg(feature = "testing")]
-#[allow(unsafe_code)]
 #[no_mangle]
+#[allow(unsafe_code)]
+#[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
 pub extern "C" fn test_create_app_with_access(access_info: *const ffi::ContainerPermissions,
                                               access_info_len: usize,
                                               o_app: *mut *mut App)

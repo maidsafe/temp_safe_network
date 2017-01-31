@@ -10,7 +10,6 @@ repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.1.0"
 
 [dependencies]
-clippy = { version = "=0.0.99", optional = true }
 ffi_utils = { path = "../ffi_utils", version = "~0.1.0" }
 futures = "~0.1.6"
 log = "~0.3.6"
@@ -27,6 +26,9 @@ self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", bra
 time = "~0.1.35"
 tokio-core = "~0.1.1"
 unwrap = "~1.1.0"
+
+[dev-dependencies]
+safe_authenticator = { path = "../safe_authenticator", version = "~0.1.0" }
 
 [features]
 use-mock-routing = ["safe_core/use-mock-routing"]

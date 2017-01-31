@@ -126,7 +126,7 @@ impl ReprC for File {
 
     /// Convert to the native rust equivalent by cloning the internal data, preserving self.
     #[allow(unsafe_code)]
-    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
     fn from_repr_c_cloned(repr_c: *const FfiFile) -> Result<File, NfsError> {
         let user_metadata = unsafe {
                 slice::from_raw_parts((*repr_c).user_metadata_ptr, (*repr_c).user_metadata_len)

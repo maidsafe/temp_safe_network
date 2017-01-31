@@ -41,11 +41,9 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
-                                   option_unwrap_used))]
-#![cfg_attr(feature="clippy", allow(use_debug, too_many_arguments))]
+#![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
+                                         option_unwrap_used))]
+#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
 
 #[macro_use]
 extern crate ffi_utils;
@@ -59,7 +57,7 @@ extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate rust_sodium;
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature="testing"))]
 extern crate safe_authenticator;
 #[macro_use]
 extern crate safe_core;
@@ -73,7 +71,7 @@ pub mod object_cache;
 
 mod errors;
 /// Utility functions to test apps functionality
-#[cfg(any(test, feature = "testing"))]
+#[cfg(any(test, feature="testing"))]
 pub mod test_utils;
 
 pub use self::errors::*;
@@ -93,7 +91,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::mpsc as std_mpsc;
-#[cfg(feature = "testing")]
+#[cfg(feature="testing")]
 pub use test_utils::{test_create_app, test_create_app_with_access};
 use tokio_core::reactor::{Core, Handle};
 

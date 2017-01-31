@@ -41,11 +41,9 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
+#![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
                                    option_unwrap_used))]
-#![cfg_attr(feature="clippy", allow(use_debug, too_many_arguments))]
+#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
 
 #[macro_use]
 extern crate ffi_utils;
@@ -73,7 +71,7 @@ mod errors;
 mod access_container;
 
 /// Provides utilities to test the authenticator functionality
-#[cfg(any(test, feature = "testing"))]
+#[cfg(any(test, feature="testing"))]
 pub mod test_utils;
 #[cfg(test)]
 mod tests;

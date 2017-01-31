@@ -22,14 +22,13 @@
 //! App-related IPC utilities.
 
 use errors::AppError;
-use ffi_utils::{ReprC, catch_unwind_cb, catch_unwind_error_code, from_c_str};
+use ffi_utils::{ReprC, catch_unwind_cb, from_c_str};
 use safe_core::ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
 use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
-use std::ptr;
 
 /// Encode `AuthReq`.
 #[no_mangle]
@@ -39,9 +38,8 @@ pub unsafe extern "C" fn encode_auth_req(req: *const FfiAuthReq,
                                                              i32,
                                                              u32,
                                                              *const c_char)) {
-    let req_id = ipc::gen_req_id();
-
-    let error_code = catch_unwind_error_code(|| -> Result<_, AppError> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
+        let req_id = ipc::gen_req_id();
         let req = AuthReq::from_repr_c_cloned(req)?;
 
         let msg = IpcMsg::Req {
@@ -55,11 +53,7 @@ pub unsafe extern "C" fn encode_auth_req(req: *const FfiAuthReq,
         o_cb(user_data, 0, req_id, encoded.as_ptr());
 
         Ok(())
-    });
-
-    if error_code != 0 {
-        o_cb(user_data, error_code, req_id, ptr::null_mut());
-    }
+    })
 }
 
 /// Encode `ContainersReq`.
@@ -70,9 +64,8 @@ pub unsafe extern "C" fn encode_containers_req(req: *const FfiContainersReq,
                                                                    i32,
                                                                    u32,
                                                                    *const c_char)) {
-    let req_id = ipc::gen_req_id();
-
-    let error_code = catch_unwind_error_code(|| -> Result<_, AppError> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
+        let req_id = ipc::gen_req_id();
         let req = ContainersReq::from_repr_c_cloned(req)?;
 
         let msg = IpcMsg::Req {
@@ -86,11 +79,7 @@ pub unsafe extern "C" fn encode_containers_req(req: *const FfiContainersReq,
         o_cb(user_data, 0, req_id, encoded.as_ptr());
 
         Ok(())
-    });
-
-    if error_code != 0 {
-        o_cb(user_data, error_code, req_id, ptr::null_mut());
-    }
+    })
 }
 
 /// Decode IPC message.

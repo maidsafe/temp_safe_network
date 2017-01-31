@@ -111,7 +111,7 @@ pub fn decode_ipc_msg(client: &Client,
                                                        },
                                                        app_id2)?;
 
-                            return Ok(Err((err_code, resp)));
+                            Ok(Err((err_code, resp)))
                         }
                         AppState::NotAuthenticated |
                         AppState::Revoked => {
@@ -152,7 +152,7 @@ pub fn decode_ipc_msg(client: &Client,
                             };
                             let resp = encode_response(&resp, app_id2)?;
 
-                            return Ok(Err((err_code, resp)));
+                            Ok(Err((err_code, resp)))
                         }
                     }
                 })
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                             }
                             Ok(IpcMsg::Resp { .. }) |
                             Ok(IpcMsg::Revoked { .. }) |
-                            Ok(IpcMsg::Err { .. }) => {
+                            Ok(IpcMsg::Err(..)) => {
                                 o_err(user_data.0,
                                       ffi_error_code!(AuthError::Unexpected("Unexpected msg \
                                                                              type"

@@ -65,7 +65,7 @@ impl ReprC for [u8; 32] {
     type Error = ();
 
     #[allow(unsafe_code)]
-    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
     fn from_repr_c_cloned(c_repr: *const [u8; 32]) -> Result<[u8; 32], ()> {
         unsafe { Ok(*c_repr) }
     }
