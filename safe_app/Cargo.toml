@@ -10,7 +10,6 @@ repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.1.0"
 
 [dependencies]
-clippy = { version = "=0.0.99", optional = true }
 ffi_utils = { path = "../ffi_utils", version = "~0.1.0" }
 futures = "~0.1.6"
 log = "~0.3.6"
@@ -22,13 +21,18 @@ routing = { git = "https://github.com/maidsafe/routing.git", branch = "mutable-d
 rust_sodium = "~0.1.2"
 rustc-serialize = "~0.3.22"
 safe_core = { path = "../safe_core", version = "~0.22.0" }
+safe_authenticator = { path = "../safe_authenticator", version = "~0.1.0", optional = true }
 self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "dev" }
 time = "~0.1.35"
 tokio-core = "~0.1.1"
 unwrap = "~1.1.0"
 
+[dev-dependencies]
+safe_authenticator = { path = "../safe_authenticator", version = "~0.1.0" }
+
 [features]
 use-mock-routing = ["safe_core/use-mock-routing"]
+testing = ["safe_authenticator", "safe_authenticator/testing", "safe_core/testing"]
 
 [lib]
 crate_type = ["staticlib", "rlib", "cdylib"]

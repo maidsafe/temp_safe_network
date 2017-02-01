@@ -81,6 +81,91 @@ pub fn app_info(client: &Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>
         .into_box()
 }
 
+/// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
+/// an encoded `IpcMsg::Resp` in case of an errror
+pub fn decode_ipc_msg(client: &Client,
+                      msg: &str)
+                      -> Box<AuthFuture<Result<IpcMsg, (i32, CString)>>> {
+    let msg = fry!(decode_msg(msg));
+
+    match msg {
+        IpcMsg::Req { req: IpcReq::Auth(auth_req), req_id } => {
+            let app_id = auth_req.app.id.clone();
+            let app_id2 = app_id.clone();
+
+            let c2 = client.clone();
+
+            get_config(client)
+                .and_then(move |(_config_version, config)| app_state(c2, &config, app_id))
+                .and_then(move |app_state| {
+                    match app_state {
+                        AppState::Authenticated => {
+                            // App is already registered
+                            let err_code =
+                                ffi_error_code!(AuthError::from(IpcError::AlreadyAuthorised));
+
+                            let auth_error = Err(IpcError::AlreadyAuthorised);
+                            let resp = encode_response(&IpcMsg::Resp {
+                                                           resp: IpcResp::Auth(auth_error),
+                                                           req_id: req_id,
+                                                       },
+                                                       app_id2)?;
+
+                            Ok(Err((err_code, resp)))
+                        }
+                        AppState::NotAuthenticated |
+                        AppState::Revoked => {
+                            // App is not registered yet or was previously registered
+                            Ok(Ok(IpcMsg::Req {
+                                req_id: req_id,
+                                req: IpcReq::Auth(auth_req),
+                            }))
+                        }
+                    }
+                })
+                .into_box()
+        }
+        IpcMsg::Req { req: IpcReq::Containers(cont_req), req_id } => {
+            let app_id = cont_req.app.id.clone();
+            let app_id2 = app_id.clone();
+
+            let c2 = client.clone();
+
+            get_config(client)
+                .and_then(move |(_config_version, config)| app_state(c2, &config, app_id))
+                .and_then(move |app_state| {
+                    match app_state {
+                        AppState::Authenticated => {
+                            Ok(Ok(IpcMsg::Req {
+                                req_id: req_id,
+                                req: IpcReq::Containers(cont_req),
+                            }))
+                        }
+                        AppState::Revoked |
+                        AppState::NotAuthenticated => {
+                            // App is not authenticated
+                            let err_code = ffi_error_code!(AuthError::from(IpcError::UnknownApp));
+
+                            let resp = IpcMsg::Resp {
+                                resp: IpcResp::Auth(Err(IpcError::UnknownApp)),
+                                req_id: req_id,
+                            };
+                            let resp = encode_response(&resp, app_id2)?;
+
+                            Ok(Err((err_code, resp)))
+                        }
+                    }
+                })
+                .into_box()
+        }
+        IpcMsg::Resp { .. } |
+        IpcMsg::Revoked { .. } |
+        IpcMsg::Err(..) => {
+            return err!(AuthError::IpcError(IpcError::InvalidMsg.into()));
+        }
+    }
+}
+
 /// Decodes a given encoded IPC message and calls a corresponding callback
 #[no_mangle]
 pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
@@ -99,85 +184,37 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
 
     catch_unwind_cb(user_data.0, o_err, || -> Result<_, AuthError> {
         let msg_raw = CStr::from_ptr(msg).to_str()?;
-        let msg = decode_msg(msg_raw)?;
-        match msg {
-            IpcMsg::Req { req: IpcReq::Auth(auth_req), req_id } => {
-                let app_id = auth_req.app.id.clone();
-                let app_id2 = app_id.clone();
-
-                (*auth).send(move |client| {
-                        let c2 = client.clone();
-
-                        get_config(client)
-                            .and_then(move |(_config_version, config)| {
-                                app_state(c2, &config, app_id)
-                            })
-                            .and_then(move |app_state| {
-                                match app_state {
-                                    AppState::Authenticated => {
-                                        // App is already registered, calling err callback
-                                        let resp = encode_response(&IpcMsg::Resp {
-                                            req_id: req_id,
-                                            resp: IpcResp::Auth(Err(IpcError::AlreadyAuthorised))
-                                        }, app_id2)?;
-
-                                        let err = AuthError::from(IpcError::AlreadyAuthorised);
-
-                                        o_err(user_data.0, ffi_error_code!(err), resp.as_ptr());
-                                    }
-                                    AppState::NotAuthenticated |
-                                    AppState::Revoked => {
-                                        // App is not registered yet or was previously registered
-                                        o_auth(user_data.0, req_id, &auth_req.into_repr_c()?);
-                                    }
-                                }
-                                Ok(())
-                            })
-                            .map_err(move |e| o_err(user_data.0, ffi_error_code!(e), ptr::null()))
-                            .into_box()
-                            .into()
-                    })?;
-            }
-            IpcMsg::Req { req: IpcReq::Containers(cont_req), req_id } => {
-                let app_id = cont_req.app.id.clone();
-                let app_id2 = app_id.clone();
-
-                (*auth).send(move |client| {
-                        let c2 = client.clone();
-
-                        get_config(client)
-                            .and_then(move |(_config_version, config)| {
-                                app_state(c2, &config, app_id)
-                            })
-                            .and_then(move |app_state| {
-                                match app_state {
-                                    AppState::Authenticated => {
-                                        o_containers(user_data.0, req_id, &cont_req.into_repr_c()?);
-                                    }
-                                    AppState::Revoked |
-                                    AppState::NotAuthenticated => {
-                                        // App is not authenticated
-                                        let resp = encode_response(&IpcMsg::Resp {
-                                            req_id: req_id,
-                                            resp: IpcResp::Auth(Err(IpcError::UnknownApp))
-                                        }, app_id2)?;
-
-                                        let err = AuthError::from(IpcError::UnknownApp);
-
-                                        o_err(user_data.0, ffi_error_code!(err), resp.as_ptr());
-                                    }
-                                }
-                                Ok(())
-                            })
-                            .map_err(move |e| o_err(user_data.0, ffi_error_code!(e), ptr::null()))
-                            .into_box()
-                            .into()
-                    })?;
-            }
-            _ => {
-                return Err(IpcError::InvalidMsg.into());
-            }
-        }
+        (*auth).send(move |client| {
+                decode_ipc_msg(client, msg_raw)
+                    .and_then(move |msg| {
+                        match msg {
+                            Ok(IpcMsg::Req { req: IpcReq::Auth(auth_req), req_id }) => {
+                                o_auth(user_data.0, req_id, &auth_req.into_repr_c()?);
+                            }
+                            Ok(IpcMsg::Req { req: IpcReq::Containers(cont_req), req_id }) => {
+                                o_containers(user_data.0, req_id, &cont_req.into_repr_c()?);
+                            }
+                            Err((err_code, err)) => {
+                                o_err(user_data.0, err_code, err.as_ptr());
+                            }
+                            Ok(IpcMsg::Resp { .. }) |
+                            Ok(IpcMsg::Revoked { .. }) |
+                            Ok(IpcMsg::Err(..)) => {
+                                o_err(user_data.0,
+                                      ffi_error_code!(AuthError::Unexpected("Unexpected msg \
+                                                                             type"
+                                          .to_owned())),
+                                      ptr::null_mut());
+                            }
+                        }
+                        Ok(())
+                    })
+                    .map_err(move |err| {
+                        o_err(user_data.0, ffi_error_code!(err), ptr::null_mut());
+                    })
+                    .into_box()
+                    .into()
+            })?;
         Ok(())
     })
 }
@@ -945,6 +982,3 @@ pub fn app_state(client: Client,
         None => ok!(AppState::NotAuthenticated),
     }
 }
-
-#[cfg(test)]
-mod tests {}

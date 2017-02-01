@@ -32,7 +32,7 @@ macro_rules! ffi_result_code {
 #[macro_export]
 macro_rules! ffi_error_code {
     ($err:expr) => {{
-        #[cfg_attr(feature = "clippy", allow(useless_attribute))]
+        #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
         #[allow(unused)]
         use $crate::ErrorCode;
 
@@ -53,7 +53,7 @@ macro_rules! try_cb {
         match $result {
             Ok(value) => value,
             Err(err) => {
-                #[cfg_attr(feature = "clippy", allow(useless_attribute))]
+                #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
                 #[allow(unused)]
                 use $crate::callback::{Callback, CallbackArgs};
                 $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());

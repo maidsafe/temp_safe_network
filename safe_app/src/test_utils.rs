@@ -21,22 +21,27 @@
 
 use super::{App, AppContext};
 use super::errors::AppError;
-use futures::{Future, IntoFuture, future};
-use maidsafe_utilities::serialisation::serialise;
-use rand;
-use routing::{Action, MutableData, PermissionSet, User, Value};
-use rust_sodium::crypto::{box_, secretbox, sign};
-use safe_core::{Client, CoreFuture, FutureExt, MDataInfo, utils};
-use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Config, Permission,
-                     access_container_enc_key};
-use safe_core::utils::test_utils::random_client;
+use ffi_utils::catch_unwind_error_code;
+use futures::{Future, IntoFuture};
+use safe_authenticator::test_utils as authenticator;
+use safe_core::{Client, FutureExt, utils};
+use safe_core::ipc::{AppExchangeInfo, Permission};
+use safe_core::ipc::req::{AuthReq, containers_from_repr_c, ffi};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
 
-const ACCESS_CONTAINER_TAG: u64 = 1000;
+/// Generates an `AppExchangeInfo` strucutre for a mock application
+pub fn gen_app_exchange_info() -> AppExchangeInfo {
+    AppExchangeInfo {
+        id: unwrap!(utils::generate_random_string(10)),
+        scope: None,
+        name: unwrap!(utils::generate_random_string(10)),
+        vendor: unwrap!(utils::generate_random_string(10)),
+    }
+}
 
-// Run the given closure inside the app's event loop. The return value of
-// the closure is returned immediately.
+/// Run the given closure inside the app's event loop. The return value of
+/// the closure is returned immediately.
 pub fn run_now<F, R>(app: &App, f: F) -> R
     where F: FnOnce(&Client, &AppContext) -> R + Send + 'static,
           R: Send + 'static
@@ -51,9 +56,9 @@ pub fn run_now<F, R>(app: &App, f: F) -> R
     unwrap!(rx.recv())
 }
 
-// Run the given closure inside the app event loop. The closure should
-// return a future which will then be driven to completion and its result
-// returned.
+/// Run the given closure inside the app event loop. The closure should
+/// return a future which will then be driven to completion and its result
+/// returned.
 pub fn run<F, I, T>(app: &App, f: F) -> T
     where F: FnOnce(&Client, &AppContext) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = AppError> + 'static,
@@ -76,152 +81,70 @@ pub fn run<F, I, T>(app: &App, f: F) -> T
     unwrap!(unwrap!(rx.recv()))
 }
 
-// Create registered app.
+/// Create registered app.
 pub fn create_app() -> App {
-    let app_id = unwrap!(utils::generate_random_string(10));
+    let auth = authenticator::create_account_and_login();
 
-    let enc_key = secretbox::gen_key();
-    let (sign_pk, sign_sk) = sign::gen_keypair();
-    let (enc_pk, enc_sk) = box_::gen_keypair();
+    let app_info = gen_app_exchange_info();
+    let app_id = app_info.id.clone();
 
-    // Create account and authorize the app key.
-    let owner_key = random_client(move |client| {
-        let owner_key = unwrap!(client.owner_key());
-        client.ins_auth_key(sign_pk, 1).map(move |_| owner_key)
-    });
-
-    let app_keys = AppKeys {
-        owner_key: owner_key,
-        enc_key: enc_key,
-        sign_pk: sign_pk,
-        sign_sk: sign_sk,
-        enc_pk: enc_pk,
-        enc_sk: enc_sk,
-    };
-
-    let access_container = AccessContInfo {
-        id: rand::random(),
-        tag: ACCESS_CONTAINER_TAG,
-        nonce: secretbox::gen_nonce(),
-    };
-
-    let auth_granted = AuthGranted {
-        app_keys: app_keys,
-        bootstrap_config: Config,
-        access_container: access_container,
-    };
+    let auth_granted = unwrap!(authenticator::register_app(&auth,
+                                                           &AuthReq {
+                                                               app: app_info,
+                                                               app_container: false,
+                                                               containers: HashMap::new(),
+                                                           }));
 
     unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }
 
-/*
-// Create unregistered app.
-pub fn create_unregistered_app() -> App {
-    unwrap!(App::unregistered(|_| ()))
-}
-*/
+/// Create app and grant it access to the specified containers.
+/// If `create_containers` is true, also create all the containers specified in
+/// the `access_info` and set their permissions accordingly.
+pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>) -> App {
+    let auth = authenticator::create_account_and_login();
 
-// Create app and grant it access to the specified containers.
-// If `create_containers` is true, also create all the containers specified in
-// the `access_info` and set their permissions accordingly.
-pub fn create_app_with_access(access_info: HashMap<String, (MDataInfo, BTreeSet<Permission>)>,
-                              create_containers: bool)
-                              -> App {
-    let app_id = unwrap!(utils::generate_random_string(10));
-    let enc_key = secretbox::gen_key();
-    let (sign_pk, sign_sk) = sign::gen_keypair();
-    let (enc_pk, enc_sk) = box_::gen_keypair();
+    let app_info = gen_app_exchange_info();
+    let app_id = app_info.id.clone();
 
-    // Create the access container.
-    let access_container_info = AccessContInfo {
-        id: rand::random(),
-        tag: ACCESS_CONTAINER_TAG,
-        nonce: secretbox::gen_nonce(),
-    };
+    let auth_granted = unwrap!(authenticator::register_app(&auth,
+                                                           &AuthReq {
+                                                               app: app_info,
+                                                               app_container: true,
+                                                               containers: access_info,
+                                                           }));
 
-    let access_container_key =
-        unwrap!(access_container_enc_key(&app_id, &enc_key, &access_container_info.nonce));
-
-    let access_container_value = {
-        let value = unwrap!(serialise(&access_info));
-        unwrap!(utils::symmetric_encrypt(&value, &enc_key, None))
-    };
-
-    let access_container_entries = btree_map![
-            access_container_key => Value {
-                content: access_container_value,
-                entry_version: 0,
-            }
-        ];
-
-    let access_container_name = access_container_info.id;
-    let access_container_type_tag = access_container_info.tag;
-
-    let container_infos: Vec<_> = access_info.into_iter().map(|(_key, (info, _))| info).collect();
-
-    // Put the access container on the network and authorise the app.
-    let owner_key = random_client(move |client| {
-        let owner_key = unwrap!(client.owner_key());
-
-        let access_container = unwrap!(MutableData::new(access_container_name,
-                                                        access_container_type_tag,
-                                                        Default::default(),
-                                                        access_container_entries,
-                                                        btree_set![owner_key]));
-
-        let f1 = client.put_mdata(access_container);
-        let f2 = client.ins_auth_key(sign_pk, 1);
-        let f3 = if create_containers {
-            create_all_mdata(client.clone(), container_infos)
-        } else {
-            future::ok(()).into_box()
-        };
-
-        f1.join3(f2, f3).map(move |_| owner_key)
-    });
-
-    let app_keys = AppKeys {
-        owner_key: owner_key,
-        enc_key: enc_key,
-        sign_pk: sign_pk,
-        sign_sk: sign_sk,
-        enc_pk: enc_pk,
-        enc_sk: enc_sk,
-    };
-
-    let auth_granted = AuthGranted {
-        app_keys: app_keys,
-        bootstrap_config: Config,
-        access_container: access_container_info,
-    };
-
-    unwrap!(App::registered(app_id, auth_granted, |_| ()))
+    unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }
 
-fn create_all_mdata(client: Client, infos: Vec<MDataInfo>) -> Box<CoreFuture<()>> {
-    let owner_key = unwrap!(client.owner_key());
+/// Creates a random app instance for testing
+#[no_mangle]
+#[allow(unsafe_code)]
+#[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
+pub extern "C" fn test_create_app(o_app: *mut *mut App) -> i32 {
+    catch_unwind_error_code(|| -> Result<(), AppError> {
+        let app = create_app();
+        unsafe {
+            *o_app = Box::into_raw(Box::new(app));
+        }
+        Ok(())
+    })
+}
 
-    // Allow everything for anyone.
-    let permissions = {
-        let set =
-            PermissionSet::new().allow(Action::Insert).allow(Action::Update).allow(Action::Delete);
-        btree_map![User::Anyone => set]
-    };
-
-    // FIXME: it should not be necessary to `collect` here, but
-    // without it the compiler chokes on "reached the recursion limit during
-    // monomorphization (selection ambiguity)"
-    let futs: Vec<_> = infos.into_iter()
-        .map(move |info| {
-            let mdata = unwrap!(MutableData::new(info.name,
-                                                 info.type_tag,
-                                                 permissions.clone(),
-                                                 Default::default(),
-                                                 btree_set![owner_key]));
-
-            client.put_mdata(mdata)
-        })
-        .collect();
-
-    future::join_all(futs).map(|_| ()).into_box()
+/// Create a random app instance for testing, with access to containers
+#[no_mangle]
+#[allow(unsafe_code)]
+#[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
+pub extern "C" fn test_create_app_with_access(access_info: *const ffi::ContainerPermissions,
+                                              access_info_len: usize,
+                                              o_app: *mut *mut App)
+                                              -> i32 {
+    catch_unwind_error_code(|| -> Result<(), AppError> {
+        let containers = unsafe { containers_from_repr_c(access_info, access_info_len)? };
+        let app = create_app_with_access(containers);
+        unsafe {
+            *o_app = Box::into_raw(Box::new(app));
+        }
+        Ok(())
+    })
 }

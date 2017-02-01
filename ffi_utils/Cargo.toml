@@ -10,7 +10,6 @@ repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.1.0"
 
 [dependencies]
-clippy = { version = "=0.0.99", optional = true }
 log = "~0.3.6"
 # TODO rand is only used by tests but putting it as dev-dependency fails to compile with
 # cargo rustc --release --features clippy --verbose -- --test -Zno-trans

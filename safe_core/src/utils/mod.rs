@@ -22,6 +22,7 @@
 #[macro_use]
 mod futures;
 /// Common utility functions for writting test cases
+#[cfg(any(test, feature="testing"))]
 pub mod test_utils;
 
 pub use self::futures::FutureExt;

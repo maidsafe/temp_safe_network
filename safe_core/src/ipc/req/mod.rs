@@ -130,7 +130,7 @@ impl ReprC for AuthReq {
     /// After calling this function, the subobjects memory is owned by the
     /// resulting object.
     #[allow(unsafe_code)]
-    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
     fn from_repr_c_cloned(repr_c: *const ffi::AuthReq) -> Result<Self, IpcError> {
         unsafe {
             Ok(AuthReq {
@@ -180,7 +180,7 @@ impl ReprC for ContainersReq {
     /// After calling this functions, the subobjects memory is owned by the
     /// resulting object.
     #[allow(unsafe_code)]
-    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
     fn from_repr_c_cloned(repr_c: *const ffi::ContainersReq) -> Result<Self, IpcError> {
         unsafe {
             Ok(ContainersReq {
@@ -233,7 +233,7 @@ impl ReprC for AppExchangeInfo {
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
     #[allow(unsafe_code)]
-    #[cfg_attr(feature="clippy", allow(not_unsafe_ptr_arg_deref))]
+    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
     fn from_repr_c_cloned(raw: *const ffi::AppExchangeInfo) -> Result<Self, IpcError> {
         unsafe {
             Ok(AppExchangeInfo {

@@ -108,32 +108,32 @@ mod tests {
     use ffi::immutable_data::*;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_2, call_3};
+    use futures::Future;
     use object_cache::CipherOptHandle;
     use routing::{XOR_NAME_LEN, XorName};
-    use safe_core::{DIR_TAG, MDataInfo};
     use safe_core::ipc::Permission;
     use safe_core::nfs::File as NativeFile;
     use safe_core::nfs::NfsError;
     use std::collections::HashMap;
     use std::ffi::CString;
-    use test_utils::{create_app_with_access, run_now};
+    use test_utils::{create_app_with_access, run, run_now};
 
     #[test]
     fn basics() {
-        let container_info = unwrap!(MDataInfo::random_private(DIR_TAG));
-
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert("_test".to_string(),
-                                             (container_info.clone(),
-                                              btree_set![Permission::Read,
-                                                         Permission::Insert,
-                                                         Permission::Update,
-                                                         Permission::Delete]));
+        let _ = container_permissions.insert("_videos".to_string(),
+                                             btree_set![Permission::Read,
+                                                        Permission::Insert,
+                                                        Permission::Update,
+                                                        Permission::Delete]);
 
-        let app = create_app_with_access(container_permissions, true);
+        let app = create_app_with_access(container_permissions);
 
-        let container_info_h = run_now(&app, move |_, context| {
-            context.object_cache().insert_mdata_info(container_info)
+        let container_info_h = run(&app, move |client, context| {
+            let context = context.clone();
+
+            context.get_container_mdata_info(client, "_videos")
+                .map(move |info| context.object_cache().insert_mdata_info(info))
         });
 
         let file_name0 = "file0.txt";

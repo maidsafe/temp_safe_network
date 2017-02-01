@@ -22,7 +22,7 @@
 //! App-related IPC utilities.
 
 use errors::AppError;
-use ffi_utils::{ReprC, catch_unwind_cb, catch_unwind_error_code, from_c_str};
+use ffi_utils::{ReprC, catch_unwind_cb, from_c_str};
 use safe_core::ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
@@ -34,11 +34,13 @@ use std::os::raw::{c_char, c_void};
 #[no_mangle]
 pub unsafe extern "C" fn encode_auth_req(req: *const FfiAuthReq,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, u32, *const c_char))
-                                         -> i32 {
-    catch_unwind_error_code(|| -> Result<_, AppError> {
-        let req = AuthReq::from_repr_c_cloned(req)?;
+                                         o_cb: extern "C" fn(*mut c_void,
+                                                             i32,
+                                                             u32,
+                                                             *const c_char)) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
+        let req = AuthReq::from_repr_c_cloned(req)?;
 
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -48,7 +50,7 @@ pub unsafe extern "C" fn encode_auth_req(req: *const FfiAuthReq,
         let encoded = ipc::encode_msg(&msg, "safe-auth")?;
         let encoded = CString::new(encoded)?;
 
-        o_cb(user_data, req_id, encoded.as_ptr());
+        o_cb(user_data, 0, req_id, encoded.as_ptr());
 
         Ok(())
     })
@@ -59,12 +61,12 @@ pub unsafe extern "C" fn encode_auth_req(req: *const FfiAuthReq,
 pub unsafe extern "C" fn encode_containers_req(req: *const FfiContainersReq,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
+                                                                   i32,
                                                                    u32,
-                                                                   *const c_char))
-                                               -> i32 {
-    catch_unwind_error_code(|| -> Result<_, AppError> {
-        let req = ContainersReq::from_repr_c_cloned(req)?;
+                                                                   *const c_char)) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
+        let req = ContainersReq::from_repr_c_cloned(req)?;
 
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -74,7 +76,7 @@ pub unsafe extern "C" fn encode_containers_req(req: *const FfiContainersReq,
         let encoded = ipc::encode_msg(&msg, "safe-auth")?;
         let encoded = CString::new(encoded)?;
 
-        o_cb(user_data, req_id, encoded.as_ptr());
+        o_cb(user_data, 0, req_id, encoded.as_ptr());
 
         Ok(())
     })
@@ -123,31 +125,19 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::from_c_str;
+    use ffi_utils::test_utils::call_2;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
-    use safe_core::ipc::{self, AccessContInfo, AppExchangeInfo, AppKeys, AuthGranted, AuthReq,
-                         Config, ContainersReq, IpcMsg, IpcReq, IpcResp};
+    use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, Config, ContainersReq,
+                         IpcMsg, IpcReq, IpcResp};
     use safe_core::ipc::req::ffi::Permission;
     use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use safe_core::utils;
     use std::collections::HashMap;
     use std::ffi::CString;
     use std::mem;
-    use std::os::raw::{c_char, c_void};
-
-    struct EncodedCtx {
-        req_id: u32,
-        encoded: String,
-    }
-
-    extern "C" fn encoded_cb(ctx: *mut c_void, req_id: u32, string: *const c_char) {
-        unsafe {
-            let ctx = ctx as *mut EncodedCtx;
-            (*ctx).req_id = req_id;
-            (*ctx).encoded = unwrap!(from_c_str(string));
-        }
-    }
+    use std::os::raw::c_void;
+    use test_utils::gen_app_exchange_info;
 
     #[test]
     fn encode_auth_req_basics() {
@@ -159,15 +149,8 @@ mod tests {
 
         let req_c = unwrap!(req.clone().into_repr_c());
 
-        let context = EncodedCtx {
-            req_id: 0,
-            encoded: String::new(),
-        };
-        let context_ptr: *const EncodedCtx = &context;
-        let error_code = unsafe { encode_auth_req(&req_c, context_ptr as *mut _, encoded_cb) };
-        assert_eq!(error_code, 0);
-
-        let EncodedCtx { req_id, encoded } = context;
+        let (req_id, encoded): (u32, String) =
+            unsafe { unwrap!(call_2(|ud, cb| encode_auth_req(&req_c, ud, cb))) };
 
         // Decode it and verify it's the same we encoded.
         assert!(encoded.starts_with("safe-auth:"));
@@ -195,17 +178,8 @@ mod tests {
 
         let req_c = unwrap!(req.clone().into_repr_c());
 
-        let context = EncodedCtx {
-            req_id: 0,
-            encoded: String::new(),
-        };
-        let context_ptr: *const EncodedCtx = &context;
-
-        let error_code =
-            unsafe { encode_containers_req(&req_c, context_ptr as *mut _, encoded_cb) };
-        assert_eq!(error_code, 0);
-
-        let EncodedCtx { req_id, encoded } = context;
+        let (req_id, encoded): (u32, String) =
+            unsafe { unwrap!(call_2(|ud, cb| encode_containers_req(&req_c, ud, cb))) };
 
         // Decode it and verify it's the same we encoded.
         assert!(encoded.starts_with("safe-auth:"));
@@ -383,15 +357,6 @@ mod tests {
             sign_sk: sign_sk,
             enc_pk: enc_pk,
             enc_sk: enc_sk,
-        }
-    }
-
-    fn gen_app_exchange_info() -> AppExchangeInfo {
-        AppExchangeInfo {
-            id: unwrap!(utils::generate_random_string(10)),
-            scope: None,
-            name: unwrap!(utils::generate_random_string(10)),
-            vendor: unwrap!(utils::generate_random_string(10)),
         }
     }
 }
