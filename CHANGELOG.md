@@ -1,5 +1,8 @@
 # Safe Core - Change Log
 
+## [0.22.2]
+- Integrate with routing 0.28.0
+
 ## [0.22.1]
 - API to get MAID-Public signing key.
 
