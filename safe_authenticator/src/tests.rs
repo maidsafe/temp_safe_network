@@ -519,8 +519,9 @@ impl ReprC for RegisteredAppId {
     type C = *const RegisteredApp;
     type Error = StringError;
 
-    fn from_repr_c_cloned(ffi: *const RegisteredApp) -> Result<RegisteredAppId, StringError> {
-        Ok(RegisteredAppId(unsafe { from_c_str((*ffi).app_info.id)? }))
+    unsafe fn from_repr_c_cloned(ffi: *const RegisteredApp)
+                                 -> Result<RegisteredAppId, StringError> {
+        Ok(RegisteredAppId(from_c_str((*ffi).app_info.id)?))
     }
 }
 
@@ -529,9 +530,9 @@ impl ReprC for RevokedAppId {
     type C = *const FfiAppExchangeInfo;
     type Error = StringError;
 
-    fn from_repr_c_cloned(app_info: *const FfiAppExchangeInfo)
-                          -> Result<RevokedAppId, StringError> {
-        Ok(RevokedAppId(unsafe { from_c_str((*app_info).id)? }))
+    unsafe fn from_repr_c_cloned(app_info: *const FfiAppExchangeInfo)
+                                 -> Result<RevokedAppId, StringError> {
+        Ok(RevokedAppId(from_c_str((*app_info).id)?))
     }
 }
 
