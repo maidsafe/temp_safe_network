@@ -209,24 +209,15 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy))]
-#![cfg_attr(feature="clippy", allow(use_debug, similar_names))] // "mpid" and "maid" are similar.
-
 extern crate accumulator;
 extern crate fs2;
 #[macro_use]
 extern crate log;
 extern crate lru_time_cache;
 extern crate itertools;
-extern crate kademlia_routing_table;
 #[macro_use]
 extern crate maidsafe_utilities;
 extern crate config_file_handler;
-// Needed because the crate is only used for macros
-#[cfg_attr(feature="clippy", allow(useless_attribute))]
-#[allow(unused_extern_crates)]
 #[macro_use]
 extern crate quick_error;
 #[cfg(any(test, feature = "use-mock-crust"))]
@@ -255,3 +246,6 @@ mod vault;
 pub mod mock_crust_detail;
 pub use config_handler::Config;
 pub use vault::Vault;
+
+/// The number of nodes in groups managing data and user accounts.
+pub const GROUP_SIZE: usize = 8;

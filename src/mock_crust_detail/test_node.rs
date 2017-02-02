@@ -15,20 +15,16 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-
+use super::poll;
 use config_handler::Config;
-use kademlia_routing_table::RoutingTable;
-
 use personas::data_manager::IdAndVersion;
 use rand::{self, Rng};
-use routing::XorName;
+use routing::{RoutingTable, XorName};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use rustc_serialize::hex::ToHex;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-
-use super::poll;
 use vault::Vault;
 
 /// Test node for mock network
@@ -110,12 +106,12 @@ impl TestNode {
     }
 
     /// Resend all unacknowledged messages.
-    pub fn resend_unacknowledged(&self) -> bool {
+    pub fn resend_unacknowledged(&mut self) -> bool {
         self.vault.resend_unacknowledged()
     }
 
     /// Clear routing node state..
-    pub fn clear_state(&self) {
+    pub fn clear_state(&mut self) {
         self.vault.clear_state()
     }
 
