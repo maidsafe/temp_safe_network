@@ -125,8 +125,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                     let ser_data_map = serialise(&data_map)?;
                     let enc_data_map = {
                         let cipher_opt = context2.object_cache().get_cipher_opt(cipher_opt_h)?;
-                        let sym_key = context2.sym_enc_key()?;
-                        cipher_opt.encrypt(&ser_data_map, sym_key)?
+                        cipher_opt.encrypt(&ser_data_map, &context2)?
                     };
 
                     Ok(enc_data_map)
@@ -175,10 +174,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
             immutable_data::get_value(client, &name, None)
                 .map_err(AppError::from)
                 .and_then(move |enc_data_map| {
-                    let sym_key = context2.sym_enc_key()?;
-                    let (asym_pk, asym_sk) = client2.encryption_keypair()?;
-                    let ser_data_map =
-                        CipherOpt::decrypt(&enc_data_map, sym_key, &asym_pk, &asym_sk)?;
+                    let ser_data_map = CipherOpt::decrypt(&enc_data_map, &context2, &client2)?;
                     let data_map = deserialise(&ser_data_map)?;
 
                     Ok(data_map)
