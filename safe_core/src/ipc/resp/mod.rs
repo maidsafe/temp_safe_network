@@ -24,9 +24,9 @@ pub mod ffi;
 
 use client::MDataInfo;
 use ffi_utils::vec_into_raw_parts;
-use ipc::{BootstrapConfig, IpcError};
+use ipc::IpcError;
 use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
-use routing::XorName;
+use routing::{BootstrapConfig, XorName};
 use rust_sodium::crypto::{box_, hash, secretbox, sign};
 use std::slice;
 
@@ -60,11 +60,11 @@ impl AuthGranted {
     pub fn into_repr_c(self) -> Result<ffi::AuthGranted, SerialisationError> {
         let AuthGranted { app_keys, bootstrap_config, access_container } = self;
         let bootstrap_config = serialise(&bootstrap_config)?;
-        let (p, len, cap) = vec_into_raw_parts(bootstrap_config);
+        let (ptr, len, cap) = vec_into_raw_parts(bootstrap_config);
         Ok(ffi::AuthGranted {
             app_keys: app_keys.into_repr_c(),
             access_container: access_container.into_repr_c(),
-            bootstrap_config: p,
+            bootstrap_config_ptr: ptr,
             bootstrap_config_len: len,
             bootstrap_config_cap: cap,
         })
@@ -78,11 +78,10 @@ impl AuthGranted {
     pub unsafe fn from_repr_c(repr_c: *const ffi::AuthGranted) -> Result<Self, SerialisationError> {
         let ffi::AuthGranted { app_keys,
                                access_container,
-                               bootstrap_config,
+                               bootstrap_config_ptr,
                                bootstrap_config_len,
                                .. } = *repr_c;
-        let bootstrap_config = slice::from_raw_parts(bootstrap_config as *mut _,
-                                                     bootstrap_config_len);
+        let bootstrap_config = slice::from_raw_parts(bootstrap_config_ptr, bootstrap_config_len);
         let bootstrap_config = deserialise(bootstrap_config)?;
         Ok(AuthGranted {
             app_keys: AppKeys::from_repr_c(app_keys),

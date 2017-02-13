@@ -19,11 +19,10 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use ipc::BootstrapConfig;
 use maidsafe_utilities::thread;
 use rand;
-use routing::{Authority, ClientError, EntryAction, Event, FullId, ImmutableData, InterfaceError,
-              MessageId, MutableData, PermissionSet, Response, RoutingError,
+use routing::{Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, ImmutableData,
+              InterfaceError, MessageId, MutableData, PermissionSet, Response, RoutingError,
               TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;

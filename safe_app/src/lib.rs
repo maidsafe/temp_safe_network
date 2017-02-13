@@ -114,6 +114,8 @@ pub struct App {
 
 impl App {
     /// Create unregistered app.
+    /// TODO: add a `BootstrapConfig` argument to this function and
+    /// figure out what to pass to it.
     pub fn unregistered<N>(network_observer: N) -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
     {
@@ -134,7 +136,7 @@ impl App {
         let AuthGranted {
             app_keys: AppKeys { owner_key, enc_key, enc_pk, enc_sk, sign_pk, sign_sk },
             access_container,
-            ..
+            bootstrap_config,
         } = auth_granted;
 
         let client_keys = ClientKeys {
@@ -145,7 +147,12 @@ impl App {
         };
 
         Self::new(network_observer, move |el_h, core_tx, net_tx| {
-            let client = Client::from_keys(client_keys, owner_key, el_h, core_tx, net_tx, None)?;
+            let client = Client::from_keys(client_keys,
+                                           owner_key,
+                                           el_h,
+                                           core_tx,
+                                           net_tx,
+                                           bootstrap_config)?;
             let context = AppContext::registered(app_id, enc_key, access_container);
             Ok((client, context))
         })

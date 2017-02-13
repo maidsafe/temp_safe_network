@@ -134,6 +134,7 @@ impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will
     /// create an unregistered random client, which can do very limited set of
     /// operations - eg., a Network-Get
+    /// TODO: add `BootstrapConfig` argument.
     pub fn unregistered<T>(el_handle: Handle,
                            core_tx: CoreMsgTx<T>,
                            net_tx: NetworkTx)
@@ -302,12 +303,12 @@ impl Client {
                         el_handle: Handle,
                         core_tx: CoreMsgTx<T>,
                         net_tx: NetworkTx,
-                        config: Option<BootstrapConfig>)
+                        config: BootstrapConfig)
                         -> Result<Client, CoreError>
         where T: 'static
     {
         trace!("Attempting to log into an acc using client keys.");
-        let (routing, routing_rx) = setup_routing(Some(keys.clone().into()), config)?;
+        let (routing, routing_rx) = setup_routing(Some(keys.clone().into()), Some(config))?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
