@@ -19,13 +19,13 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-use App;
+use {App, AppContext};
 use errors::AppError;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{CipherOptHandle, EncryptKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
-use safe_core::CoreError;
+use safe_core::{Client, CoreError};
 use std::os::raw::c_void;
 
 /// Cipher Options
@@ -54,15 +54,12 @@ enum WireFormat {
 
 impl CipherOpt {
     /// Encrypt plain text
-    pub fn encrypt(&self,
-                   plain_text: &[u8],
-                   sym_key: &secretbox::Key)
-                   -> Result<Vec<u8>, AppError> {
+    pub fn encrypt(&self, plain_text: &[u8], app_ctx: &AppContext) -> Result<Vec<u8>, AppError> {
         match *self {
             CipherOpt::PlainText => Ok(serialise(&WireFormat::Plain(plain_text.to_owned()))?),
             CipherOpt::Symmetric => {
                 let nonce = secretbox::gen_nonce();
-                let cipher_text = secretbox::seal(plain_text, &nonce, sym_key);
+                let cipher_text = secretbox::seal(plain_text, &nonce, app_ctx.sym_enc_key()?);
                 let wire_format = WireFormat::Symmetric {
                     nonce: nonce,
                     cipher_text: cipher_text,
@@ -79,9 +76,8 @@ impl CipherOpt {
 
     /// Decrypt something encrypted by CipherOpt::encrypt()
     pub fn decrypt(cipher_text: &[u8],
-                   sym_key: &secretbox::Key,
-                   asym_pk: &box_::PublicKey,
-                   asym_sk: &box_::SecretKey)
+                   app_ctx: &AppContext,
+                   client: &Client)
                    -> Result<Vec<u8>, AppError> {
         if cipher_text.is_empty() {
             return Ok(Vec::new());
@@ -90,11 +86,12 @@ impl CipherOpt {
         match deserialise::<WireFormat>(cipher_text)? {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {
-                Ok(secretbox::open(&cipher_text, &nonce, sym_key)
+                Ok(secretbox::open(&cipher_text, &nonce, app_ctx.sym_enc_key()?)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)?)
             }
             WireFormat::Asymmetric(cipher_text) => {
-                Ok(sealedbox::open(&cipher_text, asym_pk, asym_sk)
+                let (asym_pk, asym_sk) = client.encryption_keypair()?;
+                Ok(sealedbox::open(&cipher_text, &asym_pk, &asym_sk)
                     .map_err(|()| CoreError::AsymmetricDecipherFailure)?)
             }
         }
@@ -209,8 +206,7 @@ mod tests {
         }
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_handle));
-            let enc_key = unwrap!(context.sym_enc_key());
-            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, enc_key));
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, &context));
             (plain_text, cipher_text)
         });
         assert!(cipher_text != plain_text);
@@ -237,8 +233,7 @@ mod tests {
         }
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_handle));
-            let enc_key = unwrap!(context.sym_enc_key());
-            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, enc_key));
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, &context));
             (plain_text, cipher_text)
         });
         assert!(cipher_text != plain_text);
@@ -276,8 +271,7 @@ mod tests {
         let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_h));
-            let sym_key = unwrap!(context.sym_enc_key());
-            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, sym_key));
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, &context));
             (plain_text, cipher_text)
         });
 
@@ -363,10 +357,7 @@ mod tests {
                          cipher_text: &[u8],
                          orig_plain_text: &[u8])
                          -> bool {
-        let sym_key = unwrap!(context.sym_enc_key());
-        let (asym_pk, asym_sk) = unwrap!(client.encryption_keypair());
-
-        let plain_text = match CipherOpt::decrypt(cipher_text, sym_key, &asym_pk, &asym_sk) {
+        let plain_text = match CipherOpt::decrypt(cipher_text, context, client) {
             Ok(text) => text,
             Err(_) => return false,
         };
