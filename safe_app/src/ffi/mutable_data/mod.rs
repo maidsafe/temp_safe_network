@@ -29,7 +29,7 @@ mod tests;
 use App;
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts, vec_into_raw_parts};
+use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
 use futures::Future;
 use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle, MDataKeysHandle,
                    MDataPermissionSetHandle, MDataPermissionsHandle, MDataValuesHandle,
@@ -37,6 +37,7 @@ use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle,
 use routing::MutableData;
 use safe_core::{CoreError, FutureExt, mdata_info};
 use std::os::raw::c_void;
+use std::ptr;
 
 /// Create new mutable data and put it on the network.
 ///
@@ -122,8 +123,7 @@ pub unsafe extern "C" fn mdata_get_version(app: *const App,
 ///     2. error code
 ///     3. pointer to content
 ///     4. content length
-///     5. content capacity
-///     6. entry version
+///     5. entry version
 #[no_mangle]
 pub unsafe extern "C" fn mdata_get_value(app: *const App,
                                          info_h: MDataInfoHandle,
@@ -132,21 +132,31 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
                                          user_data: *mut c_void,
                                          o_cb: extern "C" fn(*mut c_void,
                                                              i32,
-                                                             *mut u8,
-                                                             usize,
+                                                             *const u8,
                                                              usize,
                                                              u64)) {
     catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
         let key = vec_clone_from_raw_parts(key_ptr, key_len);
 
-        send_with_mdata_info(app, info_h, user_data, o_cb, move |client, _, info| {
+        (*app).send(move |client, context| {
+            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
+                               user_data,
+                               o_cb);
             let info = info.clone();
+
             client.get_mdata_value(info.name, info.type_tag, key)
                 .and_then(move |value| {
                     let content = info.decrypt(&value.content)?;
-                    let content = vec_into_raw_parts(content);
-                    Ok((content.0, content.1, content.2, value.entry_version))
+                    Ok((content, value.entry_version))
                 })
+                .map(move |(content, version)| {
+                    o_cb(user_data.0, 0, content.as_ptr(), content.len(), version);
+                })
+                .map_err(AppError::from)
+                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null(), 0, 0))
+                .into_box()
+                .into()
         })
     })
 }

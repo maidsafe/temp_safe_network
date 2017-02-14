@@ -19,6 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use super::{App, AppContext};
+use super::errors::AppError;
 use ffi_utils::catch_unwind_error_code;
 use futures::{Future, IntoFuture};
 use safe_authenticator::test_utils as authenticator;
@@ -27,8 +29,6 @@ use safe_core::ipc::{AppExchangeInfo, Permission};
 use safe_core::ipc::req::{AuthReq, containers_from_repr_c, ffi};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::mpsc;
-use super::{App, AppContext};
-use super::errors::AppError;
 
 /// Generates an `AppExchangeInfo` strucutre for a mock application
 pub fn gen_app_exchange_info() -> AppExchangeInfo {

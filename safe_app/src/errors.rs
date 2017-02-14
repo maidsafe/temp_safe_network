@@ -19,7 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-
+pub use self::codes::*;
 use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
@@ -27,7 +27,6 @@ use routing::ClientError;
 use safe_core::{CoreError, SelfEncryptionStorageError};
 use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
-pub use self::codes::*;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
 use std::ffi::NulError;

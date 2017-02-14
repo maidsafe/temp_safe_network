@@ -204,9 +204,9 @@ fn decrypt_value(info: &MDataInfo, value: &Value) -> Result<Value, CoreError> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use rand;
     use rust_sodium::crypto::secretbox;
-    use super::*;
 
     #[test]
     fn private_mdata_info_encrypts() {

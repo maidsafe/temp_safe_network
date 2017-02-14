@@ -27,6 +27,12 @@ mod account;
 mod mock;
 mod routing_event_loop;
 
+use self::account::Account;
+pub use self::account::ClientKeys;
+pub use self::mdata_info::MDataInfo;
+#[cfg(feature = "use-mock-routing")]
+use self::mock::Routing;
+use super::DIR_TAG;
 use errors::CoreError;
 use event::{CoreEvent, NetworkEvent, NetworkTx};
 use event_loop::{CoreMsg, CoreMsgTx};
@@ -36,24 +42,18 @@ use ipc::BootstrapConfig;
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::{AccountInfo, Authority, EntryAction, Event, FullId, ImmutableData, InterfaceError,
-              MessageId, MutableData, PermissionSet, Response, TYPE_TAG_SESSION_PACKET, User,
-              Value, XorName};
+              MessageId, MutableData, PermissionSet, Response, TYPE_TAG_SESSION_PACKET, User, Value,
+              XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256::{self, Digest};
-use self::account::Account;
-pub use self::account::ClientKeys;
-pub use self::mdata_info::MDataInfo;
-#[cfg(feature = "use-mock-routing")]
-use self::mock::Routing;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
-use super::DIR_TAG;
 use tokio_core::reactor::{Handle, Timeout};
 use utils::{self, FutureExt};
 
@@ -335,7 +335,7 @@ impl Client {
     }
 
     #[doc(hidden)]
-    pub fn restart_routing<T>(&self, mut core_tx: CoreMsgTx<T>, mut net_tx: NetworkTx)
+    pub fn restart_routing<T>(&self, core_tx: CoreMsgTx<T>, net_tx: NetworkTx)
         where T: 'static
     {
         let opt_id = if let ClientType::Registered { ref acc, .. } = self.inner().client_type {
@@ -1050,6 +1050,7 @@ fn create_empty_dir(routing: &Routing,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use DIR_TAG;
     use errors::CoreError;
     use futures::Future;
@@ -1057,7 +1058,6 @@ mod tests {
     #[cfg(feature = "use-mock-routing")]
     use rand;
     use routing::{ClientError, ImmutableData};
-    use super::*;
     use tokio_core::reactor::Core;
     use utils;
     use utils::test_utils::{finish, random_client, setup_client};

@@ -26,7 +26,6 @@ pub mod resp;
 
 mod errors;
 
-pub use routing::BootstrapConfig;
 pub use self::errors::IpcError;
 pub use self::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 pub use self::req::ffi::Permission;
@@ -34,6 +33,7 @@ pub use self::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp, access_conta
 use ffi_utils::{base64_decode, base64_encode};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::{self, Rng};
+pub use routing::BootstrapConfig;
 use std::u32;
 
 #[derive(RustcEncodable, RustcDecodable, Debug)]

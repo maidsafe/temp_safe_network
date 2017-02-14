@@ -519,8 +519,7 @@ impl ReprC for RegisteredAppId {
     type C = *const RegisteredApp;
     type Error = StringError;
 
-    unsafe fn from_repr_c_cloned(ffi: *const RegisteredApp)
-                                 -> Result<RegisteredAppId, StringError> {
+    unsafe fn clone_from_repr_c(ffi: *const RegisteredApp) -> Result<RegisteredAppId, StringError> {
         Ok(RegisteredAppId(from_c_str((*ffi).app_info.id)?))
     }
 }
@@ -530,8 +529,8 @@ impl ReprC for RevokedAppId {
     type C = *const FfiAppExchangeInfo;
     type Error = StringError;
 
-    unsafe fn from_repr_c_cloned(app_info: *const FfiAppExchangeInfo)
-                                 -> Result<RevokedAppId, StringError> {
+    unsafe fn clone_from_repr_c(app_info: *const FfiAppExchangeInfo)
+                                -> Result<RevokedAppId, StringError> {
         Ok(RevokedAppId(from_c_str((*app_info).id)?))
     }
 }
@@ -635,7 +634,7 @@ fn decode_ipc_msg(authenticator: &Authenticator,
 
     extern "C" fn auth_cb(user_data: *mut c_void, req_id: u32, req: *const FfiAuthReq) {
         unsafe {
-            let req = match AuthReq::from_repr_c_cloned(req) {
+            let req = match AuthReq::clone_from_repr_c(req) {
                 Ok(req) => req,
                 Err(_) => {
                     return send_via_user_data(user_data,
@@ -656,7 +655,7 @@ fn decode_ipc_msg(authenticator: &Authenticator,
                                 req_id: u32,
                                 req: *const FfiContainersReq) {
         unsafe {
-            let req = match ContainersReq::from_repr_c_cloned(req) {
+            let req = match ContainersReq::clone_from_repr_c(req) {
                 Ok(req) => req,
                 Err(_) => {
                     return send_via_user_data(user_data,
