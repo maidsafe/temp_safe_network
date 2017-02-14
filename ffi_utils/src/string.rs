@@ -31,11 +31,11 @@ impl ReprC for String {
     type C = *const c_char;
     type Error = StringError;
 
-    fn from_repr_c_cloned(c_repr: Self::C) -> Result<String, StringError> {
+    unsafe fn from_repr_c_cloned(c_repr: Self::C) -> Result<String, StringError> {
         Ok(if c_repr.is_null() {
             "".to_owned()
         } else {
-            unsafe { from_c_str(c_repr)? }
+            from_c_str(c_repr)?
         })
     }
 }
