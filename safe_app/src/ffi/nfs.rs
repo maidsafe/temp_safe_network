@@ -70,7 +70,7 @@ pub unsafe extern "C" fn file_insert(app: *const App,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let file = NativeFile::from_repr_c_cloned(file)?;
+        let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn file_update(app: *const App,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let file = NativeFile::from_repr_c_cloned(file)?;
+        let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
@@ -101,6 +101,7 @@ pub unsafe extern "C" fn file_update(app: *const App,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use App;
     use errors::AppError;
     use ffi::cipher_opt::CipherOpt;
@@ -115,7 +116,6 @@ mod tests {
     use safe_core::nfs::NfsError;
     use std::collections::HashMap;
     use std::ffi::CString;
-    use super::*;
     use test_utils::{create_app_with_access, run, run_now};
 
     #[test]

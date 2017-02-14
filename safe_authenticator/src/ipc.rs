@@ -19,6 +19,9 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
+use super::access_container::{access_container, access_container_entry, access_container_nonce,
+                              put_access_container_entry};
 use ffi_utils::{OpaqueCtx, ReprC, StringError, base64_encode, catch_unwind_cb, from_c_str};
 use futures::{Future, future};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
@@ -37,9 +40,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::ptr;
-use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
-use super::access_container::{access_container, access_container_entry, access_container_nonce,
-                              put_access_container_entry};
 
 
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
@@ -247,9 +247,7 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                         Ok(app.ok_or(AuthError::IpcError(IpcError::UnknownApp))?)
                     })
                     .and_then(move |app| {
-                        access_container(c2).map(move |access_container| {
-                            (access_container, app)
-                        })
+                        access_container(c2).map(move |access_container| (access_container, app))
                     })
                     .and_then(move |(access_container, app)| {
                         // Get an access container entry for the app being revoked
@@ -334,7 +332,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
-        let auth_req = AuthReq::from_repr_c_cloned(req)?;
+        let auth_req = AuthReq::clone_from_repr_c(req)?;
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
@@ -438,7 +436,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
-        let cont_req = ContainersReq::from_repr_c_cloned(req)?;
+        let cont_req = ContainersReq::clone_from_repr_c(req)?;
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {

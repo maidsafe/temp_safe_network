@@ -40,7 +40,7 @@ pub unsafe extern "C" fn encode_auth_req(req: *const FfiAuthReq,
                                                              *const c_char)) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
-        let req = AuthReq::from_repr_c_cloned(req)?;
+        let req = AuthReq::clone_from_repr_c(req)?;
 
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -66,7 +66,7 @@ pub unsafe extern "C" fn encode_containers_req(req: *const FfiContainersReq,
                                                                    *const c_char)) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
-        let req = ContainersReq::from_repr_c_cloned(req)?;
+        let req = ContainersReq::clone_from_repr_c(req)?;
 
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -130,6 +130,8 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use ffi_utils::ReprC;
     use ffi_utils::test_utils::call_2;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
@@ -142,7 +144,6 @@ mod tests {
     use std::ffi::CString;
     use std::mem;
     use std::os::raw::c_void;
-    use super::*;
     use test_utils::gen_app_exchange_info;
 
     #[test]
@@ -243,7 +244,7 @@ mod tests {
                 unsafe {
                     let ctx = ctx as *mut Context;
                     (*ctx).req_id = req_id;
-                    (*ctx).auth_granted = unwrap!(AuthGranted::from_repr_c(auth_granted));
+                    (*ctx).auth_granted = unwrap!(AuthGranted::clone_from_repr_c(auth_granted));
                 }
             }
 

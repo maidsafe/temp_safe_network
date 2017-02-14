@@ -21,7 +21,7 @@
 
 //! Utilities for passing strings across FFI boundaries.
 
-use ffi_repr::ReprC;
+use repr_c::ReprC;
 use std::error::Error;
 use std::ffi::{CStr, IntoStringError, NulError};
 use std::os::raw::c_char;
@@ -31,7 +31,7 @@ impl ReprC for String {
     type C = *const c_char;
     type Error = StringError;
 
-    unsafe fn from_repr_c_cloned(c_repr: Self::C) -> Result<String, StringError> {
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<String, StringError> {
         Ok(if c_repr.is_null() {
             "".to_owned()
         } else {

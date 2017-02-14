@@ -19,6 +19,7 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+use super::cipher_opt::CipherOpt;
 use App;
 use errors::AppError;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
@@ -30,7 +31,6 @@ use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr};
 use std::os::raw::c_void;
-use super::cipher_opt::CipherOpt;
 
 type SEWriterHandle = SelfEncryptorWriterHandle;
 type SEReaderHandle = SelfEncryptorReaderHandle;
@@ -56,9 +56,7 @@ pub unsafe extern "C" fn idata_new_self_encryptor(app: *const App,
                     let handle = context.object_cache().insert_se_writer(se);
                     o_cb(user_data.0, 0, handle);
                 })
-                .map_err(move |e| {
-                    o_cb(user_data.0, ffi_error_code!(e), 0);
-                })
+                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), 0); })
                 .into_box();
 
             Some(fut)
@@ -189,9 +187,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
                     let handle = context3.object_cache().insert_se_reader(se_reader);
                     o_cb(user_data.0, 0, handle);
                 })
-                .map_err(move |e| {
-                    o_cb(user_data.0, ffi_error_code!(e), 0);
-                })
+                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), 0); })
                 .into_box()
                 .into()
         })
@@ -263,9 +259,7 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
                     mem::forget(data);
                 })
                 .map_err(AppError::from)
-                .map_err(move |e| {
-                    o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0);
-                })
+                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0); })
                 .into_box();
 
             Some(fut)
@@ -309,13 +303,13 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use errors::AppError;
     use ffi::cipher_opt::*;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_3};
     use routing::XOR_NAME_LEN;
     use safe_core::utils;
-    use super::*;
     use test_utils::create_app;
 
     #[test]

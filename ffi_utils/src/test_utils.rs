@@ -21,7 +21,7 @@
 
 //! Test utilities.
 
-use ffi_repr::ReprC;
+use repr_c::ReprC;
 use std::fmt::Debug;
 use std::os::raw::c_void;
 use std::slice;
@@ -124,7 +124,7 @@ extern "C" fn callback_1<E, T>(user_data: *mut c_void, error: i32, arg: T::C)
 {
     unsafe {
         let result: Result<T, i32> = if error == 0 {
-            Ok(unwrap!(T::from_repr_c_cloned(arg)))
+            Ok(unwrap!(T::clone_from_repr_c(arg)))
         } else {
             Err(error)
         };
@@ -143,7 +143,7 @@ extern "C" fn callback_2<E0, E1, T0, T1>(user_data: *mut c_void,
 {
     unsafe {
         let result: Result<(T0, T1), i32> = if error == 0 {
-            Ok((unwrap!(T0::from_repr_c_cloned(arg0)), unwrap!(T1::from_repr_c_cloned(arg1))))
+            Ok((unwrap!(T0::clone_from_repr_c(arg0)), unwrap!(T1::clone_from_repr_c(arg1))))
         } else {
             Err(error)
         };
@@ -167,7 +167,7 @@ extern "C" fn callback_vec<E: Debug, U, T: ReprC<C = *const U, Error = E>>(user_
         let slice_ffi = slice::from_raw_parts(array, size);
         let mut vec = Vec::with_capacity(slice_ffi.len());
         for elt in slice_ffi {
-            vec.push(unwrap!(T::from_repr_c_cloned(elt)));
+            vec.push(unwrap!(T::clone_from_repr_c(elt)));
         }
         send_via_user_data(user_data, (error, SendWrapper(vec)));
     }

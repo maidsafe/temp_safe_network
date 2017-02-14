@@ -29,14 +29,14 @@ pub trait ReprC {
     type Error;
 
     /// Converts from a raw type into an owned type by cloning data
-    unsafe fn from_repr_c_cloned(c_repr: Self::C) -> Result<Self, Self::Error> where Self: Sized;
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> where Self: Sized;
 }
 
 impl ReprC for u64 {
     type C = u64;
     type Error = ();
 
-    unsafe fn from_repr_c_cloned(c_repr: u64) -> Result<u64, ()> {
+    unsafe fn clone_from_repr_c(c_repr: u64) -> Result<u64, ()> {
         Ok(c_repr)
     }
 }
@@ -45,7 +45,7 @@ impl ReprC for u32 {
     type C = u32;
     type Error = ();
 
-    unsafe fn from_repr_c_cloned(c_repr: u32) -> Result<u32, ()> {
+    unsafe fn clone_from_repr_c(c_repr: u32) -> Result<u32, ()> {
         Ok(c_repr)
     }
 }
@@ -54,7 +54,7 @@ impl ReprC for usize {
     type C = usize;
     type Error = ();
 
-    unsafe fn from_repr_c_cloned(c_repr: usize) -> Result<usize, ()> {
+    unsafe fn clone_from_repr_c(c_repr: usize) -> Result<usize, ()> {
         Ok(c_repr)
     }
 }
@@ -64,7 +64,7 @@ impl ReprC for [u8; 32] {
     type C = *const [u8; 32];
     type Error = ();
 
-    unsafe fn from_repr_c_cloned(c_repr: *const [u8; 32]) -> Result<[u8; 32], ()> {
+    unsafe fn clone_from_repr_c(c_repr: *const [u8; 32]) -> Result<[u8; 32], ()> {
         Ok(*c_repr)
     }
 }

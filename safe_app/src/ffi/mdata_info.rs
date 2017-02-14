@@ -203,10 +203,10 @@ pub unsafe extern "C" fn mdata_info_deserialise(app: *const App,
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ffi_utils::test_utils::{call_1, call_3};
     use rand;
     use safe_core::MDataInfo;
-    use super::*;
     use test_utils::{create_app, run_now};
 
     #[test]
