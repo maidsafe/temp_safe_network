@@ -59,6 +59,24 @@ impl ReprC for usize {
     }
 }
 
+impl<T> ReprC for *const T {
+    type C = *const T;
+    type Error = ();
+
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
+        Ok(c_repr)
+    }
+}
+
+impl<T> ReprC for *mut T {
+    type C = *mut T;
+    type Error = ();
+
+    unsafe fn clone_from_repr_c(c_repr: Self::C) -> Result<Self, Self::Error> {
+        Ok(c_repr)
+    }
+}
+
 /// `XorName`
 impl ReprC for [u8; 32] {
     type C = *const [u8; 32];

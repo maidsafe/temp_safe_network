@@ -22,7 +22,7 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_into_raw_parts};
+use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::MDataInfoHandle;
 use routing::{XOR_NAME_LEN, XorName};
@@ -185,14 +185,19 @@ pub unsafe extern "C" fn mdata_info_serialise(app: *const App,
                                               user_data: *mut c_void,
                                               o_cb: extern "C" fn(*mut c_void,
                                                                   i32,
-                                                                  *mut u8,
-                                                                  usize,
+                                                                  *const u8,
                                                                   usize)) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app, user_data, o_cb, move |_, context| {
-            let info = context.object_cache().get_mdata_info(info_h)?;
-            let encoded = serialise(&*info)?;
-            Ok(vec_into_raw_parts(encoded))
+        let user_data = OpaqueCtx(user_data);
+
+        (*app).send(move |_, context| {
+            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
+                               user_data,
+                               o_cb);
+            let encoded = try_cb!(serialise(&*info).map_err(AppError::from), user_data, o_cb);
+
+            o_cb(user_data.0, 0, encoded.as_ptr(), encoded.len());
+            None
         })
     })
 }
@@ -219,7 +224,7 @@ pub unsafe extern "C" fn mdata_info_deserialise(app: *const App,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::test_utils::{call_1, call_3};
+    use ffi_utils::test_utils::{call_1, call_vec_u8};
     use rand;
     use safe_core::MDataInfo;
     use test_utils::{create_app, run_now};
@@ -250,11 +255,8 @@ mod tests {
                     move |_, context| context.object_cache().insert_mdata_info(info))
         };
 
-        let encoded = unsafe {
-            let res = call_3(|ud, cb| mdata_info_serialise(&app, info1_h, ud, cb));
-            let (ptr, len, cap) = unwrap!(res);
-            Vec::from_raw_parts(ptr, len, cap)
-        };
+        let encoded =
+            unsafe { unwrap!(call_vec_u8(|ud, cb| mdata_info_serialise(&app, info1_h, ud, cb))) };
 
         let info2_h = unsafe {
             let res = call_1(|ud, cb| {

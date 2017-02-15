@@ -29,8 +29,8 @@ use object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWrit
 use routing::{XOR_NAME_LEN, XorName};
 use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
-use std::{mem, ptr};
 use std::os::raw::c_void;
+use std::ptr;
 
 type SEWriterHandle = SelfEncryptorWriterHandle;
 type SEReaderHandle = SelfEncryptorReaderHandle;
@@ -227,8 +227,7 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
                                                         user_data: *mut c_void,
                                                         o_cb: extern "C" fn(*mut c_void,
                                                                             i32,
-                                                                            *mut u8,
-                                                                            usize,
+                                                                            *const u8,
                                                                             usize)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -237,7 +236,7 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
             let se = match context.object_cache().get_se_reader(se_h) {
                 Ok(r) => r,
                 Err(e) => {
-                    o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0);
+                    o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0);
                     return None;
                 }
             };
@@ -246,20 +245,14 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
                 o_cb(user_data.0,
                      ffi_error_code!(AppError::InvalidSelfEncryptorReadOffsets),
                      ptr::null_mut(),
-                     0,
                      0);
                 return None;
             }
 
             let fut = se.read(from_pos, len)
-                .map(move |mut data| {
-                    let size = data.len();
-                    let capacity = data.capacity();
-                    o_cb(user_data.0, 0, data.as_mut_ptr(), size, capacity);
-                    mem::forget(data);
-                })
+                .map(move |data| { o_cb(user_data.0, 0, data.as_ptr(), data.len()); })
                 .map_err(AppError::from)
-                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), ptr::null_mut(), 0, 0); })
+                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0); })
                 .into_box();
 
             Some(fut)
@@ -307,7 +300,7 @@ mod tests {
     use errors::AppError;
     use ffi::cipher_opt::*;
     use ffi_utils::ErrorCode;
-    use ffi_utils::test_utils::{call_0, call_1, call_3};
+    use ffi_utils::test_utils::{call_0, call_1, call_vec_u8};
     use routing::XOR_NAME_LEN;
     use safe_core::utils;
     use test_utils::create_app;
@@ -346,11 +339,8 @@ mod tests {
             }));
 
             // It should've been closed by immut_data_close_self_encryptor
-            {
-                let res =
-                    call_0(|ud, cb| idata_self_encryptor_writer_free(&app, se_writer_h, ud, cb));
-                assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
-            }
+            let res = call_0(|ud, cb| idata_self_encryptor_writer_free(&app, se_writer_h, ud, cb));
+            assert_eq!(res, Err(AppError::InvalidSelfEncryptorHandle.error_code()));
 
             // Invalid Self encryptor reader.
             let res: Result<u64, _> = call_1(|ud, cb| idata_size(&app, 0, ud, cb));
@@ -367,15 +357,15 @@ mod tests {
             let size = unwrap!(call_1(|ud, cb| idata_size(&app, se_reader_h, ud, cb)));
             assert_eq!(size, plain_text.len() as u64);
 
-            let res =
-                call_3(|ud, cb| idata_read_from_self_encryptor(&app, se_reader_h, 1, size, ud, cb));
+            let res = call_vec_u8(|ud, cb| {
+                idata_read_from_self_encryptor(&app, se_reader_h, 1, size, ud, cb)
+            });
             assert_eq!(res,
                        Err(AppError::InvalidSelfEncryptorReadOffsets.error_code()));
 
-            let (data_ptr, data_size, data_cap) = unwrap!(call_3(|ud, cb| {
+            let received_plain_text = unwrap!(call_vec_u8(|ud, cb| {
                 idata_read_from_self_encryptor(&app, se_reader_h, 0, size, ud, cb)
             }));
-            let received_plain_text = Vec::from_raw_parts(data_ptr, data_size, data_cap);
             assert_eq!(plain_text, received_plain_text);
 
             unwrap!(call_0(|ud, cb| idata_self_encryptor_reader_free(&app, se_reader_h, ud, cb)));

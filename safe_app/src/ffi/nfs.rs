@@ -107,7 +107,7 @@ mod tests {
     use ffi::cipher_opt::CipherOpt;
     use ffi::immutable_data::*;
     use ffi_utils::ErrorCode;
-    use ffi_utils::test_utils::{call_0, call_1, call_2, call_3};
+    use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8};
     use futures::Future;
     use object_cache::CipherOptHandle;
     use routing::{XOR_NAME_LEN, XorName};
@@ -243,10 +243,8 @@ mod tests {
             idata_size(app, reader_h, ud, cb)
         }));
 
-        let (ptr, len, cap) = unwrap!(call_3(|ud, cb| {
+        unwrap!(call_vec_u8(|ud, cb| {
             idata_read_from_self_encryptor(app, reader_h, 0, size, ud, cb)
-        }));
-
-        Vec::from_raw_parts(ptr, len, cap)
+        }))
     }
 }

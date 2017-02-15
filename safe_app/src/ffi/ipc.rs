@@ -142,7 +142,6 @@ mod tests {
     use safe_core::utils;
     use std::collections::HashMap;
     use std::ffi::CString;
-    use std::mem;
     use std::os::raw::c_void;
     use test_utils::gen_app_exchange_info;
 
@@ -228,23 +227,25 @@ mod tests {
         struct Context {
             unexpected_cb: bool,
             req_id: u32,
-            auth_granted: AuthGranted,
+            auth_granted: Option<AuthGranted>,
         };
 
         let context = unsafe {
             let mut context = Context {
                 unexpected_cb: false,
                 req_id: 0,
-                auth_granted: mem::uninitialized(),
+                auth_granted: None,
             };
 
             extern "C" fn auth_cb(ctx: *mut c_void,
                                   req_id: u32,
                                   auth_granted: *const FfiAuthGranted) {
                 unsafe {
+                    let auth_granted = unwrap!(AuthGranted::clone_from_repr_c(auth_granted));
+
                     let ctx = ctx as *mut Context;
                     (*ctx).req_id = req_id;
-                    (*ctx).auth_granted = unwrap!(AuthGranted::clone_from_repr_c(auth_granted));
+                    (*ctx).auth_granted = Some(auth_granted);
                 }
             }
 
@@ -282,7 +283,7 @@ mod tests {
 
         assert!(!context.unexpected_cb);
         assert_eq!(context.req_id, req_id);
-        assert_eq!(context.auth_granted, auth_granted);
+        assert_eq!(unwrap!(context.auth_granted), auth_granted);
     }
 
     #[test]
