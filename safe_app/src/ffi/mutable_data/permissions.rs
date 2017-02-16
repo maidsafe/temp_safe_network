@@ -26,7 +26,7 @@ use errors::AppError;
 use ffi::helper::send_sync;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle, SignKeyHandle};
-use routing::{Action, PermissionSet};
+use routing::{Action, PermissionSet, User};
 use std::os::raw::c_void;
 
 /// Permission actions.
@@ -169,7 +169,9 @@ pub unsafe extern "C" fn mdata_permissions_get(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
-            let handle = *permissions.get(&user_h).ok_or(AppError::InvalidSignKeyHandle)?;
+            let user_key = *context.object_cache().get_sign_key(user_h)?;
+            let handle = *permissions.get(&User::Key(user_key))
+                .ok_or(AppError::InvalidSignKeyHandle)?;
 
             Ok(handle)
         })
@@ -193,8 +195,12 @@ fn mdata_permissions_for_each(app: *const App,
 
         send_sync(app, user_data.0, done_cb, move |_, context| {
             let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
-            for (user_h, permission_set_h) in &*permissions {
-                each_cb(user_data.0, *user_h, *permission_set_h);
+            for (user_key, permission_set_h) in &*permissions {
+                let user_h = match *user_key {
+                    User::Key(key) => context.object_cache().insert_sign_key(key),
+                    User::Anyone => 0,
+                };
+                each_cb(user_data.0, user_h, *permission_set_h);
             }
 
             Ok(())
@@ -215,7 +221,8 @@ pub unsafe extern "C" fn mdata_permissions_insert(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
-            let _ = permissions.insert(user_h, permission_set_h);
+            let user_key = *context.object_cache().get_sign_key(user_h)?;
+            let _ = permissions.insert(User::Key(user_key), permission_set_h);
 
             Ok(())
         })

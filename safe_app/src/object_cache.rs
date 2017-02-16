@@ -25,7 +25,7 @@
 use super::errors::AppError;
 use ffi::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
-use routing::{EntryAction, PermissionSet, Value};
+use routing::{EntryAction, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, sign};
 use safe_core::{MDataInfo, SelfEncryptionStorage};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
@@ -83,7 +83,7 @@ pub struct ObjectCache {
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
     mdata_values: Store<Vec<Value>>,
     mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
-    mdata_permissions: Store<BTreeMap<SignKeyHandle, MDataPermissionSetHandle>>,
+    mdata_permissions: Store<BTreeMap<User, MDataPermissionSetHandle>>,
     mdata_permission_set: Store<PermissionSet>,
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
@@ -207,7 +207,7 @@ impl_cache!(mdata_entry_actions,
             insert_mdata_entry_actions,
             remove_mdata_entry_actions);
 impl_cache!(mdata_permissions,
-            BTreeMap<SignKeyHandle, MDataPermissionSetHandle>,
+            BTreeMap<User, MDataPermissionSetHandle>,
             MDataPermissionsHandle,
             InvalidMDataPermissionsHandle,
             get_mdata_permissions,

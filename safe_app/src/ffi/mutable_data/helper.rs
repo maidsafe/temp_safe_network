@@ -43,13 +43,8 @@ pub fn insert_permissions(object_cache: &ObjectCache,
                           -> MDataPermissionsHandle {
     let permissions = permissions.into_iter()
         .map(|(user, permission_set)| {
-            let user_h = match user {
-                User::Anyone => 0,
-                User::Key(key) => object_cache.insert_sign_key(key),
-            };
             let permission_set_h = object_cache.insert_mdata_permission_set(permission_set);
-
-            (user_h, permission_set_h)
+            (user, permission_set_h)
         })
         .collect();
 
@@ -63,10 +58,8 @@ pub fn get_permissions(object_cache: &ObjectCache,
     let input = object_cache.get_mdata_permissions(handle)?.clone();
     let mut output = BTreeMap::new();
 
-    for (user_h, permission_set_h) in input {
-        let user = get_user(object_cache, user_h)?;
+    for (user, permission_set_h) in input {
         let permission_set = *object_cache.get_mdata_permission_set(permission_set_h)?;
-
         let _ = output.insert(user, permission_set);
     }
 
