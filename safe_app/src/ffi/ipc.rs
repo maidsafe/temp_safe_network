@@ -40,7 +40,7 @@ pub unsafe extern "C" fn encode_auth_req(req: *const FfiAuthReq,
                                                              *const c_char)) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
-        let req = AuthReq::from_repr_c_cloned(req)?;
+        let req = AuthReq::clone_from_repr_c(req)?;
 
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -66,7 +66,7 @@ pub unsafe extern "C" fn encode_containers_req(req: *const FfiContainersReq,
                                                                    *const c_char)) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let req_id = ipc::gen_req_id();
-        let req = ContainersReq::from_repr_c_cloned(req)?;
+        let req = ContainersReq::clone_from_repr_c(req)?;
 
         let msg = IpcMsg::Req {
             req_id: req_id,
@@ -100,8 +100,14 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
             IpcMsg::Resp { resp: IpcResp::Auth(res), req_id } => {
                 match res {
                     Ok(auth_granted) => {
-                        let auth_granted = auth_granted.into_repr_c();
-                        o_auth(user_data, req_id, &auth_granted);
+                        match auth_granted.into_repr_c() {
+                            Ok(auth_granted) => {
+                                o_auth(user_data, req_id, &auth_granted);
+                            }
+                            Err(err) => {
+                                o_err(user_data, ffi_error_code!(AppError::from(err)), req_id);
+                            }
+                        }
                     }
                     Err(err) => o_err(user_data, ffi_error_code!(AppError::from(err)), req_id),
                 }
@@ -125,17 +131,17 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffi_utils::ReprC;
     use ffi_utils::test_utils::call_2;
     use rand;
     use rust_sodium::crypto::{box_, secretbox, sign};
-    use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, Config, ContainersReq,
-                         IpcMsg, IpcReq, IpcResp};
+    use safe_core::ipc::{self, AccessContInfo, AppKeys, AuthGranted, AuthReq, BootstrapConfig,
+                         ContainersReq, IpcMsg, IpcReq, IpcResp};
     use safe_core::ipc::req::ffi::Permission;
     use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
     use safe_core::utils;
     use std::collections::HashMap;
     use std::ffi::CString;
-    use std::mem;
     use std::os::raw::c_void;
     use test_utils::gen_app_exchange_info;
 
@@ -206,7 +212,7 @@ mod tests {
 
         let auth_granted = AuthGranted {
             app_keys: gen_app_keys(),
-            bootstrap_config: Config,
+            bootstrap_config: BootstrapConfig::default(),
             access_container: access_container,
         };
 
@@ -221,23 +227,25 @@ mod tests {
         struct Context {
             unexpected_cb: bool,
             req_id: u32,
-            auth_granted: AuthGranted,
+            auth_granted: Option<AuthGranted>,
         };
 
         let context = unsafe {
             let mut context = Context {
                 unexpected_cb: false,
                 req_id: 0,
-                auth_granted: mem::uninitialized(),
+                auth_granted: None,
             };
 
             extern "C" fn auth_cb(ctx: *mut c_void,
                                   req_id: u32,
                                   auth_granted: *const FfiAuthGranted) {
                 unsafe {
+                    let auth_granted = unwrap!(AuthGranted::clone_from_repr_c(auth_granted));
+
                     let ctx = ctx as *mut Context;
                     (*ctx).req_id = req_id;
-                    (*ctx).auth_granted = AuthGranted::from_repr_c(auth_granted);
+                    (*ctx).auth_granted = Some(auth_granted);
                 }
             }
 
@@ -275,7 +283,7 @@ mod tests {
 
         assert!(!context.unexpected_cb);
         assert_eq!(context.req_id, req_id);
-        assert_eq!(context.auth_granted, auth_granted);
+        assert_eq!(unwrap!(context.auth_granted), auth_granted);
     }
 
     #[test]

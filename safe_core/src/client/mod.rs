@@ -38,6 +38,7 @@ use event::{CoreEvent, NetworkEvent, NetworkTx};
 use event_loop::{CoreMsg, CoreMsgTx};
 use event_loop::CoreFuture;
 use futures::{self, Complete, Future};
+use ipc::BootstrapConfig;
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::{AccountInfo, Authority, EntryAction, Event, FullId, ImmutableData, InterfaceError,
@@ -133,6 +134,7 @@ impl Client {
     /// This is a getter-only Gateway function to the Maidsafe network. It will
     /// create an unregistered random client, which can do very limited set of
     /// operations - eg., a Network-Get
+    /// TODO: add `BootstrapConfig` argument.
     pub fn unregistered<T>(el_handle: Handle,
                            core_tx: CoreMsgTx<T>,
                            net_tx: NetworkTx)
@@ -141,7 +143,7 @@ impl Client {
     {
         trace!("Creating unregistered client.");
 
-        let (routing, routing_rx) = setup_routing(None)?;
+        let (routing, routing_rx) = setup_routing(None, None)?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
@@ -179,7 +181,7 @@ impl Client {
         let pub_key = maid_keys.sign_pk;
         let full_id = Some(maid_keys.clone().into());
 
-        let (routing, routing_rx) = setup_routing(full_id)?;
+        let (routing, routing_rx) = setup_routing(full_id, None)?;
 
         let user_root_dir = MDataInfo::random_private(DIR_TAG)?;
         let config_dir = MDataInfo::random_private(DIR_TAG)?;
@@ -253,7 +255,7 @@ impl Client {
 
         let (acc_content, acc_version) = {
             trace!("Creating throw-away routing getter for account packet.");
-            let (routing, routing_rx) = setup_routing(None)?;
+            let (routing, routing_rx) = setup_routing(None, None)?;
 
             routing.get_mdata_value(dst,
                                  acc_loc,
@@ -277,7 +279,7 @@ impl Client {
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         trace!("Creating an actual routing...");
-        let (routing, routing_rx) = setup_routing(Some(id_packet))?;
+        let (routing, routing_rx) = setup_routing(Some(id_packet), None)?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
@@ -300,12 +302,13 @@ impl Client {
                         owner: sign::PublicKey,
                         el_handle: Handle,
                         core_tx: CoreMsgTx<T>,
-                        net_tx: NetworkTx)
+                        net_tx: NetworkTx,
+                        config: BootstrapConfig)
                         -> Result<Client, CoreError>
         where T: 'static
     {
         trace!("Attempting to log into an acc using client keys.");
-        let (routing, routing_rx) = setup_routing(Some(keys.clone().into()))?;
+        let (routing, routing_rx) = setup_routing(Some(keys.clone().into()), Some(config))?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
@@ -341,7 +344,7 @@ impl Client {
             None
         };
 
-        let (routing, routing_rx) = match setup_routing(opt_id) {
+        let (routing, routing_rx) = match setup_routing(opt_id, None) {
             Ok(elt) => elt,
             Err(e) => {
                 info!("Could not restart routing (will re-attempt, unless dropped): {:?}",
@@ -719,6 +722,11 @@ impl Client {
         self.inner().client_type.owner_key()
     }
 
+    /// Returns the `crust::Config` associated with the `crust::Service` (if any).
+    pub fn bootstrap_config(&self) -> BootstrapConfig {
+        self.inner().routing.bootstrap_config()
+    }
+
     fn update_account_packet(&self) -> Box<CoreFuture<()>> {
         trace!("Updating account packet.");
 
@@ -983,9 +991,11 @@ impl ClientType {
     }
 }
 
-fn setup_routing(full_id: Option<FullId>) -> Result<(Routing, Receiver<Event>), CoreError> {
+fn setup_routing(full_id: Option<FullId>,
+                 config: Option<BootstrapConfig>)
+                 -> Result<(Routing, Receiver<Event>), CoreError> {
     let (routing_tx, routing_rx) = mpsc::channel();
-    let routing = Routing::new(routing_tx, full_id)?;
+    let routing = Routing::new(routing_tx, full_id, config)?;
 
     trace!("Waiting to get connected to the Network...");
     match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {

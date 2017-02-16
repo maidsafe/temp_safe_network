@@ -21,7 +21,7 @@
 
 //! Test utilities.
 
-use ffi_repr::ReprC;
+use repr_c::ReprC;
 use std::fmt::Debug;
 use std::os::raw::c_void;
 use std::slice;
@@ -84,34 +84,30 @@ pub unsafe fn call_2<F, E0, E1, T0, T1>(f: F) -> Result<(T0, T1), i32>
     unwrap!(rx.recv()).0
 }
 
-/// Call a FFI function and block until its callback gets called, then return
-/// the arguments which were passed to that callback in a tuple.
-/// Use this if the callback accepts three arguments in addition to `user_data` and
-/// `error_code`.
-pub unsafe fn call_3<F, T0, T1, T2>(f: F) -> Result<(T0, T1, T2), i32>
-    where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T0, T1, T2))
-{
-    let (tx, rx) = mpsc::channel::<(i32, SendWrapper<(T0, T1, T2)>)>();
-    f(sender_as_user_data(&tx), callback_3::<T0, T1, T2>);
-
-    let (error, args) = unwrap!(rx.recv());
-    if error == 0 { Ok(args.0) } else { Err(error) }
-}
-
 /// Call a FFI function and block until its callback gets called, then copy
 /// the array argument which was passed to `Vec<T>` and return the result.
 /// Use this if the callback accepts `*const T` and `usize` (length) arguments in addition
 /// to `user_data` and `error_code`.
-pub unsafe fn call_vec<F, U, E: Debug, T: ReprC<C = *const U, Error = E>>(f: F)
-                                                                          -> Result<Vec<T>, i32>
-    where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T::C, usize))
+pub unsafe fn call_vec<F, E, T, U>(f: F) -> Result<Vec<T>, i32>
+    where F: FnOnce(*mut c_void, extern "C" fn(*mut c_void, i32, T::C, usize)),
+          E: Debug,
+          T: ReprC<C = *const U, Error = E>
 {
-    let (tx, rx) = mpsc::channel::<(i32, SendWrapper<Vec<T>>)>();
+    let (tx, rx) = mpsc::channel::<SendWrapper<Result<Vec<T>, i32>>>();
 
-    f(sender_as_user_data(&tx), callback_vec::<E, U, T>);
+    f(sender_as_user_data(&tx), callback_vec::<E, T, U>);
+    unwrap!(rx.recv()).0
+}
 
-    let (error, vec) = unwrap!(rx.recv());
-    if error == 0 { Ok(vec.0) } else { Err(error) }
+/// Call a FFI function and block until its callback gets called, then copy
+/// the byte array argument which was passed to `Vec<u8>` and return the result.
+pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
+    where F: FnOnce(*mut c_void,
+                    extern "C" fn(*mut c_void, i32, *const u8, usize))
+{
+    let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
+    f(sender_as_user_data(&tx), callback_vec_u8);
+    unwrap!(rx.recv())
 }
 
 extern "C" fn callback_0(user_data: *mut c_void, error: i32) {
@@ -124,7 +120,7 @@ extern "C" fn callback_1<E, T>(user_data: *mut c_void, error: i32, arg: T::C)
 {
     unsafe {
         let result: Result<T, i32> = if error == 0 {
-            Ok(unwrap!(T::from_repr_c_cloned(arg)))
+            Ok(unwrap!(T::clone_from_repr_c(arg)))
         } else {
             Err(error)
         };
@@ -143,7 +139,7 @@ extern "C" fn callback_2<E0, E1, T0, T1>(user_data: *mut c_void,
 {
     unsafe {
         let result: Result<(T0, T1), i32> = if error == 0 {
-            Ok((unwrap!(T0::from_repr_c_cloned(arg0)), unwrap!(T1::from_repr_c_cloned(arg1))))
+            Ok((unwrap!(T0::clone_from_repr_c(arg0)), unwrap!(T1::clone_from_repr_c(arg1))))
         } else {
             Err(error)
         };
@@ -151,25 +147,35 @@ extern "C" fn callback_2<E0, E1, T0, T1>(user_data: *mut c_void,
     }
 }
 
-extern "C" fn callback_3<T0, T1, T2>(user_data: *mut c_void,
-                                     error: i32,
-                                     arg0: T0,
-                                     arg1: T1,
-                                     arg2: T2) {
-    unsafe { send_via_user_data(user_data, (error, SendWrapper((arg0, arg1, arg2)))) }
+extern "C" fn callback_vec<E, T, U>(user_data: *mut c_void, error: i32, array: T::C, size: usize)
+    where E: Debug,
+          T: ReprC<C = *const U, Error = E>
+{
+    unsafe {
+        let result: Result<Vec<T>, i32> = if error == 0 {
+            let slice_ffi = slice::from_raw_parts(array, size);
+            let mut vec = Vec::with_capacity(slice_ffi.len());
+            for elt in slice_ffi {
+                vec.push(unwrap!(T::clone_from_repr_c(elt)));
+            }
+            Ok(vec)
+        } else {
+            Err(error)
+        };
+
+        send_via_user_data(user_data, SendWrapper(result))
+    }
 }
 
-extern "C" fn callback_vec<E: Debug, U, T: ReprC<C = *const U, Error = E>>(user_data: *mut c_void,
-                                                                           error: i32,
-                                                                           array: T::C,
-                                                                           size: usize) {
+extern "C" fn callback_vec_u8(user_data: *mut c_void, error: i32, ptr: *const u8, len: usize) {
     unsafe {
-        let slice_ffi = slice::from_raw_parts(array, size);
-        let mut vec = Vec::with_capacity(slice_ffi.len());
-        for elt in slice_ffi {
-            vec.push(unwrap!(T::from_repr_c_cloned(elt)));
-        }
-        send_via_user_data(user_data, (error, SendWrapper(vec)));
+        let result = if error == 0 {
+            Ok(slice::from_raw_parts(ptr, len).to_vec())
+        } else {
+            Err(error)
+        };
+
+        send_via_user_data(user_data, result)
     }
 }
 

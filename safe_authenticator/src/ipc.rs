@@ -29,7 +29,7 @@ use routing::{Action, ClientError, EntryActions, PermissionSet, User, Value};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, nfs};
-use safe_core::ipc::{self, Config, IpcError, IpcMsg, decode_msg};
+use safe_core::ipc::{self, IpcError, IpcMsg, decode_msg};
 use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
 use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
@@ -332,7 +332,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
-        let auth_req = AuthReq::from_repr_c_cloned(req)?;
+        let auth_req = AuthReq::clone_from_repr_c(req)?;
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
@@ -436,7 +436,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
-        let cont_req = ContainersReq::from_repr_c_cloned(req)?;
+        let cont_req = ContainersReq::clone_from_repr_c(req)?;
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
@@ -769,6 +769,7 @@ fn encode_auth_resp_impl(client: Client,
     let c4 = client.clone();
     let c5 = client.clone();
     let c6 = client.clone();
+    let c7 = client.clone();
 
     let sign_pk = app.keys.sign_pk;
     let app_keys = app.keys.clone();
@@ -808,7 +809,7 @@ fn encode_auth_resp_impl(client: Client,
         .and_then(move |(dir, app_keys)| {
             Ok(AuthGranted {
                 app_keys: app_keys,
-                bootstrap_config: Config {},
+                bootstrap_config: c7.bootstrap_config(),
                 access_container: AccessContInfo::from_mdata_info(dir)?,
             })
         })

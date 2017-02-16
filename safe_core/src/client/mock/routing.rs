@@ -22,8 +22,8 @@
 use super::vault::{Data, Vault};
 use maidsafe_utilities::thread;
 use rand;
-use routing::{Authority, ClientError, EntryAction, Event, FullId, ImmutableData, InterfaceError,
-              MessageId, MutableData, PermissionSet, Response, RoutingError,
+use routing::{Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, ImmutableData,
+              InterfaceError, MessageId, MutableData, PermissionSet, Response, RoutingError,
               TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
@@ -69,7 +69,10 @@ pub struct Routing {
 }
 
 impl Routing {
-    pub fn new(sender: Sender<Event>, id: Option<FullId>) -> Result<Self, RoutingError> {
+    pub fn new(sender: Sender<Event>,
+               id: Option<FullId>,
+               _config: Option<BootstrapConfig>)
+               -> Result<Self, RoutingError> {
         ::rust_sodium::init();
 
         let cloned_sender = sender.clone();
@@ -858,6 +861,10 @@ impl Routing {
     #[cfg(test)]
     pub fn set_simulate_timeout(&mut self, enable: bool) {
         self.timeout_simulation = enable;
+    }
+
+    pub fn bootstrap_config(&self) -> BootstrapConfig {
+        BootstrapConfig::default()
     }
 
     fn verify_network_limits(&self, msg_id: MessageId, op: &str) -> Result<(), ClientError> {

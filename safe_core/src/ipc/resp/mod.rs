@@ -19,13 +19,18 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+#![allow(unsafe_code)]
+
 /// Ffi module
 pub mod ffi;
 
 use client::MDataInfo;
-use ipc::{Config, IpcError};
-use routing::XorName;
+use ffi_utils::{ReprC, vec_into_raw_parts};
+use ipc::IpcError;
+use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
+use routing::{BootstrapConfig, XorName};
 use rust_sodium::crypto::{box_, hash, secretbox, sign};
+use std::slice;
 
 /// IPC response
 // TODO: `TransOwnership` variant
@@ -45,7 +50,7 @@ pub struct AuthGranted {
     /// The crust config.
     ///
     /// Useful to reuse bootstrap nodes and speed up access.
-    pub bootstrap_config: Config,
+    pub bootstrap_config: BootstrapConfig,
     /// Access container
     pub access_container: AccessContInfo,
 }
@@ -54,25 +59,37 @@ impl AuthGranted {
     /// Consumes the object and returns the wrapped raw pointer
     ///
     /// You're now responsible for freeing this memory once you're done.
-    pub fn into_repr_c(self) -> ffi::AuthGranted {
-        let AuthGranted { app_keys, access_container, .. } = self;
-        ffi::AuthGranted {
+    pub fn into_repr_c(self) -> Result<ffi::AuthGranted, SerialisationError> {
+        let AuthGranted { app_keys, bootstrap_config, access_container } = self;
+        let bootstrap_config = serialise(&bootstrap_config)?;
+        let (ptr, len, cap) = vec_into_raw_parts(bootstrap_config);
+        Ok(ffi::AuthGranted {
             app_keys: app_keys.into_repr_c(),
             access_container: access_container.into_repr_c(),
-        }
+            bootstrap_config_ptr: ptr,
+            bootstrap_config_len: len,
+            bootstrap_config_cap: cap,
+        })
     }
+}
 
-    /// Constructs the object from a raw pointer.
-    ///
-    /// After calling this function, the raw pointer is owned by the resulting
-    /// object.
-    #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(repr_c: *const ffi::AuthGranted) -> Self {
-        AuthGranted {
-            app_keys: AppKeys::from_repr_c((*repr_c).app_keys),
-            bootstrap_config: Config,
-            access_container: AccessContInfo::from_repr_c((*repr_c).access_container),
-        }
+impl ReprC for AuthGranted {
+    type C = *const ffi::AuthGranted;
+    type Error = IpcError;
+
+    unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
+        let ffi::AuthGranted { app_keys,
+                               access_container,
+                               bootstrap_config_ptr,
+                               bootstrap_config_len,
+                               .. } = *repr_c;
+        let bootstrap_config = slice::from_raw_parts(bootstrap_config_ptr, bootstrap_config_len);
+        let bootstrap_config = deserialise(bootstrap_config)?;
+        Ok(AuthGranted {
+            app_keys: AppKeys::clone_from_repr_c(app_keys)?,
+            bootstrap_config: bootstrap_config,
+            access_container: AccessContInfo::clone_from_repr_c(access_container)?,
+        })
     }
 }
 
@@ -125,21 +142,21 @@ impl AppKeys {
             enc_sk: enc_sk.0,
         }
     }
+}
 
-    /// Constructs the object from a raw pointer.
-    ///
-    /// After calling this function, the raw pointer is owned by the resulting
-    /// object.
-    #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(raw: ffi::AppKeys) -> Self {
-        AppKeys {
+impl ReprC for AppKeys {
+    type C = ffi::AppKeys;
+    type Error = IpcError;
+
+    unsafe fn clone_from_repr_c(raw: Self::C) -> Result<Self, Self::Error> {
+        Ok(AppKeys {
             owner_key: sign::PublicKey(raw.owner_key),
             enc_key: secretbox::Key(raw.enc_key),
             sign_pk: sign::PublicKey(raw.sign_pk),
             sign_sk: sign::SecretKey(raw.sign_sk),
             enc_pk: box_::PublicKey(raw.enc_pk),
             enc_sk: box_::SecretKey(raw.enc_sk),
-        }
+        })
     }
 }
 
@@ -167,19 +184,6 @@ impl AccessContInfo {
         }
     }
 
-    /// Constructs the object from a raw pointer.
-    ///
-    /// After calling this function, the raw pointer is owned by the resulting
-    /// object.
-    #[allow(unsafe_code)]
-    pub unsafe fn from_repr_c(repr_c: ffi::AccessContInfo) -> Self {
-        AccessContInfo {
-            id: XorName(repr_c.id),
-            tag: repr_c.tag,
-            nonce: secretbox::Nonce(repr_c.nonce),
-        }
-    }
-
     /// Creates `MDataInfo` from this `AccessContInfo`
     pub fn into_mdata_info(self, enc_key: secretbox::Key) -> MDataInfo {
         MDataInfo {
@@ -203,6 +207,19 @@ impl AccessContInfo {
     }
 }
 
+impl ReprC for AccessContInfo {
+    type C = ffi::AccessContInfo;
+    type Error = IpcError;
+
+    unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
+        Ok(AccessContInfo {
+            id: XorName(repr_c.id),
+            tag: repr_c.tag,
+            nonce: secretbox::Nonce(repr_c.nonce),
+        })
+    }
+}
+
 /// Encrypts and serialises an access container key using given app ID and app key
 pub fn access_container_enc_key(app_id: &str,
                                 app_enc_key: &secretbox::Key,
@@ -223,7 +240,8 @@ pub fn access_container_enc_key(app_id: &str,
 #[allow(unsafe_code)]
 mod tests {
     use super::*;
-    use ipc::Config;
+    use ffi_utils::ReprC;
+    use ipc::BootstrapConfig;
     use routing::{XOR_NAME_LEN, XorName};
     use rust_sodium::crypto::{box_, secretbox, sign};
 
@@ -248,15 +266,15 @@ mod tests {
         };
         let ag = AuthGranted {
             app_keys: ak,
-            bootstrap_config: Config,
+            bootstrap_config: BootstrapConfig::default(),
             access_container: ac,
         };
 
-        let ffi = ag.into_repr_c();
+        let ffi = unwrap!(ag.into_repr_c());
 
         assert_eq!(ffi.access_container.tag, 681);
 
-        let ag = unsafe { AuthGranted::from_repr_c(&ffi) };
+        let ag = unsafe { unwrap!(AuthGranted::clone_from_repr_c(&ffi)) };
 
         assert_eq!(ag.access_container.tag, 681);
     }
@@ -291,7 +309,7 @@ mod tests {
         assert_eq!(ffi_ak.enc_sk.iter().collect::<Vec<_>>(),
                    oursk.0.iter().collect::<Vec<_>>());
 
-        let ak = unsafe { AppKeys::from_repr_c(ffi_ak) };
+        let ak = unsafe { unwrap!(AppKeys::clone_from_repr_c(ffi_ak)) };
 
         assert_eq!(ak.owner_key, ok);
         assert_eq!(ak.enc_key, key);
@@ -317,7 +335,7 @@ mod tests {
         assert_eq!(ffi.nonce.iter().collect::<Vec<_>>(),
                    nonce.0.iter().collect::<Vec<_>>());
 
-        let a = unsafe { AccessContInfo::from_repr_c(ffi) };
+        let a = unsafe { unwrap!(AccessContInfo::clone_from_repr_c(ffi)) };
 
         assert_eq!(a.id.0.iter().sum::<u8>() as usize, 2 * XOR_NAME_LEN);
         assert_eq!(a.tag, 681);

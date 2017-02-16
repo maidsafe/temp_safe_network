@@ -19,7 +19,6 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
-
 pub use self::codes::*;
 use ffi_utils::ErrorCode;
 use futures::sync::mpsc::SendError;

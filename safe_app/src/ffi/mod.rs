@@ -25,7 +25,7 @@
 
 use super::App;
 use super::errors::AppError;
-use ffi_utils::{OpaqueCtx, catch_unwind_error_code, from_c_str};
+use ffi_utils::{OpaqueCtx, ReprC, catch_unwind_error_code, from_c_str};
 use safe_core::NetworkEvent;
 use safe_core::ipc::AuthGranted;
 use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn app_registered(app_id: *const c_char,
     catch_unwind_error_code(|| -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
         let app_id = from_c_str(app_id)?;
-        let auth_granted = AuthGranted::from_repr_c(auth_granted);
+        let auth_granted = AuthGranted::clone_from_repr_c(auth_granted)?;
 
         let app = App::registered(app_id, auth_granted, move |event| {
             call_network_observer(event, user_data.0, network_observer_cb)

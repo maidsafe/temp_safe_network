@@ -126,20 +126,17 @@ impl ReprC for File {
 
     /// Convert to the native rust equivalent by cloning the internal data, preserving self.
     #[allow(unsafe_code)]
-    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
-    fn from_repr_c_cloned(repr_c: *const FfiFile) -> Result<File, NfsError> {
-        let user_metadata = unsafe {
-                slice::from_raw_parts((*repr_c).user_metadata_ptr, (*repr_c).user_metadata_len)
-            }
+    unsafe fn clone_from_repr_c(repr_c: *const FfiFile) -> Result<File, NfsError> {
+        let user_metadata = slice::from_raw_parts((*repr_c).user_metadata_ptr,
+                                                  (*repr_c).user_metadata_len)
             .to_vec();
 
         let mut file = File::new(user_metadata);
-        unsafe {
-            file.set_size((*repr_c).size);
-            file.set_created_time((*repr_c).created);
-            file.set_modified_time((*repr_c).modified);
-            file.set_data_map_name(XorName((*repr_c).data_map_name));
-        }
+        file.set_size((*repr_c).size);
+        file.set_created_time((*repr_c).created);
+        file.set_modified_time((*repr_c).modified);
+        file.set_data_map_name(XorName((*repr_c).data_map_name));
+
         Ok(file)
     }
 }

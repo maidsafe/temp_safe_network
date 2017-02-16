@@ -19,6 +19,8 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+#![allow(unsafe_code)]
+
 /// Ffi module
 pub mod ffi;
 
@@ -129,16 +131,12 @@ impl ReprC for AuthReq {
     ///
     /// After calling this function, the subobjects memory is owned by the
     /// resulting object.
-    #[allow(unsafe_code)]
-    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
-    fn from_repr_c_cloned(repr_c: *const ffi::AuthReq) -> Result<Self, IpcError> {
-        unsafe {
-            Ok(AuthReq {
-                app: AppExchangeInfo::from_repr_c_cloned(&(*repr_c).app)?,
-                app_container: (*repr_c).app_container,
-                containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
-            })
-        }
+    unsafe fn clone_from_repr_c(repr_c: *const ffi::AuthReq) -> Result<Self, IpcError> {
+        Ok(AuthReq {
+            app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
+            app_container: (*repr_c).app_container,
+            containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
+        })
     }
 }
 
@@ -179,15 +177,11 @@ impl ReprC for ContainersReq {
     ///
     /// After calling this functions, the subobjects memory is owned by the
     /// resulting object.
-    #[allow(unsafe_code)]
-    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
-    fn from_repr_c_cloned(repr_c: *const ffi::ContainersReq) -> Result<Self, IpcError> {
-        unsafe {
-            Ok(ContainersReq {
-                app: AppExchangeInfo::from_repr_c_cloned(&(*repr_c).app)?,
-                containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
-            })
-        }
+    unsafe fn clone_from_repr_c(repr_c: *const ffi::ContainersReq) -> Result<Self, IpcError> {
+        Ok(ContainersReq {
+            app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
+            containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
+        })
     }
 }
 
@@ -232,21 +226,17 @@ impl ReprC for AppExchangeInfo {
     ///
     /// After calling this function, the raw pointer is owned by the resulting
     /// object.
-    #[allow(unsafe_code)]
-    #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
-    fn from_repr_c_cloned(raw: *const ffi::AppExchangeInfo) -> Result<Self, IpcError> {
-        unsafe {
-            Ok(AppExchangeInfo {
-                id: from_c_str((*raw).id).map_err(StringError::from)?,
-                scope: if (*raw).scope.is_null() {
-                    None
-                } else {
-                    Some(from_c_str((*raw).scope).map_err(StringError::from)?)
-                },
-                name: from_c_str((*raw).name).map_err(StringError::from)?,
-                vendor: from_c_str((*raw).vendor).map_err(StringError::from)?,
-            })
-        }
+    unsafe fn clone_from_repr_c(raw: *const ffi::AppExchangeInfo) -> Result<Self, IpcError> {
+        Ok(AppExchangeInfo {
+            id: from_c_str((*raw).id).map_err(StringError::from)?,
+            scope: if (*raw).scope.is_null() {
+                None
+            } else {
+                Some(from_c_str((*raw).scope).map_err(StringError::from)?)
+            },
+            name: from_c_str((*raw).name).map_err(StringError::from)?,
+            vendor: from_c_str((*raw).vendor).map_err(StringError::from)?,
+        })
     }
 }
 
@@ -290,7 +280,7 @@ mod tests {
             assert_eq!(unwrap!(CStr::from_ptr(ffi_a.vendor).to_str()), "hey girl");
         }
 
-        let mut a = unwrap!(AppExchangeInfo::from_repr_c_cloned(&ffi_a));
+        let mut a = unsafe { unwrap!(AppExchangeInfo::clone_from_repr_c(&ffi_a)) };
 
         assert_eq!(a.id, "myid");
         assert_eq!(a.scope, Some("hi".to_string()));
@@ -329,7 +319,7 @@ mod tests {
         assert_eq!(ffi.app_container, false);
         assert_eq!(ffi.containers_len, 0);
 
-        let a = unwrap!(AuthReq::from_repr_c_cloned(&ffi));
+        let a = unsafe { unwrap!(AuthReq::clone_from_repr_c(&ffi)) };
 
         assert_eq!(a.app.id, "1");
         assert_eq!(a.app.scope, Some("2".to_string()));
@@ -357,7 +347,7 @@ mod tests {
 
         assert_eq!(ffi.containers_len, 0);
 
-        let a = unwrap!(ContainersReq::from_repr_c_cloned(&ffi));
+        let a = unsafe { unwrap!(ContainersReq::clone_from_repr_c(&ffi)) };
 
         assert_eq!(a.app.id, "1");
         assert_eq!(a.app.scope, Some("2".to_string()));

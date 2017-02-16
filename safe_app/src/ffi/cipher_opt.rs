@@ -187,23 +187,16 @@ mod tests {
     use object_cache::CipherOptHandle;
     use rust_sodium::crypto::box_;
     use safe_core::{Client, utils};
-    use std::os::raw::c_void;
-    use std::sync::mpsc;
     use test_utils::{create_app, run_now};
 
     #[test]
     fn app_0_to_app_0_plain() {
         let app_0 = create_app();
-
-        let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
-        let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
-
         let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
-        let cipher_opt_handle: CipherOptHandle;
-        unsafe {
-            cipher_opt_new_plaintext(&app_0, tx, handle_cb);
-            cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
-        }
+
+        let cipher_opt_handle: CipherOptHandle =
+            unsafe { unwrap!(call_1(|ud, cb| cipher_opt_new_plaintext(&app_0, ud, cb))) };
+
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_handle));
             let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, &context));
@@ -222,15 +215,10 @@ mod tests {
     fn app_0_to_app_0_sym() {
         let app_0 = create_app();
 
-        let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
-        let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
-
         let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
-        let cipher_opt_handle: CipherOptHandle;
-        unsafe {
-            cipher_opt_new_symmetric(&app_0, tx, handle_cb);
-            cipher_opt_handle = unwrap!(unwrap!(rx.recv()));
-        }
+        let cipher_opt_handle: CipherOptHandle =
+            unsafe { unwrap!(call_1(|ud, cb| cipher_opt_new_symmetric(&app_0, ud, cb))) };
+
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_handle));
             let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, &context));
@@ -246,7 +234,6 @@ mod tests {
     }
 
     // NOTE: rustfmt is behaving erratically on this function. Disabling it for now.
-    // TODO: try to re-enable it in the next rustfmt version (current: 0.6.3)
     #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
     fn app_0_to_app_1_asym() {
@@ -255,7 +242,8 @@ mod tests {
         let app_1 = create_app();
 
         // Get encryption public key of App 1.
-        let enc_pk = run_now(&app_1, move |client, _| unwrap!(client.public_encryption_key()));
+        let enc_pk = run_now(&app_1,
+                             move |client, _| unwrap!(client.public_encryption_key()));
 
         // Insert it into App 0's object cache.
         let enc_pk_h = run_now(&app_0, move |_, context| {
@@ -292,7 +280,7 @@ mod tests {
         // App 1 can decrypt it.
         run_now(&app_1, move |client, context| {
             assert!(decrypt_and_check(client, context, &cipher_text, &plain_text));
-        })
+        });
     }
 
     #[test]
@@ -304,28 +292,23 @@ mod tests {
             context.object_cache().insert_encrypt_key(pk)
         });
 
-        let (tx, rx) = mpsc::channel::<Result<CipherOptHandle, i32>>();
-        let tx = Box::into_raw(Box::new(tx.clone())) as *mut c_void;
-
         let cipher_opt_handle_pt;
         let cipher_opt_handle_sym;
         let cipher_opt_handle_asym;
 
         unsafe {
-            cipher_opt_new_plaintext(&app, tx, handle_cb);
-            cipher_opt_handle_pt = unwrap!(unwrap!(rx.recv()));
-
-            cipher_opt_new_symmetric(&app, tx, handle_cb);
-            cipher_opt_handle_sym = unwrap!(unwrap!(rx.recv()));
+            cipher_opt_handle_pt = unwrap!(call_1(|ud, cb| cipher_opt_new_plaintext(&app, ud, cb)));
+            cipher_opt_handle_sym =
+                unwrap!(call_1(|ud, cb| cipher_opt_new_symmetric(&app, ud, cb)));
 
             let err_code = AppError::InvalidEncryptKeyHandle.error_code();
-            cipher_opt_new_asymmetric(&app, 29293290, tx, handle_cb);
-            let res = unwrap!(rx.recv());
-            assert!(res.is_err());
+            let res: Result<CipherOptHandle, _> =
+                call_1(|ud, cb| cipher_opt_new_asymmetric(&app, 29293290, ud, cb));
             assert_eq!(unwrap!(res.err()), err_code);
 
-            cipher_opt_new_asymmetric(&app, peer_encrypt_key_handle, tx, handle_cb);
-            cipher_opt_handle_asym = unwrap!(unwrap!(rx.recv()));
+            cipher_opt_handle_asym = unwrap!(call_1(|ud, cb| {
+                cipher_opt_new_asymmetric(&app, peer_encrypt_key_handle, ud, cb)
+            }));
         }
 
         run_now(&app, move |_, context| {
@@ -372,19 +355,6 @@ mod tests {
         match res {
             Ok(()) => assert_eq!(expected, 0),
             Err(code) => assert_eq!(expected, code),
-        }
-    }
-
-    extern "C" fn handle_cb(tx: *mut c_void, error_code: i32, handle: CipherOptHandle) {
-        let tx = tx as *mut mpsc::Sender<Result<CipherOptHandle, i32>>;
-        let res = if error_code == 0 {
-            Ok(handle)
-        } else {
-            Err(error_code)
-        };
-
-        unsafe {
-            unwrap!((*tx).send(res));
         }
     }
 }

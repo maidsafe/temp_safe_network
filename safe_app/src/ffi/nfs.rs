@@ -70,7 +70,7 @@ pub unsafe extern "C" fn file_insert(app: *const App,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let file = NativeFile::from_repr_c_cloned(file)?;
+        let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn file_update(app: *const App,
                                      user_data: *mut c_void,
                                      o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let file = NativeFile::from_repr_c_cloned(file)?;
+        let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
 
         send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
@@ -107,7 +107,7 @@ mod tests {
     use ffi::cipher_opt::CipherOpt;
     use ffi::immutable_data::*;
     use ffi_utils::ErrorCode;
-    use ffi_utils::test_utils::{call_0, call_1, call_2, call_3};
+    use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8};
     use futures::Future;
     use object_cache::CipherOptHandle;
     use routing::{XOR_NAME_LEN, XorName};
@@ -243,10 +243,8 @@ mod tests {
             idata_size(app, reader_h, ud, cb)
         }));
 
-        let (ptr, len, cap) = unwrap!(call_3(|ud, cb| {
+        unwrap!(call_vec_u8(|ud, cb| {
             idata_read_from_self_encryptor(app, reader_h, 0, size, ud, cb)
-        }));
-
-        Vec::from_raw_parts(ptr, len, cap)
+        }))
     }
 }

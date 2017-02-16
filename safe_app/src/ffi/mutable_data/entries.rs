@@ -99,15 +99,26 @@ pub unsafe extern "C" fn mdata_entries_get(app: *const App,
                                                                usize,
                                                                u64)) {
     catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
         let key = vec_clone_from_raw_parts(key_ptr, key_len);
 
-        with_entries(app, entries_h, user_data, o_cb, move |entries| {
+        (*app).send(move |_, context| {
+            let entries = context.object_cache().get_mdata_entries(entries_h);
+            let entries = try_cb!(entries, user_data, o_cb);
+
             let value = entries.get(&key)
                 .ok_or(ClientError::NoSuchEntry)
                 .map_err(CoreError::from)
-                .map_err(AppError::from)?;
+                .map_err(AppError::from);
+            let value = try_cb!(value, user_data, o_cb);
 
-            Ok((value.content.as_ptr(), value.content.len(), value.entry_version))
+            o_cb(user_data.0,
+                 0,
+                 value.content.as_ptr(),
+                 value.content.len(),
+                 value.entry_version);
+
+            None
         })
     })
 }
@@ -320,13 +331,12 @@ unsafe fn with_values<C, F>(app: *const App,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::test_utils::{call_1, call_3};
+    use ffi_utils::test_utils::{call_1, send_via_user_data, sender_as_user_data};
     use ffi_utils::vec_clone_from_raw_parts;
     use routing::Value;
     use safe_core::utils;
     use std::collections::BTreeMap;
     use std::os::raw::c_void;
-    use std::slice;
     use std::sync::mpsc::{self, Sender};
     use test_utils::{create_app, run_now};
 
@@ -358,29 +368,48 @@ mod tests {
             unsafe { unwrap!(call_1(|ud, cb| mdata_entries_len(&app, handle, ud, cb))) };
         assert_eq!(len, 2);
 
-        // key 0
-        let (content, version) = unsafe {
-            let (ptr, len, version) = unwrap!(call_3(|ud, cb| {
-                mdata_entries_get(&app, handle, key0.as_ptr(), key0.len(), ud, cb)
-            }));
+        let (tx, rx) = mpsc::channel::<Value>();
+        extern "C" fn get_cb(user_data: *mut c_void,
+                             error_code: i32,
+                             ptr: *const u8,
+                             len: usize,
+                             version: u64) {
+            assert_eq!(error_code, 0);
 
-            let content = slice::from_raw_parts(ptr, len);
-            (content, version)
+            unsafe {
+                let value = vec_clone_from_raw_parts(ptr, len);
+                let value = Value {
+                    content: value,
+                    entry_version: version,
+                };
+
+                send_via_user_data(user_data, value)
+            }
+        }
+
+        // key 0
+        unsafe {
+            mdata_entries_get(&app,
+                              handle,
+                              key0.as_ptr(),
+                              key0.len(),
+                              sender_as_user_data(&tx),
+                              get_cb);
         };
-        assert_eq!(content, &value0.content[..]);
-        assert_eq!(version, value0.entry_version);
+        let value = unwrap!(rx.recv());
+        assert_eq!(value, value0);
 
         // key 1
-        let (content, version) = unsafe {
-            let (ptr, len, version) = unwrap!(call_3(|ud, cb| {
-                mdata_entries_get(&app, handle, key1.as_ptr(), key1.len(), ud, cb)
-            }));
-
-            let content = slice::from_raw_parts(ptr, len);
-            (content, version)
+        unsafe {
+            mdata_entries_get(&app,
+                              handle,
+                              key1.as_ptr(),
+                              key1.len(),
+                              sender_as_user_data(&tx),
+                              get_cb);
         };
-        assert_eq!(content, &value1.content[..]);
-        assert_eq!(version, value1.entry_version);
+        let value = unwrap!(rx.recv());
+        assert_eq!(value, value1);
 
         // iteration
         let (tx, rx) = mpsc::channel::<()>();

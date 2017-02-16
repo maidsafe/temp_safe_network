@@ -19,18 +19,36 @@
 // Please review the Licences for the specific language governing permissions
 // and limitations relating to use of the SAFE Network Software.
 
+#![allow(unsafe_code)]
+
 use routing::XOR_NAME_LEN;
 use rust_sodium::crypto::{box_, secretbox, sign};
 
-// TODO: crust Config once it's no longer a stub
 /// It represents the authentication response.
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct AuthGranted {
     /// The access keys.
     pub app_keys: AppKeys,
     /// Access container
     pub access_container: AccessContInfo,
+
+    /// Crust's bootstrap config
+    pub bootstrap_config_ptr: *mut u8,
+    /// `bootstrap_config`'s length
+    pub bootstrap_config_len: usize,
+    /// Used by Rust memory allocator
+    pub bootstrap_config_cap: usize,
+}
+
+impl Drop for AuthGranted {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Vec::from_raw_parts(self.bootstrap_config_ptr,
+                                        self.bootstrap_config_len,
+                                        self.bootstrap_config_cap);
+        }
+    }
 }
 
 /// Represents the needed keys to work with the data

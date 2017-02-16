@@ -34,3 +34,5 @@ build-tests/
 packages/
 .DS_Store
 *.bootstrap.cache
+cargo-all.sh
+
