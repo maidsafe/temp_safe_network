@@ -21,7 +21,8 @@ log = "~0.3.6"
 maidsafe_utilities = "~0.10.0"
 quick-error = "~1.1.0"
 rand = "~0.3.14"
-routing = { git = "https://github.com/maidsafe/routing" }
+# routing = { git = "https://github.com/maidsafe/routing", branch = "mutable-data" }
+routing = { path = "../routing" }
 rustc-serialize = "~0.3.19"
 rust_sodium = "~0.1.2"
 unwrap = "~1.1.0"
@@ -35,6 +36,7 @@ tempdir = "~0.3.5"
 [features]
 generate-diagrams = ["hyper"]
 use-mock-crust = ["routing/use-mock-crust"]
+use-mock-routing = []
 
 [[test]]
 name = "tests"

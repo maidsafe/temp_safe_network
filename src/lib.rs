@@ -220,7 +220,7 @@ extern crate maidsafe_utilities;
 extern crate config_file_handler;
 #[macro_use]
 extern crate quick_error;
-#[cfg(any(test, feature = "use-mock-crust"))]
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
@@ -231,19 +231,24 @@ extern crate tempdir;
 #[macro_use]
 extern crate unwrap;
 
+/// For unit and integration tests only
+#[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]
+pub mod test_utils;
+
+/// For integration tests only
+#[cfg(all(feature = "use-mock-crust", not(feature = "use-mock-routing")))]
+pub mod mock_crust_detail;
+
 mod cache;
 mod chunk_store;
 mod config_handler;
 mod error;
-/// For integration tests only
-#[cfg(feature = "use-mock-crust")]
-pub mod test_utils;
+#[cfg(all(test, feature = "use-mock-routing"))]
+mod mock_routing;
 mod personas;
 mod utils;
 mod vault;
-/// For integration tests only
-#[cfg(feature = "use-mock-crust")]
-pub mod mock_crust_detail;
+
 pub use config_handler::Config;
 pub use vault::Vault;
 

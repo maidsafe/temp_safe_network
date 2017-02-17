@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+// TODO: remove this
+#![allow(unused)]
 
 use GROUP_SIZE;
 use accumulator::Accumulator;
@@ -22,10 +24,11 @@ use chunk_store::ChunkStore;
 use error::InternalError;
 use itertools::Itertools;
 use maidsafe_utilities::{self, serialisation};
-use routing::{AppendWrapper, Authority, Data, DataIdentifier, MessageId, RoutingTable,
-              StructuredData, XorName};
-use routing::client_errors::{GetError, MutationError};
-use std::collections::{HashMap, HashSet, VecDeque};
+use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
+              RoutingTable, StructuredData, User, XorName};
+use routing::ClientError;
+use rust_sodium::crypto::sign;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::ops::Add;
@@ -45,6 +48,9 @@ const GET_FROM_DATA_HOLDER_TIMEOUT_SECS: u64 = 60;
 /// The interval for print status log.
 const STATUS_LOG_INTERVAL: u64 = 120;
 
+// TODO: uncomment and fix this
+
+/*
 /// Specification of a particular version of a data chunk. For immutable data, the `u64` is always
 /// 0; for structured and appendable data, it specifies the version.
 pub type IdAndVersion = (DataIdentifier, u64);
@@ -348,13 +354,19 @@ impl Cache {
         self.pending_writes.remove(data_id).unwrap_or_else(Vec::new)
     }
 }
-
+*/
 
 pub struct DataManager {
-    chunk_store: ChunkStore<DataIdentifier, Data>,
-    /// Accumulates refresh messages and the peers we received them from.
-    refresh_accumulator: Accumulator<IdAndVersion, XorName>,
-    cache: Cache,
+    // TODO: uncomment this
+    // chunk_store: ChunkStore<DataIdentifier, Data>,
+
+
+    // TODO: uncomment this
+    // /// Accumulates refresh messages and the peers we received them from.
+    // refresh_accumulator: Accumulator<IdAndVersion, XorName>,
+
+    // TODO: uncomment this
+    // cache: Cache,
     immutable_data_count: u64,
     structured_data_count: u64,
     appendable_data_count: u64,
@@ -362,6 +374,7 @@ pub struct DataManager {
     logging_time: Instant,
 }
 
+/*
 fn id_and_version_of(data: &Data) -> IdAndVersion {
     (data.identifier(),
      match *data {
@@ -371,9 +384,13 @@ fn id_and_version_of(data: &Data) -> IdAndVersion {
          Data::Immutable(_) => 0,
      })
 }
+*/
 
 impl Debug for DataManager {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        unimplemented!()
+
+        /*
         write!(formatter,
                "This vault has received {} Client Get requests. Chunks stored: Immutable: {}, \
                 Structured: {}, Appendable: {}. Total stored: {} bytes.",
@@ -382,11 +399,15 @@ impl Debug for DataManager {
                self.structured_data_count,
                self.appendable_data_count,
                self.chunk_store.used_space())
+        */
     }
 }
 
 impl DataManager {
     pub fn new(chunk_store_root: PathBuf, capacity: u64) -> Result<DataManager, InternalError> {
+        unimplemented!()
+
+        /*
         Ok(DataManager {
             chunk_store: ChunkStore::new(chunk_store_root, capacity)?,
             refresh_accumulator:
@@ -399,8 +420,524 @@ impl DataManager {
             client_get_requests: 0,
             logging_time: Instant::now(),
         })
+        */
     }
 
+    pub fn handle_refresh(&mut self,
+                          routing_node: &mut RoutingNode,
+                          src: XorName,
+                          serialised_data_list: &[u8])
+                          -> Result<(), InternalError> {
+        unimplemented!()
+
+        /*
+        let RefreshDataList(data_list) = serialisation::deserialise(serialised_data_list)?;
+        for data_idv in data_list {
+            if self.cache.register_data_with_holder(&src, &data_idv) {
+                continue;
+            }
+            if let Some(holders) = self.refresh_accumulator.add(data_idv, src).cloned() {
+                self.refresh_accumulator.delete(&data_idv);
+                let (ref data_id, ref version) = data_idv;
+                let data_needed = match *data_id {
+                    DataIdentifier::Immutable(..) => !self.chunk_store.has(data_id),
+                    DataIdentifier::Structured(..) => {
+                        match self.chunk_store.get(data_id) {
+                            // We don't have the data, so we need to retrieve it.
+                            Err(_) => true,
+                            Ok(Data::Structured(sd)) => sd.get_version() < *version,
+                            Ok(_) => unreachable!(),
+                        }
+                    }
+                    DataIdentifier::PubAppendable(..) => {
+                        match self.chunk_store.get(data_id) {
+                            // We don't have the data, so we need to retrieve it.
+                            Err(_) => true,
+                            Ok(Data::PubAppendable(ad)) => ad.get_version() <= *version,
+                            Ok(_) => unreachable!(),
+                        }
+                    }
+                    DataIdentifier::PrivAppendable(..) => {
+                        match self.chunk_store.get(data_id) {
+                            // We don't have the data, so we need to retrieve it.
+                            Err(_) => true,
+                            Ok(Data::PrivAppendable(ad)) => ad.get_version() <= *version,
+                            Ok(_) => unreachable!(),
+                        }
+                    }
+                };
+                if !data_needed {
+                    continue;
+                }
+                self.cache.add_records(data_idv, holders);
+            }
+        }
+        self.send_gets_for_needed_data(routing_node)
+        */
+    }
+
+    /// Handles an accumulated refresh message sent from the whole group.
+    pub fn handle_group_refresh(&mut self,
+                                routing_node: &mut RoutingNode,
+                                serialised_refresh: &[u8])
+                                -> Result<(), InternalError> {
+        unimplemented!()
+
+        /*
+        let RefreshData((data_id, version), refresh_hash) =
+            serialisation::deserialise(serialised_refresh)?;
+        let mut success = false;
+        for PendingWrite { data, mutate_type, src, dst, message_id, hash, rejected, .. } in
+            self.cache.take_pending_writes(&data_id) {
+            if hash == refresh_hash {
+                let already_existed = self.chunk_store.has(&data_id);
+                if let Err(error) = self.chunk_store.put(&data_id, &data) {
+                    trace!("DM failed to store {:?} in chunkstore: {:?}",
+                           data_id,
+                           error);
+                    let error = MutationError::NetworkOther(format!("Failed to store chunk: {:?}",
+                                                                    error));
+                    self.send_failure(routing_node,
+                                      mutate_type,
+                                      src,
+                                      dst,
+                                      data_id,
+                                      message_id,
+                                      error)?;
+                } else {
+                    trace!("DM updated for: {:?}", data_id);
+                    let _ = match mutate_type {
+                        PendingMutationType::Append => {
+                            trace!("DM sending AppendSuccess for data {:?}", data_id);
+                            routing_node.send_append_success(dst, src, data_id, message_id)
+                        }
+                        PendingMutationType::Post => {
+                            trace!("DM sending PostSuccess for data {:?}", data_id);
+                            routing_node.send_post_success(dst, src, data_id, message_id)
+                        }
+                        PendingMutationType::Put => {
+                            // Put to a deleted data shall not be counted
+                            if !already_existed {
+                                self.count_added_data(&data_id);
+                            }
+                            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
+                                self.logging_time = Instant::now();
+                                info!("{:?}", self);
+                            }
+                            trace!("DM sending PutSuccess for data {:?}", data_id);
+                            routing_node.send_put_success(dst, src, data_id, message_id)
+                        }
+                        PendingMutationType::Delete => {
+                            trace!("DM sending DeleteSuccess for data {:?}", data_id);
+                            routing_node.send_delete_success(dst, src, data_id, message_id)
+                        }
+                    };
+                    let data_list = vec![(data_id, version)];
+                    let _ = self.send_refresh(routing_node,
+                                              Authority::NaeManager(*data_id.name()),
+                                              data_list);
+                    success = true;
+                }
+            } else if !rejected {
+                trace!("{:?} did not accumulate. Sending failure", data_id);
+                let error = MutationError::NetworkOther("Concurrent modification.".to_owned());
+                self.send_failure(routing_node,
+                                  mutate_type,
+                                  src,
+                                  dst,
+                                  data.identifier(),
+                                  message_id,
+                                  error)?;
+            }
+        }
+        if !success {
+            if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
+                let data_idv = (data_id, version);
+                for node in &group {
+                    let _ = self.cache.register_data_with_holder(node, &data_idv);
+                }
+                self.send_gets_for_needed_data(routing_node)?;
+            }
+        }
+        Ok(())
+        */
+    }
+
+    pub fn handle_get_idata(&mut self,
+                            routing_node: &mut RoutingNode,
+                            src: Authority<XorName>,
+                            dst: Authority<XorName>,
+                            name: XorName,
+                            msg_id: MessageId)
+                            -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_put_idata(&mut self,
+                            routing_node: &mut RoutingNode,
+                            src: Authority<XorName>,
+                            dst: Authority<XorName>,
+                            data: ImmutableData,
+                            msg_id: MessageId)
+                            -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_put_mdata(&mut self,
+                            routing_node: &mut RoutingNode,
+                            src: Authority<XorName>,
+                            dst: Authority<XorName>,
+                            data: MutableData,
+                            msg_id: MessageId,
+                            requester: sign::PublicKey)
+                            -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_get_mdata_version(&mut self,
+                                    routing_node: &mut RoutingNode,
+                                    src: Authority<XorName>,
+                                    dst: Authority<XorName>,
+                                    name: XorName,
+                                    tag: u64,
+                                    msg_id: MessageId)
+                                    -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_list_mdata_entries(&mut self,
+                                     routing_node: &mut RoutingNode,
+                                     src: Authority<XorName>,
+                                     dst: Authority<XorName>,
+                                     name: XorName,
+                                     tag: u64,
+                                     msg_id: MessageId)
+                                     -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_list_mdata_keys(&mut self,
+                                  routing_node: &mut RoutingNode,
+                                  src: Authority<XorName>,
+                                  dst: Authority<XorName>,
+                                  name: XorName,
+                                  tag: u64,
+                                  msg_id: MessageId)
+                                  -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_list_mdata_values(&mut self,
+                                    routing_node: &mut RoutingNode,
+                                    src: Authority<XorName>,
+                                    dst: Authority<XorName>,
+                                    name: XorName,
+                                    tag: u64,
+                                    msg_id: MessageId)
+                                    -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_get_mdata_value(&mut self,
+                                  routing_node: &mut RoutingNode,
+                                  src: Authority<XorName>,
+                                  dst: Authority<XorName>,
+                                  name: XorName,
+                                  tag: u64,
+                                  key: Vec<u8>,
+                                  msg_id: MessageId)
+                                  -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_mutate_mdata_entries(&mut self,
+                                       routing_node: &mut RoutingNode,
+                                       src: Authority<XorName>,
+                                       dst: Authority<XorName>,
+                                       name: XorName,
+                                       tag: u64,
+                                       actions: BTreeMap<Vec<u8>, EntryAction>,
+                                       msg_id: MessageId,
+                                       requester: sign::PublicKey)
+                                       -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_list_mdata_permissions(&mut self,
+                                         routing_node: &mut RoutingNode,
+                                         src: Authority<XorName>,
+                                         dst: Authority<XorName>,
+                                         name: XorName,
+                                         tag: u64,
+                                         msg_id: MessageId)
+                                         -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_list_mdata_user_permissions(&mut self,
+                                              routing_node: &mut RoutingNode,
+                                              src: Authority<XorName>,
+                                              dst: Authority<XorName>,
+                                              name: XorName,
+                                              tag: u64,
+                                              user: User,
+                                              msg_id: MessageId)
+                                              -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_set_mdata_user_permissions(&mut self,
+                                             routing_node: &mut RoutingNode,
+                                             src: Authority<XorName>,
+                                             dst: Authority<XorName>,
+                                             name: XorName,
+                                             tag: u64,
+                                             user: User,
+                                             permissions: PermissionSet,
+                                             version: u64,
+                                             msg_id: MessageId,
+                                             requester: sign::PublicKey)
+                                             -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_del_mdata_user_permissions(&mut self,
+                                             routing_node: &mut RoutingNode,
+                                             src: Authority<XorName>,
+                                             dst: Authority<XorName>,
+                                             name: XorName,
+                                             tag: u64,
+                                             user: User,
+                                             version: u64,
+                                             msg_id: MessageId,
+                                             requester: sign::PublicKey)
+                                             -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn handle_change_mdata_owner(&mut self,
+                                     routing_node: &mut RoutingNode,
+                                     src: Authority<XorName>,
+                                     dst: Authority<XorName>,
+                                     name: XorName,
+                                     tag: u64,
+                                     new_owners: BTreeSet<sign::PublicKey>,
+                                     version: u64,
+                                     msg_id: MessageId)
+                                     -> Result<(), InternalError> {
+        unimplemented!()
+    }
+
+    pub fn check_timeouts(&mut self, routing_node: &mut RoutingNode) {
+        unimplemented!()
+
+        // let _ = self.send_gets_for_needed_data(routing_node);
+    }
+
+    pub fn handle_node_added(&mut self,
+                             routing_node: &mut RoutingNode,
+                             node_name: &XorName,
+                             routing_table: &RoutingTable<XorName>) {
+        unimplemented!()
+
+        /*
+        self.cache.prune_data_holders(routing_table);
+        if self.cache.prune_ongoing_gets(routing_table) {
+            let _ = self.send_gets_for_needed_data(routing_node);
+        }
+        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
+            .keys()
+            .into_iter()
+            .filter_map(|data_id| self.to_id_and_version(data_id)));
+        let mut has_pruned_data = false;
+        // Only retain data for which we're still in the close group.
+        let mut data_list = Vec::new();
+        for (data_id, version) in data_idvs {
+            match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
+                None => {
+                    trace!("No longer a DM for {:?}", data_id);
+                    if self.chunk_store.has(&data_id) && !self.cache.is_in_unneeded(&data_id) {
+                        self.count_removed_data(&data_id);
+                        has_pruned_data = true;
+                        if let DataIdentifier::Immutable(..) = data_id {
+                            self.cache.add_as_unneeded(data_id);
+                        } else {
+                            let _ = self.chunk_store.delete(&data_id);
+                        }
+                    }
+                }
+                Some(close_group) => {
+                    if close_group.contains(&node_name) {
+                        data_list.push((data_id, version));
+                    }
+                }
+            }
+        }
+        if !data_list.is_empty() {
+            let _ = self.send_refresh(routing_node, Authority::ManagedNode(*node_name), data_list);
+        }
+        if has_pruned_data && self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
+            self.logging_time = Instant::now();
+            info!("{:?}", self);
+        }
+        */
+    }
+
+    /// Get all names and hashes of all data. // [TODO]: Can be optimised - 2016-04-23 09:11pm
+    /// Send to all members of group of data.
+    pub fn handle_node_lost(&mut self,
+                            routing_node: &mut RoutingNode,
+                            node_name: &XorName,
+                            routing_table: &RoutingTable<XorName>) {
+        unimplemented!()
+
+        /*
+        let pruned_unneeded_chunks = self.cache.prune_unneeded_chunks(routing_table);
+        if pruned_unneeded_chunks != 0 {
+            self.immutable_data_count += pruned_unneeded_chunks;
+            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
+                self.logging_time = Instant::now();
+                info!("{:?}", self);
+            }
+        }
+        self.cache.prune_data_holders(routing_table);
+        if self.cache.prune_ongoing_gets(routing_table) {
+            let _ = self.send_gets_for_needed_data(routing_node);
+        }
+
+
+        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
+            .keys()
+            .into_iter()
+            .filter_map(|data_id| self.to_id_and_version(data_id))
+            .collect_vec());
+        let mut data_lists: HashMap<XorName, Vec<IdAndVersion>> = HashMap::new();
+        for data_idv in data_idvs {
+            match routing_table.other_closest_names(data_idv.0.name(), GROUP_SIZE) {
+                None => {
+                    error!("Moved out of close group of {:?} in a NodeLost event.",
+                           node_name);
+                }
+                Some(close_group) => {
+                    // If no new node joined the group due to this event, continue:
+                    // If the group has fewer than GROUP_SIZE elements, the lost node was not
+                    // replaced at all. Otherwise, if the group's last node is closer to the data
+                    // than the lost node, the lost node was not in the group in the first place.
+                    if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
+                        if data_idv.0.name().closer(node_name, outer_node) {
+                            data_lists.entry(*outer_node).or_insert_with(Vec::new).push(data_idv);
+                        }
+                    }
+                }
+            }
+        }
+        for (node_name, data_list) in data_lists {
+            let _ = self.send_refresh(routing_node, Authority::ManagedNode(node_name), data_list);
+        }
+        */
+    }
+
+    pub fn handle_get_idata_success(&mut self,
+                                    routing_node: &mut RoutingNode,
+                                    src: XorName,
+                                    mut data: ImmutableData)
+                                    -> Result<(), InternalError> {
+        unimplemented!()
+
+        /*
+        let (data_id, version) = id_and_version_of(&data);
+        self.cache.handle_get_success(src, &data_id, version);
+        self.send_gets_for_needed_data(routing_node)?;
+        // If we're no longer in the close group, return.
+        if !self.close_to_address(routing_node, data_id.name()) {
+            return Ok(());
+        }
+        // TODO: Check that the data's hash actually agrees with an accumulated entry.
+        let mut got_new_data = true;
+        match data_id {
+            DataIdentifier::PubAppendable(..) => {
+                if let Ok(Data::PubAppendable(appendable_data)) = self.chunk_store.get(&data_id) {
+                    // Make sure we don't 'update' to a lower version.
+                    if appendable_data.get_version() > version {
+                        return Ok(());
+                    }
+                    if appendable_data.get_version() == version {
+                        if let Data::PubAppendable(ref mut received) = data {
+                            received.data.extend(appendable_data.data.into_iter());
+                        } else {
+                            unreachable!("DataIdentifier variant and Data variant mismatch");
+                        }
+                    }
+                    got_new_data = false;
+                }
+            }
+            DataIdentifier::PrivAppendable(..) => {
+                if let Ok(Data::PrivAppendable(appendable_data)) = self.chunk_store.get(&data_id) {
+                    // Make sure we don't 'update' to a lower version.
+                    if appendable_data.get_version() > version {
+                        return Ok(());
+                    }
+                    if appendable_data.get_version() == version {
+                        if let Data::PrivAppendable(ref mut received) = data {
+                            received.data.extend(appendable_data.data.into_iter());
+                        } else {
+                            unreachable!("DataIdentifier variant and Data variant mismatch");
+                        }
+                    }
+                    got_new_data = false;
+                }
+            }
+            DataIdentifier::Structured(..) => {
+                if let Ok(Data::Structured(structured_data)) = self.chunk_store.get(&data_id) {
+                    // Make sure we don't 'update' to a lower version.
+                    if structured_data.get_version() >= version {
+                        return Ok(());
+                    }
+                    got_new_data = false;
+                }
+            }
+            DataIdentifier::Immutable(..) => {
+                if self.chunk_store.has(&data_id) {
+                    return Ok(()); // Immutable data is already there.
+                }
+            }
+        }
+
+        self.clean_chunk_store();
+        // chunk_store::put() deletes the old data automatically.
+        self.chunk_store.put(&data_id, &data)?;
+        if got_new_data {
+            self.count_added_data(&data_id);
+            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
+                self.logging_time = Instant::now();
+                info!("{:?}", self);
+            }
+        }
+        Ok(())
+        */
+    }
+
+    pub fn handle_get_idata_failure(&mut self,
+                                    routing_node: &mut RoutingNode,
+                                    src: XorName,
+                                    msg_id: MessageId)
+                                    -> Result<(), InternalError> {
+        unimplemented!()
+
+        /*
+        if !self.cache.handle_get_failure(src, &data_id) {
+            warn!("Received unexpected failure response while getting data {:?}.",
+                  data_id);
+            return Err(InternalError::InvalidMessage);
+        }
+        self.send_gets_for_needed_data(routing_node)
+        */
+    }
+
+
+    // TODO: port these to the new idata/mdata operations
+
+    /*
     pub fn handle_get(&mut self,
                       routing_node: &mut RoutingNode,
                       src: Authority<XorName>,
@@ -678,226 +1215,8 @@ impl DataManager {
         }
     }
 
-    pub fn handle_get_success(&mut self,
-                              routing_node: &mut RoutingNode,
-                              src: XorName,
-                              mut data: Data)
-                              -> Result<(), InternalError> {
-        let (data_id, version) = id_and_version_of(&data);
-        self.cache.handle_get_success(src, &data_id, version);
-        self.send_gets_for_needed_data(routing_node)?;
-        // If we're no longer in the close group, return.
-        if !self.close_to_address(routing_node, data_id.name()) {
-            return Ok(());
-        }
-        // TODO: Check that the data's hash actually agrees with an accumulated entry.
-        let mut got_new_data = true;
-        match data_id {
-            DataIdentifier::PubAppendable(..) => {
-                if let Ok(Data::PubAppendable(appendable_data)) = self.chunk_store.get(&data_id) {
-                    // Make sure we don't 'update' to a lower version.
-                    if appendable_data.get_version() > version {
-                        return Ok(());
-                    }
-                    if appendable_data.get_version() == version {
-                        if let Data::PubAppendable(ref mut received) = data {
-                            received.data.extend(appendable_data.data.into_iter());
-                        } else {
-                            unreachable!("DataIdentifier variant and Data variant mismatch");
-                        }
-                    }
-                    got_new_data = false;
-                }
-            }
-            DataIdentifier::PrivAppendable(..) => {
-                if let Ok(Data::PrivAppendable(appendable_data)) = self.chunk_store.get(&data_id) {
-                    // Make sure we don't 'update' to a lower version.
-                    if appendable_data.get_version() > version {
-                        return Ok(());
-                    }
-                    if appendable_data.get_version() == version {
-                        if let Data::PrivAppendable(ref mut received) = data {
-                            received.data.extend(appendable_data.data.into_iter());
-                        } else {
-                            unreachable!("DataIdentifier variant and Data variant mismatch");
-                        }
-                    }
-                    got_new_data = false;
-                }
-            }
-            DataIdentifier::Structured(..) => {
-                if let Ok(Data::Structured(structured_data)) = self.chunk_store.get(&data_id) {
-                    // Make sure we don't 'update' to a lower version.
-                    if structured_data.get_version() >= version {
-                        return Ok(());
-                    }
-                    got_new_data = false;
-                }
-            }
-            DataIdentifier::Immutable(..) => {
-                if self.chunk_store.has(&data_id) {
-                    return Ok(()); // Immutable data is already there.
-                }
-            }
-        }
 
-        self.clean_chunk_store();
-        // chunk_store::put() deletes the old data automatically.
-        self.chunk_store.put(&data_id, &data)?;
-        if got_new_data {
-            self.count_added_data(&data_id);
-            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
-                self.logging_time = Instant::now();
-                info!("{:?}", self);
-            }
-        }
-        Ok(())
-    }
 
-    pub fn handle_get_failure(&mut self,
-                              routing_node: &mut RoutingNode,
-                              src: XorName,
-                              data_id: DataIdentifier)
-                              -> Result<(), InternalError> {
-        if !self.cache.handle_get_failure(src, &data_id) {
-            warn!("Received unexpected failure response while getting data {:?}.",
-                  data_id);
-            return Err(InternalError::InvalidMessage);
-        }
-        self.send_gets_for_needed_data(routing_node)
-    }
-
-    pub fn handle_refresh(&mut self,
-                          routing_node: &mut RoutingNode,
-                          src: XorName,
-                          serialised_data_list: &[u8])
-                          -> Result<(), InternalError> {
-        let RefreshDataList(data_list) = serialisation::deserialise(serialised_data_list)?;
-        for data_idv in data_list {
-            if self.cache.register_data_with_holder(&src, &data_idv) {
-                continue;
-            }
-            if let Some(holders) = self.refresh_accumulator.add(data_idv, src).cloned() {
-                self.refresh_accumulator.delete(&data_idv);
-                let (ref data_id, ref version) = data_idv;
-                let data_needed = match *data_id {
-                    DataIdentifier::Immutable(..) => !self.chunk_store.has(data_id),
-                    DataIdentifier::Structured(..) => {
-                        match self.chunk_store.get(data_id) {
-                            // We don't have the data, so we need to retrieve it.
-                            Err(_) => true,
-                            Ok(Data::Structured(sd)) => sd.get_version() < *version,
-                            Ok(_) => unreachable!(),
-                        }
-                    }
-                    DataIdentifier::PubAppendable(..) => {
-                        match self.chunk_store.get(data_id) {
-                            // We don't have the data, so we need to retrieve it.
-                            Err(_) => true,
-                            Ok(Data::PubAppendable(ad)) => ad.get_version() <= *version,
-                            Ok(_) => unreachable!(),
-                        }
-                    }
-                    DataIdentifier::PrivAppendable(..) => {
-                        match self.chunk_store.get(data_id) {
-                            // We don't have the data, so we need to retrieve it.
-                            Err(_) => true,
-                            Ok(Data::PrivAppendable(ad)) => ad.get_version() <= *version,
-                            Ok(_) => unreachable!(),
-                        }
-                    }
-                };
-                if !data_needed {
-                    continue;
-                }
-                self.cache.add_records(data_idv, holders);
-            }
-        }
-        self.send_gets_for_needed_data(routing_node)
-    }
-
-    /// Handles an accumulated refresh message sent from the whole group.
-    pub fn handle_group_refresh(&mut self,
-                                routing_node: &mut RoutingNode,
-                                serialised_refresh: &[u8])
-                                -> Result<(), InternalError> {
-        let RefreshData((data_id, version), refresh_hash) =
-            serialisation::deserialise(serialised_refresh)?;
-        let mut success = false;
-        for PendingWrite { data, mutate_type, src, dst, message_id, hash, rejected, .. } in
-            self.cache.take_pending_writes(&data_id) {
-            if hash == refresh_hash {
-                let already_existed = self.chunk_store.has(&data_id);
-                if let Err(error) = self.chunk_store.put(&data_id, &data) {
-                    trace!("DM failed to store {:?} in chunkstore: {:?}",
-                           data_id,
-                           error);
-                    let error = MutationError::NetworkOther(format!("Failed to store chunk: {:?}",
-                                                                    error));
-                    self.send_failure(routing_node,
-                                      mutate_type,
-                                      src,
-                                      dst,
-                                      data_id,
-                                      message_id,
-                                      error)?;
-                } else {
-                    trace!("DM updated for: {:?}", data_id);
-                    let _ = match mutate_type {
-                        PendingMutationType::Append => {
-                            trace!("DM sending AppendSuccess for data {:?}", data_id);
-                            routing_node.send_append_success(dst, src, data_id, message_id)
-                        }
-                        PendingMutationType::Post => {
-                            trace!("DM sending PostSuccess for data {:?}", data_id);
-                            routing_node.send_post_success(dst, src, data_id, message_id)
-                        }
-                        PendingMutationType::Put => {
-                            // Put to a deleted data shall not be counted
-                            if !already_existed {
-                                self.count_added_data(&data_id);
-                            }
-                            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
-                                self.logging_time = Instant::now();
-                                info!("{:?}", self);
-                            }
-                            trace!("DM sending PutSuccess for data {:?}", data_id);
-                            routing_node.send_put_success(dst, src, data_id, message_id)
-                        }
-                        PendingMutationType::Delete => {
-                            trace!("DM sending DeleteSuccess for data {:?}", data_id);
-                            routing_node.send_delete_success(dst, src, data_id, message_id)
-                        }
-                    };
-                    let data_list = vec![(data_id, version)];
-                    let _ = self.send_refresh(routing_node,
-                                              Authority::NaeManager(*data_id.name()),
-                                              data_list);
-                    success = true;
-                }
-            } else if !rejected {
-                trace!("{:?} did not accumulate. Sending failure", data_id);
-                let error = MutationError::NetworkOther("Concurrent modification.".to_owned());
-                self.send_failure(routing_node,
-                                  mutate_type,
-                                  src,
-                                  dst,
-                                  data.identifier(),
-                                  message_id,
-                                  error)?;
-            }
-        }
-        if !success {
-            if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
-                let data_idv = (data_id, version);
-                for node in &group {
-                    let _ = self.cache.register_data_with_holder(node, &data_idv);
-                }
-                self.send_gets_for_needed_data(routing_node)?;
-            }
-        }
-        Ok(())
-    }
 
     #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     fn send_failure(&self,
@@ -980,105 +1299,6 @@ impl DataManager {
 
     fn close_to_address(&self, routing_node: &mut RoutingNode, address: &XorName) -> bool {
         routing_node.close_group(*address, GROUP_SIZE).is_some()
-    }
-
-    pub fn handle_node_added(&mut self,
-                             routing_node: &mut RoutingNode,
-                             node_name: &XorName,
-                             routing_table: &RoutingTable<XorName>) {
-        self.cache.prune_data_holders(routing_table);
-        if self.cache.prune_ongoing_gets(routing_table) {
-            let _ = self.send_gets_for_needed_data(routing_node);
-        }
-        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
-            .keys()
-            .into_iter()
-            .filter_map(|data_id| self.to_id_and_version(data_id)));
-        let mut has_pruned_data = false;
-        // Only retain data for which we're still in the close group.
-        let mut data_list = Vec::new();
-        for (data_id, version) in data_idvs {
-            match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
-                None => {
-                    trace!("No longer a DM for {:?}", data_id);
-                    if self.chunk_store.has(&data_id) && !self.cache.is_in_unneeded(&data_id) {
-                        self.count_removed_data(&data_id);
-                        has_pruned_data = true;
-                        if let DataIdentifier::Immutable(..) = data_id {
-                            self.cache.add_as_unneeded(data_id);
-                        } else {
-                            let _ = self.chunk_store.delete(&data_id);
-                        }
-                    }
-                }
-                Some(close_group) => {
-                    if close_group.contains(&node_name) {
-                        data_list.push((data_id, version));
-                    }
-                }
-            }
-        }
-        if !data_list.is_empty() {
-            let _ = self.send_refresh(routing_node, Authority::ManagedNode(*node_name), data_list);
-        }
-        if has_pruned_data && self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
-            self.logging_time = Instant::now();
-            info!("{:?}", self);
-        }
-    }
-
-    /// Get all names and hashes of all data. // [TODO]: Can be optimised - 2016-04-23 09:11pm
-    /// Send to all members of group of data.
-    pub fn handle_node_lost(&mut self,
-                            routing_node: &mut RoutingNode,
-                            node_name: &XorName,
-                            routing_table: &RoutingTable<XorName>) {
-        let pruned_unneeded_chunks = self.cache.prune_unneeded_chunks(routing_table);
-        if pruned_unneeded_chunks != 0 {
-            self.immutable_data_count += pruned_unneeded_chunks;
-            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
-                self.logging_time = Instant::now();
-                info!("{:?}", self);
-            }
-        }
-        self.cache.prune_data_holders(routing_table);
-        if self.cache.prune_ongoing_gets(routing_table) {
-            let _ = self.send_gets_for_needed_data(routing_node);
-        }
-
-
-        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
-            .keys()
-            .into_iter()
-            .filter_map(|data_id| self.to_id_and_version(data_id))
-            .collect_vec());
-        let mut data_lists: HashMap<XorName, Vec<IdAndVersion>> = HashMap::new();
-        for data_idv in data_idvs {
-            match routing_table.other_closest_names(data_idv.0.name(), GROUP_SIZE) {
-                None => {
-                    error!("Moved out of close group of {:?} in a NodeLost event.",
-                           node_name);
-                }
-                Some(close_group) => {
-                    // If no new node joined the group due to this event, continue:
-                    // If the group has fewer than GROUP_SIZE elements, the lost node was not
-                    // replaced at all. Otherwise, if the group's last node is closer to the data
-                    // than the lost node, the lost node was not in the group in the first place.
-                    if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
-                        if data_idv.0.name().closer(node_name, outer_node) {
-                            data_lists.entry(*outer_node).or_insert_with(Vec::new).push(data_idv);
-                        }
-                    }
-                }
-            }
-        }
-        for (node_name, data_list) in data_lists {
-            let _ = self.send_refresh(routing_node, Authority::ManagedNode(node_name), data_list);
-        }
-    }
-
-    pub fn check_timeouts(&mut self, routing_node: &mut RoutingNode) {
-        let _ = self.send_gets_for_needed_data(routing_node);
     }
 
     #[cfg(feature = "use-mock-crust")]
@@ -1189,7 +1409,11 @@ impl DataManager {
             }
         }
     }
+
+    */
 }
+
+/*
 
 /// A list of data held by the sender. Sent from node to node.
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
@@ -1199,3 +1423,5 @@ struct RefreshDataList(Vec<IdAndVersion>);
 /// quorum of group members approves.
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Copy, Clone)]
 struct RefreshData(IdAndVersion, u64);
+
+*/

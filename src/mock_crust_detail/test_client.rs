@@ -20,9 +20,8 @@ use super::test_node::TestNode;
 use GROUP_SIZE;
 use maidsafe_utilities::serialisation;
 use rand::{Rng, XorShiftRng};
-use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId,
-              PublicId, Response, StructuredData, XorName};
-use routing::client_errors::{GetError, MutationError};
+use routing::{Authority, Event, FullId, MessageId, PublicId, Response, StructuredData, XorName};
+use routing::ClientError;
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
 use std::collections::BTreeSet;
 use std::iter;

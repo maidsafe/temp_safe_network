@@ -18,6 +18,9 @@
 //! # Chunk Store
 //! A simple, non-persistent, disk-based key-value store.
 
+// TODO: remove this
+#![allow(unused)]
+
 use fs2::FileExt;
 use maidsafe_utilities::serialisation::{self, SerialisationError};
 use rustc_serialize::{Decodable, Encodable};

@@ -31,6 +31,7 @@
          missing_debug_implementations, variant_size_differences)]
 
 #![cfg(feature = "use-mock-crust")]
+#![cfg(not(feature = "use-mock-routing"))]
 
 extern crate itertools;
 #[macro_use]

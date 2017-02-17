@@ -15,13 +15,32 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+// TODO: remove this
+#![allow(unused)]
 
 use routing::{Authority, XorName};
 use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign;
+
+pub fn client_key(authority: &Authority<XorName>) -> &sign::PublicKey {
+    if let Authority::Client { ref client_key, .. } = *authority {
+        client_key
+    } else {
+        unreachable!("Logic error")
+    }
+}
 
 pub fn client_name(authority: &Authority<XorName>) -> XorName {
-    if let Authority::Client { ref client_key, .. } = *authority {
-        XorName(sha256::hash(&client_key.0[..]).0)
+    client_name_from_key(client_key(authority))
+}
+
+pub fn client_name_from_key(key: &sign::PublicKey) -> XorName {
+    XorName(sha256::hash(&key[..]).0)
+}
+
+pub fn client_manager_name(authority: &Authority<XorName>) -> XorName {
+    if let Authority::ClientManager(name) = *authority {
+        name
     } else {
         unreachable!("Logic error")
     }

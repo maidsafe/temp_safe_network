@@ -19,7 +19,7 @@ use chunk_store;
 use config_file_handler;
 use maidsafe_utilities::serialisation::SerialisationError;
 use routing::{InterfaceError, MessageId, Request, Response, RoutingError};
-use routing::client_errors::{GetError, MutationError};
+use routing::ClientError;
 use routing::messaging;
 use std::io;
 
@@ -27,12 +27,6 @@ quick_error! {
     #[derive(Debug)]
     pub enum InternalError {
         ChunkStore(error: chunk_store::Error) {
-            from()
-        }
-        ClientGet(error: GetError) {
-            from()
-        }
-        ClientMutation(error: MutationError) {
             from()
         }
         FailedToFindCachedRequest(message_id: MessageId)
@@ -46,6 +40,9 @@ quick_error! {
             from()
         }
         Routing(error: InterfaceError) {
+            from()
+        }
+        RoutingClient(error: ClientError) {
             from()
         }
         RoutingInternal(error: RoutingError) {

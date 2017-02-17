@@ -26,7 +26,7 @@ use GROUP_SIZE;
 use itertools::Itertools;
 use mock_crust_detail::test_node::TestNode;
 use personas::data_manager::IdAndVersion;
-use routing::{self, Data, XorName, Xorable};
+use routing::{self, XorName, Xorable};
 use std::collections::{HashMap, HashSet};
 
 /// Checks that none of the given nodes has any copy of the given data left.
