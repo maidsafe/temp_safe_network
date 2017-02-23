@@ -1,4 +1,4 @@
-// Copyright 2015 MaidSafe.net limited.
+// Copyright 2017 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
@@ -15,76 +15,28 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+mod account;
+
+use self::account::Account;
 use GROUP_SIZE;
 use error::InternalError;
 use itertools::Itertools;
 use maidsafe_utilities::serialisation;
-use routing::{AccountInfo, Authority, ImmutableData, MessageId, MutableData, RoutingTable,
+use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable,
               TYPE_TAG_SESSION_PACKET, XorName};
 use routing::ClientError;
 use rust_sodium::crypto::sign;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::convert::From;
 use utils;
 use vault::RoutingNode;
-
-// 500 units, max 100MB for immutable_data (1MB per chunk)
-#[cfg(not(feature = "use-mock-crust"))]
-const DEFAULT_ACCOUNT_SIZE: u64 = 500;
-#[cfg(feature = "use-mock-crust")]
-const DEFAULT_ACCOUNT_SIZE: u64 = 100;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
 enum Refresh {
     Update(XorName, Account),
     Delete(XorName),
 }
-
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
-pub struct Account {
-    info: AccountInfo,
-    auth_keys: BTreeSet<sign::PublicKey>,
-    version: u64,
-}
-
-impl Account {
-    fn increment_mutation_counter(&mut self) -> Result<(), ClientError> {
-        if self.info.mutations_available < 1 {
-            return Err(ClientError::LowBalance);
-        }
-
-        self.info.mutations_done += 1;
-        self.info.mutations_available -= 1;
-
-        Ok(())
-    }
-
-    fn decrement_mutation_counter(&mut self) -> Result<(), ClientError> {
-        if self.info.mutations_done < 1 {
-            return Err(ClientError::InvalidOperation);
-        }
-
-        self.info.mutations_done -= 1;
-        self.info.mutations_available += 1;
-
-        Ok(())
-    }
-}
-
-impl Default for Account {
-    fn default() -> Self {
-        Account {
-            info: AccountInfo {
-                mutations_available: DEFAULT_ACCOUNT_SIZE,
-                mutations_done: 0,
-            },
-            auth_keys: BTreeSet::new(),
-            version: 0,
-        }
-    }
-}
-
 
 pub struct MaidManager {
     accounts: HashMap<XorName, Account>,
@@ -572,33 +524,21 @@ impl MaidManager {
 }
 
 #[cfg(all(test, feature = "use-mock-routing"))]
-mod test {
+mod tests {
     use super::*;
-    use super::DEFAULT_ACCOUNT_SIZE;
+    use super::account::DEFAULT_ACCOUNT_SIZE;
     use rand;
-    use routing::{Request, Response};
+    use routing::{AccountInfo, Request, Response};
+    use std::collections::BTreeSet;
     use test_utils;
-
-    macro_rules! assert_match {
-        ($e:expr, $p:pat => $r:expr) => {
-            match $e {
-                $p => $r,
-                ref x => panic!("Unexpected {:?} (expecting: {})", x, stringify!($p)),
-            }
-        };
-
-        ($e:expr, $p:pat) => {
-            assert_match!($e, $p => ())
-        }
-    }
 
     #[test]
     fn account_basics() {
+        let (src, client_key) = test_utils::gen_client_authority();
+        let dst = test_utils::gen_client_manager_authority(client_key);
+
         let mut node = RoutingNode::new();
         let mut mm = MaidManager::new();
-
-        let (src, client_key) = gen_client_authority();
-        let dst = gen_client_manager_authority(client_key);
 
         // Retrieving account info for non-existintg account fails.
         let res = get_account_info(&mut mm, &mut node, src, dst);
@@ -616,15 +556,15 @@ mod test {
 
     #[test]
     fn idata_basics() {
+        let (src, client_key) = test_utils::gen_client_authority();
+        let dst = test_utils::gen_client_manager_authority(client_key);
+
         let mut node = RoutingNode::new();
         let mut mm = MaidManager::new();
 
-        let (src, client_key) = gen_client_authority();
-        let dst = gen_client_manager_authority(client_key);
-
         // Create account and retrieve the current account info.
         create_account(&mut mm, &mut node, src, dst);
-        let account_info_1 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
+        let account_info_0 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
 
         // Put immutable data.
         let data = test_utils::random_immutable_data(10, &mut rand::thread_rng());
@@ -644,24 +584,24 @@ mod test {
             });
 
         // Verify the mutation was accounted for.
-        let account_info_2 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
-        assert_eq!(account_info_2.mutations_done,
-                   account_info_1.mutations_done + 1);
-        assert_eq!(account_info_2.mutations_available,
-                   account_info_1.mutations_available - 1);
+        let account_info_1 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
+        assert_eq!(account_info_1.mutations_done,
+                   account_info_0.mutations_done + 1);
+        assert_eq!(account_info_1.mutations_available,
+                   account_info_0.mutations_available - 1);
     }
 
     #[test]
     fn mdata_basics() {
+        let (src, client_key) = test_utils::gen_client_authority();
+        let dst = test_utils::gen_client_manager_authority(client_key);
+
         let mut node = RoutingNode::new();
         let mut mm = MaidManager::new();
 
-        let (src, client_key) = gen_client_authority();
-        let dst = gen_client_manager_authority(client_key);
-
         // Create account and retrieve the current account info.
         create_account(&mut mm, &mut node, src, dst);
-        let account_info_1 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
+        let account_info_0 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
 
         // Put initial mutable data
         let tag = rand::random();
@@ -683,21 +623,21 @@ mod test {
             });
 
         // Verify the mutation was accounted for.
-        let account_info_2 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
-        assert_eq!(account_info_2.mutations_done,
-                   account_info_1.mutations_done + 1);
-        assert_eq!(account_info_2.mutations_available,
-                   account_info_1.mutations_available - 1);
+        let account_info_1 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
+        assert_eq!(account_info_1.mutations_done,
+                   account_info_0.mutations_done + 1);
+        assert_eq!(account_info_1.mutations_available,
+                   account_info_0.mutations_available - 1);
     }
 
     #[test]
     fn auth_keys() {
+        let (owner_client, owner_key) = test_utils::gen_client_authority();
+        let owner_client_manager = test_utils::gen_client_manager_authority(owner_key);
+        let (_, app_key) = test_utils::gen_client_authority();
+
         let mut node = RoutingNode::new();
         let mut mm = MaidManager::new();
-
-        let (owner_client, owner_key) = gen_client_authority();
-        let owner_client_manager = gen_client_manager_authority(owner_key);
-        let (_, app_key) = gen_client_authority();
 
         // Create owner account
         create_account(&mut mm, &mut node, owner_client, owner_client_manager);
@@ -729,7 +669,7 @@ mod test {
             Response::InsAuthKey { res: Err(ClientError::InvalidSuccessor), .. });
 
         // Attempt to insert new auth key by non-owner fails.
-        let (evil_client, _) = gen_client_authority();
+        let (evil_client, _) = test_utils::gen_client_authority();
         let msg_id = MessageId::new();
         unwrap!(mm.handle_ins_auth_key(&mut node,
                                        evil_client,
@@ -773,12 +713,12 @@ mod test {
 
     #[test]
     fn mutation_authorisation() {
+        let (owner_client, owner_key) = test_utils::gen_client_authority();
+        let owner_client_manager = test_utils::gen_client_manager_authority(owner_key);
+        let (app_client, app_key) = test_utils::gen_client_authority();
+
         let mut node = RoutingNode::new();
         let mut mm = MaidManager::new();
-
-        let (owner_client, owner_key) = gen_client_authority();
-        let owner_client_manager = gen_client_manager_authority(owner_key);
-        let (app_client, app_key) = gen_client_authority();
 
         // Create owner account
         create_account(&mut mm, &mut node, owner_client, owner_client_manager);
@@ -827,42 +767,6 @@ mod test {
         assert!(!node.sent_responses.contains_key(&msg_id));
     }
 
-
-    #[test]
-    fn account_struct_normal_updates() {
-        let mut account = Account::default();
-
-        assert_eq!(0, account.info.mutations_done);
-        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.info.mutations_available);
-        for _ in 0..DEFAULT_ACCOUNT_SIZE {
-            assert!(account.increment_mutation_counter().is_ok());
-        }
-        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.info.mutations_done);
-        assert_eq!(0, account.info.mutations_available);
-
-        for _ in 0..DEFAULT_ACCOUNT_SIZE {
-            assert!(account.decrement_mutation_counter().is_ok());
-        }
-        assert_eq!(0, account.info.mutations_done);
-        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.info.mutations_available);
-    }
-
-    #[test]
-    fn account_struct_error_updates() {
-        let mut account = Account::default();
-
-        assert_eq!(0, account.info.mutations_done);
-        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.info.mutations_available);
-        for _ in 0..DEFAULT_ACCOUNT_SIZE {
-            assert!(account.increment_mutation_counter().is_ok());
-        }
-        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.info.mutations_done);
-        assert_eq!(0, account.info.mutations_available);
-        assert!(account.increment_mutation_counter().is_err());
-        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.info.mutations_done);
-        assert_eq!(0, account.info.mutations_available);
-    }
-
     fn create_account(mm: &mut MaidManager,
                       node: &mut RoutingNode,
                       src: Authority<XorName>,
@@ -884,22 +788,6 @@ mod test {
         assert_match!(
             unwrap!(node.sent_responses.remove(&msg_id)).response,
             Response::GetAccountInfo { res, .. } => res)
-    }
-
-    fn gen_client_authority() -> (Authority<XorName>, sign::PublicKey) {
-        let (client_key, _) = sign::gen_keypair();
-
-        let client = Authority::Client {
-            client_key: client_key,
-            peer_id: rand::random(),
-            proxy_node_name: rand::random(),
-        };
-
-        (client, client_key)
-    }
-
-    fn gen_client_manager_authority(client_key: sign::PublicKey) -> Authority<XorName> {
-        Authority::ClientManager(utils::client_name_from_key(&client_key))
     }
 
     fn gen_empty_mdata(tag: u64, owner: sign::PublicKey) -> MutableData {

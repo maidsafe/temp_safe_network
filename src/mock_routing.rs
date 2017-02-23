@@ -16,14 +16,17 @@
 // relating to use of the SAFE Network Software.
 
 use GROUP_SIZE;
+use rand;
 use routing::{AccountInfo, Authority, Cache, ClientError, Event, EventStream, ImmutableData,
-              InterfaceError, MessageId, MutableData, Request, Response, RoutingError, XorName};
+              InterfaceError, MessageId, MutableData, PermissionSet, Request, Response,
+              RoutingError, User, Value, XorName};
 use rust_sodium::crypto::sign;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
 
 /// Mock routing node for unit testing.
 pub struct Node {
+    name: XorName,
     pub sent_requests: HashMap<MessageId, RequestWrapper>,
     pub sent_responses: HashMap<MessageId, ResponseWrapper>,
 }
@@ -59,8 +62,26 @@ impl Node {
         unwrap!(Self::builder().create(GROUP_SIZE))
     }
 
+    pub fn name(&self) -> Result<XorName, InterfaceError> {
+        Ok(self.name)
+    }
+
     pub fn close_group(&self, _name: XorName, _count: usize) -> Option<Vec<XorName>> {
         unimplemented!()
+    }
+
+    pub fn send_get_idata_request(&mut self,
+                                  src: Authority<XorName>,
+                                  dst: Authority<XorName>,
+                                  name: XorName,
+                                  msg_id: MessageId)
+                                  -> Result<(), InterfaceError> {
+        self.send_request(src,
+                          dst,
+                          Request::GetIData {
+                              name: name,
+                              msg_id: msg_id,
+                          })
     }
 
     pub fn send_put_idata_request(&mut self,
@@ -103,9 +124,23 @@ impl Node {
     }
 
     impl_response!(send_get_account_info_response, GetAccountInfo, AccountInfo);
+    impl_response!(send_get_idata_response, GetIData, ImmutableData);
     impl_response!(send_put_idata_response, PutIData);
     impl_response!(send_put_mdata_response, PutMData);
+    impl_response!(send_get_mdata_version_response, GetMDataVersion, u64);
+    impl_response!(send_list_mdata_entries_response,
+                   ListMDataEntries, BTreeMap<Vec<u8>, Value>);
+    impl_response!(send_list_mdata_keys_response,
+                   ListMDataKeys, BTreeSet<Vec<u8>>);
+    impl_response!(send_list_mdata_values_response,
+                   ListMDataValues, Vec<Value>);
+    impl_response!(send_get_mdata_value_response,
+                   GetMDataValue, Value);
     impl_response!(send_mutate_mdata_entries_response, MutateMDataEntries);
+    impl_response!(send_list_mdata_permissions_response,
+                   ListMDataPermissions, BTreeMap<User, PermissionSet>);
+    impl_response!(send_list_mdata_user_permissions_response,
+                   ListMDataUserPermissions, PermissionSet);
     impl_response!(send_set_mdata_user_permissions_response,
                    SetMDataUserPermissions);
     impl_response!(send_del_mdata_user_permissions_response,
@@ -174,6 +209,7 @@ impl NodeBuilder {
 
     pub fn create(self, _min_section_size: usize) -> Result<Node, RoutingError> {
         Ok(Node {
+            name: rand::random(),
             sent_requests: Default::default(),
             sent_responses: Default::default(),
         })

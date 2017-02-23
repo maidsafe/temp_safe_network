@@ -15,9 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// TODO: remove this
-#![allow(unused)]
-
 use routing::{Authority, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;

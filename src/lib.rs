@@ -233,6 +233,7 @@ extern crate unwrap;
 
 /// For unit and integration tests only
 #[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]
+#[macro_use]
 pub mod test_utils;
 
 /// For integration tests only

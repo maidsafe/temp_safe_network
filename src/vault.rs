@@ -407,8 +407,9 @@ impl Vault {
             // ================== GetIData success ==================
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetIData { res: Ok(data), .. }) => {
-                self.data_manager.handle_get_idata_success(&mut self.routing_node, src_name, data)
+             Response::GetIData { res: Ok(data), msg_id }) => {
+                self.data_manager
+                    .handle_get_idata_success(&mut self.routing_node, src_name, data, msg_id)
             }
             // ================== GetIData failure ==================
             (Authority::ManagedNode(src_name),
