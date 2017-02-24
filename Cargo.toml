@@ -21,9 +21,10 @@ log = "~0.3.6"
 maidsafe_utilities = "~0.10.0"
 quick-error = "~1.1.0"
 rand = "~0.3.14"
-routing = "~0.28.2"
+routing = "~0.28.3"
 rustc-serialize = "~0.3.19"
 rust_sodium = "~0.1.2"
+tiny-keccak = "~1.2.0"
 unwrap = "~1.1.0"
 
 [build-dependencies]

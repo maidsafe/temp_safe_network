@@ -229,6 +229,7 @@ extern crate rustc_serialize;
 extern crate rust_sodium;
 #[cfg(test)]
 extern crate tempdir;
+extern crate tiny_keccak;
 #[cfg(any(test, feature = "use-mock-crust"))]
 #[macro_use]
 extern crate unwrap;
