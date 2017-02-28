@@ -146,21 +146,16 @@ impl DataManager {
                 continue;
             }
 
-            match mutation {
-                PendingMutation::PutIData(_) |
-                PendingMutation::PutMData(_) => {
-                    if self.handle_pending_mutation(routing_node, src, dst, mutation, message_id)? {
-                        self.count_added_data(&data_id);
-                        log_status!(self);
-                        success = true;
-                    }
+            let mutation_type = mutation.mutation_type();
+            if self.handle_pending_mutation(routing_node, src, dst, mutation, message_id)? {
+                match mutation_type {
+                    PendingMutationType::PutIData |
+                    PendingMutationType::PutMData => self.count_added_data(&data_id),
+                    _ => (),
                 }
-                _ => {
-                    if self.handle_pending_mutation(routing_node, src, dst, mutation, message_id)? {
-                        log_status!(self);
-                        success = true;
-                    }
-                }
+
+                log_status!(self);
+                success = true;
             }
 
             let data_list = vec![(data_id, version)];
@@ -978,34 +973,208 @@ fn create_pending_mutation_for_mdata(mutation_type: PendingMutationType,
 mod tests {
     use super::*;
     use rand;
-    use routing::{Authority, Request};
+    use routing::{Authority, EntryActions, Request, Response};
     use std::env;
     use test_utils;
 
     const CHUNK_STORE_CAPACITY: u64 = 1024;
     const CHUNK_STORE_DIR: &'static str = "test_safe_vault_chunk_store";
 
+    const TEST_TAG: u64 = 12345678;
+
     #[test]
     fn idata_basics() {
-        let (_, client_key) = test_utils::gen_client_authority();
+        let (client, client_key) = test_utils::gen_client_authority();
         let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-        let data = test_utils::random_immutable_data(10, &mut rand::thread_rng());
+        let data = test_utils::gen_random_immutable_data(10, &mut rand::thread_rng());
         let nae_manager = Authority::NaeManager(*data.name());
 
         let mut node = RoutingNode::new();
         let mut dm = create_data_manager();
 
+        // Get non-existent data fails.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_get_idata(&mut node, client, nae_manager, *data.name(), msg_id));
+
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(
+            message.response,
+            Response::GetIData { res: Err(ClientError::NoSuchData), .. });
+
         // Put immutable data sends refresh to the NAE manager.
         let msg_id = MessageId::new();
-        unwrap!(dm.handle_put_idata(&mut node, client_manager, nae_manager, data, msg_id));
+        unwrap!(dm.handle_put_idata(&mut node, client_manager, nae_manager, data.clone(), msg_id));
 
         let message = unwrap!(node.sent_requests.remove(&msg_id));
-        assert_match!(message.request, Request::Refresh(..));
+        let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
         assert_eq!(message.src, nae_manager);
         assert_eq!(message.dst, nae_manager);
 
-        // TODO: more testing
+        // Simulate receiving the refresh. This should result in the data being
+        // put into the chunk store.
+        unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+
+        // Get the data back and assert its the same data we put in originally.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_get_idata(&mut node, client, nae_manager, *data.name(), msg_id));
+
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        let retrieved_data =
+            assert_match!(message.response, Response::GetIData { res: Ok(data), .. } => data);
+        assert_eq!(retrieved_data, data);
+    }
+
+    #[test]
+    fn mdata_basics() {
+        let mut rng = rand::thread_rng();
+
+        let (client, client_key) = test_utils::gen_client_authority();
+        let client_manager = test_utils::gen_client_manager_authority(client_key);
+
+        let data = test_utils::gen_empty_mutable_data(TEST_TAG, client_key, &mut rng);
+        let data_name = *data.name();
+        let nae_manager = Authority::NaeManager(data_name);
+
+        let mut node = RoutingNode::new();
+        let mut dm = create_data_manager();
+
+        // Attempt to list entries of non-existent data fails.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_list_mdata_entries(&mut node,
+                                             client,
+                                             nae_manager,
+                                             data_name,
+                                             TEST_TAG,
+                                             msg_id));
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(
+            message.response,
+            Response::ListMDataEntries { res: Err(ClientError::NoSuchData), .. });
+
+        // Put mutable data sends refresh to the NAE manager.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_put_mdata(&mut node,
+                                    client_manager,
+                                    nae_manager,
+                                    data,
+                                    msg_id,
+                                    client_key));
+
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+
+        // Simulate receiving the refresh. This should result in the data being
+        // put into the chunk store.
+        unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(message.response, Response::PutMData { res: Ok(()), .. });
+
+        // Now list the data entries - should successfuly respond with empty list.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_list_mdata_entries(&mut node,
+                                             client,
+                                             nae_manager,
+                                             data_name,
+                                             TEST_TAG,
+                                             msg_id));
+
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        let entries = assert_match!(
+            message.response,
+            Response::ListMDataEntries { res: Ok(entries), .. } => entries);
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn mdata_mutations() {
+        let mut rng = rand::thread_rng();
+
+        let (client, client_key) = test_utils::gen_client_authority();
+        let client_manager = test_utils::gen_client_manager_authority(client_key);
+
+        let data = test_utils::gen_empty_mutable_data(TEST_TAG, client_key, &mut rng);
+        let data_name = *data.name();
+        let nae_manager = Authority::NaeManager(data_name);
+
+        let mut node = RoutingNode::new();
+        let mut dm = create_data_manager();
+
+        // Put the data.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_put_mdata(&mut node,
+                                    client_manager,
+                                    nae_manager,
+                                    data,
+                                    msg_id,
+                                    client_key));
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+        unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+
+        // Initially, the entries should be empty.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_list_mdata_entries(&mut node,
+                                             client,
+                                             nae_manager,
+                                             data_name,
+                                             TEST_TAG,
+                                             msg_id));
+
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        let entries = assert_match!(
+            message.response,
+            Response::ListMDataEntries { res: Ok(entries), .. } => entries);
+        assert!(entries.is_empty());
+
+        // Mutate the entries and simulate refresh.
+        let key_0 = test_utils::gen_random_vec(10, &mut rng);
+        let value_0 = test_utils::gen_random_vec(10, &mut rng);
+
+        let key_1 = test_utils::gen_random_vec(10, &mut rng);
+        let value_1 = test_utils::gen_random_vec(10, &mut rng);
+
+        let actions = EntryActions::new()
+            .ins(key_0.clone(), value_0.clone(), 0)
+            .ins(key_1.clone(), value_1.clone(), 0)
+            .into();
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                               client,
+                                               nae_manager,
+                                               data_name,
+                                               TEST_TAG,
+                                               actions,
+                                               msg_id,
+                                               client_key));
+
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+        unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+
+        // The data should now contain the previously inserted two entries.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_list_mdata_entries(&mut node,
+                                             client,
+                                             nae_manager,
+                                             data_name,
+                                             TEST_TAG,
+                                             msg_id));
+
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        let entries = assert_match!(
+            message.response,
+            Response::ListMDataEntries { res: Ok(entries), .. } => entries);
+        assert_eq!(entries.len(), 2);
+        let retrieved_value_0 = unwrap!(entries.get(&key_0));
+        let retrieved_value_1 = unwrap!(entries.get(&key_1));
+
+        assert_eq!(retrieved_value_0.content, value_0);
+        assert_eq!(retrieved_value_1.content, value_1);
     }
 
     fn create_data_manager() -> DataManager {

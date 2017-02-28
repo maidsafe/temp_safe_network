@@ -529,7 +529,6 @@ mod tests {
     use super::account::DEFAULT_ACCOUNT_SIZE;
     use rand;
     use routing::{AccountInfo, Request, Response};
-    use std::collections::BTreeSet;
     use test_utils;
 
     #[test]
@@ -567,7 +566,7 @@ mod tests {
         let account_info_0 = unwrap!(get_account_info(&mut mm, &mut node, src, dst));
 
         // Put immutable data.
-        let data = test_utils::random_immutable_data(10, &mut rand::thread_rng());
+        let data = test_utils::gen_random_immutable_data(10, &mut rand::thread_rng());
         let msg_id = MessageId::new();
         unwrap!(mm.handle_put_idata(&mut node, src, dst, data.clone(), msg_id));
 
@@ -605,7 +604,7 @@ mod tests {
 
         // Put initial mutable data
         let tag = rand::random();
-        let data = gen_empty_mdata(tag, client_key);
+        let data = test_utils::gen_empty_mutable_data(tag, client_key, &mut rand::thread_rng());
 
         let msg_id = MessageId::new();
         unwrap!(mm.handle_put_mdata(&mut node, src, dst, data.clone(), msg_id, client_key));
@@ -725,7 +724,7 @@ mod tests {
 
         // Put a mutable data
         let tag = rand::random();
-        let data = gen_empty_mdata(tag, owner_key);
+        let data = test_utils::gen_empty_mutable_data(tag, owner_key, &mut rand::thread_rng());
         let msg_id = MessageId::new();
         unwrap!(mm.handle_put_mdata(&mut node,
                                     owner_client,
@@ -772,7 +771,9 @@ mod tests {
                       src: Authority<XorName>,
                       dst: Authority<XorName>) {
         let client_key = assert_match!(src, Authority::Client { client_key, .. } => client_key);
-        let account_packet = gen_empty_mdata(TYPE_TAG_SESSION_PACKET, client_key);
+        let account_packet = test_utils::gen_empty_mutable_data(TYPE_TAG_SESSION_PACKET,
+                                                                client_key,
+                                                                &mut rand::thread_rng());
         let msg_id = MessageId::new();
         unwrap!(mm.handle_put_mdata(node, src, dst, account_packet, msg_id, client_key));
     }
@@ -788,16 +789,5 @@ mod tests {
         assert_match!(
             unwrap!(node.sent_responses.remove(&msg_id)).response,
             Response::GetAccountInfo { res, .. } => res)
-    }
-
-    fn gen_empty_mdata(tag: u64, owner: sign::PublicKey) -> MutableData {
-        let mut owners = BTreeSet::new();
-        let _ = owners.insert(owner);
-
-        unwrap!(MutableData::new(rand::random(),
-                                 tag,
-                                 Default::default(),
-                                 Default::default(),
-                                 owners))
     }
 }

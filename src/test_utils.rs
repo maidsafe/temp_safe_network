@@ -15,9 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use rand::{self, Rng};
-use routing::{Authority, ImmutableData, XorName};
+use rand::{self, Rand, Rng};
+use routing::{Authority, ImmutableData, MutableData, XorName};
 use rust_sodium::crypto::sign;
+use std::collections::BTreeSet;
 use utils;
 
 macro_rules! assert_match {
@@ -42,9 +43,29 @@ pub fn iterations() -> usize {
     }
 }
 
-/// Creates random immutable data
-pub fn random_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
-    ImmutableData::new(rng.gen_iter().take(size).collect())
+/// Generate random vector of the given length.
+pub fn gen_random_vec<T: Rand, R: Rng>(size: usize, rng: &mut R) -> Vec<T> {
+    rng.gen_iter().take(size).collect()
+}
+
+/// Generate random immutable data
+pub fn gen_random_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
+    ImmutableData::new(gen_random_vec(size, rng))
+}
+
+/// Generate mutable data with the given tag, owner and no entries.
+pub fn gen_empty_mutable_data<R: Rng>(tag: u64,
+                                      owner: sign::PublicKey,
+                                      rng: &mut R)
+                                      -> MutableData {
+    let mut owners = BTreeSet::new();
+    let _ = owners.insert(owner);
+
+    unwrap!(MutableData::new(rng.gen(),
+                             tag,
+                             Default::default(),
+                             Default::default(),
+                             owners))
 }
 
 /// Generate random `Client` authority and return it together with its client key.
