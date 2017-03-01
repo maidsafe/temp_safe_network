@@ -1216,7 +1216,7 @@ mod tests {
                                              nae_manager,
                                              data_name,
                                              TEST_TAG,
-                                             new_owners,
+                                             new_owners.clone(),
                                              1,
                                              msg_id));
         let message = unwrap!(node.sent_responses.remove(&msg_id));

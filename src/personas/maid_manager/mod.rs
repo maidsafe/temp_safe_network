@@ -32,15 +32,9 @@ use std::convert::From;
 use utils;
 use vault::RoutingNode;
 
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
-enum Refresh {
-    Update(XorName, Account),
-    Delete(XorName),
-}
-
 pub struct MaidManager {
     accounts: HashMap<XorName, Account>,
-    request_cache: HashMap<MessageId, (Authority<XorName>, Authority<XorName>)>,
+    request_cache: HashMap<MessageId, CachedRequest>,
 }
 
 impl MaidManager {
@@ -118,11 +112,16 @@ impl MaidManager {
             routing_node.send_put_idata_request(src, dst, data, msg_id)?;
         }
 
-        if let Some((prior_src, prior_dst)) = self.request_cache.insert(msg_id, (src, dst)) {
+        if let Some(prior) = self.request_cache.insert(msg_id,
+                                                       CachedRequest {
+                                                           src: src,
+                                                           dst: dst,
+                                                           tag: None,
+                                                       }) {
             error!("Overwrote existing cached request with {:?} from {:?} to {:?}",
                    msg_id,
-                   prior_src,
-                   prior_dst);
+                   prior.src,
+                   prior.dst);
         }
 
         Ok(())
@@ -132,7 +131,7 @@ impl MaidManager {
                                     routing_node: &mut RoutingNode,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        let (src, dst) = self.remove_cached_request(msg_id)?;
+        let CachedRequest { src, dst, .. } = self.remove_cached_request(msg_id)?;
 
         // Send success response back to client
         let client_name = utils::client_name(&src);
@@ -154,7 +153,7 @@ impl MaidManager {
                                     error: ClientError,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        let (src, dst) = self.remove_cached_request(msg_id)?;
+        let CachedRequest { src, dst, .. } = self.remove_cached_request(msg_id)?;
 
         if !self.handle_put_failure(routing_node, &src) {
             return Ok(());
@@ -212,6 +211,8 @@ impl MaidManager {
             return Err(From::from(err));
         }
 
+        let tag = data.tag();
+
         {
             // Forwarding the request to NAE Manager.
             let src = dst;
@@ -220,11 +221,16 @@ impl MaidManager {
             routing_node.send_put_mdata_request(src, dst, data, msg_id, requester)?;
         }
 
-        if let Some((prior_src, prior_dst)) = self.request_cache.insert(msg_id, (src, dst)) {
+        if let Some(prior) = self.request_cache.insert(msg_id,
+                                                       CachedRequest {
+                                                           src: src,
+                                                           dst: dst,
+                                                           tag: Some(tag),
+                                                       }) {
             error!("Overwrote existing cached request with {:?} from {:?} to {:?}",
                    msg_id,
-                   prior_src,
-                   prior_dst);
+                   prior.src,
+                   prior.dst);
         }
 
         Ok(())
@@ -234,7 +240,7 @@ impl MaidManager {
                                     routing_node: &mut RoutingNode,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        let (src, dst) = self.remove_cached_request(msg_id)?;
+        let CachedRequest { src, dst, .. } = self.remove_cached_request(msg_id)?;
 
         // Send success response back to client
         let client_name = utils::client_name(&src);
@@ -255,17 +261,28 @@ impl MaidManager {
                                     error: ClientError,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        let (src, dst) = self.remove_cached_request(msg_id)?;
+        let CachedRequest { src, dst, tag } = self.remove_cached_request(msg_id)?;
 
         if !self.handle_put_failure(routing_node, &src) {
             return Ok(());
         }
 
-        // TODO (adam): originally, we had special handling for session packets
-        //              here, but we don't have the type_tag (in the response)
-        //              anymore now, so we can't know whether we are dealing with
-        //              session packets. Find out what to do.
-        //              Possible solution: store the `DataId` in the request_cache.
+        let error = match (tag, error) {
+            (Some(TYPE_TAG_SESSION_PACKET), ClientError::DataExists) => {
+                // We wouldn't have forwarded two `Put` requests for the same account, so
+                // it must have been created via another client manager.
+                let client_name = utils::client_name(&src);
+                let _ = self.accounts.remove(&client_name);
+                let refresh = Refresh::Delete(client_name);
+                if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
+                    trace!("MM sending delete refresh for account {}", src.name());
+                    let _ = routing_node.send_refresh_request(dst, dst, serialised_refresh, msg_id);
+                }
+
+                ClientError::AccountExists
+            }
+            (_, error) => error,
+        };
 
         // Send failure response back to client
         routing_node.send_put_mdata_response(dst, src, Err(error), msg_id)?;
@@ -395,7 +412,7 @@ impl MaidManager {
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete = self.request_cache
             .iter()
-            .filter(|&(_, &(ref src, _))| accounts_to_delete.contains(&src.name()))
+            .filter(|&(_, entry)| accounts_to_delete.contains(&entry.src.name()))
             .map(|(msg_id, _)| *msg_id)
             .collect_vec();
         for msg_id in msg_ids_to_delete {
@@ -536,9 +553,7 @@ impl MaidManager {
         }
     }
 
-    fn remove_cached_request(&mut self,
-                             msg_id: MessageId)
-                             -> Result<(Authority<XorName>, Authority<XorName>), InternalError> {
+    fn remove_cached_request(&mut self, msg_id: MessageId) -> Result<CachedRequest, InternalError> {
         self.request_cache
             .remove(&msg_id)
             .ok_or_else(move || InternalError::FailedToFindCachedRequest(msg_id))
@@ -550,6 +565,21 @@ impl MaidManager {
     pub fn get_put_count(&self, client_name: &XorName) -> Option<u64> {
         self.accounts.get(client_name).map(|account| account.data_stored)
     }
+}
+
+#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+enum Refresh {
+    Update(XorName, Account),
+    Delete(XorName),
+}
+
+// Entry in the request cache.
+struct CachedRequest {
+    src: Authority<XorName>,
+    dst: Authority<XorName>,
+
+    // Some(type_tag) if the request is for mutable data. None otherwise.
+    tag: Option<u64>,
 }
 
 #[cfg(all(test, feature = "use-mock-routing"))]
