@@ -276,9 +276,10 @@ impl MaidManager {
                                        routing_node: &mut RoutingNode,
                                        src: Authority<XorName>,
                                        dst: Authority<XorName>,
-                                       msg_id: MessageId)
+                                       msg_id: MessageId,
+                                       requester: sign::PublicKey)
                                        -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester)) {
             routing_node.send_mutate_mdata_entries_response(dst, src, Err(err.clone()), msg_id)?;
             Err(From::from(err))
         } else {
@@ -290,9 +291,10 @@ impl MaidManager {
                                              routing_node: &mut RoutingNode,
                                              src: Authority<XorName>,
                                              dst: Authority<XorName>,
-                                             msg_id: MessageId)
+                                             msg_id: MessageId,
+                                             requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester)) {
             routing_node.send_set_mdata_user_permissions_response(dst,
                                                                   src,
                                                                   Err(err.clone()),
@@ -307,9 +309,10 @@ impl MaidManager {
                                              routing_node: &mut RoutingNode,
                                              src: Authority<XorName>,
                                              dst: Authority<XorName>,
-                                             msg_id: MessageId)
+                                             msg_id: MessageId,
+                                             requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester)) {
             routing_node.send_del_mdata_user_permissions_response(dst,
                                                                   src,
                                                                   Err(err.clone()),
@@ -326,7 +329,7 @@ impl MaidManager {
                                      dst: Authority<XorName>,
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None) {
             routing_node.send_change_mdata_owner_response(dst, src, Err(err.clone()), msg_id)?;
             Err(From::from(err))
         } else {
@@ -472,21 +475,31 @@ impl MaidManager {
 
     fn prepare_mdata_mutation(&mut self,
                               src: &Authority<XorName>,
-                              dst: &Authority<XorName>)
+                              dst: &Authority<XorName>,
+                              requester: Option<sign::PublicKey>)
                               -> Result<(), ClientError> {
         let client_manager_name = utils::client_manager_name(dst);
 
-        if let Some(account) = self.accounts.get_mut(&client_manager_name) {
-            let client_key = utils::client_key(src);
-            let client_name = utils::client_name_from_key(&client_key);
-
-            if client_name == client_manager_name || account.auth_keys.contains(&client_key) {
-                account.increment_mutation_counter()
-            } else {
-                Err(ClientError::AccessDenied)
-            }
+        let account = if let Some(account) = self.accounts.get_mut(&client_manager_name) {
+            account
         } else {
-            Err(ClientError::NoSuchAccount)
+            return Err(ClientError::NoSuchAccount);
+        };
+
+        let client_key = utils::client_key(src);
+
+        if let Some(requester) = requester {
+            if requester != *client_key {
+                return Err(ClientError::AccessDenied);
+            }
+        }
+
+        let client_name = utils::client_name_from_key(&client_key);
+
+        if client_name == client_manager_name || account.auth_keys.contains(&client_key) {
+            account.increment_mutation_counter()
+        } else {
+            Err(ClientError::AccessDenied)
         }
     }
 
@@ -751,15 +764,22 @@ mod tests {
 
         // Attemp to mutate by unauthorised client fails.
         let msg_id = MessageId::new();
-        let _ = mm.handle_mutate_mdata_entries(&mut node, app_client, owner_client_manager, msg_id);
+        let _ = mm.handle_mutate_mdata_entries(&mut node,
+                                               app_client,
+                                               owner_client_manager,
+                                               msg_id,
+                                               app_key);
         assert_match!(
             unwrap!(node.sent_responses.remove(&msg_id)).response,
             Response::MutateMDataEntries { res: Err(ClientError::AccessDenied), .. });
 
         // Mutation by the owner succeeds.
         let msg_id = MessageId::new();
-        let _ =
-            mm.handle_mutate_mdata_entries(&mut node, owner_client, owner_client_manager, msg_id);
+        let _ = mm.handle_mutate_mdata_entries(&mut node,
+                                               owner_client,
+                                               owner_client_manager,
+                                               msg_id,
+                                               owner_key);
         // Note: No response sent here means all is good (MM sends respone to
         // MutateMDataEntries request only in case of error).
         assert!(!node.sent_responses.contains_key(&msg_id));
@@ -778,8 +798,25 @@ mod tests {
 
         // Mutation by authorised app now succeeds.
         let msg_id = MessageId::new();
-        let _ = mm.handle_mutate_mdata_entries(&mut node, app_client, owner_client_manager, msg_id);
+        let _ = mm.handle_mutate_mdata_entries(&mut node,
+                                               app_client,
+                                               owner_client_manager,
+                                               msg_id,
+                                               app_key);
         assert!(!node.sent_responses.contains_key(&msg_id));
+
+        // Attempt to mutate by requester that doesn't match the source client
+        // key fails.
+        let msg_id = MessageId::new();
+        let _ = mm.handle_mutate_mdata_entries(&mut node,
+                                               app_client,
+                                               owner_client_manager,
+                                               msg_id,
+                                               owner_key);
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(
+            message.response,
+            Response::MutateMDataEntries { res: Err(ClientError::AccessDenied), .. });
     }
 
     fn create_account(mm: &mut MaidManager,

@@ -268,7 +268,11 @@ impl Vault {
              dst @ Authority::NaeManager(_),
              Request::MutateMDataEntries { name, tag, actions, msg_id, requester }) => {
                 self.maid_manager
-                    .handle_mutate_mdata_entries(&mut self.routing_node, src, dst, msg_id)?;
+                    .handle_mutate_mdata_entries(&mut self.routing_node,
+                                                 src,
+                                                 dst,
+                                                 msg_id,
+                                                 requester)?;
                 self.data_manager
                     .handle_mutate_mdata_entries(&mut self.routing_node,
                                                  src,
@@ -322,7 +326,11 @@ impl Vault {
                                                 msg_id,
                                                 requester }) => {
                 self.maid_manager
-                    .handle_set_mdata_user_permissions(&mut self.routing_node, src, dst, msg_id)?;
+                    .handle_set_mdata_user_permissions(&mut self.routing_node,
+                                                       src,
+                                                       dst,
+                                                       msg_id,
+                                                       requester)?;
                 self.data_manager
                     .handle_set_mdata_user_permissions(&mut self.routing_node,
                                                        src,
@@ -341,7 +349,11 @@ impl Vault {
              dst @ Authority::NaeManager(_),
              Request::DelMDataUserPermissions { name, tag, user, version, msg_id, requester }) => {
                 self.maid_manager
-                    .handle_del_mdata_user_permissions(&mut self.routing_node, src, dst, msg_id)?;
+                    .handle_del_mdata_user_permissions(&mut self.routing_node,
+                                                       src,
+                                                       dst,
+                                                       msg_id,
+                                                       requester)?;
                 self.data_manager
                     .handle_del_mdata_user_permissions(&mut self.routing_node,
                                                        src,
