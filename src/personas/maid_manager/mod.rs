@@ -136,8 +136,13 @@ impl MaidManager {
 
         // Send success response back to client
         let client_name = utils::client_name(&src);
-        // TODO (adam): are we sure this can't panic?
-        let account = self.accounts.get(&client_name).expect("Account not found.").clone();
+        let account = if let Some(account) = self.accounts.get(&client_name) {
+            account.clone()
+        } else {
+            error!("Account for {:?} not found.", client_name);
+            return Err(InternalError::NoSuchAccount);
+        };
+
         self.send_refresh(routing_node, &client_name, account, MessageId::zero());
         let _ = routing_node.send_put_idata_response(dst, src, Ok(()), msg_id);
 
@@ -198,6 +203,11 @@ impl MaidManager {
         }
 
         if let Err(err) = self.increment_mutation_counter(&client_name) {
+            // Undo the account creation
+            if data.tag() == TYPE_TAG_SESSION_PACKET {
+                let _ = self.accounts.remove(&client_name);
+            }
+
             routing_node.send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
             return Err(From::from(err));
         }
@@ -228,8 +238,13 @@ impl MaidManager {
 
         // Send success response back to client
         let client_name = utils::client_name(&src);
-        // TODO (adam): are we sure this can't panic?
-        let account = self.accounts.get(&client_name).expect("Account not found.").clone();
+        let account = if let Some(account) = self.accounts.get(&client_name) {
+            account.clone()
+        } else {
+            error!("Account for {:?} not found.", client_name);
+            return Err(InternalError::NoSuchAccount);
+        };
+
         self.send_refresh(routing_node, &client_name, account, MessageId::zero());
         let _ = routing_node.send_put_mdata_response(dst, src, Ok(()), msg_id);
         Ok(())
@@ -247,9 +262,10 @@ impl MaidManager {
         }
 
         // TODO (adam): originally, we had special handling for session packets
-        //              here, but we don't have the type_tag now, so we can't know
-        //              whether we are dealing with session packets. Find out what
-        //              to do.
+        //              here, but we don't have the type_tag (in the response)
+        //              anymore now, so we can't know whether we are dealing with
+        //              session packets. Find out what to do.
+        //              Possible solution: store the `DataId` in the request_cache.
 
         // Send failure response back to client
         routing_node.send_put_mdata_response(dst, src, Err(error), msg_id)?;

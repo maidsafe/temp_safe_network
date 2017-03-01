@@ -54,5 +54,6 @@ quick_error! {
         UnknownRequestType(request: Request)
         UnknownResponseType(response: Response)
         InvalidMessage
+        NoSuchAccount
     }
 }
