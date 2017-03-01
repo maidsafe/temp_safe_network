@@ -1177,6 +1177,71 @@ mod tests {
         assert_eq!(retrieved_value_1.content, value_1);
     }
 
+    #[test]
+    fn mdata_change_owner() {
+        let mut rng = rand::thread_rng();
+
+        let (client_0, client_0_key) = test_utils::gen_client_authority();
+        let client_manager = test_utils::gen_client_manager_authority(client_0_key);
+
+        let data = test_utils::gen_empty_mutable_data(TEST_TAG, client_0_key, &mut rng);
+        let data_name = *data.name();
+        let nae_manager = Authority::NaeManager(data_name);
+
+        let mut node = RoutingNode::new();
+        let mut dm = create_data_manager();
+
+        // Put the data.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_put_mdata(&mut node,
+                                    client_manager,
+                                    nae_manager,
+                                    data,
+                                    msg_id,
+                                    client_0_key));
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+        unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+
+        let (client_1, _) = test_utils::gen_client_authority();
+        let (_, client_2_key) = test_utils::gen_client_authority();
+
+        // Attempt to change the owner by a non-owner fails.
+        let mut new_owners = BTreeSet::new();
+        let _ = new_owners.insert(client_2_key);
+
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_change_mdata_owner(&mut node,
+                                             client_1,
+                                             nae_manager,
+                                             data_name,
+                                             TEST_TAG,
+                                             new_owners,
+                                             1,
+                                             msg_id));
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(
+            message.response,
+            Response::ChangeMDataOwner { res: Err(ClientError::AccessDenied), .. });
+
+        // Changing the owner by the current owner succeeds.
+        let msg_id = MessageId::new();
+        unwrap!(dm.handle_change_mdata_owner(&mut node,
+                                             client_0,
+                                             nae_manager,
+                                             data_name,
+                                             TEST_TAG,
+                                             new_owners,
+                                             1,
+                                             msg_id));
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+        unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(message.response, Response::ChangeMDataOwner { res: Ok(()), .. });
+    }
+
     fn create_data_manager() -> DataManager {
         unwrap!(DataManager::new(env::temp_dir().join(CHUNK_STORE_DIR), CHUNK_STORE_CAPACITY))
     }
