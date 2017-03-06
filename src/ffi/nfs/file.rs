@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -40,13 +40,14 @@ pub unsafe extern "C" fn nfs_delete_file(app_handle: *const App,
                                          -> int32_t {
     helper::catch_unwind_i32(|| {
         trace!("FFI delete file, given the path.");
+        #[cfg_attr(rustfmt, rustfmt_skip)]
         let file_path = ffi_try!(helper::c_utf8_to_str(file_path, file_path_len));
         ffi_try!(delete_file(&*app_handle, file_path, is_shared));
         0
     })
 }
 
-/// Get file. The returned FileDetails pointer must be disposed of by calling
+/// Get file. The returned `FileDetails` pointer must be disposed of by calling
 /// `file_details_drop` when no longer needed.
 #[no_mangle]
 pub unsafe extern "C" fn nfs_get_file(app_handle: *const App,
@@ -152,11 +153,10 @@ pub unsafe extern "C" fn nfs_get_file_metadata(app_handle: *const App,
 }
 
 fn delete_file(app: &App, file_path: &str, is_shared: bool) -> Result<(), FfiError> {
-    let (mut directory, file_name) =
-        try!(helper::get_directory_and_file(app, file_path, is_shared));
+    let (mut directory, file_name) = helper::get_directory_and_file(app, file_path, is_shared)?;
 
     let file_helper = FileHelper::new(app.get_client());
-    let _ = try!(file_helper.delete(file_name, &mut directory));
+    let _ = file_helper.delete(file_name, &mut directory)?;
 
     Ok(())
 }
@@ -168,9 +168,8 @@ fn get_file(app: &App,
             length: i64,
             include_metadata: bool)
             -> Result<FileDetails, FfiError> {
-    let (directory, file_name) =
-        try!(helper::get_directory_and_file(app, file_path, is_path_shared));
-    let file = try!(directory.find_file(&file_name).ok_or(FfiError::InvalidPath));
+    let (directory, file_name) = helper::get_directory_and_file(app, file_path, is_path_shared)?;
+    let file = directory.find_file(&file_name).ok_or(FfiError::InvalidPath)?;
 
     FileDetails::new(file, app.get_client(), offset, length, include_metadata)
 }
@@ -186,11 +185,10 @@ fn modify_file(app: &App,
         return Err(FfiError::from("Optional parameters could not be parsed"));
     }
 
-    let (mut directory, file_name) =
-        try!(helper::get_directory_and_file(app, file_path, is_shared));
-    let mut file = try!(directory.find_file(&file_name)
+    let (mut directory, file_name) = helper::get_directory_and_file(app, file_path, is_shared)?;
+    let mut file = directory.find_file(&file_name)
         .cloned()
-        .ok_or(FfiError::InvalidPath));
+        .ok_or(FfiError::InvalidPath)?;
 
     let mut file_helper = FileHelper::new(app.get_client());
 
@@ -207,13 +205,13 @@ fn modify_file(app: &App,
 
     if metadata_updated {
         file.get_mut_metadata().set_modified_time(time::now_utc());
-        let _ = try!(file_helper.update_metadata(file.clone(), &mut directory));
+        let _ = file_helper.update_metadata(file.clone(), &mut directory)?;
     }
 
     if let Some(content) = new_content {
-        let mut writer = try!(file_helper.update_content(file.clone(), Mode::Overwrite, directory));
-        try!(writer.write(&content[..]));
-        let _ = try!(writer.close());
+        let mut writer = file_helper.update_content(file.clone(), Mode::Overwrite, directory)?;
+        writer.write(&content[..])?;
+        let _ = writer.close()?;
     }
 
     Ok(())
@@ -228,8 +226,8 @@ fn move_file(app: &App,
              -> Result<(), FfiError> {
     let directory_helper = DirectoryHelper::new(app.get_client());
     let (mut src_dir, src_file_name) =
-        try!(helper::get_directory_and_file(app, src_path, is_src_path_shared));
-    let mut dst_dir = try!(helper::get_directory(app, dst_path, is_dst_path_shared));
+        helper::get_directory_and_file(app, src_path, is_src_path_shared)?;
+    let mut dst_dir = helper::get_directory(app, dst_path, is_dst_path_shared)?;
 
     if dst_dir.find_file(&src_file_name).is_some() {
         return Err(FfiError::from(NfsError::FileAlreadyExistsWithSameName));
@@ -241,16 +239,16 @@ fn move_file(app: &App,
     };
 
     if retain_src {
-        file = try!(File::new(file.get_metadata().clone(), file.get_datamap().clone()));
+        file = File::new(file.get_metadata().clone(), file.get_datamap().clone())?;
     }
 
     dst_dir.upsert_file(file);
 
-    let _ = try!(directory_helper.update(&dst_dir));
+    let _ = directory_helper.update(&dst_dir)?;
 
     if !retain_src {
-        let _ = try!(src_dir.remove_file(&src_file_name));
-        let _ = try!(directory_helper.update(&src_dir));
+        let _ = src_dir.remove_file(&src_file_name)?;
+        let _ = directory_helper.update(&src_dir)?;
     }
 
     Ok(())
@@ -260,9 +258,8 @@ fn get_file_metadata(app: &App,
                      file_path: &str,
                      is_path_shared: bool)
                      -> Result<FileMetadata, FfiError> {
-    let (directory, file_name) =
-        try!(helper::get_directory_and_file(app, file_path, is_path_shared));
-    let file = try!(directory.find_file(&file_name).ok_or(FfiError::InvalidPath));
+    let (directory, file_name) = helper::get_directory_and_file(app, file_path, is_path_shared)?;
+    let file = directory.find_file(&file_name).ok_or(FfiError::InvalidPath)?;
 
     FileMetadata::new(file.get_metadata())
 }
@@ -344,7 +341,7 @@ mod test {
                                    Some("new_test_file.txt".to_string()),
                                    None,
                                    None)
-            .is_ok());
+                        .is_ok());
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         assert_eq!(app_root_dir.get_files().len(), 1);
@@ -372,7 +369,7 @@ mod test {
                                    None,
                                    Some(METADATA.as_bytes().to_vec()),
                                    None)
-            .is_ok());
+                        .is_ok());
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file("test_file.txt"));
@@ -389,7 +386,7 @@ mod test {
 
         create_test_file(&app, "test_file.txt");
 
-        let content = "first".as_bytes().to_vec();
+        let content = b"first".to_vec();
         unwrap!(super::modify_file(&app, "/test_file.txt", false, None, None, Some(content)));
 
 
@@ -404,7 +401,7 @@ mod test {
             assert_eq!(content, "first");
         }
 
-        let content = "second".as_bytes().to_vec();
+        let content = b"second".to_vec();
         unwrap!(super::modify_file(&app, "/test_file.txt", false, None, None, Some(content)));
 
         {

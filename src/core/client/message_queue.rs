@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
 
 use core::errors::CoreError;
 use core::translated_events::{NetworkEvent, ResponseEvent};
@@ -30,9 +29,9 @@ use std::sync::mpsc::{Receiver, Sender};
 
 const EVENT_RECEIVER_THREAD_NAME: &'static str = "EventReceiverThread";
 
-/// MessageQueue gets and collects messages/responses from routing. It also maintains local caching
-/// of previously fetched ImmutableData (because the very nature of such data implies Immutability)
-/// enabling fast re-retrieval and avoiding networking.
+/// `MessageQueue` gets and collects messages/responses from routing. It also maintains local
+/// caching of previously fetched `ImmutableData` (because the very nature of such data implies
+/// Immutability) enabling fast re-retrieval and avoiding networking.
 pub struct MessageQueue {
     local_cache: LruCache<XorName, Data>,
     network_event_observers: Vec<Sender<NetworkEvent>>,
@@ -57,13 +56,16 @@ fn handle_response(response: Response, mut queue_guard: MutexGuard<MessageQueue>
                     }
                 };
                 let err = Err(CoreError::GetFailure {
-                    data_id: data_id,
-                    reason: reason,
-                });
+                                  data_id: data_id,
+                                  reason: reason,
+                              });
                 let _ = response_observer.send(ResponseEvent::GetResp(err));
             }
         }
-        Response::PutSuccess(_, id) => {
+        Response::PutSuccess(_, id) |
+        Response::PostSuccess(_, id) |
+        Response::DeleteSuccess(_, id) |
+        Response::AppendSuccess(_, id) => {
             if let Some(response_observer) = queue_guard.response_observers.remove(&id) {
                 let _ = response_observer.send(ResponseEvent::MutationResp(Ok(())));
             }
@@ -74,31 +76,16 @@ fn handle_response(response: Response, mut queue_guard: MutexGuard<MessageQueue>
                 let _ = response_observer.send(ResponseEvent::MutationResp(Err(err)));
             }
         }
-        Response::PostSuccess(_, id) => {
-            if let Some(response_observer) = queue_guard.response_observers.remove(&id) {
-                let _ = response_observer.send(ResponseEvent::MutationResp(Ok(())));
-            }
-        }
         Response::PostFailure { id, data_id, external_error_indicator } => {
             if let Some(response_observer) = queue_guard.response_observers.remove(&id) {
                 let err = parse_mutation_failure(external_error_indicator, data_id, "POST");
                 let _ = response_observer.send(ResponseEvent::MutationResp(Err(err)));
             }
         }
-        Response::DeleteSuccess(_, id) => {
-            if let Some(response_observer) = queue_guard.response_observers.remove(&id) {
-                let _ = response_observer.send(ResponseEvent::MutationResp(Ok(())));
-            }
-        }
         Response::DeleteFailure { id, data_id, external_error_indicator } => {
             if let Some(response_observer) = queue_guard.response_observers.remove(&id) {
                 let err = parse_mutation_failure(external_error_indicator, data_id, "DELETE");
                 let _ = response_observer.send(ResponseEvent::MutationResp(Err(err)));
-            }
-        }
-        Response::AppendSuccess(_, id) => {
-            if let Some(response_observer) = queue_guard.response_observers.remove(&id) {
-                let _ = response_observer.send(ResponseEvent::MutationResp(Ok(())));
             }
         }
         Response::AppendFailure { id, data_id, external_error_indicator } => {
@@ -140,10 +127,11 @@ impl MessageQueue {
                network_event_observers: Vec<Sender<NetworkEvent>>)
                -> (Arc<Mutex<MessageQueue>>, Joiner) {
         let message_queue = Arc::new(Mutex::new(MessageQueue {
-            local_cache: LruCache::new(1000),
-            network_event_observers: network_event_observers,
-            response_observers: HashMap::new(),
-        }));
+                                                    local_cache: LruCache::new(1000),
+                                                    network_event_observers:
+                                                        network_event_observers,
+                                                    response_observers: HashMap::new(),
+                                                }));
 
         let message_queue_cloned = message_queue.clone();
         let receiver_joiner =
@@ -153,39 +141,34 @@ impl MessageQueue {
 
                               match it {
                                   Event::Response { response, .. } => {
-                                      handle_response(response,
-                                                      unwrap!(message_queue_cloned.lock()));
-                                  }
+                    handle_response(response, unwrap!(message_queue_cloned.lock()));
+                }
                                   Event::Connected => {
-                                      let mut dead_sender_positions = Vec::<usize>::new();
-                                      let mut queue_guard = unwrap!(message_queue_cloned.lock());
-                                      for it in queue_guard.network_event_observers
-                                          .iter()
-                                          .enumerate() {
-                                          if it.1.send(NetworkEvent::Connected).is_err() {
-                                              dead_sender_positions.push(it.0);
-                                          }
-                                      }
+                    let mut dead_sender_positions = Vec::<usize>::new();
+                    let mut queue_guard = unwrap!(message_queue_cloned.lock());
+                    for it in queue_guard.network_event_observers.iter().enumerate() {
+                        if it.1.send(NetworkEvent::Connected).is_err() {
+                            dead_sender_positions.push(it.0);
+                        }
+                    }
 
-                                      MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
-                                                         dead_sender_positions);
-                                  }
+                    MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
+                                                     dead_sender_positions);
+                }
                                   Event::Terminate => {
-                                      let mut dead_sender_positions = Vec::<usize>::new();
-                                      let mut queue_guard = unwrap!(message_queue_cloned.lock());
-                                      info!("Received a Terminate event. Informing {} observers.",
-                                            queue_guard.network_event_observers.len());
-                                      for it in queue_guard.network_event_observers
-                                          .iter()
-                                          .enumerate() {
-                                          if it.1.send(NetworkEvent::Disconnected).is_err() {
-                                              dead_sender_positions.push(it.0);
-                                          }
-                                      }
+                    let mut dead_sender_positions = Vec::<usize>::new();
+                    let mut queue_guard = unwrap!(message_queue_cloned.lock());
+                    info!("Received a Terminate event. Informing {} observers.",
+                          queue_guard.network_event_observers.len());
+                    for it in queue_guard.network_event_observers.iter().enumerate() {
+                        if it.1.send(NetworkEvent::Disconnected).is_err() {
+                            dead_sender_positions.push(it.0);
+                        }
+                    }
 
-                                      MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
-                                                         dead_sender_positions);
-                                  }
+                    MessageQueue::purge_dead_senders(&mut queue_guard.network_event_observers,
+                                                     dead_sender_positions);
+                }
                                   _ => debug!("Received unsupported routing event: {:?}.", it),
                               }
                           });
@@ -208,7 +191,10 @@ impl MessageQueue {
     }
 
     pub fn local_cache_get(&mut self, key: &XorName) -> Result<Data, CoreError> {
-        self.local_cache.get_mut(key).ok_or(CoreError::VersionCacheMiss).map(|elt| elt.clone())
+        self.local_cache
+            .get_mut(key)
+            .ok_or(CoreError::VersionCacheMiss)
+            .map(|elt| elt.clone())
     }
 
     pub fn local_cache_insert(&mut self, key: XorName, value: Data) {

@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -30,14 +30,14 @@ use routing::{Data, DataIdentifier, ImmutableData};
 use self_encryption::{DataMap, SelfEncryptor, SequentialEncryptor};
 use std::{mem, ptr, slice};
 
-/// SelfEncryptorWriterWrapper ties in the objects with dependent lifetimes and manages correct
+/// `SelfEncryptorWriterWrapper` ties in the objects with dependent lifetimes and manages correct
 /// destruction sequence.
 pub struct SelfEncryptorWriterWrapper {
     se: SequentialEncryptor<'static, SelfEncryptionStorageError, SelfEncryptionStorage>,
     _storage: Box<SelfEncryptionStorage>,
 }
 
-/// SelfEncryptorWriterWrapper ties in the objects with dependent lifetimes and manages correct
+/// `SelfEncryptorWriterWrapper` ties in the objects with dependent lifetimes and manages correct
 /// destruction sequence.
 pub struct SelfEncryptorReaderWrapper {
     se: SelfEncryptor<'static, SelfEncryptionStorageError, SelfEncryptionStorage>,
@@ -52,7 +52,7 @@ pub unsafe extern "C" fn immut_data_new_self_encryptor(app: *const App,
     helper::catch_unwind_i32(|| {
         let mut se_storage = Box::new(SelfEncryptionStorage::new((*app).get_client()));
         let se = ffi_try!(SequentialEncryptor::new(mem::transmute(&mut *se_storage), None)
-            .map_err(CoreError::from));
+                              .map_err(CoreError::from));
 
         let se_wrapper = SelfEncryptorWriterWrapper {
             se: se,
@@ -74,9 +74,9 @@ pub unsafe extern "C" fn immut_data_write_to_self_encryptor(se_h: SelfEncryptorW
     helper::catch_unwind_i32(|| {
         let data_slice = slice::from_raw_parts(data, size);
         ffi_try!(ffi_try!(unwrap!(object_cache()).get_se_writer(se_h))
-            .se
-            .write(data_slice)
-            .map_err(CoreError::from));
+                     .se
+                     .write(data_slice)
+                     .map_err(CoreError::from));
 
         0
     })
@@ -94,9 +94,9 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(app: *const App,
         let client = (*app).get_client();
 
         let data_map = ffi_try!(ffi_try!(unwrap!(object_cache()).get_se_writer(se_h))
-            .se
-            .close()
-            .map_err(CoreError::from));
+                                    .se
+                                    .close()
+                                    .map_err(CoreError::from));
 
         let ser_data_map = ffi_try!(serialise(&data_map).map_err(FfiError::from));
         let final_immut_data =
@@ -104,12 +104,12 @@ pub unsafe extern "C" fn immut_data_close_self_encryptor(app: *const App,
         let ser_final_immut_data = ffi_try!(serialise(&final_immut_data).map_err(FfiError::from));
 
         let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache()).get_cipher_opt(cipher_opt_h))
-            .encrypt(app, &ser_final_immut_data));
+                                    .encrypt(app, &ser_final_immut_data));
 
         let raw_immut_data = ImmutableData::new(raw_data);
         let raw_immut_data_name = *raw_immut_data.name();
-        let resp_getter = ffi_try!(unwrap!(client.lock())
-            .put(Data::Immutable(raw_immut_data), None));
+        let resp_getter = ffi_try!(unwrap!(client.lock()).put(Data::Immutable(raw_immut_data),
+                                                              None));
         ffi_try!(resp_getter.get());
 
         let data_id = DataIdentifier::Immutable(raw_immut_data_name);
@@ -141,7 +141,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
 
         let ser_final_immut_data = ffi_try!(CipherOpt::decrypt(&app, raw_immut_data.value()));
         let final_immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_final_immut_data)
-            .map_err(FfiError::from));
+                                            .map_err(FfiError::from));
         let ser_data_map = ffi_try!(immut_data_operations::get_data_from_immut_data(client.clone(),
                                                                     final_immut_data,
                                                                     None));
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
 
         let mut se_storage = Box::new(SelfEncryptionStorage::new(client));
         let se = ffi_try!(SelfEncryptor::new(mem::transmute(&mut *se_storage), data_map)
-            .map_err(CoreError::from));
+                              .map_err(CoreError::from));
 
         let se_wrapper = SelfEncryptorReaderWrapper {
             se: se,
@@ -166,10 +166,10 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
 
 /// Get data size from Self Encryptor
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub unsafe extern "C" fn immut_data_size(se_h: SelfEncryptorReaderHandle, o_size: *mut u64) -> i32 {
     helper::catch_unwind_i32(|| {
         let size = ffi_try!(unwrap!(object_cache()).get_se_reader(se_h)).se.len();
-
         ptr::write(o_size, size);
         0
     })
@@ -208,22 +208,23 @@ pub unsafe extern "C" fn immut_data_read_from_self_encryptor(se_h: SelfEncryptor
 #[no_mangle]
 pub extern "C" fn immut_data_self_encryptor_writer_free(handle: SelfEncryptorWriterHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache()).remove_se_writer(handle));
-        0
-    })
+                                 let _ = ffi_try!(unwrap!(object_cache()).remove_se_writer(handle));
+                                 0
+                             })
 }
 
 /// Free Self Encryptor Reader handle
 #[no_mangle]
 pub extern "C" fn immut_data_self_encryptor_reader_free(handle: SelfEncryptorReaderHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache()).remove_se_reader(handle));
-        0
-    })
+                                 let _ = ffi_try!(unwrap!(object_cache()).remove_se_reader(handle));
+                                 0
+                             })
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use core::utility;
     use ffi::errors::FfiError;
     use ffi::low_level_api::cipher_opt::*;
@@ -231,7 +232,6 @@ mod tests {
     use ffi::low_level_api::object_cache::object_cache;
     use ffi::test_utils;
     use std::ptr;
-    use super::*;
 
     #[test]
     fn immut_data_operations() {

@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,7 @@
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use time::{self, Timespec, Tm};
 
-/// FileMetadata about a File or a Directory
+/// `FileMetadata` about a File or a Directory
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct FileMetadata {
     name: String,
@@ -108,14 +108,14 @@ impl Encodable for FileMetadata {
         let modified_time = self.modified_time.to_timespec();
 
         e.emit_struct("FileMetadata", 8, |e| {
-            try!(e.emit_struct_field("name", 0, |e| self.name.encode(e)));
-            try!(e.emit_struct_field("size", 1, |e| self.size.encode(e)));
-            try!(e.emit_struct_field("created_time_sec", 2, |e| created_time.sec.encode(e)));
-            try!(e.emit_struct_field("created_time_nsec", 3, |e| created_time.nsec.encode(e)));
-            try!(e.emit_struct_field("modified_time_sec", 4, |e| modified_time.sec.encode(e)));
-            try!(e.emit_struct_field("modified_time_nsec", 5, |e| modified_time.nsec.encode(e)));
-            try!(e.emit_struct_field("user_metadata", 6, |e| self.user_metadata.encode(e)));
-            try!(e.emit_struct_field("version", 7, |e| self.version.encode(e)));
+            e.emit_struct_field("name", 0, |e| self.name.encode(e))?;
+            e.emit_struct_field("size", 1, |e| self.size.encode(e))?;
+            e.emit_struct_field("created_time_sec", 2, |e| created_time.sec.encode(e))?;
+            e.emit_struct_field("created_time_nsec", 3, |e| created_time.nsec.encode(e))?;
+            e.emit_struct_field("modified_time_sec", 4, |e| modified_time.sec.encode(e))?;
+            e.emit_struct_field("modified_time_nsec", 5, |e| modified_time.nsec.encode(e))?;
+            e.emit_struct_field("user_metadata", 6, |e| self.user_metadata.encode(e))?;
+            e.emit_struct_field("version", 7, |e| self.version.encode(e))?;
 
             Ok(())
         })
@@ -126,27 +126,39 @@ impl Decodable for FileMetadata {
     fn decode<D: Decoder>(d: &mut D) -> Result<FileMetadata, D::Error> {
         d.read_struct("FileMetadata", 8, |d| {
             Ok(FileMetadata {
-                name: try!(d.read_struct_field("name", 0, Decodable::decode)),
-                size: try!(d.read_struct_field("size", 1, Decodable::decode)),
-                created_time: ::time::at_utc(Timespec {
-                    sec: try!(d.read_struct_field("created_time_sec", 2, Decodable::decode)),
-                    nsec: try!(d.read_struct_field("created_time_nsec", 3, Decodable::decode)),
-                }),
-                modified_time: ::time::at_utc(Timespec {
-                    sec: try!(d.read_struct_field("modified_time_sec", 4, Decodable::decode)),
-                    nsec: try!(d.read_struct_field("modified_time_nsec", 5, Decodable::decode)),
-                }),
-                user_metadata: try!(d.read_struct_field("user_metadata", 6, Decodable::decode)),
-                version: try!(d.read_struct_field("version", 7, Decodable::decode)),
-            })
+                   name: d.read_struct_field("name", 0, Decodable::decode)?,
+                   size: d.read_struct_field("size", 1, Decodable::decode)?,
+                   created_time: ::time::at_utc(Timespec {
+                                                    sec:
+                                                        d.read_struct_field("created_time_sec",
+                                                                            2,
+                                                                            Decodable::decode)?,
+                                                    nsec:
+                                                        d.read_struct_field("created_time_nsec",
+                                                                            3,
+                                                                            Decodable::decode)?,
+                                                }),
+                   modified_time: ::time::at_utc(Timespec {
+                                                     sec:
+                                                         d.read_struct_field("modified_time_sec",
+                                                                             4,
+                                                                             Decodable::decode)?,
+                                                     nsec:
+                                                         d.read_struct_field("modified_time_nsec",
+                                                                             5,
+                                                                             Decodable::decode)?,
+                                                 }),
+                   user_metadata: d.read_struct_field("user_metadata", 6, Decodable::decode)?,
+                   version: d.read_struct_field("version", 7, Decodable::decode)?,
+               })
         })
     }
 }
 
 #[cfg(test)]
 mod test {
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use super::*;
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
 
     #[test]
     fn serialise_and_deserialise_file_metadata() {

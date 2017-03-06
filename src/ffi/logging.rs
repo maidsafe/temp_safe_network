@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,6 +17,7 @@
 
 //! Logging.
 
+use super::helper;
 use config_file_handler::FileHandler;
 
 use core::errors::CoreError;
@@ -24,15 +25,14 @@ use libc::int32_t;
 use maidsafe_utilities::log as safe_log;
 use std::mem;
 use std::ptr;
-use super::helper;
 
 /// This function should be called to enable logging to a file
 #[no_mangle]
 pub extern "C" fn init_logging() -> int32_t {
     helper::catch_unwind_i32(|| {
-        ffi_try!(safe_log::init(false).map_err(CoreError::Unexpected));
-        0
-    })
+                                 ffi_try!(safe_log::init(false).map_err(CoreError::Unexpected));
+                                 0
+                             })
 }
 
 /// This function should be called to find where log file will be created. It will additionally
@@ -52,13 +52,14 @@ pub unsafe extern "C" fn output_log_path(c_output_file_name: *const u8,
         let fh = ffi_ptr_try!(FileHandler::<()>::new(&op_file, true)
                                   .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
                               c_result);
-        let op_file_path = ffi_ptr_try!(fh.path()
+        let op_file_path =
+            ffi_ptr_try!(fh.path()
                              .to_path_buf()
                              .into_os_string()
                              .into_string()
                              .map_err(|e| CoreError::Unexpected(format!("{:?}", e))),
                          c_result)
-            .into_bytes();
+                    .into_bytes();
 
         ptr::write(c_size, op_file_path.len() as i32);
         ptr::write(c_capacity, op_file_path.capacity() as i32);
@@ -74,12 +75,12 @@ pub unsafe extern "C" fn output_log_path(c_output_file_name: *const u8,
 #[cfg(test)]
 mod test {
 
+    use super::*;
     use std::env;
     use std::fs::File;
     use std::io::Read;
     use std::thread;
     use std::time::Duration;
-    use super::*;
 
     // Enable this test when doing explicit file-logging
     #[test]

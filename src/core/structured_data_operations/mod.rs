@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -33,7 +33,7 @@ use std::collections::{BTreeMap, BTreeSet};
 const PADDING_SIZE_IN_BYTES: u64 = 1024;
 const MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES: u64 = 70;
 
-/// Inform about data fitting or not into given StructuredData
+/// Inform about data fitting or not into given `StructuredData`
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum DataFitResult {
     /// Invalid StrucuturedData.
@@ -45,13 +45,13 @@ pub enum DataFitResult {
 }
 
 /// Calculates approximate space available for data. Calculates the worst case scenario in which
-/// all owners must sign this StructuredData.
+/// all owners must sign this `StructuredData`.
 pub fn get_approximate_space_for_data(owners: BTreeSet<sign::PublicKey>) -> Result<u64, CoreError> {
-    let mut structured_data = try!(StructuredData::new(u64::MAX,
-                                                       XorName([u8::MAX; XOR_NAME_LEN]),
-                                                       u64::MAX,
-                                                       Vec::new(),
-                                                       owners.clone()));
+    let mut structured_data = StructuredData::new(u64::MAX,
+                                                  XorName([u8::MAX; XOR_NAME_LEN]),
+                                                  u64::MAX,
+                                                  Vec::new(),
+                                                  owners.clone())?;
 
     // Fill it with rest of signatures
     let max_signatures = owners.iter().cloned().fold(BTreeMap::new(), |mut signatures, owner| {
@@ -60,7 +60,7 @@ pub fn get_approximate_space_for_data(owners: BTreeSet<sign::PublicKey>) -> Resu
     });
     structured_data.replace_signatures(max_signatures);
 
-    let serialised_structured_data_len = try!(serialise(&structured_data)).len() as u64 +
+    let serialised_structured_data_len = serialise(&structured_data)?.len() as u64 +
                                          PADDING_SIZE_IN_BYTES;
     if ::routing::MAX_STRUCTURED_DATA_SIZE_IN_BYTES <= serialised_structured_data_len {
         Ok(0)
@@ -69,14 +69,14 @@ pub fn get_approximate_space_for_data(owners: BTreeSet<sign::PublicKey>) -> Resu
     }
 }
 
-/// Check if it is possible to fit the given data into the given StructuredData
+/// Check if it is possible to fit the given data into the given `StructuredData`
 pub fn check_if_data_can_fit_in_structured_data(data: &[u8],
                                                 owner_keys: BTreeSet<sign::PublicKey>)
                                                 -> Result<DataFitResult, CoreError> {
     if data.len() as u64 > ::routing::MAX_STRUCTURED_DATA_SIZE_IN_BYTES - PADDING_SIZE_IN_BYTES {
         Ok(DataFitResult::DataDoesNotFit)
     } else {
-        let available_size = try!(get_approximate_space_for_data(owner_keys));
+        let available_size = get_approximate_space_for_data(owner_keys)?;
         if available_size <= MIN_RESIDUAL_SPACE_FOR_VALID_STRUCTURED_DATA_IN_BYTES {
             Ok(DataFitResult::NoDataCanFit)
         } else if available_size < data.len() as u64 {

@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -21,7 +21,7 @@ use routing::XorName;
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256;
 
-/// IdType
+/// `IdType`
 ///
 /// #Examples
 ///
@@ -53,15 +53,13 @@ impl IdType {
 
     /// Returns name
     pub fn name(&self) -> XorName {
-        let combined_iter = (&self.public_keys.0)
-            .0
-            .into_iter()
-            .chain((&self.public_keys.1).0.into_iter());
+        let combined_iter =
+            (&self.public_keys.0).0.into_iter().chain((&self.public_keys.1).0.into_iter());
         let mut combined = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
         }
-        for i in self.type_tag.to_string().into_bytes().into_iter() {
+        for i in self.type_tag.to_string().into_bytes() {
             combined.push(i);
         }
         XorName(sha256::hash(&combined).0)
@@ -104,11 +102,11 @@ impl IdType {
 mod test {
     extern crate rand;
 
+    use self::rand::Rng;
     use core::id::{IdType, MaidTypeTags, RevocationIdType};
     use core::id::Random;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use rust_sodium::crypto::{box_, sign};
-    use self::rand::Rng;
 
     impl Random for IdType {
         fn generate_random() -> IdType {

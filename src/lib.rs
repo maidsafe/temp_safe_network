@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -15,13 +15,13 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-//! #Safe-Core Library
-//! [Project github page](https://github.com/maidsafe/safe_core)
+//! # Safe Client Libraries
+//! [Project GitHub page](https://github.com/maidsafe/safe_client_libs)
 
 #![doc(html_logo_url =
            "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-       html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-       html_root_url = "http://maidsafe.github.io/safe_core")]
+       html_favicon_url = "https://maidsafe.net/img/favicon.ico",
+       html_root_url = "https://docs.rs/safe_client_libs")]
 
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
@@ -36,12 +36,6 @@
         unused_qualifications, unused_results)]
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
-
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
-                                   option_unwrap_used))]
-#![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))] // TODO: Fix doc_markdown errors.
 
 extern crate config_file_handler;
 #[macro_use]
@@ -70,7 +64,7 @@ pub mod dns;
 /// Ffi module;
 pub mod ffi;
 
-/// Unversioned StructuredData
+/// Unversioned `StructuredData`
 pub const UNVERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 500;
-/// Versioned StructuredData
+/// Versioned `StructuredData`
 pub const VERSIONED_STRUCT_DATA_TYPE_TAG: u64 = 501;

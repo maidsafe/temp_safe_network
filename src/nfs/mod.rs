@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -19,11 +19,11 @@
 pub mod file;
 /// Errors
 pub mod errors;
-/// Helper for directory_listing and File for NFS Low level API
+/// Helper for `directory_listing` and File for NFS Low level API
 pub mod helper;
 /// Directory and File Metadata
 pub mod metadata;
-/// Module for directory reltaed structs - DirectoryListin, DirectoryInfo
+/// Module for directory related structs - `DirectoryListing`, `DirectoryInfo`
 pub mod directory_listing;
 
 /// Root directory name
@@ -35,7 +35,7 @@ pub const VERSIONED_DIRECTORY_LISTING_TAG: u64 = ::core::CLIENT_STRUCTURED_DATA_
 /// Tag representing the Versioned Directory Listing
 pub const UNVERSIONED_DIRECTORY_LISTING_TAG: u64 = VERSIONED_DIRECTORY_LISTING_TAG + 1;
 
-/// AccessLevel indicates whether the container is Private or Public shared
+/// `AccessLevel` indicates whether the container is Private or Public shared
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub enum AccessLevel {
     /// Private Directory where the directory is encrypted with users private keys

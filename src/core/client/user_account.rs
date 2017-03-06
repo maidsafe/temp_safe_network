@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -69,7 +69,7 @@ impl Account {
     /// This is similar to the username in various places.
     pub fn generate_network_id(keyword: &[u8], pin: &[u8]) -> Result<XorName, CoreError> {
         let mut id = XorName([0; XOR_NAME_LEN]);
-        try!(Account::derive_key(&mut id.0[..], keyword, pin));
+        Account::derive_key(&mut id.0[..], keyword, pin)?;
 
         Ok(id)
     }
@@ -147,8 +147,8 @@ impl Account {
     /// Symmetric encryption of Session Packet using User's credentials. Credentials are passed
     /// through key-derivation-function first
     pub fn encrypt(&self, password: &[u8], pin: &[u8]) -> Result<Vec<u8>, CoreError> {
-        let serialised_self = try!(serialise(self));
-        let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
+        let serialised_self = serialise(self)?;
+        let (key, nonce) = Account::generate_crypto_keys(password, pin)?;
 
         Ok(secretbox::seal(&serialised_self, &nonce, &key))
     }
@@ -159,18 +159,18 @@ impl Account {
                    password: &[u8],
                    pin: &[u8])
                    -> Result<Account, CoreError> {
-        let (key, nonce) = try!(Account::generate_crypto_keys(password, pin));
+        let (key, nonce) = Account::generate_crypto_keys(password, pin)?;
         let decrypted_self = try!(secretbox::open(encrypted_self, &nonce, &key)
             .map_err(|_| CoreError::SymmetricDecipherFailure));
 
-        Ok(try!(deserialise(&decrypted_self)))
+        Ok(deserialise(&decrypted_self)?)
     }
 
     fn generate_crypto_keys(password: &[u8],
                             pin: &[u8])
                             -> Result<(secretbox::Key, secretbox::Nonce), CoreError> {
         let mut output = [0; secretbox::KEYBYTES + secretbox::NONCEBYTES];
-        try!(Account::derive_key(&mut output[..], password, pin));
+        Account::derive_key(&mut output[..], password, pin)?;
 
         let mut key = secretbox::Key([0; secretbox::KEYBYTES]);
         let mut nonce = secretbox::Nonce([0; secretbox::NONCEBYTES]);
@@ -199,20 +199,19 @@ impl Account {
             }
         }
 
-        try!(pwhash::derive_key(output,
-                                input,
-                                &salt,
-                                pwhash::OPSLIMIT_INTERACTIVE,
-                                pwhash::MEMLIMIT_INTERACTIVE)
-            .map_err(|_| CoreError::UnsuccessfulPwHash)
-            .map(|_| Ok(())))
+        pwhash::derive_key(output,
+                           input,
+                           &salt,
+                           pwhash::OPSLIMIT_INTERACTIVE,
+                           pwhash::MEMLIMIT_INTERACTIVE).map_err(|_| CoreError::UnsuccessfulPwHash)
+                .map(|_| Ok(()))?
     }
 }
 
 #[cfg(test)]
 mod test {
-    use maidsafe_utilities::serialisation::{deserialise, serialise};
     use super::*;
+    use maidsafe_utilities::serialisation::{deserialise, serialise};
 
     #[test]
     fn generating_new_account() {
@@ -244,8 +243,7 @@ mod test {
                                                         1234.to_string().as_bytes())));
         assert_eq!(user1_id3,
                    unwrap!(Account::generate_network_id(keyword1.as_bytes(),
-                                                        ::std::u32::MAX.to_string()
-                                                            .as_bytes())));
+                                                        ::std::u32::MAX.to_string().as_bytes())));
 
         let keyword2 = "user2".to_owned();
         let gen_id_res1 = Account::generate_network_id(keyword1.as_bytes(),
@@ -307,8 +305,8 @@ mod test {
         let password = "impossible to guess".to_owned();
         let pin = 1000u16;
 
-        let encrypted_account =
-            unwrap!(account.encrypt(password.as_bytes(), pin.to_string().as_bytes()));
+        let encrypted_account = unwrap!(account.encrypt(password.as_bytes(),
+                                                        pin.to_string().as_bytes()));
         let serialised_account = unwrap!(serialise(&account));
         assert!(encrypted_account.len() > 0);
         assert!(encrypted_account != serialised_account);

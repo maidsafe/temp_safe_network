@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -122,25 +122,25 @@ fn add_service(app: &App,
                service_home_dir_path: &str,
                is_path_shared: bool)
                -> Result<(), FfiError> {
-    let dir_to_map = try!(helper::get_directory(app, service_home_dir_path, is_path_shared));
+    let dir_to_map = helper::get_directory(app, service_home_dir_path, is_path_shared)?;
     let client = app.get_client();
-    let signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    let dns_operation = try!(DnsOperations::new(client));
+    let signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
+    let dns_operation = DnsOperations::new(client)?;
 
-    try!(dns_operation.add_service(&long_name,
-                                   (service_name, dir_to_map.get_key().clone()),
-                                   &signing_key,
-                                   None));
+    dns_operation.add_service(&long_name,
+                              (service_name, *dir_to_map.get_key()),
+                              &signing_key,
+                              None)?;
     Ok(())
 }
 
 
 fn delete_service(app: &App, long_name: String, service_name: String) -> Result<(), FfiError> {
     let client = app.get_client();
-    let signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    let dns_ops = try!(DnsOperations::new(client));
+    let signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
+    let dns_ops = DnsOperations::new(client)?;
 
-    try!(dns_ops.remove_service(&long_name, service_name, &signing_key, None));
+    dns_ops.remove_service(&long_name, service_name, &signing_key, None)?;
 
     Ok(())
 }
@@ -150,18 +150,18 @@ fn get_service_dir(app: &App,
                    service_name: &str)
                    -> Result<DirectoryDetails, FfiError> {
     let dns_operations = match app.get_app_dir_key() {
-        Some(_) => try!(DnsOperations::new(app.get_client())),
+        Some(_) => DnsOperations::new(app.get_client())?,
         None => DnsOperations::new_unregistered(app.get_client()),
     };
 
     let directory_key =
-        try!(dns_operations.get_service_home_directory_key(long_name, service_name, None));
+        dns_operations.get_service_home_directory_key(long_name, service_name, None)?;
     DirectoryDetails::from_directory_key(app.get_client(), directory_key)
 }
 
 fn get_services(app: &App, long_name: &str) -> Result<Vec<String>, FfiError> {
-    let dns_ops = try!(DnsOperations::new(app.get_client()));
-    let list = try!(dns_ops.get_all_services(long_name, None));
+    let dns_ops = DnsOperations::new(app.get_client())?;
+    let list = dns_ops.get_all_services(long_name, None)?;
 
     Ok(list)
 }
@@ -192,7 +192,7 @@ mod test {
 
         unwrap!(long_name::register_long_name(&app, public_name.clone()));
         assert!(super::add_service(&app, public_name, "www".to_string(), "/test_dir", false)
-            .is_ok());
+                    .is_ok());
     }
 
     #[test]

@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
 
 use core::client::Client;
 use ffi::app::App;
@@ -48,7 +47,7 @@ pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize) -> Result<Option<
         Ok(None)
     } else {
         String::from_utf8(slice::from_raw_parts(ptr, len).to_owned())
-            .map(|v| Some(v))
+            .map(Some)
             .map_err(|error| FfiError::from(error.description()))
     }
 }
@@ -56,7 +55,7 @@ pub unsafe fn c_utf8_to_opt_string(ptr: *const u8, len: usize) -> Result<Option<
 // TODO: add c_utf8_to_opt_str (return Option<&str> instead of Option<String>)
 
 /// Returns a heap-allocated raw string, usable by C/FFI-boundary.
-/// The tuple means (pointer, length_in_bytes, capacity).
+/// The tuple means (pointer, `length_in_bytes`, capacity).
 /// Use `misc_u8_ptr_free` to free the memory.
 pub fn string_to_c_utf8(s: String) -> (*mut u8, usize, usize) {
     u8_vec_to_ptr(s.into_bytes())
@@ -110,22 +109,22 @@ pub fn get_safe_drive_key(client: Arc<Mutex<Client>>) -> Result<DirectoryKey, Ff
 
     let safe_drive_dir_name = SAFE_DRIVE_DIR_NAME.to_string();
     let dir_helper = DirectoryHelper::new(client);
-    let mut root_dir = try!(dir_helper.get_user_root_directory_listing());
+    let mut root_dir = dir_helper.get_user_root_directory_listing()?;
     let dir_metadata = match root_dir.find_sub_directory(&safe_drive_dir_name).cloned() {
         Some(metadata) => metadata,
         None => {
             trace!("SAFEDrive does not exist - creating one.");
-            let (created_dir, _) = try!(dir_helper.create(safe_drive_dir_name,
-                                                          UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                          Vec::new(),
-                                                          false,
-                                                          AccessLevel::Private,
-                                                          Some(&mut root_dir)));
+            let (created_dir, _) = dir_helper.create(safe_drive_dir_name,
+                                                     UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                                     Vec::new(),
+                                                     false,
+                                                     AccessLevel::Private,
+                                                     Some(&mut root_dir))?;
             created_dir.get_metadata().clone()
         }
     };
 
-    let key = dir_metadata.get_key().clone();
+    let key = *dir_metadata.get_key();
     Ok(key)
 }
 
@@ -140,11 +139,11 @@ pub fn get_final_subdirectory(client: Arc<Mutex<Client>>,
     let mut current_dir_listing = match starting_directory {
         Some(directory_key) => {
             trace!("Traversal begins at given starting directory.");
-            try!(dir_helper.get(directory_key))
+            dir_helper.get(directory_key)?
         }
         None => {
             trace!("Traversal begins at user-root-directory.");
-            try!(dir_helper.get_user_root_directory_listing())
+            dir_helper.get_user_root_directory_listing()?
         }
     };
 
@@ -152,11 +151,11 @@ pub fn get_final_subdirectory(client: Arc<Mutex<Client>>,
         trace!("Traversing to dir with name: {}", *it);
 
         current_dir_listing = {
-            let current_dir_metadata = try!(current_dir_listing.get_sub_directories()
+            let current_dir_metadata = current_dir_listing.get_sub_directories()
                 .iter()
                 .find(|a| *a.get_name() == *it)
-                .ok_or(FfiError::PathNotFound));
-            try!(dir_helper.get(current_dir_metadata.get_key()))
+                .ok_or(FfiError::PathNotFound)?;
+            dir_helper.get(current_dir_metadata.get_key())?
         };
     }
 
@@ -165,7 +164,7 @@ pub fn get_final_subdirectory(client: Arc<Mutex<Client>>,
 
 // Return a DirectoryListing corresponding to the path.
 pub fn get_directory(app: &App, path: &str, is_shared: bool) -> Result<DirectoryListing, FfiError> {
-    let start_dir_key = try!(app.get_root_dir_key(is_shared));
+    let start_dir_key = app.get_root_dir_key(is_shared)?;
     let tokens = tokenise_path(path, false);
     get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key))
 }
@@ -174,11 +173,11 @@ pub fn get_directory_and_file(app: &App,
                               path: &str,
                               is_shared: bool)
                               -> Result<(DirectoryListing, String), FfiError> {
-    let start_dir_key = try!(app.get_root_dir_key(is_shared));
+    let start_dir_key = app.get_root_dir_key(is_shared)?;
     let mut tokens = tokenise_path(path, false);
-    let file_name = try!(tokens.pop().ok_or(FfiError::PathNotFound));
+    let file_name = tokens.pop().ok_or(FfiError::PathNotFound)?;
     let directory_listing =
-        try!(get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key)));
+        get_final_subdirectory(app.get_client(), &tokens, Some(&start_dir_key))?;
     Ok((directory_listing, file_name))
 }
 

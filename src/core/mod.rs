@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -30,9 +30,9 @@ pub mod translated_events;
 pub mod self_encryption_storage;
 /// Implements the Self Encryption storage error trait
 pub mod self_encryption_storage_error;
-/// Helper functions to handle ImmutableData related operations
+/// Helper functions to handle `ImmutableData` related operations
 pub mod immut_data_operations;
-/// Helper functions to handle StructuredData related operations
+/// Helper functions to handle `StructuredData` related operations
 pub mod structured_data_operations;
 
 pub use self::self_encryption_storage::SelfEncryptionStorage;
@@ -40,6 +40,6 @@ pub use self::self_encryption_storage_error::SelfEncryptionStorageError;
 
 /// All Maidsafe tagging should positive-offset from this
 pub const MAIDSAFE_TAG: u64 = 5483_000;
-/// All StructuredData tagging should positive-offset from this if the operation needs to go
-/// through this safe_core crate
+/// All `StructuredData` tagging should positive-offset from this if the operation needs to go
+/// through this `safe_core` crate
 pub const CLIENT_STRUCTURED_DATA_TAG: u64 = 15000;

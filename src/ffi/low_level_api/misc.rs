@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -27,6 +27,7 @@ use std::{mem, ptr, slice};
 
 /// Free Encrypt Key handle
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub extern "C" fn misc_encrypt_key_free(handle: EncryptKeyHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let _ = ffi_try!(unwrap!(object_cache()).remove_encrypt_key(handle));
@@ -38,12 +39,12 @@ pub extern "C" fn misc_encrypt_key_free(handle: EncryptKeyHandle) -> i32 {
 #[no_mangle]
 pub extern "C" fn misc_sign_key_free(handle: SignKeyHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache()).remove_sign_key(handle));
-        0
-    })
+                                 let _ = ffi_try!(unwrap!(object_cache()).remove_sign_key(handle));
+                                 0
+                             })
 }
 
-/// Serialise sign::PubKey
+/// Serialise `sign::PubKey`
 #[no_mangle]
 pub unsafe extern "C" fn misc_serialise_sign_key(sign_key_h: SignKeyHandle,
                                                  o_data: *mut *mut u8,
@@ -52,8 +53,8 @@ pub unsafe extern "C" fn misc_serialise_sign_key(sign_key_h: SignKeyHandle,
                                                  -> i32 {
     helper::catch_unwind_i32(|| {
         let mut ser_sign_key = ffi_try!(serialise(ffi_try!(unwrap!(object_cache())
-                .get_sign_key(sign_key_h)))
-            .map_err(FfiError::from));
+                                                               .get_sign_key(sign_key_h)))
+                                                .map_err(FfiError::from));
 
         *o_data = ser_sign_key.as_mut_ptr();
         ptr::write(o_size, ser_sign_key.len());
@@ -64,7 +65,7 @@ pub unsafe extern "C" fn misc_serialise_sign_key(sign_key_h: SignKeyHandle,
     })
 }
 
-/// Deserialise sign::PubKey
+/// Deserialise `sign::PubKey`
 #[no_mangle]
 pub unsafe extern "C" fn misc_deserialise_sign_key(data: *mut u8,
                                                    size: usize,
@@ -81,7 +82,7 @@ pub unsafe extern "C" fn misc_deserialise_sign_key(data: *mut u8,
     })
 }
 
-/// Get MAID-sign::PubKey
+/// Get `MAID-sign::PubKey`
 #[no_mangle]
 pub unsafe extern "C" fn misc_maid_sign_key(app: *const App, o_handle: *mut SignKeyHandle) -> i32 {
     helper::catch_unwind_i32(|| {
@@ -96,7 +97,7 @@ pub unsafe extern "C" fn misc_maid_sign_key(app: *const App, o_handle: *mut Sign
     })
 }
 
-/// Serialise DataIdentifier
+/// Serialise `DataIdentifier`
 #[no_mangle]
 pub unsafe extern "C" fn misc_serialise_data_id(data_id_h: DataIdHandle,
                                                 o_data: *mut *mut u8,
@@ -105,8 +106,8 @@ pub unsafe extern "C" fn misc_serialise_data_id(data_id_h: DataIdHandle,
                                                 -> i32 {
     helper::catch_unwind_i32(|| {
         let mut ser_data_id = ffi_try!(serialise(ffi_try!(unwrap!(object_cache())
-                .get_data_id(data_id_h)))
-            .map_err(FfiError::from));
+                                                              .get_data_id(data_id_h)))
+                                               .map_err(FfiError::from));
 
         *o_data = ser_data_id.as_mut_ptr();
         ptr::write(o_size, ser_data_id.len());
@@ -117,7 +118,7 @@ pub unsafe extern "C" fn misc_serialise_data_id(data_id_h: DataIdHandle,
     })
 }
 
-/// Deserialise DataIdentifier
+/// Deserialise `DataIdentifier`
 #[no_mangle]
 pub unsafe extern "C" fn misc_deserialise_data_id(data: *const u8,
                                                   size: usize,
@@ -134,7 +135,7 @@ pub unsafe extern "C" fn misc_deserialise_data_id(data: *const u8,
     })
 }
 
-/// Serialise AppendableData
+/// Serialise `AppendableData`
 #[no_mangle]
 pub unsafe extern "C" fn misc_serialise_appendable_data(ad_h: AppendableDataHandle,
                                                         o_data: *mut *mut u8,
@@ -157,7 +158,7 @@ pub unsafe extern "C" fn misc_serialise_appendable_data(ad_h: AppendableDataHand
     })
 }
 
-/// Deserialise AppendableData
+/// Deserialise `AppendableData`
 #[no_mangle]
 pub unsafe extern "C" fn misc_deserialise_appendable_data(data: *const u8,
                                                           size: usize,
@@ -180,7 +181,7 @@ pub unsafe extern "C" fn misc_deserialise_appendable_data(data: *const u8,
     })
 }
 
-/// Serialise StructuredData
+/// Serialise `StructuredData`
 #[no_mangle]
 pub unsafe extern "C" fn misc_serialise_struct_data(sd_h: StructDataHandle,
                                                     o_data: *mut *mut u8,
@@ -189,7 +190,7 @@ pub unsafe extern "C" fn misc_serialise_struct_data(sd_h: StructDataHandle,
                                                     -> i32 {
     helper::catch_unwind_i32(|| {
         let mut ser_ad = ffi_try!(serialise(ffi_try!(unwrap!(object_cache()).get_sd(sd_h)))
-            .map_err(FfiError::from));
+                                      .map_err(FfiError::from));
 
         *o_data = ser_ad.as_mut_ptr();
         ptr::write(o_size, ser_ad.len());
@@ -200,7 +201,7 @@ pub unsafe extern "C" fn misc_serialise_struct_data(sd_h: StructDataHandle,
     })
 }
 
-/// Deserialise StructuredData
+/// Deserialise `StructuredData`
 #[no_mangle]
 pub unsafe extern "C" fn misc_deserialise_struct_data(data: *const u8,
                                                       size: usize,
@@ -217,7 +218,7 @@ pub unsafe extern "C" fn misc_deserialise_struct_data(data: *const u8,
     })
 }
 
-/// Deallocate pointer obtained via FFI and allocated by safe_core
+/// Deallocate pointer obtained via FFI and allocated by `safe_core`
 #[no_mangle]
 pub unsafe extern "C" fn misc_u8_ptr_free(ptr: *mut u8, size: usize, capacity: usize) {
     // TODO: refactor implementation to remove the need for `cap`. Related issue:
@@ -233,6 +234,7 @@ pub extern "C" fn misc_object_cache_reset() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use core::utility;
     use ffi::low_level_api::appendable_data::*;
     use ffi::low_level_api::cipher_opt::*;
@@ -245,14 +247,13 @@ mod tests {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     use std::ptr;
-    use super::*;
 
     #[test]
     fn sign_key_serialisation() {
         let app = test_utils::create_app(false);
         let client = app.get_client();
 
-        let sign_key = unwrap!(unwrap!(client.lock()).get_public_signing_key()).clone();
+        let sign_key = *unwrap!(unwrap!(client.lock()).get_public_signing_key());
         let sign_key_h = unwrap!(object_cache()).insert_sign_key(sign_key);
 
         unsafe {

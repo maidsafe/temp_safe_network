@@ -27,7 +27,7 @@ function create_package {
     --directories $ConfigFilePath \
     --maintainer "MaidSafeQA <qa@maidsafe.net>" \
     --description "$Description" \
-    --url "http://maidsafe.net" \
+    --url "https://maidsafe.net" \
     "$RootDir/target/release/examples/$CoreName"=$CorePath \
     "$RootDir/installer/common/$ClientName.crust.config"=$ConfigFilePath
 }

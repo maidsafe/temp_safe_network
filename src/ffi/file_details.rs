@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,6 +18,7 @@
 //! FFI-enabled types containing details (content and metadata) about a file.
 
 
+use super::helper;
 use core::client::Client;
 use ffi::errors::FfiError;
 use ffi::low_level_api::misc::misc_u8_ptr_free;
@@ -26,7 +27,6 @@ use nfs::helper::file_helper::FileHelper;
 use nfs::metadata::file_metadata::FileMetadata as NfsFileMetadata;
 use std::ptr;
 use std::sync::{Arc, Mutex};
-use super::helper;
 
 /// Details of a file and its content.
 #[derive(Debug)]
@@ -52,27 +52,27 @@ impl FileDetails {
                -> Result<Self, FfiError> {
         let start_position = offset as u64;
         let mut file_helper = FileHelper::new(client);
-        let mut reader = try!(file_helper.read(&file));
+        let mut reader = file_helper.read(file)?;
         let mut size = length as u64;
         if size == 0 {
             size = reader.size() - start_position;
         };
 
-        let content = try!(reader.read(start_position, size));
+        let content = reader.read(start_position, size)?;
         let (content, content_len, content_cap) = helper::u8_vec_to_ptr(content);
 
         let file_metadata_ptr = if include_metadata {
-            Box::into_raw(Box::new(try!(FileMetadata::new(file.get_metadata()))))
+            Box::into_raw(Box::new(FileMetadata::new(file.get_metadata())?))
         } else {
             ptr::null_mut()
         };
 
         Ok(FileDetails {
-            content: content,
-            content_len: content_len,
-            content_cap: content_cap,
-            metadata: file_metadata_ptr,
-        })
+               content: content,
+               content_len: content_len,
+               content_cap: content_cap,
+               metadata: file_metadata_ptr,
+           })
     }
 
     // TODO: when drop-flag removal lands in stable, we should turn this into
@@ -115,25 +115,25 @@ impl FileMetadata {
         let modified_time = file_metadata.get_modified_time().to_timespec();
 
         let (name, name_len, name_cap) = helper::string_to_c_utf8(file_metadata.get_name()
-            .to_string());
+                                                                      .to_string());
 
         let user_metadata = file_metadata.get_user_metadata().to_owned();
         let (user_metadata, user_metadata_len, user_metadata_cap) =
             helper::u8_vec_to_ptr(user_metadata);
 
         Ok(FileMetadata {
-            name: name,
-            name_len: name_len,
-            name_cap: name_cap,
-            size: file_metadata.get_size(),
-            user_metadata: user_metadata,
-            user_metadata_len: user_metadata_len,
-            user_metadata_cap: user_metadata_cap,
-            creation_time_sec: created_time.sec,
-            creation_time_nsec: created_time.nsec as i64,
-            modification_time_sec: modified_time.sec,
-            modification_time_nsec: modified_time.nsec as i64,
-        })
+               name: name,
+               name_len: name_len,
+               name_cap: name_cap,
+               size: file_metadata.get_size(),
+               user_metadata: user_metadata,
+               user_metadata_len: user_metadata_len,
+               user_metadata_cap: user_metadata_cap,
+               creation_time_sec: created_time.sec,
+               creation_time_nsec: created_time.nsec as i64,
+               modification_time_sec: modified_time.sec,
+               modification_time_nsec: modified_time.nsec as i64,
+           })
     }
 
     /// Deallocate memory allocated by this struct (drop-flags workaround).
@@ -149,13 +149,13 @@ impl FileMetadata {
     }
 }
 
-/// Dispose of the FileDetails instance.
+/// Dispose of the `FileDetails` instance.
 #[no_mangle]
 pub unsafe extern "C" fn file_details_drop(details: *mut FileDetails) {
     Box::from_raw(details).deallocate()
 }
 
-/// Dispose of the FileMetadata instance.
+/// Dispose of the `FileMetadata` instance.
 #[no_mangle]
 pub unsafe extern "C" fn file_metadata_drop(metadata: *mut FileMetadata) {
     Box::from_raw(metadata).deallocate()

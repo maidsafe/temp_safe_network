@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -30,12 +30,6 @@
         unused_qualifications, unused_results)]
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
-
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
-                                   option_unwrap_used))]
-#![cfg_attr(feature="clippy", allow(use_debug, doc_markdown))] // TODO: Fix doc_markdown errors.
 
 #[macro_use]
 extern crate log;
@@ -145,10 +139,10 @@ impl Bot {
 
         let tx_msgs = (0..MSGS_SENT_BY_EACH_BOT)
             .map(|x| {
-                let mut msg: Vec<_> = rng.gen_iter::<u8>().take(10).collect();
-                msg.extend(format!("Bot-{}-msg-{}", n, x).into_bytes());
-                msg
-            })
+                     let mut msg: Vec<_> = rng.gen_iter::<u8>().take(10).collect();
+                     msg.extend(format!("Bot-{}-msg-{}", n, x).into_bytes());
+                     msg
+                 })
             .collect();
 
         Bot {
@@ -321,9 +315,14 @@ fn main() {
         Docopt::new(USAGE).and_then(|docopt| docopt.decode()).unwrap_or_else(|error| error.exit());
 
     let mut rng = XorShiftRng::from_seed(match args.flag_seed {
-        Some(seed) => [0, 0, 0, seed],
-        None => [rand::random(), rand::random(), rand::random(), rand::random()],
-    });
+                                             Some(seed) => [0, 0, 0, seed],
+                                             None => {
+                                                 [rand::random(),
+                                                  rand::random(),
+                                                  rand::random(),
+                                                  rand::random()]
+                                             }
+                                         });
 
     // ------------------------------------------------------------------------
     // Create bots
@@ -339,11 +338,9 @@ fn main() {
         // ------------------------------------------------------------------------
         // Create email in parallel
         now = Instant::now();
-        crossbeam::scope(|scope| {
-            for bot in &bots {
-                let _ = scope.spawn(move || bot.create_email());
-            }
-        });
+        crossbeam::scope(|scope| for bot in &bots {
+                             let _ = scope.spawn(move || bot.create_email());
+                         });
         duration = now.elapsed();
         info!("Create emails for {} bots: {} secs, {} millis\n",
               BOTS,
@@ -358,26 +355,23 @@ fn main() {
             let peer_handles_ref = &peer_handles;
 
             // Get peer emails in parallel
-            crossbeam::scope(|scope| {
-                for (j, peer_bot) in bots.iter().enumerate() {
-                    if i == j {
-                        continue;
-                    }
-                    let _ = scope.spawn(move || {
-                        unwrap!(peer_handles_ref.lock())
-                            .push(bot.get_peer_email_handles(&peer_bot.email))
-                    });
-                }
-            });
+            crossbeam::scope(|scope| for (j, peer_bot) in bots.iter().enumerate() {
+                                 if i == j {
+                                     continue;
+                                 }
+                                 let _ = scope.spawn(move || {
+                                        unwrap!(peer_handles_ref.lock())
+                                            .push(bot.get_peer_email_handles(&peer_bot.email))
+                                    });
+                             });
 
             // Send each email-msg from a bot in parallel to all others
             for msg in &bot.tx_msgs {
                 let guard = unwrap!(peer_handles.lock());
-                crossbeam::scope(|scope| {
-                    for &(ad_h, cipher_opt_h) in &*guard {
-                        let _ = scope.spawn(move || bot.send_email(ad_h, cipher_opt_h, msg));
-                    }
-                })
+                crossbeam::scope(|scope| for &(ad_h, cipher_opt_h) in &*guard {
+                                     let job = move || bot.send_email(ad_h, cipher_opt_h, msg);
+                                     let _ = scope.spawn(job);
+                                 })
             }
 
             let guard = unwrap!(peer_handles.lock());
@@ -410,8 +404,8 @@ fn main() {
                         continue;
                     }
                     for tx_msg in &peer_bot.tx_msgs {
-                        let pos = unwrap!(rx_emails.iter()
-                            .position(|rx_email| *rx_email == *tx_msg));
+                        let pos =
+                            unwrap!(rx_emails.iter().position(|rx_email| *rx_email == *tx_msg));
                         let _ = rx_emails.remove(pos);
                     }
                 }

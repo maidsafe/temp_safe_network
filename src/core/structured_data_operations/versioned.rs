@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
 
 use core::client::Client;
 use core::errors::CoreError;
@@ -36,8 +35,7 @@ struct VersionsInfo {
     ptr_to_current_version: XorName,
 }
 
-/// Create the StructuredData to manage versioned data.
-#[cfg_attr(feature="clippy", allow(too_many_arguments))]
+/// Create the `StructuredData` to manage versioned data.
 pub fn create(client: Arc<Mutex<Client>>,
               version_name_to_store: XorName,
               tag_type: u64,
@@ -61,8 +59,8 @@ pub fn get_all_versions(client: Arc<Mutex<Client>>,
                         -> Result<Vec<XorName>, CoreError> {
     trace!("Getting all versions of versioned StructuredData.");
 
-    let immut_data = try!(get_immutable_data(client, struct_data));
-    Ok(try!(deserialise(&immut_data.value())))
+    let immut_data = get_immutable_data(client, struct_data)?;
+    Ok(deserialise(immut_data.value())?)
 }
 
 /// Append a new version
@@ -76,7 +74,7 @@ pub fn append_version(client: Arc<Mutex<Client>>,
 
     // let immut_data = try!(get_immutable_data(mut client, struct_data));
     // client.delete(immut_data);
-    let mut versions = try!(get_all_versions(client.clone(), &struct_data));
+    let mut versions = get_all_versions(client.clone(), &struct_data)?;
     versions.push(version_to_append);
 
     let new_version_number = struct_data.get_version() +
@@ -90,7 +88,6 @@ pub fn append_version(client: Arc<Mutex<Client>>,
                 struct_data.get_owners().clone())
 }
 
-#[cfg_attr(feature="clippy", allow(too_many_arguments))]
 fn create_impl(client: Arc<Mutex<Client>>,
                version_names_to_store: &[XorName],
                tag_type: u64,
@@ -98,7 +95,7 @@ fn create_impl(client: Arc<Mutex<Client>>,
                version: u64,
                owners: BTreeSet<sign::PublicKey>)
                -> Result<StructuredData, CoreError> {
-    let immutable_data = ImmutableData::new(try!(serialise(&version_names_to_store)));
+    let immutable_data = ImmutableData::new(serialise(&version_names_to_store)?);
     let name_of_immutable_data = *immutable_data.name();
 
     let total_versions = version_names_to_store.len();
@@ -108,16 +105,16 @@ fn create_impl(client: Arc<Mutex<Client>>,
         ptr_to_current_version: version_names_to_store[total_versions - 1],
     };
 
-    let encoded = try!(serialise(&versions_info));
+    let encoded = serialise(&versions_info)?;
 
-    match try!(check_if_data_can_fit_in_structured_data(&encoded, owners.clone())) {
+    match check_if_data_can_fit_in_structured_data(&encoded, owners.clone())? {
         DataFitResult::DataFits => {
             trace!("Name of ImmutableData containing versions fits in StructuredData.");
 
             let data = Data::Immutable(immutable_data);
-            try!(Client::put_recover(client, data, None));
+            Client::put_recover(client, data, None)?;
 
-            Ok(try!(StructuredData::new(tag_type, name, version, encoded, owners)))
+            Ok(StructuredData::new(tag_type, name, version, encoded, owners)?)
         }
         _ => {
             trace!("Name of ImmutableData containing versions does not fit in StructuredData.");
@@ -126,28 +123,28 @@ fn create_impl(client: Arc<Mutex<Client>>,
     }
 }
 
-/// Get a total number of versions in versioned StructuredData
+/// Get a total number of versions in versioned `StructuredData`
 pub fn version_count(sd: &StructuredData) -> Result<u64, CoreError> {
     if sd.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
         return Err(CoreError::InvalidStructuredDataTypeTag);
     }
-    Ok(try!(deserialise::<VersionsInfo>(&sd.get_data())).total_versions)
+    Ok(deserialise::<VersionsInfo>(sd.get_data())?.total_versions)
 }
 
-/// Get the current version of versioned StructuredData
+/// Get the current version of versioned `StructuredData`
 pub fn current_version(sd: &StructuredData) -> Result<XorName, CoreError> {
     if sd.get_type_tag() != ::VERSIONED_STRUCT_DATA_TYPE_TAG {
         return Err(CoreError::InvalidStructuredDataTypeTag);
     }
-    Ok(try!(deserialise::<VersionsInfo>(&sd.get_data())).ptr_to_current_version)
+    Ok(deserialise::<VersionsInfo>(sd.get_data())?.ptr_to_current_version)
 }
 
 fn get_immutable_data(client: Arc<Mutex<Client>>,
                       struct_data: &StructuredData)
                       -> Result<ImmutableData, CoreError> {
-    let name = try!(deserialise::<VersionsInfo>(&struct_data.get_data())).ptr_to_versions;
-    let resp_getter = try!(unwrap!(client.lock()).get(DataIdentifier::Immutable(name), None));
-    let data = try!(resp_getter.get());
+    let name = deserialise::<VersionsInfo>(struct_data.get_data())?.ptr_to_versions;
+    let resp_getter = unwrap!(client.lock()).get(DataIdentifier::Immutable(name), None)?;
+    let data = resp_getter.get()?;
     match data {
         Data::Immutable(immutable_data) => Ok(immutable_data),
         _ => Err(CoreError::ReceivedUnexpectedData),
@@ -157,12 +154,12 @@ fn get_immutable_data(client: Arc<Mutex<Client>>,
 #[cfg(test)]
 mod test {
 
+    use super::*;
     use core::utility;
     use rand;
     use routing::XorName;
 
     use std::sync::{Arc, Mutex};
-    use super::*;
 
     #[test]
     fn save_and_retrieve_immutable_data() {

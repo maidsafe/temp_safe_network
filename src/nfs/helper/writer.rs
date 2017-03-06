@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -56,18 +56,18 @@ impl<'a> Writer<'a> {
         };
 
         Ok(Writer {
-            client: client.clone(),
-            file: file,
-            parent_directory: parent_directory,
-            self_encryptor: try!(SequentialEncryptor::new(storage, data_map)),
-        })
+               client: client.clone(),
+               file: file,
+               parent_directory: parent_directory,
+               self_encryptor: SequentialEncryptor::new(storage, data_map)?,
+           })
     }
 
     /// Data of a file/blob can be written in smaller chunks
     pub fn write(&mut self, data: &[u8]) -> Result<(), NfsError> {
         trace!("Writer writing file data of size {} into self-encryptor.",
                data.len());
-        Ok(try!(self.self_encryptor.write(data)))
+        Ok(self.self_encryptor.write(data)?)
     }
 
     /// close is invoked only after all the data is completely written
@@ -80,7 +80,7 @@ impl<'a> Writer<'a> {
         let mut directory = self.parent_directory;
         let size = self.self_encryptor.len();
 
-        file.set_datamap(try!(self.self_encryptor.close()));
+        file.set_datamap(self.self_encryptor.close()?);
         trace!("Writer induced self-encryptor close.");
 
         file.get_mut_metadata().set_modified_time(::time::now_utc());
@@ -90,7 +90,7 @@ impl<'a> Writer<'a> {
         directory.upsert_file(file.clone());
 
         let directory_helper = DirectoryHelper::new(self.client.clone());
-        if let Some(updated_grand_parent) = try!(directory_helper.update(&directory)) {
+        if let Some(updated_grand_parent) = directory_helper.update(&directory)? {
             Ok((directory, Some(updated_grand_parent)))
         } else {
             Ok((directory, None))

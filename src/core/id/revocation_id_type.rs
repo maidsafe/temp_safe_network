@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -20,7 +20,7 @@ use routing::XorName;
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 
-/// RevocationIdType
+/// `RevocationIdType`
 ///
 /// #Examples
 ///
@@ -37,7 +37,7 @@ pub struct RevocationIdType {
     secret_key: sign::SecretKey,
 }
 
-#[cfg_attr(feature="clippy", allow(new_without_default))]
+#[cfg_attr(feature="cargo-clippy", allow(new_without_default))]
 impl RevocationIdType {
     /// An instance of RevocationIdType can be created by invoking the new()
     /// Default contructed RevocationIdType instance is returned
@@ -63,7 +63,10 @@ impl RevocationIdType {
         for iter in combined_iter {
             combined.push(*iter);
         }
-        for i in self.type_tags.0.to_string().into_bytes().into_iter() {
+        for i in self.type_tags
+                .0
+                .to_string()
+                .into_bytes() {
             combined.push(i);
         }
         XorName(sha256::hash(&combined).0)
@@ -97,12 +100,12 @@ impl RevocationIdType {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use core::id::{MaidTypeTags, MpidTypeTags, Random};
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use rand;
     use rand::Rng;
     use rust_sodium::crypto::sign;
-    use super::*;
 
 
     impl Random for RevocationIdType {

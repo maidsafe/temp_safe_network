@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -20,7 +20,7 @@ use routing::XorName;
 use rust_sodium::crypto::{box_, sign};
 use rust_sodium::crypto::hash::sha256;
 
-/// PublicIdType
+/// `PublicIdType`
 ///
 /// #Examples
 ///
@@ -45,18 +45,17 @@ impl PublicIdType {
         let type_tag = revocation_id.type_tags().2;
         let public_keys = id_type.public_keys();
         let revocation_public_key = revocation_id.public_key();
-        let combined_iter = (public_keys.0)
-            .0
-            .into_iter()
-            .chain((public_keys.1)
-                .0
-                .into_iter()
-                .chain(revocation_public_key.0.into_iter()));
+        let combined_iter =
+            (public_keys.0).0.into_iter().chain((public_keys.1)
+                                                    .0
+                                                    .into_iter()
+                                                    .chain(revocation_public_key.0
+                                                               .into_iter()));
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
         }
-        for i in type_tag.to_string().into_bytes().into_iter() {
+        for i in type_tag.to_string().into_bytes() {
             combined.push(i);
         }
         let message_length = combined.len();
@@ -81,15 +80,13 @@ impl PublicIdType {
 
     /// Returns the name
     pub fn name(&self) -> XorName {
-        let combined_iter = (self.public_keys.0)
-            .0
-            .into_iter()
-            .chain((self.public_keys.1).0.into_iter());
+        let combined_iter =
+            (self.public_keys.0).0.into_iter().chain((self.public_keys.1).0.into_iter());
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
         }
-        for i in self.type_tag.to_string().into_bytes().into_iter() {
+        for i in self.type_tag.to_string().into_bytes() {
             combined.push(i);
         }
         for i in 0..sign::SIGNATUREBYTES {
@@ -116,10 +113,10 @@ impl PublicIdType {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use core::id::{IdType, MaidTypeTags, MpidTypeTags, Random, RevocationIdType};
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use rust_sodium::crypto::sign;
-    use super::*;
 
     impl Random for PublicIdType {
         fn generate_random() -> PublicIdType {
@@ -163,20 +160,18 @@ mod test {
         let type_tag = public_maid.type_tag;
         let public_id_keys = public_maid.public_keys;
         let public_revocation_key = public_maid.revocation_public_key;
-        let combined_keys = (public_id_keys.0)
-            .0
-            .into_iter()
-            .chain((public_id_keys.1)
-                .0
-                .into_iter()
-                .chain(public_revocation_key.0
-                    .into_iter()));
+        let combined_keys =
+            (public_id_keys.0).0.into_iter().chain((public_id_keys.1)
+                                                       .0
+                                                       .into_iter()
+                                                       .chain(public_revocation_key.0
+                                                                  .into_iter()));
         let mut combined = Vec::new();
 
         for iter in combined_keys {
             combined.push(*iter);
         }
-        for i in type_tag.to_string().into_bytes().into_iter() {
+        for i in type_tag.to_string().into_bytes() {
             combined.push(i);
         }
 

@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-//! StringList is a FFI-enabled wrapper over vector of strings with a corresponding
+//! `StringList` is a FFI-enabled wrapper over vector of strings with a corresponding
 //! FFI-enabled API.
 
 
@@ -27,13 +27,13 @@ use std::ptr;
 /// List of strings.
 pub type StringList = Vec<CString>;
 
-/// Convert vec of strings to an owning raw pointer to StringList. Consumes the
+/// Convert vec of strings to an owning raw pointer to `StringList`. Consumes the
 /// vector.
 pub fn into_ptr(strings: Vec<String>) -> Result<*mut StringList, FfiError> {
     let mut result = Vec::with_capacity(strings.len());
 
     for string in strings {
-        result.push(try!(CString::new(string)));
+        result.push(CString::new(string)?);
     }
 
     Ok(Box::into_raw(Box::new(result)))

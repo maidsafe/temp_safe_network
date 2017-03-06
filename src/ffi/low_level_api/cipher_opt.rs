@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -15,6 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use super::{CipherOptHandle, EncryptKeyHandle};
+use super::object_cache::object_cache;
 use core::errors::CoreError;
 use ffi::app::App;
 use ffi::errors::FfiError;
@@ -22,8 +24,6 @@ use ffi::helper;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
 use std::ptr;
-use super::{CipherOptHandle, EncryptKeyHandle};
-use super::object_cache::object_cache;
 
 /// Cipher Options
 #[derive(Debug)]
@@ -53,9 +53,9 @@ impl CipherOpt {
     /// Encrypt plain text
     pub fn encrypt(&self, app: &App, plain_text: &[u8]) -> Result<Vec<u8>, FfiError> {
         match *self {
-            CipherOpt::PlainText => Ok(try!(serialise(&WireFormat::Plain(plain_text.to_owned())))),
+            CipherOpt::PlainText => Ok(serialise(&WireFormat::Plain(plain_text.to_owned()))?),
             CipherOpt::Symmetric => {
-                let sym_key = try!(app.sym_key());
+                let sym_key = app.sym_key()?;
                 let nonce = secretbox::gen_nonce();
                 let cipher_text = secretbox::seal(plain_text, &nonce, sym_key);
                 let wire_format = WireFormat::Symmetric {
@@ -63,26 +63,26 @@ impl CipherOpt {
                     cipher_text: cipher_text,
                 };
 
-                Ok(try!(serialise(&wire_format)))
+                Ok(serialise(&wire_format)?)
             }
             CipherOpt::Asymmetric { ref peer_encrypt_key } => {
                 let cipher_text = sealedbox::seal(plain_text, peer_encrypt_key);
-                Ok(try!(serialise(&WireFormat::Asymmetric(cipher_text))))
+                Ok(serialise(&WireFormat::Asymmetric(cipher_text))?)
             }
         }
     }
 
     /// Decrypt something encrypted by CipherOpt::encrypt()
     pub fn decrypt(app: &App, raw_data: &[u8]) -> Result<Vec<u8>, FfiError> {
-        match try!(deserialise::<WireFormat>(raw_data)) {
+        match deserialise::<WireFormat>(raw_data)? {
             WireFormat::Plain(plain_text) => Ok(plain_text),
             WireFormat::Symmetric { nonce, cipher_text } => {
-                let sym_key = try!(app.sym_key());
+                let sym_key = app.sym_key()?;
                 Ok(try!(secretbox::open(&cipher_text, &nonce, sym_key)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)))
             }
             WireFormat::Asymmetric(cipher_text) => {
-                let &(ref pk, ref sk) = try!(app.asym_keys());
+                let &(ref pk, ref sk) = app.asym_keys()?;
                 Ok(try!(sealedbox::open(&cipher_text, pk, sk)
                     .map_err(|()| CoreError::SymmetricDecipherFailure)))
             }
@@ -90,8 +90,9 @@ impl CipherOpt {
     }
 }
 
-/// Construct CipherOpt::PlainText handle
+/// Construct `CipherOpt::PlainText` handle
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub unsafe extern "C" fn cipher_opt_new_plaintext(o_handle: *mut CipherOptHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let handle = unwrap!(object_cache()).insert_cipher_opt(CipherOpt::PlainText);
@@ -101,8 +102,9 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(o_handle: *mut CipherOptHandle
     })
 }
 
-/// Construct CipherOpt::Symmetric handle
+/// Construct `CipherOpt::Symmetric` handle
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub unsafe extern "C" fn cipher_opt_new_symmetric(o_handle: *mut CipherOptHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let handle = unwrap!(object_cache()).insert_cipher_opt(CipherOpt::Symmetric);
@@ -112,7 +114,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(o_handle: *mut CipherOptHandle
     })
 }
 
-/// Construct CipherOpt::Asymmetric handle
+/// Construct `CipherOpt::Asymmetric` handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_asymmetric(peer_encrypt_key_h: EncryptKeyHandle,
                                                    o_handle: *mut CipherOptHandle)
@@ -127,8 +129,9 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(peer_encrypt_key_h: EncryptKe
     })
 }
 
-/// Free CipherOpt handle
+/// Free `CipherOpt` handle
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub extern "C" fn cipher_opt_free(handle: CipherOptHandle) -> i32 {
     helper::catch_unwind_i32(|| {
         let _ = ffi_try!(unwrap!(object_cache()).remove_cipher_opt(handle));
@@ -138,6 +141,7 @@ pub extern "C" fn cipher_opt_free(handle: CipherOptHandle) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use core::utility;
     use ffi::app::App;
     use ffi::errors::FfiError;
@@ -145,10 +149,9 @@ mod tests {
     use ffi::low_level_api::object_cache::object_cache;
     use ffi::test_utils;
     use rust_sodium::crypto::box_;
-    use super::*;
 
     fn decrypt_and_check(app: &App, raw_data: &[u8], orig_plain_text: &[u8]) -> bool {
-        let plain_text_rx = match CipherOpt::decrypt(&app, &raw_data) {
+        let plain_text_rx = match CipherOpt::decrypt(app, raw_data) {
             Ok(pt) => pt,
             Err(_) => return false,
         };

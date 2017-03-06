@@ -2,11 +2,11 @@
 //
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences".to_string()).
+// licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
 
 use core::client::Client;
 use core::errors::CoreError;
@@ -28,7 +27,7 @@ use routing::{Data, DataIdentifier, ImmutableData, StructuredData, XorName};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
-/// DirectoryHelper provides helper functions to perform Operations on Directory
+/// `DirectoryHelper` provides helper functions to perform Operations on Directory
 pub struct DirectoryHelper {
     client: Arc<Mutex<Client>>,
 }
@@ -58,28 +57,28 @@ impl DirectoryHelper {
                directory_name);
 
         if parent_directory.iter()
-            .next()
-            .and_then(|dir| dir.find_sub_directory(&directory_name))
-            .is_some() {
+               .next()
+               .and_then(|dir| dir.find_sub_directory(&directory_name))
+               .is_some() {
             return Err(NfsError::DirectoryAlreadyExistsWithSameName);
         }
 
-        let directory = try!(DirectoryListing::new(directory_name,
-                                       tag_type,
-                                       user_metadata,
-                                       versioned,
-                                       access_level,
-                                       parent_directory.iter()
-                                           .next()
-                                           .map(|directory| directory.get_key().clone())));
+        let dir = DirectoryListing::new(directory_name,
+                                        tag_type,
+                                        user_metadata,
+                                        versioned,
+                                        access_level,
+                                        parent_directory.iter().next().map(|directory| {
+                                                                               *directory.get_key()
+                                                                           }))?;
 
-        let structured_data = try!(self.save_directory_listing(&directory));
-        try!(Client::put_recover(self.client.clone(), Data::Structured(structured_data), None));
+        let structured_data = self.save_directory_listing(&dir)?;
+        Client::put_recover(self.client.clone(), Data::Structured(structured_data), None)?;
         if let Some(mut parent_directory) = parent_directory {
-            parent_directory.upsert_sub_directory(directory.get_metadata().clone());
-            Ok((directory, try!(self.update(parent_directory))))
+            parent_directory.upsert_sub_directory(dir.get_metadata().clone());
+            Ok((dir, self.update(parent_directory)?))
         } else {
-            Ok((directory, None))
+            Ok((dir, None))
         }
     }
 
@@ -92,21 +91,20 @@ impl DirectoryHelper {
                   -> Result<Option<DirectoryListing>, NfsError> {
         trace!("Deleting directory with name: {}", directory_to_delete);
 
-        let dir_meta = try!(parent_directory.remove_sub_directory(directory_to_delete));
-        let sign_key = try!(unwrap!(self.client.lock()).get_secret_signing_key()).clone();
-        let sd = try!(self.get_structured_data(dir_meta.get_id(), dir_meta.get_type_tag()));
-        let mut delete_sd = try!(StructuredData::new(sd.get_type_tag(),
-                                                     *sd.name(),
-                                                     sd.get_version() + 1,
-                                                     vec![],
-                                                     sd.get_owners().clone())
-            .map_err(CoreError::from));
-        let _ = try!(delete_sd.add_signature(&(unwrap!(sd.get_owners().iter().nth(0),
-                                     "Logic error: SD doesn't have any owners")
-                                 .clone(),
-                             sign_key))
-            .map_err(CoreError::from));
-        try!(Client::delete_recover(self.client.clone(), Data::Structured(delete_sd), None));
+        let dir_meta = parent_directory.remove_sub_directory(directory_to_delete)?;
+        let sign_key = unwrap!(self.client.lock()).get_secret_signing_key()?.clone();
+        let sd = self.get_structured_data(dir_meta.get_id(), dir_meta.get_type_tag())?;
+        let mut delete_sd =
+            StructuredData::new(sd.get_type_tag(),
+                                *sd.name(),
+                                sd.get_version() + 1,
+                                vec![],
+                                sd.get_owners().clone()).map_err(CoreError::from)?;
+        let _ = delete_sd.add_signature(&(*unwrap!(sd.get_owners().iter().nth(0),
+                                                   "Logic error: SD doesn't have any owners"),
+                                          sign_key))
+            .map_err(CoreError::from)?;
+        Client::delete_recover(self.client.clone(), Data::Structured(delete_sd), None)?;
         parent_directory.get_mut_metadata().set_modified_time(::time::now_utc());
         self.update(parent_directory)
     }
@@ -119,11 +117,11 @@ impl DirectoryHelper {
                   -> Result<Option<DirectoryListing>, NfsError> {
         trace!("Updating directory given the directory listing.");
 
-        try!(self.update_directory_listing(directory));
+        self.update_directory_listing(directory)?;
         if let Some(parent_dir_key) = directory.get_metadata().get_parent_dir_key() {
-            let mut parent_directory = try!(self.get(&parent_dir_key));
+            let mut parent_directory = self.get(parent_dir_key)?;
             parent_directory.upsert_sub_directory(directory.get_metadata().clone());
-            try!(self.update_directory_listing(&parent_directory));
+            self.update_directory_listing(&parent_directory)?;
             Ok(Some(parent_directory))
         } else {
             Ok(None)
@@ -137,8 +135,8 @@ impl DirectoryHelper {
                         -> Result<Vec<XorName>, NfsError> {
         trace!("Getting all versions of a versioned directory.");
 
-        let structured_data = try!(self.get_structured_data(directory_id, type_tag));
-        Ok(try!(versioned::get_all_versions(self.client.clone(), &structured_data)))
+        let structured_data = self.get_structured_data(directory_id, type_tag)?;
+        Ok(versioned::get_all_versions(self.client.clone(), &structured_data)?)
     }
 
     /// Return the DirectoryListing for the specified version
@@ -149,14 +147,14 @@ impl DirectoryHelper {
                           -> Result<DirectoryListing, NfsError> {
         trace!("Getting a version of a versioned directory.");
 
-        let immutable_data = try!(self.get_immutable_data(version));
+        let immutable_data = self.get_immutable_data(version)?;
         match *access_level {
             AccessLevel::Private => {
                 DirectoryListing::decrypt(self.client.clone(),
                                           directory_id,
                                           immutable_data.value().clone())
             }
-            AccessLevel::Public => Ok(try!(deserialise(immutable_data.value()))),
+            AccessLevel::Public => Ok(deserialise(immutable_data.value())?),
         }
     }
 
@@ -170,9 +168,10 @@ impl DirectoryHelper {
         if versioned {
             trace!("Getting the last version of a versioned directory listing.");
 
-            let versions = try!(self.get_versions(directory_id, type_tag));
-            let latest_version = try!(versions.last()
-                .ok_or(NfsError::from("Programming Error - Please report this as a Bug.")));
+            let versions = self.get_versions(directory_id, type_tag)?;
+            let latest_version =
+                versions.last()
+                    .ok_or_else(|| NfsError::from("Programming Error - Please report this bug."))?;
             self.get_by_version(directory_id, access_level, *latest_version)
         } else {
             trace!("Getting an unversioned directory listing.");
@@ -183,9 +182,8 @@ impl DirectoryHelper {
 
             let encryption_keys = match *access_level {
                 AccessLevel::Private => {
-                    private_key = *try!(unwrap!(self.client.lock()).get_public_encryption_key());
-                    secret_key = try!(unwrap!(self.client.lock()).get_secret_encryption_key())
-                        .clone();
+                    private_key = *unwrap!(self.client.lock()).get_public_encryption_key()?;
+                    secret_key = unwrap!(self.client.lock()).get_secret_encryption_key()?.clone();
                     nonce = DirectoryListing::generate_nonce(directory_id);
 
                     Some((&private_key, &secret_key, &nonce))
@@ -193,10 +191,10 @@ impl DirectoryHelper {
                 AccessLevel::Public => None,
             };
 
-            let structured_data = try!(self.get_structured_data(directory_id, type_tag));
+            let structured_data = self.get_structured_data(directory_id, type_tag)?;
             let serialised_directory_listing =
-                try!(unversioned::get_data(self.client.clone(), &structured_data, encryption_keys));
-            Ok(try!(deserialise(&serialised_directory_listing)))
+                unversioned::get_data(self.client.clone(), &structured_data, encryption_keys)?;
+            Ok(deserialise(&serialised_directory_listing)?)
         }
     }
 
@@ -204,9 +202,7 @@ impl DirectoryHelper {
     pub fn get_user_root_directory_listing(&self) -> Result<DirectoryListing, NfsError> {
         trace!("Getting the user root directory listing.");
 
-        let root_directory_id = unwrap!(self.client.lock())
-            .get_user_root_directory_id()
-            .cloned();
+        let root_directory_id = unwrap!(self.client.lock()).get_user_root_directory_id().cloned();
         match root_directory_id {
             Some(id) => {
                 self.get(&DirectoryKey::new(id,
@@ -217,13 +213,12 @@ impl DirectoryHelper {
             None => {
                 debug!("Root directory does not exist - creating one.");
 
-                let (created_directory, _) =
-                    try!(self.create(::nfs::ROOT_DIRECTORY_NAME.to_string(),
-                                     ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                     Vec::new(),
-                                     false,
-                                     AccessLevel::Private,
-                                     None));
+                let (created_directory, _) = self.create(::nfs::ROOT_DIRECTORY_NAME.to_string(),
+                                                         ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                                         Vec::new(),
+                                                         false,
+                                                         AccessLevel::Private,
+                                                         None)?;
                 try!(unwrap!(self.client.lock())
                     .set_user_root_directory_id(created_directory.get_key().get_id().clone()));
                 Ok(created_directory)
@@ -240,26 +235,25 @@ impl DirectoryHelper {
                 name: {}.",
                directory_name);
 
-        let config_dir_id = unwrap!(self.client.lock())
-            .get_configuration_root_directory_id()
-            .cloned();
+        let config_dir_id =
+            unwrap!(self.client.lock()).get_configuration_root_directory_id().cloned();
         let mut config_directory_listing = match config_dir_id {
             Some(id) => {
-                try!(self.get(&DirectoryKey::new(id,
-                                                 ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                 false,
-                                                 AccessLevel::Private)))
+                self.get(&DirectoryKey::new(id,
+                                            ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                            false,
+                                            AccessLevel::Private))?
             }
             None => {
                 debug!("Configuartion Root directory does not exist - creating one.");
 
                 let (created_directory, _) =
-                    try!(self.create(::nfs::CONFIGURATION_DIRECTORY_NAME.to_string(),
-                                     ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                     Vec::new(),
-                                     false,
-                                     AccessLevel::Private,
-                                     None));
+                    self.create(::nfs::CONFIGURATION_DIRECTORY_NAME.to_string(),
+                                ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                Vec::new(),
+                                false,
+                                AccessLevel::Private,
+                                None)?;
                 try!(unwrap!(self.client.lock())
                     .set_configuration_root_directory_id(created_directory.get_key()
                         .get_id()
@@ -272,18 +266,18 @@ impl DirectoryHelper {
             .position(|metadata| *metadata.get_name() == directory_name) {
             Some(index) => {
                 let directory_key = config_directory_listing.get_sub_directories()[index].get_key();
-                Ok(try!(self.get(&directory_key)))
+                Ok(self.get(directory_key)?)
             }
             None => {
                 debug!("Give configuration directory does not exist (inside the root \
                         configuration dir) - creating one.");
 
-                let (directory, _) = try!(self.create(directory_name,
-                                                      ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                      Vec::new(),
-                                                      false,
-                                                      AccessLevel::Private,
-                                                      Some(&mut config_directory_listing)));
+                let (directory, _) = self.create(directory_name,
+                            ::nfs::UNVERSIONED_DIRECTORY_LISTING_TAG,
+                            Vec::new(),
+                            false,
+                            AccessLevel::Private,
+                            Some(&mut config_directory_listing))?;
                 Ok(directory)
             }
         }
@@ -294,8 +288,8 @@ impl DirectoryHelper {
     fn save_directory_listing(&self,
                               directory: &DirectoryListing)
                               -> Result<StructuredData, NfsError> {
-        let owner_key = *try!(unwrap!(self.client.lock()).get_public_signing_key());
-        let signing_key = try!(unwrap!(self.client.lock()).get_secret_signing_key()).clone();
+        let owner_key = *unwrap!(self.client.lock()).get_public_signing_key()?;
+        let signing_key = unwrap!(self.client.lock()).get_secret_signing_key()?.clone();
 
         let access_level = directory.get_key().get_access_level();
         let versioned = directory.get_key().is_versioned();
@@ -307,23 +301,23 @@ impl DirectoryHelper {
             trace!("Converting directory listing to a versioned StructuredData.");
 
             let serialised_data = match *access_level {
-                AccessLevel::Private => try!(directory.encrypt(self.client.clone())),
-                AccessLevel::Public => try!(serialise(&directory)),
+                AccessLevel::Private => directory.encrypt(self.client.clone())?,
+                AccessLevel::Public => serialise(&directory)?,
             };
-            let version = try!(self.save_as_immutable_data(serialised_data));
+            let version = self.save_as_immutable_data(serialised_data)?;
             versioned::create(self.client.clone(),
                               version,
                               directory.get_key().get_type_tag(),
-                              directory.get_key().get_id().clone(),
+                              *directory.get_key().get_id(),
                               0,
                               owners)
         } else {
             trace!("Converting directory listing to an unversioned StructuredData.");
 
-            let private_key = *try!(unwrap!(self.client.lock()).get_public_encryption_key());
-            let secret_key = try!(unwrap!(self.client.lock()).get_secret_encryption_key()).clone();
+            let private_key = *unwrap!(self.client.lock()).get_public_encryption_key()?;
+            let secret_key = unwrap!(self.client.lock()).get_secret_encryption_key()?.clone();
             let nonce = DirectoryListing::generate_nonce(directory.get_key().get_id());
-            let serialised_data = try!(serialise(&directory));
+            let serialised_data = serialise(&directory)?;
 
             let encryption_keys = match *access_level {
                 AccessLevel::Private => Some((&private_key, &secret_key, &nonce)),
@@ -331,23 +325,24 @@ impl DirectoryHelper {
             };
             unversioned::create(self.client.clone(),
                                 directory.get_key().get_type_tag(),
-                                directory.get_key().get_id().clone(),
+                                *directory.get_key().get_id(),
                                 0,
                                 serialised_data,
                                 owners,
                                 encryption_keys)
         };
-        let mut sd = try!(sd);
-        let _ = try!(sd.add_signature(&(owner_key, signing_key)).map_err(CoreError::from));
+        let mut sd = sd?;
+        let _ = sd.add_signature(&(owner_key, signing_key)).map_err(CoreError::from)?;
         Ok(sd)
     }
 
     fn update_directory_listing(&self, directory: &DirectoryListing) -> Result<(), NfsError> {
-        let structured_data = try!(self.get_structured_data(directory.get_key().get_id(),
-                                                            directory.get_key().get_type_tag()));
+        let structured_data =
+            self.get_structured_data(directory.get_key().get_id(),
+                                     directory.get_key().get_type_tag())?;
 
-        let signing_key = try!(unwrap!(self.client.lock()).get_secret_signing_key()).clone();
-        let owner_key = *try!(unwrap!(self.client.lock()).get_public_signing_key());
+        let signing_key = unwrap!(self.client.lock()).get_secret_signing_key()?.clone();
+        let owner_key = *unwrap!(self.client.lock()).get_public_signing_key()?;
         let access_level = directory.get_key().get_access_level();
         let versioned = directory.get_key().is_versioned();
 
@@ -356,46 +351,45 @@ impl DirectoryHelper {
                     StructuredData).");
 
             let serialised_data = match *access_level {
-                AccessLevel::Private => try!(directory.encrypt(self.client.clone())),
-                AccessLevel::Public => try!(serialise(&directory)),
+                AccessLevel::Private => directory.encrypt(self.client.clone())?,
+                AccessLevel::Public => serialise(&directory)?,
             };
-            let version = try!(self.save_as_immutable_data(serialised_data));
-            try!(versioned::append_version(self.client.clone(),
-                                           structured_data,
-                                           version,
-                                           &signing_key,
-                                           true))
+            let version = self.save_as_immutable_data(serialised_data)?;
+            versioned::append_version(self.client.clone(),
+                                      structured_data,
+                                      version,
+                                      &signing_key,
+                                      true)?
         } else {
             trace!("Updating directory listing with a new one (will convert DL to an unversioned \
                     StructuredData).");
 
-            let private_key = *try!(unwrap!(self.client.lock()).get_public_encryption_key());
-            let secret_key = try!(unwrap!(self.client.lock()).get_secret_encryption_key()).clone();
+            let private_key = *unwrap!(self.client.lock()).get_public_encryption_key()?;
+            let secret_key = unwrap!(self.client.lock()).get_secret_encryption_key()?.clone();
             let nonce = DirectoryListing::generate_nonce(directory.get_key().get_id());
-            let serialised_data = try!(serialise(&directory));
+            let serialised_data = serialise(&directory)?;
 
             let encryption_keys = match *access_level {
                 AccessLevel::Private => Some((&private_key, &secret_key, &nonce)),
                 AccessLevel::Public => None,
             };
             let mut owners = BTreeSet::new();
-            owners.insert(owner_key.clone());
-            try!(unversioned::create(self.client.clone(),
-                                     directory.get_key().get_type_tag(),
-                                     directory.get_key().get_id().clone(),
-                                     structured_data.get_version() + 1,
-                                     serialised_data,
-                                     owners,
-                                     encryption_keys))
+            owners.insert(owner_key);
+            unversioned::create(self.client.clone(),
+                                directory.get_key().get_type_tag(),
+                                *directory.get_key().get_id(),
+                                structured_data.get_version() + 1,
+                                serialised_data,
+                                owners,
+                                encryption_keys)?
         };
 
-        let _ = try!(updated_structured_data.add_signature(&(owner_key, signing_key))
-            .map_err(CoreError::from));
+        let _ = updated_structured_data.add_signature(&(owner_key, signing_key))
+            .map_err(CoreError::from)?;
 
         debug!("Posting updated structured data to the network ...");
-        try!(try!(unwrap!(self.client.lock())
-                .post(Data::Structured(updated_structured_data), None))
-            .get());
+        unwrap!(self.client.lock()).post(Data::Structured(updated_structured_data), None)?
+            .get()?;
         Ok(())
     }
 
@@ -404,7 +398,7 @@ impl DirectoryHelper {
         let immutable_data = ImmutableData::new(data);
         let name = *immutable_data.name();
         debug!("Posting PUT request to save immutable data to the network ...");
-        try!(Client::put_recover(self.client.clone(), Data::Immutable(immutable_data), None));
+        Client::put_recover(self.client.clone(), Data::Immutable(immutable_data), None)?;
         Ok(name)
     }
 
@@ -412,8 +406,8 @@ impl DirectoryHelper {
     fn get_structured_data(&self, id: &XorName, type_tag: u64) -> Result<StructuredData, NfsError> {
         let request = DataIdentifier::Structured(*id, type_tag);
         debug!("Getting structured data from the network ...");
-        let response_getter = try!(unwrap!(self.client.lock()).get(request, None));
-        match try!(response_getter.get()) {
+        let response_getter = unwrap!(self.client.lock()).get(request, None)?;
+        match response_getter.get()? {
             Data::Structured(structured_data) => Ok(structured_data),
             _ => Err(NfsError::from(CoreError::ReceivedUnexpectedData)),
         }
@@ -423,8 +417,8 @@ impl DirectoryHelper {
     fn get_immutable_data(&self, id: XorName) -> Result<ImmutableData, NfsError> {
         let request = DataIdentifier::Immutable(id);
         debug!("Getting immutable data from the network ...");
-        let response_getter = try!(unwrap!(self.client.lock()).get(request, None));
-        match try!(response_getter.get()) {
+        let response_getter = unwrap!(self.client.lock()).get(request, None)?;
+        match response_getter.get()? {
             Data::Immutable(immutable_data) => Ok(immutable_data),
             _ => Err(NfsError::from(CoreError::ReceivedUnexpectedData)),
         }
@@ -433,10 +427,10 @@ impl DirectoryHelper {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use core::utility::test_utils;
     use nfs::AccessLevel;
     use std::sync::{Arc, Mutex};
-    use super::*;
 
     #[test]
     fn create_dir_listing() {
@@ -472,12 +466,12 @@ mod test {
                                       AccessLevel::Private,
                                       Some(&mut child_directory)));
         assert!(dir_helper.create("Grand Child".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                    Vec::new(),
-                    true,
-                    AccessLevel::Private,
-                    Some(&mut child_directory))
-            .is_err());
+                                  ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                                  Vec::new(),
+                                  true,
+                                  AccessLevel::Private,
+                                  Some(&mut child_directory))
+                    .is_err());
         assert!(grand_parent.is_some());
         let grand_parent = unwrap!(grand_parent, "Grand Parent Should be updated");
         assert_eq!(*grand_parent.get_metadata().get_name(),
@@ -494,11 +488,11 @@ mod test {
             let client = Arc::new(Mutex::new(test_client));
             let dir_helper = DirectoryHelper::new(client.clone());
             let (directory, _) = unwrap!(dir_helper.create("PublicDirectory".to_string(),
-                        ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                        vec![2u8, 10],
-                        true,
-                        AccessLevel::Public,
-                        None));
+                                                           ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                                                           vec![2u8, 10],
+                                                           true,
+                                                           AccessLevel::Public,
+                                                           None));
             public_directory = directory;
         }
         {
@@ -578,8 +572,7 @@ mod test {
                     None));
 
         let mut versions = unwrap!(dir_helper.get_versions(dir_listing.get_key().get_id(),
-                                                           dir_listing.get_key()
-                                                               .get_type_tag()));
+                                                           dir_listing.get_key().get_type_tag()));
         assert_eq!(versions.len(), 1);
 
         dir_listing.get_mut_metadata().set_name("NewName".to_string());
@@ -647,8 +640,7 @@ mod test {
                    *directory.get_metadata().get_id());
 
         let delete_result = unwrap!(dir_helper.delete(&mut directory,
-                                                      child_directory.get_metadata()
-                                                          .get_name()));
+                                                      child_directory.get_metadata().get_name()));
         assert!(delete_result.is_none());
     }
 }
