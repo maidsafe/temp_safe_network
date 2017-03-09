@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -33,11 +33,11 @@ use std::collections::{HashMap, HashSet};
 pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
     let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::identifier).collect();
     let mut data_count = HashMap::new();
-    nodes.iter()
-        .flat_map(TestNode::get_stored_names)
-        .foreach(|data_idv| if deleted_data_ids.contains(&data_idv.0) {
-            *data_count.entry(data_idv).or_insert(0) += 1;
-        });
+    nodes.iter().flat_map(TestNode::get_stored_names).foreach(|data_idv| if
+        deleted_data_ids.contains(&data_idv.0) {
+                                                                  *data_count.entry(data_idv)
+                                                                       .or_insert(0) += 1;
+                                                              });
     for (data_id, count) in data_count {
         assert!(count < 5,
                 "Found deleted data: {:?}. count: {}",
@@ -67,9 +67,10 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             .into_iter()
             .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
-        let mut expected_data_holders = nodes.iter()
-            .map(TestNode::name)
-            .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
+        let mut expected_data_holders =
+            nodes.iter().map(TestNode::name).sorted_by(|left, right| {
+                                                           data_id.name().cmp_distance(left, right)
+                                                       });
 
         expected_data_holders.truncate(GROUP_SIZE);
 

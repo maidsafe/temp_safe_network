@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -69,8 +69,9 @@ fn put_oversized_data() {
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    match client.put_and_verify(Data::Immutable(
-            test_utils::random_immutable_data(1100 * 1024, &mut rng)), &mut nodes) {
+    match client.put_and_verify(Data::Immutable(test_utils::random_immutable_data(1100 * 1024,
+                                                                                  &mut rng)),
+                                &mut nodes) {
         Err(Some(error)) => assert_eq!(error, MutationError::DataTooLarge),
         unexpected => panic!("Got unexpected response: {:?}", unexpected),
     }
@@ -270,8 +271,10 @@ fn maid_manager_account_adding_with_churn() {
 
     for i in 0..test_utils::iterations() {
         for data in (0..4).map(|_| {
-            Data::Structured(test_utils::random_structured_data(100000, &full_id, &mut rng))
-        }) {
+                                   Data::Structured(test_utils::random_structured_data(100000,
+                                                                                       &full_id,
+                                                                                       &mut rng))
+                               }) {
             client.put(data.clone());
             put_count += 1;
         }
@@ -294,8 +297,10 @@ fn maid_manager_account_adding_with_churn() {
             node.clear_state();
         }
         trace!("Processed {} events.", event_count);
-        let mut sorted_maid_managers = nodes.iter()
-            .sorted_by(|left, right| client.name().cmp_distance(&left.name(), &right.name()));
+        let mut sorted_maid_managers =
+            nodes.iter().sorted_by(|left, right| {
+                                       client.name().cmp_distance(&left.name(), &right.name())
+                                   });
         sorted_maid_managers.truncate(GROUP_SIZE);
         let node_count_stats: Vec<(XorName, Option<u64>)> = sorted_maid_managers.into_iter()
             .map(|x| (x.name(), x.get_maid_manager_put_count(client.name())))
@@ -360,8 +365,10 @@ fn maid_manager_account_decrease_with_churn() {
             node.clear_state();
         }
         trace!("Processed {} events.", event_count);
-        let mut sorted_maid_managers = nodes.iter()
-            .sorted_by(|left, right| client.name().cmp_distance(&left.name(), &right.name()));
+        let mut sorted_maid_managers =
+            nodes.iter().sorted_by(|left, right| {
+                                       client.name().cmp_distance(&left.name(), &right.name())
+                                   });
         sorted_maid_managers.truncate(GROUP_SIZE);
         let node_count_stats: Vec<(XorName, Option<u64>)> = sorted_maid_managers.into_iter()
             .map(|x| (x.name(), x.get_maid_manager_put_count(client.name())))

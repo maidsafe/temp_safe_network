@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -153,8 +153,7 @@ impl TestClient {
         let dst = Authority::NaeManager(*request.name());
         let request_message_id = MessageId::new();
         self.flush();
-        unwrap!(self.routing_client
-            .send_get_request(dst.clone(), request, request_message_id));
+        unwrap!(self.routing_client.send_get_request(dst.clone(), request, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the get_response",
                events_count);
@@ -191,8 +190,7 @@ impl TestClient {
                          -> Result<DataIdentifier, Option<MutationError>> {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client
-            .send_post_request(dst.clone(), data, request_message_id));
+        unwrap!(self.routing_client.send_post_request(dst.clone(), data, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the post_response",
                events_count);
@@ -229,8 +227,7 @@ impl TestClient {
                            -> Result<DataIdentifier, Option<MutationError>> {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client
-            .send_delete_request(dst.clone(), data, request_message_id));
+        unwrap!(self.routing_client.send_delete_request(dst.clone(), data, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the delete_response",
                events_count);
@@ -267,8 +264,7 @@ impl TestClient {
         let request_message_id = MessageId::new();
         self.flush();
         let dst = Authority::ClientManager(*self.public_id.name());
-        unwrap!(self.routing_client
-            .send_get_account_info_request(dst, request_message_id));
+        unwrap!(self.routing_client.send_get_account_info_request(dst, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the get_account_info_response",
                events_count);

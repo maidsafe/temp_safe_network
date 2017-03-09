@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
 
 use GROUP_SIZE;
 use error::InternalError;
@@ -162,7 +161,7 @@ impl MaidManager {
                                   MessageId::zero());
                 // Send failure response back to client
                 let error = match (data_id,
-                                   serialisation::deserialise(external_error_indicator)?) {
+                       serialisation::deserialise(external_error_indicator)?) {
                     (DataIdentifier::Structured(_, TYPE_TAG_SESSION_PACKET),
                      MutationError::DataExists) => {
                         // We wouldn't have forwarded two `Put` requests for the same account, so
@@ -171,8 +170,10 @@ impl MaidManager {
                         let refresh = Refresh::Delete(client_name);
                         if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
                             trace!("MM sending delete refresh for account {}", src.name());
-                            let _ = routing_node
-                                .send_refresh_request(dst, dst, serialised_refresh, msg_id);
+                            let _ = routing_node.send_refresh_request(dst,
+                                                                      dst,
+                                                                      serialised_refresh,
+                                                                      msg_id);
                         }
                         MutationError::AccountExists
                     }
@@ -199,8 +200,10 @@ impl MaidManager {
                                                                msg_id);
         } else {
             let external_error_indicator = serialisation::serialise(&GetError::NoSuchAccount)?;
-            let _ = routing_node
-                .send_get_account_info_failure(dst, src, external_error_indicator, msg_id);
+            let _ = routing_node.send_get_account_info_failure(dst,
+                                                               src,
+                                                               external_error_indicator,
+                                                               msg_id);
         }
         Ok(())
     }
@@ -242,7 +245,11 @@ impl MaidManager {
                              routing_table: &RoutingTable<XorName>) {
         // Remove all accounts which we are no longer responsible for.
         let not_close = |name: &&XorName| !routing_table.is_closest(*name, GROUP_SIZE);
-        let accounts_to_delete = self.accounts.keys().filter(not_close).cloned().collect_vec();
+        let accounts_to_delete = self.accounts
+            .keys()
+            .filter(not_close)
+            .cloned()
+            .collect_vec();
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete = self.request_cache
             .iter()
@@ -357,10 +364,10 @@ impl MaidManager {
             .get_mut(&client_name)
             .ok_or(MutationError::NoSuchAccount)
             .and_then(|account| {
-                let result = account.add_entry();
-                trace!("Client account {:?}: {:?}", client_name, account);
-                result
-            });
+                          let result = account.add_entry();
+                          trace!("Client account {:?}: {:?}", client_name, account);
+                          result
+                      });
         if let Err(error) = result {
             trace!("MM responds put_failure of data {}, due to error {:?}",
                    data.name(),

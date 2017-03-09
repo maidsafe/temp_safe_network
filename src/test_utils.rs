@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -59,7 +59,7 @@ pub fn random_structured_data_with_size<R: Rng>(type_tag: u64,
                                      0,
                                      rng.gen_iter().take(size).collect(),
                                      owner)
-        .expect("Cannot create structured data for test");
+            .expect("Cannot create structured data for test");
     let _ = sd.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
     sd
 }
@@ -81,7 +81,7 @@ pub fn random_pub_appendable_data_with_size<R: Rng>(full_id: &FullId,
                                         owner,
                                         BTreeSet::new(),
                                         Filter::black_list(None))
-        .expect("Cannot create public appendable data for test");
+            .expect("Cannot create public appendable data for test");
 
     for _ in 0..size / 128 {
         let pointer = DataIdentifier::Structured(rng.gen(), 12345);
@@ -106,7 +106,7 @@ pub fn pub_appendable_data_version_up<R: Rng>(full_id: &FullId,
                                             owner,
                                             BTreeSet::new(),
                                             Filter::black_list(None))
-        .expect("Cannot create public appendable data for test");
+            .expect("Cannot create public appendable data for test");
     for data in old_ad.get_data() {
         new_ad.append(data.clone());
     }
@@ -140,7 +140,7 @@ pub fn random_priv_appendable_data_with_size<R: Rng>(full_id: &FullId,
                                          BTreeSet::new(),
                                          Filter::black_list(None),
                                          encrypt_key)
-        .expect("Cannot create private appendable data for test");
+            .expect("Cannot create private appendable data for test");
 
     for _ in 0..size / 128 {
         let pointer = DataIdentifier::Structured(rng.gen(), 12345);

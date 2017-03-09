@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -88,12 +88,12 @@ impl<Key, Value> ChunkStore<Key, Value>
     pub fn new(root: PathBuf, max_space: u64) -> Result<ChunkStore<Key, Value>, Error> {
         let lock_file = Self::lock_and_clear_dir(&root)?;
         Ok(ChunkStore {
-            rootdir: root,
-            lock_file: Some(lock_file),
-            max_space: max_space,
-            used_space: 0,
-            phantom: PhantomData,
-        })
+               rootdir: root,
+               lock_file: Some(lock_file),
+               max_space: max_space,
+               used_space: 0,
+               phantom: PhantomData,
+           })
     }
 
     /// Stores a new data chunk under `key`.
@@ -227,7 +227,10 @@ impl<Key, Value> ChunkStore<Key, Value>
 
 impl<Key, Value> Drop for ChunkStore<Key, Value> {
     fn drop(&mut self) {
-        let _ = self.lock_file.take().iter().map(File::unlock);
+        let _ = self.lock_file
+            .take()
+            .iter()
+            .map(File::unlock);
         let _ = fs::remove_dir_all(&self.rootdir);
     }
 }

@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
 
 use GROUP_SIZE;
 use accumulator::Accumulator;
@@ -127,7 +126,10 @@ impl Cache {
 
     fn register_data_with_holder(&mut self, src: &XorName, data_idv: &IdAndVersion) -> bool {
         if self.data_holders.values().any(|data_idvs| data_idvs.contains(data_idv)) {
-            let _ = self.data_holders.entry(*src).or_insert_with(HashSet::new).insert(*data_idv);
+            let _ = self.data_holders
+                .entry(*src)
+                .or_insert_with(HashSet::new)
+                .insert(*data_idv);
             return true;
         }
         false
@@ -135,7 +137,10 @@ impl Cache {
 
     fn add_records(&mut self, data_idv: IdAndVersion, holders: HashSet<XorName>) {
         for holder in holders {
-            let _ = self.data_holders.entry(holder).or_insert_with(HashSet::new).insert(data_idv);
+            let _ = self.data_holders
+                .entry(holder)
+                .or_insert_with(HashSet::new)
+                .insert(data_idv);
         }
     }
 
@@ -209,9 +214,9 @@ impl Cache {
         let lost_gets = self.ongoing_gets
             .iter()
             .filter(|&(holder, &(_, (ref data_id, _)))| {
-                routing_table.other_closest_names(data_id.name(), GROUP_SIZE)
-                    .map_or(true, |group| !group.contains(&holder))
-            })
+                        routing_table.other_closest_names(data_id.name(), GROUP_SIZE)
+                            .map_or(true, |group| !group.contains(&holder))
+                    })
             .map(|(holder, _)| *holder)
             .collect_vec();
         if !lost_gets.is_empty() {
@@ -235,8 +240,8 @@ impl Cache {
         let expired_gets = self.ongoing_gets
             .iter()
             .filter(|&(_, &(ref timestamp, _))| {
-                timestamp.elapsed().as_secs() > GET_FROM_DATA_HOLDER_TIMEOUT_SECS
-            })
+                        timestamp.elapsed().as_secs() > GET_FROM_DATA_HOLDER_TIMEOUT_SECS
+                    })
             .map(|(holder, _)| *holder)
             .collect_vec();
         for holder in expired_gets {
@@ -254,8 +259,10 @@ impl Cache {
         let mut candidates = Vec::new();
         for idle_holder in idle_holders {
             if let Some(data_idvs) = self.data_holders.get_mut(&idle_holder) {
-                if let Some(&data_idv) = data_idvs.iter()
-                    .find(|&&(ref data_id, _)| !outstanding_data_ids.contains(data_id)) {
+                if let Some(&data_idv) =
+                    data_idvs.iter().find(|&&(ref data_id, _)| {
+                                              !outstanding_data_ids.contains(data_id)
+                                          }) {
                     let _ = data_idvs.remove(&data_idv);
                     let (data_id, _) = data_idv;
                     let _ = outstanding_data_ids.insert(data_id);
@@ -272,7 +279,10 @@ impl Cache {
         }
         self.logging_time = Instant::now();
         let new_og_count = self.ongoing_gets.len();
-        let new_dhi_count = self.data_holders.values().map(HashSet::len).fold(0, Add::add);
+        let new_dhi_count = self.data_holders
+            .values()
+            .map(HashSet::len)
+            .fold(0, Add::add);
         if new_og_count != self.ongoing_gets_count ||
            new_dhi_count != self.data_holder_items_count {
             self.ongoing_gets_count = new_og_count;
@@ -289,11 +299,11 @@ impl Cache {
         let expired_writes = self.pending_writes
             .iter_mut()
             .flat_map(|(_, writes)| {
-                writes.iter()
-                    .position(|write| write.timestamp.elapsed() > timeout)
-                    .map_or_else(Vec::new, |index| writes.split_off(index))
-                    .into_iter()
-            })
+                          writes.iter()
+                              .position(|write| write.timestamp.elapsed() > timeout)
+                              .map_or_else(Vec::new, |index| writes.split_off(index))
+                              .into_iter()
+                      })
             .collect_vec();
         let expired_keys = self.pending_writes
             .iter_mut()
@@ -388,17 +398,17 @@ impl Debug for DataManager {
 impl DataManager {
     pub fn new(chunk_store_root: PathBuf, capacity: u64) -> Result<DataManager, InternalError> {
         Ok(DataManager {
-            chunk_store: ChunkStore::new(chunk_store_root, capacity)?,
-            refresh_accumulator:
-                Accumulator::with_duration(ACCUMULATOR_QUORUM,
-                                           Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
-            cache: Default::default(),
-            immutable_data_count: 0,
-            structured_data_count: 0,
-            appendable_data_count: 0,
-            client_get_requests: 0,
-            logging_time: Instant::now(),
-        })
+               chunk_store: ChunkStore::new(chunk_store_root, capacity)?,
+               refresh_accumulator:
+                   Accumulator::with_duration(ACCUMULATOR_QUORUM,
+                                              Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
+               cache: Default::default(),
+               immutable_data_count: 0,
+               structured_data_count: 0,
+               appendable_data_count: 0,
+               client_get_requests: 0,
+               logging_time: Instant::now(),
+           })
     }
 
     pub fn handle_get(&mut self,
@@ -556,8 +566,11 @@ impl DataManager {
                        message_id,
                        error);
                 let post_error = serialisation::serialise(&error)?;
-                return Ok(routing_node
-                    .send_post_failure(dst, src, data_id, post_error, message_id)?);
+                return Ok(routing_node.send_post_failure(dst,
+                                                         src,
+                                                         data_id,
+                                                         post_error,
+                                                         message_id)?);
             }
         };
 
@@ -648,8 +661,11 @@ impl DataManager {
                        message_id,
                        error);
                 let append_error = serialisation::serialise(&MutationError::NoSuchData)?;
-                return Ok(routing_node
-                    .send_append_failure(dst, src, data_id, append_error, message_id)?);
+                return Ok(routing_node.send_append_failure(dst,
+                                                           src,
+                                                           data_id,
+                                                           append_error,
+                                                           message_id)?);
             }
         };
 
@@ -659,8 +675,11 @@ impl DataManager {
                 let append_error = serialisation::serialise(&error)?;
                 trace!("DM sending append_failure for data {:?}, data exceeds size limit.",
                        data_id);
-                return Ok(routing_node
-                    .send_append_failure(dst, src, data_id, append_error, message_id)?);
+                return Ok(routing_node.send_append_failure(dst,
+                                                           src,
+                                                           data_id,
+                                                           append_error,
+                                                           message_id)?);
             }
             self.update_pending_writes(routing_node,
                                        data,
@@ -911,19 +930,19 @@ impl DataManager {
                     -> Result<(), InternalError> {
         let write_error = serialisation::serialise(&error)?;
         Ok(match mutate_type {
-            PendingMutationType::Append => {
-                routing_node.send_append_failure(dst, src, data_id, write_error, message_id)
-            }
-            PendingMutationType::Post => {
-                routing_node.send_post_failure(dst, src, data_id, write_error, message_id)
-            }
-            PendingMutationType::Put => {
-                routing_node.send_put_failure(dst, src, data_id, write_error, message_id)
-            }
-            PendingMutationType::Delete => {
-                routing_node.send_delete_failure(dst, src, data_id, write_error, message_id)
-            }
-        }?)
+               PendingMutationType::Append => {
+                   routing_node.send_append_failure(dst, src, data_id, write_error, message_id)
+               }
+               PendingMutationType::Post => {
+                   routing_node.send_post_failure(dst, src, data_id, write_error, message_id)
+               }
+               PendingMutationType::Put => {
+                   routing_node.send_put_failure(dst, src, data_id, write_error, message_id)
+               }
+               PendingMutationType::Delete => {
+                   routing_node.send_delete_failure(dst, src, data_id, write_error, message_id)
+               }
+           }?)
     }
 
     #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
@@ -990,10 +1009,13 @@ impl DataManager {
         if self.cache.prune_ongoing_gets(routing_table) {
             let _ = self.send_gets_for_needed_data(routing_node);
         }
-        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
-            .keys()
-            .into_iter()
-            .filter_map(|data_id| self.to_id_and_version(data_id)));
+        let data_idvs =
+            self.cache.chain_records_in_cache(self.chunk_store
+                                                  .keys()
+                                                  .into_iter()
+                                                  .filter_map(|data_id| {
+                                                                  self.to_id_and_version(data_id)
+                                                              }));
         let mut has_pruned_data = false;
         // Only retain data for which we're still in the close group.
         let mut data_list = Vec::new();
@@ -1047,11 +1069,12 @@ impl DataManager {
         }
 
 
-        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
-            .keys()
-            .into_iter()
-            .filter_map(|data_id| self.to_id_and_version(data_id))
-            .collect_vec());
+        let data_idvs = self.cache
+            .chain_records_in_cache(self.chunk_store
+                                        .keys()
+                                        .into_iter()
+                                        .filter_map(|data_id| self.to_id_and_version(data_id))
+                                        .collect_vec());
         let mut data_lists: HashMap<XorName, Vec<IdAndVersion>> = HashMap::new();
         for data_idv in data_idvs {
             match routing_table.other_closest_names(data_idv.0.name(), GROUP_SIZE) {
