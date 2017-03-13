@@ -54,7 +54,3 @@ impl Data {
         }
     }
 }
-
-/// Specification of a particular version of a data chunk. For immutable data,
-/// the `u64` is always 0; for mutable data, it specifies the version.
-pub type VersionedDataId = (DataId, u64);

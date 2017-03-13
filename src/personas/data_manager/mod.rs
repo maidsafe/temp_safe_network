@@ -18,9 +18,9 @@
 mod cache;
 mod data;
 
-use self::cache::{Cache, PendingMutation, PendingMutationType, PendingWrite, RefreshData,
-                  RefreshDataList};
-use self::data::{Data, DataId, VersionedDataId};
+use self::cache::{Cache, DataInfo, FragmentInfo};
+use self::cache::{PendingMutation, PendingMutationType, PendingWrite};
+use self::data::{Data, DataId};
 use GROUP_SIZE;
 use accumulator::Accumulator;
 use chunk_store::ChunkStore;
@@ -30,7 +30,7 @@ use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, Per
               RoutingTable, User, XorName};
 use routing::ClientError;
 use rust_sodium::crypto::sign;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::path::PathBuf;
@@ -57,7 +57,7 @@ macro_rules! log_status {
 pub struct DataManager {
     chunk_store: ChunkStore<DataId, Data>,
     /// Accumulates refresh messages and the peers we received them from.
-    refresh_accumulator: Accumulator<VersionedDataId, XorName>,
+    refresh_accumulator: Accumulator<FragmentInfo, XorName>,
     cache: Cache,
     immutable_data_count: u64,
     mutable_data_count: u64,
@@ -85,38 +85,53 @@ impl DataManager {
     pub fn handle_refresh(&mut self,
                           routing_node: &mut RoutingNode,
                           src: XorName,
-                          serialised_data_list: &[u8])
+                          serialised_refresh: &[u8])
                           -> Result<(), InternalError> {
-        let RefreshDataList(data_list) = serialisation::deserialise(serialised_data_list)?;
-        for vid in data_list {
-            if self.cache.register_data_with_holder(&src, &vid) {
+        let fragments: Vec<FragmentInfo> = serialisation::deserialise(serialised_refresh)?;
+        for fragment in fragments {
+            if self.cache.register_needed_fragment_with_holder(fragment.clone(), src) {
                 continue;
             }
 
-            if let Some(holders) = self.refresh_accumulator.add(vid, src).cloned() {
-                self.refresh_accumulator.delete(&vid);
+            if let Some(holders) = self.refresh_accumulator.add(fragment.clone(), src).cloned() {
+                self.refresh_accumulator.delete(&fragment);
 
-                let (data_id, version) = vid;
-                let data_needed = match data_id {
-                    DataId::Immutable(..) => !self.chunk_store.has(&data_id),
-                    DataId::Mutable(..) => {
-                        match self.chunk_store.get(&data_id) {
+                let needed = match fragment {
+                    FragmentInfo::ImmutableData(name) => {
+                        !self.chunk_store.has(&DataId::Immutable(name))
+                    }
+                    FragmentInfo::MutableDataShell { name, tag, version, .. } => {
+                        match self.chunk_store.get(&DataId::Mutable(name, tag)) {
                             Err(_) => true,
                             Ok(Data::Mutable(data)) => data.version() < version,
                             Ok(_) => unreachable!(),
                         }
                     }
+                    FragmentInfo::MutableDataEntry { name, tag, ref key, version, .. } => {
+                        if let Ok(Data::Mutable(data)) =
+                            self.chunk_store.get(&DataId::Mutable(name, tag)) {
+                            match data.get(key) {
+                                None => true,
+                                Some(value) if value.entry_version < version => true,
+                                Some(_) => false,
+                            }
+                        } else {
+                            true
+                        }
+                    }
                 };
 
-                if !data_needed {
+                if !needed {
                     continue;
                 }
 
-                self.cache.add_records(vid, holders);
+                for holder in holders {
+                    self.cache.insert_needed_fragment(fragment.clone(), holder);
+                }
             }
         }
 
-        self.send_gets_for_needed_data(routing_node)
+        self.request_needed_fragments(routing_node)
     }
 
     /// Handles an accumulated refresh message sent from the whole group.
@@ -124,7 +139,7 @@ impl DataManager {
                                 routing_node: &mut RoutingNode,
                                 serialised_refresh: &[u8])
                                 -> Result<(), InternalError> {
-        let RefreshData { versioned_data_id: (data_id, version), hash: refresh_hash } =
+        let DataInfo { data_id, version, hash: refresh_hash } =
             serialisation::deserialise(serialised_refresh)?;
         let mut success = false;
 
@@ -147,6 +162,8 @@ impl DataManager {
             }
 
             let mutation_type = mutation.mutation_type();
+            let fragments = mutation.fragment_infos();
+
             if self.handle_pending_mutation(routing_node, src, dst, mutation, message_id)? {
                 match mutation_type {
                     PendingMutationType::PutIData |
@@ -158,21 +175,26 @@ impl DataManager {
                 success = true;
             }
 
-            let data_list = vec![(data_id, version)];
             self.send_refresh(routing_node,
                               Authority::NaeManager(*data_id.name()),
-                              data_list)?;
+                              fragments)?;
         }
 
         if !success {
+            unimplemented!();
+
+            // TODO (adam):
+
+            /*
             if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
                 let vid = (data_id, version);
                 for node in &group {
                     let _ = self.cache.register_data_with_holder(node, &vid);
                 }
 
-                self.send_gets_for_needed_data(routing_node)?;
+                self.request_needed_fragments(routing_node)?;
             }
+            */
         }
 
         Ok(())
@@ -207,8 +229,8 @@ impl DataManager {
                                     data: ImmutableData,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        self.cache.handle_get_idata_success(src, data.name(), msg_id);
-        self.send_gets_for_needed_data(routing_node)?;
+        self.cache.remove_needed_fragment(&src, msg_id);
+        self.request_needed_fragments(routing_node)?;
 
         // If we're no longer in the close group, return.
         if !close_to_address(routing_node, data.name()) {
@@ -218,7 +240,6 @@ impl DataManager {
         let data = Data::Immutable(data);
         let data_id = data.id();
 
-        // TODO: Check that the data's hash actually agrees with an accumulated entry.
         if self.chunk_store.has(&data_id) {
             return Ok(()); // data is already there.
         }
@@ -237,11 +258,11 @@ impl DataManager {
                                     src: XorName,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        if !self.cache.handle_get_idata_failure(src, msg_id) {
+        if !self.cache.remove_needed_fragment(&src, msg_id) {
             return Err(InternalError::InvalidMessage);
         }
 
-        self.send_gets_for_needed_data(routing_node)
+        self.request_needed_fragments(routing_node)
     }
 
     pub fn handle_put_idata(&mut self,
@@ -539,21 +560,17 @@ impl DataManager {
                              routing_node: &mut RoutingNode,
                              node_name: &XorName,
                              routing_table: &RoutingTable<XorName>) {
-        self.cache.prune_data_holders(routing_table);
-        if self.cache.prune_ongoing_gets(routing_table) {
-            let _ = self.send_gets_for_needed_data(routing_node);
+        if self.cache.prune_needed_fragments(routing_table) {
+            let _ = self.request_needed_fragments(routing_node);
         }
 
-        let vids = self.cache.chain_records_in_cache(self.chunk_store
-            .keys()
-            .into_iter()
-            .filter_map(|data_id| self.to_versioned_data_id(data_id)));
-
+        let mut refresh = Vec::new();
         let mut has_pruned_data = false;
-        // Only retain data for which we're still in the close group.
-        let mut data_list = Vec::new();
 
-        for (data_id, version) in vids {
+        for fragment in self.our_fragments() {
+            let data_id = fragment.data_id();
+
+            // Only retain fragments for which we're still in the close group.
             match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
                 None => {
                     trace!("No longer a DM for {:?}", data_id);
@@ -570,14 +587,14 @@ impl DataManager {
                 }
                 Some(close_group) => {
                     if close_group.contains(&node_name) {
-                        data_list.push((data_id, version));
+                        refresh.push(fragment.clone());
                     }
                 }
             }
         }
 
-        if !data_list.is_empty() {
-            let _ = self.send_refresh(routing_node, Authority::ManagedNode(*node_name), data_list);
+        if !refresh.is_empty() {
+            let _ = self.send_refresh(routing_node, Authority::ManagedNode(*node_name), refresh);
         }
 
         if has_pruned_data {
@@ -597,20 +614,13 @@ impl DataManager {
             log_status!(self);
         }
 
-        self.cache.prune_data_holders(routing_table);
-
-        if self.cache.prune_ongoing_gets(routing_table) {
-            let _ = self.send_gets_for_needed_data(routing_node);
+        if self.cache.prune_needed_fragments(routing_table) {
+            let _ = self.request_needed_fragments(routing_node);
         }
 
-        let vids = self.cache.chain_records_in_cache(self.chunk_store
-            .keys()
-            .into_iter()
-            .filter_map(|data_id| self.to_versioned_data_id(data_id)));
-        let mut data_lists = HashMap::new();
-
-        for vid in vids {
-            match routing_table.other_closest_names(vid.0.name(), GROUP_SIZE) {
+        let mut refreshes = HashMap::new();
+        for fragment in self.our_fragments() {
+            match routing_table.other_closest_names(fragment.name(), GROUP_SIZE) {
                 None => {
                     error!("Moved out of close group of {:?} in a NodeLost event.",
                            node_name);
@@ -621,21 +631,23 @@ impl DataManager {
                     // replaced at all. Otherwise, if the group's last node is closer to the data
                     // than the lost node, the lost node was not in the group in the first place.
                     if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
-                        if vid.0.name().closer(node_name, outer_node) {
-                            data_lists.entry(*outer_node).or_insert_with(Vec::new).push(vid);
+                        if fragment.name().closer(node_name, outer_node) {
+                            refreshes.entry(*outer_node)
+                                .or_insert_with(Vec::new)
+                                .push(fragment.clone());
                         }
                     }
                 }
             }
         }
 
-        for (node_name, data_list) in data_lists {
-            let _ = self.send_refresh(routing_node, Authority::ManagedNode(node_name), data_list);
+        for (node_name, refresh) in refreshes {
+            let _ = self.send_refresh(routing_node, Authority::ManagedNode(node_name), refresh);
         }
     }
 
     pub fn check_timeouts(&mut self, routing_node: &mut RoutingNode) {
-        let _ = self.send_gets_for_needed_data(routing_node);
+        let _ = self.request_needed_fragments(routing_node);
     }
 
     fn read_mdata<F, R>(&mut self,
@@ -729,9 +741,9 @@ impl DataManager {
         }
 
         let data_name = *mutation.data_id().name();
-        if let Some(refresh_data) =
-            self.cache.insert_pending_write(mutation, src, dst, message_id, rejected) {
-            self.send_group_refresh(routing_node, data_name, refresh_data, message_id)?;
+        if let Some(refresh) = self.cache
+            .insert_pending_write(mutation, src, dst, message_id, rejected) {
+            self.send_group_refresh(routing_node, data_name, refresh, message_id)?;
         }
 
         Ok(())
@@ -834,23 +846,23 @@ impl DataManager {
     fn send_refresh(&self,
                     routing_node: &mut RoutingNode,
                     dst: Authority<XorName>,
-                    data_list: Vec<VersionedDataId>)
+                    refresh: Vec<FragmentInfo>)
                     -> Result<(), InternalError> {
         // FIXME - We need to handle >2MB chunks
         let src = Authority::ManagedNode(routing_node.name()?);
-        let serialised_list = serialisation::serialise(&RefreshDataList(data_list))?;
+        let serialised_refresh = serialisation::serialise(&refresh)?;
         trace!("DM sending refresh to {:?}.", dst);
-        routing_node.send_refresh_request(src, dst, serialised_list, MessageId::new())?;
+        routing_node.send_refresh_request(src, dst, serialised_refresh, MessageId::new())?;
         Ok(())
     }
 
     fn send_group_refresh(&self,
                           routing_node: &mut RoutingNode,
                           name: XorName,
-                          refresh_data: RefreshData,
+                          refresh: DataInfo,
                           msg_id: MessageId)
                           -> Result<(), InternalError> {
-        match serialisation::serialise(&refresh_data) {
+        match serialisation::serialise(&refresh) {
             Ok(serialised_data) => {
                 trace!("DM sending refresh data to group {:?}.", name);
                 routing_node.send_refresh_request(Authority::NaeManager(name),
@@ -866,25 +878,40 @@ impl DataManager {
         }
     }
 
-    fn send_gets_for_needed_data(&mut self,
-                                 routing_node: &mut RoutingNode)
-                                 -> Result<(), InternalError> {
+    fn request_needed_fragments(&mut self,
+                                routing_node: &mut RoutingNode)
+                                -> Result<(), InternalError> {
         let src = Authority::ManagedNode(routing_node.name()?);
-        let candidates = self.cache.needed_data();
+        let candidates = self.cache.unrequested_needed_fragments();
 
-        for (idle_holder, vid) in candidates {
-            if let Some(group) = routing_node.close_group(*vid.0.name(), GROUP_SIZE) {
-                if group.contains(&idle_holder) {
-                    let (data_id, _) = vid;
+        for (holder, fragment) in candidates {
+            if let Some(group) = routing_node.close_group(*fragment.name(), GROUP_SIZE) {
+                if group.contains(&holder) {
+                    let dst = Authority::ManagedNode(holder);
+                    let msg_id = MessageId::new();
 
-                    // TODO: figure out how to get mutable data too.
-                    if let DataId::Immutable(name) = data_id {
-                        let msg_id = MessageId::new();
-                        self.cache.insert_into_ongoing_gets(idle_holder, vid, msg_id);
+                    match fragment {
+                        FragmentInfo::ImmutableData(name) => {
+                            routing_node.send_get_idata_request(src, dst, name, msg_id)?;
+                        }
+                        FragmentInfo::MutableDataShell { name, tag, .. } => {
+                            /* TODO (adam): implement the GetMDataShell request
+                            routing_node.send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
+                            */
 
-                        let dst = Authority::ManagedNode(idle_holder);
-                        let _ = routing_node.send_get_idata_request(src, dst, name, msg_id);
+                            unimplemented!()
+                        }
+                        FragmentInfo::MutableDataEntry { name, tag, key, .. } => {
+                            routing_node.send_get_mdata_value_request(src,
+                                                                      dst,
+                                                                      name,
+                                                                      tag,
+                                                                      key,
+                                                                      msg_id)?;
+                        }
                     }
+
+                    self.cache.start_needed_fragment_request(&fragment, &holder, msg_id);
                 }
             }
         }
@@ -893,19 +920,41 @@ impl DataManager {
         Ok(())
     }
 
-    /// Returns the `VersionedDataId` for the given data identifier, or `None` if not stored.
-    fn to_versioned_data_id(&self, data_id: DataId) -> Option<VersionedDataId> {
-        match data_id {
-            DataId::Immutable(_) => Some((data_id, 0)),
-            DataId::Mutable(..) => {
-                if let Ok(Data::Mutable(data)) = self.chunk_store.get(&data_id) {
-                    Some((data_id, data.version()))
-                } else {
-                    error!("Failed to get {:?} from chunk store.", data_id);
-                    None
+    // Get all fragments for the data we have in the chunk store.
+    fn chunk_store_fragments(&self) -> HashSet<FragmentInfo> {
+        let mut result = HashSet::new();
+
+        for data_id in self.chunk_store.keys() {
+            match data_id {
+                DataId::Immutable(name) => {
+                    let _ = result.insert(FragmentInfo::ImmutableData(name));
+                }
+                DataId::Mutable(..) => {
+                    let data = if let Ok(Data::Mutable(data)) = self.chunk_store.get(&data_id) {
+                        data
+                    } else {
+                        error!("Failed to get {:?} from chunk store.", data_id);
+                        continue;
+                    };
+
+                    for fragment in FragmentInfo::mutable_data(&data) {
+                        let _ = result.insert(fragment);
+                    }
                 }
             }
         }
+
+        result
+    }
+
+    // Get all fragments we are responsible for (irrespective of whether we already
+    // have them or not).
+    fn our_fragments(&self) -> HashSet<FragmentInfo> {
+        self.cache
+            .needed_fragments()
+            .union(&self.chunk_store_fragments())
+            .cloned()
+            .collect()
     }
 
     fn count_added_data(&mut self, data_id: &DataId) {
