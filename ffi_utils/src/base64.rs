@@ -36,7 +36,7 @@ fn config() -> Config {
     Config {
         char_set: CharacterSet::UrlSafe,
         newline: Newline::LF,
-        pad: true,
+        pad: false,
         line_length: None,
     }
 }
