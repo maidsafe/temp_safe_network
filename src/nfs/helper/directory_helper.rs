@@ -64,7 +64,8 @@ impl DirectoryHelper {
             return Err(NfsError::DirectoryAlreadyExistsWithSameName);
         }
 
-        let directory = try!(DirectoryListing::new(directory_name,
+        let directory =
+            try!(DirectoryListing::new(directory_name,
                                        tag_type,
                                        user_metadata,
                                        versioned,
@@ -117,7 +118,8 @@ impl DirectoryHelper {
     pub fn update(&self,
                   directory: &DirectoryListing)
                   -> Result<Option<DirectoryListing>, NfsError> {
-        trace!("Updating directory given the directory listing.");
+        trace!("Updating directory given the directory listing: {:?}.",
+               directory);
 
         try!(self.update_directory_listing(directory));
         if let Some(parent_dir_key) = directory.get_metadata().get_parent_dir_key() {
@@ -150,14 +152,16 @@ impl DirectoryHelper {
         trace!("Getting a version of a versioned directory.");
 
         let immutable_data = try!(self.get_immutable_data(version));
-        match *access_level {
+        let dir = match *access_level {
             AccessLevel::Private => {
                 DirectoryListing::decrypt(self.client.clone(),
                                           directory_id,
                                           immutable_data.value().clone())
             }
             AccessLevel::Public => Ok(try!(deserialise(immutable_data.value()))),
-        }
+        };
+        trace!("Got DirectoryListing: {:?}", dir);
+        dir
     }
 
     /// Return the DirectoryListing for the latest version
@@ -196,7 +200,9 @@ impl DirectoryHelper {
             let structured_data = try!(self.get_structured_data(directory_id, type_tag));
             let serialised_directory_listing =
                 try!(unversioned::get_data(self.client.clone(), &structured_data, encryption_keys));
-            Ok(try!(deserialise(&serialised_directory_listing)))
+            let dir = Ok(try!(deserialise(&serialised_directory_listing)));
+            trace!("Got unversioned DirectoryListing: {:?}", dir);
+            dir
         }
     }
 
@@ -433,10 +439,10 @@ impl DirectoryHelper {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use core::utility::test_utils;
     use nfs::AccessLevel;
     use std::sync::{Arc, Mutex};
-    use super::*;
 
     #[test]
     fn create_dir_listing() {

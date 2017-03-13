@@ -87,6 +87,8 @@ impl<'a> Writer<'a> {
         file.get_mut_metadata().set_size(size);
         file.get_mut_metadata().increment_version();
 
+        trace!("Upserting file: {:?}", file);
+
         directory.upsert_file(file.clone());
 
         let directory_helper = DirectoryHelper::new(self.client.clone());
