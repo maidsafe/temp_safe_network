@@ -18,8 +18,8 @@
 use super::STATUS_LOG_INTERVAL;
 use super::data::{Data, DataId};
 use GROUP_SIZE;
-use maidsafe_utilities::{self, serialisation};
-use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable, XorName};
+use maidsafe_utilities;
+use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable, Value, XorName};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
@@ -52,21 +52,19 @@ impl Cache {
             request.stop_if_expired();
         }
 
-        // TODO (adam): make sure that for each fragment, we return at most one
-        // record. This is so we send the request for each fragment to at most
-        // one peer.
+        // TODO (adam): should we exclude fragments of uneeded chunks?
 
         // Return all fragments that do not already have request ongoing.
-        let mut result = Vec::new();
+        let mut result = HashMap::new();
         for (holder, fragments) in self.needed_fragments.iter() {
             for (fragment, request) in fragments {
                 if !request.is_ongoing() {
-                    result.push((*holder, fragment.clone()));
+                    let _ = result.insert(fragment.clone(), *holder);
                 }
             }
         }
 
-        result
+        result.into_iter().map(|(fragment, holder)| (holder, fragment)).collect()
     }
 
     /// Returns all data fragments we need.
@@ -78,25 +76,50 @@ impl Cache {
             .collect()
     }
 
-    pub fn insert_needed_fragment(&mut self, fragment: FragmentInfo, holder: XorName) {
-        let _ = self.needed_fragments
+    /// Insert new needed fragment and register it with the given holder.
+    /// Returns true if the fragment hasn't been previously registered with the holder,
+    /// false otherwise.
+    pub fn insert_needed_fragment(&mut self, fragment: FragmentInfo, holder: XorName) -> bool {
+        self.needed_fragments
             .entry(holder)
             .or_insert_with(HashMap::new)
-            .insert(fragment, FragmentRequest::new());
+            .insert(fragment, FragmentRequest::new())
+            .is_none()
     }
 
+    /// Register the given fragment with the new holder, but only if we already
+    /// have it registered with some other holder(s).
     pub fn register_needed_fragment_with_holder(&mut self,
                                                 fragment: FragmentInfo,
                                                 holder: XorName)
                                                 -> bool {
         if self.needed_fragments
             .values()
-            .any(|nfs| nfs.contains_key(&fragment)) {
-            self.insert_needed_fragment(fragment, holder);
-            true
+            .any(|fragments| fragments.contains_key(&fragment)) {
+            self.insert_needed_fragment(fragment, holder)
         } else {
             false
         }
+    }
+
+    /// Register all existing needed fragments belonging to the given data with the new holder.
+    pub fn register_needed_data_with_holder(&mut self, data_id: &DataId, holder: XorName) -> bool {
+        let fragments: Vec<_> = self.needed_fragments
+            .values()
+            .flat_map(HashMap::keys)
+            .filter(|fragment| fragment.data_id() == *data_id)
+            .cloned()
+            .collect();
+
+        let mut result = false;
+
+        for fragment in fragments {
+            if self.insert_needed_fragment(fragment, holder) {
+                result = true;
+            }
+        }
+
+        result
     }
 
     pub fn start_needed_fragment_request(&mut self,
@@ -118,7 +141,7 @@ impl Cache {
 
         for (holder, fragments) in &mut self.needed_fragments {
             let lost_fragments: Vec<_> = fragments.iter()
-                .filter(|&(fragment, request)| {
+                .filter(|&(fragment, _)| {
                     routing_table.other_closest_names(fragment.name(), GROUP_SIZE)
                         .map_or(true, |group| !group.contains(&holder))
                 })
@@ -156,7 +179,7 @@ impl Cache {
 
 
             if let Some(fragment) = fragments.iter()
-                .find(|&(fragment, request)| request.message_id() == Some(message_id))
+                .find(|&(_, request)| request.message_id() == Some(message_id))
                 .map(|(fragment, _)| fragment.clone()) {
                 let _ = fragments.remove(&fragment);
                 remove_holder = fragments.is_empty();
@@ -204,18 +227,12 @@ impl Cache {
                                 msg_id: MessageId,
                                 rejected: bool)
                                 -> Option<DataInfo> {
-        let hash = match serialisation::serialise(&mutation) {
-            Err(_) => return None,
-            Ok(serialised) => serialised,
-        };
-        let hash = maidsafe_utilities::big_endian_sip_hash(&hash);
+        let hash = maidsafe_utilities::big_endian_sip_hash(&mutation);
 
         let mut writes = self.pending_writes.entry(mutation.data_id()).or_insert_with(Vec::new);
         let result = if !rejected && writes.iter().all(|pending_write| pending_write.rejected) {
-            let (data_id, version) = mutation.data_id_and_version();
             Some(DataInfo {
-                data_id: data_id,
-                version: version,
+                data_id: mutation.data_id(),
                 hash: hash,
             })
         } else {
@@ -280,7 +297,7 @@ impl Cache {
         let mut new_total = 0;
         let mut new_requested = 0;
 
-        for (fragment, request) in self.needed_fragments.values().flat_map(HashMap::iter) {
+        for request in self.needed_fragments.values().flat_map(HashMap::values) {
             new_total += 1;
             if request.is_ongoing() {
                 new_requested += 1;
@@ -346,17 +363,6 @@ impl PendingMutation {
         }
     }
 
-    pub fn data_id_and_version(&self) -> (DataId, u64) {
-        match *self {
-            PendingMutation::PutIData(ref data) => (DataId::immutable(data), 0),
-            PendingMutation::PutMData(ref data) |
-            PendingMutation::MutateMDataEntries(ref data) |
-            PendingMutation::SetMDataUserPermissions(ref data) |
-            PendingMutation::DelMDataUserPermissions(ref data) |
-            PendingMutation::ChangeMDataOwner(ref data) => (DataId::mutable(data), data.version()),
-        }
-    }
-
     pub fn mutation_type(&self) -> PendingMutationType {
         match *self {
             PendingMutation::PutIData(_) => PendingMutationType::PutIData,
@@ -384,7 +390,14 @@ impl PendingMutation {
     }
 
     pub fn fragment_infos(&self) -> Vec<FragmentInfo> {
-        unimplemented!()
+        match *self {
+            PendingMutation::PutIData(ref data) => vec![FragmentInfo::ImmutableData(*data.name())],
+            PendingMutation::PutMData(ref data) |
+            PendingMutation::MutateMDataEntries(ref data) |
+            PendingMutation::SetMDataUserPermissions(ref data) |
+            PendingMutation::DelMDataUserPermissions(ref data) |
+            PendingMutation::ChangeMDataOwner(ref data) => FragmentInfo::mutable_data(data),
+        }
     }
 }
 
@@ -421,9 +434,47 @@ pub enum FragmentInfo {
 }
 
 impl FragmentInfo {
+    /// Create `FragmentInfo` for the shell of the given mutable data.
+    pub fn mutable_data_shell(data: &MutableData) -> Self {
+        let shell = (*data.name(),
+                     data.tag(),
+                     data.version(),
+                     data.owners().clone(),
+                     data.permissions().clone());
+        let hash = maidsafe_utilities::big_endian_sip_hash(&shell);
+
+        FragmentInfo::MutableDataShell {
+            name: *data.name(),
+            tag: data.tag(),
+            version: data.version(),
+            hash: hash,
+        }
+    }
+
+    /// Create `FragmentInfo` for the given mutable data entry.
+    pub fn mutable_data_entry(data: &MutableData, key: Vec<u8>, value: &Value) -> Self {
+        // TODO (adam): should we include entry_version in the hash?
+        let hash = maidsafe_utilities::big_endian_sip_hash(&value.content);
+        FragmentInfo::MutableDataEntry {
+            name: *data.name(),
+            tag: data.tag(),
+            key: key,
+            version: value.entry_version,
+            hash: hash,
+        }
+    }
+
     // Get all fragments for the given mutable data.
     pub fn mutable_data(data: &MutableData) -> Vec<Self> {
-        unimplemented!()
+        let mut result = Vec::with_capacity(1 + data.entries().len());
+
+        result.push(Self::mutable_data_shell(data));
+
+        for (key, value) in data.entries() {
+            result.push(Self::mutable_data_entry(data, key.clone(), value));
+        }
+
+        result
     }
 
     pub fn name(&self) -> &XorName {
@@ -479,9 +530,50 @@ impl FragmentRequest {
 #[derive(Clone, Copy, Debug, RustcEncodable, RustcDecodable)]
 pub struct DataInfo {
     pub data_id: DataId,
-    pub version: u64,
     pub hash: u64,
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use rand;
+
+    #[test]
+    fn needed_fragments() {
+        let mut cache = Cache::default();
+
+        let holder0 = rand::random();
+        let holder1 = rand::random();
+
+        let fragment0 = FragmentInfo::ImmutableData(rand::random());
+
+        assert!(cache.needed_fragments().is_empty());
+        assert!(cache.unrequested_needed_fragments().is_empty());
+
+        // Insert a single fragment. Should be present in both collections.
+        assert!(cache.insert_needed_fragment(fragment0.clone(), holder0));
+
+        let fragments = cache.needed_fragments();
+        assert_eq!(fragments.len(), 1);
+        assert_eq!(unwrap!(fragments.into_iter().next()), fragment0);
+
+        let fragments = cache.unrequested_needed_fragments();
+        assert_eq!(fragments.len(), 1);
+        assert_eq!(fragments[0].0, holder0);
+        assert_eq!(fragments[0].1, fragment0);
+
+        // Insert the same fragment with the same holder again. The collections
+        // should not change.
+        assert!(!cache.insert_needed_fragment(fragment0.clone(), holder0));
+
+        assert_eq!(cache.needed_fragments().len(), 1);
+        assert_eq!(cache.unrequested_needed_fragments().len(), 1);
+
+        // Insert the same fragment but with different holder. The collections
+        // should still include it only once.
+        assert!(cache.insert_needed_fragment(fragment0.clone(), holder1));
+        assert_eq!(cache.unrequested_needed_fragments().len(), 1);
+
+        // TODO: more tests
+    }
+}

@@ -54,3 +54,15 @@ impl Data {
         }
     }
 }
+
+impl From<ImmutableData> for Data {
+    fn from(data: ImmutableData) -> Self {
+        Data::Immutable(data)
+    }
+}
+
+impl From<MutableData> for Data {
+    fn from(data: MutableData) -> Self {
+        Data::Mutable(data)
+    }
+}

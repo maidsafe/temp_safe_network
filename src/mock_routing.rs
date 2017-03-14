@@ -19,7 +19,7 @@ use GROUP_SIZE;
 use rand;
 use routing::{AccountInfo, Authority, Cache, ClientError, Event, EventStream, ImmutableData,
               InterfaceError, MessageId, MutableData, PermissionSet, Request, Response,
-              RoutingError, User, Value, XorName};
+              RoutingError, RoutingTable, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
@@ -27,6 +27,7 @@ use std::sync::mpsc::{RecvError, TryRecvError};
 /// Mock routing node for unit testing.
 pub struct Node {
     name: XorName,
+    routing_table: RoutingTable<XorName>,
     pub sent_requests: HashMap<MessageId, RequestWrapper>,
     pub sent_responses: HashMap<MessageId, ResponseWrapper>,
 }
@@ -66,8 +67,20 @@ impl Node {
         Ok(self.name)
     }
 
-    pub fn close_group(&self, _name: XorName, _count: usize) -> Option<Vec<XorName>> {
-        unimplemented!()
+    pub fn close_group(&self, name: XorName, count: usize) -> Option<Vec<XorName>> {
+        self.routing_table
+            .closest_names(&name, count)
+            .map(|names| names.into_iter().cloned().collect())
+    }
+
+    // mock-only method.
+    pub fn routing_table(&self) -> &RoutingTable<XorName> {
+        &self.routing_table
+    }
+
+    // mock-only method.
+    pub fn add_to_routing_table(&mut self, name: XorName) {
+        unwrap!(self.routing_table.add(name));
     }
 
     pub fn send_get_idata_request(&mut self,
@@ -111,6 +124,24 @@ impl Node {
                               data: data,
                               msg_id: msg_id,
                               requester: requester,
+                          })
+    }
+
+    pub fn send_get_mdata_value_request(&mut self,
+                                        src: Authority<XorName>,
+                                        dst: Authority<XorName>,
+                                        name: XorName,
+                                        tag: u64,
+                                        key: Vec<u8>,
+                                        msg_id: MessageId)
+                                        -> Result<(), InterfaceError> {
+        self.send_request(src,
+                          dst,
+                          Request::GetMDataValue {
+                              name: name,
+                              tag: tag,
+                              key: key,
+                              msg_id: msg_id,
                           })
     }
 
@@ -208,8 +239,11 @@ impl NodeBuilder {
     }
 
     pub fn create(self, _min_section_size: usize) -> Result<Node, RoutingError> {
+        let name = rand::random();
+
         Ok(Node {
-            name: rand::random(),
+            name: name,
+            routing_table: RoutingTable::new(name, GROUP_SIZE),
             sent_requests: Default::default(),
             sent_responses: Default::default(),
         })
