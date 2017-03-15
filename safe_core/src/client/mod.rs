@@ -376,7 +376,7 @@ impl Client {
         // Using in `if` keeps borrow alive. Do not try to combine the 2 lines into one.
         let opt = self.inner_mut().hooks.remove(id);
         if let Some(hook) = opt {
-            hook.complete(event);
+            let _ = hook.send(event);
         }
     }
 
@@ -399,7 +399,7 @@ impl Client {
                 .cache
                 .get_mut(&name) {
                 trace!("ImmutableData found in cache.");
-                hook.complete(CoreEvent::GetIData(Ok(data.clone())));
+                let _ = hook.send(CoreEvent::GetIData(Ok(data.clone())));
                 return rx.into_box();
             }
 
@@ -413,7 +413,7 @@ impl Client {
 
         let result = self.routing_mut().get_idata(Authority::NaeManager(name), name, msg_id);
         if let Err(err) = result {
-            hook.complete(CoreEvent::GetIData(Err(CoreError::from(err))));
+            let _ = hook.send(CoreEvent::GetIData(Err(CoreError::from(err))));
         } else {
             self.insert_hook(msg_id, hook);
         }
@@ -521,7 +521,7 @@ impl Client {
         let result = self.routing_mut().get_account_info(dst, msg_id);
 
         if let Err(e) = result {
-            hook.complete(CoreEvent::GetAccountInfo(Err(From::from(e))));
+            let _ = hook.send(CoreEvent::GetAccountInfo(Err(From::from(e))));
         } else {
             self.insert_hook(msg_id, hook);
         }
@@ -769,7 +769,7 @@ impl Client {
         let result = req(&mut *self.routing_mut(), msg_id);
 
         if let Err(err) = result {
-            hook.complete(err_event(Err(CoreError::from(err))));
+            let _ = hook.send(err_event(Err(CoreError::from(err))));
         } else {
             self.insert_hook(msg_id, hook);
         }
@@ -1316,7 +1316,7 @@ mod tests {
                 NetworkEvent::Connected => (),
                 x => panic!("Unexpected network event: {:?}", x),
             }
-            hook.complete(());
+            let _ = hook.send(());
         });
 
         random_client_with_net_obs(move |net_event| unwrap!(tx.send(net_event)),

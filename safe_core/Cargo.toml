@@ -11,19 +11,19 @@ version = "0.22.0"
 
 [dependencies]
 ffi_utils = { path = "../ffi_utils", version = "~0.1.0" }
-futures = "~0.1.6"
-lazy_static = "~0.2.1"
-log = "~0.3.6"
+futures = "~0.1.11"
+lazy_static = "~0.2.4"
+log = "~0.3.7"
 lru-cache = "~0.1.0"
 maidsafe_utilities = "~0.10.0"
-rand = "~0.3.14"
+rand = "~0.3.15"
 # routing = "~0.27.1"
 routing = { git = "https://github.com/maidsafe/routing.git", branch = "mutable-data" }
 rust_sodium = "~0.1.2"
 rustc-serialize = "~0.3.22"
 self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "dev" }
-time = "~0.1.35"
-tokio-core = "~0.1.1"
+time = "~0.1.36"
+tokio-core = "~0.1.4"
 unwrap = "~1.1.0"
 
 [features]
