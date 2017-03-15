@@ -278,6 +278,18 @@ impl AppContext {
         refresh_access_info(reg, client)
     }
 
+    /// Fetch a list of container names that this app has access to
+    pub fn get_container_names(&self, client: &Client) -> Box<AppFuture<BTreeSet<String>>> {
+        let reg = fry!(self.as_registered()).clone();
+
+        fetch_access_info(reg.clone(), client)
+            .map(move |_| {
+                     let access_info = reg.access_info.borrow();
+                     access_info.keys().cloned().collect()
+                 })
+            .into_box()
+    }
+
     /// Fetch mdata_info for the given container name.
     pub fn get_container_mdata_info<T: Into<String>>(&self,
                                                      client: &Client,
@@ -323,6 +335,7 @@ impl AppContext {
     }
 }
 
+#[cfg_attr(rustfmt, rustfmt_skip)]
 fn refresh_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<()>> {
     let entry_key = fry!(access_container_enc_key(&context.app_id,
                                                   &context.sym_enc_key,
@@ -398,6 +411,26 @@ mod tests {
                                                                          let _info = unwrap!(res);
                                                                          Ok(())
                                                                      })
+        });
+    }
+
+    #[test]
+    fn get_container_names() {
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert("_videos".to_string(), btree_set![Permission::Read]);
+        let _ = container_permissions.insert("_downloads".to_string(),
+                                             btree_set![Permission::Read]);
+
+        let app = create_app_with_access(container_permissions);
+
+        run(&app, move |client, context| {
+            context.get_container_names(client).then(move |res| {
+                let info = unwrap!(res);
+                assert!(info.contains(&"_videos".to_string()));
+                assert!(info.contains(&"_downloads".to_string()));
+                assert_eq!(info.len(), 3); // third item is the app container
+                Ok(())
+            })
         });
     }
 
