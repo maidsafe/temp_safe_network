@@ -129,7 +129,7 @@ impl ReprC for File {
     unsafe fn clone_from_repr_c(repr_c: *const FfiFile) -> Result<File, NfsError> {
         let user_metadata = slice::from_raw_parts((*repr_c).user_metadata_ptr,
                                                   (*repr_c).user_metadata_len)
-            .to_vec();
+                .to_vec();
 
         let mut file = File::new(user_metadata);
         file.set_size((*repr_c).size);
@@ -164,18 +164,26 @@ impl Decodable for File {
     fn decode<D: Decoder>(d: &mut D) -> Result<File, D::Error> {
         d.read_struct("File", 7, |d| {
             Ok(File {
-                size: d.read_struct_field("size", 0, Decodable::decode)?,
-                created: ::time::at_utc(Timespec {
-                    sec: d.read_struct_field("created_time_sec", 1, Decodable::decode)?,
-                    nsec: d.read_struct_field("created_time_nsec", 2, Decodable::decode)?,
-                }),
-                modified: ::time::at_utc(Timespec {
-                    sec: d.read_struct_field("modified_time_sec", 3, Decodable::decode)?,
-                    nsec: d.read_struct_field("modified_time_nsec", 4, Decodable::decode)?,
-                }),
-                user_metadata: d.read_struct_field("user_metadata", 5, Decodable::decode)?,
-                data_map_name: d.read_struct_field("data_map_name", 6, Decodable::decode)?,
-            })
+                   size: d.read_struct_field("size", 0, Decodable::decode)?,
+                   created: ::time::at_utc(Timespec {
+                                               sec: d.read_struct_field("created_time_sec",
+                                                                        1,
+                                                                        Decodable::decode)?,
+                                               nsec: d.read_struct_field("created_time_nsec",
+                                                                         2,
+                                                                         Decodable::decode)?,
+                                           }),
+                   modified: ::time::at_utc(Timespec {
+                                                sec: d.read_struct_field("modified_time_sec",
+                                                                         3,
+                                                                         Decodable::decode)?,
+                                                nsec: d.read_struct_field("modified_time_nsec",
+                                                                          4,
+                                                                          Decodable::decode)?,
+                                            }),
+                   user_metadata: d.read_struct_field("user_metadata", 5, Decodable::decode)?,
+                   data_map_name: d.read_struct_field("data_map_name", 6, Decodable::decode)?,
+               })
         })
     }
 }
@@ -187,9 +195,7 @@ mod tests {
 
     #[test]
     fn serialise_deserialise() {
-        let obj_before = File::new("{mime:\"application/json\"}"
-            .to_string()
-            .into_bytes());
+        let obj_before = File::new("{mime:\"application/json\"}".to_string().into_bytes());
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after = unwrap!(deserialise(&serialised_data));
         assert_eq!(obj_before, obj_after);

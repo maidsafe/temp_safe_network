@@ -172,8 +172,7 @@ impl App {
             let (core_tx, core_rx) = futures_mpsc::unbounded();
             let (net_tx, net_rx) = futures_mpsc::unbounded();
 
-            el_h.spawn(net_rx.map(move |event| network_observer(Ok(event)))
-                .for_each(|_| Ok(())));
+            el_h.spawn(net_rx.map(move |event| network_observer(Ok(event))).for_each(|_| Ok(())));
 
             let core_tx_clone = core_tx.clone();
 
@@ -186,9 +185,9 @@ impl App {
         let core_tx = rx.recv()??;
 
         Ok(App {
-            core_tx: Mutex::new(core_tx),
-            _core_joiner: joiner,
-        })
+               core_tx: Mutex::new(core_tx),
+               _core_joiner: joiner,
+           })
     }
 
     /// Send a message to app's event loop
@@ -252,12 +251,12 @@ impl AppContext {
                   access_container_info: AccessContInfo)
                   -> Self {
         AppContext::Registered(Rc::new(Registered {
-            object_cache: ObjectCache::new(),
-            app_id: app_id,
-            sym_enc_key: sym_enc_key,
-            access_container_info: access_container_info,
-            access_info: RefCell::new(HashMap::new()),
-        }))
+                                           object_cache: ObjectCache::new(),
+                                           app_id: app_id,
+                                           sym_enc_key: sym_enc_key,
+                                           access_container_info: access_container_info,
+                                           access_info: RefCell::new(HashMap::new()),
+                                       }))
     }
 
     /// Object cache
@@ -289,11 +288,11 @@ impl AppContext {
 
         fetch_access_info(reg.clone(), client)
             .and_then(move |_| {
-                let access_info = reg.access_info.borrow();
-                access_info.get(&name)
-                    .map(|&(ref mdata_info, _)| mdata_info.clone())
-                    .ok_or(AppError::NoSuchContainer)
-            })
+                          let access_info = reg.access_info.borrow();
+                          access_info.get(&name)
+                              .map(|&(ref mdata_info, _)| mdata_info.clone())
+                              .ok_or(AppError::NoSuchContainer)
+                      })
             .into_box()
     }
 
@@ -308,11 +307,11 @@ impl AppContext {
 
         fetch_access_info(reg.clone(), client)
             .and_then(move |_| {
-                let access_info = reg.access_info.borrow();
-                access_info.get(&name)
-                    .map(|&(_, ref permissions)| permissions.contains(&permission))
-                    .ok_or(AppError::NoSuchContainer)
-            })
+                          let access_info = reg.access_info.borrow();
+                          access_info.get(&name)
+                              .map(|&(_, ref permissions)| permissions.contains(&permission))
+                              .ok_or(AppError::NoSuchContainer)
+                      })
             .into_box()
     }
 
@@ -330,8 +329,8 @@ fn refresh_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFutur
                                                   &context.access_container_info.nonce));
 
     client.get_mdata_value(context.access_container_info.id,
-                         context.access_container_info.tag,
-                         entry_key)
+                           context.access_container_info.tag,
+                           entry_key)
         .map_err(AppError::from)
         .and_then(move |value| {
             let encoded = utils::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
@@ -363,8 +362,9 @@ mod tests {
     fn refresh_access_info() {
         // Shared container
         let mut container_permissions = HashMap::new();
-        let _ = container_permissions.insert("_videos".to_string(),
-                                             btree_set![Permission::Read, Permission::Insert]);
+        let _ =
+            container_permissions.insert("_videos".to_string(),
+                                         btree_set![Permission::Read, Permission::Insert]);
 
         let app = create_app_with_access(container_permissions.clone());
 
@@ -372,15 +372,14 @@ mod tests {
             let reg = unwrap!(context.as_registered()).clone();
             assert!(reg.access_info.borrow().is_empty());
 
-            context.refresh_access_info(client)
-                .then(move |result| {
-                    unwrap!(result);
-                    let access_info = reg.access_info.borrow();
-                    assert_eq!(unwrap!(access_info.get("_videos")).1,
-                               *unwrap!(container_permissions.get("_videos")));
+            context.refresh_access_info(client).then(move |result| {
+                unwrap!(result);
+                let access_info = reg.access_info.borrow();
+                assert_eq!(unwrap!(access_info.get("_videos")).1,
+                           *unwrap!(container_permissions.get("_videos")));
 
-                    Ok(())
-                })
+                Ok(())
+            })
         });
     }
 
@@ -395,11 +394,10 @@ mod tests {
         let app = create_app_with_access(container_permissions);
 
         run(&app, move |client, context| {
-            context.get_container_mdata_info(client, cont_name)
-                .then(move |res| {
-                    let _info = unwrap!(res);
-                    Ok(())
-                })
+            context.get_container_mdata_info(client, cont_name).then(move |res| {
+                                                                         let _info = unwrap!(res);
+                                                                         Ok(())
+                                                                     })
         });
     }
 
@@ -416,15 +414,15 @@ mod tests {
         run(&app, move |client, context| {
             let f1 = context.is_permitted(client, cont_name.clone(), Permission::Read)
                 .then(move |res| {
-                    assert!(unwrap!(res));
-                    Ok(())
-                });
+                          assert!(unwrap!(res));
+                          Ok(())
+                      });
 
             let f2 = context.is_permitted(client, cont_name.clone(), Permission::Insert)
                 .then(move |res| {
-                    assert!(!unwrap!(res));
-                    Ok(())
-                });
+                          assert!(!unwrap!(res));
+                          Ok(())
+                      });
 
             f1.join(f2).map(|_| ())
         });

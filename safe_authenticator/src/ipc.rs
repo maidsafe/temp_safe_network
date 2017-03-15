@@ -76,9 +76,7 @@ pub fn get_config(client: &Client) -> Box<AuthFuture<(u64, HashMap<sha256::Diges
 /// Retrieves an app info by the given key from the config file
 pub fn app_info(client: &Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>>> {
     let app_id_hash = sha256::hash(app_id.as_bytes());
-    get_config(client)
-        .and_then(move |(_, config)| Ok(config.get(&app_id_hash).cloned()))
-        .into_box()
+    get_config(client).and_then(move |(_, config)| Ok(config.get(&app_id_hash).cloned())).into_box()
 }
 
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
@@ -106,9 +104,9 @@ pub fn decode_ipc_msg(client: &Client,
 
                             let auth_error = Err(IpcError::AlreadyAuthorised);
                             let resp = encode_response(&IpcMsg::Resp {
-                                                           resp: IpcResp::Auth(auth_error),
-                                                           req_id: req_id,
-                                                       },
+                                                            resp: IpcResp::Auth(auth_error),
+                                                            req_id: req_id,
+                                                        },
                                                        app_id2)?;
 
                             Ok(Err((err_code, resp)))
@@ -117,9 +115,9 @@ pub fn decode_ipc_msg(client: &Client,
                         AppState::Revoked => {
                             // App is not registered yet or was previously registered
                             Ok(Ok(IpcMsg::Req {
-                                req_id: req_id,
-                                req: IpcReq::Auth(auth_req),
-                            }))
+                                      req_id: req_id,
+                                      req: IpcReq::Auth(auth_req),
+                                  }))
                         }
                     }
                 })
@@ -137,9 +135,9 @@ pub fn decode_ipc_msg(client: &Client,
                     match app_state {
                         AppState::Authenticated => {
                             Ok(Ok(IpcMsg::Req {
-                                req_id: req_id,
-                                req: IpcReq::Containers(cont_req),
-                            }))
+                                      req_id: req_id,
+                                      req: IpcReq::Containers(cont_req),
+                                  }))
                         }
                         AppState::Revoked |
                         AppState::NotAuthenticated => {
@@ -210,8 +208,8 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                         Ok(())
                     })
                     .map_err(move |err| {
-                        o_err(user_data.0, ffi_error_code!(err), ptr::null_mut());
-                    })
+                                 o_err(user_data.0, ffi_error_code!(err), ptr::null_mut());
+                             })
                     .into_box()
                     .into()
             })?;
@@ -336,9 +334,9 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
-                                           req_id: req_id,
-                                           resp: IpcResp::Auth(Err(IpcError::AuthDenied)),
-                                       },
+                                            req_id: req_id,
+                                            resp: IpcResp::Auth(Err(IpcError::AuthDenied)),
+                                        },
                                        auth_req.app.id)?;
             o_cb(user_data.0,
                  ffi_error_code!(AuthError::from(IpcError::AuthDenied)),
@@ -358,9 +356,9 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
 
                     get_config(client)
                         .and_then(move |(_cfg_version, config)| {
-                            app_state(c2, &config, app_id.clone())
-                                .map(move |app_state| (config, app_state, app_id))
-                        })
+                                      app_state(c2, &config, app_id.clone())
+                                          .map(move |app_state| (config, app_state, app_id))
+                                  })
                         .and_then(move |(mut config, app_state, app_id)| {
                             // Determine an app state. If it's revoked we can reuse existing
                             // keys stored in the config.
@@ -383,7 +381,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                     } else {
                                         err!(AuthError::Unexpected("Logical error - couldn't \
                                                                     find a revoked app in config"
-                                            .to_owned()))
+                                                                           .to_owned()))
                                     }
                                 }
                                 AppState::Authenticated => {
@@ -440,9 +438,9 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
 
         if !is_granted {
             let resp = encode_response(&IpcMsg::Resp {
-                                           req_id: req_id,
-                                           resp: IpcResp::Containers(Err(IpcError::AuthDenied)),
-                                       },
+                                            req_id: req_id,
+                                            resp: IpcResp::Containers(Err(IpcError::AuthDenied)),
+                                        },
                                        cont_req.app.id)?;
             o_cb(user_data.0,
                  ffi_error_code!(AuthError::from(IpcError::AuthDenied)),
@@ -460,17 +458,17 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
 
                     app_info(client, &app_id)
                         .and_then(move |app| match app {
-                            Some(app) => {
-                                let sign_pk = app.keys.sign_pk;
-                                update_container_perms(c2, permissions, sign_pk)
-                                    .map(move |perms| (app, perms))
-                                    .into_box()
-                            }
-                            None => err!(IpcError::UnknownApp),
-                        })
+                                      Some(app) => {
+                            let sign_pk = app.keys.sign_pk;
+                            update_container_perms(c2, permissions, sign_pk)
+                                .map(move |perms| (app, perms))
+                                .into_box()
+                        }
+                                      None => err!(IpcError::UnknownApp),
+                                  })
                         .and_then(move |(app, perms)| {
-                            access_container(c3).map(move |dir| (dir, app, perms))
-                        })
+                                      access_container(c3).map(move |dir| (dir, app, perms))
+                                  })
                         .and_then(move |(dir, app, mut perms)| {
                             let app_keys = app.keys;
 
@@ -504,9 +502,9 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                         })
                         .and_then(move |_| {
                             let resp = encode_response(&IpcMsg::Resp {
-                                                           req_id: req_id,
-                                                           resp: IpcResp::Containers(Ok(())),
-                                                       },
+                                                            req_id: req_id,
+                                                            resp: IpcResp::Containers(Ok(())),
+                                                        },
                                                        cont_req.app.id)?;
                             o_cb(user_data.0, 0, resp.as_ptr());
                             Ok(())
@@ -514,9 +512,10 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                         .or_else(move |e| -> Result<(), AuthError> {
                             let err_code = ffi_error_code!(e);
                             let resp = encode_response(&IpcMsg::Resp {
-                                                           req_id: req_id,
-                                                           resp: IpcResp::Containers(Err(e.into())),
-                                                       },
+                                                            req_id: req_id,
+                                                            resp:
+                                                                IpcResp::Containers(Err(e.into())),
+                                                        },
                                                        app_id2)?;
                             Ok(o_cb(user_data.0, err_code, resp.as_ptr()))
                         })
@@ -559,10 +558,10 @@ fn insert_app_to_config(client: Client, app: AppInfo) -> Box<AuthFuture<()>> {
 
     get_config(&client)
         .and_then(move |(version, mut auth_cfg)| {
-            // Add app info to the authenticator config
-            let _ = auth_cfg.insert(app_id_hash, app);
-            update_config(c2, Some(version + 1), auth_cfg)
-        })
+                      // Add app info to the authenticator config
+                      let _ = auth_cfg.insert(app_id_hash, app);
+                      update_config(c2, Some(version + 1), auth_cfg)
+                  })
         .into_box()
 }
 
@@ -587,37 +586,37 @@ fn reencrypt_private_containers(client: Client,
             new_mdata.name = mdata_info.name;
 
             reqs.push(c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
-                .and_then(move |entries| {
-                    let mut mutations = EntryActions::new();
+                          .and_then(move |entries| {
+                let mut mutations = EntryActions::new();
 
-                    for (old_key, val) in entries {
-                        let key = old_mdata.decrypt(&old_key)?;
-                        let content = old_mdata.decrypt(&val.content)?;
+                for (old_key, val) in entries {
+                    let key = old_mdata.decrypt(&old_key)?;
+                    let content = old_mdata.decrypt(&val.content)?;
 
-                        let new_key = new_mdata.enc_entry_key(&key)?;
-                        let new_content = new_mdata.enc_entry_value(&content)?;
+                    let new_key = new_mdata.enc_entry_key(&key)?;
+                    let new_content = new_mdata.enc_entry_value(&content)?;
 
-                        // Delete the old entry with the old key and
-                        // insert the re-encrypted entry with a new key
-                        mutations = mutations.del(old_key, val.entry_version + 1)
-                            .ins(new_key, new_content, 0);
-                    }
+                    // Delete the old entry with the old key and
+                    // insert the re-encrypted entry with a new key
+                    mutations =
+                        mutations.del(old_key, val.entry_version + 1).ins(new_key, new_content, 0);
+                }
 
-                    Ok((new_mdata, mutations))
-                })
-                .and_then(move |(new_mdata, mutations)| {
-                    c3.mutate_mdata_entries(new_mdata.name, new_mdata.type_tag, mutations.into())
-                        .map_err(From::from)
-                        .map(move |_| (container, new_mdata))
-                })
-                .map_err(From::from));
+                Ok((new_mdata, mutations))
+            })
+                          .and_then(move |(new_mdata, mutations)| {
+                c3.mutate_mdata_entries(new_mdata.name, new_mdata.type_tag, mutations.into())
+                    .map_err(From::from)
+                    .map(move |_| (container, new_mdata))
+            })
+                          .map_err(From::from));
         }
     }
 
     future::join_all(reqs)
         .and_then(move |updated_containers| {
-            get_config(&c3).map(move |(_ver, config)| (config, updated_containers))
-        })
+                      get_config(&c3).map(move |(_ver, config)| (config, updated_containers))
+                  })
         .and_then(move |(config, updated_containers)| {
             // Updating user root container with new MDataInfo
             let user_root = fry!(c4.user_root_dir());
@@ -630,8 +629,12 @@ fn reencrypt_private_containers(client: Client,
                 let new_content = fry!(user_root.enc_entry_value(&plaintext));
 
                 reqs.push(c4.clone()
-                    .get_mdata_value(user_root.name, user_root.type_tag, entry_name.clone())
-                    .map(move |value| (entry_name, value.entry_version, new_content)));
+                              .get_mdata_value(user_root.name,
+                                               user_root.type_tag,
+                                               entry_name.clone())
+                              .map(move |value| {
+                                       (entry_name, value.entry_version, new_content)
+                                   }));
             }
 
             let c5 = c4.clone();
@@ -699,14 +702,14 @@ fn revoke_container_perms(client: Client,
         let c2 = client.clone();
 
         reqs.push(client.clone()
-            .get_mdata_version(mdata_info.name, mdata_info.type_tag)
-            .and_then(move |version| {
-                c2.del_mdata_user_permissions(mdata_info.name,
-                                              mdata_info.type_tag,
-                                              User::Key(sign_pk),
-                                              version + 1)
-            })
-            .map_err(From::from));
+                      .get_mdata_version(mdata_info.name, mdata_info.type_tag)
+                      .and_then(move |version| {
+                                    c2.del_mdata_user_permissions(mdata_info.name,
+                                                                  mdata_info.type_tag,
+                                                                  User::Key(sign_pk),
+                                                                  version + 1)
+                                })
+                      .map_err(From::from));
     }
 
     future::join_all(reqs).map(move |_results| ()).into_box()
@@ -729,32 +732,32 @@ fn update_container_perms(client: Client,
         let dir2 = root.clone();
 
         reqs.push(client.get_mdata_value(root.name, root.type_tag, key)
-            .and_then(move |val| {
-                let plaintext = fry!(dir2.decrypt(&val.content));
-                let mdata_info = fry!(deserialise::<MDataInfo>(&plaintext));
+                      .and_then(move |val| {
+            let plaintext = fry!(dir2.decrypt(&val.content));
+            let mdata_info = fry!(deserialise::<MDataInfo>(&plaintext));
 
-                c2.get_mdata_version(mdata_info.name, mdata_info.type_tag)
-                    .map(move |version| (mdata_info, version))
-                    .into_box()
-            })
-            .and_then(move |(mdata_info, version)| {
-                c3.set_mdata_user_permissions(mdata_info.name,
-                                                mdata_info.type_tag,
-                                                User::Key(sign_pk),
-                                                perm_set,
-                                                version + 1)
-                    .map(move |_| (container_key, mdata_info, access))
-            })
-            .map_err(AuthError::from));
+            c2.get_mdata_version(mdata_info.name, mdata_info.type_tag)
+                .map(move |version| (mdata_info, version))
+                .into_box()
+        })
+                      .and_then(move |(mdata_info, version)| {
+            c3.set_mdata_user_permissions(mdata_info.name,
+                                            mdata_info.type_tag,
+                                            User::Key(sign_pk),
+                                            perm_set,
+                                            version + 1)
+                .map(move |_| (container_key, mdata_info, access))
+        })
+                      .map_err(AuthError::from));
     }
 
     future::join_all(reqs)
         .map(|perms| {
-            perms.into_iter().fold(HashMap::new(), |mut map, (container_key, dir, access)| {
+                 perms.into_iter().fold(HashMap::new(), |mut map, (container_key, dir, access)| {
                 let _ = map.insert(container_key, (dir, access));
                 map
             })
-        })
+             })
         .map_err(AuthError::from)
         .into_box()
 }
@@ -781,16 +784,16 @@ fn encode_auth_resp_impl(client: Client,
         .map_err(AuthError::from)
         .and_then(move |_| update_container_perms(c3, permissions, sign_pk))
         .and_then(move |perms| if app_container {
-            check_app_container(c4, app_id, sign_pk)
-                .map(move |mdata_info| (mdata_info, perms))
-                .into_box()
-        } else {
-            ok!((None, perms))
-        })
+                      check_app_container(c4, app_id, sign_pk)
+                          .map(move |mdata_info| (mdata_info, perms))
+                          .into_box()
+                  } else {
+                      ok!((None, perms))
+                  })
         .and_then(move |(app_container, perms)| {
-            // Update access_container
-            access_container(c5).map(move |dir| (dir, app_container, perms))
-        })
+                      // Update access_container
+                      access_container(c5).map(move |dir| (dir, app_container, perms))
+                  })
         .and_then(move |(dir, app_container, mut perms)| {
             if let Some(mdata_info) = app_container {
                 // Store info about the app's dedicated container in the access container
@@ -808,10 +811,10 @@ fn encode_auth_resp_impl(client: Client,
         })
         .and_then(move |(dir, app_keys)| {
             Ok(AuthGranted {
-                app_keys: app_keys,
-                bootstrap_config: c7.bootstrap_config(),
-                access_container: AccessContInfo::from_mdata_info(dir)?,
-            })
+                   app_keys: app_keys,
+                   bootstrap_config: c7.bootstrap_config(),
+                   access_container: AccessContInfo::from_mdata_info(dir)?,
+               })
         })
         .into_box()
 }
@@ -879,10 +882,11 @@ pub fn remove_app_container(client: Client, app_id: String) -> Box<AuthFuture<bo
                     c2.list_mdata_entries(mdata_info.name, mdata_info.type_tag)
                         .and_then(move |entries| {
                             // Remove all entries in MData
-                            let actions = entries.iter()
-                                .fold(EntryActions::new(), |actions, (entry_name, val)| {
-                                    actions.del(entry_name.clone(), val.entry_version + 1)
-                                });
+                            let actions = entries.iter().fold(EntryActions::new(),
+                                                              |actions, (entry_name, val)| {
+                                                                  actions.del(entry_name.clone(),
+                                                                              val.entry_version + 1)
+                                                              });
                             c3.mutate_mdata_entries(mdata_info.name,
                                                     mdata_info.type_tag,
                                                     actions.into())
@@ -919,9 +923,7 @@ fn check_app_container(client: Client,
             match res {
                 Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => {
                     // Proceed to create a container
-                    create_app_container(client, app_id, app_sign_pk)
-                        .map(Some)
-                        .into_box()
+                    create_app_container(client, app_id, app_sign_pk).map(Some).into_box()
                 }
                 Err(e) => err!(e),
                 Ok(val) => {

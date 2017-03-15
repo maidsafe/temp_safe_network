@@ -88,12 +88,12 @@ impl Routing {
         };
 
         Ok(Routing {
-            sender: sender,
-            full_id: id.unwrap_or_else(FullId::new),
-            client_auth: client_auth,
-            max_ops_countdown: None,
-            timeout_simulation: false,
-        })
+               sender: sender,
+               full_id: id.unwrap_or_else(FullId::new),
+               client_auth: client_auth,
+               max_ops_countdown: None,
+               timeout_simulation: false,
+           })
     }
 
     /// Gets MAID account information.
@@ -332,9 +332,12 @@ impl Routing {
                         "list_mdata_keys",
                         GET_MDATA_ENTRIES_DELAY_MS,
                         |data| {
-                            let keys = data.keys().into_iter().cloned().collect();
-                            Ok(keys)
-                        },
+            let keys = data.keys()
+                .into_iter()
+                .cloned()
+                .collect();
+            Ok(keys)
+        },
                         |res| {
                             Response::ListMDataKeys {
                                 res: res,
@@ -357,9 +360,12 @@ impl Routing {
                         "list_mdata_values",
                         GET_MDATA_ENTRIES_DELAY_MS,
                         |data| {
-                            let values = data.values().into_iter().cloned().collect();
-                            Ok(values)
-                        },
+            let values = data.values()
+                .into_iter()
+                .cloned()
+                .collect();
+            Ok(values)
+        },
                         |res| {
                             Response::ListMDataValues {
                                 res: res,
@@ -382,11 +388,7 @@ impl Routing {
                         msg_id,
                         "get_mdata_value",
                         GET_MDATA_ENTRIES_DELAY_MS,
-                        |data| {
-                            data.get(&key)
-                                .cloned()
-                                .ok_or(ClientError::NoSuchEntry)
-                        },
+                        |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry),
                         |res| {
                             Response::GetMDataValue {
                                 res: res,
@@ -823,9 +825,9 @@ impl Routing {
         };
 
         let ok = owner_keys.iter().any(|owner_key| {
-            let owner_name = XorName(sha256::hash(&owner_key.0).0);
-            owner_name == dst_name
-        });
+                                           let owner_name = XorName(sha256::hash(&owner_key.0).0);
+                                           owner_name == dst_name
+                                       });
 
         if ok {
             Ok(())
@@ -888,10 +890,10 @@ impl Routing {
 
     fn update_network_limits(&self) -> Option<u64> {
         self.max_ops_countdown.as_ref().map(|count| {
-            let ops = count.get();
-            count.set(ops - 1);
-            ops
-        })
+                                                let ops = count.get();
+                                                count.set(ops - 1);
+                                                ops
+                                            })
     }
 }
 

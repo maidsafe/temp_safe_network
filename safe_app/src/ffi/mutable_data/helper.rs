@@ -43,9 +43,9 @@ pub fn insert_permissions(object_cache: &ObjectCache,
                           -> MDataPermissionsHandle {
     let permissions = permissions.into_iter()
         .map(|(user, permission_set)| {
-            let permission_set_h = object_cache.insert_mdata_permission_set(permission_set);
-            (user, permission_set_h)
-        })
+                 let permission_set_h = object_cache.insert_mdata_permission_set(permission_set);
+                 (user, permission_set_h)
+             })
         .collect();
 
     object_cache.insert_mdata_permissions(permissions)

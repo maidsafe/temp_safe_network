@@ -782,12 +782,12 @@ fn mutable_data_ownership() {
     // Chaning the owner by owner should succeed.
     let msg_id = MessageId::new();
     unwrap!(owner_routing.change_mdata_owner(client_mgr,
-                                           name,
-                                           tag,
-                                           app_sign_key,
-                                           1,
-                                           msg_id,
-                                           owner_key));
+                                             name,
+                                             tag,
+                                             app_sign_key,
+                                             1,
+                                             msg_id,
+                                             owner_key));
     expect_success!(owner_routing_rx, msg_id, Response::ChangeMDataOwner);
 }
 

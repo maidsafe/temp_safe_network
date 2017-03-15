@@ -171,7 +171,7 @@ pub unsafe extern "C" fn mdata_permissions_get(app: *const App,
             let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
             let user_key = *context.object_cache().get_sign_key(user_h)?;
             let handle = *permissions.get(&User::Key(user_key))
-                .ok_or(AppError::InvalidSignKeyHandle)?;
+                              .ok_or(AppError::InvalidSignKeyHandle)?;
 
             Ok(handle)
         })
@@ -189,7 +189,7 @@ fn mdata_permissions_for_each(app: *const App,
                                                             SignKeyHandle,
                                                             MDataPermissionSetHandle),
                               user_data: *mut c_void,
-                              done_cb: extern "C" fn(*mut c_void, i32)) {
+done_cb: extern "C" fn(*mut c_void, i32)){
     catch_unwind_cb(user_data, done_cb, || {
         let user_data = OpaqueCtx(user_data);
 

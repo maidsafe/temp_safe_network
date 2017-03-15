@@ -58,18 +58,14 @@ impl Writer {
                version: Option<u64>)
                -> Box<NfsFuture<Writer>> {
         let fut = match mode {
-            Mode::Modify => {
-                data_map::get(&client, file.data_map_name())
-                    .map(Some)
-                    .into_box()
-            }
+            Mode::Modify => data_map::get(&client, file.data_map_name()).map(Some).into_box(),
             Mode::Overwrite => future::ok(None).into_box(),
         };
 
         let client = client.clone();
         fut.and_then(move |data_map| {
-                SequentialEncryptor::new(storage, data_map).map_err(From::from)
-            })
+                          SequentialEncryptor::new(storage, data_map).map_err(From::from)
+                      })
             .map(move |encryptor| {
                 Writer {
                     client: client,

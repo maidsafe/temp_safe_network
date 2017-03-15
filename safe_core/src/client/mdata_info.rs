@@ -190,16 +190,16 @@ pub fn decrypt_values(info: &MDataInfo, values: &[Value]) -> Result<Vec<Value>, 
 
 fn encrypt_value(info: &MDataInfo, value: &Value) -> Result<Value, CoreError> {
     Ok(Value {
-        content: info.enc_entry_value(&value.content)?,
-        entry_version: value.entry_version,
-    })
+           content: info.enc_entry_value(&value.content)?,
+           entry_version: value.entry_version,
+       })
 }
 
 fn decrypt_value(info: &MDataInfo, value: &Value) -> Result<Value, CoreError> {
     Ok(Value {
-        content: info.decrypt(&value.content)?,
-        entry_version: value.entry_version,
-    })
+           content: info.decrypt(&value.content)?,
+           entry_version: value.entry_version,
+       })
 }
 
 #[cfg(test)]

@@ -49,9 +49,9 @@ pub fn run_now<F, R>(app: &App, f: F) -> R
     let (tx, rx) = mpsc::channel();
 
     unwrap!(app.send(move |client, context| {
-        unwrap!(tx.send(f(client, context)));
-        None
-    }));
+                         unwrap!(tx.send(f(client, context)));
+                         None
+                     }));
 
     unwrap!(rx.recv())
 }
@@ -70,9 +70,9 @@ pub fn run<F, I, T>(app: &App, f: F) -> T
         let future = f(client, app)
             .into_future()
             .then(move |result| {
-                unwrap!(tx.send(result));
-                Ok(())
-            })
+                      unwrap!(tx.send(result));
+                      Ok(())
+                  })
             .into_box();
 
         Some(future)
@@ -90,10 +90,10 @@ pub fn create_app() -> App {
 
     let auth_granted = unwrap!(authenticator::register_app(&auth,
                                                            &AuthReq {
-                                                               app: app_info,
-                                                               app_container: false,
-                                                               containers: HashMap::new(),
-                                                           }));
+                                                                app: app_info,
+                                                                app_container: false,
+                                                                containers: HashMap::new(),
+                                                            }));
 
     unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }
@@ -109,10 +109,10 @@ pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>
 
     let auth_granted = unwrap!(authenticator::register_app(&auth,
                                                            &AuthReq {
-                                                               app: app_info,
-                                                               app_container: true,
-                                                               containers: access_info,
-                                                           }));
+                                                                app: app_info,
+                                                                app_container: true,
+                                                                containers: access_info,
+                                                            }));
 
     unwrap!(App::registered(app_id, auth_granted, |_network_event| ()))
 }

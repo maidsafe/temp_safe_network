@@ -55,9 +55,9 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(app: *const App,
                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Ins(Value {
-            content: vec_clone_from_raw_parts(value_ptr, value_len),
-            entry_version: 0,
-        })
+                             content: vec_clone_from_raw_parts(value_ptr, value_len),
+                             entry_version: 0,
+                         })
     })
 }
 
@@ -74,9 +74,9 @@ pub unsafe extern "C" fn mdata_entry_actions_update(app: *const App,
                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
-            content: vec_clone_from_raw_parts(value_ptr, value_len),
-            entry_version: entry_version,
-        })
+                                content: vec_clone_from_raw_parts(value_ptr, value_len),
+                                entry_version: entry_version,
+                            })
     })
 }
 

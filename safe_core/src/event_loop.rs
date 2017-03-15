@@ -50,9 +50,9 @@ impl<T> CoreMsg<T> {
     {
         let mut f = Some(f);
         CoreMsg(Some(Box::new(move |client, context| -> Option<TailFuture> {
-            let f = unwrap!(f.take());
-            f(client, context)
-        })))
+                                  let f = unwrap!(f.take());
+                                  f(client, context)
+                              })))
     }
 
     /// Construct a new message which when processed by the event loop will

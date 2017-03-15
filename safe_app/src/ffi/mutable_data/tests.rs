@@ -97,9 +97,9 @@ fn md_created_by_app_2() {
         let cl2 = client.clone();
         client.put_mdata(mdata)
             .then(move |res| {
-                unwrap!(res);
-                cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 2)
-            })
+                      unwrap!(res);
+                      cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 2)
+                  })
             .then(move |res| -> Result<_, ()> {
                 match res {
                     Ok(()) => panic!("It should fail"),
@@ -118,9 +118,9 @@ fn md_created_by_app_2() {
             let cl2 = client.clone();
             client.ins_auth_key(sign_pk, 1)
                 .then(move |res| {
-                    unwrap!(res);
-                    cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 2)
-                })
+                          unwrap!(res);
+                          cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 2)
+                      })
                 .then(move |res| -> Result<(), ()> {
                     match res {
                         Ok(()) => panic!("It should fail"),
@@ -152,9 +152,9 @@ fn md_created_by_app_3() {
         let mut actions = BTreeMap::new();
         let _ = actions.insert(vec![1, 2, 3, 4],
                                EntryAction::Ins(Value {
-                                   content: vec![2, 3, 5],
-                                   entry_version: 1,
-                               }));
+                                                    content: vec![2, 3, 5],
+                                                    entry_version: 1,
+                                                }));
         let cl2 = client.clone();
         let cl3 = client.clone();
         let name2 = name.clone();
@@ -164,9 +164,9 @@ fn md_created_by_app_3() {
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![1, 2, 3, 4],
                                        EntryAction::Update(Value {
-                                           content: vec![2, 8, 5],
-                                           entry_version: 2,
-                                       }));
+                                                               content: vec![2, 8, 5],
+                                                               entry_version: 2,
+                                                           }));
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
             .then(move |res| {
@@ -241,9 +241,9 @@ fn md_created_by_app_4() {
         let mut actions = BTreeMap::new();
         let _ = actions.insert(vec![1, 2, 3, 4],
                                EntryAction::Ins(Value {
-                                   content: vec![2, 3, 5],
-                                   entry_version: 1,
-                               }));
+                                                    content: vec![2, 3, 5],
+                                                    entry_version: 1,
+                                                }));
         let cl2 = client.clone();
         let cl3 = client.clone();
         let cl4 = client.clone();
@@ -321,8 +321,9 @@ fn md_created_by_app_4() {
             let mut rng = unwrap!(OsRng::new());
 
             let mut permissions = BTreeMap::new();
-            let _ = permissions.insert(User::Key(app_sign_pk),
-                                       PermissionSet::new().allow(Action::ManagePermissions));
+            let _ =
+                permissions.insert(User::Key(app_sign_pk),
+                                   PermissionSet::new().allow(Action::ManagePermissions));
 
             let mut data = BTreeMap::new();
             let _ = data.insert(vec![1, 8, 3, 4],
@@ -390,8 +391,7 @@ fn multiple_apps() {
                 unwrap!(res);
                 unwrap!(name_tx.send(name.clone()));
                 let entry_key: Vec<u8> = unwrap!(entry_rx.recv());
-                cl2.get_mdata_value(name, DIR_TAG, entry_key.clone())
-                    .map(move |v| (v, entry_key))
+                cl2.get_mdata_value(name, DIR_TAG, entry_key.clone()).map(move |v| (v, entry_key))
             })
             .then(move |res| {
                 let (value, entry_key) = unwrap!(res);
@@ -404,11 +404,11 @@ fn multiple_apps() {
                     .map(move |()| entry_key)
             })
             .then(move |res| {
-                let entry_key = unwrap!(res);
-                unwrap!(mutate_again_tx.send(()));
-                unwrap!(final_check_rx.recv());
-                cl4.list_mdata_keys(name3, DIR_TAG).map(move |x| (x, entry_key))
-            })
+                      let entry_key = unwrap!(res);
+                      unwrap!(mutate_again_tx.send(()));
+                      unwrap!(final_check_rx.recv());
+                      cl4.list_mdata_keys(name3, DIR_TAG).map(move |x| (x, entry_key))
+                  })
             .then(move |res| -> Result<_, ()> {
                 let (keys, entry_key) = unwrap!(res);
                 assert_eq!(keys.len(), 1);
@@ -426,9 +426,9 @@ fn multiple_apps() {
         let mut actions = BTreeMap::new();
         let _ = actions.insert(entry_key.clone(),
                                EntryAction::Ins(Value {
-                                   content: vec![8],
-                                   entry_version: 1,
-                               }));
+                                                    content: vec![8],
+                                                    entry_version: 1,
+                                                }));
 
         let cl2 = client.clone();
         client.mutate_mdata_entries(name.clone(), DIR_TAG, actions)
@@ -440,9 +440,9 @@ fn multiple_apps() {
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![2, 2, 2],
                                        EntryAction::Ins(Value {
-                                           content: vec![21],
-                                           entry_version: 1,
-                                       }));
+                                                            content: vec![21],
+                                                            entry_version: 1,
+                                                        }));
 
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
@@ -501,9 +501,9 @@ fn permissions_and_version() {
                 cl2.set_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), permissions, 1)
             })
             .then(move |res| {
-                unwrap!(res);
-                cl3.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), 1)
-            })
+                      unwrap!(res);
+                      cl3.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), 1)
+                  })
             .then(move |res| {
                 match res {
                     Ok(()) => panic!("It should fail with invalid successor"),
@@ -542,14 +542,14 @@ fn permissions_and_version() {
                 cl5.get_mdata_version(name, DIR_TAG)
             })
             .then(move |res| {
-                let v = unwrap!(res);
-                assert_eq!(v, 1);
-                cl6.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), v + 1)
-            })
+                      let v = unwrap!(res);
+                      assert_eq!(v, 1);
+                      cl6.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), v + 1)
+                  })
             .then(move |res| {
-                unwrap!(res);
-                cl7.list_mdata_permissions(name, DIR_TAG)
-            })
+                      unwrap!(res);
+                      cl7.list_mdata_permissions(name, DIR_TAG)
+                  })
             .map(move |permissions| {
                 assert_eq!(permissions.len(), 1);
                 assert_eq!(unwrap!(permissions.get(&User::Key(sign_pk)))
@@ -614,9 +614,9 @@ fn permissions_crud() {
                                                1)
             })
             .then(move |res| {
-                unwrap!(res);
-                cl3.list_mdata_permissions(name, DIR_TAG)
-            })
+                      unwrap!(res);
+                      cl3.list_mdata_permissions(name, DIR_TAG)
+                  })
             .then(move |res| {
                 {
                     let permissions = unwrap!(res);
@@ -655,9 +655,9 @@ fn permissions_crud() {
                                                2)
             })
             .then(move |res| {
-                unwrap!(res);
-                cl5.list_mdata_permissions(name, DIR_TAG)
-            })
+                      unwrap!(res);
+                      cl5.list_mdata_permissions(name, DIR_TAG)
+                  })
             .then(move |res| {
                 {
                     let permissions = unwrap!(res);
@@ -708,13 +708,13 @@ fn permissions_crud() {
                                                3)
             })
             .then(move |res| {
-                unwrap!(res);
-                cl7.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key_a), 4)
-            })
+                      unwrap!(res);
+                      cl7.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key_a), 4)
+                  })
             .then(move |res| {
-                unwrap!(res);
-                cl8.list_mdata_permissions(name, DIR_TAG)
-            })
+                      unwrap!(res);
+                      cl8.list_mdata_permissions(name, DIR_TAG)
+                  })
             .then(move |res| {
                 {
                     let permissions = unwrap!(res);
@@ -753,9 +753,9 @@ fn permissions_crud() {
                                                5)
             })
             .then(move |res| {
-                unwrap!(res);
-                cl10.list_mdata_permissions(name, DIR_TAG)
-            })
+                      unwrap!(res);
+                      cl10.list_mdata_permissions(name, DIR_TAG)
+                  })
             .then(move |res| -> Result<_, ()> {
                 {
                     let permissions = unwrap!(res);
@@ -839,21 +839,21 @@ fn entries_crud() {
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![0, 1, 1],
                                        EntryAction::Ins(Value {
-                                           content: vec![2, 3, 17],
-                                           entry_version: 1,
-                                       }));
+                                                            content: vec![2, 3, 17],
+                                                            entry_version: 1,
+                                                        }));
                 let _ = actions.insert(vec![0, 1, 0],
                                        EntryAction::Update(Value {
-                                           content: vec![2, 8, 64],
-                                           entry_version: 2,
-                                       }));
+                                                               content: vec![2, 8, 64],
+                                                               entry_version: 2,
+                                                           }));
                 let _ = actions.insert(vec![0, 0, 1], EntryAction::Del(2));
                 cl2.mutate_mdata_entries(name, DIR_TAG, actions)
             })
             .then(move |res| {
-                unwrap!(res);
-                cl3.list_mdata_entries(name, DIR_TAG)
-            })
+                      unwrap!(res);
+                      cl3.list_mdata_entries(name, DIR_TAG)
+                  })
             .then(move |res| {
                 let entries = unwrap!(res);
                 assert_eq!(entries.len(), 3);
@@ -875,21 +875,21 @@ fn entries_crud() {
                 let mut actions = BTreeMap::new();
                 let _ = actions.insert(vec![1, 0, 0],
                                        EntryAction::Ins(Value {
-                                           content: vec![4, 4, 4, 4],
-                                           entry_version: 1,
-                                       }));
+                                                            content: vec![4, 4, 4, 4],
+                                                            entry_version: 1,
+                                                        }));
                 let _ = actions.insert(vec![0, 1, 0],
                                        EntryAction::Update(Value {
-                                           content: vec![64, 8, 1],
-                                           entry_version: 3,
-                                       }));
+                                                               content: vec![64, 8, 1],
+                                                               entry_version: 3,
+                                                           }));
                 let _ = actions.insert(vec![0, 1, 1], EntryAction::Del(2));
                 cl4.mutate_mdata_entries(name, DIR_TAG, actions)
             })
             .then(move |res| {
-                unwrap!(res);
-                cl5.list_mdata_entries(name, DIR_TAG)
-            })
+                      unwrap!(res);
+                      cl5.list_mdata_entries(name, DIR_TAG)
+                  })
             .then(|res| -> Result<_, ()> {
                 let entries = unwrap!(res);
                 assert_eq!(entries.len(), 4);

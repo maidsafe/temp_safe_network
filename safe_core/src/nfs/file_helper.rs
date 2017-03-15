@@ -40,22 +40,23 @@ pub fn insert<T: AsRef<str>>(client: Client,
     serialise(&file)
         .map_err(From::from)
         .and_then(|encoded| {
-            let key = parent.enc_entry_key(name.as_bytes())?;
-            let value = parent.enc_entry_value(&encoded)?;
+                      let key = parent.enc_entry_key(name.as_bytes())?;
+                      let value = parent.enc_entry_value(&encoded)?;
 
-            Ok((key, value))
-        })
+                      Ok((key, value))
+                  })
         .into_future()
         .and_then(move |(key, value)| {
-            client.mutate_mdata_entries(parent.name,
-                                        parent.type_tag,
-                                        EntryActions::new().ins(key, value, 0).into())
-        })
+                      client.mutate_mdata_entries(parent.name,
+                                                  parent.type_tag,
+                                                  EntryActions::new().ins(key, value, 0).into())
+                  })
         .map_err(From::from)
         .into_box()
 }
 
 /// Gets a file from the directory
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub fn fetch<S: AsRef<str>>(client: Client,
                             parent: MDataInfo,
                             name: S)
@@ -63,14 +64,14 @@ pub fn fetch<S: AsRef<str>>(client: Client,
     parent.enc_entry_key(name.as_ref().as_bytes())
         .into_future()
         .and_then(move |key| {
-            client.get_mdata_value(parent.name, parent.type_tag, key)
-                .map(move |value| (value, parent))
-        })
+                      client.get_mdata_value(parent.name, parent.type_tag, key)
+                          .map(move |value| (value, parent))
+                  })
         .and_then(move |(value, parent)| {
-            let plaintext = parent.decrypt(&value.content)?;
-            let file = deserialise(&plaintext)?;
-            Ok((value.entry_version, file))
-        })
+                      let plaintext = parent.decrypt(&value.content)?;
+                      let file = deserialise(&plaintext)?;
+                      Ok((value.entry_version, file))
+                  })
         .map_err(convert_error)
         .into_box()
 }
@@ -93,10 +94,8 @@ pub fn delete<S: AsRef<str>>(client: Client,
     let key = fry!(parent.enc_entry_key(name.as_bytes()));
 
     client.mutate_mdata_entries(parent.name,
-                              parent.type_tag,
-                              EntryActions::new()
-                                  .del(key, version)
-                                  .into())
+                                parent.type_tag,
+                                EntryActions::new().del(key, version).into())
         .map_err(convert_error)
         .into_box()
 }
@@ -118,25 +117,23 @@ pub fn update<S: AsRef<str>>(client: Client,
     serialise(&file)
         .map_err(From::from)
         .and_then(|encoded| {
-            let key = parent.enc_entry_key(name.as_bytes())?;
-            let content = parent.enc_entry_value(&encoded)?;
+                      let key = parent.enc_entry_key(name.as_bytes())?;
+                      let content = parent.enc_entry_value(&encoded)?;
 
-            Ok((key, content))
-        })
+                      Ok((key, content))
+                  })
         .into_future()
         .and_then(move |(key, content)| if version != 0 {
-            Ok((key, content, version, parent)).into_future().into_box()
-        } else {
-            client.get_mdata_value(parent.name, parent.type_tag, key.clone())
-                .map(move |value| (key, content, value.entry_version + 1, parent))
-                .into_box()
-        })
+                      Ok((key, content, version, parent)).into_future().into_box()
+                  } else {
+                      client.get_mdata_value(parent.name, parent.type_tag, key.clone())
+                          .map(move |value| (key, content, value.entry_version + 1, parent))
+                          .into_box()
+                  })
         .and_then(move |(key, content, version, parent)| {
             client2.mutate_mdata_entries(parent.name,
                                          parent.type_tag,
-                                         EntryActions::new()
-                                             .update(key, content, version)
-                                             .into())
+                                         EntryActions::new().update(key, content, version).into())
         })
         .map_err(convert_error)
         .into_box()
@@ -215,11 +212,10 @@ mod tests {
 
         file_helper::create(client.clone(), user_root.clone(), "hello.txt", Vec::new())
             .then(move |res| {
-                let writer = unwrap!(res);
+                      let writer = unwrap!(res);
 
-                writer.write(&[0u8; ORIG_SIZE])
-                    .and_then(move |_| writer.close())
-            })
+                      writer.write(&[0u8; ORIG_SIZE]).and_then(move |_| writer.close())
+                  })
             .map(move |file| (user_root, file))
             .into_box()
     }
@@ -231,18 +227,18 @@ mod tests {
 
             create_test_file(client.clone())
                 .then(move |res| {
-                    let (_dir, file) = unwrap!(res);
-                    file_helper::read(c2, &file)
-                })
+                          let (_dir, file) = unwrap!(res);
+                          file_helper::read(c2, &file)
+                      })
                 .then(|res| {
-                    let reader = unwrap!(res);
-                    let size = reader.size();
-                    println!("reading {} bytes", size);
-                    reader.read(0, size)
-                })
+                          let reader = unwrap!(res);
+                          let size = reader.size();
+                          println!("reading {} bytes", size);
+                          reader.read(0, size)
+                      })
                 .map(move |data| {
-                    assert_eq!(data, vec![0u8; 100]);
-                })
+                         assert_eq!(data, vec![0u8; 100]);
+                     })
         });
     }
 
@@ -259,23 +255,22 @@ mod tests {
                     file_helper::update_content(c2, dir, "hello.txt", file, 1, Mode::Overwrite)
                 })
                 .then(move |res| {
-                    let writer = unwrap!(res);
-                    writer.write(&[1u8; NEW_SIZE])
-                        .and_then(move |_| writer.close())
-                })
+                          let writer = unwrap!(res);
+                          writer.write(&[1u8; NEW_SIZE]).and_then(move |_| writer.close())
+                      })
                 .then(move |res| {
-                    let file = unwrap!(res);
-                    file_helper::read(c3, &file)
-                })
+                          let file = unwrap!(res);
+                          file_helper::read(c3, &file)
+                      })
                 .then(|res| {
-                    let reader = unwrap!(res);
-                    let size = reader.size();
-                    println!("reading {} bytes", size);
-                    reader.read(0, size)
-                })
+                          let reader = unwrap!(res);
+                          let size = reader.size();
+                          println!("reading {} bytes", size);
+                          reader.read(0, size)
+                      })
                 .map(|data| {
-                    assert_eq!(data, vec![1u8; 50]);
-                })
+                         assert_eq!(data, vec![1u8; 50]);
+                     })
         });
     }
 
@@ -287,28 +282,27 @@ mod tests {
 
             create_test_file(client.clone())
                 .then(move |res| {
-                    let (dir, file) = unwrap!(res);
-                    // Update - should append (after S.E behaviour changed)
-                    file_helper::update_content(c2, dir, "hello.txt", file, 1, Mode::Modify)
-                })
+                          let (dir, file) = unwrap!(res);
+                          // Update - should append (after S.E behaviour changed)
+                          file_helper::update_content(c2, dir, "hello.txt", file, 1, Mode::Modify)
+                      })
                 .then(move |res| {
-                    let writer = unwrap!(res);
-                    writer.write(&[2u8; APPEND_SIZE])
-                        .and_then(move |_| writer.close())
-                })
+                          let writer = unwrap!(res);
+                          writer.write(&[2u8; APPEND_SIZE]).and_then(move |_| writer.close())
+                      })
                 .then(move |res| {
-                    let file = unwrap!(res);
-                    file_helper::read(c3, &file)
-                })
+                          let file = unwrap!(res);
+                          file_helper::read(c3, &file)
+                      })
                 .then(|res| {
                     let reader = unwrap!(res);
                     let size = reader.size();
-                    reader.read(0, size)
-                        .map(move |data| {
-                            assert_eq!(size, (ORIG_SIZE + APPEND_SIZE) as u64);
-                            assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
-                            assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
-                        })
+                    reader.read(0, size).map(move |data| {
+                                                 assert_eq!(size, (ORIG_SIZE + APPEND_SIZE) as u64);
+                                                 assert_eq!(data[0..ORIG_SIZE].to_owned(),
+                                                            vec![0u8; ORIG_SIZE]);
+                                                 assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
+                                             })
                 })
         });
     }
@@ -321,17 +315,17 @@ mod tests {
 
             create_test_file(client.clone())
                 .then(move |res| {
-                    let (dir, mut file) = unwrap!(res);
-                    file.set_user_metadata(vec![12u8; 10]);
-                    file_helper::update(c2, dir, "hello.txt", file, 1)
-                })
+                          let (dir, mut file) = unwrap!(res);
+                          file.set_user_metadata(vec![12u8; 10]);
+                          file_helper::update(c2, dir, "hello.txt", file, 1)
+                      })
                 .then(move |res| {
-                    assert!(res.is_ok());
-                    file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
-                })
+                          assert!(res.is_ok());
+                          file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
+                      })
                 .map(move |(_version, file)| {
-                    assert_eq!(*file.user_metadata(), [12u8; 10][..]);
-                })
+                         assert_eq!(*file.user_metadata(), [12u8; 10][..]);
+                     })
         });
     }
 
@@ -343,13 +337,13 @@ mod tests {
 
             create_test_file(client.clone())
                 .then(move |res| {
-                    let (dir, _file) = unwrap!(res);
-                    file_helper::delete(c2, dir, "hello.txt", 1)
-                })
+                          let (dir, _file) = unwrap!(res);
+                          file_helper::delete(c2, dir, "hello.txt", 1)
+                      })
                 .then(move |res| {
-                    assert!(res.is_ok());
-                    file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
-                })
+                          assert!(res.is_ok());
+                          file_helper::fetch(c3.clone(), unwrap!(c3.user_root_dir()), "hello.txt")
+                      })
                 .then(move |res| -> Result<_, CoreError> {
                     match res {
                         Ok(_) => {

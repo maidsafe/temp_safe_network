@@ -46,7 +46,7 @@ pub fn create_dir(client: &Client, is_public: bool) -> Box<NfsFuture<MDataInfo>>
                                                BTreeMap::new(),
                                                BTreeMap::new(),
                                                owners)
-                .map_err(CoreError::from));
+                                      .map_err(CoreError::from));
             client.put_mdata(dir_md)
                 .and_then(|()| Ok(dir))
                 .map_err(NfsError::from)
