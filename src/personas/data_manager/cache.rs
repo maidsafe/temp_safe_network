@@ -22,6 +22,7 @@ use maidsafe_utilities;
 use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable, Value, XorName};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
+use utils;
 
 /// The timeout for cached data from requests; if no consensus is reached, the data is dropped.
 const PENDING_WRITE_TIMEOUT_SECS: u64 = 60;
@@ -56,10 +57,16 @@ impl Cache {
 
         // Return all fragments that do not already have request ongoing.
         let mut result = HashMap::new();
-        for (holder, fragments) in self.needed_fragments.iter() {
+        for (holder, fragments) in &self.needed_fragments {
+            for fragment in fragments.keys() {
+                let _ = result.insert(fragment.clone(), *holder);
+            }
+        }
+
+        for (_, fragments) in &self.needed_fragments {
             for (fragment, request) in fragments {
-                if !request.is_ongoing() {
-                    let _ = result.insert(fragment.clone(), *holder);
+                if request.is_ongoing() {
+                    let _ = result.remove(fragment);
                 }
             }
         }
@@ -133,6 +140,37 @@ impl Cache {
         }
     }
 
+    pub fn stop_needed_fragment_request(&mut self,
+                                        holder: &XorName,
+                                        message_id: MessageId)
+                                        -> Option<FragmentInfo> {
+        let mut remove_holder = false;
+
+        let result = {
+            let fragments = match self.needed_fragments.get_mut(holder) {
+                Some(fragments) => fragments,
+                None => return None,
+            };
+
+
+            if let Some(fragment) = fragments.iter()
+                .find(|&(_, request)| request.message_id() == Some(message_id))
+                .map(|(fragment, _)| fragment.clone()) {
+                let _ = fragments.remove(&fragment);
+                remove_holder = fragments.is_empty();
+                Some(fragment)
+            } else {
+                None
+            }
+        };
+
+        if remove_holder {
+            let _ = self.needed_fragments.remove(&holder);
+        }
+
+        result
+    }
+
     /// Removes needed fragments that are no longer valid due to churn.
     /// Returns whether any of the pruned fragments had a request ongoing.
     pub fn prune_needed_fragments(&mut self, routing_table: &RoutingTable<XorName>) -> bool {
@@ -168,32 +206,21 @@ impl Cache {
         result
     }
 
-    pub fn remove_needed_fragment(&mut self, holder: &XorName, message_id: MessageId) -> bool {
-        let mut remove_holder = false;
+    // Removes the given fragment from all holders.
+    pub fn remove_needed_fragment(&mut self, fragment: &FragmentInfo) {
+        let mut empty_holders = Vec::new();
 
-        let result = {
-            let fragments = match self.needed_fragments.get_mut(holder) {
-                Some(fragments) => fragments,
-                None => return false,
-            };
+        for (holder, fragments) in &mut self.needed_fragments {
+            let _ = fragments.remove(fragment);
 
-
-            if let Some(fragment) = fragments.iter()
-                .find(|&(_, request)| request.message_id() == Some(message_id))
-                .map(|(fragment, _)| fragment.clone()) {
-                let _ = fragments.remove(&fragment);
-                remove_holder = fragments.is_empty();
-                true
-            } else {
-                false
+            if fragments.is_empty() {
+                empty_holders.push(*holder);
             }
-        };
-
-        if remove_holder {
-            let _ = self.needed_fragments.remove(&holder);
         }
 
-        result
+        for holder in empty_holders {
+            let _ = self.needed_fragments.remove(&holder);
+        }
     }
 
     pub fn is_in_unneeded(&self, data_id: &DataId) -> bool {
@@ -436,12 +463,7 @@ pub enum FragmentInfo {
 impl FragmentInfo {
     /// Create `FragmentInfo` for the shell of the given mutable data.
     pub fn mutable_data_shell(data: &MutableData) -> Self {
-        let shell = (*data.name(),
-                     data.tag(),
-                     data.version(),
-                     data.owners().clone(),
-                     data.permissions().clone());
-        let hash = maidsafe_utilities::big_endian_sip_hash(&shell);
+        let hash = utils::mdata_shell_hash(data);
 
         FragmentInfo::MutableDataShell {
             name: *data.name(),
@@ -453,8 +475,8 @@ impl FragmentInfo {
 
     /// Create `FragmentInfo` for the given mutable data entry.
     pub fn mutable_data_entry(data: &MutableData, key: Vec<u8>, value: &Value) -> Self {
-        // TODO (adam): should we include entry_version in the hash?
-        let hash = maidsafe_utilities::big_endian_sip_hash(&value.content);
+        let hash = utils::mdata_value_hash(value);
+
         FragmentInfo::MutableDataEntry {
             name: *data.name(),
             tag: data.tag(),
@@ -574,6 +596,9 @@ mod tests {
         assert!(cache.insert_needed_fragment(fragment0.clone(), holder1));
         assert_eq!(cache.unrequested_needed_fragments().len(), 1);
 
-        // TODO: more tests
+        // Start request against one holder. The fragment should not appear among the unrequested
+        // fragments even though this fragment is still unrequested in different holder.
+        cache.start_needed_fragment_request(&fragment0, &holder0, MessageId::new());
+        assert_eq!(cache.unrequested_needed_fragments().len(), 0);
     }
 }

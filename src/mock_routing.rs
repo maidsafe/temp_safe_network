@@ -32,6 +32,26 @@ pub struct Node {
     pub sent_responses: HashMap<MessageId, ResponseWrapper>,
 }
 
+macro_rules! impl_request {
+    ($method:ident, $message:ident { $($pname:ident : $ptype:ty),* }) => {
+        pub fn $method(&mut self,
+                       src: Authority<XorName>,
+                       dst: Authority<XorName>,
+                       $($pname : $ptype),*)
+                       -> Result<(), InterfaceError> {
+            self.send_request(src,
+                              dst,
+                              Request::$message {
+                                $($pname : $pname),*,
+                              })
+        }
+    };
+
+    ($method:ident, $message:ident { $($pname:ident : $ptype:ty),*, }) => {
+        impl_request!($method, $message { $($pname : $ptype),* });
+    };
+}
+
 macro_rules! impl_response {
     ($method:ident, $message:ident, $payload:ty) => {
         pub fn $method(&mut self,
@@ -83,67 +103,39 @@ impl Node {
         unwrap!(self.routing_table.add(name));
     }
 
-    pub fn send_get_idata_request(&mut self,
-                                  src: Authority<XorName>,
-                                  dst: Authority<XorName>,
-                                  name: XorName,
-                                  msg_id: MessageId)
-                                  -> Result<(), InterfaceError> {
-        self.send_request(src,
-                          dst,
-                          Request::GetIData {
-                              name: name,
-                              msg_id: msg_id,
-                          })
-    }
+    impl_request!(send_get_idata_request,
+                  GetIData {
+                      name: XorName,
+                      msg_id: MessageId,
+                  });
 
-    pub fn send_put_idata_request(&mut self,
-                                  src: Authority<XorName>,
-                                  dst: Authority<XorName>,
-                                  data: ImmutableData,
-                                  msg_id: MessageId)
-                                  -> Result<(), InterfaceError> {
-        self.send_request(src,
-                          dst,
-                          Request::PutIData {
-                              data: data,
-                              msg_id: msg_id,
-                          })
-    }
+    impl_request!(send_put_idata_request,
+                  PutIData {
+                      data: ImmutableData,
+                      msg_id: MessageId,
+                  });
 
-    pub fn send_put_mdata_request(&mut self,
-                                  src: Authority<XorName>,
-                                  dst: Authority<XorName>,
-                                  data: MutableData,
-                                  msg_id: MessageId,
-                                  requester: sign::PublicKey)
-                                  -> Result<(), InterfaceError> {
-        self.send_request(src,
-                          dst,
-                          Request::PutMData {
-                              data: data,
-                              msg_id: msg_id,
-                              requester: requester,
-                          })
-    }
+    impl_request!(send_put_mdata_request,
+                  PutMData {
+                      data: MutableData,
+                      msg_id: MessageId,
+                      requester: sign::PublicKey,
+                  });
 
-    pub fn send_get_mdata_value_request(&mut self,
-                                        src: Authority<XorName>,
-                                        dst: Authority<XorName>,
-                                        name: XorName,
-                                        tag: u64,
-                                        key: Vec<u8>,
-                                        msg_id: MessageId)
-                                        -> Result<(), InterfaceError> {
-        self.send_request(src,
-                          dst,
-                          Request::GetMDataValue {
-                              name: name,
-                              tag: tag,
-                              key: key,
-                              msg_id: msg_id,
-                          })
-    }
+    impl_request!(send_get_mdata_shell_request,
+                  GetMDataShell {
+                      name: XorName,
+                      tag: u64,
+                      msg_id: MessageId,
+                  });
+
+    impl_request!(send_get_mdata_value_request,
+                  GetMDataValue {
+                      name: XorName,
+                      tag: u64,
+                      key: Vec<u8>,
+                      msg_id: MessageId
+                  });
 
     pub fn send_refresh_request(&mut self,
                                 src: Authority<XorName>,
@@ -158,6 +150,7 @@ impl Node {
     impl_response!(send_get_idata_response, GetIData, ImmutableData);
     impl_response!(send_put_idata_response, PutIData);
     impl_response!(send_put_mdata_response, PutMData);
+    impl_response!(send_get_mdata_shell_response, GetMDataShell, MutableData);
     impl_response!(send_get_mdata_version_response, GetMDataVersion, u64);
     impl_response!(send_list_mdata_entries_response,
                    ListMDataEntries, BTreeMap<Vec<u8>, Value>);
@@ -250,20 +243,21 @@ impl NodeBuilder {
     }
 }
 
+#[derive(Debug)]
 pub struct ResponseWrapper {
     pub src: Authority<XorName>,
     pub dst: Authority<XorName>,
     pub response: Response,
 }
 
+#[derive(Debug)]
 pub struct RequestWrapper {
     pub src: Authority<XorName>,
     pub dst: Authority<XorName>,
     pub request: Request,
 }
 
-// TODO: consider adding these should be added to impl Request / impl Response
-//       in routing.
+// TODO: consider adding these to impl Request / impl Response in routing.
 
 fn request_id(request: &Request) -> MessageId {
     match *request {
@@ -272,6 +266,7 @@ fn request_id(request: &Request) -> MessageId {
         Request::PutIData { msg_id, .. } => msg_id,
         Request::GetIData { msg_id, .. } => msg_id,
         Request::PutMData { msg_id, .. } => msg_id,
+        Request::GetMDataShell { msg_id, .. } => msg_id,
         Request::GetMDataVersion { msg_id, .. } => msg_id,
         Request::ListMDataEntries { msg_id, .. } => msg_id,
         Request::ListMDataKeys { msg_id, .. } => msg_id,
@@ -295,6 +290,7 @@ fn response_id(response: &Response) -> MessageId {
         Response::PutIData { msg_id, .. } => msg_id,
         Response::GetIData { msg_id, .. } => msg_id,
         Response::PutMData { msg_id, .. } => msg_id,
+        Response::GetMDataShell { msg_id, .. } => msg_id,
         Response::GetMDataVersion { msg_id, .. } => msg_id,
         Response::ListMDataEntries { msg_id, .. } => msg_id,
         Response::ListMDataKeys { msg_id, .. } => msg_id,

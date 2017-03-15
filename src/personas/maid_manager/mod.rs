@@ -663,7 +663,7 @@ mod tests {
 
         // Put initial mutable data
         let tag = rand::random();
-        let data = test_utils::gen_empty_mutable_data(tag, client_key, &mut rand::thread_rng());
+        let data = test_utils::gen_mutable_data(tag, 0, client_key, &mut rand::thread_rng());
 
         let msg_id = MessageId::new();
         unwrap!(mm.handle_put_mdata(&mut node, src, dst, data.clone(), msg_id, client_key));
@@ -783,7 +783,7 @@ mod tests {
 
         // Put a mutable data
         let tag = rand::random();
-        let data = test_utils::gen_empty_mutable_data(tag, owner_key, &mut rand::thread_rng());
+        let data = test_utils::gen_mutable_data(tag, 0, owner_key, &mut rand::thread_rng());
         let msg_id = MessageId::new();
         unwrap!(mm.handle_put_mdata(&mut node,
                                     owner_client,
@@ -854,9 +854,10 @@ mod tests {
                       src: Authority<XorName>,
                       dst: Authority<XorName>) {
         let client_key = assert_match!(src, Authority::Client { client_key, .. } => client_key);
-        let account_packet = test_utils::gen_empty_mutable_data(TYPE_TAG_SESSION_PACKET,
-                                                                client_key,
-                                                                &mut rand::thread_rng());
+        let account_packet = test_utils::gen_mutable_data(TYPE_TAG_SESSION_PACKET,
+                                                          0,
+                                                          client_key,
+                                                          &mut rand::thread_rng());
         let msg_id = MessageId::new();
         unwrap!(mm.handle_put_mdata(node, src, dst, account_packet, msg_id, client_key));
     }

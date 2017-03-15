@@ -29,7 +29,7 @@ use chunk_store::ChunkStore;
 use error::InternalError;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
-              RoutingTable, User, XorName};
+              RoutingTable, User, Value, XorName};
 use routing::ClientError;
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -37,6 +37,7 @@ use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
+use utils;
 use vault::RoutingNode;
 
 const MAX_FULL_PERCENT: u64 = 50;
@@ -224,9 +225,23 @@ impl DataManager {
                                     data: ImmutableData,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        // TODO (adam): shouldn't we remove the fragment from all holders?
-        self.cache.remove_needed_fragment(&src, msg_id);
+        let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src, msg_id) {
+            match fragment {
+                FragmentInfo::ImmutableData(ref name) if *name == *data.name() => {
+                    self.cache.remove_needed_fragment(&fragment);
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        };
+
         self.request_needed_fragments(routing_node)?;
+
+        if !valid {
+            return Ok(());
+        }
 
         // If we're no longer in the close group, return.
         if !close_to_address(routing_node, data.name()) {
@@ -254,7 +269,7 @@ impl DataManager {
                                     src: XorName,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        if !self.cache.remove_needed_fragment(&src, msg_id) {
+        if self.cache.stop_needed_fragment_request(&src, msg_id).is_none() {
             return Err(InternalError::InvalidMessage);
         }
 
@@ -324,6 +339,80 @@ impl DataManager {
                                    dst,
                                    msg_id,
                                    rejected)
+    }
+
+    pub fn handle_get_mdata_shell(&mut self,
+                                  routing_node: &mut RoutingNode,
+                                  src: Authority<XorName>,
+                                  dst: Authority<XorName>,
+                                  name: XorName,
+                                  tag: u64,
+                                  msg_id: MessageId)
+                                  -> Result<(), InternalError> {
+        let res = self.read_mdata(&src, name, tag, |data| Ok(data.shell()));
+        routing_node.send_get_mdata_shell_response(dst, src, res, msg_id)?;
+        Ok(())
+    }
+
+    pub fn handle_get_mdata_shell_success(&mut self,
+                                          routing_node: &mut RoutingNode,
+                                          src: XorName,
+                                          shell: MutableData,
+                                          msg_id: MessageId)
+                                          -> Result<(), InternalError> {
+        let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src, msg_id) {
+            let actual_hash = utils::mdata_shell_hash(&shell);
+
+            match fragment {
+                FragmentInfo::MutableDataShell { hash, .. } if hash == actual_hash => {
+                    self.cache.remove_needed_fragment(&fragment);
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        };
+
+        self.request_needed_fragments(routing_node)?;
+
+        if !valid {
+            return Ok(());
+        }
+
+        // If we're no longer in the close group, return.
+        if !close_to_address(routing_node, shell.name()) {
+            return Ok(());
+        }
+
+        let data = Data::Mutable(shell);
+        let data_id = data.id();
+
+        // TODO: if we already have the data, but with lower version, replace its
+        // shell with the new one. If we have higher version, do noting and return early.
+
+        // TODO: if there are entries for this data in the entry cache, apply them.
+
+        self.clean_chunk_store();
+        self.chunk_store.put(&data_id, &data)?;
+
+        // TODO: do this only if we didn't have the data previously.
+        // self.count_added_data(&data_id);
+        // log_status!(self);
+
+        Ok(())
+    }
+
+    pub fn handle_get_mdata_shell_failure(&mut self,
+                                          routing_node: &mut RoutingNode,
+                                          src: XorName,
+                                          msg_id: MessageId)
+                                          -> Result<(), InternalError> {
+        if self.cache.stop_needed_fragment_request(&src, msg_id).is_none() {
+            return Err(InternalError::InvalidMessage);
+        }
+
+        self.request_needed_fragments(routing_node)
     }
 
     pub fn handle_get_mdata_version(&mut self,
@@ -399,6 +488,71 @@ impl DataManager {
                                   |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry));
         routing_node.send_get_mdata_value_response(dst, src, res, msg_id)?;
         Ok(())
+    }
+
+    pub fn handle_get_mdata_value_success(&mut self,
+                                          routing_node: &mut RoutingNode,
+                                          src: XorName,
+                                          value: Value,
+                                          msg_id: MessageId)
+                                          -> Result<(), InternalError> {
+        let info = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src, msg_id) {
+            let actual_hash = utils::mdata_value_hash(&value);
+
+            match fragment {
+                FragmentInfo::MutableDataEntry { name, tag, ref key, hash, .. } if hash ==
+                                                                                   actual_hash => {
+                    self.cache.remove_needed_fragment(&fragment);
+                    Some((name, tag, key.clone()))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        self.request_needed_fragments(routing_node)?;
+
+        let (name, tag, key) = if let Some(info) = info {
+            info
+        } else {
+            return Ok(());
+        };
+
+        // If we're no longer in the close group, return.
+        // TODO (adam): consider performing this check only if the corresponding data
+        // is not in the chunk store, because if it is, we are probably still
+        // close to it.
+        if !close_to_address(routing_node, &name) {
+            return Ok(());
+        }
+
+        let data_id = DataId::Mutable(name, tag);
+
+        match self.chunk_store.get(&data_id) {
+            Ok(Data::Mutable(mut data)) => {
+                if data.mutate_entry_without_validation(key, value) {
+                    self.clean_chunk_store();
+                    self.chunk_store.put(&data_id, &Data::Mutable(data))?;
+                } else {
+                    // TODO (adam): what here?
+                }
+            }
+            Ok(_) => unreachable!(),
+            Err(_) => {
+                // TODO (adam): store the entry into the entry cache.
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn handle_get_mdata_value_failure(&mut self,
+                                          _routing_node: &mut RoutingNode,
+                                          _src: XorName,
+                                          _msg_id: MessageId)
+                                          -> Result<(), InternalError> {
+        unimplemented!()
     }
 
     pub fn handle_mutate_mdata_entries(&mut self,
@@ -890,12 +1044,8 @@ impl DataManager {
                         FragmentInfo::ImmutableData(name) => {
                             routing_node.send_get_idata_request(src, dst, name, msg_id)?;
                         }
-                        FragmentInfo::MutableDataShell { name: _name, tag: _tag, .. } => {
-                            /* TODO (adam): implement the GetMDataShell request
+                        FragmentInfo::MutableDataShell { name, tag, .. } => {
                             routing_node.send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
-                            */
-
-                            unimplemented!()
                         }
                         FragmentInfo::MutableDataEntry { name, tag, ref key, .. } => {
                             routing_node.send_get_mdata_value_request(src,

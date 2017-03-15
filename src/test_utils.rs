@@ -16,9 +16,9 @@
 // relating to use of the SAFE Network Software.
 
 use rand::{self, Rand, Rng};
-use routing::{Authority, ImmutableData, MutableData, XorName};
+use routing::{Authority, ImmutableData, MutableData, Value, XorName};
 use rust_sodium::crypto::sign;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use utils;
 
 macro_rules! assert_match {
@@ -53,19 +53,36 @@ pub fn gen_random_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableD
     ImmutableData::new(gen_random_vec(size, rng))
 }
 
-/// Generate mutable data with the given tag, owner and no entries.
-pub fn gen_empty_mutable_data<R: Rng>(tag: u64,
-                                      owner: sign::PublicKey,
-                                      rng: &mut R)
-                                      -> MutableData {
+/// Generate mutable data with the given tag, number of entries and owner.
+pub fn gen_mutable_data<R: Rng>(tag: u64,
+                                num_entries: usize,
+                                owner: sign::PublicKey,
+                                rng: &mut R)
+                                -> MutableData {
+    let mut entries = BTreeMap::new();
+    while entries.len() < num_entries {
+        let (key, value) = gen_mutable_data_entry(rng);
+        let _ = entries.insert(key, value);
+    }
+
     let mut owners = BTreeSet::new();
     let _ = owners.insert(owner);
 
-    unwrap!(MutableData::new(rng.gen(),
-                             tag,
-                             Default::default(),
-                             Default::default(),
-                             owners))
+    unwrap!(MutableData::new(rng.gen(), tag, Default::default(), entries, owners))
+}
+
+/// Generate mutable data entry (key, value) pair.
+pub fn gen_mutable_data_entry<R: Rng>(rng: &mut R) -> (Vec<u8>, Value) {
+    let key_size = rng.gen_range(1, 10);
+    let key = gen_random_vec(key_size, rng);
+
+    let value_size = rng.gen_range(1, 10);
+    let value = Value {
+        content: gen_random_vec(value_size, rng),
+        entry_version: 0,
+    };
+
+    (key, value)
 }
 
 /// Generate random `Client` authority and return it together with its client key.

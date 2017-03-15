@@ -15,7 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use routing::{Authority, XorName};
+use maidsafe_utilities;
+use routing::{Authority, MutableData, Value, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 
@@ -41,4 +42,17 @@ pub fn client_manager_name(authority: &Authority<XorName>) -> XorName {
     } else {
         unreachable!("Logic error")
     }
+}
+
+pub fn mdata_shell_hash(data: &MutableData) -> u64 {
+    let shell = (*data.name(),
+                 data.tag(),
+                 data.version(),
+                 data.owners().clone(),
+                 data.permissions().clone());
+    maidsafe_utilities::big_endian_sip_hash(&shell)
+}
+
+pub fn mdata_value_hash(value: &Value) -> u64 {
+    maidsafe_utilities::big_endian_sip_hash(&value)
 }

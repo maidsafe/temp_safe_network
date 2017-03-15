@@ -207,6 +207,13 @@ impl Vault {
                 self.data_manager
                     .handle_put_mdata(&mut self.routing_node, src, dst, data, msg_id, requester)
             }
+            // ========== GetMDataShell ==========
+            (src @ Authority::ManagedNode(_),
+             dst @ Authority::ManagedNode(_),
+             Request::GetMDataShell { name, tag, msg_id }) => {
+                self.data_manager
+                    .handle_get_mdata_shell(&mut self.routing_node, src, dst, name, tag, msg_id)
+            }
             // ========== GetMDataVersion ==========
             (src @ Authority::Client { .. },
              dst @ Authority::NaeManager(_),
@@ -453,6 +460,35 @@ impl Vault {
              Response::PutMData { res: Err(err), msg_id }) => {
                 self.maid_manager.handle_put_mdata_failure(&mut self.routing_node, err, msg_id)
             }
+            // ================== GetMDataShell success =============
+            (Authority::ManagedNode(src_name),
+             Authority::ManagedNode(_),
+             Response::GetMDataShell { res: Ok(shell), msg_id }) => {
+                self.data_manager
+                    .handle_get_mdata_shell_success(&mut self.routing_node, src_name, shell, msg_id)
+            }
+            // ================== GetMDataShell failure =============
+            (Authority::ManagedNode(src_name),
+             Authority::ManagedNode(_),
+             Response::GetMDataShell { res: Err(_), msg_id }) => {
+                self.data_manager
+                    .handle_get_mdata_shell_failure(&mut self.routing_node, src_name, msg_id)
+            }
+            // ================== GetMDataValue success =============
+            (Authority::ManagedNode(src_name),
+             Authority::ManagedNode(_),
+             Response::GetMDataValue { res: Ok(value), msg_id }) => {
+                self.data_manager
+                    .handle_get_mdata_value_success(&mut self.routing_node, src_name, value, msg_id)
+            }
+            // ================== GetMDataValue failure =============
+            (Authority::ManagedNode(src_name),
+             Authority::ManagedNode(_),
+             Response::GetMDataValue { res: Err(_), msg_id }) => {
+                self.data_manager
+                    .handle_get_mdata_value_failure(&mut self.routing_node, src_name, msg_id)
+            }
+
             // ================== Invalid Response ==================
             (_, _, response) => Err(InternalError::UnknownResponseType(response)),
         }

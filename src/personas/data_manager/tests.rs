@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::*;
-use maidsafe_utilities::serialisation::deserialise;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::{self, Rng};
 use routing::{EntryActions, Request, Response};
 use std::env;
@@ -77,7 +77,7 @@ fn mdata_basics() {
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let data = test_utils::gen_empty_mutable_data(TEST_TAG, client_key, &mut rng);
+    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
@@ -138,7 +138,7 @@ fn mdata_mutations() {
 
     let (client, client_key) = test_utils::gen_client_authority();
 
-    let data = test_utils::gen_empty_mutable_data(TEST_TAG, client_key, &mut rng);
+    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
@@ -218,7 +218,7 @@ fn mdata_change_owner() {
 
     let (client_0, client_0_key) = test_utils::gen_client_authority();
 
-    let data = test_utils::gen_empty_mutable_data(TEST_TAG, client_0_key, &mut rng);
+    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_0_key, &mut rng);
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
@@ -268,79 +268,305 @@ fn mdata_change_owner() {
 }
 
 #[test]
-fn churn_idata() {
+fn handle_node_added() {
     let mut rng = rand::thread_rng();
 
-    // N0 - this node has the data initially
-    let mut n0_node = RoutingNode::new();
-    let mut n0_dm = create_data_manager();
-    let n0_name = unwrap!(n0_node.name());
+    let mut node = RoutingNode::new();
+    let mut dm = create_data_manager();
 
-    // N1 - a new node that has joined the network.
-    let mut n1_node = RoutingNode::new();
-    let mut n1_dm = create_data_manager();
-    let n1_name = unwrap!(n1_node.name());
+    let new_node_name = rand::random();
+    node.add_to_routing_table(new_node_name);
 
-    // Other nodes in the group
-    let node_names: Vec<_> = rng.gen_iter().take(GROUP_SIZE - 2).collect();
+    let (_, client_key) = test_utils::gen_client_authority();
+    let data0 = test_utils::gen_random_immutable_data(10, &mut rng);
+    let data1 = test_utils::gen_mutable_data(TEST_TAG, 2, client_key, &mut rng);
 
-    n0_node.add_to_routing_table(n1_name);
-    n1_node.add_to_routing_table(n0_name);
+    dm.put_into_chunk_store(data0.clone());
+    dm.put_into_chunk_store(data1.clone());
 
-    for name in &node_names {
-        n0_node.add_to_routing_table(*name);
-        n1_node.add_to_routing_table(*name);
+    // Node receives NodeAdded event. It should send all the fragments that it has
+    // to the new node in a Refresh message.
+    let rt = node.routing_table().clone();
+    dm.handle_node_added(&mut node, &new_node_name, &rt);
+
+    assert_eq!(node.sent_requests.len(), 1);
+
+    let (_, message) = unwrap!(node.sent_requests.drain().next());
+
+    assert_eq!(message.src, Authority::ManagedNode(unwrap!(node.name())));
+    assert_eq!(message.dst, Authority::ManagedNode(new_node_name));
+
+    let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+    let fragments: Vec<FragmentInfo> = unwrap!(deserialise(&payload));
+
+    assert_eq!(fragments.len(), 4);
+
+    let check = fragments.iter().any(|fragment| match *fragment {
+        FragmentInfo::ImmutableData(ref name) if name == data0.name() => true,
+        _ => false,
+    });
+    assert!(check);
+
+    let check = fragments.iter().any(|fragment| match *fragment {
+        FragmentInfo::MutableDataShell { name, tag, version, .. } if name == *data1.name() &&
+                                                                     tag == data1.tag() &&
+                                                                     version == data1.version() => {
+            true
+        }
+        _ => false,
+    });
+    assert!(check);
+
+    for entry_key in data1.keys() {
+        let check = fragments.iter().any(|fragment| match *fragment {
+            FragmentInfo::MutableDataEntry { name, tag, ref key, .. } if name == *data1.name() &&
+                                                                         tag == data1.tag() &&
+                                                                         *key == *entry_key => true,
+            _ => false,
+        });
+        assert!(check);
     }
+
+    // TODO: test also that the refresh contains fragments that the node doesn't
+    // yet have, but needs.
+}
+
+#[test]
+fn idata_with_churn() {
+    let mut rng = rand::thread_rng();
+
+    let (mut new_node, mut new_dm, old_node_names) = setup_churn(&mut rng);
 
     let data = test_utils::gen_random_immutable_data(10, &mut rng);
-    n0_dm.put_into_chunk_store(data.clone());
 
-    // N0 receives node added event. It should send refresh containing all the
-    // fragments it holds to the new node.
-    let rt = n0_node.routing_table().clone();
-    n0_dm.handle_node_added(&mut n0_node, &n1_name, &rt);
+    let fragment = FragmentInfo::ImmutableData(*data.name());
+    let refresh_payload = unwrap!(serialise(&vec![fragment]));
 
-    assert_eq!(n0_node.sent_requests.len(), 1);
-    let (_, message) = unwrap!(n0_node.sent_requests.drain().next());
-    assert_eq!(message.src, Authority::ManagedNode(n0_name));
-    assert_eq!(message.dst, Authority::ManagedNode(n1_name));
-    let refresh_payload = assert_match!(message.request,
-                                        Request::Refresh(payload, _) => payload);
+    // NEW NODE receives the refresh message from one of the old nodes. The message
+    // should not accumulate yet.
+    unwrap!(new_dm.handle_refresh(&mut new_node, old_node_names[0], &refresh_payload));
+    assert!(new_node.sent_requests.is_empty());
 
-    let fragments: Vec<FragmentInfo> = unwrap!(deserialise(&refresh_payload));
-    assert_eq!(fragments.len(), 1);
-    assert_eq!(fragments[0], FragmentInfo::ImmutableData(*data.name()));
-
-    // N1 receives the refresh message from P0. The message should not accumulate yet.
-    unwrap!(n1_dm.handle_refresh(&mut n1_node, n0_name, &refresh_payload));
-    assert!(n1_node.sent_requests.is_empty());
-
-    // N1 receives the refresh from at least QUORUM other nodes. The message should now accumulate.
-    for node_name in node_names.iter().take(ACCUMULATOR_QUORUM - 1) {
-        unwrap!(n1_dm.handle_refresh(&mut n1_node, *node_name, &refresh_payload));
+    // NEW NODE receives the refresh from at least QUORUM other nodes. The message
+    // should now accumulate.
+    for name in old_node_names.iter().skip(1).take(ACCUMULATOR_QUORUM - 1) {
+        unwrap!(new_dm.handle_refresh(&mut new_node, *name, &refresh_payload));
     }
 
-    assert_eq!(n1_node.sent_requests.len(), 1);
-    let (msg_id, message) = unwrap!(n1_node.sent_requests.drain().next());
-    let name = assert_match!(message.request,
-                             Request::GetIData { name, .. } => name);
-    let dst = assert_match!(message.dst, Authority::ManagedNode(name) => name);
-    assert_eq!(name, *data.name());
+    // Helper function to verify the node sent the get request for a data with
+    // the given name. Returns the message id and the destination authority name
+    // of the request.
+    fn verify_get_idata_request_sent(node: &mut RoutingNode,
+                                     data_name: &XorName)
+                                     -> (MessageId, XorName) {
+        assert_eq!(node.sent_requests.len(), 1);
+        let (msg_id, message) = unwrap!(node.sent_requests.drain().next());
+        let name = assert_match!(message.request,
+                                 Request::GetIData { name, .. } => name);
+        assert_eq!(name, *data_name);
+        let dst = assert_match!(message.dst, Authority::ManagedNode(name) => name);
+
+        (msg_id, dst)
+    }
+
+    let (msg_id, dst) = verify_get_idata_request_sent(&mut new_node, data.name());
 
     // One of the nodes receives the above GetIData requests and sends the
     // response. We gloss over that here, as it's not the focus of the test.
 
-    // N1 receives response to the get request. It should put the data into the chunk store.
-    unwrap!(n1_dm.handle_get_idata_success(&mut n1_node, dst, data.clone(), msg_id));
-    assert!(n1_dm.get_from_chunk_store(&DataId::Immutable(*data.name())).is_some());
+    // Simulate failure of the GetIData request. NEW NODE should retry the request with
+    // another holder.
+    unwrap!(new_dm.handle_get_idata_failure(&mut new_node, dst, msg_id));
+    let (msg_id, dst) = verify_get_idata_request_sent(&mut new_node, data.name());
 
-    // TODO: test also that if N1 receives get_idata failure, it retries the
-    // request with another holder.
+    // Again, we gloss over the request handling and response sending here.
+
+    // Simulate malicious node sending wrong data. NEW NODE should throw it away and
+    // send another request to another holder.
+    let bad_data = test_utils::gen_random_immutable_data(10, &mut rng);
+    let bad_data_name = *bad_data.name();
+    unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, bad_data, msg_id));
+    assert!(new_dm.get_from_chunk_store(&DataId::Immutable(bad_data_name)).is_none());
+    let (msg_id, dst) = verify_get_idata_request_sent(&mut new_node, data.name());
+
+    // ...
+
+    // NEW NODE now receives successful response. It should put the data into the chunk store.
+    unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, data.clone(), msg_id));
+    assert!(new_dm.get_from_chunk_store(&DataId::Immutable(*data.name())).is_some());
+
+    // NEW NODE should not send any more requests to the other holders, because it already
+    // has everything it needs.
+    assert!(new_node.sent_requests.is_empty());
 }
+
+#[test]
+fn mdata_with_churn() {
+    let mut rng = rand::thread_rng();
+
+    let (_, client_key) = test_utils::gen_client_authority();
+    let data = test_utils::gen_mutable_data(TEST_TAG, 2, client_key, &mut rng);
+
+    let (mut new_node, mut new_dm) = setup_mdata_refresh(&data, &mut rng);
+
+    // NEW NODE should sent one request for the shell and one request for each entry.
+    assert_eq!(new_node.sent_requests.len(), 3);
+    let (shell_msg_id, shell_dst) = take_get_mdata_shell_request(&mut new_node);
+    let entry_messages = take_get_mdata_value_requests(&mut new_node);
+    assert_eq!(entry_messages.len(), 2);
+
+    // NEW NODE receives responses for the above requests. It should put the complete
+    // data (shell + entries) into the chunk store.
+    unwrap!(new_dm.handle_get_mdata_shell_success(&mut new_node,
+                                                  shell_dst,
+                                                  data.shell(),
+                                                  shell_msg_id));
+
+    for (msg_id, dst, key) in entry_messages {
+        let value = unwrap!(data.get(&key)).clone();
+        unwrap!(new_dm.handle_get_mdata_value_success(&mut new_node,
+                                                      dst,
+                                                      value,
+                                                      msg_id));
+    }
+
+    let stored_data = assert_match!(
+        new_dm.get_from_chunk_store(&DataId::mutable(&data)),
+        Some(Data::Mutable(data)) => data);
+    assert_eq!(stored_data, data);
+
+    // NEW NODE should not send any more requests, because it already has everything it needs.
+    assert!(new_node.sent_requests.is_empty());
+}
+
+#[test]
+fn mdata_with_churn_with_response_failure() {
+    let mut rng = rand::thread_rng();
+
+    let (_, client_key) = test_utils::gen_client_authority();
+    let data = test_utils::gen_mutable_data(TEST_TAG, 1, client_key, &mut rng);
+
+    let (mut new_node, mut new_dm) = setup_mdata_refresh(&data, &mut rng);
+
+    let (msg_id, dst0) = take_get_mdata_shell_request(&mut new_node);
+
+    // Simulate receiving failure response. The node should retry the request with
+    // different holder.
+    unwrap!(new_dm.handle_get_mdata_shell_failure(&mut new_node,
+                                                  dst0,
+                                                  msg_id));
+    assert!(new_dm.get_from_chunk_store(&DataId::mutable(&data)).is_none());
+
+    let (_, dst1) = take_get_mdata_shell_request(&mut new_node);
+    assert!(dst0 != dst1);
+}
+
+#[test]
+fn mdata_with_churn_with_hash_mismatch() {
+    let mut rng = rand::thread_rng();
+
+    let (_, client_key) = test_utils::gen_client_authority();
+    let data = test_utils::gen_mutable_data(TEST_TAG, 1, client_key, &mut rng);
+    let bad_data = test_utils::gen_mutable_data(TEST_TAG, 1, client_key, &mut rng);
+
+    let (mut new_node, mut new_dm) = setup_mdata_refresh(&data, &mut rng);
+
+    let (shell_msg_id, shell_dst0) = take_get_mdata_shell_request(&mut new_node);
+    let (entry_msg_id, entry_dst0, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
+
+    // Simulate malicious node sending wrong data. The node should reject it and retry the request
+    // with other holder.
+    unwrap!(new_dm.handle_get_mdata_shell_success(&mut new_node,
+                                                  shell_dst0,
+                                                  bad_data.shell(),
+                                                  shell_msg_id));
+    assert!(new_dm.get_from_chunk_store(&DataId::mutable(&bad_data)).is_none());
+
+    let (_, shell_dst1) = take_get_mdata_shell_request(&mut new_node);
+    assert!(shell_dst0 != shell_dst1);
+
+    let bad_value = unwrap!(bad_data.values().into_iter().next()).clone();
+    unwrap!(new_dm.handle_get_mdata_value_success(&mut new_node,
+                                                  entry_dst0,
+                                                  bad_value,
+                                                  entry_msg_id));
+
+    let (_, entry_dst1, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
+    assert!(entry_dst0 != entry_dst1);
+}
+
+// TODO: test also entries arriving before shell.
+// TODO: test also GetMDataShell response when we already have the data (test both
+//       lower and higher versions and the case when the data in the chunk store already
+//       has entries)
 
 fn create_data_manager() -> DataManager {
     let suffix: u64 = rand::random();
     let dir = format!("{}_{}", CHUNK_STORE_DIR, suffix);
 
     unwrap!(DataManager::new(env::temp_dir().join(dir), CHUNK_STORE_CAPACITY))
+}
+
+// Create all the objects necessary for churn-related tests.
+// Returns:
+//   - new node (RoutingNode + DataManager),
+//   - names of the rest of the nodes in the group.
+fn setup_churn<R: Rng>(rng: &mut R) -> (RoutingNode, DataManager, Vec<XorName>) {
+    let mut new_node = RoutingNode::new();
+    let new_dm = create_data_manager();
+
+    let old_node_names: Vec<_> = rng.gen_iter().take(GROUP_SIZE - 1).collect();
+
+    for name in &old_node_names {
+        new_node.add_to_routing_table(*name);
+    }
+
+    (new_node, new_dm, old_node_names)
+}
+
+fn setup_mdata_refresh<R: Rng>(data: &MutableData, rng: &mut R) -> (RoutingNode, DataManager) {
+    let (mut new_node, mut new_dm, old_node_names) = setup_churn(rng);
+
+    let fragments = FragmentInfo::mutable_data(&data);
+    let refresh_payload = unwrap!(serialise(&fragments));
+
+    // Node receives the refresh messages from at least QUORUM other nodes and it accumulates.
+    for name in old_node_names.iter().take(ACCUMULATOR_QUORUM) {
+        unwrap!(new_dm.handle_refresh(&mut new_node, *name, &refresh_payload));
+    }
+
+    (new_node, new_dm)
+}
+
+// Removes GetMDataShell request from the list of sent requests and returns its message id and
+// destination authority name.
+fn take_get_mdata_shell_request(node: &mut RoutingNode) -> (MessageId, XorName) {
+    let result = node.sent_requests
+        .iter()
+        .filter_map(|(msg_id, message)| match (&message.request, message.dst) {
+            (&Request::GetMDataShell { .. }, Authority::ManagedNode(dst)) => Some((*msg_id, dst)),
+            _ => None,
+        })
+        .next();
+    let (msg_id, dst) = unwrap!(result);
+    let _ = node.sent_requests.remove(&msg_id);
+    (msg_id, dst)
+}
+
+fn take_get_mdata_value_requests(node: &mut RoutingNode) -> Vec<(MessageId, XorName, Vec<u8>)> {
+    let result: Vec<_> = node.sent_requests
+        .iter()
+        .filter_map(|(msg_id, message)| match (&message.request, message.dst) {
+            (&Request::GetMDataValue { ref key, .. }, Authority::ManagedNode(dst)) => {
+                Some((*msg_id, dst, key.clone()))
+            }
+            _ => None,
+        })
+        .collect();
+
+    for &(msg_id, _, _) in &result {
+        let _ = node.sent_requests.remove(&msg_id);
+    }
+
+    result
 }
