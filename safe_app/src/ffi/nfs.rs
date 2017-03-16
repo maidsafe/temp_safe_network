@@ -50,9 +50,9 @@ pub unsafe extern "C" fn file_fetch(app: *const App,
 
             file_helper::fetch(client.clone(), parent.clone(), file_name)
                 .map(move |(version, file)| {
-                    let ffi_file = file.into_repr_c();
-                    o_cb(user_data.0, 0, &ffi_file, version)
-                })
+                         let ffi_file = file.into_repr_c();
+                         o_cb(user_data.0, 0, &ffi_file, version)
+                     })
                 .map_err(AppError::from)
                 .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null(), 0))
                 .into_box()
@@ -169,8 +169,8 @@ mod tests {
         // Fetch it back.
         let (retrieved_file, retrieved_version): (NativeFile, u64) = unsafe {
             unwrap!(call_2(|ud, cb| {
-                file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
-            }))
+                               file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
+                           }))
         };
         assert_eq!(retrieved_file.user_metadata(), &user_metadata[..]);
         assert_eq!(retrieved_file.size(), 0);

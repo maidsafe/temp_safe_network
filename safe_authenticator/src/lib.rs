@@ -186,9 +186,9 @@ impl Authenticator {
         let core_tx = rx.recv()??;
 
         Ok(Authenticator {
-            core_tx: Mutex::new(core_tx),
-            _core_joiner: joiner,
-        })
+               core_tx: Mutex::new(core_tx),
+               _core_joiner: joiner,
+           })
     }
 
     /// Log in to an existing account
@@ -227,9 +227,9 @@ impl Authenticator {
         let core_tx = rx.recv()??;
 
         Ok(Authenticator {
-            core_tx: Mutex::new(core_tx),
-            _core_joiner: joiner,
-        })
+               core_tx: Mutex::new(core_tx),
+               _core_joiner: joiner,
+           })
     }
 }
 

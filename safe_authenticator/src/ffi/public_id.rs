@@ -42,9 +42,9 @@ pub unsafe extern "C" fn authenticator_public_id_create(auth: *const Authenticat
         (*auth).send(move |client| {
             public_id::create(client, public_id)
                 .then(move |res| {
-                    o_cb(user_data.0, ffi_result_code!(res));
-                    Ok(())
-                })
+                          o_cb(user_data.0, ffi_result_code!(res));
+                          Ok(())
+                      })
                 .into_box()
                 .into()
         })
@@ -100,15 +100,21 @@ mod tests {
         // Create public id first time succeeds.
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                authenticator_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb)
-            }))
+                               authenticator_public_id_create(&authenticator,
+                                                              ffi_public_id.as_ptr(),
+                                                              ud,
+                                                              cb)
+                           }))
         }
 
         // Attempt to create already existing public id fails.
         let res = unsafe {
             call_0(|ud, cb| {
-                authenticator_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb)
-            })
+                       authenticator_public_id_create(&authenticator,
+                                                      ffi_public_id.as_ptr(),
+                                                      ud,
+                                                      cb)
+                   })
         };
 
         match res {
@@ -138,8 +144,11 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                authenticator_public_id_create(&authenticator, ffi_public_id.as_ptr(), ud, cb)
-            }))
+                               authenticator_public_id_create(&authenticator,
+                                                              ffi_public_id.as_ptr(),
+                                                              ud,
+                                                              cb)
+                           }))
         }
 
         // Now retrieving it succeeds.

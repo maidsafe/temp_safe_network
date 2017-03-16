@@ -64,12 +64,12 @@ impl AuthGranted {
         let bootstrap_config = serialise(&bootstrap_config)?;
         let (ptr, len, cap) = vec_into_raw_parts(bootstrap_config);
         Ok(ffi::AuthGranted {
-            app_keys: app_keys.into_repr_c(),
-            access_container: access_container.into_repr_c(),
-            bootstrap_config_ptr: ptr,
-            bootstrap_config_len: len,
-            bootstrap_config_cap: cap,
-        })
+               app_keys: app_keys.into_repr_c(),
+               access_container: access_container.into_repr_c(),
+               bootstrap_config_ptr: ptr,
+               bootstrap_config_len: len,
+               bootstrap_config_cap: cap,
+           })
     }
 }
 
@@ -86,10 +86,10 @@ impl ReprC for AuthGranted {
         let bootstrap_config = slice::from_raw_parts(bootstrap_config_ptr, bootstrap_config_len);
         let bootstrap_config = deserialise(bootstrap_config)?;
         Ok(AuthGranted {
-            app_keys: AppKeys::clone_from_repr_c(app_keys)?,
-            bootstrap_config: bootstrap_config,
-            access_container: AccessContInfo::clone_from_repr_c(access_container)?,
-        })
+               app_keys: AppKeys::clone_from_repr_c(app_keys)?,
+               bootstrap_config: bootstrap_config,
+               access_container: AccessContInfo::clone_from_repr_c(access_container)?,
+           })
     }
 }
 
@@ -150,13 +150,13 @@ impl ReprC for AppKeys {
 
     unsafe fn clone_from_repr_c(raw: Self::C) -> Result<Self, Self::Error> {
         Ok(AppKeys {
-            owner_key: sign::PublicKey(raw.owner_key),
-            enc_key: secretbox::Key(raw.enc_key),
-            sign_pk: sign::PublicKey(raw.sign_pk),
-            sign_sk: sign::SecretKey(raw.sign_sk),
-            enc_pk: box_::PublicKey(raw.enc_pk),
-            enc_sk: box_::SecretKey(raw.enc_sk),
-        })
+               owner_key: sign::PublicKey(raw.owner_key),
+               enc_key: secretbox::Key(raw.enc_key),
+               sign_pk: sign::PublicKey(raw.sign_pk),
+               sign_sk: sign::SecretKey(raw.sign_sk),
+               enc_pk: box_::PublicKey(raw.enc_pk),
+               enc_sk: box_::SecretKey(raw.enc_sk),
+           })
     }
 }
 
@@ -197,10 +197,10 @@ impl AccessContInfo {
     pub fn from_mdata_info(md: MDataInfo) -> Result<AccessContInfo, IpcError> {
         if let Some((_, Some(nonce))) = md.enc_info {
             Ok(AccessContInfo {
-                id: md.name,
-                tag: md.type_tag,
-                nonce: nonce,
-            })
+                   id: md.name,
+                   tag: md.type_tag,
+                   nonce: nonce,
+               })
         } else {
             Err(IpcError::Unexpected("MDataInfo doesn't contain nonce".to_owned()))
         }
@@ -213,10 +213,10 @@ impl ReprC for AccessContInfo {
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
         Ok(AccessContInfo {
-            id: XorName(repr_c.id),
-            tag: repr_c.tag,
-            nonce: secretbox::Nonce(repr_c.nonce),
-        })
+               id: XorName(repr_c.id),
+               tag: repr_c.tag,
+               nonce: secretbox::Nonce(repr_c.nonce),
+           })
     }
 }
 
@@ -337,7 +337,11 @@ mod tests {
 
         let a = unsafe { unwrap!(AccessContInfo::clone_from_repr_c(ffi)) };
 
-        assert_eq!(a.id.0.iter().sum::<u8>() as usize, 2 * XOR_NAME_LEN);
+        assert_eq!(a.id
+                       .0
+                       .iter()
+                       .sum::<u8>() as usize,
+                   2 * XOR_NAME_LEN);
         assert_eq!(a.tag, 681);
         assert_eq!(a.nonce, nonce);
     }

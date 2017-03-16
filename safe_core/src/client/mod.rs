@@ -149,15 +149,15 @@ impl Client {
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
-            el_handle: el_handle,
-            routing: routing,
-            hooks: HashMap::with_capacity(10),
-            cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            client_type: ClientType::Unregistered,
-            timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
-            joiner: joiner,
-            session_packet_version: 0,
-        }))
+                         el_handle: el_handle,
+                         routing: routing,
+                         hooks: HashMap::with_capacity(10),
+                         cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
+                         client_type: ClientType::Unregistered,
+                         timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
+                         joiner: joiner,
+                         session_packet_version: 0,
+                     }))
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
@@ -222,15 +222,15 @@ impl Client {
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
-            el_handle: el_handle,
-            routing: routing,
-            hooks: HashMap::with_capacity(10),
-            cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
-            timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
-            joiner: joiner,
-            session_packet_version: 0,
-        }))
+                         el_handle: el_handle,
+                         routing: routing,
+                         hooks: HashMap::with_capacity(10),
+                         cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
+                         client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
+                         timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
+                         joiner: joiner,
+                         session_packet_version: 0,
+                     }))
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
@@ -258,10 +258,10 @@ impl Client {
             let (routing, routing_rx) = setup_routing(None, None)?;
 
             routing.get_mdata_value(dst,
-                                 acc_loc,
-                                 TYPE_TAG_SESSION_PACKET,
-                                 b"Login".to_vec(),
-                                 msg_id)?;
+                                    acc_loc,
+                                    TYPE_TAG_SESSION_PACKET,
+                                    b"Login".to_vec(),
+                                    msg_id)?;
 
             match wait_for_response!(routing_rx, Response::GetMDataValue, msg_id) {
                 Ok(Value { content, entry_version }) => (content, entry_version),
@@ -285,15 +285,15 @@ impl Client {
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
-            el_handle: el_handle,
-            routing: routing,
-            hooks: HashMap::with_capacity(10),
-            cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
-            timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
-            joiner: joiner,
-            session_packet_version: acc_version,
-        }))
+                         el_handle: el_handle,
+                         routing: routing,
+                         hooks: HashMap::with_capacity(10),
+                         cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
+                         client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
+                         timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
+                         joiner: joiner,
+                         session_packet_version: acc_version,
+                     }))
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
@@ -314,15 +314,15 @@ impl Client {
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
 
         Ok(Self::new(Inner {
-            el_handle: el_handle,
-            routing: routing,
-            hooks: HashMap::with_capacity(10),
-            cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-            client_type: ClientType::from_keys(keys, owner),
-            timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
-            joiner: joiner,
-            session_packet_version: 0,
-        }))
+                         el_handle: el_handle,
+                         routing: routing,
+                         hooks: HashMap::with_capacity(10),
+                         cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
+                         client_type: ClientType::from_keys(keys, owner),
+                         timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
+                         joiner: joiner,
+                         session_packet_version: 0,
+                     }))
     }
 
     fn new(inner: Inner) -> Self {
@@ -353,9 +353,9 @@ impl Client {
                     let core_tx = core_tx.clone();
                     let net_tx = net_tx.clone();
                     CoreMsg::new(move |client, _| {
-                        client.restart_routing(core_tx, net_tx);
-                        None
-                    })
+                                     client.restart_routing(core_tx, net_tx);
+                                     None
+                                 })
                 };
                 let _ = core_tx.send(msg);
                 return;
@@ -376,7 +376,7 @@ impl Client {
         // Using in `if` keeps borrow alive. Do not try to combine the 2 lines into one.
         let opt = self.inner_mut().hooks.remove(id);
         if let Some(hook) = opt {
-            hook.complete(event);
+            let _ = hook.send(event);
         }
     }
 
@@ -395,25 +395,23 @@ impl Client {
         // Check if the data is in the cache. If it is, return it immediately.
         // If not, retrieve it from the network and store it in the cache.
         let rx = {
-            if let Some(data) = self.inner_mut()
-                .cache
-                .get_mut(&name) {
+            if let Some(data) = self.inner_mut().cache.get_mut(&name) {
                 trace!("ImmutableData found in cache.");
-                hook.complete(CoreEvent::GetIData(Ok(data.clone())));
+                let _ = hook.send(CoreEvent::GetIData(Ok(data.clone())));
                 return rx.into_box();
             }
 
             let inner = self.inner.clone();
             rx.map(move |data| {
-                    let _ = inner.borrow_mut().cache.insert(*data.name(), data.clone());
-                    data
-                })
+                         let _ = inner.borrow_mut().cache.insert(*data.name(), data.clone());
+                         data
+                     })
                 .into_box()
         };
 
         let result = self.routing_mut().get_idata(Authority::NaeManager(name), name, msg_id);
         if let Err(err) = result {
-            hook.complete(CoreEvent::GetIData(Err(CoreError::from(err))));
+            let _ = hook.send(CoreEvent::GetIData(Err(CoreError::from(err))));
         } else {
             self.insert_hook(msg_id, hook);
         }
@@ -449,8 +447,8 @@ impl Client {
 
         let requester = fry!(self.public_signing_key());
         self.mutate(|routing, dst, msg_id| {
-            routing.mutate_mdata_entries(dst, name, tag, actions, msg_id, requester)
-        })
+                        routing.mutate_mdata_entries(dst, name, tag, actions, msg_id, requester)
+                    })
     }
 
     /// Get a current version of `MutableData` from the network.
@@ -517,11 +515,14 @@ impl Client {
 
         let (hook, rx, msg_id) = oneshot!(self, CoreEvent::GetAccountInfo);
 
-        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
+        let dst = fry!(self.inner()
+                           .client_type
+                           .cm_addr()
+                           .map(|a| a.clone()));
         let result = self.routing_mut().get_account_info(dst, msg_id);
 
         if let Err(e) = result {
-            hook.complete(CoreEvent::GetAccountInfo(Err(From::from(e))));
+            let _ = hook.send(CoreEvent::GetAccountInfo(Err(From::from(e))));
         } else {
             self.insert_hook(msg_id, hook);
         }
@@ -616,7 +617,10 @@ impl Client {
     pub fn list_auth_keys_and_version(&self) -> Box<CoreFuture<(BTreeSet<sign::PublicKey>, u64)>> {
         trace!("ListAuthKeysAndVersion");
 
-        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
+        let dst = fry!(self.inner()
+                           .client_type
+                           .cm_addr()
+                           .map(|a| a.clone()));
 
         self.get(CoreEvent::ListAuthKeysAndVersion,
                  |routing, msg_id| routing.list_auth_keys_and_version(dst, msg_id))
@@ -656,7 +660,10 @@ impl Client {
     /// Get User's Root Directory ID if available in account packet used for
     /// current login
     pub fn user_root_dir(&self) -> Result<MDataInfo, CoreError> {
-        self.inner().client_type.acc().and_then(|account| Ok(account.user_root.clone()))
+        self.inner()
+            .client_type
+            .acc()
+            .and_then(|account| Ok(account.user_root.clone()))
     }
 
     /// Create an entry for the Maidsafe configuration specific Root Directory
@@ -678,7 +685,10 @@ impl Client {
     /// Get Maidsafe specific configuration's Root Directory ID if available in
     /// account packet used for current login
     pub fn config_root_dir(&self) -> Result<MDataInfo, CoreError> {
-        self.inner().client_type.acc().and_then(|account| Ok(account.config_root.clone()))
+        self.inner()
+            .client_type
+            .acc()
+            .and_then(|account| Ok(account.config_root.clone()))
     }
 
     /// Returns the public encryption key
@@ -748,9 +758,9 @@ impl Client {
         let mut actions = BTreeMap::new();
         let _ = actions.insert(b"Login".to_vec(),
                                EntryAction::Update(Value {
-                                   content: encrypted_account,
-                                   entry_version: entry_version,
-                               }));
+                                                       content: encrypted_account,
+                                                       entry_version: entry_version,
+                                                   }));
 
         self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, actions)
     }
@@ -769,7 +779,7 @@ impl Client {
         let result = req(&mut *self.routing_mut(), msg_id);
 
         if let Err(err) = result {
-            hook.complete(err_event(Err(CoreError::from(err))));
+            let _ = hook.send(err_event(Err(CoreError::from(err))));
         } else {
             self.insert_hook(msg_id, hook);
         }
@@ -781,7 +791,10 @@ impl Client {
     fn mutate<F>(&self, req: F) -> Box<CoreFuture<()>>
         where F: FnOnce(&mut Routing, Authority, MessageId) -> Result<(), InterfaceError>
     {
-        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
+        let dst = fry!(self.inner()
+                           .client_type
+                           .cm_addr()
+                           .map(|a| a.clone()));
 
         self.get(CoreEvent::Mutation,
                  |routing, msg_id| req(routing, dst, msg_id))
@@ -813,9 +826,9 @@ impl Client {
 
         future.select(timeout)
             .then(|result| match result {
-                Ok((a, _)) => Ok(a),
-                Err((a, _)) => Err(a),
-            })
+                      Ok((a, _)) => Ok(a),
+                      Err((a, _)) => Err(a),
+                  })
             .into_box()
     }
 
@@ -1316,7 +1329,7 @@ mod tests {
                 NetworkEvent::Connected => (),
                 x => panic!("Unexpected network event: {:?}", x),
             }
-            hook.complete(());
+            let _ = hook.send(());
         });
 
         random_client_with_net_obs(move |net_event| unwrap!(tx.send(net_event)),
@@ -1340,10 +1353,10 @@ mod tests {
 
             client.get_idata(rand::random())
                 .then(|result| match result {
-                    Ok(_) => panic!("Unexpected success"),
-                    Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
-                    Err(err) => panic!("Unexpected {:?}", err),
-                })
+                          Ok(_) => panic!("Unexpected success"),
+                          Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
+                          Err(err) => panic!("Unexpected {:?}", err),
+                      })
                 .then(move |result| {
                     unwrap!(result);
 
@@ -1353,10 +1366,10 @@ mod tests {
                     client2.put_idata(data)
                 })
                 .then(|result| match result {
-                    Ok(_) => panic!("Unexpected success"),
-                    Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
-                    Err(err) => panic!("Unexpected {:?}", err),
-                })
+                          Ok(_) => panic!("Unexpected success"),
+                          Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
+                          Err(err) => panic!("Unexpected {:?}", err),
+                      })
         })
     }
 }

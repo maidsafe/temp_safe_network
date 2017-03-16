@@ -87,9 +87,9 @@ pub fn extract_value(client: &Client,
             Ok(SelfEncryptor::new(storage, data_map)?)
         })
         .and_then(|self_encryptor| {
-            let length = self_encryptor.len();
-            self_encryptor.read(0, length).map_err(From::from)
-        })
+                      let length = self_encryptor.len();
+                      self_encryptor.read(0, length).map_err(From::from)
+                  })
         .into_box()
 }
 
@@ -119,9 +119,9 @@ fn pack(client: Client, value: Vec<u8>) -> Box<CoreFuture<ImmutableData>> {
             .and_then(move |_| self_encryptor.close())
             .map_err(From::from)
             .and_then(move |(data_map, _)| {
-                let value = fry!(serialise(&DataTypeEncoding::DataMap(data_map)));
-                pack(client, value)
-            })
+                          let value = fry!(serialise(&DataTypeEncoding::DataMap(data_map)));
+                          pack(client, value)
+                      })
             .into_box()
     } else {
         ok!(data)
@@ -138,9 +138,9 @@ fn unpack(client: Client, data: ImmutableData) -> Box<CoreFuture<Vec<u8>>> {
             self_encryptor.read(0, length)
                 .map_err(From::from)
                 .and_then(move |serialised_data| {
-                    let data = fry!(deserialise(&serialised_data));
-                    unpack(client, data)
-                })
+                              let data = fry!(deserialise(&serialised_data));
+                              unpack(client, data)
+                          })
                 .into_box()
         }
     }
@@ -188,20 +188,19 @@ mod tests {
 
                 create(client, value_before.clone(), None)
                     .then(move |res| {
-                        let data_before = unwrap!(res);
-                        let data_name = *data_before.name();
-                        client2.put_idata(data_before)
-                            .map(move |_| data_name)
-                    })
+                              let data_before = unwrap!(res);
+                              let data_name = *data_before.name();
+                              client2.put_idata(data_before).map(move |_| data_name)
+                          })
                     .then(move |res| {
-                        let data_name = unwrap!(res);
-                        get_value(&client3, &data_name, None)
-                    })
+                              let data_name = unwrap!(res);
+                              get_value(&client3, &data_name, None)
+                          })
                     .then(move |res| {
-                        let value_after = unwrap!(res);
-                        assert_eq!(value_after, value_before);
-                        finish()
-                    })
+                              let value_after = unwrap!(res);
+                              assert_eq!(value_after, value_before);
+                              finish()
+                          })
             })
         }
 
@@ -216,20 +215,19 @@ mod tests {
 
                 create(client, value_before.clone(), Some(key.clone()))
                     .then(move |res| {
-                        let data_before = unwrap!(res);
-                        let data_name = *data_before.name();
-                        client2.put_idata(data_before)
-                            .map(move |_| data_name)
-                    })
+                              let data_before = unwrap!(res);
+                              let data_name = *data_before.name();
+                              client2.put_idata(data_before).map(move |_| data_name)
+                          })
                     .then(move |res| {
-                        let data_name = unwrap!(res);
-                        get_value(&client3, &data_name, Some(key))
-                    })
+                              let data_name = unwrap!(res);
+                              get_value(&client3, &data_name, Some(key))
+                          })
                     .then(move |res| {
-                        let value_after = unwrap!(res);
-                        assert_eq!(value_after, value_before);
-                        finish()
-                    })
+                              let value_after = unwrap!(res);
+                              assert_eq!(value_after, value_before);
+                              finish()
+                          })
             })
         }
 
@@ -244,19 +242,18 @@ mod tests {
 
                 create(client, value, None)
                     .then(move |res| {
-                        let data = unwrap!(res);
-                        let data_name = *data.name();
-                        client2.put_idata(data)
-                            .map(move |_| data_name)
-                    })
+                              let data = unwrap!(res);
+                              let data_name = *data.name();
+                              client2.put_idata(data).map(move |_| data_name)
+                          })
                     .then(move |res| {
-                        let data_name = unwrap!(res);
-                        get_value(&client3, &data_name, Some(key))
-                    })
+                              let data_name = unwrap!(res);
+                              get_value(&client3, &data_name, Some(key))
+                          })
                     .then(|res| {
-                        assert!(res.is_err());
-                        finish()
-                    })
+                              assert!(res.is_err());
+                              finish()
+                          })
             })
         }
 
@@ -271,19 +268,18 @@ mod tests {
 
                 create(client, value, Some(key))
                     .then(move |res| {
-                        let data = unwrap!(res);
-                        let data_name = *data.name();
-                        client2.put_idata(data)
-                            .map(move |_| data_name)
-                    })
+                              let data = unwrap!(res);
+                              let data_name = *data.name();
+                              client2.put_idata(data).map(move |_| data_name)
+                          })
                     .then(move |res| {
-                        let data_name = unwrap!(res);
-                        get_value(&client3, &data_name, None)
-                    })
+                              let data_name = unwrap!(res);
+                              get_value(&client3, &data_name, None)
+                          })
                     .then(|res| {
-                        assert!(res.is_err());
-                        finish()
-                    })
+                              assert!(res.is_err());
+                              finish()
+                          })
 
             })
         }

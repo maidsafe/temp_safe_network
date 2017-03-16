@@ -61,9 +61,10 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
     catch_unwind_error_code(|| -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
 
-        let app = App::unregistered(move |event| {
-            call_network_observer(event, user_data.0, network_observer_cb)
-        })?;
+        let app =
+            App::unregistered(move |event| {
+                                  call_network_observer(event, user_data.0, network_observer_cb)
+                              })?;
 
         *o_app = Box::into_raw(Box::new(app));
 

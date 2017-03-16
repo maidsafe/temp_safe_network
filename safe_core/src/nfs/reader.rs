@@ -45,9 +45,9 @@ impl Reader {
                 let self_encryptor = SelfEncryptor::new(storage, data_map)?;
 
                 Ok(Reader {
-                    client: client,
-                    self_encryptor: self_encryptor,
-                })
+                       client: client,
+                       self_encryptor: self_encryptor,
+                   })
             })
             .into_box()
     }
@@ -69,7 +69,10 @@ impl Reader {
             debug!("Reading {len} bytes of data from file starting at offset of {pos} bytes ...",
                    len = length,
                    pos = position);
-            self.self_encryptor.read(position, length).map_err(From::from).into_box()
+            self.self_encryptor
+                .read(position, length)
+                .map_err(From::from)
+                .into_box()
         }
     }
 }

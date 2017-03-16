@@ -25,7 +25,9 @@ use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
 use safe_core::ipc::req::ffi::Permission;
+use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
+use std::ptr;
 
 /// Fetch access info from the network.
 #[no_mangle]
@@ -39,9 +41,41 @@ pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
         (*app).send(move |client, context| {
             context.refresh_access_info(client)
                 .then(move |res| {
-                    o_cb(user_data.0, ffi_result_code!(res));
-                    Ok(())
+                          o_cb(user_data.0, ffi_result_code!(res));
+                          Ok(())
+                      })
+                .into_box()
+                .into()
+        })
+    })
+}
+
+/// Retrieve a list of container names that an app has access to.
+#[no_mangle]
+pub unsafe extern "C" fn access_container_get_names(app: *const App,
+                                                    user_data: *mut c_void,
+                                                    o_cb: extern "C" fn(*mut c_void,
+                                                                        i32,
+                                                                        *const *const c_char,
+                                                                        u32)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+
+        (*app).send(move |client, context| {
+            context.get_container_names(client)
+                .and_then(move |names| {
+                    let mut c_str_vec = Vec::new();
+                    for name in names {
+                        c_str_vec.push(CString::new(name)?);
+                    }
+                    Ok(c_str_vec)
                 })
+                .map(move |c_str_vec| {
+                         let ptr_vec: Vec<*const c_char> =
+                        c_str_vec.iter().map(|c_string| c_string.as_ptr()).collect();
+                         o_cb(user_data.0, 0, ptr_vec.as_ptr(), c_str_vec.len() as u32);
+                     })
+                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0); })
                 .into_box()
                 .into()
         })
@@ -56,7 +90,7 @@ fn access_container_get_container_mdata_info(app: *const App,
                                              user_data: *mut c_void,
                                              o_cb: extern "C" fn(*mut c_void,
                                                                  i32,
-                                                                 MDataInfoHandle)) {
+MDataInfoHandle)){
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = from_c_str(name)?;
@@ -66,9 +100,9 @@ fn access_container_get_container_mdata_info(app: *const App,
 
             context.get_container_mdata_info(client, name)
                 .map(move |info| {
-                    let handle = context.object_cache().insert_mdata_info(info);
-                    o_cb(user_data.0, 0, handle);
-                })
+                         let handle = context.object_cache().insert_mdata_info(info);
+                         o_cb(user_data.0, 0, handle);
+                     })
                 .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), 0))
                 .into_box()
                 .into()

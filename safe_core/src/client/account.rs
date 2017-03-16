@@ -107,8 +107,8 @@ impl Account {
                            &salt,
                            pwhash::OPSLIMIT_INTERACTIVE,
                            pwhash::MEMLIMIT_INTERACTIVE)
-            .map(|_| ())
-            .map_err(|_| CoreError::UnsuccessfulPwHash)
+                .map(|_| ())
+                .map_err(|_| CoreError::UnsuccessfulPwHash)
     }
 }
 

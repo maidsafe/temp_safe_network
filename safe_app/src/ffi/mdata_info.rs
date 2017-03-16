@@ -169,7 +169,7 @@ pub unsafe extern "C" fn mdata_info_extract_name_and_type_tag(app: *const App,
                                                                                   i32,
                                                                                   *const [u8;
                                                                                    XOR_NAME_LEN],
-                                                                                  u64)) {
+u64)){
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = context.object_cache().get_mdata_info(info_h)?;

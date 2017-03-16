@@ -35,11 +35,11 @@ pub struct Vault {
 impl Vault {
     pub fn new() -> Self {
         sync::load().unwrap_or_else(|| {
-            Vault {
-                client_manager: HashMap::new(),
-                nae_manager: HashMap::new(),
-            }
-        })
+                                        Vault {
+                                            client_manager: HashMap::new(),
+                                            nae_manager: HashMap::new(),
+                                        }
+                                    })
     }
 
     // Get account for the client manager name.

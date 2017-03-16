@@ -74,11 +74,11 @@ fn user_root_dir() {
     let dirs = run(&authenticator, move |client| {
         let fs: Vec<_> = dirs.into_iter()
             .map(|dir| {
-                let f1 = client.list_mdata_entries(dir.name, dir.type_tag);
-                let f2 = client.list_mdata_permissions(dir.name, dir.type_tag);
+                     let f1 = client.list_mdata_entries(dir.name, dir.type_tag);
+                     let f2 = client.list_mdata_permissions(dir.name, dir.type_tag);
 
-                f1.join(f2).map_err(AuthError::from)
-            })
+                     f1.join(f2).map_err(AuthError::from)
+                 })
             .collect();
 
         future::join_all(fs)
@@ -149,7 +149,7 @@ fn app_authentication() {
     let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
 
     let (received_req_id, received_auth_req) = match unwrap!(decode_ipc_msg(&authenticator,
-                                                                            &encoded_msg)) {
+                                 &encoded_msg)) {
         IpcMsg::Req { req_id, req: IpcReq::Auth(req) } => (req_id, req),
         x => panic!("Unexpected {:?}", x),
     };
@@ -221,10 +221,10 @@ fn app_authentication() {
 
         client.get_mdata_value(user_root_dir.name, user_root_dir.type_tag, app_dir_key)
             .and_then(move |value| {
-                let encoded = user_root_dir.decrypt(&value.content)?;
-                let decoded = deserialise::<MDataInfo>(&encoded)?;
-                Ok(decoded)
-            })
+                          let encoded = user_root_dir.decrypt(&value.content)?;
+                          let decoded = deserialise::<MDataInfo>(&encoded)?;
+                          Ok(decoded)
+                      })
             .map_err(AuthError::from)
     });
 
@@ -297,9 +297,9 @@ fn containers_unknown_app() {
     let msg = IpcMsg::Req {
         req_id: req_id,
         req: IpcReq::Containers(ContainersReq {
-            app: unwrap!(rand_app()),
-            containers: create_containers_req(),
-        }),
+                                    app: unwrap!(rand_app()),
+                                    containers: create_containers_req(),
+                                }),
     };
 
     // Serialise the request as base64 payload in "safe-auth:payload"
@@ -402,10 +402,7 @@ fn revoke_app() {
 
     let _ = run(&authenticator, move |client| {
         file_helper::create(client.clone(), videos_md2, "video.mp4", Vec::new())
-            .and_then(move |writer| {
-                writer.write(&[1u8; 10])
-                    .and_then(move |_| writer.close())
-            })
+            .and_then(move |writer| writer.write(&[1u8; 10]).and_then(move |_| writer.close()))
             .map_err(From::from)
     });
 
@@ -473,10 +470,7 @@ fn revoke_app_reencryption() {
 
     let _ = run(&authenticator, move |client| {
         file_helper::create(client.clone(), videos_md2, "video.mp4", vec![1, 2, 3])
-            .and_then(move |writer| {
-                writer.write(&[1u8; 10])
-                    .and_then(move |_| writer.close())
-            })
+            .and_then(move |writer| writer.write(&[1u8; 10]).and_then(move |_| writer.close()))
             .map_err(From::from)
     });
 

@@ -63,11 +63,11 @@ pub fn container_perm_into_repr_c(cont_name: String,
     let (access_ptr, len, cap) = vec_into_raw_parts(access_vec);
 
     Ok(ffi::ContainerPermissions {
-        cont_name: CString::new(cont_name)?.into_raw(),
-        access: access_ptr,
-        access_len: len,
-        access_cap: cap,
-    })
+           cont_name: CString::new(cont_name)?.into_raw(),
+           access: access_ptr,
+           access_len: len,
+           access_cap: cap,
+       })
 }
 
 /// Consumes the object and returns the wrapped raw pointer
@@ -114,12 +114,12 @@ impl AuthReq {
         let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
 
         Ok(ffi::AuthReq {
-            app: app.into_repr_c()?,
-            app_container: app_container,
-            containers: containers_ptr,
-            containers_len: len,
-            containers_cap: cap,
-        })
+               app: app.into_repr_c()?,
+               app_container: app_container,
+               containers: containers_ptr,
+               containers_len: len,
+               containers_cap: cap,
+           })
     }
 }
 
@@ -133,10 +133,10 @@ impl ReprC for AuthReq {
     /// resulting object.
     unsafe fn clone_from_repr_c(repr_c: *const ffi::AuthReq) -> Result<Self, IpcError> {
         Ok(AuthReq {
-            app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
-            app_container: (*repr_c).app_container,
-            containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
-        })
+               app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
+               app_container: (*repr_c).app_container,
+               containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
+           })
     }
 }
 
@@ -161,11 +161,11 @@ impl ContainersReq {
         let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
 
         Ok(ffi::ContainersReq {
-            app: app.into_repr_c()?,
-            containers: containers_ptr,
-            containers_len: len,
-            containers_cap: cap,
-        })
+               app: app.into_repr_c()?,
+               containers: containers_ptr,
+               containers_len: len,
+               containers_cap: cap,
+           })
     }
 }
 
@@ -179,9 +179,9 @@ impl ReprC for ContainersReq {
     /// resulting object.
     unsafe fn clone_from_repr_c(repr_c: *const ffi::ContainersReq) -> Result<Self, IpcError> {
         Ok(ContainersReq {
-            app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
-            containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
-        })
+               app: AppExchangeInfo::clone_from_repr_c(&(*repr_c).app)?,
+               containers: containers_from_repr_c((*repr_c).containers, (*repr_c).containers_len)?,
+           })
     }
 }
 
@@ -206,15 +206,15 @@ impl AppExchangeInfo {
         let AppExchangeInfo { id, scope, name, vendor } = self;
 
         Ok(ffi::AppExchangeInfo {
-            id: CString::new(id).map_err(StringError::from)?.into_raw(),
-            scope: if let Some(scope) = scope {
-                CString::new(scope).map_err(StringError::from)?.into_raw()
-            } else {
-                ptr::null()
-            },
-            name: CString::new(name).map_err(StringError::from)?.into_raw(),
-            vendor: CString::new(vendor).map_err(StringError::from)?.into_raw(),
-        })
+               id: CString::new(id).map_err(StringError::from)?.into_raw(),
+               scope: if let Some(scope) = scope {
+                   CString::new(scope).map_err(StringError::from)?.into_raw()
+               } else {
+                   ptr::null()
+               },
+               name: CString::new(name).map_err(StringError::from)?.into_raw(),
+               vendor: CString::new(vendor).map_err(StringError::from)?.into_raw(),
+           })
     }
 }
 
@@ -228,15 +228,15 @@ impl ReprC for AppExchangeInfo {
     /// object.
     unsafe fn clone_from_repr_c(raw: *const ffi::AppExchangeInfo) -> Result<Self, IpcError> {
         Ok(AppExchangeInfo {
-            id: from_c_str((*raw).id).map_err(StringError::from)?,
-            scope: if (*raw).scope.is_null() {
-                None
-            } else {
-                Some(from_c_str((*raw).scope).map_err(StringError::from)?)
-            },
-            name: from_c_str((*raw).name).map_err(StringError::from)?,
-            vendor: from_c_str((*raw).vendor).map_err(StringError::from)?,
-        })
+               id: from_c_str((*raw).id).map_err(StringError::from)?,
+               scope: if (*raw).scope.is_null() {
+                   None
+               } else {
+                   Some(from_c_str((*raw).scope).map_err(StringError::from)?)
+               },
+               name: from_c_str((*raw).name).map_err(StringError::from)?,
+               vendor: from_c_str((*raw).vendor).map_err(StringError::from)?,
+           })
     }
 }
 

@@ -113,9 +113,9 @@ pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
         let future = f(client)
             .into_future()
             .then(move |result| {
-                unwrap!(tx.send(result));
-                Ok(())
-            })
+                      unwrap!(tx.send(result));
+                      Ok(())
+                  })
             .into_box();
 
         Some(future)
@@ -127,11 +127,11 @@ pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
 /// Creates a random `AppExchangeInfo`
 pub fn rand_app() -> Result<AppExchangeInfo, CoreError> {
     Ok(AppExchangeInfo {
-        id: utils::generate_random_string(10)?,
-        scope: None,
-        name: utils::generate_random_string(10)?,
-        vendor: utils::generate_random_string(10)?,
-    })
+           id: utils::generate_random_string(10)?,
+           scope: None,
+           name: utils::generate_random_string(10)?,
+           vendor: utils::generate_random_string(10)?,
+       })
 }
 
 /// Fetch the access container entry for the app.

@@ -53,9 +53,9 @@ pub unsafe extern "C" fn idata_new_self_encryptor(app: *const App,
             let fut = SequentialEncryptor::new(se_storage, None)
                 .map_err(AppError::from)
                 .map(move |se| {
-                    let handle = context.object_cache().insert_se_writer(se);
-                    o_cb(user_data.0, 0, handle);
-                })
+                         let handle = context.object_cache().insert_se_writer(se);
+                         o_cb(user_data.0, 0, handle);
+                     })
                 .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), 0); })
                 .into_box();
 
@@ -89,9 +89,9 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(app: *const App,
             };
             let fut = fut.map_err(AppError::from)
                 .then(move |res| {
-                    o_cb(user_data.0, ffi_result_code!(res));
-                    Ok(())
-                })
+                          o_cb(user_data.0, ffi_result_code!(res));
+                          Ok(())
+                      })
                 .into_box();
             Some(fut)
         })
@@ -131,15 +131,14 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                     Ok(enc_data_map)
                 })
                 .and_then(move |enc_data_map| {
-                    immutable_data::create(&client2, enc_data_map, None).map_err(AppError::from)
-                })
+                              immutable_data::create(&client2, enc_data_map, None)
+                                  .map_err(AppError::from)
+                          })
                 .and_then(move |data| {
-                    let name = *data.name();
+                              let name = *data.name();
 
-                    client3.put_idata(data)
-                        .map_err(AppError::from)
-                        .map(move |_| name)
-                })
+                              client3.put_idata(data).map_err(AppError::from).map(move |_| name)
+                          })
                 .then(move |result| {
                     match result {
                         Ok(name) => o_cb(user_data.0, 0, &name.0),
@@ -270,10 +269,10 @@ pub unsafe extern "C" fn idata_self_encryptor_writer_free(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let res = context.object_cache().remove_se_writer(handle);
-            o_cb(user_data.0, ffi_result_code!(res));
-            None
-        })
+                        let res = context.object_cache().remove_se_writer(handle);
+                        o_cb(user_data.0, ffi_result_code!(res));
+                        None
+                    })
     });
 }
 
@@ -287,10 +286,10 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let res = context.object_cache().remove_se_reader(handle);
-            o_cb(user_data.0, ffi_result_code!(res));
-            None
-        })
+                        let res = context.object_cache().remove_se_reader(handle);
+                        o_cb(user_data.0, ffi_result_code!(res));
+                        None
+                    })
     })
 }
 
@@ -334,7 +333,8 @@ mod tests {
                                               cb)
             }));
 
-            let name: [u8; XOR_NAME_LEN] = unwrap!(call_1(|ud, cb| {
+            let name: [u8; XOR_NAME_LEN];
+            name = unwrap!(call_1(|ud, cb| {
                 idata_close_self_encryptor(&app, se_writer_h, cipher_opt_h, ud, cb)
             }));
 
@@ -363,10 +363,11 @@ mod tests {
             assert_eq!(res,
                        Err(AppError::InvalidSelfEncryptorReadOffsets.error_code()));
 
-            let received_plain_text = unwrap!(call_vec_u8(|ud, cb| {
+            let received_plain_text;
+            received_plain_text = call_vec_u8(|ud, cb| {
                 idata_read_from_self_encryptor(&app, se_reader_h, 0, size, ud, cb)
-            }));
-            assert_eq!(plain_text, received_plain_text);
+            });
+            assert_eq!(plain_text, unwrap!(received_plain_text));
 
             unwrap!(call_0(|ud, cb| idata_self_encryptor_reader_free(&app, se_reader_h, ud, cb)));
 

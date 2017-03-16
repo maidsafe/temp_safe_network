@@ -109,10 +109,10 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let handle = context.object_cache().insert_cipher_opt(CipherOpt::PlainText);
-            o_cb(user_data.0, 0, handle);
-            None
-        })
+                        let handle = context.object_cache().insert_cipher_opt(CipherOpt::PlainText);
+                        o_cb(user_data.0, 0, handle);
+                        None
+                    })
     });
 }
 
@@ -126,10 +126,10 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
-            let handle = context.object_cache().insert_cipher_opt(CipherOpt::Symmetric);
-            o_cb(user_data.0, 0, handle);
-            None
-        })
+                        let handle = context.object_cache().insert_cipher_opt(CipherOpt::Symmetric);
+                        o_cb(user_data.0, 0, handle);
+                        None
+                    })
     })
 }
 
@@ -152,8 +152,9 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
                     return None;
                 }
             };
-            let handle = context.object_cache()
-                .insert_cipher_opt(CipherOpt::Asymmetric { peer_encrypt_key: pk });
+            let handle = context.object_cache().insert_cipher_opt(CipherOpt::Asymmetric {
+                                                                      peer_encrypt_key: pk,
+                                                                  });
             o_cb(user_data.0, 0, handle);
             None
         })
@@ -170,10 +171,10 @@ pub unsafe extern "C" fn cipher_opt_free(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let res = context.object_cache().remove_cipher_opt(handle);
-            o_cb(user_data.0, ffi_result_code!(res));
-            None
-        })
+                        let res = context.object_cache().remove_cipher_opt(handle);
+                        o_cb(user_data.0, ffi_result_code!(res));
+                        None
+                    })
     });
 }
 
@@ -292,24 +293,20 @@ mod tests {
             context.object_cache().insert_encrypt_key(pk)
         });
 
-        let cipher_opt_handle_pt;
-        let cipher_opt_handle_sym;
-        let cipher_opt_handle_asym;
-
-        unsafe {
-            cipher_opt_handle_pt = unwrap!(call_1(|ud, cb| cipher_opt_new_plaintext(&app, ud, cb)));
-            cipher_opt_handle_sym =
-                unwrap!(call_1(|ud, cb| cipher_opt_new_symmetric(&app, ud, cb)));
-
+        let cipher_opt_handle_pt =
+            unsafe { unwrap!(call_1(|ud, cb| cipher_opt_new_plaintext(&app, ud, cb))) };
+        let cipher_opt_handle_sym =
+            unsafe { unwrap!(call_1(|ud, cb| cipher_opt_new_symmetric(&app, ud, cb))) };
+        let cipher_opt_handle_asym = unsafe {
             let err_code = AppError::InvalidEncryptKeyHandle.error_code();
             let res: Result<CipherOptHandle, _> =
                 call_1(|ud, cb| cipher_opt_new_asymmetric(&app, 29293290, ud, cb));
             assert_eq!(unwrap!(res.err()), err_code);
 
-            cipher_opt_handle_asym = unwrap!(call_1(|ud, cb| {
-                cipher_opt_new_asymmetric(&app, peer_encrypt_key_handle, ud, cb)
-            }));
-        }
+            unwrap!(call_1(|ud, cb| {
+                               cipher_opt_new_asymmetric(&app, peer_encrypt_key_handle, ud, cb)
+                           }))
+        };
 
         run_now(&app, move |_, context| {
             let obj_cache = context.object_cache();
