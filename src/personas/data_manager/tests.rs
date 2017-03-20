@@ -495,10 +495,38 @@ fn mdata_with_churn_with_hash_mismatch() {
     assert!(entry_dst0 != entry_dst1);
 }
 
-// TODO: test also entries arriving before shell.
-// TODO: test also GetMDataShell response when we already have the data (test both
-//       lower and higher versions and the case when the data in the chunk store already
-//       has entries)
+#[test]
+fn mdata_with_churn_with_entries_arriving_before_shell() {
+    let mut rng = rand::thread_rng();
+
+    let (_, client_key) = test_utils::gen_client_authority();
+    let data = test_utils::gen_mutable_data(TEST_TAG, 1, client_key, &mut rng);
+    let value = unwrap!(data.values().into_iter().cloned().next());
+
+    let (mut new_node, mut new_dm) = setup_mdata_refresh(&data, &mut rng);
+
+    let (shell_msg_id, shell_dst) = take_get_mdata_shell_request(&mut new_node);
+    let (entry_msg_id, entry_dst, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
+
+    // First the entry arrives.
+    unwrap!(new_dm.handle_get_mdata_value_success(&mut new_node,
+                                                  entry_dst,
+                                                  value,
+                                                  entry_msg_id));
+
+    // Then the shell arrives.
+    unwrap!(new_dm.handle_get_mdata_shell_success(&mut new_node,
+                                                  shell_dst,
+                                                  data.shell(),
+                                                  shell_msg_id));
+
+    let stored_data = assert_match!(new_dm.get_from_chunk_store(&DataId::mutable(&data)),
+                                    Some(Data::Mutable(data)) => data);
+    assert_eq!(stored_data, data);
+
+    // The node should not send any more requests, because it already has everything it needs.
+    assert!(new_node.sent_requests.is_empty());
+}
 
 fn create_data_manager() -> DataManager {
     let suffix: u64 = rand::random();

@@ -357,7 +357,7 @@ impl DataManager {
     pub fn handle_get_mdata_shell_success(&mut self,
                                           routing_node: &mut RoutingNode,
                                           src: XorName,
-                                          shell: MutableData,
+                                          mut shell: MutableData,
                                           msg_id: MessageId)
                                           -> Result<(), InternalError> {
         let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src, msg_id) {
@@ -385,20 +385,42 @@ impl DataManager {
             return Ok(());
         }
 
-        let data = Data::Mutable(shell);
-        let data_id = data.id();
+        let data_id = DataId::mutable(&shell);
+        let new = match self.chunk_store.get(&data_id) {
+            Ok(Data::Mutable(ref old_data)) if old_data.version() >= shell.version() => {
+                // The data in the chunk store is already more recent than the
+                // shell we received. Ignore it.
+                return Ok(());
+            }
+            Ok(Data::Mutable(ref old_data)) => {
+                // The shell is more recent than the data in the chunk store.
+                // Repace the data with the shell, but keep the entries.
+                for (key, value) in old_data.entries() {
+                    shell.mutate_entry_without_validation(key.clone(), value.clone());
+                }
 
-        // TODO: if we already have the data, but with lower version, replace its
-        // shell with the new one. If we have higher version, do noting and return early.
+                false
+            }
+            Ok(_) => unreachable!(),
+            Err(_) => {
+                // If we have cached entries for this data, apply them.
+                for (key, value) in self.cache.take_mdata_entries(*shell.name(), shell.tag()) {
+                    // OK to ingore the return value here because as the shell has no
+                    // entries, this call can never fail.
+                    let _ = shell.mutate_entry_without_validation(key, value);
+                }
 
-        // TODO: if there are entries for this data in the entry cache, apply them.
+                true
+            }
+        };
 
         self.clean_chunk_store();
-        self.chunk_store.put(&data_id, &data)?;
+        self.chunk_store.put(&data_id, &Data::Mutable(shell))?;
 
-        // TODO: do this only if we didn't have the data previously.
-        // self.count_added_data(&data_id);
-        // log_status!(self);
+        if new {
+            self.count_added_data(&data_id);
+            log_status!(self);
+        }
 
         Ok(())
     }
@@ -520,9 +542,6 @@ impl DataManager {
         };
 
         // If we're no longer in the close group, return.
-        // TODO (adam): consider performing this check only if the corresponding data
-        // is not in the chunk store, because if it is, we are probably still
-        // close to it.
         if !close_to_address(routing_node, &name) {
             return Ok(());
         }
@@ -534,13 +553,13 @@ impl DataManager {
                 if data.mutate_entry_without_validation(key, value) {
                     self.clean_chunk_store();
                     self.chunk_store.put(&data_id, &Data::Mutable(data))?;
-                } else {
-                    // TODO (adam): what here?
                 }
             }
             Ok(_) => unreachable!(),
             Err(_) => {
-                // TODO (adam): store the entry into the entry cache.
+                // We don't have the shell yet, so keep the entry around in the cache
+                // until we receive the shell.
+                self.cache.insert_mdata_entry(name, tag, key, value);
             }
         }
 

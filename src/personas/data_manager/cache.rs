@@ -28,6 +28,8 @@ use utils;
 const PENDING_WRITE_TIMEOUT_SECS: u64 = 60;
 /// The timeout for retrieving data fragments from individual peers.
 const FRAGMENT_REQUEST_TIMEOUT_SECS: u64 = 60;
+/// The timeout after which cached mutable data entries expire.
+const MDATA_ENTRY_TIMEOUT_SECS: u64 = 60;
 
 pub struct Cache {
     /// Chunks we are no longer responsible for. These can be deleted from the chunk store.
@@ -37,6 +39,8 @@ pub struct Cache {
     needed_fragments: HashMap<XorName, HashMap<FragmentInfo, FragmentRequest>>,
     /// Maps data identifiers to the list of pending writes that affect that chunk.
     pending_writes: HashMap<DataId, Vec<PendingWrite>>,
+    /// Mutable data entries that arrived before the data shell.
+    mdata_entries: HashMap<(XorName, u64), HashMap<Vec<u8>, (Value, Instant)>>,
 
     total_needed_fragments_count: usize,
     requested_needed_fragments_count: usize,
@@ -315,6 +319,54 @@ impl Cache {
         self.unneeded_chunks.pop_front()
     }
 
+    pub fn insert_mdata_entry(&mut self, name: XorName, tag: u64, key: Vec<u8>, value: Value) {
+        self.remove_expired_mdata_entries();
+        let _ = self.mdata_entries
+            .entry((name, tag))
+            .or_insert_with(HashMap::new)
+            .insert(key, (value, Instant::now()));
+    }
+
+    pub fn take_mdata_entries(&mut self, name: XorName, tag: u64) -> HashMap<Vec<u8>, Value> {
+        let result = self.mdata_entries
+            .remove(&(name, tag))
+            .unwrap_or_else(HashMap::new)
+            .into_iter()
+            .map(|(key, (value, _))| (key, value))
+            .collect();
+
+        self.remove_expired_mdata_entries();
+
+        result
+    }
+
+    fn remove_expired_mdata_entries(&mut self) {
+        let mut remove = Vec::new();
+
+        for (data_id, entries) in &mut self.mdata_entries {
+            let expired_keys: Vec<_> = entries.iter()
+                .filter_map(|(key, &(_, instant))| if instant.elapsed().as_secs() >
+                                                      MDATA_ENTRY_TIMEOUT_SECS {
+                    Some(key.clone())
+                } else {
+                    None
+                })
+                .collect();
+
+            for key in expired_keys {
+                let _ = entries.remove(&key);
+            }
+
+            if entries.is_empty() {
+                remove.push(*data_id);
+            }
+        }
+
+        for data_id in remove {
+            let _ = self.mdata_entries.remove(&data_id);
+        }
+    }
+
     pub fn print_stats(&mut self) {
         if self.logging_time.elapsed().as_secs() < STATUS_LOG_INTERVAL {
             return;
@@ -349,6 +401,7 @@ impl Default for Cache {
             unneeded_chunks: VecDeque::new(),
             needed_fragments: HashMap::new(),
             pending_writes: HashMap::new(),
+            mdata_entries: HashMap::new(),
             logging_time: Instant::now(),
             total_needed_fragments_count: 0,
             requested_needed_fragments_count: 0,
