@@ -1,9 +1,9 @@
 [package]
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 build = "build.rs"
-description = "This is Pre alpha, and not useful, no code worth looking at."
-documentation = "http://docs.maidsafe.net/safe_vault/latest"
-homepage = "http://maidsafe.net"
+description = "Implementation of the 'Vault' node for the SAFE Network."
+documentation = "https://docs.rs/safe_vault"
+homepage = "https://maidsafe.net"
 license = "GPL-3.0"
 name = "safe_vault"
 readme = "README.md"

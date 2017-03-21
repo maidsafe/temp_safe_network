@@ -387,7 +387,7 @@ function create_package {
     --directories $ConfigFileDir \
     --maintainer "MaidSafe QA <qa@maidsafe.net>" \
     --description "$Description" \
-    --url "http://maidsafe.net" \
+    --url "https://maidsafe.net" \
     $BeforeInstallCommand \
     $AfterInstallCommand \
     $BeforeRemoveCommand \
