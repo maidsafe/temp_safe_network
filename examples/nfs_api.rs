@@ -31,8 +31,6 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![allow(unused_extern_crates)]#[macro_use]
-extern crate maidsafe_utilities;
 extern crate time;
 extern crate routing;
 extern crate safe_core;

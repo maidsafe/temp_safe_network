@@ -32,7 +32,7 @@
          missing_debug_implementations, variant_size_differences)]
 
 extern crate safe_core;
-#[macro_use]
+#[cfg_attr(test, macro_use)]
 extern crate maidsafe_utilities;
 extern crate routing;
 #[macro_use]

@@ -27,13 +27,14 @@ before_script:
       fi
     fi
 script:
-  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
+  - export -f travis_wait travis_jigger && if [ ${TRAVIS_RUST_VERSION} = stable ]; then
       (
         set -x;
         cargo fmt -- --write-mode=diff &&
-        cargo test --release --verbose
+        travis_wait 40 cargo test --release --verbose --no-run &&
+        cargo test --release --verbose --features use-mock-routing
       );
-    elif [ "${TRAVIS_OS_NAME}" = linux ]; then
+    elif [ ${TRAVIS_OS_NAME} = linux ]; then
       (
         set -x;
         cargo clippy --profile test &&
@@ -41,4 +42,4 @@ script:
       );
     fi
 before_cache:
- - cargo prune
+  - cargo prune

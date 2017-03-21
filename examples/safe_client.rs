@@ -143,7 +143,7 @@ fn main() {
 //     let response_getter = unwrap!(client.register_online(mpid_account));
 
 //     loop {
-//         println!("\n------- messaging options: r for receive, s for send, t for terminate -------");
+//         println!("\n------- messaging options: r for receive, s for send, t for terminate ----");
 //         let mut operation = String::new();
 //         let _ = std::io::stdin().read_line(&mut operation);
 //         operation = operation.trim().to_string();

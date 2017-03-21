@@ -37,7 +37,7 @@ extern crate routing;
 extern crate rustc_serialize;
 extern crate safe_core;
 extern crate rust_sodium;
-#[macro_use]
+#[cfg_attr(test, macro_use)]
 extern crate maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
