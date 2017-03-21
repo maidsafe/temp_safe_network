@@ -20,9 +20,10 @@ use routing::ClientError;
 use rust_sodium::crypto::sign;
 use std::collections::BTreeSet;
 
-// 500 units, max 100MB for immutable_data (1MB per chunk)
+/// Default available number of mutations per account.
 #[cfg(not(feature = "use-mock-crust"))]
 pub const DEFAULT_ACCOUNT_SIZE: u64 = 500;
+/// Default available number of mutations per account.
 #[cfg(feature = "use-mock-crust")]
 pub const DEFAULT_ACCOUNT_SIZE: u64 = 100;
 
@@ -41,6 +42,7 @@ impl Account {
 
         self.info.mutations_done += 1;
         self.info.mutations_available -= 1;
+        self.version += 1;
 
         Ok(())
     }
@@ -52,6 +54,7 @@ impl Account {
 
         self.info.mutations_done -= 1;
         self.info.mutations_available += 1;
+        self.version += 1;
 
         Ok(())
     }
@@ -107,5 +110,17 @@ mod tests {
         assert!(account.increment_mutation_counter().is_err());
         assert_eq!(DEFAULT_ACCOUNT_SIZE, account.info.mutations_done);
         assert_eq!(0, account.info.mutations_available);
+    }
+
+    #[test]
+    fn version() {
+        let mut account = Account::default();
+        assert_eq!(account.version, 0);
+
+        unwrap!(account.increment_mutation_counter());
+        assert_eq!(account.version, 1);
+
+        unwrap!(account.decrement_mutation_counter());
+        assert_eq!(account.version, 2);
     }
 }

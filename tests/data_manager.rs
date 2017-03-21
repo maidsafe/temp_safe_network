@@ -18,12 +18,11 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
+/* TODO: uncomment and fix
+
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
-
-use routing::{AppendWrapper, AppendedData, Authority, Data, DataIdentifier, Event, FullId,
-              ImmutableData, PrivAppendedData, PubAppendableData, Response, StructuredData};
-use routing::client_errors::{GetError, MutationError};
+use routing::{Authority, ClientError, Event, FullId, ImmutableData, Response, StructuredData};
 use routing::mock_crust::{self, Network};
 use rust_sodium::crypto::{box_, sign};
 use safe_vault::{GROUP_SIZE, test_utils};
@@ -1053,3 +1052,5 @@ fn gen_random_immutable_data_not_close_to<R: Rng>(node: &TestNode, rng: &mut R) 
         }
     }
 }
+
+*/

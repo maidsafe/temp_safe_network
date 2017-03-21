@@ -17,9 +17,10 @@
 
 use super::poll;
 use config_handler::Config;
-use personas::data_manager::IdAndVersion;
+use itertools::Itertools;
+use personas::data_manager::DataId;
 use rand::{self, Rng};
-use routing::{RoutingTable, XorName};
+use routing::{RoutingTable, XorName, Xorable};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use rustc_serialize::hex::ToHex;
 use std::env;
@@ -95,14 +96,14 @@ impl TestNode {
         self.handle.endpoint()
     }
 
-    /// return names of all data stored on mock network
-    pub fn get_stored_names(&self) -> Vec<IdAndVersion> {
-        self.vault.get_stored_names()
+    /// Return IDs of all data stored on mock network
+    pub fn get_stored_ids(&self) -> Vec<(DataId, u64)> {
+        self.vault.get_stored_ids()
     }
 
-    /// return the number of account packets stored for the given client
-    pub fn get_maid_manager_put_count(&self, client_name: &XorName) -> Option<u64> {
-        self.vault.get_maid_manager_put_count(client_name)
+    /// return the number of mutations performed by the given client
+    pub fn get_maid_manager_mutation_count(&self, client_name: &XorName) -> Option<u64> {
+        self.vault.get_maid_manager_mutation_count(client_name)
     }
 
     /// Resend all unacknowledged messages.
@@ -123,6 +124,12 @@ impl TestNode {
     /// returns the vault's routing_table.
     pub fn routing_table(&self) -> RoutingTable<XorName> {
         self.vault.routing_table()
+    }
+}
+
+impl Drop for TestNode {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.chunk_store_root);
     }
 }
 
@@ -181,8 +188,13 @@ fn _poll_all(nodes: &mut [TestNode]) {
     while nodes.iter_mut().any(|node| node.poll() > 0) {}
 }
 
-impl Drop for TestNode {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.chunk_store_root);
-    }
+/// Get `count` closest nodes to the given name.
+pub fn closest_to<'a, 'b>(nodes: &'a [TestNode],
+                          name: &'b XorName,
+                          count: usize)
+                          -> Vec<&'a TestNode> {
+    let mut sorted = nodes.iter()
+        .sorted_by(|left, right| name.cmp_distance(&left.name(), &right.name()));
+    sorted.truncate(count);
+    sorted
 }

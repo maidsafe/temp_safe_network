@@ -23,9 +23,9 @@ use error::InternalError;
 pub use mock_routing::Node as RoutingNode;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use mock_routing::NodeBuilder;
-use personas::data_manager::DataManager;
 #[cfg(feature = "use-mock-crust")]
-use personas::data_manager::IdAndVersion;
+use personas::data_manager::DataId;
+use personas::data_manager::DataManager;
 use personas::maid_manager::MaidManager;
 use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
 pub use routing::Event;
@@ -536,14 +536,14 @@ impl Vault {
         ev_processed
     }
 
-    /// Get the names of all the data chunks stored in a personas' chunk store.
-    pub fn get_stored_names(&self) -> Vec<IdAndVersion> {
-        self.data_manager.get_stored_names()
+    /// Get the IDs and versions of all the data chunks stored in a personas' chunk store.
+    pub fn get_stored_ids(&self) -> Vec<(DataId, u64)> {
+        self.data_manager.get_stored_ids()
     }
 
-    /// Get the number of put requests the network processed for the given client.
-    pub fn get_maid_manager_put_count(&self, client_name: &XorName) -> Option<u64> {
-        self.maid_manager.get_put_count(client_name)
+    /// Get the number of mutations the network processed for the given client.
+    pub fn get_maid_manager_mutation_count(&self, client_name: &XorName) -> Option<u64> {
+        self.maid_manager.get_mutation_count(client_name)
     }
 
     /// Resend all unacknowledged messages.

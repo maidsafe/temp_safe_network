@@ -22,7 +22,7 @@ mod tests;
 
 use self::cache::{Cache, DataInfo, FragmentInfo};
 use self::cache::{PendingMutation, PendingMutationType, PendingWrite};
-use self::data::{Data, DataId};
+pub use self::data::{Data, DataId};
 use GROUP_SIZE;
 use accumulator::Accumulator;
 use chunk_store::ChunkStore;
@@ -567,11 +567,15 @@ impl DataManager {
     }
 
     pub fn handle_get_mdata_value_failure(&mut self,
-                                          _routing_node: &mut RoutingNode,
-                                          _src: XorName,
-                                          _msg_id: MessageId)
+                                          routing_node: &mut RoutingNode,
+                                          src: XorName,
+                                          msg_id: MessageId)
                                           -> Result<(), InternalError> {
-        unimplemented!()
+        if self.cache.stop_needed_fragment_request(&src, msg_id).is_none() {
+            return Err(InternalError::InvalidMessage);
+        }
+
+        self.request_needed_fragments(routing_node)
     }
 
     pub fn handle_mutate_mdata_entries(&mut self,
@@ -1135,22 +1139,34 @@ impl DataManager {
             DataId::Mutable(..) => self.mutable_data_count -= 1,
         }
     }
+}
 
-    /*
-    #[cfg(feature = "use-mock-crust")]
-    pub fn get_stored_names(&self) -> Vec<IdAndVersion> {
-        let (front, back) = self.cache.unneeded_chunks.as_slices();
+#[cfg(feature = "use-mock-crust")]
+impl DataManager {
+    pub fn get_stored_ids(&self) -> Vec<(DataId, u64)> {
         self.chunk_store
             .keys()
             .into_iter()
-            .filter(|data_id| !front.contains(data_id) && !back.contains(data_id))
-            .filter_map(|data_id| self.to_id_and_version(data_id))
+            .filter(|data_id| !self.cache.is_in_unneeded(data_id))
+            .filter_map(|data_id| self.get_version(&data_id).map(|version| (data_id, version)))
             .collect()
     }
-    */
+
+    fn get_version(&self, data_id: &DataId) -> Option<u64> {
+        match *data_id {
+            DataId::Immutable(_) => Some(0),
+            DataId::Mutable(..) => {
+                if let Ok(Data::Mutable(data)) = self.chunk_store.get(data_id) {
+                    Some(data.version())
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "use-mock-routing"))]
 impl DataManager {
     /// For testing only - put the given data directly into the chunks store.
     pub fn put_into_chunk_store<T: Into<Data>>(&mut self, data: T) {

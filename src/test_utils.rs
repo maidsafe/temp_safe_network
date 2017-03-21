@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use rand::{self, Rand, Rng};
+use rand::{Rand, Rng};
 use routing::{Authority, ImmutableData, MutableData, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -44,13 +44,13 @@ pub fn iterations() -> usize {
 }
 
 /// Generate random vector of the given length.
-pub fn gen_random_vec<T: Rand, R: Rng>(size: usize, rng: &mut R) -> Vec<T> {
+pub fn gen_vec<T: Rand, R: Rng>(size: usize, rng: &mut R) -> Vec<T> {
     rng.gen_iter().take(size).collect()
 }
 
 /// Generate random immutable data
-pub fn gen_random_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
-    ImmutableData::new(gen_random_vec(size, rng))
+pub fn gen_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
+    ImmutableData::new(gen_vec(size, rng))
 }
 
 /// Generate mutable data with the given tag, number of entries and owner.
@@ -74,11 +74,11 @@ pub fn gen_mutable_data<R: Rng>(tag: u64,
 /// Generate mutable data entry (key, value) pair.
 pub fn gen_mutable_data_entry<R: Rng>(rng: &mut R) -> (Vec<u8>, Value) {
     let key_size = rng.gen_range(1, 10);
-    let key = gen_random_vec(key_size, rng);
+    let key = gen_vec(key_size, rng);
 
     let value_size = rng.gen_range(1, 10);
     let value = Value {
-        content: gen_random_vec(value_size, rng),
+        content: gen_vec(value_size, rng),
         entry_version: 0,
     };
 
@@ -86,7 +86,9 @@ pub fn gen_mutable_data_entry<R: Rng>(rng: &mut R) -> (Vec<u8>, Value) {
 }
 
 /// Generate random `Client` authority and return it together with its client key.
+#[cfg(not(feature = "use-mock-crust"))]
 pub fn gen_client_authority() -> (Authority<XorName>, sign::PublicKey) {
+    use rand;
     let (client_key, _) = sign::gen_keypair();
 
     let client = Authority::Client {

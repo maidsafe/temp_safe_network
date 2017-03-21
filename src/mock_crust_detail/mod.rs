@@ -25,19 +25,21 @@ pub mod test_node;
 use GROUP_SIZE;
 use itertools::Itertools;
 use mock_crust_detail::test_node::TestNode;
-use personas::data_manager::IdAndVersion;
+use personas::data_manager::{Data, DataId};
 use routing::{self, XorName, Xorable};
 use std::collections::{HashMap, HashSet};
 
 /// Checks that none of the given nodes has any copy of the given data left.
 pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
-    let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::identifier).collect();
+    let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::id).collect();
     let mut data_count = HashMap::new();
-    nodes.iter()
-        .flat_map(TestNode::get_stored_names)
-        .foreach(|data_idv| if deleted_data_ids.contains(&data_idv.0) {
+
+    for data_idv in nodes.iter().flat_map(TestNode::get_stored_ids) {
+        if deleted_data_ids.contains(&data_idv.0) {
             *data_count.entry(data_idv).or_insert(0) += 1;
-        });
+        }
+    }
+
     for (data_id, count) in data_count {
         assert!(count < 5,
                 "Found deleted data: {:?}. count: {}",
@@ -48,19 +50,19 @@ pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
 
 /// Checks that the given `nodes` store the expected number of copies of the given data.
 pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
-    let mut data_holders_map: HashMap<IdAndVersion, Vec<XorName>> = HashMap::new();
+    let mut data_holders_map: HashMap<(DataId, u64), Vec<XorName>> = HashMap::new();
     for node in nodes {
-        for data_idv in node.get_stored_names() {
+        for data_idv in node.get_stored_ids() {
             data_holders_map.entry(data_idv).or_insert_with(Vec::new).push(node.name());
         }
     }
 
     for data in all_data {
         let (data_id, data_version) = match data {
-            Data::Immutable(data) => (data.identifier(), 0),
-            Data::Structured(data) => (data.identifier(), data.get_version()),
-            _ => unreachable!(),
+            Data::Immutable(data) => (DataId::immutable(&data), 0),
+            Data::Mutable(data) => (DataId::mutable(&data), data.version()),
         };
+
         let data_holders = data_holders_map.get(&(data_id, data_version))
             .cloned()
             .unwrap_or_else(Vec::new)

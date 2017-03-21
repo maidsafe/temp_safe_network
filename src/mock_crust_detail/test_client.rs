@@ -18,10 +18,9 @@
 use super::poll;
 use super::test_node::TestNode;
 use GROUP_SIZE;
-use maidsafe_utilities::serialisation;
 use rand::{Rng, XorShiftRng};
-use routing::{Authority, Event, FullId, MessageId, PublicId, Response, StructuredData, XorName};
-use routing::ClientError;
+use routing::{self, AccountInfo, Authority, ClientError, Event, EventStream, FullId, ImmutableData,
+              MessageId, MutableData, PublicId, Response, TYPE_TAG_SESSION_PACKET, XorName};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
 use std::collections::BTreeSet;
 use std::iter;
@@ -43,9 +42,9 @@ impl TestClient {
         let full_id = FullId::new();
         let public_id = *full_id.public_id();
 
-        let handle = network.new_service_handle(config, None);
+        let handle = network.new_service_handle(config.clone(), None);
         let client = mock_crust::make_current(&handle, || {
-            unwrap!(routing::Client::new(Some(full_id.clone()), GROUP_SIZE))
+            unwrap!(routing::Client::new(Some(full_id.clone()), config, GROUP_SIZE))
         });
 
         TestClient {
@@ -80,7 +79,7 @@ impl TestClient {
     }
 
     /// Resend all unacknowledged messages.
-    pub fn resend_unacknowledged(&self) -> bool {
+    pub fn resend_unacknowledged(&mut self) -> bool {
         self.routing_client.resend_unacknowledged()
     }
 
@@ -96,17 +95,123 @@ impl TestClient {
 
     /// create an account and store it
     pub fn create_account(&mut self, nodes: &mut [TestNode]) {
-        let owner_pubkey = *self.full_id.public_id().signing_public_key();
-        let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
-        let mut account = unwrap!(StructuredData::new(0, self.rng.gen(), 0, vec![], owner));
-        let _ = account.add_signature(&(owner_pubkey, self.full_id.signing_private_key().clone()));
+        let owner = *self.full_id.public_id().signing_public_key();
+        let owners = iter::once(owner).collect::<BTreeSet<_>>();
 
-        unwrap!(self.put_and_verify(Data::Structured(account), nodes));
+        let data = unwrap!(MutableData::new(self.rng.gen(),
+                                            TYPE_TAG_SESSION_PACKET,
+                                            Default::default(),
+                                            Default::default(),
+                                            owners));
+
+        unwrap!(self.put_mdata_response(data, nodes));
     }
 
-    fn flush(&mut self) {
-        while let Ok(_) = self.try_recv() {}
+    /// Put immutable data
+    pub fn put_idata(&mut self, data: ImmutableData) -> MessageId {
+        let dst = Authority::ClientManager(*self.public_id.name());
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client.put_idata(dst, data, msg_id));
+        msg_id
     }
+
+    /// Put immutable data and read from mock network
+    pub fn put_idata_response(&mut self,
+                              data: ImmutableData,
+                              nodes: &mut [TestNode])
+                              -> Result<(), ClientError> {
+        let request_msg_id = self.put_idata(data);
+        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+
+        match self.try_recv() {
+            Ok(Event::Response {
+                response: Response::PutIData { res: Ok(()), msg_id }, ..
+            }) => {
+                assert_eq!(request_msg_id, msg_id);
+                Ok(())
+            }
+            Ok(Event::Response {
+                response: Response::PutIData { res: Err(error), msg_id }, ..
+            }) => {
+                assert_eq!(request_msg_id, msg_id);
+                Err(error)
+            }
+            Ok(response) => panic!("Unexpected response: {:?}", response),
+            Err(error) => Err(ClientError::from(format!("{:?}", error))),
+        }
+    }
+
+    /// Put mutable data
+    pub fn put_mdata(&mut self, data: MutableData) -> MessageId {
+        let dst = Authority::ClientManager(*self.public_id.name());
+        let msg_id = MessageId::new();
+        let requester = *self.public_id.signing_public_key();
+        unwrap!(self.routing_client.put_mdata(dst, data, msg_id, requester));
+        msg_id
+    }
+
+    /// Put mutable data and read from mock network
+    pub fn put_mdata_response(&mut self,
+                              data: MutableData,
+                              nodes: &mut [TestNode])
+                              -> Result<(), ClientError> {
+        let request_msg_id = self.put_mdata(data);
+        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+
+        match self.try_recv() {
+            Ok(Event::Response {
+                response: Response::PutMData { res: Ok(()), msg_id }, ..
+            }) => {
+                assert_eq!(request_msg_id, msg_id);
+                Ok(())
+            }
+            Ok(Event::Response {
+                response: Response::PutMData { res: Err(error), msg_id }, ..
+            }) => {
+                assert_eq!(request_msg_id, msg_id);
+                Err(error)
+            }
+            Ok(response) => panic!("Unexpected response: {:?}", response),
+            Err(error) => panic!("Unexpected error: {:?}", error),
+        }
+    }
+
+    /// Sends a GetAccountInfo request, polls the mock network and expects a GetAccountInfo response
+    pub fn get_account_info_response(&mut self,
+                                     nodes: &mut [TestNode])
+                                     -> Result<AccountInfo, ClientError> {
+        self.flush();
+
+        let dst = Authority::ClientManager(*self.public_id.name());
+        let request_msg_id = MessageId::new();
+        unwrap!(self.routing_client.get_account_info(dst, request_msg_id));
+        let events_count = poll::nodes_and_client(nodes, self);
+        trace!("totally {} events got processed during the get_account_info_response",
+               events_count);
+
+        loop {
+            match self.try_recv() {
+                Ok(Event::Response { response: Response::GetAccountInfo { res: Ok(account_info),
+                                                                msg_id },
+                                     .. }) => {
+                    assert_eq!(request_msg_id, msg_id);
+                    return Ok(account_info);
+                }
+                Ok(Event::Response { response: Response::GetAccountInfo { res: Err(error),
+                                                                msg_id },
+                                     .. }) => {
+                    assert_eq!(request_msg_id, msg_id);
+                    return Err(error);
+                }
+                Ok(response) => panic!("Unexpected response: {:?}", response),
+                Err(error) => panic!("Unexpected error: {:?}", error),
+            }
+        }
+    }
+
+
+    /*
+
 
     /// Try and get data from nodes provided.
     pub fn get(&mut self, request: DataIdentifier, nodes: &mut [TestNode]) -> Data {
@@ -221,80 +326,6 @@ impl TestClient {
         }
     }
 
-    /// Sends a Delete request, polls the mock network and expects a Delete response
-    pub fn delete_response(&mut self,
-                           data: Data,
-                           nodes: &mut [TestNode])
-                           -> Result<DataIdentifier, Option<MutationError>> {
-        let dst = Authority::NaeManager(*data.name());
-        let request_message_id = MessageId::new();
-        unwrap!(self.routing_client
-            .send_delete_request(dst.clone(), data, request_message_id));
-        let events_count = poll::nodes_and_client(nodes, self);
-        trace!("totally {} events got processed during the delete_response",
-               events_count);
-        loop {
-            match self.try_recv() {
-                Ok(Event::Response {
-                    response: Response::DeleteSuccess(data_id, response_id),
-                    ..
-                }) => {
-                    assert_eq!(request_message_id, response_id);
-                    return Ok(data_id);
-                }
-                Ok(Event::Response {
-                    response: Response::DeleteFailure { id, external_error_indicator, .. },
-                    src,
-                    ..
-                }) => {
-                    assert_eq!(request_message_id, id);
-                    assert_eq!(src, dst);
-                    let parsed_error: MutationError =
-                        unwrap!(serialisation::deserialise(&external_error_indicator));
-                    return Err(Some(parsed_error));
-                }
-                Ok(response) => panic!("Unexpected Delete response : {:?}", response),
-                Err(err) => panic!("Unexpected error : {:?}", err),
-            }
-        }
-    }
-
-    /// Sends a GetAccountInfo request, polls the mock network and expects a GetAccountInfo response
-    pub fn get_account_info_response(&mut self,
-                                     nodes: &mut [TestNode])
-                                     -> Result<(u64, u64), Option<GetError>> {
-        let request_message_id = MessageId::new();
-        self.flush();
-        let dst = Authority::ClientManager(*self.public_id.name());
-        unwrap!(self.routing_client
-            .send_get_account_info_request(dst, request_message_id));
-        let events_count = poll::nodes_and_client(nodes, self);
-        trace!("totally {} events got processed during the get_account_info_response",
-               events_count);
-        loop {
-            match self.try_recv() {
-                Ok(Event::Response { response: Response::GetAccountInfoSuccess { id,
-                                                                       data_stored,
-                                                                       space_available },
-                                     .. }) => {
-                    assert_eq!(request_message_id, id);
-                    return Ok((data_stored, space_available));
-                }
-                Ok(Event::Response {
-                    response: Response::GetAccountInfoFailure { id, external_error_indicator },
-                    ..
-                }) => {
-                    assert_eq!(request_message_id, id);
-                    let parsed_error: GetError =
-                        unwrap!(serialisation::deserialise(&external_error_indicator));
-                    return Err(Some(parsed_error));
-                }
-                Ok(response) => panic!("Unexpected GetAccountInfo response : {:?}", response),
-                Err(err) => panic!("Unexpected error : {:?}", err),
-            }
-        }
-    }
-
     /// Post request
     pub fn post(&mut self, data: Data) {
         let dst = Authority::NaeManager(*data.name());
@@ -302,93 +333,7 @@ impl TestClient {
         unwrap!(self.routing_client.send_post_request(dst, data, request_message_id));
     }
 
-    /// Put request
-    pub fn put(&mut self, data: Data) {
-        let dst = Authority::ClientManager(*self.public_id.name());
-        let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_put_request(dst, data, request_message_id));
-    }
-
-    /// Delete request
-    pub fn delete(&mut self, data: Data) {
-        let dst = Authority::NaeManager(*data.name());
-        let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_delete_request(dst, data, request_message_id));
-    }
-
-    /// Put data and read from mock network
-    pub fn put_and_verify(&mut self,
-                          data: Data,
-                          nodes: &mut [TestNode])
-                          -> Result<(), Option<MutationError>> {
-        let dst = Authority::ClientManager(*self.public_id.name());
-        let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_put_request(dst, data.clone(), request_message_id));
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
-
-        match self.try_recv() {
-            Ok(Event::Response { response: Response::PutSuccess(_, response_message_id), .. }) => {
-                assert_eq!(request_message_id, response_message_id);
-                Ok(())
-            }
-            Ok(Event::Response { response: Response::PutFailure {
-                    id: response_id,
-                    data_id,
-                    external_error_indicator: response_error
-                }, .. }) => {
-                assert_eq!(request_message_id, response_id);
-                assert!(data.identifier() == data_id);
-                let parsed_error = unwrap!(serialisation::deserialise(&response_error));
-                Err(Some(parsed_error))
-            }
-            Ok(response) => panic!("Unexpected Put response : {:?}", response),
-            // TODO: Once the network guarantees that every request gets a response, panic!
-            Err(_) => Err(None),
-        }
-    }
-
-    /// Append data
-    pub fn append(&mut self, wrapper: AppendWrapper) {
-        let request_data_id = wrapper.identifier();
-        let dst = Authority::NaeManager(*request_data_id.name());
-        let request_message_id = MessageId::new();
-        let _ = self.routing_client.send_append_request(dst, wrapper, request_message_id);
-    }
-
-    /// Append data and read from mock network
-    pub fn append_and_verify(&mut self,
-                             wrapper: AppendWrapper,
-                             nodes: &mut [TestNode])
-                             -> Result<(), Option<MutationError>> {
-        let request_data_id = wrapper.identifier();
-        let dst = Authority::NaeManager(*request_data_id.name());
-        let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_append_request(dst, wrapper, request_message_id));
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
-
-        match self.try_recv() {
-            Ok(Event::Response {
-                    response: Response::AppendSuccess(_, response_message_id),
-                    ..
-                }) => {
-                assert_eq!(request_message_id, response_message_id);
-                Ok(())
-            }
-            Ok(Event::Response { response: Response::AppendFailure {
-                    id: response_id,
-                    data_id,
-                    external_error_indicator: response_error
-                }, .. }) => {
-                assert_eq!(request_message_id, response_id);
-                assert_eq!(request_data_id, data_id);
-                let parsed_error = unwrap!(serialisation::deserialise(&response_error));
-                Err(Some(parsed_error))
-            }
-            Ok(response) => panic!("Unexpected Append response : {:?}", response),
-            // TODO: Once the network guarantees that every request gets a response, panic!
-            Err(_) => Err(None),
-        }
-    }
+    */
 
     /// Return a full id for this client
     pub fn full_id(&self) -> &FullId {
@@ -398,5 +343,9 @@ impl TestClient {
     /// Return client's network name
     pub fn name(&self) -> &XorName {
         &self.name
+    }
+
+    fn flush(&mut self) {
+        while let Ok(_) = self.try_recv() {}
     }
 }

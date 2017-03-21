@@ -17,21 +17,27 @@
 
 use routing::{ImmutableData, MutableData, XorName};
 
+/// Identifier for a data (immutable or mutable)
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, RustcDecodable, RustcEncodable)]
 pub enum DataId {
+    /// Identifier of immutable data.
     Immutable(XorName),
+    /// Identifier of mutable data.
     Mutable(XorName, u64),
 }
 
 impl DataId {
+    /// Create identifier of the given immutable data.
     pub fn immutable(data: &ImmutableData) -> Self {
         DataId::Immutable(*data.name())
     }
 
+    /// Create identifier of the given mutable data.
     pub fn mutable(data: &MutableData) -> Self {
         DataId::Mutable(*data.name(), data.tag())
     }
 
+    /// Get name of this identifier.
     pub fn name(&self) -> &XorName {
         match *self {
             DataId::Immutable(ref name) => name,
@@ -40,13 +46,17 @@ impl DataId {
     }
 }
 
+/// Type that can hold both immutable and mutable data.
 #[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
 pub enum Data {
+    /// Immutable data.
     Immutable(ImmutableData),
+    /// Mutable data.
     Mutable(MutableData),
 }
 
 impl Data {
+    /// Get `DataId` of this `Data`.
     pub fn id(&self) -> DataId {
         match *self {
             Data::Immutable(ref data) => DataId::immutable(data),
