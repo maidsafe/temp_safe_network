@@ -2,7 +2,7 @@
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "Integration tests"
 documentation = "https://docs.rs/safe_core-tests"
-homepage = "http://maidsafe.net"
+homepage = "https://maidsafe.net"
 license = "GPL-3.0"
 name = "tests"
 readme = "README.md"
@@ -10,7 +10,6 @@ repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.1.0"
 
 [dependencies]
-clippy = { version = "=0.0.99", optional = true }
 log = "~0.3.6"
 ffi_utils = { path = "../ffi_utils" }
 safe_app = { path = "../safe_app" }

@@ -1,23 +1,19 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
-// Commercial License, version 1.0 or later, or (2) The General Public License
-// (GPL), version 3, depending on which licence you accepted on initial access
-// to the Software (the "Licences").
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project
-// generally, you agree to be bound by the terms of the MaidSafe Contributor
-// Agreement, version 1.0.
-// This, along with the Licenses can be found in the root directory of this
-// project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network
-// Software distributed under the GPL Licence is distributed on an "AS IS"
-// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-// implied.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions
-// and limitations relating to use of the SAFE Network Software.
+// Please review the Licences for the specific language governing permissions and limitations
+// relating to use of the SAFE Network Software.
 
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use self_encryption::DataMap;
@@ -135,28 +131,36 @@ impl Decodable for FileMetadata {
     fn decode<D: Decoder>(d: &mut D) -> Result<FileMetadata, D::Error> {
         d.read_struct("FileMetadata", 8, |d| {
             Ok(FileMetadata {
-                name: d.read_struct_field("name", 0, Decodable::decode)?,
-                size: d.read_struct_field("size", 1, Decodable::decode)?,
-                created: ::time::at_utc(Timespec {
-                    sec: d.read_struct_field("created_time_sec", 2, Decodable::decode)?,
-                    nsec: d.read_struct_field("created_time_nsec", 3, Decodable::decode)?,
-                }),
-                modified: ::time::at_utc(Timespec {
-                    sec: d.read_struct_field("modified_time_sec", 4, Decodable::decode)?,
-                    nsec: d.read_struct_field("modified_time_nsec", 5, Decodable::decode)?,
-                }),
-                user_metadata: d.read_struct_field("user_metadata", 6, Decodable::decode)?,
-                data_map: d.read_struct_field("data_map", 7, Decodable::decode)?,
-            })
+                   name: d.read_struct_field("name", 0, Decodable::decode)?,
+                   size: d.read_struct_field("size", 1, Decodable::decode)?,
+                   created: ::time::at_utc(Timespec {
+                                               sec: d.read_struct_field("created_time_sec",
+                                                                        2,
+                                                                        Decodable::decode)?,
+                                               nsec: d.read_struct_field("created_time_nsec",
+                                                                         3,
+                                                                         Decodable::decode)?,
+                                           }),
+                   modified: ::time::at_utc(Timespec {
+                                                sec: d.read_struct_field("modified_time_sec",
+                                                                         4,
+                                                                         Decodable::decode)?,
+                                                nsec: d.read_struct_field("modified_time_nsec",
+                                                                          5,
+                                                                          Decodable::decode)?,
+                                            }),
+                   user_metadata: d.read_struct_field("user_metadata", 6, Decodable::decode)?,
+                   data_map: d.read_struct_field("data_map", 7, Decodable::decode)?,
+               })
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use self_encryption::DataMap;
-    use super::*;
 
     #[test]
     fn serialise_and_deserialise_file_metadata() {
