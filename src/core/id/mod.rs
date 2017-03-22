@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,16 +17,16 @@
 
 /// Maid
 pub mod id_type;
-/// PublicMaid
+/// `PublicMaid`
 pub mod public_id_type;
-/// AnMaid
+/// `AnMaid`
 pub mod revocation_id_type;
 
 pub use self::id_type::*;
 pub use self::public_id_type::*;
 pub use self::revocation_id_type::*;
 
-/// Interface to IdTypes
+/// Interface to `IdType`s
 pub trait IdTypeTags {
     /// returns tag type for revocation id type
     fn revocation_id_type_tag(&self) -> u64;
@@ -36,10 +36,10 @@ pub trait IdTypeTags {
     fn public_id_type_tag(&self) -> u64;
 }
 
-/// TypeTags for Maid type variants
+/// `TypeTags` for Maid type variants
 pub struct MaidTypeTags;
 
-/// TypeTags for Maid type variants
+/// `TypeTags` for Maid type variants
 pub struct MpidTypeTags;
 
 impl IdTypeTags for MaidTypeTags {

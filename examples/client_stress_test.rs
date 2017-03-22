@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -31,18 +31,13 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
-#![cfg_attr(feature="clippy", allow(use_debug, print_stdout))]
-
 extern crate docopt;
 extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate safe_core;
 extern crate rust_sodium;
-#[macro_use]
+#[cfg_attr(test, macro_use)]
 extern crate maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
@@ -85,7 +80,7 @@ fn random_structured_data<R: Rng>(type_tag: u64,
                                   rng: &mut R)
                                   -> StructuredData {
     let mut owners = BTreeSet::new();
-    owners.insert(public_key.clone());
+    owners.insert(*public_key);
     unwrap!(StructuredData::new(type_tag,
                                 rng.gen(),
                                 0,
@@ -97,16 +92,20 @@ fn random_structured_data<R: Rng>(type_tag: u64,
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));
 
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|docopt| docopt.decode())
-        .unwrap_or_else(|error| error.exit());
+    let args: Args =
+        Docopt::new(USAGE).and_then(|docopt| docopt.decode()).unwrap_or_else(|error| error.exit());
 
     let immutable_data_count = unwrap!(args.flag_immutable);
     let structured_data_count = unwrap!(args.flag_structured);
     let mut rng = rand::XorShiftRng::from_seed(match args.flag_seed {
-        Some(seed) => [0, 0, 0, seed],
-        None => [rand::random(), rand::random(), rand::random(), rand::random()],
-    });
+                                                   Some(seed) => [0, 0, 0, seed],
+                                                   None => {
+                                                       [rand::random(),
+                                                        rand::random(),
+                                                        rand::random(),
+                                                        rand::random()]
+                                                   }
+                                               });
 
     // Create account
     let secret_0: String = rng.gen_ascii_chars().take(20).collect();

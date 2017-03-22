@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
 
 use core::client::Client;
 use core::errors::CoreError;
@@ -55,8 +54,8 @@ impl Storage<SelfEncryptionStorageError> for SelfEncryptionStorage {
         }
 
         let immutable_data_request = DataIdentifier::Immutable(XorName(name_id));
-        let resp_getter = try!(unwrap!(self.client.lock()).get(immutable_data_request, None));
-        match try!(resp_getter.get()) {
+        let resp_getter = unwrap!(self.client.lock()).get(immutable_data_request, None)?;
+        match resp_getter.get()? {
             Data::Immutable(ref received_data) => Ok(received_data.value().clone()),
             _ => {
                 Err(SelfEncryptionStorageError(Box::new(CoreError::Unexpected("Wrong data type \
@@ -71,6 +70,6 @@ impl Storage<SelfEncryptionStorageError> for SelfEncryptionStorage {
         trace!("Self encrypt invoked PUT.");
 
         let immutable_data = ImmutableData::new(data);
-        Ok(try!(Client::put_recover(self.client.clone(), Data::Immutable(immutable_data), None)))
+        Ok(Client::put_recover(self.client.clone(), Data::Immutable(immutable_data), None)?)
     }
 }

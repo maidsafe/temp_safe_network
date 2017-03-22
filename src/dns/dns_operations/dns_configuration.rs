@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -46,13 +46,13 @@ pub fn initialise_dns_configuaration(client: Arc<Mutex<Client>>) -> Result<(), D
 
     let dir_helper = DirectoryHelper::new(client.clone());
     let dir_listing =
-        try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
+        dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string())?;
     let mut file_helper = FileHelper::new(client.clone());
     match file_helper.create(DNS_CONFIG_FILE_NAME.to_string(), vec![], dir_listing) {
         Ok(writer) => {
             trace!("Dns configuration not found - initialising.");
 
-            let _ = try!(writer.close());
+            let _ = writer.close()?;
             Ok(())
         }
         Err(NfsError::FileAlreadyExistsWithSameName) => {
@@ -70,18 +70,18 @@ pub fn get_dns_configuration_data(client: Arc<Mutex<Client>>)
 
     let dir_helper = DirectoryHelper::new(client.clone());
     let dir_listing =
-        try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
-    let file = try!(dir_listing.get_files()
+        dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string())?;
+    let file = dir_listing.get_files()
         .iter()
         .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
-        .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted));
+        .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted)?;
     let mut file_helper = FileHelper::new(client.clone());
-    let mut reader = try!(file_helper.read(file));
+    let mut reader = file_helper.read(file)?;
     let size = reader.size();
     if size == 0 {
         Ok(vec![])
     } else {
-        Ok(try!(deserialise(&try!(reader.read(0, size)))))
+        Ok(deserialise(&reader.read(0, size)?)?)
     }
 }
 
@@ -93,26 +93,26 @@ pub fn write_dns_configuration_data(client: Arc<Mutex<Client>>,
 
     let dir_helper = DirectoryHelper::new(client.clone());
     let dir_listing =
-        try!(dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string()));
-    let file = try!(dir_listing.get_files()
-            .iter()
-            .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
-            .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted))
+        dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string())?;
+    let file = dir_listing.get_files()
+        .iter()
+        .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
+        .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted)?
         .clone();
     let mut file_helper = FileHelper::new(client.clone());
-    let mut writer = try!(file_helper.update_content(file, Mode::Overwrite, dir_listing));
-    try!(writer.write(&try!(serialise(&config))));
-    let _ = try!(writer.close());
+    let mut writer = file_helper.update_content(file, Mode::Overwrite, dir_listing)?;
+    writer.write(&serialise(&config)?)?;
+    let _ = writer.close()?;
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use core::utility;
     use core::utility::test_utils;
     use rust_sodium::crypto::box_;
     use std::sync::{Arc, Mutex};
-    use super::*;
 
     #[test]
     fn read_write_dns_configuration_file() {

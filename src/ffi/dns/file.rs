@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -101,16 +101,15 @@ fn get_file(app: &App,
             include_metadata: bool)
             -> Result<FileDetails, FfiError> {
     let dns_operations = match app.get_app_dir_key() {
-        Some(_) => try!(DnsOperations::new(app.get_client())),
+        Some(_) => DnsOperations::new(app.get_client())?,
         None => DnsOperations::new_unregistered(app.get_client()),
     };
     let directory_key =
-        try!(dns_operations.get_service_home_directory_key(long_name, service_name, None));
+        dns_operations.get_service_home_directory_key(long_name, service_name, None)?;
     let mut tokens = helper::tokenise_path(file_path, false);
-    let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
-    let file_dir =
-        try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key)));
-    let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
+    let file_name = tokens.pop().ok_or(FfiError::InvalidPath)?;
+    let file_dir = helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key))?;
+    let file = file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath)?;
 
     FileDetails::new(file, app.get_client(), offset, length, include_metadata)
 }
@@ -121,17 +120,16 @@ fn get_file_metadata(app: &App,
                      file_path: &str)
                      -> Result<FileMetadata, FfiError> {
     let dns_operations = match app.get_app_dir_key() {
-        Some(_) => try!(DnsOperations::new(app.get_client())),
+        Some(_) => DnsOperations::new(app.get_client())?,
         None => DnsOperations::new_unregistered(app.get_client()),
     };
 
     let directory_key =
-        try!(dns_operations.get_service_home_directory_key(long_name, service_name, None));
+        dns_operations.get_service_home_directory_key(long_name, service_name, None)?;
     let mut tokens = helper::tokenise_path(file_path, false);
-    let file_name = try!(tokens.pop().ok_or(FfiError::InvalidPath));
-    let file_dir =
-        try!(helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key)));
-    let file = try!(file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath));
+    let file_name = tokens.pop().ok_or(FfiError::InvalidPath)?;
+    let file_dir = helper::get_final_subdirectory(app.get_client(), &tokens, Some(&directory_key))?;
+    let file = file_dir.find_file(&file_name).ok_or(FfiError::InvalidPath)?;
 
     FileMetadata::new(&file.get_metadata().clone())
 }
@@ -163,7 +161,7 @@ mod test {
                                                       false,
                                                       AccessLevel::Public,
                                                       Some(&mut app_dir)));
-        let dir_key = file_dir.get_key().clone();
+        let dir_key = *file_dir.get_key();
 
         let bin_metadata = vec![0u8; 0];
         let mut writer = unwrap!(file_helper.create(file_name, bin_metadata, file_dir));

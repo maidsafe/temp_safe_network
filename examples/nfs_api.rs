@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -31,13 +31,6 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy))]
-#![cfg_attr(feature="clippy", allow(use_debug, print_stdout))]
-
-#![allow(unused_extern_crates)]#[macro_use]
-extern crate maidsafe_utilities;
 extern crate time;
 extern crate routing;
 extern crate safe_core;
@@ -79,7 +72,7 @@ fn create_account() -> Result<Client, NfsError> {
 
     // Log into the created account
     println!("\nTrying to log into the created account using supplied credentials ...");
-    let client = try!(Client::log_in(&secret_0, &secret_1));
+    let client = Client::log_in(&secret_0, &secret_1)?;
     println!("Account Login Successful !!");
     Ok(client)
 }
@@ -101,7 +94,6 @@ fn get_user_string(placeholder: &str) -> String {
     txt
 }
 
-#[cfg_attr(feature="clippy", allow(indexing_slicing))]
 fn format_version_id(version_id: &[u8; XOR_NAME_LEN]) -> String {
     let mut version = String::new();
     for byte in &version_id[0..4] {
@@ -118,8 +110,8 @@ fn get_child_directory(client: Arc<Mutex<Client>>,
                        directory: &mut DirectoryListing)
                        -> Result<DirectoryListing, NfsError> {
     let directory_name = &get_user_string("Directory name");
-    let directory_metadata = try!(directory.find_sub_directory(directory_name)
-        .ok_or(NfsError::DirectoryNotFound));
+    let directory_metadata = directory.find_sub_directory(directory_name)
+        .ok_or(NfsError::DirectoryNotFound)?;
     let directory_helper = DirectoryHelper::new(client);
 
     directory_helper.get(directory_metadata.get_key())
@@ -164,12 +156,12 @@ fn directory_operation(option: u32,
                     };
 
                     let directory_helper = DirectoryHelper::new(client.clone());
-                    let _ = try!(directory_helper.create(name.clone(),
-                                                         tag_type,
-                                                         vec![],
-                                                         versioned,
-                                                         access_level,
-                                                         Some(&mut directory)));
+                    let _ = directory_helper.create(name.clone(),
+                                                    tag_type,
+                                                    vec![],
+                                                    versioned,
+                                                    access_level,
+                                                    Some(&mut directory))?;
                     println!("Created Directory - {}", name);
                 }
                 Err(_) => println!("Invalid input"),
@@ -194,10 +186,11 @@ fn directory_operation(option: u32,
         }
         3 => {
             // List versions
-            let child = try!(get_child_directory(client.clone(), directory));
+            let child = get_child_directory(client.clone(), directory)?;
             let directory_helper = DirectoryHelper::new(client.clone());
-            let versions = try!(directory_helper.get_versions(child.get_key().get_id(),
-                                                              child.get_key().get_type_tag()));
+            let versions =
+                directory_helper.get_versions(child.get_key().get_id(),
+                                              child.get_key().get_type_tag())?;
             if versions.is_empty() {
                 println!("No directory versions found");
             } else {
@@ -212,8 +205,7 @@ fn directory_operation(option: u32,
         4 => {
             // Delete directory
             let directory_helper = DirectoryHelper::new(client.clone());
-            let _ =
-                try!(directory_helper.delete(&mut directory, &get_user_string("Directory name")));
+            let _ = directory_helper.delete(&mut directory, &get_user_string("Directory name"))?;
             println!("Directory deleted");
         }
         _ => {}
@@ -228,7 +220,7 @@ fn file_operation(option: u32,
     match option {
         5 => {
             // List files
-            let child = try!(get_child_directory(client, directory));
+            let child = get_child_directory(client, directory)?;
             let files = child.get_files();
             if files.is_empty() {
                 println!("No Files found in Directory - {}",
@@ -247,18 +239,18 @@ fn file_operation(option: u32,
         }
         6 => {
             // Create file
-            let child = try!(get_child_directory(client.clone(), directory));
+            let child = get_child_directory(client.clone(), directory)?;
             let data = get_user_string("text to be saved as a file").into_bytes();
             let mut file_helper = FileHelper::new(client);
-            let mut writer = try!(file_helper.create(get_user_string("File name"), vec![], child));
+            let mut writer = file_helper.create(get_user_string("File name"), vec![], child)?;
 
-            try!(writer.write(&data[..]));
-            let _ = try!(writer.close());
+            writer.write(&data[..])?;
+            let _ = writer.close()?;
             println!("File created");
         }
         7 => {
             // Update file
-            let child = try!(get_child_directory(client.clone(), directory));
+            let child = get_child_directory(client.clone(), directory)?;
             let file = if let Some(file) = child.find_file(&get_user_string("File name")) {
                 file
             } else {
@@ -267,22 +259,22 @@ fn file_operation(option: u32,
             let data = get_user_string("text to be saved as a file").into_bytes();
             let mut file_helper = FileHelper::new(client);
             let mut writer =
-                try!(file_helper.update_content(file.clone(), Mode::Overwrite, child.clone()));
-            try!(writer.write(&data[..]));
-            let _ = try!(writer.close());
+                file_helper.update_content(file.clone(), Mode::Overwrite, child.clone())?;
+            writer.write(&data[..])?;
+            let _ = writer.close()?;
             println!("File Updated");
         }
         8 => {
             // Read file
-            let child = try!(get_child_directory(client.clone(), directory));
+            let child = get_child_directory(client.clone(), directory)?;
             let file = if let Some(file) = child.find_file(&get_user_string("File name")) {
                 file
             } else {
                 return Err(NfsError::FileNotFound);
             };
             let mut file_helper = FileHelper::new(client);
-            let mut reader = try!(file_helper.read(file));
-            let data_read = try!(reader.read(0, file.get_metadata().get_size()));
+            let mut reader = file_helper.read(file)?;
+            let data_read = reader.read(0, file.get_metadata().get_size())?;
 
             match String::from_utf8(data_read) {
                 Ok(data) => {
@@ -294,11 +286,11 @@ fn file_operation(option: u32,
         }
         9 => {
             // Read file by version
-            let child = try!(get_child_directory(client.clone(), directory));
+            let child = get_child_directory(client.clone(), directory)?;
             let file_name = get_user_string("File name");
-            let file = try!(child.find_file(&file_name).ok_or(NfsError::FileNotFound));
+            let file = child.find_file(&file_name).ok_or(NfsError::FileNotFound)?;
             let mut file_helper = FileHelper::new(client);
-            let versions = try!(file_helper.get_versions(&file, &child));
+            let versions = file_helper.get_versions(file, &child)?;
             let ref file_version;
             if versions.len() == 1 {
                 file_version = unwrap!(versions.get(0));
@@ -311,8 +303,8 @@ fn file_operation(option: u32,
                                                     &version.get_metadata().get_modified_time())))
                 }
                 match get_user_string("Number corresponding to the version")
-                    .trim()
-                    .parse::<usize>() {
+                          .trim()
+                          .parse::<usize>() {
                     Ok(index) => {
                         if let Some(version) = versions.get(index - 1) {
                             file_version = version;
@@ -328,8 +320,8 @@ fn file_operation(option: u32,
                 }
             }
 
-            let mut reader = try!(file_helper.read(file_version));
-            let data_read = try!(reader.read(0, file_version.get_metadata().get_size()));
+            let mut reader = file_helper.read(file_version)?;
+            let data_read = reader.read(0, file_version.get_metadata().get_size())?;
 
             match String::from_utf8(data_read) {
                 Ok(data) => {
@@ -341,14 +333,14 @@ fn file_operation(option: u32,
         }
         10 => {
             // Delete file
-            let mut child = try!(get_child_directory(client.clone(), directory));
+            let mut child = get_child_directory(client.clone(), directory)?;
             let file_helper = FileHelper::new(client);
-            let _ = try!(file_helper.delete(get_user_string("File name"), &mut child));
+            let _ = file_helper.delete(get_user_string("File name"), &mut child)?;
             println!("File deleted");
         }
         11 => {
             // Copy file
-            let from_directory = try!(get_child_directory(client.clone(), directory));
+            let from_directory = get_child_directory(client.clone(), directory)?;
             let to_dir_name = get_user_string("Select the Directory to copy file to (Destination \
                                                Directory)");
             let directory_metadata = directory.get_sub_directories();
@@ -357,22 +349,23 @@ fn file_operation(option: u32,
                 println!("No directories found");
                 return Ok(());
             } else {
-                match directory_metadata.iter()
-                    .find(|metadata| *metadata.get_name() == to_dir_name) {
+                match directory_metadata.iter().find(|metadata| {
+                                                         *metadata.get_name() == to_dir_name
+                                                     }) {
                     Some(to_dir) => {
                         if from_directory.get_key() == to_dir.get_key() {
                             return Err(NfsError::DestinationAndSourceAreSame);
                         }
                         let file_name = &get_user_string("File name");
-                        let file = try!(from_directory.find_file(file_name)
-                            .ok_or(NfsError::FileNotFound));
+                        let file = from_directory.find_file(file_name)
+                            .ok_or(NfsError::FileNotFound)?;
                         let directory_helper = DirectoryHelper::new(client);
-                        let mut destination = try!(directory_helper.get(to_dir.get_key()));
+                        let mut destination = directory_helper.get(to_dir.get_key())?;
                         if destination.find_file(file_name).is_some() {
                             return Err(NfsError::FileAlreadyExistsWithSameName);
                         }
                         destination.get_mut_files().push(file.clone());
-                        let _ = try!(directory_helper.update(&destination));
+                        let _ = directory_helper.update(&destination)?;
                         println!("File copied");
                     }
                     None => println!("Destination Directory not found"),

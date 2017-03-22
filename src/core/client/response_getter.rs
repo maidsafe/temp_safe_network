@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,7 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
 
 use core::client::message_queue::MessageQueue;
 use core::errors::CoreError;
@@ -63,9 +62,9 @@ impl GetResponseGetter {
             let (tx, rx) = mpsc::channel();
             let _thread_canceller = ThreadCanceller(tx);
             wait_canceller(sender, rx);
-            match try!(data_receiver.recv()) {
+            match data_receiver.recv()? {
                 ResponseEvent::GetResp(result) => {
-                    let data = try!(result);
+                    let data = result?;
                     if let DataIdentifier::Immutable(..) = self.requested_id {
                         let mut msg_queue = unwrap!(self.message_queue.lock());
                         msg_queue.local_cache_insert(self.requested_name, data.clone());
@@ -114,7 +113,7 @@ impl GetAccountInfoResponseGetter {
         let _thread_canceller = ThreadCanceller(tx);
         wait_canceller(sender, rx);
         let res = data_receiver.recv();
-        match try!(res) {
+        match res? {
             ResponseEvent::GetAccountInfoResp(result) => result,
             ResponseEvent::Terminated => Err(CoreError::RequestTimeout),
             _ => Err(CoreError::ReceivedUnexpectedData),
@@ -129,9 +128,9 @@ impl GetAccountInfoResponseGetter {
     }
 }
 
-/// MutationResponseGetter is a lazy evaluated response getter for mutating network requests such
-/// as PUT/POST/DELETE. It will fetch either from local cache or wait for the MessageQueue to notify
-/// it of the incoming response from the network
+/// `MutationResponseGetter` is a lazy evaluated response getter for mutating network requests such
+/// as PUT/POST/DELETE. It will fetch either from local cache or wait for the `MessageQueue` to
+/// notify it of the incoming response from the network
 pub struct MutationResponseGetter {
     data_channel: (Sender<ResponseEvent>, Receiver<ResponseEvent>),
 }
@@ -150,7 +149,7 @@ impl MutationResponseGetter {
         let (tx, rx) = mpsc::channel();
         let _thread_canceller = ThreadCanceller(tx);
         wait_canceller(sender, rx);
-        match try!(data_receiver.recv()) {
+        match data_receiver.recv()? {
             ResponseEvent::MutationResp(result) => result,
             ResponseEvent::Terminated => Err(CoreError::RequestTimeout),
             _ => Err(CoreError::ReceivedUnexpectedData),
@@ -167,17 +166,17 @@ impl MutationResponseGetter {
 
 fn wait_canceller(tx: Sender<ResponseEvent>, rx: Receiver<()>) {
     maidsafe_utilities::thread::named("DetachedCanceller", move || {
-            const SLEEP_PER_ITER: u64 = 1;
-            for _ in 0..REQ_TIMEOUT_SECS {
-                if let Ok(()) = rx.try_recv() {
+        const SLEEP_PER_ITER: u64 = 1;
+        for _ in 0..REQ_TIMEOUT_SECS {
+            if let Ok(()) = rx.try_recv() {
                     return;
                 }
-                thread::sleep(Duration::from_secs(SLEEP_PER_ITER));
-            }
-            debug!("Response has timed out - firing wait canceller.");
-            let _ = tx.send(ResponseEvent::Terminated);
-        })
-        .detach();
+            thread::sleep(Duration::from_secs(SLEEP_PER_ITER));
+        }
+        debug!("Response has timed out - firing wait canceller.");
+        let _ = tx.send(ResponseEvent::Terminated);
+    })
+            .detach();
 }
 
 struct ThreadCanceller(Sender<()>);

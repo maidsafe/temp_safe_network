@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -32,7 +32,7 @@ use std::{mem, ptr, slice};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
-/// Create new StructuredData
+/// Create new `StructuredData`
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_new(app: *const App,
                                          type_tag: u64,
@@ -62,8 +62,8 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
         let mut sd = match type_tag {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .get_cipher_opt(cipher_opt_h))
-                    .encrypt(app, &plain_text));
+                                                     .get_cipher_opt(cipher_opt_h))
+                                                .encrypt(app, &plain_text));
 
                 ffi_try!(unversioned::create(client,
                                              type_tag,
@@ -81,8 +81,8 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
                 // that we need to live with this.
                 let ser_immut_data = ffi_try!(serialise(&immut_data).map_err(FfiError::from));
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .get_cipher_opt(cipher_opt_h))
-                    .encrypt(app, &ser_immut_data));
+                                                     .get_cipher_opt(cipher_opt_h))
+                                                .encrypt(app, &ser_immut_data));
 
                 let immut_data_final = Data::Immutable(ImmutableData::new(raw_data));
                 let immut_data_final_name = *immut_data_final.name();
@@ -99,17 +99,17 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                 let raw_data = ffi_try!(ffi_try!(unwrap!(object_cache())
-                        .get_cipher_opt(cipher_opt_h))
-                    .encrypt(app, &plain_text));
+                                                     .get_cipher_opt(cipher_opt_h))
+                                                .encrypt(app, &plain_text));
 
                 ffi_try!(StructuredData::new(type_tag, xor_id, version, raw_data, owners)
-                    .map_err(CoreError::from))
+                             .map_err(CoreError::from))
             }
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
 
         let _ = ffi_try!(sd.add_signature(&(owner_key, private_signing_key))
-            .map_err(CoreError::from));
+                             .map_err(CoreError::from));
 
         let handle = unwrap!(object_cache()).insert_sd(sd);
         ptr::write(o_handle, handle);
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn struct_data_new(app: *const App,
     })
 }
 
-/// Fetch an existing StructuredData from Network.
+/// Fetch an existing `StructuredData` from Network.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_fetch(app: *const App,
                                            data_id_h: DataIdHandle,
@@ -141,7 +141,7 @@ pub unsafe extern "C" fn struct_data_fetch(app: *const App,
 }
 
 // TODO possibly move this to data_id module
-/// Extract DataIdentifier from StructuredData.
+/// Extract `DataIdentifier` from `StructuredData`.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_extract_data_id(sd_h: StructDataHandle,
                                                      o_handle: *mut DataIdHandle)
@@ -157,7 +157,7 @@ pub unsafe extern "C" fn struct_data_extract_data_id(sd_h: StructDataHandle,
 }
 
 // TODO See if we can extract common functionality and merge with new() above
-/// Put new data into StructuredData. Version is not updated. It will be updated on POST.
+/// Put new data into `StructuredData`. Version is not updated. It will be updated on POST.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                               sd_h: StructDataHandle,
@@ -178,7 +178,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
         let mut new_sd = match ffi_try!(object_cache.get_sd(sd_h)).get_type_tag() {
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
-                    .encrypt(app, &plain_text));
+                                            .encrypt(app, &plain_text));
 
                 let sd = ffi_try!(object_cache.get_sd(sd_h));
                 ffi_try!(unversioned::create(client,
@@ -195,7 +195,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                     ffi_try!(immut_data_operations::create(client.clone(), plain_text, None));
                 let ser_immut_data = ffi_try!(serialise(&immut_data).map_err(FfiError::from));
                 let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
-                    .encrypt(app, &ser_immut_data));
+                                            .encrypt(app, &ser_immut_data));
 
                 let immut_data_final = Data::Immutable(ImmutableData::new(raw_data));
                 let immut_data_final_name = *immut_data_final.name();
@@ -211,7 +211,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
                 let raw_data = ffi_try!(ffi_try!(object_cache.get_cipher_opt(cipher_opt_h))
-                    .encrypt(app, &plain_text));
+                                            .encrypt(app, &plain_text));
 
                 let sd = ffi_try!(object_cache.get_sd(sd_h));
                 ffi_try!(StructuredData::new(sd.get_type_tag(),
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
                                              sd.get_version(),
                                              raw_data,
                                              sd.get_owners().clone())
-                    .map_err(CoreError::from))
+                                 .map_err(CoreError::from))
             }
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
@@ -231,7 +231,7 @@ pub unsafe extern "C" fn struct_data_new_data(app: *const App,
     })
 }
 
-/// Extract data from StructuredData
+/// Extract data from `StructuredData`
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
                                                   sd_h: StructDataHandle,
@@ -266,7 +266,7 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
 
                 let ser_immut_data = ffi_try!(CipherOpt::decrypt(&app, immut_data_final.value()));
                 let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
-                    .map_err(FfiError::from));
+                                              .map_err(FfiError::from));
                 ffi_try!(immut_data_operations::get_data_from_immut_data(client, immut_data, None))
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
@@ -284,7 +284,7 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
     })
 }
 
-/// Get number of versions from a versioned StructuredData
+/// Get number of versions from a versioned `StructuredData`
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_num_of_versions(sd_h: StructDataHandle,
                                                      o_num: *mut usize)
@@ -298,7 +298,7 @@ pub unsafe extern "C" fn struct_data_num_of_versions(sd_h: StructDataHandle,
     })
 }
 
-/// Get nth (starts from 0) version from a versioned StructuredData
+/// Get nth (starts from 0) version from a versioned `StructuredData`
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
                                                  sd_h: StructDataHandle,
@@ -329,7 +329,8 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
         // TODO Try to combine this code with above (extract_data) if it makes it smaller
         let immut_data_final_name = versions.remove(n);
         let resp_getter = ffi_try!(unwrap!(client.lock())
-            .get(DataIdentifier::Immutable(immut_data_final_name), None));
+                                       .get(DataIdentifier::Immutable(immut_data_final_name),
+                                            None));
         let immut_data_final = match ffi_try!(resp_getter.get()) {
             Data::Immutable(immut_data) => immut_data,
             _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
@@ -337,7 +338,7 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
 
         let ser_immut_data = ffi_try!(CipherOpt::decrypt(&app, immut_data_final.value()));
         let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
-            .map_err(FfiError::from));
+                                      .map_err(FfiError::from));
         let mut plain_text =
             ffi_try!(immut_data_operations::get_data_from_immut_data(client, immut_data, None));
 
@@ -350,7 +351,7 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
     })
 }
 
-/// PUT StructuredData
+/// PUT `StructuredData`
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_put(app: *const App, sd_h: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
@@ -365,8 +366,9 @@ pub unsafe extern "C" fn struct_data_put(app: *const App, sd_h: StructDataHandle
 }
 
 // TODO add test case for this
-/// Make StructuredData unclaimable - after this operation, the StructuredData will remain in the
-/// network with no data but will not be claimable by anyone anymore including the original owner.
+/// Make `StructuredData` unclaimable - after this operation, the `StructuredData` will remain in
+/// the network with no data but will not be claimable by anyone any more including the original
+/// owner.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_make_unclaimable(app: *const App,
                                                       sd_h: StructDataHandle)
@@ -384,7 +386,7 @@ pub unsafe extern "C" fn struct_data_make_unclaimable(app: *const App,
     })
 }
 
-/// POST StructuredData. This will bump version.
+/// POST `StructuredData`. This will bump version.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_post(app: *const App, sd_h: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
@@ -409,36 +411,35 @@ fn struct_data_post_impl(client: Arc<Mutex<Client>>,
             let mut owners = BTreeSet::new();
             owners.insert(NO_OWNER_PUB_KEY);
 
-            try!(StructuredData::new(sd.get_type_tag(),
-                                     *sd.name(),
-                                     sd.get_version() + 1,
-                                     vec![],
-                                     owners)
-                .map_err(CoreError::from))
+            StructuredData::new(sd.get_type_tag(),
+                                *sd.name(),
+                                sd.get_version() + 1,
+                                vec![],
+                                owners).map_err(CoreError::from)?
         } else {
             // TODO Ask routing to remove this inefficiency of requiring to clone data and all
-            let mut new_sd = try!(StructuredData::new(sd.get_type_tag(),
-                                                      *sd.name(),
-                                                      sd.get_version() + 1,
-                                                      sd.get_data().clone(),
-                                                      sd.get_owners().clone())
-                .map_err(CoreError::from));
-            let owner_key = *try!(unwrap!(client.lock()).get_public_signing_key());
-            let private_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-            let _ = try!(new_sd.add_signature(&(owner_key, private_signing_key))
-                .map_err(CoreError::from));
+            let mut new_sd =
+                StructuredData::new(sd.get_type_tag(),
+                                    *sd.name(),
+                                    sd.get_version() + 1,
+                                    sd.get_data().clone(),
+                                    sd.get_owners().clone()).map_err(CoreError::from)?;
+            let owner_key = *unwrap!(client.lock()).get_public_signing_key()?;
+            let private_signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
+            let _ = new_sd.add_signature(&(owner_key, private_signing_key))
+                .map_err(CoreError::from)?;
             new_sd
         }
     };
 
     let data = Data::Structured(new_sd.clone());
-    let resp_getter = try!(unwrap!(client.lock()).post(data, None));
-    try!(resp_getter.get());
+    let resp_getter = unwrap!(client.lock()).post(data, None)?;
+    resp_getter.get()?;
 
     Ok(new_sd)
 }
 
-/// DELETE StructuredData. Version will be bumped.
+/// DELETE `StructuredData`. Version will be bumped.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_delete(app: *const App, sd_h: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
@@ -458,46 +459,47 @@ fn struct_data_delete_impl(client: Arc<Mutex<Client>>,
                            sd: &StructuredData)
                            -> Result<StructuredData, FfiError> {
     // TODO Ask routing to remove this inefficiency of requiring to clone data and all
-    let mut new_sd = try!(StructuredData::new(sd.get_type_tag(),
-                                              *sd.name(),
-                                              sd.get_version() + 1,
-                                              vec![],
-                                              sd.get_owners().clone())
-        .map_err(CoreError::from));
+    let mut new_sd =
+        StructuredData::new(sd.get_type_tag(),
+                            *sd.name(),
+                            sd.get_version() + 1,
+                            vec![],
+                            sd.get_owners().clone()).map_err(CoreError::from)?;
 
-    let owner_key = *try!(unwrap!(client.lock()).get_public_signing_key());
-    let private_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    let _ = try!(new_sd.add_signature(&(owner_key, private_signing_key))
-        .map_err(CoreError::from));
+    let owner_key = *unwrap!(client.lock()).get_public_signing_key()?;
+    let private_signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
+    let _ = new_sd.add_signature(&(owner_key, private_signing_key)).map_err(CoreError::from)?;
 
     let data = Data::Structured(new_sd.clone());
-    let resp_getter = try!(unwrap!(client.lock()).delete(data, None));
-    try!(resp_getter.get());
+    let resp_getter = unwrap!(client.lock()).delete(data, None)?;
+    resp_getter.get()?;
 
     Ok(new_sd)
 }
 
-/// See if StructuredData size is valid.
+/// See if `StructuredData` size is valid.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_validate_size(handle: StructDataHandle,
                                                    o_valid: *mut bool)
                                                    -> i32 {
     helper::catch_unwind_i32(|| {
-        *o_valid = ffi_try!(unwrap!(object_cache()).get_sd(handle)).validate_size();
-        0
-    })
+                                 *o_valid = ffi_try!(unwrap!(object_cache()).get_sd(handle))
+            .validate_size();
+                                 0
+                             })
 }
 
-/// Get the current version of StructuredData by its handle
+/// Get the current version of `StructuredData` by its handle
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_version(handle: StructDataHandle, o_version: *mut u64) -> i32 {
     helper::catch_unwind_i32(|| {
-        *o_version = ffi_try!(unwrap!(object_cache()).get_sd(handle)).get_version();
-        0
-    })
+                                 *o_version = ffi_try!(unwrap!(object_cache()).get_sd(handle))
+            .get_version();
+                                 0
+                             })
 }
 
-/// Returns true if the app is one of the owners of the provided StructuredData.
+/// Returns true if the app is one of the owners of the provided `StructuredData`.
 #[no_mangle]
 pub unsafe extern "C" fn struct_data_is_owned(app: *const App,
                                               handle: StructDataHandle,
@@ -507,25 +509,25 @@ pub unsafe extern "C" fn struct_data_is_owned(app: *const App,
         let client = (*app).get_client();
         let my_key = *ffi_try!(unwrap!(client.lock()).get_public_signing_key());
 
-        *o_is_owned = ffi_try!(unwrap!(object_cache()).get_sd(handle))
-            .get_owners()
-            .contains(&my_key);
+        *o_is_owned =
+            ffi_try!(unwrap!(object_cache()).get_sd(handle)).get_owners().contains(&my_key);
 
         0
     })
 }
 
-/// Free StructuredData handle
+/// Free `StructuredData` handle
 #[no_mangle]
 pub extern "C" fn struct_data_free(handle: StructDataHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache()).remove_sd(handle));
-        0
-    })
+                                 let _ = ffi_try!(unwrap!(object_cache()).remove_sd(handle));
+                                 0
+                             })
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use core::{CLIENT_STRUCTURED_DATA_TAG, utility};
     use ffi::app::App;
     use ffi::errors::FfiError;
@@ -535,7 +537,6 @@ mod tests {
     use ffi::test_utils;
     use rand;
     use std::ptr;
-    use super::*;
 
     #[test]
     fn unversioned_struct_data_crud() {

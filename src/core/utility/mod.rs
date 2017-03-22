@@ -1,11 +1,12 @@
 // Copyright 2015 MaidSafe.net limited.
+//
 // This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
 // version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -36,7 +37,10 @@ pub fn hybrid_encrypt(plain_text: &[u8],
     let sym_nonce = secretbox::gen_nonce();
 
     let mut asym_plain_text = [0u8; secretbox::KEYBYTES + secretbox::NONCEBYTES];
-    for it in sym_key.0.iter().chain(sym_nonce.0.iter()).enumerate() {
+    for it in sym_key.0
+            .iter()
+            .chain(sym_nonce.0.iter())
+            .enumerate() {
         asym_plain_text[it.0] = *it.1;
     }
 
@@ -46,16 +50,16 @@ pub fn hybrid_encrypt(plain_text: &[u8],
                                       asym_public_key,
                                       asym_secret_key);
 
-    Ok(try!(serialise(&(asym_cipher_text, sym_cipher_text))))
+    Ok(serialise(&(asym_cipher_text, sym_cipher_text))?)
 }
 
-/// Reverse of hybrid_encrypt. Refer hybrid_encrypt.
+/// Reverse of `hybrid_encrypt`. Refer `hybrid_encrypt`.
 pub fn hybrid_decrypt(cipher_text: &[u8],
                       asym_nonce: &box_::Nonce,
                       asym_public_key: &box_::PublicKey,
                       asym_secret_key: &box_::SecretKey)
                       -> Result<Vec<u8>, CoreError> {
-    let (asym_cipher_text, sym_cipher_text): (Vec<u8>, Vec<u8>) = try!(deserialise(cipher_text));
+    let (asym_cipher_text, sym_cipher_text): (Vec<u8>, Vec<u8>) = deserialise(cipher_text)?;
 
     let asym_plain_text = try!(box_::open(&asym_cipher_text,
                                           asym_nonce,
@@ -83,10 +87,10 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
 
 /// Generates a random string for specified size
 pub fn generate_random_string(length: usize) -> Result<String, CoreError> {
-    let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
-        error!("{:?}", error);
-        CoreError::RandomDataGenerationFailure
-    }));
+    let mut os_rng = ::rand::OsRng::new().map_err(|error| {
+                     error!("{:?}", error);
+                     CoreError::RandomDataGenerationFailure
+                 })?;
     Ok((0..length).map(|_| os_rng.gen::<char>()).collect())
 }
 
@@ -94,10 +98,10 @@ pub fn generate_random_string(length: usize) -> Result<String, CoreError> {
 pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
     where T: ::rand::Rand
 {
-    let mut os_rng = try!(::rand::OsRng::new().map_err(|error| {
-        error!("{:?}", error);
-        CoreError::RandomDataGenerationFailure
-    }));
+    let mut os_rng = ::rand::OsRng::new().map_err(|error| {
+                     error!("{:?}", error);
+                     CoreError::RandomDataGenerationFailure
+                 })?;
     Ok((0..length).map(|_| os_rng.gen()).collect())
 }
 
@@ -114,8 +118,8 @@ pub fn derive_secrets(acc_locator: &str, acc_password: &str) -> (Vec<u8>, Vec<u8
 
 #[cfg(test)]
 mod test {
-    use rust_sodium::crypto::box_;
     use super::*;
+    use rust_sodium::crypto::box_;
 
     const SIZE: usize = 10;
 

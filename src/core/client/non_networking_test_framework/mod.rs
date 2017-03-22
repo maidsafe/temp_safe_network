@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -15,11 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// TODO: Look to enable this lint check.
-#![cfg_attr(feature="clippy", allow(map_entry))]
-
 mod storage;
 
+use self::storage::{ClientAccount, Storage, StorageError};
 use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread;
 use rand;
@@ -30,7 +28,6 @@ use routing::client_errors::{GetError, MutationError};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use rustc_serialize::Encodable;
-use self::storage::{ClientAccount, Storage, StorageError};
 use std;
 use std::cell::Cell;
 use std::sync::Mutex;
@@ -75,10 +72,10 @@ impl RoutingMock {
             proxy_node_name: rand::random(),
         };
         Ok(RoutingMock {
-            sender: sender,
-            client_auth: client_auth,
-            max_ops_countdown: None,
-        })
+               sender: sender,
+               client_auth: client_auth,
+               max_ops_countdown: None,
+           })
     }
 
     // Note: destination authority is ignored (everywhere in Mock) because the clients can direct
@@ -90,7 +87,7 @@ impl RoutingMock {
                             msg_id: MessageId)
                             -> Result<(), InterfaceError> {
         let cloned_sender = self.sender.clone();
-        let client_auth = self.client_auth.clone();
+        let client_auth = self.client_auth;
 
         let err = if self.network_limits_reached() {
             info!("Mock GET: {:?} {:?} [0]", data_id, msg_id);
@@ -117,15 +114,15 @@ impl RoutingMock {
             match unwrap!(STORAGE.lock()).get_data(&data_name) {
                 Ok(data) => {
                     if match (&data, &data_id) {
-                        (&Data::Immutable(_), &DataIdentifier::Immutable(_)) => true,
-                        (&Data::PrivAppendable(_), &DataIdentifier::PrivAppendable(_)) => true,
-                        (&Data::PubAppendable(_), &DataIdentifier::PubAppendable(_)) => true,
-                        (&Data::Structured(ref struct_data),
-                         &DataIdentifier::Structured(_, ref tag)) => {
-                            struct_data.get_type_tag() == *tag
-                        }
-                        _ => false,
-                    } {
+                           (&Data::Immutable(_), &DataIdentifier::Immutable(_)) |
+                           (&Data::PrivAppendable(_), &DataIdentifier::PrivAppendable(_)) |
+                           (&Data::PubAppendable(_), &DataIdentifier::PubAppendable(_)) => true,
+                           (&Data::Structured(ref struct_data),
+                            &DataIdentifier::Structured(_, ref tag)) => {
+                               struct_data.get_type_tag() == *tag
+                           }
+                           _ => false,
+                       } {
                         let event = Event::Response {
                             src: nae_auth,
                             dst: client_auth,
@@ -160,7 +157,7 @@ impl RoutingMock {
                             msg_id: MessageId)
                             -> Result<(), InterfaceError> {
         let cloned_sender = self.sender.clone();
-        let client_auth = self.client_auth.clone();
+        let client_auth = self.client_auth;
 
         let data_name = *data.name();
         let data_id = data.identifier();
@@ -245,7 +242,7 @@ impl RoutingMock {
                              msg_id: MessageId)
                              -> Result<(), InterfaceError> {
         let cloned_sender = self.sender.clone();
-        let client_auth = self.client_auth.clone();
+        let client_auth = self.client_auth;
 
         let data_name = *data.name();
         let data_id = data.identifier();
@@ -262,7 +259,7 @@ impl RoutingMock {
                     (Data::Structured(sd_new), Ok(Data::Structured(sd_stored))) => {
                         if sd_stored.is_deleted() {
                             Err(MutationError::InvalidOperation)
-                        } else if let Ok(_) = sd_stored.validate_self_against_successor(&sd_new) {
+                        } else if sd_stored.validate_self_against_successor(&sd_new).is_ok() {
                             Ok(Data::Structured(sd_new))
                         } else {
                             Err(MutationError::InvalidSuccessor)
@@ -331,7 +328,7 @@ impl RoutingMock {
                                msg_id: MessageId)
                                -> Result<(), InterfaceError> {
         let cloned_sender = self.sender.clone();
-        let client_auth = self.client_auth.clone();
+        let client_auth = self.client_auth;
 
         let data_name = *data.name();
         let data_id = data.identifier();
@@ -347,7 +344,7 @@ impl RoutingMock {
                 (Data::Structured(sd_new), Ok(Data::Structured(mut sd_stored))) => {
                     if sd_stored.is_deleted() {
                         Some(MutationError::InvalidOperation)
-                    } else if let Ok(_) = sd_stored.delete_if_valid_successor(&sd_new) {
+                    } else if sd_stored.delete_if_valid_successor(&sd_new).is_ok() {
                         if let Err(err) = storage.put_data(data_name, Data::Structured(sd_stored)) {
                             Some(MutationError::from(err))
                         } else {
@@ -392,7 +389,7 @@ impl RoutingMock {
                                          msg_id: MessageId)
                                          -> Result<(), InterfaceError> {
         let cloned_sender = self.sender.clone();
-        let client_auth = self.client_auth.clone();
+        let client_auth = self.client_auth;
         let client_name = self.client_name();
 
         let err = if self.network_limits_reached() {
@@ -452,7 +449,7 @@ impl RoutingMock {
                                msg_id: MessageId)
                                -> Result<(), InterfaceError> {
         let cloned_sender = self.sender.clone();
-        let client_auth = self.client_auth.clone();
+        let client_auth = self.client_auth;
 
         let data_id = wrapper.identifier();
         let data_name = *data_id.name();
@@ -616,15 +613,17 @@ impl RoutingMock {
 
     fn update_network_limits(&self) -> Option<u64> {
         self.max_ops_countdown.as_ref().map(|count| {
-            let ops = count.get();
-            count.set(ops - 1);
-            ops
-        })
+                                                let ops = count.get();
+                                                count.set(ops - 1);
+                                                ops
+                                            })
     }
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use super::storage::DEFAULT_CLIENT_ACCOUNT_SIZE;
     use core::client::message_queue::MessageQueue;
     use core::client::response_getter::{GetAccountInfoResponseGetter, GetResponseGetter,
                                         MutationResponseGetter};
@@ -645,8 +644,6 @@ mod test {
     use std::iter;
     use std::sync::{Arc, Mutex};
     use std::sync::mpsc;
-    use super::*;
-    use super::storage::DEFAULT_CLIENT_ACCOUNT_SIZE;
 
     #[test]
     fn map_serialisation() {
@@ -686,7 +683,7 @@ mod test {
         {
             let result = do_get(&mut mock_routing,
                                 message_queue.clone(),
-                                location_nae_mgr.clone(),
+                                location_nae_mgr,
                                 orig_data.identifier());
 
             match result {
@@ -726,7 +723,7 @@ mod test {
         {
             let result = do_post(&mut mock_routing,
                                  message_queue.clone(),
-                                 location_nae_mgr.clone(),
+                                 location_nae_mgr,
                                  orig_data.clone());
 
             match result {
@@ -742,7 +739,7 @@ mod test {
         {
             let result = do_delete(&mut mock_routing,
                                    message_queue.clone(),
-                                   location_client_mgr.clone(),
+                                   location_client_mgr,
                                    orig_data.clone());
 
             match result {
@@ -785,12 +782,12 @@ mod test {
             _ => panic!("Could not Bootstrap !!"),
         }
 
-        let owner_key = account_packet.get_public_maid().public_keys().0.clone();
+        let owner_key = account_packet.get_public_maid().public_keys().0;
         let sign_key = &account_packet.get_maid().secret_keys().0;
         let signature = (owner_key, sign_key.clone());
 
         let mut owners = BTreeSet::new();
-        owners.insert(owner_key.clone());
+        owners.insert(owner_key);
 
         // Construct ImmutableData
         let orig_immutable_data = generate_random_immutable_data();
@@ -902,7 +899,7 @@ mod test {
         {
             let result = do_put(&mut mock_routing,
                                 message_queue.clone(),
-                                location_client_mgr_struct.clone(),
+                                location_client_mgr_struct,
                                 data_account_version.clone());
 
             match result {
@@ -916,7 +913,7 @@ mod test {
         {
             let result = do_post(&mut mock_routing,
                                  message_queue.clone(),
-                                 location_nae_mgr_struct.clone(),
+                                 location_nae_mgr_struct,
                                  invalid_version_data_account_version);
 
             match result {
@@ -932,7 +929,7 @@ mod test {
         {
             let result = do_post(&mut mock_routing,
                                  message_queue.clone(),
-                                 location_client_mgr_struct.clone(),
+                                 location_client_mgr_struct,
                                  invalid_signature_data_account_version);
 
             match result {
@@ -993,7 +990,7 @@ mod test {
         {
             let result = do_delete(&mut mock_routing,
                                    message_queue.clone(),
-                                   location_client_mgr_struct.clone(),
+                                   location_client_mgr_struct,
                                    data_account_version.clone());
 
             match result {
@@ -1052,7 +1049,7 @@ mod test {
 
         let result = do_put(&mut mock_routing,
                             message_queue.clone(),
-                            location_client_mgr_struct.clone(),
+                            location_client_mgr_struct,
                             data_account_version);
 
         match result {
@@ -1069,7 +1066,7 @@ mod test {
 
         let result = do_delete(&mut mock_routing,
                                message_queue.clone(),
-                               location_client_mgr_struct.clone(),
+                               location_client_mgr_struct,
                                data_account_version);
 
         match result {
@@ -1120,9 +1117,12 @@ mod test {
             _ => panic!("Could not Bootstrap !!"),
         }
 
-        let owner_key = account_packet.get_public_maid().public_keys().0.clone();
-        let signing_key = account_packet.get_maid().secret_keys().0.clone();
-        let signature = (owner_key.clone(), signing_key.clone());
+        let owner_key = account_packet.get_public_maid().public_keys().0;
+        let signing_key = account_packet.get_maid()
+            .secret_keys()
+            .0
+            .clone();
+        let signature = (owner_key, signing_key.clone());
 
         let mut owners = BTreeSet::new();
         owners.insert(owner_key);
@@ -1225,7 +1225,7 @@ mod test {
         // POST without version bump should fail
         let result = do_post(&mut mock_routing,
                              message_queue.clone(),
-                             appendable_data_nae_mgr.clone(),
+                             appendable_data_nae_mgr,
                              Data::PubAppendable(appendable_data.clone()));
 
         match result {
@@ -1284,7 +1284,7 @@ mod test {
 
             let result = do_append(&mut mock_routing,
                                    message_queue.clone(),
-                                   appendable_data_nae_mgr.clone(),
+                                   appendable_data_nae_mgr,
                                    append_wrapper);
 
             match result {
@@ -1302,7 +1302,8 @@ mod test {
         let appendable_data_name = rand::random();
         let appendable_data_nae_mgr = Authority::NaeManager(appendable_data_name);
 
-        let mut appendable_data = unwrap!(PubAppendableData::new(appendable_data_name,
+        let mut appendable_data =
+            unwrap!(PubAppendableData::new(appendable_data_name,
                                            0,
                                            owners.clone(),
                                            Default::default(),
@@ -1344,9 +1345,15 @@ mod test {
     fn create_account_and_full_id() -> (Account, FullId) {
         let account = Account::new(None, None);
         let id = FullId::with_keys((account.get_maid().public_keys().1,
-                                    account.get_maid().secret_keys().1.clone()),
+                                    account.get_maid()
+                                        .secret_keys()
+                                        .1
+                                        .clone()),
                                    (account.get_maid().public_keys().0,
-                                    account.get_maid().secret_keys().0.clone()));
+                                    account.get_maid()
+                                        .secret_keys()
+                                        .0
+                                        .clone()));
 
         (account, id)
     }

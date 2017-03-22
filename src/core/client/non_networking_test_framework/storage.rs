@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -33,11 +33,11 @@ pub struct Storage {
 impl Storage {
     pub fn new() -> Self {
         sync::load().unwrap_or_else(|| {
-            Storage {
-                data_store: HashMap::new(),
-                client_accounts: HashMap::new(),
-            }
-        })
+                                        Storage {
+                                            data_store: HashMap::new(),
+                                            client_accounts: HashMap::new(),
+                                        }
+                                    })
     }
 
     // Check if data with the given name is in the storage.
@@ -121,22 +121,20 @@ mod sync {
 
 #[cfg(not(test))]
 mod sync {
+    use super::Storage;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::env;
     use std::fs::File;
     use std::io::{Read, Write};
     use std::path::PathBuf;
-    use super::Storage;
 
     const STORAGE_FILE_NAME: &'static str = "VaultStorageSimulation";
 
     pub fn load() -> Option<Storage> {
         if let Ok(mut file) = File::open(path()) {
             let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata()).len() as usize);
-            if let Ok(_) = file.read_to_end(&mut raw_disk_data) {
-                if !raw_disk_data.is_empty() {
-                    return deserialise(&raw_disk_data).ok();
-                }
+            if file.read_to_end(&mut raw_disk_data).is_ok() && !raw_disk_data.is_empty() {
+                return deserialise(&raw_disk_data).ok();
             }
         }
 

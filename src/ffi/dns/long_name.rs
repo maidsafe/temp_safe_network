@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -56,26 +56,27 @@ pub fn register_long_name(app: &App, long_name: String) -> Result<(), FfiError> 
         let client_guard = unwrap!(client.lock());
 
         let mut owners = BTreeSet::new();
-        owners.insert(*try!(client_guard.get_public_signing_key()));
+        owners.insert(*client_guard.get_public_signing_key()?);
 
-        let private_signing_key = try!(client_guard.get_secret_signing_key()).clone();
+        let private_signing_key = client_guard.get_secret_signing_key()?.clone();
         (owners, private_signing_key)
     };
 
-    let dns_operation = try!(DnsOperations::new(client.clone()));
-    try!(dns_operation.register_dns(long_name,
-                                    &msg_public_key,
-                                    &msg_secret_key,
-                                    &services,
-                                    owners,
-                                    &private_signing_key,
-                                    None));
+    let dns_operation = DnsOperations::new(client.clone())?;
+    dns_operation.register_dns(long_name,
+                               &msg_public_key,
+                               &msg_secret_key,
+                               &services,
+                               owners,
+                               &private_signing_key,
+                               None)?;
 
     Ok(())
 }
 
 /// Delete DNS.
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub unsafe extern "C" fn dns_delete_long_name(app_handle: *const App,
                                               long_name: *const u8,
                                               long_name_len: usize)
@@ -104,16 +105,16 @@ pub unsafe extern "C" fn dns_get_long_names(app_handle: *const App,
 
 fn delete_long_name(app: &App, long_name: &str) -> Result<(), FfiError> {
     let client = app.get_client();
-    let signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
-    let dns_ops = try!(DnsOperations::new(client));
-    try!(dns_ops.delete_dns(long_name, &signing_key));
+    let signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
+    let dns_ops = DnsOperations::new(client)?;
+    dns_ops.delete_dns(long_name, &signing_key)?;
 
     Ok(())
 }
 
 fn get_long_names(app: &App) -> Result<Vec<String>, FfiError> {
-    let dns_ops = try!(DnsOperations::new(app.get_client()));
-    let list = try!(dns_ops.get_all_registered_names());
+    let dns_ops = DnsOperations::new(app.get_client())?;
+    let list = dns_ops.get_all_registered_names()?;
     Ok(list)
 }
 

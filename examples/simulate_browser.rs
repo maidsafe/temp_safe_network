@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -31,15 +31,7 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
-#![cfg_attr(feature="clippy", allow(use_debug, print_stdout))]
-
-#![allow(unused_extern_crates)]#[macro_use]
-extern crate maidsafe_utilities;
 extern crate regex;
-extern crate routing;
 extern crate safe_core;
 extern crate rust_sodium;
 #[macro_use]
@@ -108,9 +100,9 @@ fn create_dns_record(client: Arc<Mutex<Client>>,
 
     println!("Registering Dns...");
 
-    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+    let secret_signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
     let mut owners = BTreeSet::new();
-    owners.insert(try!(unwrap!(client.lock()).get_public_signing_key()).clone());
+    owners.insert(*unwrap!(client.lock()).get_public_signing_key()?);
     dns_operations.register_dns(long_name,
                                 &public_messaging_encryption_key,
                                 &secret_messaging_encryption_key,
@@ -130,7 +122,7 @@ fn delete_dns_record(client: Arc<Mutex<Client>>,
     let _ = std::io::stdin().read_line(&mut long_name);
     long_name = long_name.trim().to_string();
 
-    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+    let secret_signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
 
     println!("Deleting Dns...");
 
@@ -141,7 +133,7 @@ fn display_dns_records(dns_operations: &DnsOperations) -> Result<(), DnsError> {
     println!("\n\n    Display Dns Records");
     println!("    ===================");
     println!("\nRegistered Dns Names (fetching...):");
-    let record_names = try!(dns_operations.get_all_registered_names());
+    let record_names = dns_operations.get_all_registered_names()?;
     for it in record_names.iter().enumerate() {
         println!("<{:?}> {}", it.0 + 1, it.1);
     }
@@ -167,15 +159,15 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
     service_home_dir_name.push_str("_home_dir");
 
     let dir_helper = DirectoryHelper::new(client.clone());
-    let (dir_listing, _) = try!(dir_helper.create(service_home_dir_name,
-                                                  UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                                  vec![],
-                                                  false,
-                                                  AccessLevel::Public,
-                                                  None));
+    let (dir_listing, _) = dir_helper.create(service_home_dir_name,
+                                             UNVERSIONED_DIRECTORY_LISTING_TAG,
+                                             vec![],
+                                             false,
+                                             AccessLevel::Public,
+                                             None)?;
 
     let mut file_helper = FileHelper::new(client.clone());
-    let mut writer = try!(file_helper.create(HOME_PAGE_FILE_NAME.to_string(), vec![], dir_listing));
+    let mut writer = file_helper.create(HOME_PAGE_FILE_NAME.to_string(), vec![], dir_listing)?;
 
     println!("\nEnter text that you want to display on the Home-Page:");
     let mut text = String::new();
@@ -184,14 +176,14 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
 
     println!("Creating Home Page for the Service...");
 
-    try!(writer.write(text.as_bytes()));
-    let (updated_parent_dir_listing, _) = try!(writer.close());
+    writer.write(text.as_bytes())?;
+    let (updated_parent_dir_listing, _) = writer.close()?;
     let dir_key = updated_parent_dir_listing.get_key();
 
-    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+    let secret_signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
 
     dns_operations.add_service(&long_name,
-                               (service_name, dir_key.clone()),
+                               (service_name, *dir_key),
                                &secret_signing_key,
                                None)
 }
@@ -213,7 +205,7 @@ fn remove_service(client: Arc<Mutex<Client>>,
 
     println!("Removing Service...");
 
-    let secret_signing_key = try!(unwrap!(client.lock()).get_secret_signing_key()).clone();
+    let secret_signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
     dns_operations.remove_service(&long_name, service_name, &secret_signing_key, None)
 }
 
@@ -226,7 +218,7 @@ fn display_services(dns_operations: &DnsOperations) -> Result<(), DnsError> {
     long_name = long_name.trim().to_string();
 
     println!("\nServices For Dns {:?} (fetching...):", long_name);
-    let service_names = try!(dns_operations.get_all_services(&long_name, None));
+    let service_names = dns_operations.get_all_services(&long_name, None)?;
     for it in service_names.iter().enumerate() {
         println!("<{:?}> {}", it.0 + 1, it.1);
     }
@@ -244,29 +236,42 @@ fn parse_url_and_get_home_page(client: Arc<Mutex<Client>>,
     let _ = std::io::stdin().read_line(&mut url);
     url = url.trim().to_string();
 
-    let re_with_service = try!(Regex::new(r"safe:([^.]+?)\.([^.]+?\.[^.]+)$")
+    let re_with_service =
+        try!(Regex::new(r"safe:([^.]+?)\.([^.]+?\.[^.]+)$")
         .map_err(|_| DnsError::Unexpected("Failed to form Regular-Expression !!".to_string())));
-    let re_without_service = try!(Regex::new(r"safe:([^.]+?\.[^.]+)$")
+    let re_without_service =
+        try!(Regex::new(r"safe:([^.]+?\.[^.]+)$")
         .map_err(|_| DnsError::Unexpected("Failed to form Regular-Expression !!".to_string())));
 
     let long_name;
     let service_name;
 
     if re_with_service.is_match(&url) {
-        let captures = try!(re_with_service.captures(&url)
-            .ok_or(DnsError::Unexpected("Could not capture items in Url !!".to_string())));
-        let caps_0 = try!(captures.at(1)
-            .ok_or(DnsError::Unexpected("Could not access a capture !!".to_string())));
-        let caps_1 = try!(captures.at(2)
-            .ok_or(DnsError::Unexpected("Could not access a capture !!".to_string())));
+        let captures =
+            re_with_service.captures(&url)
+                .ok_or_else(|| {
+                                DnsError::Unexpected("Could not capture items in Url !!"
+                                                         .to_string())
+                            })?;
+        let caps_0 =
+            captures.at(1)
+                .ok_or_else(|| DnsError::Unexpected("Could not access a capture !!".to_string()))?;
+        let caps_1 =
+            captures.at(2)
+                .ok_or_else(|| DnsError::Unexpected("Could not access a capture !!".to_string()))?;
 
         long_name = caps_1.to_string();
         service_name = caps_0.to_string();
     } else if re_without_service.is_match(&url) {
-        let captures = try!(re_without_service.captures(&url)
-            .ok_or(DnsError::Unexpected("Could not capture items in Url !!".to_string())));
-        let caps_0 = try!(captures.at(1)
-            .ok_or(DnsError::Unexpected("Could not access a capture !!".to_string())));
+        let captures =
+            re_without_service.captures(&url)
+                .ok_or_else(|| {
+                                DnsError::Unexpected("Could not capture items in Url !!"
+                                                         .to_string())
+                            })?;
+        let caps_0 =
+            captures.at(1)
+                .ok_or_else(|| DnsError::Unexpected("Could not access a capture !!".to_string()))?;
 
         long_name = caps_0.to_string();
         service_name = DEFAULT_SERVICE.to_string();
@@ -276,28 +281,27 @@ fn parse_url_and_get_home_page(client: Arc<Mutex<Client>>,
 
     println!("Fetching data...");
 
-    let dir_key =
-        try!(dns_operations.get_service_home_directory_key(&long_name, &service_name, None));
+    let dir_key = dns_operations.get_service_home_directory_key(&long_name, &service_name, None)?;
     let directory_helper = DirectoryHelper::new(client.clone());
-    let dir_listing = try!(directory_helper.get(&dir_key));
+    let dir_listing = directory_helper.get(&dir_key)?;
 
-    let file = try!(dir_listing.get_files()
+    let file = dir_listing.get_files()
         .iter()
         .find(|a| *a.get_name() == HOME_PAGE_FILE_NAME.to_string())
-        .ok_or(DnsError::Unexpected("Could not find homepage !!".to_string())));
+        .ok_or_else(|| DnsError::Unexpected("Could not find homepage !!".to_string()))?;
     let mut file_helper = FileHelper::new(client.clone());
-    let mut reader = try!(file_helper.read(file));
+    let mut reader = file_helper.read(file)?;
     let size = reader.size();
-    let content = try!(reader.read(0, size));
+    let content = reader.read(0, size)?;
 
     println!("\n-----------------------------------------------------");
     println!("                 Home Page Contents");
     println!("-----------------------------------------------------\n");
     println!("{}",
-             try!(String::from_utf8(content).map_err(|_| {
-                 DnsError::Unexpected("Cannot convert contents to displayable string !!"
-                     .to_string())
-             })));
+             String::from_utf8(content).map_err(|_| {
+                     DnsError::Unexpected("Cannot convert contents to displayable string !!"
+                         .to_string())
+                 })?);
 
     Ok(())
 }

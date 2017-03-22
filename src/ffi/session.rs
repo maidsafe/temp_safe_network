@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,6 +17,8 @@
 
 //! Session management
 
+use super::errors::FfiError;
+use super::helper;
 use core::client::Client;
 use core::translated_events::NetworkEvent;
 use libc::{int32_t, int64_t};
@@ -25,10 +27,9 @@ use nfs::metadata::directory_key::DirectoryKey;
 use std::ptr;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Sender};
-use super::errors::FfiError;
-use super::helper;
 
 /// Represents user session on the SAFE network. There should be one session per launcher.
+#[cfg_attr(feature="cargo-clippy", allow(type_complexity))]
 pub struct Session {
     client: Arc<Mutex<Client>>,
     safe_drive_dir_key: Option<DirectoryKey>,
@@ -40,45 +41,45 @@ pub struct Session {
 impl Session {
     /// Create unregistered client.
     pub fn create_unregistered_client() -> Result<Self, FfiError> {
-        let client = try!(Client::create_unregistered_client());
+        let client = Client::create_unregistered_client()?;
         let client = Arc::new(Mutex::new(client));
 
         Ok(Session {
-            client: client,
-            safe_drive_dir_key: None,
-            network_event_observers: Default::default(),
-            network_thread: None,
-        })
+               client: client,
+               safe_drive_dir_key: None,
+               network_event_observers: Default::default(),
+               network_thread: None,
+           })
     }
 
     /// Create new account.
     pub fn create_account(locator: &str, password: &str) -> Result<Self, FfiError> {
-        let client = try!(Client::create_account(locator, password));
+        let client = Client::create_account(locator, password)?;
         let client = Arc::new(Mutex::new(client));
 
-        let safe_drive_dir_key = try!(helper::get_safe_drive_key(client.clone()));
+        let safe_drive_dir_key = helper::get_safe_drive_key(client.clone())?;
 
         Ok(Session {
-            client: client,
-            safe_drive_dir_key: Some(safe_drive_dir_key),
-            network_event_observers: Default::default(),
-            network_thread: None,
-        })
+               client: client,
+               safe_drive_dir_key: Some(safe_drive_dir_key),
+               network_event_observers: Default::default(),
+               network_thread: None,
+           })
     }
 
     /// Log in to existing account.
     pub fn log_in(locator: &str, password: &str) -> Result<Self, FfiError> {
-        let client = try!(Client::log_in(locator, password));
+        let client = Client::log_in(locator, password)?;
         let client = Arc::new(Mutex::new(client));
 
-        let safe_drive_dir_key = try!(helper::get_safe_drive_key(client.clone()));
+        let safe_drive_dir_key = helper::get_safe_drive_key(client.clone())?;
 
         Ok(Session {
-            client: client,
-            safe_drive_dir_key: Some(safe_drive_dir_key),
-            network_event_observers: Default::default(),
-            network_thread: None,
-        })
+               client: client,
+               safe_drive_dir_key: Some(safe_drive_dir_key),
+               network_event_observers: Default::default(),
+               network_thread: None,
+           })
     }
 
     /// Get the client.
@@ -101,24 +102,25 @@ impl Session {
             let cloned_tx = tx.clone();
             unwrap!(self.client.lock()).add_network_event_observer(tx);
 
-            let joiner = thread::named("FfiNetworkEventObserver", move || {
-                while let Ok(event) = rx.recv() {
-                    if let NetworkEvent::Terminated = event {
-                        trace!("FFI exiting the network event notifier thread.");
-                        break;
-                    }
+            let joiner = thread::named("FfiNetworkEventObserver",
+                                       move || while let Ok(event) = rx.recv() {
+                                           if let NetworkEvent::Terminated = event {
+                                               trace!("FFI exiting the network event notifier /
+                                                       thread.");
+                                               break;
+                                           }
 
-                    let callbacks = &*unwrap!(callbacks.lock());
-                    info!("Informing {:?} to {} FFI network event observers.",
-                          event,
-                          callbacks.len());
-                    let event_ffi_val = event.into();
+                                           let callbacks = &*unwrap!(callbacks.lock());
+                                           info!("Informing {:?} to {} FFI network event /
+                                                  observers.",
+                                                 event,
+                                                 callbacks.len());
+                                           let event_ffi_val = event.into();
 
-                    for cb in callbacks {
-                        cb(event_ffi_val);
-                    }
-                }
-            });
+                                           for cb in callbacks {
+                                               cb(event_ffi_val);
+                                           }
+                                       });
 
             self.network_thread = Some((cloned_tx, joiner));
         }
@@ -126,8 +128,8 @@ impl Session {
 
     fn get_account_info(&self) -> Result<(u64, u64), FfiError> {
         let mut client = unwrap!(self.client.lock());
-        let getter = try!(client.get_account_info(None));
-        Ok(try!(getter.get()))
+        let getter = client.get_account_info(None)?;
+        Ok(getter.get()?)
     }
 }
 
@@ -211,10 +213,11 @@ pub unsafe extern "C" fn register_network_event_observer(session_handle: *mut Se
                                                          callback: extern "C" fn(i32))
                                                          -> int32_t {
     helper::catch_unwind_i32(|| {
-        trace!("FFI register a network event observer.");
-        unwrap!((*session_handle).lock()).register_network_event_observer(callback);
-        0
-    })
+                                 trace!("FFI register a network event observer.");
+                                 unwrap!((*session_handle).lock())
+                                     .register_network_event_observer(callback);
+                                 0
+                             })
 }
 
 
@@ -222,55 +225,55 @@ pub unsafe extern "C" fn register_network_event_observer(session_handle: *mut Se
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_gets(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
-        trace!("FFI retrieve client issued GETs.");
-        let session = unwrap!((*session_handle).lock());
-        let client = unwrap!(session.client.lock());
-        client.issued_gets() as int64_t
-    })
+                                 trace!("FFI retrieve client issued GETs.");
+                                 let session = unwrap!((*session_handle).lock());
+                                 let client = unwrap!(session.client.lock());
+                                 client.issued_gets() as int64_t
+                             })
 }
 
 /// Return the amount of calls that were done to `put`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_puts(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
-        trace!("FFI retrieve client issued PUTs.");
-        let session = unwrap!((*session_handle).lock());
-        let client = unwrap!(session.client.lock());
-        client.issued_puts() as int64_t
-    })
+                                 trace!("FFI retrieve client issued PUTs.");
+                                 let session = unwrap!((*session_handle).lock());
+                                 let client = unwrap!(session.client.lock());
+                                 client.issued_puts() as int64_t
+                             })
 }
 
 /// Return the amount of calls that were done to `post`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_posts(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
-        trace!("FFI retrieve client issued POSTs.");
-        let session = unwrap!((*session_handle).lock());
-        let client = unwrap!(session.client.lock());
-        client.issued_posts() as int64_t
-    })
+                                 trace!("FFI retrieve client issued POSTs.");
+                                 let session = unwrap!((*session_handle).lock());
+                                 let client = unwrap!(session.client.lock());
+                                 client.issued_posts() as int64_t
+                             })
 }
 
 /// Return the amount of calls that were done to `delete`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_deletes(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
-        trace!("FFI retrieve client issued DELETEs.");
-        let session = unwrap!((*session_handle).lock());
-        let client = unwrap!(session.client.lock());
-        client.issued_deletes() as int64_t
-    })
+                                 trace!("FFI retrieve client issued DELETEs.");
+                                 let session = unwrap!((*session_handle).lock());
+                                 let client = unwrap!(session.client.lock());
+                                 client.issued_deletes() as int64_t
+                             })
 }
 
 /// Return the amount of calls that were done to `append`
 #[no_mangle]
 pub unsafe extern "C" fn client_issued_appends(session_handle: *const SessionHandle) -> int64_t {
     helper::catch_unwind_i64(|| {
-        trace!("FFI retrieve client issued APPENDs.");
-        let session = unwrap!((*session_handle).lock());
-        let client = unwrap!(session.client.lock());
-        client.issued_appends() as int64_t
-    })
+                                 trace!("FFI retrieve client issued APPENDs.");
+                                 let session = unwrap!((*session_handle).lock());
+                                 let client = unwrap!(session.client.lock());
+                                 client.issued_appends() as int64_t
+                             })
 }
 
 /// Get data from the network. This is non-blocking. `data_stored` means number
@@ -308,9 +311,9 @@ unsafe fn allocate_handle(session: Session) -> *mut SessionHandle {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use ffi::test_utils;
     use std::ptr;
-    use super::*;
 
     #[test]
     fn create_account_and_log_in() {

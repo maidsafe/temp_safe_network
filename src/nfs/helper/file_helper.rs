@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -58,12 +58,12 @@ impl FileHelper {
         match parent_directory.find_file(&name) {
             Some(_) => Err(NfsError::FileAlreadyExistsWithSameName),
             None => {
-                let file = try!(File::new(FileMetadata::new(name, user_metatdata), DataMap::None));
-                Ok(try!(Writer::new(self.client.clone(),
-                                    &mut self.storage,
-                                    Mode::Overwrite,
-                                    parent_directory,
-                                    file)))
+                let file = File::new(FileMetadata::new(name, user_metatdata), DataMap::None)?;
+                Ok(Writer::new(self.client.clone(),
+                               &mut self.storage,
+                               Mode::Overwrite,
+                               parent_directory,
+                               file)?)
             }
         }
     }
@@ -76,7 +76,7 @@ impl FileHelper {
                   -> Result<Option<DirectoryListing>, NfsError> {
         trace!("Deleting file with name {}.", file_name);
 
-        let _ = try!(parent_directory.remove_file(&file_name));
+        let _ = parent_directory.remove_file(&file_name)?;
         let directory_helper = DirectoryHelper::new(self.client.clone());
         directory_helper.update(parent_directory)
     }
@@ -90,8 +90,8 @@ impl FileHelper {
         trace!("Updating metadata for file.");
 
         {
-            let existing_file = try!(parent_directory.find_file_by_id(file.get_id())
-                .ok_or(NfsError::FileNotFound));
+            let existing_file = parent_directory.find_file_by_id(file.get_id())
+                .ok_or(NfsError::FileNotFound)?;
             if existing_file.get_name() != file.get_name() &&
                parent_directory.find_file(file.get_name()).is_some() {
                 return Err(NfsError::FileAlreadyExistsWithSameName);
@@ -115,17 +115,17 @@ impl FileHelper {
         trace!("Updating content in file with name {}", file.get_name());
 
         {
-            let existing_file = try!(parent_directory.find_file(file.get_name())
-                .ok_or(NfsError::FileNotFound));
+            let existing_file = parent_directory.find_file(file.get_name())
+                .ok_or(NfsError::FileNotFound)?;
             if *existing_file != file {
                 return Err(NfsError::FileDoesNotMatch);
             }
         }
-        Ok(try!(Writer::new(self.client.clone(),
-                            &mut self.storage,
-                            mode,
-                            parent_directory,
-                            file)))
+        Ok(Writer::new(self.client.clone(),
+                       &mut self.storage,
+                       mode,
+                       parent_directory,
+                       file)?)
     }
 
 
@@ -139,21 +139,21 @@ impl FileHelper {
         let mut versions = Vec::<File>::new();
         let directory_helper = DirectoryHelper::new(self.client.clone());
 
-        let sdv_versions = try!(directory_helper.get_versions(parent_directory.get_key().get_id(),
-                                                              parent_directory.get_key()
-                                                                  .get_type_tag()));
+        let sdv_versions =
+            directory_helper.get_versions(parent_directory.get_key().get_id(),
+                                          parent_directory.get_key().get_type_tag())?;
 
         // Because Version 0 is invalid, so can be made an initial comparison value
         let mut file_version = 0;
         for version_id in sdv_versions {
             let directory_listing =
-                try!(directory_helper.get_by_version(parent_directory.get_key().get_id(),
-                                                     parent_directory.get_key()
-                                                         .get_access_level(),
-                                                     version_id.clone()));
-            if let Some(file) = directory_listing.get_files()
-                .iter()
-                .find(|&entry| entry.get_name() == file.get_name()) {
+                directory_helper.get_by_version(parent_directory.get_key().get_id(),
+                                                parent_directory.get_key().get_access_level(),
+                                                version_id)?;
+            if let Some(file) = directory_listing.get_files().iter().find(|&entry| {
+                                                                              entry.get_name() ==
+                                                                              file.get_name()
+                                                                          }) {
                 if file.get_metadata().get_version() != file_version {
                     file_version = file.get_metadata().get_version();
                     versions.push(file.clone());
@@ -190,11 +190,11 @@ mod test {
         let client = get_client();
         let dir_helper = DirectoryHelper::new(client.clone());
         let (mut directory, _) = unwrap!(dir_helper.create("DirName".to_string(),
-                    ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
-                    Vec::new(),
-                    true,
-                    AccessLevel::Private,
-                    None));
+                                                           ::nfs::VERSIONED_DIRECTORY_LISTING_TAG,
+                                                           Vec::new(),
+                                                           true,
+                                                           AccessLevel::Private,
+                                                           None));
         let mut file_helper = FileHelper::new(client.clone());
         let file_name = "hello.txt".to_string();
 

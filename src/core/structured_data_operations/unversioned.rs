@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -36,10 +36,9 @@ enum DataTypeEncoding {
     MapName(XorName),
 }
 
-/// Create StructuredData in accordance with data-encoding rules abstracted from user. For
-/// StructuredData created with create, data must be obtained using the complementary function
-/// defined in this module to get_data()
-#[cfg_attr(feature="clippy", allow(too_many_arguments))]
+/// Create `StructuredData` in accordance with data-encoding rules abstracted from user. For
+/// `StructuredData` created with create, data must be obtained using the complementary function
+/// defined in this module to `get_data()`
 pub fn create(client: Arc<Mutex<Client>>,
               tag_type: u64,
               id: XorName,
@@ -50,27 +49,25 @@ pub fn create(client: Arc<Mutex<Client>>,
               -> Result<StructuredData, CoreError> {
     trace!("Creating unversioned StructuredData.");
 
-    let data_to_store = try!(get_encoded_data_to_store(DataTypeEncoding::Data(data.clone()),
-                                                       data_encryption_keys));
+    let data_to_store = get_encoded_data_to_store(DataTypeEncoding::Data(data.clone()),
+                                                  data_encryption_keys)?;
 
-    match try!(structured_data_operations::check_if_data_can_fit_in_structured_data(
-            &data_to_store,
-            owners.clone())) {
+    match structured_data_operations::check_if_data_can_fit_in_structured_data(&data_to_store,
+                                                                               owners.clone())? {
         DataFitResult::DataFits => {
             trace!("Data fits in the StructuredData.");
-            Ok(try!(StructuredData::new(tag_type, id, version, data_to_store, owners)))
+            Ok(StructuredData::new(tag_type, id, version, data_to_store, owners)?)
         }
         DataFitResult::DataDoesNotFit => {
             trace!("Data does not fit in the StructuredData. Self-Encrypting data...");
 
             let mut storage = SelfEncryptionStorage::new(client.clone());
-            let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, DataMap::None));
-            try!(self_encryptor.write(&data, 0));
-            let data_map = try!(self_encryptor.close());
+            let mut self_encryptor = SelfEncryptor::new(&mut storage, DataMap::None)?;
+            self_encryptor.write(&data, 0)?;
+            let data_map = self_encryptor.close()?;
 
-            let data_to_store =
-                try!(get_encoded_data_to_store(DataTypeEncoding::Map(data_map.clone()),
-                                               data_encryption_keys));
+            let data_to_store = get_encoded_data_to_store(DataTypeEncoding::Map(data_map.clone()),
+                                                          data_encryption_keys)?;
             match try!(structured_data_operations::check_if_data_can_fit_in_structured_data(
                     &data_to_store,
                     owners.clone())) {
@@ -78,7 +75,7 @@ pub fn create(client: Arc<Mutex<Client>>,
                     trace!("DataMap (encrypted: {}) fits in the StructuredData.",
                            data_encryption_keys.is_some());
 
-                    Ok(try!(StructuredData::new(tag_type, id, version, data_to_store, owners)))
+                    Ok(StructuredData::new(tag_type, id, version, data_to_store, owners)?)
                 }
                 DataFitResult::DataDoesNotFit => {
                     trace!("DataMap (encrypted: {}) does not fit in the StructuredData. Putting \
@@ -88,21 +85,17 @@ pub fn create(client: Arc<Mutex<Client>>,
                     let immutable_data = ImmutableData::new(data_to_store);
                     let name = *immutable_data.name();
                     let data = Data::Immutable(immutable_data);
-                    try!(Client::put_recover(client, data, None));
+                    Client::put_recover(client, data, None)?;
 
-                    let data_to_store = try!(get_encoded_data_to_store(
-                        DataTypeEncoding::MapName(name), data_encryption_keys));
+                    let data_to_store = get_encoded_data_to_store(DataTypeEncoding::MapName(name),
+                                                                  data_encryption_keys)?;
 
                     match try!(structured_data_operations::
                                check_if_data_can_fit_in_structured_data(&data_to_store,
                                                                         owners.clone())) {
                         DataFitResult::DataFits => {
                             trace!("ImmutableData name fits in StructuredData");
-                            Ok(try!(StructuredData::new(tag_type,
-                                                        id,
-                                                        version,
-                                                        data_to_store,
-                                                        owners)))
+                            Ok(StructuredData::new(tag_type, id, version, data_to_store, owners)?)
                         }
                         _ => {
                             trace!("Even name of ImmutableData does not fit in StructuredData.");
@@ -117,34 +110,32 @@ pub fn create(client: Arc<Mutex<Client>>,
     }
 }
 
-/// Get Actual Data From StructuredData created via create() function in this module.
+/// Get Actual Data From `StructuredData` created via create() function in this module.
 pub fn get_data(client: Arc<Mutex<Client>>,
                 struct_data: &StructuredData,
                 data_decryption_keys: Option<(&box_::PublicKey, &box_::SecretKey, &box_::Nonce)>)
                 -> Result<Vec<u8>, CoreError> {
     trace!("Getting unversioned StructuredData");
 
-    match try!(get_decoded_stored_data(&struct_data.get_data(), data_decryption_keys)) {
+    match get_decoded_stored_data(struct_data.get_data(), data_decryption_keys)? {
         DataTypeEncoding::Data(data) => Ok(data),
         DataTypeEncoding::Map(data_map) => {
             let mut storage = SelfEncryptionStorage::new(client);
-            let mut self_encryptor = try!(SelfEncryptor::new(&mut storage, data_map));
+            let mut self_encryptor = SelfEncryptor::new(&mut storage, data_map)?;
             let length = self_encryptor.len();
-            Ok(try!(self_encryptor.read(0, length)))
+            Ok(self_encryptor.read(0, length)?)
         }
         DataTypeEncoding::MapName(data_map_name) => {
             let request = DataIdentifier::Immutable(data_map_name);
-            let response_getter = try!(unwrap!(client.lock()).get(request, None));
-            match try!(response_getter.get()) {
+            let response_getter = unwrap!(client.lock()).get(request, None)?;
+            match response_getter.get()? {
                 Data::Immutable(immutable_data) => {
-                    match try!(get_decoded_stored_data(&immutable_data.value(),
-                                                       data_decryption_keys)) {
+                    match get_decoded_stored_data(immutable_data.value(), data_decryption_keys)? {
                         DataTypeEncoding::Map(data_map) => {
                             let mut storage = SelfEncryptionStorage::new(client);
-                            let mut self_encryptor = try!(SelfEncryptor::new(&mut storage,
-                                                                             data_map));
+                            let mut self_encryptor = SelfEncryptor::new(&mut storage, data_map)?;
                             let length = self_encryptor.len();
-                            Ok(try!(self_encryptor.read(0, length)))
+                            Ok(self_encryptor.read(0, length)?)
                         }
                         _ => Err(CoreError::ReceivedUnexpectedData),
                     }
@@ -160,7 +151,7 @@ fn get_encoded_data_to_store(data: DataTypeEncoding,
                                                            &box_::SecretKey,
                                                            &box_::Nonce)>)
                              -> Result<Vec<u8>, CoreError> {
-    let serialised_data = try!(serialise(&data));
+    let serialised_data = serialise(&data)?;
     if let Some((public_encryp_key, secret_encryp_key, nonce)) = data_encryption_keys {
         utility::hybrid_encrypt(&serialised_data,
                                 nonce,
@@ -179,24 +170,23 @@ fn get_decoded_stored_data(raw_data: &[u8],
     let data: _;
     let data_to_deserialise = if let Some((public_encryp_key, secret_encryp_key, nonce)) =
         data_decryption_keys {
-        data =
-            try!(utility::hybrid_decrypt(&raw_data, nonce, public_encryp_key, secret_encryp_key));
+        data = utility::hybrid_decrypt(raw_data, nonce, public_encryp_key, secret_encryp_key)?;
         &data
     } else {
         raw_data
     };
 
-    Ok(try!(deserialise(data_to_deserialise)))
+    Ok(deserialise(data_to_deserialise)?)
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use core::utility;
     use rand;
     use routing::XorName;
     use rust_sodium::crypto::box_;
     use std::sync::{Arc, Mutex};
-    use super::*;
 
     const TAG_ID: u64 = ::core::MAIDSAFE_TAG + 1000;
 

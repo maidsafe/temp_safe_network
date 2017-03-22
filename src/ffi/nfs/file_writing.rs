@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -40,7 +40,7 @@ pub struct Writer {
 
 impl Writer {
     fn close(self) -> Result<(), FfiError> {
-        let _ = try!(self.inner.close());
+        let _ = self.inner.close()?;
         Ok(())
     }
 }
@@ -104,11 +104,11 @@ pub unsafe extern "C" fn nfs_writer_write(writer_handle: *mut Writer,
 #[no_mangle]
 pub unsafe extern "C" fn nfs_writer_close(writer_handle: *mut Writer) -> int32_t {
     helper::catch_unwind_i32(|| {
-        trace!("FFI Close and consume nfs writer.");
-        let writer = *Box::from_raw(writer_handle);
-        ffi_try!(writer.close());
-        0
-    })
+                                 trace!("FFI Close and consume nfs writer.");
+                                 let writer = *Box::from_raw(writer_handle);
+                                 ffi_try!(writer.close());
+                                 0
+                             })
 }
 
 #[allow(unsafe_code)]
@@ -117,22 +117,20 @@ fn create_file(app: &App,
                user_metadata: Vec<u8>,
                is_path_shared: bool)
                -> Result<Writer, FfiError> {
-    let (directory, file_name) =
-        try!(helper::get_directory_and_file(app, file_path, is_path_shared));
+    let (directory, file_name) = helper::get_directory_and_file(app, file_path, is_path_shared)?;
 
     let mut storage = Box::new(SelfEncryptionStorage::new(app.get_client()));
 
     let inner: InnerWriter<'static> = {
         let inner = match directory.find_file(&file_name) {
-            Some(_) => try!(Err(NfsError::FileAlreadyExistsWithSameName)),
+            Some(_) => Err(NfsError::FileAlreadyExistsWithSameName)?,
             None => {
-                let file = try!(File::new(FileMetadata::new(file_name, user_metadata),
-                                          DataMap::None));
-                try!(InnerWriter::new(app.get_client(),
-                                      &mut *storage,
-                                      Mode::Overwrite,
-                                      directory,
-                                      file))
+                let file = File::new(FileMetadata::new(file_name, user_metadata), DataMap::None)?;
+                InnerWriter::new(app.get_client(),
+                                 &mut *storage,
+                                 Mode::Overwrite,
+                                 directory,
+                                 file)?
             }
         };
 
@@ -140,32 +138,33 @@ fn create_file(app: &App,
     };
 
     Ok(Writer {
-        inner: inner,
-        _storage: storage,
-    })
+           inner: inner,
+           _storage: storage,
+       })
 }
 
 fn writer_open(app: &App, file_path: &str, is_path_shared: bool) -> Result<Writer, FfiError> {
-    let (directory, file_name) =
-        try!(helper::get_directory_and_file(app, file_path, is_path_shared));
+    let (directory, file_name) = helper::get_directory_and_file(app, file_path, is_path_shared)?;
 
-    let file = try!(directory.find_file(&file_name).cloned().ok_or(FfiError::InvalidPath));
+    let file = directory.find_file(&file_name)
+        .cloned()
+        .ok_or(FfiError::InvalidPath)?;
     let mut storage = Box::new(SelfEncryptionStorage::new(app.get_client()));
 
     let inner: InnerWriter<'static> = {
-        let inner = try!(InnerWriter::new(app.get_client(),
-                                          &mut *storage,
-                                          Mode::Modify,
-                                          directory,
-                                          file));
+        let inner = InnerWriter::new(app.get_client(),
+                                     &mut *storage,
+                                     Mode::Modify,
+                                     directory,
+                                     file)?;
 
         unsafe { mem::transmute(inner) }
     };
 
     Ok(Writer {
-        inner: inner,
-        _storage: storage,
-    })
+           inner: inner,
+           _storage: storage,
+       })
 }
 
 #[cfg(test)]
@@ -189,7 +188,7 @@ mod test {
                                                     METADATA.as_bytes().to_vec(),
                                                     false));
         unwrap!(writer.inner.write("hello world".as_bytes()));
-        let _ = unwrap!(writer.close());
+        unwrap!(writer.close());
 
         let app_dir_key = unwrap!(app.get_app_dir_key());
         let app_dir = unwrap!(dir_helper.get(&app_dir_key));

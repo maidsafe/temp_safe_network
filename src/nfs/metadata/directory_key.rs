@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,8 +18,8 @@
 use nfs::AccessLevel;
 use routing::XorName;
 
-/// DirectoryKey represnts the meta information about a directory
-/// A directory can be feteched with the DirectoryKey
+/// `DirectoryKey` represents the meta information about a directory
+/// A directory can be fetched with the `DirectoryKey`
 #[derive(Debug, RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct DirectoryKey {
     id: XorName,
@@ -63,13 +63,13 @@ impl DirectoryKey {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use nfs::AccessLevel;
     use rand;
     use routing::XorName;
-    use super::*;
 
-    /// Should be able to serialise & deserialise the DirectoryKey
+    /// Should be able to serialise & deserialise the `DirectoryKey`
     #[test]
     fn serailise_and_deserialise_directory_key() {
         let id: XorName = rand::random();
@@ -77,7 +77,7 @@ mod test {
         let versioned = false;
         let access_level = AccessLevel::Private;
 
-        let directory_key = DirectoryKey::new(id, tag, versioned, access_level.clone());
+        let directory_key = DirectoryKey::new(id, tag, versioned, access_level);
 
         let serialised = unwrap!(serialise(&directory_key));
         let deserilaised_key: DirectoryKey = unwrap!(deserialise(&serialised));

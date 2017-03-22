@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -21,7 +21,7 @@ use ffi::low_level_api::object_cache::object_cache;
 use routing::{DataIdentifier, XOR_NAME_LEN, XorName};
 use std::ptr;
 
-/// Construct DataIdentifier for StructuredData.
+/// Construct `DataIdentifier` for `StructuredData`.
 #[no_mangle]
 pub unsafe extern "C" fn data_id_new_struct_data(type_tag: u64,
                                                  id: *const [u8; XOR_NAME_LEN],
@@ -37,7 +37,7 @@ pub unsafe extern "C" fn data_id_new_struct_data(type_tag: u64,
     })
 }
 
-/// Construct DataIdentifier for ImmutableData.
+/// Construct `DataIdentifier` for `ImmutableData`.
 #[no_mangle]
 pub unsafe extern "C" fn data_id_new_immut_data(id: *const [u8; XOR_NAME_LEN],
                                                 o_handle: *mut DataIdHandle)
@@ -52,7 +52,7 @@ pub unsafe extern "C" fn data_id_new_immut_data(id: *const [u8; XOR_NAME_LEN],
     })
 }
 
-/// Construct DataIdentifier for AppendableData.
+/// Construct `DataIdentifier` for `AppendableData`.
 #[no_mangle]
 pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LEN],
                                                      is_private: bool,
@@ -73,22 +73,22 @@ pub unsafe extern "C" fn data_id_new_appendable_data(id: *const [u8; XOR_NAME_LE
     })
 }
 
-/// Free DataIdentifier handle
+/// Free `DataIdentifier` handle
 #[no_mangle]
 pub extern "C" fn data_id_free(handle: DataIdHandle) -> i32 {
     helper::catch_unwind_i32(|| {
-        let _ = ffi_try!(unwrap!(object_cache()).remove_data_id(handle));
-        0
-    })
+                                 let _ = ffi_try!(unwrap!(object_cache()).remove_data_id(handle));
+                                 0
+                             })
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ffi::errors::FfiError;
     use ffi::low_level_api::object_cache::object_cache;
     use rand;
     use routing::XOR_NAME_LEN;
-    use super::*;
 
     #[test]
     fn create_and_free() {

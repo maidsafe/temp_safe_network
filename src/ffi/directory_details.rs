@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,6 +18,7 @@
 //! Details about directory and its content.
 
 
+use super::helper;
 use core::client::Client;
 use ffi::errors::FfiError;
 use ffi::file_details::FileMetadata;
@@ -28,7 +29,6 @@ use nfs::metadata::directory_key::DirectoryKey;
 use nfs::metadata::directory_metadata::DirectoryMetadata as NfsDirectoryMetadata;
 use std::ptr;
 use std::sync::{Arc, Mutex};
-use super::helper;
 
 /// Details about a directory and its content.
 #[derive(Debug)]
@@ -47,7 +47,7 @@ impl DirectoryDetails {
                               directory_key: DirectoryKey)
                               -> Result<Self, FfiError> {
         let dir_helper = DirectoryHelper::new(client);
-        let dir_listing = try!(dir_helper.get(&directory_key));
+        let dir_listing = dir_helper.get(&directory_key)?;
 
         Self::from_directory_listing(dir_listing)
     }
@@ -55,17 +55,17 @@ impl DirectoryDetails {
     /// Obtain `DirectoryDetails` from the given directory listing.
     pub fn from_directory_listing(listing: DirectoryListing) -> Result<Self, FfiError> {
         let mut details = DirectoryDetails {
-            metadata: try!(DirectoryMetadata::new(listing.get_metadata())),
+            metadata: DirectoryMetadata::new(listing.get_metadata())?,
             files: Vec::with_capacity(listing.get_files().len()),
             sub_directories: Vec::with_capacity(listing.get_sub_directories().len()),
         };
 
         for file in listing.get_files() {
-            details.files.push(try!(FileMetadata::new(file.get_metadata())));
+            details.files.push(FileMetadata::new(file.get_metadata())?);
         }
 
         for metadata in listing.get_sub_directories() {
-            details.sub_directories.push(try!(DirectoryMetadata::new(metadata)));
+            details.sub_directories.push(DirectoryMetadata::new(metadata)?);
         }
 
         Ok(details)
@@ -113,35 +113,35 @@ impl DirectoryMetadata {
         let modified_time = dir_metadata.get_modified_time().to_timespec();
 
         let (name, name_len, name_cap) = helper::string_to_c_utf8(dir_metadata.get_name()
-            .to_string());
+                                                                      .to_string());
         let user_metadata = dir_metadata.get_user_metadata().to_owned();
         let (user_metadata, user_metadata_len, user_metadata_cap) =
             helper::u8_vec_to_ptr(user_metadata);
 
         Ok(DirectoryMetadata {
-            name: name,
-            name_len: name_len,
-            name_cap: name_cap,
-            user_metadata: user_metadata,
-            user_metadata_len: user_metadata_len,
-            user_metadata_cap: user_metadata_cap,
-            is_private: *dir_key.get_access_level() == ::nfs::AccessLevel::Private,
-            is_versioned: dir_key.is_versioned(),
-            creation_time_sec: created_time.sec,
-            creation_time_nsec: created_time.nsec as i64,
-            modification_time_sec: modified_time.sec,
-            modification_time_nsec: modified_time.nsec as i64,
-        })
+               name: name,
+               name_len: name_len,
+               name_cap: name_cap,
+               user_metadata: user_metadata,
+               user_metadata_len: user_metadata_len,
+               user_metadata_cap: user_metadata_cap,
+               is_private: *dir_key.get_access_level() == ::nfs::AccessLevel::Private,
+               is_versioned: dir_key.is_versioned(),
+               creation_time_sec: created_time.sec,
+               creation_time_nsec: created_time.nsec as i64,
+               modification_time_sec: modified_time.sec,
+               modification_time_nsec: modified_time.nsec as i64,
+           })
     }
 
     // TODO: when drop-flag removal lands in stable, we should turn this into
     // a proper impl Drop.
     fn deallocate(&mut self) {
         unsafe {
-            let _ = misc_u8_ptr_free(self.name, self.name_len, self.name_cap);
-            let _ = misc_u8_ptr_free(self.user_metadata,
-                                     self.user_metadata_len,
-                                     self.user_metadata_cap);
+            misc_u8_ptr_free(self.name, self.name_len, self.name_cap);
+            misc_u8_ptr_free(self.user_metadata,
+                             self.user_metadata_len,
+                             self.user_metadata_cap);
         }
     }
 }
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn directory_details_get_file_at(details: *const Directory
 /// Get the number of sub-directories in the directory.
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_get_sub_directories_len(
-    details: *const DirectoryDetails) -> usize {
+details: *const DirectoryDetails) -> usize{
     (*details).sub_directories.len()
 }
 
@@ -196,7 +196,7 @@ pub unsafe extern "C" fn directory_details_get_sub_directory_at(details: *const 
     }
 }
 
-/// Dispose of the DirectoryDetails instance.
+/// Dispose of the `DirectoryDetails` instance.
 #[no_mangle]
 pub unsafe extern "C" fn directory_details_drop(details: *mut DirectoryDetails) {
     let _ = Box::from_raw(details);
