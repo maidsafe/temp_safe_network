@@ -20,9 +20,9 @@ use accumulator::Accumulator;
 use chunk_store::ChunkStore;
 use error::InternalError;
 use itertools::Itertools;
-use maidsafe_utilities::{self, serialisation};
+use maidsafe_utilities::serialisation;
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, MessageId, RoutingTable,
-              StructuredData, XorName};
+              StructuredData, XorName, sha3};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
@@ -30,6 +30,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::ops::Add;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
+use tiny_keccak::sha3_256;
 use vault::RoutingNode;
 
 const MAX_FULL_PERCENT: u64 = 50;
@@ -51,7 +52,7 @@ pub type IdAndVersion = (DataIdentifier, u64);
 /// A pending write to the chunk store. This is cached in memory until the group either reaches
 /// consensus and stores the chunk, or it times out and is dropped.
 struct PendingWrite {
-    hash: u64,
+    hash: sha3::Digest256,
     data: Data,
     timestamp: Instant,
     src: Authority<XorName>,
@@ -108,7 +109,7 @@ impl Cache {
                 let _ = self.ongoing_gets.insert(src, (timestamp, expected_idv));
             }
         }
-        for (_, data_idvs) in &mut self.data_holders {
+        for data_idvs in &mut self.data_holders.values_mut() {
             let _ = data_idvs.remove(&(*data_id, version));
         }
     }
@@ -330,7 +331,7 @@ impl Cache {
             Err(_) => return None,
             Ok(serialised) => serialised,
         };
-        let hash = maidsafe_utilities::big_endian_sip_hash(&hash_pair);
+        let hash = sha3_256(&hash_pair);
         let (data_id, version) = id_and_version_of(&data);
 
         let pending_write = PendingWrite {
@@ -1221,4 +1222,4 @@ struct RefreshDataList(Vec<IdAndVersion>);
 /// A message from the group to itself to store the given data. If this accumulates, that means a
 /// quorum of group members approves.
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Copy, Clone)]
-struct RefreshData(IdAndVersion, u64);
+struct RefreshData(IdAndVersion, sha3::Digest256);

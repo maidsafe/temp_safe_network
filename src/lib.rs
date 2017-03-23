@@ -209,13 +209,15 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
+// TODO solve this
+#![cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
+
 extern crate accumulator;
 extern crate fs2;
 #[macro_use]
 extern crate log;
 extern crate lru_time_cache;
 extern crate itertools;
-#[macro_use]
 extern crate maidsafe_utilities;
 extern crate config_file_handler;
 #[macro_use]
@@ -227,6 +229,7 @@ extern crate rustc_serialize;
 extern crate rust_sodium;
 #[cfg(test)]
 extern crate tempdir;
+extern crate tiny_keccak;
 #[cfg(any(test, feature = "use-mock-crust"))]
 #[macro_use]
 extern crate unwrap;
