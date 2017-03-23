@@ -38,7 +38,7 @@ mod test {
         };
         // Use 8 nodes to avoid the case where four target nodes are full: In that case neither the
         // PutSuccess nor the PutFailure accumulates and client.put_and_verify() would hang.
-        let mut nodes = test_node::create_nodes(&network, 8, Some(config), true);
+        let mut nodes = test_node::create_nodes(&network, 8, Some(&config), true);
         let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
         let mut client = TestClient::new(&network, Some(crust_config));
         let full_id = client.full_id().clone();

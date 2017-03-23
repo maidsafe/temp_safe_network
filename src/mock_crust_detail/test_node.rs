@@ -129,13 +129,13 @@ impl TestNode {
 /// Create nodes for mock network
 pub fn create_nodes(network: &Network,
                     size: usize,
-                    config: Option<Config>,
+                    config: Option<&Config>,
                     use_cache: bool)
                     -> Vec<TestNode> {
     let mut nodes = Vec::new();
 
     // Create the seed node.
-    nodes.push(TestNode::new(network, None, config.clone(), true, use_cache));
+    nodes.push(TestNode::new(network, None, config.cloned(), true, use_cache));
     while nodes[0].poll() > 0 {}
 
     let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -144,7 +144,7 @@ pub fn create_nodes(network: &Network,
     for _ in 1..size {
         nodes.push(TestNode::new(network,
                                  Some(crust_config.clone()),
-                                 config.clone(),
+                                 config.cloned(),
                                  false,
                                  use_cache));
         poll::nodes(&mut nodes);
