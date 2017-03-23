@@ -15,9 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use rand::{Rand, Rng};
-use routing::{Authority, ImmutableData, MutableData, Value, XorName};
+use rand::{self, Rand, Rng};
+use routing::{Authority, EntryAction, EntryActions, ImmutableData, MutableData, Value, XorName};
 use rust_sodium::crypto::sign;
+use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use utils;
 
@@ -59,16 +60,21 @@ pub fn gen_mutable_data<R: Rng>(tag: u64,
                                 owner: sign::PublicKey,
                                 rng: &mut R)
                                 -> MutableData {
+    let entries = gen_mutable_data_entries(num_entries, rng);
+    let mut owners = BTreeSet::new();
+    let _ = owners.insert(owner);
+    unwrap!(MutableData::new(rng.gen(), tag, Default::default(), entries, owners))
+}
+
+/// Generate the given number of mutable data entries.
+pub fn gen_mutable_data_entries<R: Rng>(num: usize, rng: &mut R) -> BTreeMap<Vec<u8>, Value> {
     let mut entries = BTreeMap::new();
-    while entries.len() < num_entries {
+    while entries.len() < num {
         let (key, value) = gen_mutable_data_entry(rng);
         let _ = entries.insert(key, value);
     }
 
-    let mut owners = BTreeSet::new();
-    let _ = owners.insert(owner);
-
-    unwrap!(MutableData::new(rng.gen(), tag, Default::default(), entries, owners))
+    entries
 }
 
 /// Generate mutable data entry (key, value) pair.
@@ -83,6 +89,41 @@ pub fn gen_mutable_data_entry<R: Rng>(rng: &mut R) -> (Vec<u8>, Value) {
     };
 
     (key, value)
+}
+
+/// Generate random entry actions to mutate the given mutable data.
+pub fn gen_mutable_data_entry_actions<R: Rng>(data: &MutableData,
+                                              count: usize,
+                                              rng: &mut R)
+                                              -> BTreeMap<Vec<u8>, EntryAction> {
+    let mut actions = EntryActions::new();
+
+    let modify_count = cmp::min(rng.gen_range(0, count + 1), data.keys().len());
+    let insert_count = count - modify_count;
+
+    let keys_to_modify = rand::sample(rng, data.keys().into_iter().cloned(), modify_count);
+    for key in keys_to_modify {
+        let version = unwrap!(data.get(&key)).entry_version + 1;
+
+        if rng.gen() {
+            actions = actions.del(key, version);
+        } else {
+            let content = gen_vec(10, rng);
+            actions = actions.update(key, content, version);
+        }
+    }
+
+    for _ in 0..insert_count {
+        let key = gen_vec(10, rng);
+        if data.get(&key).is_some() {
+            continue;
+        }
+
+        let content = gen_vec(10, rng);
+        actions = actions.ins(key, content, 0);
+    }
+
+    actions.into()
 }
 
 /// Generate random `Client` authority and return it together with its client key.

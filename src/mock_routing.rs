@@ -17,9 +17,9 @@
 
 use GROUP_SIZE;
 use rand;
-use routing::{AccountInfo, Authority, Cache, ClientError, Event, EventStream, ImmutableData,
-              InterfaceError, MessageId, MutableData, PermissionSet, Request, Response,
-              RoutingError, RoutingTable, User, Value, XorName};
+use routing::{AccountInfo, Authority, Cache, ClientError, EntryAction, Event, EventStream,
+              ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, Request,
+              Response, RoutingError, RoutingTable, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
@@ -122,6 +122,15 @@ impl Node {
                       requester: sign::PublicKey,
                   });
 
+    impl_request!(send_mutate_mdata_entries_request,
+                  MutateMDataEntries {
+                      name: XorName,
+                      tag: u64,
+                      actions: BTreeMap<Vec<u8>, EntryAction>,
+                      msg_id: MessageId,
+                      requester: sign::PublicKey,
+                  });
+
     impl_request!(send_get_mdata_shell_request,
                   GetMDataShell {
                       name: XorName,
@@ -135,6 +144,36 @@ impl Node {
                       tag: u64,
                       key: Vec<u8>,
                       msg_id: MessageId
+                  });
+
+    impl_request!(send_set_mdata_user_permissions_request,
+                  SetMDataUserPermissions {
+                      name: XorName,
+                      tag: u64,
+                      user: User,
+                      permissions: PermissionSet,
+                      version: u64,
+                      msg_id: MessageId,
+                      requester: sign::PublicKey,
+                  });
+
+    impl_request!(send_del_mdata_user_permissions_request,
+                  DelMDataUserPermissions {
+                      name: XorName,
+                      tag: u64,
+                      user: User,
+                      version: u64,
+                      msg_id: MessageId,
+                      requester: sign::PublicKey,
+                  });
+
+    impl_request!(send_change_mdata_owner_request,
+                  ChangeMDataOwner {
+                      name: XorName,
+                      tag: u64,
+                      new_owners: BTreeSet<sign::PublicKey>,
+                      version: u64,
+                      msg_id: MessageId,
                   });
 
     pub fn send_refresh_request(&mut self,

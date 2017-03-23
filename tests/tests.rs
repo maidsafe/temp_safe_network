@@ -33,6 +33,7 @@
 #![cfg(feature = "use-mock-crust")]
 #![cfg(not(feature = "use-mock-routing"))]
 
+// extern crate maidsafe_utilities;
 // extern crate itertools;
 #[macro_use]
 extern crate log;

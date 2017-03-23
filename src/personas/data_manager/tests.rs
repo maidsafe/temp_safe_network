@@ -137,6 +137,7 @@ fn mdata_mutations() {
     let mut rng = rand::thread_rng();
 
     let (client, client_key) = test_utils::gen_client_authority();
+    let client_manager = test_utils::gen_client_manager_authority(client_key);
 
     let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
     let data_name = *data.name();
@@ -151,11 +152,11 @@ fn mdata_mutations() {
     // Initially, the entries should be empty.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                             client,
-                                             nae_manager,
-                                             data_name,
-                                             TEST_TAG,
-                                             msg_id));
+                                         client,
+                                         nae_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         msg_id));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     let entries = assert_match!(
@@ -176,13 +177,13 @@ fn mdata_mutations() {
         .into();
     let msg_id = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                               client,
-                                               nae_manager,
-                                               data_name,
-                                               TEST_TAG,
-                                               actions,
-                                               msg_id,
-                                               client_key));
+                                           client_manager,
+                                           nae_manager,
+                                           data_name,
+                                           TEST_TAG,
+                                           actions,
+                                           msg_id,
+                                           client_key));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -194,11 +195,11 @@ fn mdata_mutations() {
     // The data should now contain the previously inserted two entries.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                             client,
-                                             nae_manager,
-                                             data_name,
-                                             TEST_TAG,
-                                             msg_id));
+                                         client,
+                                         nae_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         msg_id));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     let entries = assert_match!(
@@ -237,13 +238,13 @@ fn mdata_change_owner() {
 
     let msg_id = MessageId::new();
     unwrap!(dm.handle_change_mdata_owner(&mut node,
-                                             client_1,
-                                             nae_manager,
-                                             data_name,
-                                             TEST_TAG,
-                                             new_owners.clone(),
-                                             1,
-                                             msg_id));
+                                         client_1,
+                                         nae_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         new_owners.clone(),
+                                         1,
+                                         msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
             message.response,
@@ -252,13 +253,13 @@ fn mdata_change_owner() {
     // Changing the owner by the current owner succeeds.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_change_mdata_owner(&mut node,
-                                             client_0,
-                                             nae_manager,
-                                             data_name,
-                                             TEST_TAG,
-                                             new_owners,
-                                             1,
-                                             msg_id));
+                                         client_0,
+                                         nae_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         new_owners,
+                                         1,
+                                         msg_id));
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
     unwrap!(dm.handle_group_refresh(&mut node, &refresh));

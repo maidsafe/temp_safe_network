@@ -25,13 +25,12 @@ use GROUP_SIZE;
 use error::InternalError;
 use itertools::Itertools;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable,
-              TYPE_TAG_SESSION_PACKET, XorName};
+use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
+              RoutingTable, TYPE_TAG_SESSION_PACKET, User, XorName};
 use routing::ClientError;
 use rust_sodium::crypto::sign;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::collections::hash_map::Entry;
-use std::convert::From;
 use utils;
 use vault::RoutingNode;
 
@@ -115,56 +114,20 @@ impl MaidManager {
             routing_node.send_put_idata_request(src, dst, data, msg_id)?;
         }
 
-        if let Some(prior) = self.request_cache.insert(msg_id,
-                                                       CachedRequest {
-                                                           src: src,
-                                                           dst: dst,
-                                                           tag: None,
-                                                       }) {
-            error!("Overwrote existing cached request with {:?} from {:?} to {:?}",
-                   msg_id,
-                   prior.src,
-                   prior.dst);
-        }
+        self.insert_cached_request(msg_id, src, dst, None);
 
         Ok(())
     }
 
-    pub fn handle_put_idata_success(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    msg_id: MessageId)
-                                    -> Result<(), InternalError> {
-        let CachedRequest { src, dst, .. } = self.remove_cached_request(msg_id)?;
-
-        // Send success response back to client
-        let client_name = utils::client_name(&src);
-        let account = if let Some(account) = self.accounts.get(&client_name) {
-            account.clone()
-        } else {
-            error!("Account for {:?} not found.", client_name);
-            return Err(InternalError::NoSuchAccount);
-        };
-
-        self.send_refresh(routing_node, &client_name, account, MessageId::zero());
-        let _ = routing_node.send_put_idata_response(dst, src, Ok(()), msg_id);
-
-        Ok(())
-    }
-
-    pub fn handle_put_idata_failure(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    error: ClientError,
-                                    msg_id: MessageId)
-                                    -> Result<(), InternalError> {
-        let CachedRequest { src, dst, .. } = self.remove_cached_request(msg_id)?;
-
-        if !self.handle_put_failure(routing_node, &src) {
-            return Ok(());
-        }
-
+    pub fn handle_put_idata_response(&mut self,
+                                     routing_node: &mut RoutingNode,
+                                     res: Result<(), ClientError>,
+                                     msg_id: MessageId)
+                                     -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } =
+            self.handle_mutation_response(routing_node, msg_id, res.is_ok())?;
         // Send failure response back to client
-        routing_node.send_put_idata_response(dst, src, Err(error), msg_id)?;
-
+        routing_node.send_put_idata_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -181,37 +144,38 @@ impl MaidManager {
             return Ok(());
         }
 
-        let client_name = utils::client_name(&src);
+        let src_name = utils::client_name(&src);
+        let dst_name = utils::client_manager_name(&dst);
 
         // If the type_tag is `TYPE_TAG_SESSION_PACKET`, the account must not exist, else it must
         // exist.
         if data.tag() == TYPE_TAG_SESSION_PACKET {
-            if dst.name() != client_name {
+            if dst_name != src_name {
                 trace!("Cannot create account for {:?} as {:?}.", src, dst);
                 let err = ClientError::InvalidOperation;
                 routing_node.send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
-                return Err(From::from(err));
+                return Ok(());
             }
 
-            if self.accounts.contains_key(&client_name) {
+            if self.accounts.contains_key(&src_name) {
                 let err = ClientError::AccountExists;
                 routing_node.send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
-                return Err(From::from(err));
+                return Ok(());
             }
 
             // Create the account.
-            let _ = self.accounts.insert(client_name, Account::default());
+            let _ = self.accounts.insert(src_name, Account::default());
             info!("Managing {} client accounts.", self.accounts.len());
         }
 
-        if let Err(err) = self.increment_mutation_counter(&client_name) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None) {
             // Undo the account creation
             if data.tag() == TYPE_TAG_SESSION_PACKET {
-                let _ = self.accounts.remove(&client_name);
+                let _ = self.accounts.remove(&src_name);
             }
 
             routing_node.send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
-            return Err(From::from(err));
+            return Ok(());
         }
 
         let tag = data.tag();
@@ -224,54 +188,22 @@ impl MaidManager {
             routing_node.send_put_mdata_request(src, dst, data, msg_id, requester)?;
         }
 
-        if let Some(prior) = self.request_cache.insert(msg_id,
-                                                       CachedRequest {
-                                                           src: src,
-                                                           dst: dst,
-                                                           tag: Some(tag),
-                                                       }) {
-            error!("Overwrote existing cached request with {:?} from {:?} to {:?}",
-                   msg_id,
-                   prior.src,
-                   prior.dst);
-        }
+        self.insert_cached_request(msg_id, src, dst, Some(tag));
 
         Ok(())
     }
 
-    pub fn handle_put_mdata_success(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    msg_id: MessageId)
-                                    -> Result<(), InternalError> {
-        let CachedRequest { src, dst, .. } = self.remove_cached_request(msg_id)?;
+    pub fn handle_put_mdata_response(&mut self,
+                                     routing_node: &mut RoutingNode,
+                                     res: Result<(), ClientError>,
+                                     msg_id: MessageId)
+                                     -> Result<(), InternalError> {
+        let CachedRequest { src, dst, tag } =
+            self.handle_mutation_response(routing_node, msg_id, res.is_ok())?;
 
-        // Send success response back to client
-        let client_name = utils::client_name(&src);
-        let account = if let Some(account) = self.accounts.get(&client_name) {
-            account.clone()
-        } else {
-            error!("Account for {:?} not found.", client_name);
-            return Err(InternalError::NoSuchAccount);
-        };
-
-        self.send_refresh(routing_node, &client_name, account, MessageId::zero());
-        let _ = routing_node.send_put_mdata_response(dst, src, Ok(()), msg_id);
-        Ok(())
-    }
-
-    pub fn handle_put_mdata_failure(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    error: ClientError,
-                                    msg_id: MessageId)
-                                    -> Result<(), InternalError> {
-        let CachedRequest { src, dst, tag } = self.remove_cached_request(msg_id)?;
-
-        if !self.handle_put_failure(routing_node, &src) {
-            return Ok(());
-        }
-
-        let error = match (tag, error) {
-            (Some(TYPE_TAG_SESSION_PACKET), ClientError::DataExists) => {
+        let res = match (tag, res) {
+            (_, Ok(())) => Ok(()),
+            (Some(TYPE_TAG_SESSION_PACKET), Err(ClientError::DataExists)) => {
                 // We wouldn't have forwarded two `Put` requests for the same account, so
                 // it must have been created via another client manager.
                 let client_name = utils::client_name(&src);
@@ -282,13 +214,13 @@ impl MaidManager {
                     let _ = routing_node.send_refresh_request(dst, dst, serialised_refresh, msg_id);
                 }
 
-                ClientError::AccountExists
+                Err(ClientError::AccountExists)
             }
-            (_, error) => error,
+            (_, Err(err)) => Err(err),
         };
 
         // Send failure response back to client
-        routing_node.send_put_mdata_response(dst, src, Err(error), msg_id)?;
+        routing_node.send_put_mdata_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -296,21 +228,56 @@ impl MaidManager {
                                        routing_node: &mut RoutingNode,
                                        src: Authority<XorName>,
                                        dst: Authority<XorName>,
+                                       name: XorName,
+                                       tag: u64,
+                                       actions: BTreeMap<Vec<u8>, EntryAction>,
                                        msg_id: MessageId,
                                        requester: sign::PublicKey)
                                        -> Result<(), InternalError> {
         if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester)) {
-            routing_node.send_mutate_mdata_entries_response(dst, src, Err(err.clone()), msg_id)?;
-            Err(From::from(err))
-        } else {
-            Ok(())
+            routing_node.send_mutate_mdata_entries_response(dst, src, Err(err), msg_id)?;
+            return Ok(());
         }
+
+        {
+            // Forwarding the request to NAE Manager.
+            let src = dst;
+            let dst = Authority::NaeManager(name);
+            trace!("MM forwarding MutateMDataEntries request to {:?}", dst);
+            routing_node.send_mutate_mdata_entries_request(src,
+                                                           dst,
+                                                           name,
+                                                           tag,
+                                                           actions,
+                                                           msg_id,
+                                                           requester)?;
+        }
+
+        self.insert_cached_request(msg_id, src, dst, Some(tag));
+
+        Ok(())
+    }
+
+    pub fn handle_mutate_mdata_entries_response(&mut self,
+                                                routing_node: &mut RoutingNode,
+                                                res: Result<(), ClientError>,
+                                                msg_id: MessageId)
+                                                -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } =
+            self.handle_mutation_response(routing_node, msg_id, res.is_ok())?;
+        routing_node.send_mutate_mdata_entries_response(dst, src, res, msg_id)?;
+        Ok(())
     }
 
     pub fn handle_set_mdata_user_permissions(&mut self,
                                              routing_node: &mut RoutingNode,
                                              src: Authority<XorName>,
                                              dst: Authority<XorName>,
+                                             name: XorName,
+                                             tag: u64,
+                                             user: User,
+                                             permissions: PermissionSet,
+                                             version: u64,
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
@@ -319,16 +286,48 @@ impl MaidManager {
                                                                   src,
                                                                   Err(err.clone()),
                                                                   msg_id)?;
-            Err(From::from(err))
-        } else {
-            Ok(())
+            return Ok(());
         }
+
+        {
+            // Forwarding the request to NAE Manager.
+            let src = dst;
+            let dst = Authority::NaeManager(name);
+            trace!("MM forwarding SetMDataUserPermissions request to {:?}", dst);
+            routing_node.send_set_mdata_user_permissions_request(src,
+                                                         dst,
+                                                         name,
+                                                         tag,
+                                                         user,
+                                                         permissions,
+                                                         version,
+                                                         msg_id,
+                                                         requester)?;
+        }
+
+        self.insert_cached_request(msg_id, src, dst, Some(tag));
+        Ok(())
+    }
+
+    pub fn handle_set_mdata_user_permissions_response(&mut self,
+                                                      routing_node: &mut RoutingNode,
+                                                      res: Result<(), ClientError>,
+                                                      msg_id: MessageId)
+                                                      -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } =
+            self.handle_mutation_response(routing_node, msg_id, res.is_ok())?;
+        routing_node.send_set_mdata_user_permissions_response(dst, src, res, msg_id)?;
+        Ok(())
     }
 
     pub fn handle_del_mdata_user_permissions(&mut self,
                                              routing_node: &mut RoutingNode,
                                              src: Authority<XorName>,
                                              dst: Authority<XorName>,
+                                             name: XorName,
+                                             tag: u64,
+                                             user: User,
+                                             version: u64,
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
@@ -337,24 +336,81 @@ impl MaidManager {
                                                                   src,
                                                                   Err(err.clone()),
                                                                   msg_id)?;
-            Err(From::from(err))
-        } else {
-            Ok(())
+            return Ok(());
         }
+
+        {
+            // Forwarding the request to NAE Manager.
+            let src = dst;
+            let dst = Authority::NaeManager(name);
+            trace!("MM forwarding DelMDataUserPermissions request to {:?}", dst);
+            routing_node.send_del_mdata_user_permissions_request(src,
+                                                         dst,
+                                                         name,
+                                                         tag,
+                                                         user,
+                                                         version,
+                                                         msg_id,
+                                                         requester)?;
+        }
+
+        self.insert_cached_request(msg_id, src, dst, Some(tag));
+        Ok(())
+    }
+
+    pub fn handle_del_mdata_user_permissions_response(&mut self,
+                                                      routing_node: &mut RoutingNode,
+                                                      res: Result<(), ClientError>,
+                                                      msg_id: MessageId)
+                                                      -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } =
+            self.handle_mutation_response(routing_node, msg_id, res.is_ok())?;
+        routing_node.send_del_mdata_user_permissions_response(dst, src, res, msg_id)?;
+        Ok(())
     }
 
     pub fn handle_change_mdata_owner(&mut self,
                                      routing_node: &mut RoutingNode,
                                      src: Authority<XorName>,
                                      dst: Authority<XorName>,
+                                     name: XorName,
+                                     tag: u64,
+                                     new_owners: BTreeSet<sign::PublicKey>,
+                                     version: u64,
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
         if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None) {
             routing_node.send_change_mdata_owner_response(dst, src, Err(err.clone()), msg_id)?;
-            Err(From::from(err))
-        } else {
-            Ok(())
+            return Ok(());
         }
+
+        {
+            // Forwarding the request to NAE Manager.
+            let src = dst;
+            let dst = Authority::NaeManager(name);
+            trace!("MM forwarding ChangeMDataOwner request to {:?}", dst);
+            routing_node.send_change_mdata_owner_request(src,
+                                                         dst,
+                                                         name,
+                                                         tag,
+                                                         new_owners,
+                                                         version,
+                                                         msg_id)?;
+        }
+
+        self.insert_cached_request(msg_id, src, dst, Some(tag));
+        Ok(())
+    }
+
+    pub fn handle_change_mdata_owner_response(&mut self,
+                                              routing_node: &mut RoutingNode,
+                                              res: Result<(), ClientError>,
+                                              msg_id: MessageId)
+                                              -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } =
+            self.handle_mutation_response(routing_node, msg_id, res.is_ok())?;
+        routing_node.send_change_mdata_owner_response(dst, src, res, msg_id)?;
+        Ok(())
     }
 
     pub fn handle_list_auth_keys_and_version(&mut self,
@@ -523,24 +579,32 @@ impl MaidManager {
         }
     }
 
-    fn handle_put_failure(&mut self,
-                          routing_node: &mut RoutingNode,
-                          src: &Authority<XorName>)
-                          -> bool {
+    fn handle_mutation_response(&mut self,
+                                routing_node: &mut RoutingNode,
+                                msg_id: MessageId,
+                                success: bool)
+                                -> Result<CachedRequest, InternalError> {
+        let CachedRequest { src, dst, tag } = self.remove_cached_request(msg_id)?;
 
-        let client_name = utils::client_name(src);
-
+        let client_name = utils::client_name(&src);
         let account = if let Some(account) = self.accounts.get_mut(&client_name) {
-            // Refund account
-            let _ = account.decrement_mutation_counter();
+            if !success {
+                // Refund the account
+                let _ = account.decrement_mutation_counter();
+            }
             account.clone()
         } else {
-            return false;
+            error!("Account for {:?} not found.", client_name);
+            return Err(InternalError::NoSuchAccount);
         };
 
         self.send_refresh(routing_node, &client_name, account, MessageId::zero());
 
-        true
+        Ok(CachedRequest {
+            src: src,
+            dst: dst,
+            tag: tag,
+        })
     }
 
     fn send_refresh(&self,
@@ -553,6 +617,24 @@ impl MaidManager {
         if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
             trace!("MM sending refresh for account {}", src.name());
             let _ = routing_node.send_refresh_request(src, src, serialised_refresh, msg_id);
+        }
+    }
+
+    fn insert_cached_request(&mut self,
+                             msg_id: MessageId,
+                             src: Authority<XorName>,
+                             dst: Authority<XorName>,
+                             tag: Option<u64>) {
+        if let Some(prior) = self.request_cache.insert(msg_id,
+                                                       CachedRequest {
+                                                           src: src,
+                                                           dst: dst,
+                                                           tag: tag,
+                                                       }) {
+            error!("Overwrote existing cached request with {:?} from {:?} to {:?}",
+                   msg_id,
+                   prior.src,
+                   prior.dst);
         }
     }
 
