@@ -2,7 +2,7 @@
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "FFI utilities"
 documentation = "https://docs.rs/ffi_utils"
-homepage = "http://maidsafe.net"
+homepage = "https://maidsafe.net"
 license = "GPL-3.0"
 name = "ffi_utils"
 readme = "README.md"

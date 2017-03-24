@@ -1,23 +1,19 @@
 // Copyright 2016 MaidSafe.net limited.
 //
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net
-// Commercial License, version 1.0 or later, or (2) The General Public License
-// (GPL), version 3, depending on which licence you accepted on initial access
-// to the Software (the "Licences").
+// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
+// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
+// licence you accepted on initial access to the Software (the "Licences").
 //
-// By contributing code to the SAFE Network Software, or to this project
-// generally, you agree to be bound by the terms of the MaidSafe Contributor
-// Agreement, version 1.0.
-// This, along with the Licenses can be found in the root directory of this
-// project at LICENSE, COPYING and CONTRIBUTOR.
+// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
-// Unless required by applicable law or agreed to in writing, the SAFE Network
-// Software distributed under the GPL Licence is distributed on an "AS IS"
-// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-// implied.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.
 //
-// Please review the Licences for the specific language governing permissions
-// and limitations relating to use of the SAFE Network Software.
+// Please review the Licences for the specific language governing permissions and limitations
+// relating to use of the SAFE Network Software.
 
 //! SAFE Core Integration Tests
 
@@ -41,11 +37,9 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
-                                   option_unwrap_used))]
-#![cfg_attr(feature="clippy", allow(use_debug, too_many_arguments))]
+#![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
+                                         option_unwrap_used))]
+#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
 
 extern crate safe_core;
 extern crate safe_authenticator;
@@ -62,15 +56,13 @@ use safe_app::ffi::access_container::access_container_get_container_mdata_info;
 use safe_app::ffi::ipc as app_ipc;
 use safe_app::ffi::mutable_data::entry_actions::{mdata_entry_actions_free,
                                                  mdata_entry_actions_insert,
-                                                 mdata_entry_actions_new,
-                                                 mdata_entry_actions_update};
+                                                 mdata_entry_actions_new, mdata_entry_actions_update};
 use safe_app::ffi::mutable_data::mdata_mutate_entries;
 use safe_authenticator::Authenticator;
 use safe_authenticator::ffi::{authenticator_free, create_acc};
 use safe_authenticator::ipc::{auth_decode_ipc_msg, encode_auth_resp, encode_containers_resp};
 use safe_core::ipc::req::ffi::{AppExchangeInfo, AuthReq, ContainerPermissions,
-                               ContainerPermissionsArray, ContainersReq, Permission,
-                               PermissionArray};
+                               ContainerPermissionsArray, ContainersReq, Permission, PermissionArray};
 use safe_core::ipc::resp::ffi::AuthGranted;
 use safe_core::utils;
 use std::{mem, ptr};
@@ -88,13 +80,13 @@ fn test() {
 
     let mut containers = Vec::new();
     containers.push(ContainerPermissions {
-        cont_name: FfiString::from_string("_videos"),
-        access: PermissionArray {
-            ptr: perms.as_mut_ptr(),
-            len: perms.len(),
-            cap: perms.capacity(),
-        },
-    });
+                        cont_name: FfiString::from_string("_videos"),
+                        access: PermissionArray {
+                            ptr: perms.as_mut_ptr(),
+                            len: perms.len(),
+                            cap: perms.capacity(),
+                        },
+                    });
     mem::forget(perms);
 
     let req = AuthReq {
@@ -174,9 +166,9 @@ fn test() {
     // Try to retrieve MDataInfo for _videos from the access container
     let md_info_h = unsafe {
         unwrap!(call_1(|ud, cb| {
-            let cont_name = FfiString::from_string("_videos");
-            access_container_get_container_mdata_info(app, cont_name, ud, cb)
-        }))
+                           let cont_name = FfiString::from_string("_videos");
+                           access_container_get_container_mdata_info(app, cont_name, ud, cb)
+                       }))
     };
 
     // Insert an entry into the retrieved MDataInfo
@@ -230,13 +222,13 @@ fn test() {
 
     let mut containers = Vec::new();
     containers.push(ContainerPermissions {
-        cont_name: FfiString::from_string("_videos"),
-        access: PermissionArray {
-            ptr: perms.as_mut_ptr(),
-            len: perms.len(),
-            cap: perms.capacity(),
-        },
-    });
+                        cont_name: FfiString::from_string("_videos"),
+                        access: PermissionArray {
+                            ptr: perms.as_mut_ptr(),
+                            len: perms.len(),
+                            cap: perms.capacity(),
+                        },
+                    });
     mem::forget(perms);
 
     let cont_req = ContainersReq {
@@ -281,8 +273,8 @@ fn test() {
 
     let result_str = unsafe {
         unwrap!(call_1(|ud, cb| {
-            encode_containers_resp(authenticator, cont_req, req_id, true, ud, cb)
-        }))
+                           encode_containers_resp(authenticator, cont_req, req_id, true, ud, cb)
+                       }))
     };
 
     let (tx, rx) = mpsc::channel::<Result<(), i32>>();

@@ -2,7 +2,7 @@
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "SAFE App"
 documentation = "https://docs.rs/safe_app"
-homepage = "http://maidsafe.net"
+homepage = "https://maidsafe.net"
 license = "GPL-3.0"
 name = "safe_app"
 readme = "README.md"
