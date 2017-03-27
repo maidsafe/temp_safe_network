@@ -365,7 +365,6 @@ pub unsafe extern "C" fn struct_data_put(app: *const App, sd_h: StructDataHandle
     })
 }
 
-// TODO add test case for this
 /// Make `StructuredData` unclaimable - after this operation, the `StructuredData` will remain in
 /// the network with no data but will not be claimable by anyone any more including the original
 /// owner.
@@ -406,7 +405,7 @@ fn struct_data_post_impl(client: Arc<Mutex<Client>>,
                          sd: &StructuredData,
                          make_unclaimable: bool)
                          -> Result<StructuredData, FfiError> {
-    let new_sd = {
+    let mut new_sd = {
         if make_unclaimable {
             let mut owners = BTreeSet::new();
             owners.insert(NO_OWNER_PUB_KEY);
@@ -418,19 +417,17 @@ fn struct_data_post_impl(client: Arc<Mutex<Client>>,
                                 owners).map_err(CoreError::from)?
         } else {
             // TODO Ask routing to remove this inefficiency of requiring to clone data and all
-            let mut new_sd =
-                StructuredData::new(sd.get_type_tag(),
-                                    *sd.name(),
-                                    sd.get_version() + 1,
-                                    sd.get_data().clone(),
-                                    sd.get_owners().clone()).map_err(CoreError::from)?;
-            let owner_key = *unwrap!(client.lock()).get_public_signing_key()?;
-            let private_signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
-            let _ = new_sd.add_signature(&(owner_key, private_signing_key))
-                .map_err(CoreError::from)?;
-            new_sd
+            StructuredData::new(sd.get_type_tag(),
+                                *sd.name(),
+                                sd.get_version() + 1,
+                                sd.get_data().clone(),
+                                sd.get_owners().clone()).map_err(CoreError::from)?
         }
     };
+
+    let owner_key = *unwrap!(client.lock()).get_public_signing_key()?;
+    let private_signing_key = unwrap!(client.lock()).get_secret_signing_key()?.clone();
+    let _ = new_sd.add_signature(&(owner_key, private_signing_key)).map_err(CoreError::from)?;
 
     let data = Data::Structured(new_sd.clone());
     let resp_getter = unwrap!(client.lock()).post(data, None)?;
@@ -537,6 +534,74 @@ mod tests {
     use ffi::test_utils;
     use rand;
     use std::ptr;
+
+    #[test]
+    fn make_unclaimable() {
+        let app = test_utils::create_app(false);
+
+        let mut cipher_opt_h: CipherOptHandle = 0;
+        let mut sd_h: StructDataHandle = 0;
+        let mut data_id_h: DataIdHandle = 0;
+
+        let id = rand::random();
+        let plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
+
+        unsafe {
+            assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_h), 0);
+
+            // Create
+            assert_eq!(struct_data_new(&app,
+                                       ::UNVERSIONED_STRUCT_DATA_TYPE_TAG,
+                                       &id,
+                                       0,
+                                       cipher_opt_h,
+                                       plain_text.as_ptr(),
+                                       plain_text.len(),
+                                       &mut sd_h),
+                       0);
+            assert_eq!(struct_data_extract_data_id(sd_h, &mut data_id_h), 0);
+            assert_eq!(struct_data_put(&app, sd_h), 0);
+
+            // Make unclaimable
+            assert_eq!(struct_data_make_unclaimable(&app, sd_h), 0);
+
+            // Try to read data - it should return an error
+            assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
+            let _ = unwrap!(object_cache()).get_sd(sd_h);
+
+            let mut data_ptr = ptr::null_mut();
+            let mut data_size = 0usize;
+            let mut data_cap = 0usize;
+
+            assert_ne!(struct_data_extract_data(&app,
+                                                sd_h,
+                                                &mut data_ptr,
+                                                &mut data_size,
+                                                &mut data_cap),
+                       0);
+
+            // Check that SD is not owned anymore and the only owner key is NO_OWNER_PUBKEY.
+            let mut is_owned = false;
+            assert_eq!(struct_data_is_owned(&app, sd_h, &mut is_owned), 0);
+            assert_eq!(is_owned, false);
+            assert!(unwrap!(unwrap!(object_cache()).get_sd(sd_h))
+                        .get_owners()
+                        .contains(&NO_OWNER_PUB_KEY));
+
+            // Try to do POST and DELETE - they should fail
+            // -25 is CoreError::InvalidSuccessor { reason: MutationError::InvalidOwners }
+            let new_plain_text = unwrap!(utility::generate_random_vector::<u8>(10));
+            assert_eq!(struct_data_new_data(&app,
+                                            sd_h,
+                                            cipher_opt_h,
+                                            new_plain_text.as_ptr(),
+                                            new_plain_text.len()),
+                       0);
+
+            assert_eq!(struct_data_post(&app, sd_h), -25);
+            assert_eq!(struct_data_delete(&app, sd_h), -25);
+        }
+    }
 
     #[test]
     fn unversioned_struct_data_crud() {
