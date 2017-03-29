@@ -89,9 +89,10 @@ pub fn delete<S: AsRef<str>>(client: &Client,
 
     let key = fry!(parent.enc_entry_key(name.as_bytes()));
 
-    client.mutate_mdata_entries(parent.name,
-                                parent.type_tag,
-                                EntryActions::new().del(key, version).into())
+    client
+        .mutate_mdata_entries(parent.name,
+                              parent.type_tag,
+                              EntryActions::new().del(key, version).into())
         .map_err(convert_error)
         .into_box()
 }
@@ -120,17 +121,22 @@ pub fn update<S: AsRef<str>>(client: Client,
                   })
         .into_future()
         .and_then(move |(key, content)| if version != 0 {
-                      Ok((key, content, version, parent)).into_future().into_box()
+                      Ok((key, content, version, parent))
+                          .into_future()
+                          .into_box()
                   } else {
-                      client.get_mdata_value(parent.name, parent.type_tag, key.clone())
+                      client
+                          .get_mdata_value(parent.name, parent.type_tag, key.clone())
                           .map(move |value| (key, content, value.entry_version + 1, parent))
                           .into_box()
                   })
         .and_then(move |(key, content, version, parent)| {
-            client2.mutate_mdata_entries(parent.name,
-                                         parent.type_tag,
-                                         EntryActions::new().update(key, content, version).into())
-        })
+                      client2.mutate_mdata_entries(parent.name,
+                                                   parent.type_tag,
+                                                   EntryActions::new()
+                                                       .update(key, content, version)
+                                                       .into())
+                  })
         .map_err(convert_error)
         .into_box()
 }
@@ -210,7 +216,9 @@ mod tests {
             .then(move |res| {
                       let writer = unwrap!(res);
 
-                      writer.write(&[0u8; ORIG_SIZE]).and_then(move |_| writer.close())
+                      writer
+                          .write(&[0u8; ORIG_SIZE])
+                          .and_then(move |_| writer.close())
                   })
             .map(move |file| (user_root, file))
             .into_box()
@@ -252,7 +260,9 @@ mod tests {
                 })
                 .then(move |res| {
                           let writer = unwrap!(res);
-                          writer.write(&[1u8; NEW_SIZE]).and_then(move |_| writer.close())
+                          writer
+                              .write(&[1u8; NEW_SIZE])
+                              .and_then(move |_| writer.close())
                       })
                 .then(move |res| {
                           let file = unwrap!(res);
@@ -284,7 +294,9 @@ mod tests {
                       })
                 .then(move |res| {
                           let writer = unwrap!(res);
-                          writer.write(&[2u8; APPEND_SIZE]).and_then(move |_| writer.close())
+                          writer
+                              .write(&[2u8; APPEND_SIZE])
+                              .and_then(move |_| writer.close())
                       })
                 .then(move |res| {
                           let file = unwrap!(res);
@@ -293,12 +305,13 @@ mod tests {
                 .then(|res| {
                     let reader = unwrap!(res);
                     let size = reader.size();
-                    reader.read(0, size).map(move |data| {
-                                                 assert_eq!(size, (ORIG_SIZE + APPEND_SIZE) as u64);
-                                                 assert_eq!(data[0..ORIG_SIZE].to_owned(),
-                                                            vec![0u8; ORIG_SIZE]);
-                                                 assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
-                                             })
+                    reader
+                        .read(0, size)
+                        .map(move |data| {
+                                 assert_eq!(size, (ORIG_SIZE + APPEND_SIZE) as u64);
+                                 assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
+                                 assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
+                             })
                 })
         });
     }

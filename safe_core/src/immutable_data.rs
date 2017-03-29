@@ -44,7 +44,8 @@ pub fn create(client: &Client,
     let storage = SelfEncryptionStorage::new(client.clone());
     let self_encryptor = fry!(SelfEncryptor::new(storage, DataMap::None));
 
-    self_encryptor.write(value, 0)
+    self_encryptor
+        .write(value, 0)
         .and_then(move |_| self_encryptor.close())
         .map_err(From::from)
         .and_then(move |(data_map, _)| {
@@ -97,7 +98,8 @@ pub fn get_value(client: &Client,
                  decryption_key: Option<secretbox::Key>)
                  -> Box<CoreFuture<Vec<u8>>> {
     let client2 = client.clone();
-    client.get_idata(*name)
+    client
+        .get_idata(*name)
         .and_then(move |data| extract_value(&client2, &data, decryption_key))
         .into_box()
 }
@@ -111,7 +113,8 @@ fn pack(client: Client, value: Vec<u8>) -> Box<CoreFuture<ImmutableData>> {
     if !data.validate_size() {
         let storage = SelfEncryptionStorage::new(client.clone());
         let self_encryptor = fry!(SelfEncryptor::new(storage, DataMap::None));
-        self_encryptor.write(&serialised_data, 0)
+        self_encryptor
+            .write(&serialised_data, 0)
             .and_then(move |_| self_encryptor.close())
             .map_err(From::from)
             .and_then(move |(data_map, _)| {
@@ -131,7 +134,8 @@ fn unpack(client: Client, data: &ImmutableData) -> Box<CoreFuture<Vec<u8>>> {
             let storage = SelfEncryptionStorage::new(client.clone());
             let self_encryptor = fry!(SelfEncryptor::new(storage, data_map));
             let length = self_encryptor.len();
-            self_encryptor.read(0, length)
+            self_encryptor
+                .read(0, length)
                 .map_err(From::from)
                 .and_then(move |serialised_data| {
                               let data = fry!(deserialise(&serialised_data));

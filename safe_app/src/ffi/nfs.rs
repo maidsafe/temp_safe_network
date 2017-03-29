@@ -128,7 +128,8 @@ mod tests {
         let container_info_h = run(&app, move |client, context| {
             let context = context.clone();
 
-            context.get_container_mdata_info(client, "_videos")
+            context
+                .get_container_mdata_info(client, "_videos")
                 .map(move |info| context.object_cache().insert_mdata_info(info))
         });
 
@@ -153,13 +154,13 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                file_insert(&app,
-                            container_info_h,
-                            ffi_file_name0.as_ptr(),
-                            &ffi_file,
-                            ud,
-                            cb)
-            }))
+                               file_insert(&app,
+                                           container_info_h,
+                                           ffi_file_name0.as_ptr(),
+                                           &ffi_file,
+                                           ud,
+                                           cb)
+                           }))
         }
 
         // Fetch it back.
@@ -174,7 +175,9 @@ mod tests {
 
         // Create non-empty file.
         let cipher_opt_h = run_now(&app, |_, context| {
-            context.object_cache().insert_cipher_opt(CipherOpt::PlainText)
+            context
+                .object_cache()
+                .insert_cipher_opt(CipherOpt::PlainText)
         });
 
         let content = b"hello world";
@@ -189,21 +192,25 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                file_insert(&app,
-                            container_info_h,
-                            ffi_file_name1.as_ptr(),
-                            &ffi_file,
-                            ud,
-                            cb)
-            }))
+                               file_insert(&app,
+                                           container_info_h,
+                                           ffi_file_name1.as_ptr(),
+                                           &ffi_file,
+                                           ud,
+                                           cb)
+                           }))
         }
 
         // Fetch it back.
         let (file, _version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                    file_fetch(&app, container_info_h, ffi_file_name1.as_ptr(), ud, cb)
-                }))
+                                   file_fetch(&app,
+                                              container_info_h,
+                                              ffi_file_name1.as_ptr(),
+                                              ud,
+                                              cb)
+                               }))
             }
         };
 

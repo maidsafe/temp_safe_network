@@ -54,7 +54,11 @@ impl Writer {
                version: Option<u64>)
                -> Box<NfsFuture<Writer>> {
         let fut = match mode {
-            Mode::Modify => data_map::get(&client, file.data_map_name()).map(Some).into_box(),
+            Mode::Modify => {
+                data_map::get(&client, file.data_map_name())
+                    .map(Some)
+                    .into_box()
+            }
             Mode::Overwrite => future::ok(None).into_box(),
         };
 
@@ -120,7 +124,8 @@ impl Writer {
                     EntryActions::new().ins(key, ciphertext, 0)
                 };
 
-                client2.mutate_mdata_entries(parent.name, parent.type_tag, actions.into())
+                client2
+                    .mutate_mdata_entries(parent.name, parent.type_tag, actions.into())
                     .map(move |_| file)
                     .map_err(From::from)
                     .into_box()

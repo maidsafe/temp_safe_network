@@ -93,7 +93,10 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
         let msg = ipc::decode_msg(&msg)?;
 
         match msg {
-            IpcMsg::Resp { resp: IpcResp::Auth(res), req_id } => {
+            IpcMsg::Resp {
+                resp: IpcResp::Auth(res),
+                req_id,
+            } => {
                 match res {
                     Ok(auth_granted) => {
                         match auth_granted.into_repr_c() {
@@ -108,7 +111,10 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
                     Err(err) => o_err(user_data, ffi_error_code!(AppError::from(err)), req_id),
                 }
             }
-            IpcMsg::Resp { resp: IpcResp::Containers(res), req_id } => {
+            IpcMsg::Resp {
+                resp: IpcResp::Containers(res),
+                req_id,
+            } => {
                 match res {
                     Ok(()) => o_containers(user_data, req_id),
                     Err(err) => o_err(user_data, ffi_error_code!(AppError::from(err)), req_id),
@@ -159,7 +165,10 @@ mod tests {
         let msg = unwrap!(ipc::decode_msg(&encoded));
 
         let (decoded_req_id, decoded_req) = match msg {
-            IpcMsg::Req { req_id, req: IpcReq::Auth(req) } => (req_id, req),
+            IpcMsg::Req {
+                req_id,
+                req: IpcReq::Auth(req),
+            } => (req_id, req),
             x => panic!("Unexpected {:?}", x),
         };
 
@@ -188,7 +197,10 @@ mod tests {
         let msg = unwrap!(ipc::decode_msg(&encoded));
 
         let (decoded_req_id, decoded_req) = match msg {
-            IpcMsg::Req { req_id, req: IpcReq::Containers(req) } => (req_id, req),
+            IpcMsg::Req {
+                req_id,
+                req: IpcReq::Containers(req),
+            } => (req_id, req),
             x => panic!("Unexpected {:?}", x),
         };
 

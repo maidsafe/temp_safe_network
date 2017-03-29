@@ -30,7 +30,8 @@ pub fn access_container(client: &Client) -> Box<AuthFuture<MDataInfo>> {
     let parent = fry!(client.config_root_dir());
     let key = fry!(parent.enc_entry_key(b"access-container"));
 
-    client.get_mdata_value(parent.name, parent.type_tag, key)
+    client
+        .get_mdata_value(parent.name, parent.type_tag, key)
         .map_err(From::from)
         .and_then(move |val| {
                       let content = parent.decrypt(&val.content)?;
@@ -59,7 +60,8 @@ pub fn access_container_entry(client: &Client,
     let nonce = fry!(access_container_nonce(access_container));
     let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
 
-    client.get_mdata_value(access_container.name, access_container.type_tag, key)
+    client
+        .get_mdata_value(access_container.name, access_container.type_tag, key)
         .and_then(move |value| {
                       let plaintext = symmetric_decrypt(&value.content, &app_keys.enc_key)?;
                       Ok((value.entry_version, deserialise(&plaintext)?))
@@ -87,9 +89,10 @@ pub fn put_access_container_entry(client: &Client,
         EntryActions::new().ins(key, ciphertext, 0)
     };
 
-    client.mutate_mdata_entries(access_container.name,
-                                access_container.type_tag,
-                                actions.into())
+    client
+        .mutate_mdata_entries(access_container.name,
+                              access_container.type_tag,
+                              actions.into())
         .map_err(From::from)
         .into_box()
 }

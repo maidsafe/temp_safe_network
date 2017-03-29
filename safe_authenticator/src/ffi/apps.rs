@@ -76,10 +76,12 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
 
             get_config(client)
                 .and_then(move |(cfg_version, auth_cfg)| {
-                    app_state(&c2, &auth_cfg, app_id).map(move |app_state| {
-                                                              (app_state, auth_cfg, cfg_version)
-                                                          })
-                })
+                              app_state(&c2, &auth_cfg, app_id).map(move |app_state| {
+                                                                        (app_state,
+                                                                         auth_cfg,
+                                                                         cfg_version)
+                                                                    })
+                          })
                 .and_then(move |(app_state, auth_cfg, cfg_version)| match app_state {
                               AppState::Revoked => Ok((auth_cfg, cfg_version)),
                               AppState::Authenticated => Err(AuthError::from("App is not revoked")),
@@ -88,12 +90,12 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
                               }
                           })
                 .and_then(move |(mut auth_cfg, cfg_version)| {
-                    let _app = fry!(auth_cfg.remove(&app_id_hash)
+                              let _app = fry!(auth_cfg.remove(&app_id_hash)
                         .ok_or(AuthError::from("Logical error: app isn't found in \
                                                 authenticator config")));
 
-                    update_config(&c3, Some(cfg_version + 1), &auth_cfg)
-                })
+                              update_config(&c3, Some(cfg_version + 1), &auth_cfg)
+                          })
                 .and_then(move |_| remove_app_container(c4, &app_id2))
                 .then(move |res| {
                           o_cb(user_data.0, ffi_result_code!(res));
@@ -141,14 +143,13 @@ usize)){
 
                             // If the app is not in the access container, or if the app entry has
                             // been deleted (is empty), then it's revoked.
-                            let revoked = entries.get(&key)
+                            let revoked = entries
+                                .get(&key)
                                 .map(|entry| entry.content.is_empty())
                                 .unwrap_or(true);
 
                             if revoked {
-                                apps.push(app.info
-                                              .clone()
-                                              .into_repr_c()?);
+                                apps.push(app.info.clone().into_repr_c()?);
                             }
                         }
 
@@ -227,9 +228,7 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
 
                                 let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
                                 let reg_app = RegisteredApp {
-                                    app_info: app.info
-                                        .clone()
-                                        .into_repr_c()?,
+                                    app_info: app.info.clone().into_repr_c()?,
                                     containers: containers_ptr,
                                     containers_len: len,
                                     containers_cap: cap,

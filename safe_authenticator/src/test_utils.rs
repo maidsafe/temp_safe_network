@@ -163,9 +163,9 @@ pub fn compare_access_container_entries(authenticator: &Authenticator,
                                            access_container);
             assert_eq!(perms, expected_perms);
 
-            let fut =
-                client.list_mdata_user_permissions(md_info.name, md_info.type_tag, user.clone())
-                    .map(move |perms| (perms, expected_perm_set));
+            let fut = client
+                .list_mdata_user_permissions(md_info.name, md_info.type_tag, user.clone())
+                .map(move |perms| (perms, expected_perm_set));
 
             reqs.push(fut);
         }

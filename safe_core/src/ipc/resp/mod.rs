@@ -57,7 +57,11 @@ impl AuthGranted {
     ///
     /// You're now responsible for freeing this memory once you're done.
     pub fn into_repr_c(self) -> Result<ffi::AuthGranted, SerialisationError> {
-        let AuthGranted { app_keys, bootstrap_config, access_container } = self;
+        let AuthGranted {
+            app_keys,
+            bootstrap_config,
+            access_container,
+        } = self;
         let bootstrap_config = serialise(&bootstrap_config)?;
         let (ptr, len, cap) = vec_into_raw_parts(bootstrap_config);
         Ok(ffi::AuthGranted {
@@ -75,11 +79,13 @@ impl ReprC for AuthGranted {
     type Error = IpcError;
 
     unsafe fn clone_from_repr_c(repr_c: Self::C) -> Result<Self, Self::Error> {
-        let ffi::AuthGranted { app_keys,
-                               access_container,
-                               bootstrap_config_ptr,
-                               bootstrap_config_len,
-                               .. } = *repr_c;
+        let ffi::AuthGranted {
+            app_keys,
+            access_container,
+            bootstrap_config_ptr,
+            bootstrap_config_len,
+            ..
+        } = *repr_c;
         let bootstrap_config = slice::from_raw_parts(bootstrap_config_ptr, bootstrap_config_len);
         let bootstrap_config = deserialise(bootstrap_config)?;
         Ok(AuthGranted {
@@ -129,7 +135,14 @@ impl AppKeys {
     ///
     /// You're now responsible for freeing this memory once you're done.
     pub fn into_repr_c(self) -> ffi::AppKeys {
-        let AppKeys { owner_key, enc_key, sign_pk, sign_sk, enc_pk, enc_sk } = self;
+        let AppKeys {
+            owner_key,
+            enc_key,
+            sign_pk,
+            sign_sk,
+            enc_pk,
+            enc_sk,
+        } = self;
         ffi::AppKeys {
             owner_key: owner_key.0,
             enc_key: enc_key.0,
@@ -334,11 +347,7 @@ mod tests {
 
         let a = unsafe { unwrap!(AccessContInfo::clone_from_repr_c(ffi)) };
 
-        assert_eq!(a.id
-                       .0
-                       .iter()
-                       .sum::<u8>() as usize,
-                   2 * XOR_NAME_LEN);
+        assert_eq!(a.id.0.iter().sum::<u8>() as usize, 2 * XOR_NAME_LEN);
         assert_eq!(a.tag, 681);
         assert_eq!(a.nonce, nonce);
     }

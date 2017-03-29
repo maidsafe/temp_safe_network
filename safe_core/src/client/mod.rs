@@ -38,8 +38,8 @@ use ipc::BootstrapConfig;
 use lru_cache::LruCache;
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::{AccountInfo, Authority, EntryAction, Event, FullId, ImmutableData, InterfaceError,
-              MessageId, MutableData, PermissionSet, Response, TYPE_TAG_SESSION_PACKET, User, Value,
-              XorName};
+              MessageId, MutableData, PermissionSet, Response, TYPE_TAG_SESSION_PACKET, User,
+              Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
 use rust_sodium::crypto::{box_, sign};
@@ -254,13 +254,16 @@ impl Client {
             let (routing, routing_rx) = setup_routing(None, None)?;
 
             routing.get_mdata_value(dst,
-                                    acc_loc,
-                                    TYPE_TAG_SESSION_PACKET,
-                                    b"Login".to_vec(),
-                                    msg_id)?;
+                                 acc_loc,
+                                 TYPE_TAG_SESSION_PACKET,
+                                 b"Login".to_vec(),
+                                 msg_id)?;
 
             match wait_for_response!(routing_rx, Response::GetMDataValue, msg_id) {
-                Ok(Value { content, entry_version }) => (content, entry_version),
+                Ok(Value {
+                       content,
+                       entry_version,
+                   }) => (content, entry_version),
                 Err(err) => {
                     warn!("Could not fetch account from the Network: {:?}", err);
                     return Err(err);
@@ -399,13 +402,17 @@ impl Client {
 
             let inner = self.inner.clone();
             rx.map(move |data| {
-                         let _ = inner.borrow_mut().cache.insert(*data.name(), data.clone());
+                         let _ = inner
+                             .borrow_mut()
+                             .cache
+                             .insert(*data.name(), data.clone());
                          data
                      })
                 .into_box()
         };
 
-        let result = self.routing_mut().get_idata(Authority::NaeManager(name), name, msg_id);
+        let result = self.routing_mut()
+            .get_idata(Authority::NaeManager(name), name, msg_id);
         if let Err(err) = result {
             let _ = hook.send(CoreEvent::GetIData(Err(CoreError::from(err))));
         } else {
@@ -511,10 +518,7 @@ impl Client {
 
         let (hook, rx, msg_id) = oneshot!(self, CoreEvent::GetAccountInfo);
 
-        let dst = fry!(self.inner()
-                           .client_type
-                           .cm_addr()
-                           .map(|a| a.clone()));
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
         let result = self.routing_mut().get_account_info(dst, msg_id);
 
         if let Err(e) = result {
@@ -613,10 +617,7 @@ impl Client {
     pub fn list_auth_keys_and_version(&self) -> Box<CoreFuture<(BTreeSet<sign::PublicKey>, u64)>> {
         trace!("ListAuthKeysAndVersion");
 
-        let dst = fry!(self.inner()
-                           .client_type
-                           .cm_addr()
-                           .map(|a| a.clone()));
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
 
         self.get(CoreEvent::ListAuthKeysAndVersion,
                  |routing, msg_id| routing.list_auth_keys_and_version(dst, msg_id))
@@ -787,10 +788,7 @@ impl Client {
     fn mutate<F>(&self, req: F) -> Box<CoreFuture<()>>
         where F: FnOnce(&mut Routing, Authority, MessageId) -> Result<(), InterfaceError>
     {
-        let dst = fry!(self.inner()
-                           .client_type
-                           .cm_addr()
-                           .map(|a| a.clone()));
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
 
         self.get(CoreEvent::Mutation,
                  |routing, msg_id| req(routing, dst, msg_id))
@@ -820,7 +818,8 @@ impl Client {
             }
         });
 
-        future.select(timeout)
+        future
+            .select(timeout)
             .then(|result| match result {
                       Ok((a, _)) => Ok(a),
                       Err((a, _)) => Err(a),
@@ -1348,20 +1347,21 @@ mod tests {
             client.set_simulate_timeout(true);
             client.set_timeout(Duration::from_millis(250));
 
-            client.get_idata(rand::random())
+            client
+                .get_idata(rand::random())
                 .then(|result| match result {
                           Ok(_) => panic!("Unexpected success"),
                           Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
                           Err(err) => panic!("Unexpected {:?}", err),
                       })
                 .then(move |result| {
-                    unwrap!(result);
+                          unwrap!(result);
 
-                    let data = unwrap!(utils::generate_random_vector(4));
-                    let data = ImmutableData::new(data);
+                          let data = unwrap!(utils::generate_random_vector(4));
+                          let data = ImmutableData::new(data);
 
-                    client2.put_idata(data)
-                })
+                          client2.put_idata(data)
+                      })
                 .then(|result| match result {
                           Ok(_) => panic!("Unexpected success"),
                           Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),

@@ -130,7 +130,14 @@ impl App {
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
     {
         let AuthGranted {
-            app_keys: AppKeys { owner_key, enc_key, enc_pk, enc_sk, sign_pk, sign_sk },
+            app_keys: AppKeys {
+                owner_key,
+                enc_key,
+                enc_pk,
+                enc_sk,
+                sign_pk,
+                sign_sk,
+            },
             access_container,
             bootstrap_config,
         } = auth_granted;
@@ -168,7 +175,9 @@ impl App {
             let (core_tx, core_rx) = futures_mpsc::unbounded();
             let (net_tx, net_rx) = futures_mpsc::unbounded();
 
-            el_h.spawn(net_rx.map(move |event| network_observer(Ok(event))).for_each(|_| Ok(())));
+            el_h.spawn(net_rx
+                           .map(move |event| network_observer(Ok(event)))
+                           .for_each(|_| Ok(())));
 
             let core_tx_clone = core_tx.clone();
 
@@ -297,7 +306,8 @@ impl AppContext {
         fetch_access_info(reg.clone(), client)
             .and_then(move |_| {
                           let access_info = reg.access_info.borrow();
-                          access_info.get(&name)
+                          access_info
+                              .get(&name)
                               .map(|&(ref mdata_info, _)| mdata_info.clone())
                               .ok_or(AppError::NoSuchContainer)
                       })
@@ -316,7 +326,8 @@ impl AppContext {
         fetch_access_info(reg.clone(), client)
             .and_then(move |_| {
                           let access_info = reg.access_info.borrow();
-                          access_info.get(&name)
+                          access_info
+                              .get(&name)
                               .map(|&(_, ref permissions)| permissions.contains(&permission))
                               .ok_or(AppError::NoSuchContainer)
                       })
@@ -381,14 +392,16 @@ mod tests {
             let reg = unwrap!(context.as_registered()).clone();
             assert!(reg.access_info.borrow().is_empty());
 
-            context.refresh_access_info(client).then(move |result| {
-                unwrap!(result);
-                let access_info = reg.access_info.borrow();
-                assert_eq!(unwrap!(access_info.get("_videos")).1,
-                           *unwrap!(container_permissions.get("_videos")));
+            context
+                .refresh_access_info(client)
+                .then(move |result| {
+                          unwrap!(result);
+                          let access_info = reg.access_info.borrow();
+                          assert_eq!(unwrap!(access_info.get("_videos")).1,
+                                     *unwrap!(container_permissions.get("_videos")));
 
-                Ok(())
-            })
+                          Ok(())
+                      })
         });
     }
 
@@ -403,10 +416,12 @@ mod tests {
         let app = create_app_with_access(container_permissions);
 
         run(&app, move |client, context| {
-            context.get_container_mdata_info(client, cont_name).then(move |res| {
-                                                                         let _info = unwrap!(res);
-                                                                         Ok(())
-                                                                     })
+            context
+                .get_container_mdata_info(client, cont_name)
+                .then(move |res| {
+                          let _info = unwrap!(res);
+                          Ok(())
+                      })
         });
     }
 
@@ -420,13 +435,15 @@ mod tests {
         let app = create_app_with_access(container_permissions);
 
         run(&app, move |client, context| {
-            context.get_container_names(client).then(move |res| {
-                let info = unwrap!(res);
-                assert!(info.contains(&"_videos".to_string()));
-                assert!(info.contains(&"_downloads".to_string()));
-                assert_eq!(info.len(), 3); // third item is the app container
-                Ok(())
-            })
+            context
+                .get_container_names(client)
+                .then(move |res| {
+                          let info = unwrap!(res);
+                          assert!(info.contains(&"_videos".to_string()));
+                          assert!(info.contains(&"_downloads".to_string()));
+                          assert_eq!(info.len(), 3); // third item is the app container
+                          Ok(())
+                      })
         });
     }
 
@@ -441,13 +458,15 @@ mod tests {
         let app = create_app_with_access(container_permissions);
 
         run(&app, move |client, context| {
-            let f1 = context.is_permitted(client, cont_name.clone(), Permission::Read)
+            let f1 = context
+                .is_permitted(client, cont_name.clone(), Permission::Read)
                 .then(move |res| {
                           assert!(unwrap!(res));
                           Ok(())
                       });
 
-            let f2 = context.is_permitted(client, cont_name.clone(), Permission::Insert)
+            let f2 = context
+                .is_permitted(client, cont_name.clone(), Permission::Insert)
                 .then(move |res| {
                           assert!(!unwrap!(res));
                           Ok(())

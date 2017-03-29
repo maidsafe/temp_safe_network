@@ -38,13 +38,13 @@ impl Reader {
                -> Box<NfsFuture<Reader>> {
         data_map::get(&client, file.data_map_name())
             .and_then(move |data_map| {
-                let self_encryptor = SelfEncryptor::new(storage, data_map)?;
+                          let self_encryptor = SelfEncryptor::new(storage, data_map)?;
 
-                Ok(Reader {
-                       client: client,
-                       self_encryptor: self_encryptor,
-                   })
-            })
+                          Ok(Reader {
+                                 client: client,
+                                 self_encryptor: self_encryptor,
+                             })
+                      })
             .into_box()
     }
 

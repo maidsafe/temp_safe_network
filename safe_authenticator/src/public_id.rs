@@ -122,7 +122,8 @@ pub fn create<T: Into<String>>(client: &Client, public_id: T) -> Box<AuthFuture<
 pub fn get(client: &Client) -> Box<AuthFuture<String>> {
     let client = client.clone();
 
-    client.config_root_dir()
+    client
+        .config_root_dir()
         .and_then(|config_root_dir| {
                       let key = config_root_dir.enc_entry_key(PUBLIC_ID_CONFIG_ROOT_ENTRY_KEY)?;
                       Ok((config_root_dir, key))
@@ -130,7 +131,8 @@ pub fn get(client: &Client) -> Box<AuthFuture<String>> {
         .map_err(AuthError::from)
         .into_future()
         .and_then(move |(config_root_dir, key)| {
-            client.get_mdata_value(config_root_dir.name, config_root_dir.type_tag, key)
+            client
+                .get_mdata_value(config_root_dir.name, config_root_dir.type_tag, key)
                 .map_err(|err| match err {
                              CoreError::RoutingClientError(ClientError::NoSuchEntry) => {
                                  AuthError::NoSuchPublicId

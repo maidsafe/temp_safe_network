@@ -98,7 +98,9 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
 pub fn derive_secrets(acc_locator: &str, acc_password: &str) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     let Digest(locator_hash) = sha512::hash(acc_locator.as_bytes());
 
-    let pin = sha512::hash(&locator_hash[DIGESTBYTES / 2..]).0.to_owned();
+    let pin = sha512::hash(&locator_hash[DIGESTBYTES / 2..])
+        .0
+        .to_owned();
     let keyword = locator_hash.to_owned();
     let password = sha512::hash(acc_password.as_bytes()).0.to_owned();
 
