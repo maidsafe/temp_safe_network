@@ -25,7 +25,8 @@ use std::collections::BTreeSet;
 pub fn get_client() -> Result<Client, CoreError> {
     let acc_locator = utility::generate_random_string(10)?;
     let acc_password = utility::generate_random_string(10)?;
-    Client::create_account(&acc_locator, &acc_password)
+    let invitation = unwrap!(utility::generate_random_string(10));
+    Client::create_account(&acc_locator, &acc_password, &invitation)
 }
 
 /// Generates random public keys

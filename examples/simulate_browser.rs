@@ -57,6 +57,7 @@ const HOME_PAGE_FILE_NAME: &'static str = "index.html";
 fn handle_login() -> Arc<Mutex<Client>> {
     let mut secret_0 = String::new();
     let mut secret_1 = String::new();
+    let mut invitation = String::new();
 
     println!("\n\tAccount Creation");
     println!("\t================");
@@ -67,11 +68,14 @@ fn handle_login() -> Arc<Mutex<Client>> {
     println!("\n------------ Enter password ---------------");
     let _ = std::io::stdin().read_line(&mut secret_1);
     secret_1 = secret_1.trim().to_string();
+    println!("\n------------ Enter invitation ---------------");
+    let _ = std::io::stdin().read_line(&mut invitation);
+    invitation = invitation.trim().to_string();
 
     // Account Creation
     {
         println!("\nTrying to create an account ...");
-        let _ = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let _ = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
         println!("Account Creation Successful !!");
     }
 

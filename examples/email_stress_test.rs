@@ -93,9 +93,11 @@ impl Bot {
 
         let mut sec_0: String = rng.gen_iter::<char>().take(10).collect();
         let mut sec_1: String = rng.gen_iter::<char>().take(10).collect();
+        let mut invitation: String = rng.gen_iter::<char>().take(10).collect();
 
         sec_0.push_str(&n.to_string());
         sec_1.push_str(&n.to_string());
+        invitation.push_str(&n.to_string());
 
         if account_exists {
             unsafe {
@@ -112,6 +114,8 @@ impl Bot {
                                           sec_0.as_bytes().len(),
                                           sec_1.as_bytes().as_ptr(),
                                           sec_1.as_bytes().len(),
+                                          invitation.as_bytes().as_ptr(),
+                                          invitation.as_bytes().len(),
                                           &mut session_h),
                            0);
             }

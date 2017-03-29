@@ -70,12 +70,15 @@ impl Bot {
 
         let sec_0 = unwrap!(utility::generate_random_string(10));
         let sec_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
         unsafe {
             assert_eq!(create_account(sec_0.as_bytes().as_ptr(),
                                       sec_0.as_bytes().len(),
                                       sec_1.as_bytes().as_ptr(),
                                       sec_1.as_bytes().len(),
+                                      invitation.as_bytes().as_ptr(),
+                                      invitation.as_bytes().len(),
                                       &mut session_h),
                        0);
         }

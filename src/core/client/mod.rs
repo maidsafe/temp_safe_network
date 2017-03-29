@@ -33,6 +33,7 @@ use self::user_account::Account;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
 use core::utility;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::Joiner;
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, StructuredData,
               XorName};
@@ -46,6 +47,8 @@ use rust_sodium::crypto::hash::sha256;
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
+
+type AccPktData = (String, Vec<u8>);
 
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
@@ -109,7 +112,10 @@ impl Client {
 
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
-    pub fn create_account(acc_locator: &str, acc_password: &str) -> Result<Client, CoreError> {
+    pub fn create_account(acc_locator: &str,
+                          acc_password: &str,
+                          invitation: &str)
+                          -> Result<Client, CoreError> {
         trace!("Creating an account.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
@@ -146,7 +152,9 @@ impl Client {
             _raii_joiner: raii_joiner,
             message_queue: message_queue,
             session_packet_id: Some(Account::generate_network_id(&keyword, &pin)?),
-            session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
+            session_packet_keys: Some(SessionPacketEncryptionKeys::new(password,
+                                                                       pin,
+                                                                       invitation.to_string())),
             client_manager_addr: Some(client_manager_addr),
             issued_gets: 0,
             issued_puts: 0,
@@ -166,12 +174,13 @@ impl Client {
                 let mut owners = BTreeSet::new();
                 owners.insert(owner_pubkey);
 
+                let cipher_text = account.encrypt(session_packet_keys.get_password(),
+                             session_packet_keys.get_pin())?;
+
                 let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                  *session_packet_id,
                                                  0,
-                                                 account.encrypt(session_packet_keys
-                                                                  .get_password(),
-                                                              session_packet_keys.get_pin())?,
+                                                 serialise(&(invitation, cipher_text))?,
                                                  owners)?;
                 let _ = sd.add_signature(&(owner_pubkey,
                                            account.get_maid().secret_keys().0.clone()));
@@ -199,8 +208,8 @@ impl Client {
         let resp_getter = unregistered_client.get(session_packet_request, None)?;
 
         if let Data::Structured(session_packet) = resp_getter.get()? {
-            let decrypted_session_packet =
-                Account::decrypt(session_packet.get_data(), &password, &pin)?;
+            let data: AccPktData = deserialise(session_packet.get_data())?;
+            let decrypted_session_packet = Account::decrypt(&data.1, &password, &pin)?;
             let id_packet =
                 FullId::with_keys((decrypted_session_packet.get_maid().public_keys().1,
                                    decrypted_session_packet
@@ -242,7 +251,7 @@ impl Client {
                 _raii_joiner: raii_joiner,
                 message_queue: message_queue,
                 session_packet_id: Some(Account::generate_network_id(&keyword, &pin)?),
-                session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
+                session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin, data.0)),
                 client_manager_addr: Some(client_manager_addr),
                 issued_gets: 0,
                 issued_puts: 0,
@@ -787,6 +796,13 @@ impl Client {
                     account.encrypt(session_packet_keys.get_password(),
                                  session_packet_keys.get_pin())?
                 };
+                let data = {
+                    let session_packet_keys = self.session_packet_keys
+                        .as_ref()
+                        .ok_or(CoreError::OperationForbiddenForClient)?;
+                    let invitation = session_packet_keys.get_invitation();
+                    serialise(&(invitation, encrypted_account))?
+                };
 
                 let owner_key = account.get_public_maid().public_keys().0;
                 let signing_key = account.get_maid().secret_keys().0.clone();
@@ -797,7 +813,7 @@ impl Client {
                 let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                  session_packet_id,
                                                  retrieved_session_packet.get_version() + 1,
-                                                 encrypted_account,
+                                                 data,
                                                  owners)?;
                 let _ = sd.add_signature(&(owner_key, signing_key))?;
                 sd
@@ -847,13 +863,15 @@ impl Client {
 struct SessionPacketEncryptionKeys {
     pin: Vec<u8>,
     password: Vec<u8>,
+    invitation: String,
 }
 
 impl SessionPacketEncryptionKeys {
-    fn new(password: Vec<u8>, pin: Vec<u8>) -> SessionPacketEncryptionKeys {
+    fn new(password: Vec<u8>, pin: Vec<u8>, invitation: String) -> SessionPacketEncryptionKeys {
         SessionPacketEncryptionKeys {
             pin: pin,
             password: password,
+            invitation: invitation,
         }
     }
 
@@ -863,6 +881,10 @@ impl SessionPacketEncryptionKeys {
 
     fn get_pin(&self) -> &[u8] {
         &self.pin[..]
+    }
+
+    fn get_invitation(&self) -> &str {
+        &self.invitation
     }
 }
 
@@ -884,12 +906,13 @@ mod test {
     fn account_creation() {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let _ = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         // Account creation - same secrets - should fail
-        match Client::create_account(&secret_0, &secret_1) {
+        match Client::create_account(&secret_0, &secret_1, &invitation) {
             Ok(_) => panic!("Account name hijaking should fail !"),
             Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
             Err(err) => panic!("{:?}", err),
@@ -900,9 +923,10 @@ mod test {
     fn account_login() {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
         // Creation should pass
-        let _ = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let _ = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         // Correct Credentials - Login Should Pass
         let _ = unwrap!(Client::log_in(&secret_0, &secret_1));
@@ -917,9 +941,10 @@ mod test {
         {
             let secret_0 = unwrap!(utility::generate_random_string(10));
             let secret_1 = unwrap!(utility::generate_random_string(10));
+            let invitation = unwrap!(utility::generate_random_string(10));
 
             // Creation should pass
-            let mut client = unwrap!(Client::create_account(&secret_0, &secret_1));
+            let mut client = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
             unwrap!(unwrap!(client.put(orig_data.clone(), None)).get());
         }
 
@@ -946,8 +971,9 @@ mod test {
         // Construct Client
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
-        let mut client = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let mut client = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -969,8 +995,9 @@ mod test {
         // Construct Client
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
-        let mut client = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let mut client = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -993,8 +1020,9 @@ mod test {
         // Construct Client
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
-        let client = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let client = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         // Identical Plain Texts
         let plain_text_original_0 = vec![123u8; 1000];
