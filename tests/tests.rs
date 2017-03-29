@@ -39,7 +39,8 @@
 extern crate log;
 extern crate rand;
 extern crate routing;
-// extern crate rust_sodium;
+extern crate rust_sodium;
+#[macro_use(assert_match)]
 extern crate safe_vault;
 #[macro_use]
 extern crate unwrap;

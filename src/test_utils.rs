@@ -22,6 +22,7 @@ use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use utils;
 
+#[macro_export]
 macro_rules! assert_match {
     ($e:expr, $p:pat => $r:expr) => {
         match $e {

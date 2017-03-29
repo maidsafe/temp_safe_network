@@ -168,7 +168,7 @@ impl MaidManager {
             info!("Managing {} client accounts.", self.accounts.len());
         }
 
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None, true) {
             // Undo the account creation
             if data.tag() == TYPE_TAG_SESSION_PACKET {
                 let _ = self.accounts.remove(&src_name);
@@ -234,7 +234,7 @@ impl MaidManager {
                                        msg_id: MessageId,
                                        requester: sign::PublicKey)
                                        -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester)) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester), true) {
             routing_node.send_mutate_mdata_entries_response(dst, src, Err(err), msg_id)?;
             return Ok(());
         }
@@ -281,7 +281,7 @@ impl MaidManager {
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester)) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester), true) {
             routing_node.send_set_mdata_user_permissions_response(dst,
                                                                   src,
                                                                   Err(err.clone()),
@@ -331,7 +331,7 @@ impl MaidManager {
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester)) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester), true) {
             routing_node.send_del_mdata_user_permissions_response(dst,
                                                                   src,
                                                                   Err(err.clone()),
@@ -379,7 +379,7 @@ impl MaidManager {
                                      version: u64,
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None) {
+        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None, false) {
             routing_node.send_change_mdata_owner_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
         }
@@ -467,7 +467,11 @@ impl MaidManager {
                              routing_table: &RoutingTable<XorName>) {
         // Remove all accounts which we are no longer responsible for.
         let not_close = |name: &&XorName| !routing_table.is_closest(*name, GROUP_SIZE);
-        let accounts_to_delete = self.accounts.keys().filter(not_close).cloned().collect_vec();
+        let accounts_to_delete = self.accounts
+            .keys()
+            .filter(not_close)
+            .cloned()
+            .collect_vec();
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete = self.request_cache
             .iter()
@@ -549,10 +553,13 @@ impl MaidManager {
         }
     }
 
+    // If `use_auth_keys` is true, then this mutation is allowed for any authorised client,
+    // otherwise it is allowed only for the account owner.
     fn prepare_mdata_mutation(&mut self,
                               src: &Authority<XorName>,
                               dst: &Authority<XorName>,
-                              requester: Option<sign::PublicKey>)
+                              requester: Option<sign::PublicKey>,
+                              use_auth_keys: bool)
                               -> Result<(), ClientError> {
         let client_manager_name = utils::client_name(dst);
 
@@ -563,6 +570,7 @@ impl MaidManager {
         };
 
         let client_key = utils::client_key(src);
+        let client_name = utils::client_name_from_key(&client_key);
 
         if let Some(requester) = requester {
             if requester != *client_key {
@@ -570,9 +578,8 @@ impl MaidManager {
             }
         }
 
-        let client_name = utils::client_name_from_key(&client_key);
-
-        if client_name == client_manager_name || account.auth_keys.contains(&client_key) {
+        if client_name == client_manager_name ||
+           (use_auth_keys && account.auth_keys.contains(&client_key)) {
             account.increment_mutation_counter()
         } else {
             Err(ClientError::AccessDenied)
@@ -586,7 +593,7 @@ impl MaidManager {
                                 -> Result<CachedRequest, InternalError> {
         let CachedRequest { src, dst, tag } = self.remove_cached_request(msg_id)?;
 
-        let client_name = utils::client_name(&src);
+        let client_name = utils::client_name(&dst);
         let account = if let Some(account) = self.accounts.get_mut(&client_name) {
             if !success {
                 // Refund the account
@@ -601,10 +608,10 @@ impl MaidManager {
         self.send_refresh(routing_node, &client_name, account, MessageId::zero());
 
         Ok(CachedRequest {
-            src: src,
-            dst: dst,
-            tag: tag,
-        })
+               src: src,
+               dst: dst,
+               tag: tag,
+           })
     }
 
     fn send_refresh(&self,
@@ -625,12 +632,13 @@ impl MaidManager {
                              src: Authority<XorName>,
                              dst: Authority<XorName>,
                              tag: Option<u64>) {
-        if let Some(prior) = self.request_cache.insert(msg_id,
-                                                       CachedRequest {
-                                                           src: src,
-                                                           dst: dst,
-                                                           tag: tag,
-                                                       }) {
+        if let Some(prior) = self.request_cache
+               .insert(msg_id,
+                       CachedRequest {
+                           src: src,
+                           dst: dst,
+                           tag: tag,
+                       }) {
             error!("Overwrote existing cached request with {:?} from {:?} to {:?}",
                    msg_id,
                    prior.src,
@@ -648,7 +656,9 @@ impl MaidManager {
 #[cfg(feature = "use-mock-crust")]
 impl MaidManager {
     pub fn get_mutation_count(&self, client_name: &XorName) -> Option<u64> {
-        self.accounts.get(client_name).map(|account| account.info.mutations_done)
+        self.accounts
+            .get(client_name)
+            .map(|account| account.info.mutations_done)
     }
 }
 

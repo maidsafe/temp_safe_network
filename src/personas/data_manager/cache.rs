@@ -52,8 +52,8 @@ impl Cache {
     pub fn unrequested_needed_fragments(&mut self) -> Vec<(XorName, FragmentInfo)> {
         // Reset expired requests
         for request in self.needed_fragments
-            .iter_mut()
-            .flat_map(|(_, fragments)| fragments.values_mut()) {
+                .iter_mut()
+                .flat_map(|(_, fragments)| fragments.values_mut()) {
             request.stop_if_expired();
         }
 
@@ -75,7 +75,10 @@ impl Cache {
             }
         }
 
-        result.into_iter().map(|(fragment, holder)| (holder, fragment)).collect()
+        result
+            .into_iter()
+            .map(|(fragment, holder)| (holder, fragment))
+            .collect()
     }
 
     /// Returns all data fragments we need.
@@ -105,8 +108,8 @@ impl Cache {
                                                 holder: XorName)
                                                 -> bool {
         if self.needed_fragments
-            .values()
-            .any(|fragments| fragments.contains_key(&fragment)) {
+               .values()
+               .any(|fragments| fragments.contains_key(&fragment)) {
             self.insert_needed_fragment(fragment, holder)
         } else {
             false
@@ -138,8 +141,8 @@ impl Cache {
                                          holder: &XorName,
                                          message_id: MessageId) {
         if let Some(request) = self.needed_fragments
-            .get_mut(holder)
-            .and_then(|fragments| fragments.get_mut(fragment)) {
+               .get_mut(holder)
+               .and_then(|fragments| fragments.get_mut(fragment)) {
             request.start(message_id);
         }
     }
@@ -157,9 +160,10 @@ impl Cache {
             };
 
 
-            if let Some(fragment) = fragments.iter()
-                .find(|&(_, request)| request.message_id() == Some(message_id))
-                .map(|(fragment, _)| fragment.clone()) {
+            if let Some(fragment) = fragments
+                   .iter()
+                   .find(|&(_, request)| request.message_id() == Some(message_id))
+                   .map(|(fragment, _)| fragment.clone()) {
                 let _ = fragments.remove(&fragment);
                 remove_holder = fragments.is_empty();
                 Some(fragment)
@@ -182,11 +186,13 @@ impl Cache {
         let mut result = false;
 
         for (holder, fragments) in &mut self.needed_fragments {
-            let lost_fragments: Vec<_> = fragments.iter()
+            let lost_fragments: Vec<_> = fragments
+                .iter()
                 .filter(|&(fragment, _)| {
-                    routing_table.other_closest_names(fragment.name(), GROUP_SIZE)
-                        .map_or(true, |group| !group.contains(&holder))
-                })
+                            routing_table
+                                .other_closest_names(fragment.name(), GROUP_SIZE)
+                                .map_or(true, |group| !group.contains(&holder))
+                        })
                 .map(|(fragment, request)| (fragment.clone(), *request))
                 .collect();
 
@@ -243,7 +249,8 @@ impl Cache {
             .collect();
 
         if !pruned_unneeded_chunks.is_empty() {
-            self.unneeded_chunks.retain(|data_id| !pruned_unneeded_chunks.contains(data_id));
+            self.unneeded_chunks
+                .retain(|data_id| !pruned_unneeded_chunks.contains(data_id));
         }
 
         pruned_unneeded_chunks.len() as u64
@@ -260,12 +267,14 @@ impl Cache {
                                 -> Option<DataInfo> {
         let hash = maidsafe_utilities::big_endian_sip_hash(&mutation);
 
-        let mut writes = self.pending_writes.entry(mutation.data_id()).or_insert_with(Vec::new);
+        let mut writes = self.pending_writes
+            .entry(mutation.data_id())
+            .or_insert_with(Vec::new);
         let result = if !rejected && writes.iter().all(|pending_write| pending_write.rejected) {
             Some(DataInfo {
-                data_id: mutation.data_id(),
-                hash: hash,
-            })
+                     data_id: mutation.data_id(),
+                     hash: hash,
+                 })
         } else {
             None
         };
@@ -286,7 +295,9 @@ impl Cache {
 
     /// Removes and returns all pending writes for the specified data identifier from the cache.
     pub fn take_pending_writes(&mut self, data_id: &DataId) -> Vec<PendingWrite> {
-        self.pending_writes.remove(data_id).unwrap_or_else(Vec::new)
+        self.pending_writes
+            .remove(data_id)
+            .unwrap_or_else(Vec::new)
     }
 
     /// Removes and returns all timed out pending writes.
@@ -295,11 +306,12 @@ impl Cache {
         let expired_writes: Vec<_> = self.pending_writes
             .iter_mut()
             .flat_map(|(_, writes)| {
-                writes.iter()
-                    .position(|write| write.timestamp.elapsed() > timeout)
-                    .map_or_else(Vec::new, |index| writes.split_off(index))
-                    .into_iter()
-            })
+                          writes
+                              .iter()
+                              .position(|write| write.timestamp.elapsed() > timeout)
+                              .map_or_else(Vec::new, |index| writes.split_off(index))
+                              .into_iter()
+                      })
             .collect();
 
         let expired_keys: Vec<_> = self.pending_writes
@@ -344,13 +356,14 @@ impl Cache {
         let mut remove = Vec::new();
 
         for (data_id, entries) in &mut self.mdata_entries {
-            let expired_keys: Vec<_> = entries.iter()
+            let expired_keys: Vec<_> = entries
+                .iter()
                 .filter_map(|(key, &(_, instant))| if instant.elapsed().as_secs() >
                                                       MDATA_ENTRY_TIMEOUT_SECS {
-                    Some(key.clone())
-                } else {
-                    None
-                })
+                                Some(key.clone())
+                            } else {
+                                None
+                            })
                 .collect();
 
             for key in expired_keys {

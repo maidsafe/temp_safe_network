@@ -20,16 +20,64 @@
 
 
 use rand::Rng;
-use routing::{Action, Event, MAX_MUTABLE_DATA_ENTRY_ACTIONS, MutableData, PermissionSet, Response,
-              User};
+use routing::{Action, ClientError, EntryActions, Event, MAX_MUTABLE_DATA_ENTRY_ACTIONS,
+              MutableData, PermissionSet, Response, User};
 use routing::mock_crust::{self, Network};
+use rust_sodium::crypto::sign;
 use safe_vault::{Data, GROUP_SIZE, test_utils};
-use safe_vault::mock_crust_detail::{self, poll, test_node};
+use safe_vault::mock_crust_detail::{self, poll};
 use safe_vault::mock_crust_detail::test_client::TestClient;
+use safe_vault::mock_crust_detail::test_node::{self, TestNode};
 use std::cmp;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 const TEST_NET_SIZE: usize = 20;
+
+#[test]
+fn immutable_data_normal_flow() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+
+    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    let data = test_utils::gen_immutable_data(10, &mut rng);
+    unwrap!(client.put_idata_response(data.clone(), &mut nodes));
+
+    let received_data = unwrap!(client.get_idata_response(*data.name(), &mut nodes));
+    assert_eq!(received_data, data);
+
+    // Putting the same data again is OK.
+    unwrap!(client.put_idata_response(data, &mut nodes));
+}
+
+#[test]
+fn immutable_data_error_flow() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+
+    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    // GetIData with non-existing data fails.
+    let non_existing_name = rng.gen();
+    assert_match!(client.get_idata_response(non_existing_name, &mut nodes),
+                  Err(ClientError::NoSuchData));
+}
 
 #[test]
 fn immutable_data_operations_with_churn_with_cache() {
@@ -92,8 +140,8 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
     for data in &all_data {
         match *data {
             Data::Immutable(ref sent_data) => {
-                let recovered_data =
-                    unwrap!(client.get_idata_response(*sent_data.name(), &mut nodes));
+                let recovered_data = unwrap!(client.get_idata_response(*sent_data.name(),
+                                                                       &mut nodes));
                 assert_eq!(recovered_data, *sent_data);
             }
             _ => unreachable!(),
@@ -102,57 +150,406 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
 }
 
 #[test]
-fn handle_put_get_normal_flow() {
-    let network = Network::new(GROUP_SIZE, None);
+fn mutable_data_normal_flow() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+
+    let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
 
-    let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
+    let mut client = TestClient::new(&network, Some(config.clone()));
 
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let mut all_data = Vec::new();
+    // Put mutable data
+    let mut data = test_utils::gen_mutable_data(10000, 10, *client.signing_public_key(), &mut rng);
+    unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
 
-    for i in 0..test_utils::iterations() {
-        let data = if i % 2 == 0 {
-            let data =
-                test_utils::gen_mutable_data(100000, 2, *client.signing_public_key(), &mut rng);
-            unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
-            Data::Mutable(data)
-        } else {
-            let data = test_utils::gen_immutable_data(10, &mut rng);
-            unwrap!(client.put_idata_response(data.clone(), &mut nodes));
-            Data::Immutable(data)
-        };
-        all_data.push(data);
+    // Get the shell and entries and verify they are what we put it.
+    let received_shell =
+        unwrap!(client.get_mdata_shell_response(*data.name(), data.tag(), &mut nodes));
+    let received_entries =
+        unwrap!(client.list_mdata_entries_response(*data.name(), data.tag(), &mut nodes));
+    assert_eq!(received_shell, data.shell());
+    assert_eq!(received_entries, *data.entries());
+
+    // Get the entries individually and verify they match.
+    for (key, value) in data.entries() {
+        let received_value = unwrap!(client.get_mdata_value_response(*data.name(),
+                                                                     data.tag(),
+                                                                     key.clone(),
+                                                                     &mut nodes));
+        assert_eq!(received_value, *value);
     }
 
-    for data in all_data {
-        match data {
-            Data::Mutable(sent_data) => {
-                let received_shell = unwrap!(client.get_mdata_shell_response(
-                    *sent_data.name(),
-                    sent_data.tag(),
-                    &mut nodes));
+    // Mutate and verify the data.
+    let actions = test_utils::gen_mutable_data_entry_actions(&data,
+                                                             MAX_MUTABLE_DATA_ENTRY_ACTIONS as
+                                                             usize,
+                                                             &mut rng);
+    unwrap!(data.mutate_entries(actions.clone(), *client.signing_public_key()));
+    unwrap!(client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes));
+    let received_entries =
+        unwrap!(client.list_mdata_entries_response(*data.name(), data.tag(), &mut nodes));
+    assert_eq!(received_entries, *data.entries());
 
-                let received_entries = unwrap!(client.list_mdata_entries_response(
-                    *sent_data.name(),
-                    sent_data.tag(),
-                    &mut nodes));
+    // Permissions are initially empty.
+    let received_permissions =
+        unwrap!(client.list_mdata_permissions_response(*data.name(), data.tag(), &mut nodes));
+    assert!(received_permissions.is_empty());
 
-                assert_eq!(received_shell, sent_data.shell());
-                assert_eq!(received_entries, *sent_data.entries());
-            }
-            Data::Immutable(sent_data) => {
-                let received_data =
-                    unwrap!(client.get_idata_response(*sent_data.name(), &mut nodes));
-                assert_eq!(received_data, sent_data);
-            }
+    // Set some permissions and get them back to verify they are the same.
+    let (app_key, _) = sign::gen_keypair();
+    let app_user = User::Key(app_key);
+
+    let any_permission_set = PermissionSet::new().allow(Action::Insert);
+    let app_permission_set = PermissionSet::new()
+        .allow(Action::Insert)
+        .allow(Action::Update)
+        .allow(Action::Delete);
+
+    unwrap!(data.set_user_permissions(User::Anyone,
+                                      any_permission_set,
+                                      1,
+                                      *client.signing_public_key()));
+    unwrap!(client.set_mdata_user_permissions_response(*data.name(),
+                                                       data.tag(),
+                                                       User::Anyone,
+                                                       any_permission_set,
+                                                       1,
+                                                       &mut nodes));
+
+    unwrap!(data.set_user_permissions(app_user,
+                                      app_permission_set,
+                                      2,
+                                      *client.signing_public_key()));
+    unwrap!(client.set_mdata_user_permissions_response(*data.name(),
+                                                       data.tag(),
+                                                       app_user,
+                                                       app_permission_set,
+                                                       2,
+                                                       &mut nodes));
+
+    let received_permissions =
+        unwrap!(client.list_mdata_permissions_response(*data.name(), data.tag(), &mut nodes));
+    assert_eq!(received_permissions, *data.permissions());
+
+    let received_permission_set =
+        unwrap!(client.list_mdata_user_permissions_response(*data.name(),
+                                                            data.tag(),
+                                                            User::Anyone,
+                                                            &mut nodes));
+    assert_eq!(received_permission_set, any_permission_set);
+
+    let received_permission_set =
+        unwrap!(client.list_mdata_user_permissions_response(*data.name(),
+                                                            data.tag(),
+                                                            User::Key(app_key),
+                                                            &mut nodes));
+    assert_eq!(received_permission_set, app_permission_set);
+
+    // Modify the permissions and get them back to verify.
+    let app_permission_set = PermissionSet::new()
+        .allow(Action::Insert)
+        .allow(Action::Update);
+
+    unwrap!(data.set_user_permissions(app_user,
+                                      app_permission_set,
+                                      3,
+                                      *client.signing_public_key()));
+    unwrap!(client.set_mdata_user_permissions_response(*data.name(),
+                                                       data.tag(),
+                                                       app_user,
+                                                       app_permission_set,
+                                                       3,
+                                                       &mut nodes));
+
+    unwrap!(data.del_user_permissions(&User::Anyone, 4, *client.signing_public_key()));
+    unwrap!(client.del_mdata_user_permissions_response(*data.name(),
+                                                       data.tag(),
+                                                       User::Anyone,
+                                                       4,
+                                                       &mut nodes));
+
+    let received_permissions =
+        unwrap!(client.list_mdata_permissions_response(*data.name(), data.tag(), &mut nodes));
+    assert_eq!(received_permissions, *data.permissions());
+
+    // Create an app.
+    let mut app = TestClient::new(&network, Some(config));
+    app.set_client_manager(*client.name());
+    app.ensure_connected(&mut nodes);
+
+    // Authorise the app and grant it some permissions.
+    let (_, version) = unwrap!(client.list_auth_keys_and_version_response(&mut nodes));
+    unwrap!(client.ins_auth_key_response(*app.signing_public_key(), version + 1, &mut nodes));
+
+    let user = User::Key(*app.signing_public_key());
+    let permission_set = PermissionSet::new()
+        .allow(Action::Insert)
+        .allow(Action::Update)
+        .allow(Action::Delete);
+    unwrap!(data.set_user_permissions(user, permission_set, 5, *client.signing_public_key()));
+    unwrap!(client.set_mdata_user_permissions_response(*data.name(),
+                                                       data.tag(),
+                                                       user,
+                                                       permission_set,
+                                                       5,
+                                                       &mut nodes));
+
+    // Mutate the data by the app.
+    let actions = test_utils::gen_mutable_data_entry_actions(&data, 2, &mut rng);
+    unwrap!(data.mutate_entries(actions.clone(), *app.signing_public_key()));
+    unwrap!(app.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes));
+    let received_entries =
+        unwrap!(client.list_mdata_entries_response(*data.name(), data.tag(), &mut nodes));
+    assert_eq!(received_entries, *data.entries());
+
+    // Change the owner and verify it by getting the shell.
+    let new_owners = owner_keys(*app.signing_public_key());
+    unwrap!(client.change_mdata_owner_response(*data.name(),
+                                               data.tag(),
+                                               new_owners.clone(),
+                                               6,
+                                               &mut nodes));
+
+    let received_shell =
+        unwrap!(client.get_mdata_shell_response(*data.name(), data.tag(), &mut nodes));
+    assert_eq!(*received_shell.owners(), new_owners);
+}
+
+#[test]
+fn mutable_data_error_flow() {
+    let seed = None;
+    // let node_count = TEST_NET_SIZE;
+    let node_count = 8;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+
+    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config.clone()));
+
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    let mut data = test_utils::gen_mutable_data(10000, 0, *client.signing_public_key(), &mut rng);
+    unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
+
+    // Putting to the same data fails.
+    let owners = owner_keys(*client.signing_public_key());
+    let bad_data = unwrap!(MutableData::new(*data.name(),
+                                            data.tag(),
+                                            Default::default(),
+                                            Default::default(),
+                                            owners));
+
+    assert_match!(client.put_mdata_response(bad_data, &mut nodes),
+                  Err(ClientError::DataExists));
+
+    // Requests to a non-existing data fail.
+    let mut non_existing_name;
+    loop {
+        non_existing_name = rng.gen();
+        if non_existing_name != *data.name() {
+            break;
         }
     }
+
+    assert_match!(client.get_mdata_shell_response(non_existing_name, 10000, &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    assert_match!(client.get_mdata_version_response(non_existing_name, 10000, &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    assert_match!(client.list_mdata_entries_response(non_existing_name, 10000, &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    let key = b"key".to_vec();
+    assert_match!(client.get_mdata_value_response(non_existing_name, 10000, key, &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    assert_match!(client.list_mdata_permissions_response(non_existing_name, 10000, &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    let (app_key, _) = sign::gen_keypair();
+    assert_match!(client.list_mdata_user_permissions_response(non_existing_name,
+                                                              10000,
+                                                              User::Key(app_key),
+                                                              &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
+    assert_match!(client.mutate_mdata_entries_response(non_existing_name,
+                                                       10000,
+                                                       actions,
+                                                       &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    let permission_set = PermissionSet::new().allow(Action::Insert);
+    assert_match!(client.set_mdata_user_permissions_response(non_existing_name,
+                                                             10000,
+                                                             User::Key(app_key),
+                                                             permission_set,
+                                                             1,
+                                                             &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    assert_match!(client.del_mdata_user_permissions_response(non_existing_name,
+                                                             10000,
+                                                             User::Key(app_key),
+                                                             1,
+                                                             &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    let new_owners = owner_keys(app_key);
+    assert_match!(client.change_mdata_owner_response(non_existing_name,
+                                                     10000,
+                                                     new_owners,
+                                                     1,
+                                                     &mut nodes),
+                  Err(ClientError::NoSuchData));
+
+    // Getting non-existing entry fails.
+    let non_existing_key = b"missing".to_vec();
+    assert_match!(client.get_mdata_value_response(*data.name(),
+                                                  data.tag(),
+                                                  non_existing_key.clone(),
+                                                  &mut nodes),
+                  Err(ClientError::NoSuchEntry));
+
+    // Mutating with too many entry actions fails.
+    let actions =
+        test_utils::gen_mutable_data_entry_actions(&data,
+                                                   MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize + 1,
+                                                   &mut rng);
+    assert_match!(client.mutate_mdata_entries_response(*data.name(), 10000, actions, &mut nodes),
+                  Err(ClientError::TooManyEntries));
+
+    // Updating a non-existing key fails.
+    let actions = EntryActions::new()
+        .update(non_existing_key.clone(), b"value".to_vec(), 1)
+        .into();
+    assert_match!(client.mutate_mdata_entries_response(*data.name(),
+                                                       data.tag(),
+                                                       actions,
+                                                       &mut nodes),
+                  Err(ClientError::NoSuchEntry));
+
+    // Deleting a non-existing key fails.
+    let actions = EntryActions::new()
+        .del(non_existing_key.clone(), 1)
+        .into();
+    assert_match!(client.mutate_mdata_entries_response(*data.name(),
+                                                       data.tag(),
+                                                       actions,
+                                                       &mut nodes),
+                  Err(ClientError::NoSuchEntry));
+
+    // Mutations are all-or-nothing. If at least one entry actions fails, none
+    // gets applied.
+    let actions = EntryActions::new()
+        .ins(b"key".to_vec(), b"value".to_vec(), 0)
+        .update(non_existing_key.clone(), b"value".to_vec(), 1)
+        .into();
+    assert!(client
+                .mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes)
+                .is_err());
+    let entries = unwrap!(client.list_mdata_entries_response(*data.name(), data.tag(), &mut nodes));
+    assert!(entries.is_empty());
+
+    // Insert some entries for further tests.
+    let actions: BTreeMap<_, _> = EntryActions::new()
+        .ins(b"key".to_vec(), b"value-0".to_vec(), 0)
+        .into();
+    unwrap!(data.mutate_entries(actions.clone(), *client.signing_public_key()));
+    unwrap!(client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes));
+
+    // Inserting entry that already exists fails.
+    let actions = EntryActions::new()
+        .ins(b"key".to_vec(), b"value-0".to_vec(), 0)
+        .into();
+    assert_match!(client.mutate_mdata_entries_response(*data.name(),
+                                                       data.tag(),
+                                                       actions,
+                                                       &mut nodes),
+                  Err(ClientError::EntryExists));
+
+    // Updating entry with wrong version fails.
+    let actions = EntryActions::new()
+        .update(b"key".to_vec(), b"value-1".to_vec(), 0)
+        .into();
+    assert_match!(client.mutate_mdata_entries_response(*data.name(),
+                                                       data.tag(),
+                                                       actions,
+                                                       &mut nodes),
+                  Err(ClientError::InvalidSuccessor));
+
+    // Deleting entry with wrong version fails.
+    let actions = EntryActions::new().del(b"key".to_vec(), 0).into();
+    assert_match!(client.mutate_mdata_entries_response(*data.name(),
+                                                       data.tag(),
+                                                       actions,
+                                                       &mut nodes),
+                  Err(ClientError::InvalidSuccessor));
+
+    // Create app.
+    let mut app = TestClient::new(&network, Some(config));
+    app.set_client_manager(*client.name());
+    app.ensure_connected(&mut nodes);
+
+    // Put without authorisation fails.
+    let new_data = test_utils::gen_mutable_data(10000, 0, *app.signing_public_key(), &mut rng);
+    assert_match!(app.put_mdata_response(new_data, &mut nodes),
+                  Err(ClientError::AccessDenied));
+
+    // Authorise the app client.
+    let (_, version) = unwrap!(client.list_auth_keys_and_version_response(&mut nodes));
+    unwrap!(client.ins_auth_key_response(*app.signing_public_key(), version + 1, &mut nodes));
+
+    // Mutations by clients that don't have proper permissions fail.
+    let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
+    assert_match!(app.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes),
+                  Err(ClientError::AccessDenied));
+
+    let permission_set = PermissionSet::new()
+        .allow(Action::Insert)
+        .allow(Action::Update);
+    let user = User::Key(*app.signing_public_key());
+    assert_match!(app.set_mdata_user_permissions_response(*data.name(),
+                                                          data.tag(),
+                                                          user,
+                                                          permission_set,
+                                                          1,
+                                                          &mut nodes),
+                  Err(ClientError::AccessDenied));
+
+    let permission_set = PermissionSet::new().allow(Action::Insert);
+    unwrap!(client.set_mdata_user_permissions_response(*data.name(),
+                                                       data.tag(),
+                                                       User::Anyone,
+                                                       permission_set,
+                                                       1,
+                                                       &mut nodes));
+
+    assert_match!(app.del_mdata_user_permissions_response(*data.name(),
+                                                          data.tag(),
+                                                          User::Anyone,
+                                                          2,
+                                                          &mut nodes),
+                  Err(ClientError::AccessDenied));
+
+    let new_owners = owner_keys(*app.signing_public_key());
+    assert_match!(app.change_mdata_owner_response(*data.name(),
+                                                  data.tag(),
+                                                  new_owners,
+                                                  2,
+                                                  &mut nodes),
+                  Err(ClientError::AccessDenied));
 }
 
 #[test]
@@ -169,10 +566,10 @@ fn mutable_data_parallel_mutations() {
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
     let mut clients: Vec<_> = (0..client_count)
         .map(|_| {
-            let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
-            let config = mock_crust::Config::with_contacts(&[endpoint]);
-            TestClient::new(&network, Some(config.clone()))
-        })
+                 let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
+                 let config = mock_crust::Config::with_contacts(&[endpoint]);
+                 TestClient::new(&network, Some(config.clone()))
+             })
         .collect();
 
     for client in &mut clients {
@@ -213,7 +610,8 @@ fn mutable_data_parallel_mutations() {
     // Authorize other clients.
     let (_, mut account_version) = unwrap!(clients[0]
         .list_auth_keys_and_version_response(&mut nodes));
-    let client_keys: Vec<_> = clients.iter()
+    let client_keys: Vec<_> = clients
+        .iter()
         .skip(1)
         .map(|client| *client.signing_public_key())
         .collect();
@@ -229,7 +627,8 @@ fn mutable_data_parallel_mutations() {
         // Mutate the data simultaneously by each client and keep the
         // corresponding entry actions.
         let j = rng.gen_range(0, all_data.len());
-        let sent_actions: Vec<_> = clients.iter_mut()
+        let sent_actions: Vec<_> = clients
+            .iter_mut()
             .map(|client| {
                 let ref data = all_data[j];
                 let num_actions = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize);
@@ -259,7 +658,9 @@ fn mutable_data_parallel_mutations() {
 
             while let Ok(event) = client.try_recv() {
                 match event {
-                    Event::Response { response: Response::MutateMDataEntries { res, .. }, .. } => {
+                    Event::Response {
+                        response: Response::MutateMDataEntries { res, .. }, ..
+                    } => {
                         match res {
                             Ok(()) => {
                                 trace!("Client {:?} received successful response.",
@@ -291,25 +692,18 @@ fn mutable_data_parallel_mutations() {
     }
 
     // Check that the stored data matches the local copy.
-    for sent_data in &all_data {
-        let recovered_shell = unwrap!(clients[0]
-            .get_mdata_shell_response(*sent_data.name(), sent_data.tag(), &mut nodes));
-        let recovered_entries = unwrap!(clients[0]
-            .list_mdata_entries_response(*sent_data.name(), sent_data.tag(), &mut nodes));
-
-        assert!(sent_data.shell() == recovered_shell, "shells don't match");
-        assert!(*sent_data.entries() == recovered_entries,
-                "entries don't match");
-    }
+    verify_data_is_stored(&mut nodes, &mut clients[0], &all_data);
 }
 
-
-/* TODO: uncomment and fix
-
 #[test]
-fn structured_data_operations_with_churn() {
-    let network = Network::new(GROUP_SIZE, None);
+fn mutable_data_operations_with_churn() {
+    let seed = None;
     let node_count = TEST_NET_SIZE;
+    let operation_count = 5;
+    let iterations = test_utils::iterations();
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
@@ -317,706 +711,93 @@ fn structured_data_operations_with_churn() {
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let mut all_data: Vec<Data> = vec![];
-    let mut deleted_data = vec![];
-    let mut rng = network.new_rng();
+    let mut all_data: Vec<MutableData> = Vec::new();
     let mut event_count = 0;
 
-    for i in 0..test_utils::iterations() {
+    for i in 0..iterations {
         trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
-        let mut new_data = vec![];
+        let mut new_data = Vec::with_capacity(operation_count);
         let mut mutated_data = HashSet::new();
-        for _ in 0..4 {
+
+        for _ in 0..operation_count {
             if all_data.is_empty() || rng.gen() {
-                let data =
-                    Data::Structured(test_utils::random_structured_data(Range::new(10001, 20000)
-                                                                            .ind_sample(&mut rng),
-                                                                        client.full_id(),
-                                                                        &mut rng));
-                trace!("Putting data {:?} with name {:?}.",
-                       data.identifier(),
-                       data.name());
-                client.put(data.clone());
+                // Put new data.
+                let tag = rng.gen_range(10001, 20000);
+                let entry_count = rng.gen_range(0, 10);
+                let data = test_utils::gen_mutable_data(tag,
+                                                        entry_count,
+                                                        *client.signing_public_key(),
+                                                        &mut rng);
+                trace!("Putting mutable data with name {:?}, tag {}.",
+                       data.name(),
+                       data.tag());
+                let _ = client.put_mdata(data.clone());
                 new_data.push(data);
             } else {
-                let j = Range::new(0, all_data.len()).ind_sample(&mut rng);
-                let data = Data::Structured(if let Data::Structured(sd) = all_data[j].clone() {
-                    if !mutated_data.insert(sd.identifier()) {
-                        trace!("Skipping data {:?} with name {:?}.",
-                               sd.identifier(),
-                               sd.name());
-                        continue;
-                    }
-                    let mut sd = unwrap!(StructuredData::new(sd.get_type_tag(),
-                                                             *sd.name(),
-                                                             sd.get_version() + 1,
-                                                             rng.gen_iter().take(10).collect(),
-                                                             sd.get_owners().clone()));
-                    let pub_key = *client.full_id().public_id().signing_public_key();
-                    let priv_key = client.full_id().signing_private_key().clone();
-                    let _ = sd.add_signature(&(pub_key, priv_key));
-                    sd
-                } else {
-                    panic!("Non-structured data found.");
-                });
-                if false {
-                    // FIXME: Delete tests are disabled right now.
-                    trace!("Deleting data {:?} with name {:?}",
-                           data.identifier(),
-                           data.name());
-                    client.delete(data);
-                    deleted_data.push(all_data.remove(j));
-                } else {
-                    trace!("Posting data {:?} with name {:?}.",
-                           data.identifier(),
-                           data.name());
-                    all_data[j] = data.clone();
-                    client.post(data);
+                // Mutate existing data.
+                let j = rng.gen_range(0, all_data.len());
+                let ref mut data = all_data[j];
+
+                if !mutated_data.insert((*data.name(), data.tag())) {
+                    trace!("Skipping data with name {:?}, tag {:?}.",
+                           data.name(),
+                           data.tag());
+                    continue;
                 }
+
+                let action_count = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize + 1);
+                let actions =
+                    test_utils::gen_mutable_data_entry_actions(&data, action_count, &mut rng);
+                unwrap!(data.mutate_entries(actions.clone(), *client.signing_public_key()));
+
+                trace!("Sending MutateMDataEntries for data with name {:?}, tag: {}.",
+                       data.name(),
+                       data.tag());
+                let _ = client.mutate_mdata_entries(*data.name(), data.tag(), actions);
             }
         }
+
         all_data.extend(new_data);
-        if nodes.len() <= GROUP_SIZE + 2 || Range::new(0, 4).ind_sample(&mut rng) < 3 {
-            let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
-            test_node::add_node(&network, &mut nodes, index, true);
-            trace!("Adding node {:?} with bootstrap node {}.",
-                   nodes[index].name(),
-                   index);
+
+        // Churn
+        if nodes.len() <= GROUP_SIZE + 2 || rng.gen_range(0, 4) < 3 {
+            // Add new node.
+            let bootstrap_node_index = rng.gen_range(1, nodes.len());
+            let bootstrap_node_name = nodes[bootstrap_node_index].name();
+            test_node::add_node(&network, &mut nodes, bootstrap_node_index, true);
+            let new_node_name = nodes[nodes.len() - 1].name();
+
+            trace!("Adding node {:?} with bootstrap node {:?}.",
+                   new_node_name,
+                   bootstrap_node_name);
         } else {
-            let number = Range::new(3, 4).ind_sample(&mut rng);
-            let mut removed_nodes = Vec::new();
-            for _ in 0..number {
-                let node_range = Range::new(1, nodes.len());
-                let node_index = node_range.ind_sample(&mut rng);
+            // Remove some nodes.
+            let count = rng.gen_range(1, 4);
+            let mut removed_nodes = Vec::with_capacity(count);
+            for _ in 0..count {
+                let node_index = rng.gen_range(1, nodes.len());
                 removed_nodes.push(nodes[node_index].name());
                 test_node::drop_node(&mut nodes, node_index);
             }
-            trace!("Removing {} node(s). {:?}", number, removed_nodes);
-        }
-        event_count += poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
 
+            trace!("Removing {} node(s): {:?}", count, removed_nodes);
+        }
+
+        event_count += poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
         for node in &mut nodes {
             node.clear_state();
         }
         trace!("Processed {} events.", event_count);
 
-        mock_crust_detail::check_data(all_data.clone(), &nodes);
-        mock_crust_detail::check_deleted_data(&deleted_data, &nodes);
+        mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
+                                      &nodes);
         mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
     }
 
-    for data in &all_data {
-        match *data {
-            Data::Structured(ref sent_structured_data) => {
-                match client.get(sent_structured_data.identifier(), &mut nodes) {
-                    Data::Structured(recovered_structured_data) => {
-                        assert_eq!(recovered_structured_data, *sent_structured_data);
-                    }
-                    unexpected_data => panic!("Got unexpected data: {:?}", unexpected_data),
-                }
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    for data in &deleted_data {
-        match client.get_response(data.identifier(), &mut nodes) {
-            Err(Some(error)) => assert_eq!(error, GetError::NoSuchData),
-            unexpected => panic!("Got unexpected response: {:?}", unexpected),
-        }
-    }
+    verify_data_is_stored(&mut nodes, &mut client, &all_data);
 }
 
-#[test]
-fn handle_priv_appendable_normal_flow() {
-    let network = Network::new(GROUP_SIZE, None);
-    let node_count = 15;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-    let full_id = client.full_id().clone();
-    let (pub_key, secret_key) = sign::gen_keypair();
-    let (pub_encrypt_key, _) = box_::gen_keypair();
-    let mut rng = network.new_rng();
-    let mut ad = test_utils::random_priv_appendable_data(&full_id, pub_encrypt_key, &mut rng);
-    let data = Data::PrivAppendable(ad.clone());
-    let _ = client.put_and_verify(data.clone(), &mut nodes);
-    assert_eq!(data, client.get(data.identifier(), &mut nodes));
-    let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-    let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
-    let pad = unwrap!(PrivAppendedData::new(&appended_data, &pub_encrypt_key));
-    let wrapper =
-        unwrap!(AppendWrapper::new_priv(*data.name(), pad.clone(), (&pub_key, &secret_key), 0));
-    let _ = client.append_and_verify(wrapper, &mut nodes);
-    ad.append(pad, &pub_key);
-    assert_eq!(Data::PrivAppendable(ad),
-               client.get(data.identifier(), &mut nodes));
-}
-
-#[test]
-fn handle_pub_appendable_normal_flow() {
-    let network = Network::new(GROUP_SIZE, None);
-    let node_count = 15;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-    let full_id = client.full_id().clone();
-    let mut rng = network.new_rng();
-    let mut ad = test_utils::random_pub_appendable_data(&full_id, &mut rng);
-    let (pub_key, secret_key) = sign::gen_keypair();
-    let data = Data::PubAppendable(ad.clone());
-    let _ = client.put_and_verify(data.clone(), &mut nodes);
-    assert_eq!(data, client.get(data.identifier(), &mut nodes));
-    let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-    let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
-    let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
-    let _ = client.append_and_verify(wrapper, &mut nodes);
-    ad.append(appended_data);
-    assert_eq!(Data::PubAppendable(ad),
-               client.get(data.identifier(), &mut nodes));
-}
-
-#[test]
-fn appendable_data_operations_with_churn() {
-    let network = Network::new(GROUP_SIZE, None);
-    let node_count = TEST_NET_SIZE;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-    let full_id = client.full_id().clone();
-    let mut rng = network.new_rng();
-    let mut ad = test_utils::random_pub_appendable_data(&full_id, &mut rng);
-    let (pub_key, secret_key) = sign::gen_keypair();
-    let data = Data::PubAppendable(ad.clone());
-    let _ = client.put_and_verify(data.clone(), &mut nodes);
-    assert_eq!(data, client.get(data.identifier(), &mut nodes));
-    let mut event_count = 0;
-
-    for i in 0..test_utils::iterations() {
-        trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
-
-        if rng.gen() {
-            let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-            let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
-            let wrapper =
-                AppendWrapper::new_pub(*data.name(), appended_data.clone(), ad.get_version());
-            client.append(wrapper);
-            ad.append(appended_data);
-        } else {
-            let new_appendable =
-                test_utils::pub_appendable_data_version_up(&full_id, &ad, &mut rng);
-            let new_data = Data::PubAppendable(new_appendable.clone());
-            client.post(new_data);
-            let _ = ad.update_with_other(new_appendable);
-        }
-
-        if nodes.len() <= GROUP_SIZE + 2 || Range::new(0, 4).ind_sample(&mut rng) < 3 {
-            let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
-            test_node::add_node(&network, &mut nodes, index, true);
-            trace!("Adding node {:?} with bootstrap node {}.",
-                   nodes[index].name(),
-                   index);
-        } else {
-            let number = Range::new(3, 4).ind_sample(&mut rng);
-            let mut removed_nodes = Vec::new();
-            for _ in 0..number {
-                let node_range = Range::new(1, nodes.len());
-                let node_index = node_range.ind_sample(&mut rng);
-                removed_nodes.push(nodes[node_index].name());
-                test_node::drop_node(&mut nodes, node_index);
-            }
-            trace!("Removing {} node(s). {:?}", number, removed_nodes);
-        }
-        event_count += poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
-
-        for node in &mut nodes {
-            node.clear_state();
-        }
-        assert_eq!(Data::PubAppendable(ad.clone()),
-                   client.get(data.identifier(), &mut nodes));
-        trace!("Processed {} events.", event_count);
-    }
-}
-
-#[test]
-fn append_oversized_appendable_data() {
-    let network = Network::new(GROUP_SIZE, None);
-    let mut rng = network.new_rng();
-    let node_count = TEST_NET_SIZE;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-    let full_id = client.full_id().clone();
-
-    let ad = test_utils::random_pub_appendable_data_with_size(&full_id, 76560, &mut rng);
-    let (pub_key, secret_key) = sign::gen_keypair();
-    let data = Data::PubAppendable(ad);
-    let _ = client.put_and_verify(data.clone(), &mut nodes);
-    assert_eq!(data, client.get(data.identifier(), &mut nodes));
-
-    let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-    let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
-    let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
-    client.append(wrapper);
-
-    while let Ok(event) = client.try_recv() {
-        match event {
-            Event::Response { response: Response::AppendSuccess(..), .. } => {
-                panic!("reveived unexpected append success");
-            }
-            Event::Response { response: Response::AppendFailure { .. }, .. } => (),
-            _ => panic!("reveived unexpected response"),
-        }
-    }
-}
-
-#[test]
-fn post_oversized_appendable_data() {
-    let network = Network::new(GROUP_SIZE, None);
-    let mut rng = network.new_rng();
-    let node_count = TEST_NET_SIZE;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-    let full_id = client.full_id().clone();
-
-    let ad = test_utils::random_pub_appendable_data_with_size(&full_id, 76560, &mut rng);
-    let data = Data::PubAppendable(ad.clone());
-    let _ = client.put_and_verify(data.clone(), &mut nodes);
-    assert_eq!(data, client.get(data.identifier(), &mut nodes));
-
-    let new_data =
-        Data::PubAppendable(test_utils::pub_appendable_data_version_up(&full_id, &ad, &mut rng));
-    client.post(new_data);
-    while let Ok(event) = client.try_recv() {
-        match event {
-            Event::Response { response: Response::PostSuccess(..), .. } => {
-                panic!("reveived unexpected post success");
-            }
-            Event::Response { response: Response::PostFailure { .. }, .. } => (),
-            _ => panic!("reveived unexpected response"),
-        }
-    }
-}
-
-#[test]
-fn appendable_data_parallel_append() {
-    let network = Network::new(GROUP_SIZE, None);
-    let mut rng = network.new_rng();
-    let node_count = TEST_NET_SIZE;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let mut clients: Vec<_> = (0..2)
-        .map(|_| {
-            let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
-            let config = mock_crust::Config::with_contacts(&[endpoint]);
-            TestClient::new(&network, Some(config.clone()))
-        })
-        .collect();
-    for client in &mut clients {
-        client.ensure_connected(&mut nodes);
-        client.create_account(&mut nodes);
-    }
-
-    let full_id = clients[0].full_id().clone();
-    let mut ad = test_utils::random_pub_appendable_data(&full_id, &mut rng);
-    let (pub_key, secret_key) = sign::gen_keypair();
-    let data = Data::PubAppendable(ad.clone());
-    let _ = clients[0].put_and_verify(data.clone(), &mut nodes);
-    assert_eq!(data, clients[0].get(data.identifier(), &mut nodes));
-
-    let mut event_count = 0;
-    let mut successes: usize = 0;
-
-    for i in 0..test_utils::iterations() {
-        trace!("Iteration {}", i + 1);
-        let new_data: Vec<AppendedData> = clients.iter_mut()
-            .map(|client| {
-                let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-                let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
-                let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
-                client.append(wrapper);
-                appended_data
-            })
-            .collect();
-
-        event_count += poll::poll_and_resend_unacknowledged_parallel(&mut nodes, &mut clients);
-        for node in &mut nodes {
-            node.clear_state();
-        }
-        trace!("Processed {} events.", event_count);
-
-        'client_loop: for (client, data) in clients.iter_mut().zip(new_data) {
-            while let Ok(event) = client.try_recv() {
-                match event {
-                    Event::Response { response: Response::AppendSuccess(..), .. } => {
-                        trace!("Client {:?} received AppendSuccess.", client.name());
-                        ad.append(data);
-                        successes += 1;
-                        continue 'client_loop;
-                    }
-                    Event::Response { response: Response::AppendFailure { .. }, .. } => {
-                        trace!("Client {:?} received AppendFailure.", client.name());
-                        continue 'client_loop;
-                    }
-                    _ => (),
-                }
-            }
-            trace!("No response received for client {:?} in iteration {:?}.",
-                   client.name(),
-                   i + 1);
-        }
-    }
-
-    assert_eq!(Data::PubAppendable(ad.clone()),
-               clients[0].get(data.identifier(), &mut nodes));
-    // It could be both clients failed, both succeeded, or one succeed the other fail.
-    assert!(successes > 2, "Low success rate.");
-}
-
-#[test]
-fn appendable_data_parallel_post() {
-    let network = Network::new(GROUP_SIZE, None);
-    let mut rng = network.new_rng();
-    let node_count = TEST_NET_SIZE;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let mut clients: Vec<_> = (0..2)
-        .map(|_| {
-            let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
-            let config = mock_crust::Config::with_contacts(&[endpoint]);
-            TestClient::new(&network, Some(config.clone()))
-        })
-        .collect();
-    for client in &mut clients {
-        client.ensure_connected(&mut nodes);
-        client.create_account(&mut nodes);
-    }
-
-    let full_id = clients[0].full_id().clone();
-    let mut ad = test_utils::random_pub_appendable_data(&full_id, &mut rng);
-    let data = Data::PubAppendable(ad.clone());
-    let _ = clients[0].put_and_verify(data.clone(), &mut nodes);
-    assert_eq!(data, clients[0].get(data.identifier(), &mut nodes));
-
-    let mut event_count = 0;
-    let mut successes: usize = 0;
-    let mut failures: usize = 0;
-
-    let iterations = test_utils::iterations();
-    for i in 0..iterations {
-        trace!("Iteration {}", i + 1);
-        let new_data: Vec<PubAppendableData> = clients.iter_mut()
-            .map(|client| {
-                let new_appendable =
-                    test_utils::pub_appendable_data_version_up(&full_id, &ad, &mut rng);
-                let new_data = Data::PubAppendable(new_appendable.clone());
-                client.post(new_data);
-                new_appendable
-            })
-            .collect();
-
-        event_count += poll::poll_and_resend_unacknowledged_parallel(&mut nodes, &mut clients);
-        for node in &mut nodes {
-            node.clear_state();
-        }
-        trace!("Processed {} events.", event_count);
-
-        let mut succeeded = false;
-        'client_loop: for (client, data) in clients.iter_mut().zip(new_data) {
-            while let Ok(event) = client.try_recv() {
-                match event {
-                    Event::Response { response: Response::PostSuccess(..), .. } => {
-                        // Only one client can succeed
-                        if succeeded {
-                            panic!("Client {:?} shall not received PostSuccess.", client.name());
-                        } else {
-                            trace!("Client {:?} received PostSuccess.", client.name());
-                            let _ = ad.update_with_other(data);
-                            successes += 1;
-                            succeeded = true;
-                        }
-                        continue 'client_loop;
-                    }
-                    Event::Response { response: Response::PostFailure { .. }, .. } => {
-                        trace!("Client {:?} received PostFailure.", client.name());
-                        failures += 1;
-                        continue 'client_loop;
-                    }
-                    _ => (),
-                }
-            }
-            trace!("No response received for client {:?} in iteration {:?}.",
-                   client.name(),
-                   i + 1);
-        }
-    }
-
-    assert_eq!(Data::PubAppendable(ad.clone()),
-               clients[0].get(data.identifier(), &mut nodes));
-    // It could be both clients failed or one succeed the other fail.
-    assert!(successes > 2, "Low success rate.");
-    assert!(failures >= iterations / 2, "Low failure rate.");
-}
-
-#[test]
-fn handle_put_get_error_flow() {
-    let network = Network::new(GROUP_SIZE, None);
-    let node_count = 15;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-    let mut rng = network.new_rng();
-
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-
-    // Putting to existing immutable data
-    let im = Data::Immutable(ImmutableData::new(rng.gen_iter().take(10).collect()));
-    let _ = client.put_and_verify(im.clone(), &mut nodes);
-    match client.put_and_verify(im.clone(), &mut nodes) {
-        Ok(_) => {}
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Putting to existing structured data
-    let full_id = client.full_id().clone();
-    let sd = Data::Structured(test_utils::random_structured_data(100000, &full_id, &mut rng));
-    let _ = client.put_and_verify(sd.clone(), &mut nodes);
-    match client.put_and_verify(sd.clone(), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::DataExists),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Get non-existing immutable data
-    let non_existing_im = ImmutableData::new(rng.gen_iter().take(10).collect());
-    match client.get_response(non_existing_im.identifier(), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, GetError::NoSuchData),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Get non-existing structured data
-    let non_existing_sd = test_utils::random_structured_data(100000, &full_id, &mut rng);
-    match client.get_response(non_existing_sd.identifier(), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, GetError::NoSuchData),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-}
-
-#[test]
-fn handle_post_error_flow() {
-    let network = Network::new(GROUP_SIZE, None);
-    let node_count = 15;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-    let mut rng = network.new_rng();
-
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-    let full_id = client.full_id().clone();
-    let pub_key = *full_id.public_id().signing_public_key();
-    let priv_key = full_id.signing_private_key().clone();
-    let sd = test_utils::random_structured_data(100000, &full_id, &mut rng);
-    let owner = iter::once(pub_key).collect::<BTreeSet<_>>();
-
-    // Posting to non-existing structured data
-    match client.post_response(Data::Structured(sd.clone()), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::NoSuchData),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Putting the structured data
-    let _ = client.put_and_verify(Data::Structured(sd.clone()), &mut nodes);
-
-    // Posting with incorrect type_tag
-    let mut incorrect_tag_sd =
-        StructuredData::new(200000, *sd.name(), 1, sd.get_data().clone(), owner.clone())
-            .expect("Cannot create structured data for test");
-    let _ = incorrect_tag_sd.add_signature(&(pub_key, priv_key.clone()));
-    match client.post_response(Data::Structured(incorrect_tag_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::NoSuchData),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Posting with incorrect version
-    let mut incorrect_version_sd =
-        StructuredData::new(100000, *sd.name(), 3, sd.get_data().clone(), owner.clone())
-            .expect("Cannot create structured data for test");
-    let _ = incorrect_version_sd.add_signature(&(pub_key, priv_key.clone()));
-    match client.post_response(Data::Structured(incorrect_version_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::InvalidSuccessor),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Posting with incorrect signature
-    let new_full_id = FullId::new();
-    let new_pub_key = *new_full_id.public_id().signing_public_key();
-    let new_priv_key = new_full_id.signing_private_key().clone();
-    let new_owner = iter::once(new_pub_key).collect::<BTreeSet<_>>();
-    let mut incorrect_signed_sd = StructuredData::new(100000,
-                                                      *sd.name(),
-                                                      1,
-                                                      sd.get_data().clone(),
-                                                      new_owner.clone())
-        .expect("Cannot create structured data for test");
-    let _ = incorrect_signed_sd.add_signature(&(new_pub_key, new_priv_key.clone()));
-    match client.post_response(Data::Structured(incorrect_signed_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::InvalidSuccessor),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Posting correctly
-    let mut new_sd =
-        StructuredData::new(100000, *sd.name(), 1, sd.get_data().clone(), owner.clone())
-            .expect("Cannot create structured data for test");
-    let _ = new_sd.add_signature(&(pub_key, priv_key));
-    match client.post_response(Data::Structured(new_sd), &mut nodes) {
-        Ok(data_id) => assert_eq!(data_id, sd.identifier()),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Posting with oversized data
-    let mut oversized_sd = StructuredData::new(100000,
-                                               *sd.name(),
-                                               2,
-                                               rng.gen_iter().take(102400).collect(),
-                                               new_owner.clone())
-        .expect("Cannot create structured data for test");
-    let _ = oversized_sd.add_signature(&(new_pub_key, new_priv_key.clone()));
-    match client.post_response(Data::Structured(oversized_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::DataTooLarge),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-}
-
-#[test]
-fn handle_delete_error_flow() {
-    let network = Network::new(GROUP_SIZE, None);
-    let node_count = 15;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-    let mut rng = network.new_rng();
-
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-    let (pub_key0, priv_key0) = sign::gen_keypair();
-    let (pub_key1, priv_key1) = sign::gen_keypair();
-    let owner0 = iter::once(pub_key0).collect::<BTreeSet<_>>();
-
-    let mut sd = unwrap!(StructuredData::new(100000,
-                                             rng.gen(),
-                                             0,
-                                             rng.gen_iter().take(10).collect(),
-                                             owner0.clone()));
-    let _ = sd.add_signature(&(pub_key0, priv_key0.clone()));
-
-    // Deleting a non-existing structured data
-    match client.delete_response(Data::Structured(sd.clone()), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::NoSuchData),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Putting the structured data
-    let _ = client.put_and_verify(Data::Structured(sd.clone()), &mut nodes);
-
-    // Deleting with incorrect type_tag
-    let mut incorrect_tag_sd = StructuredData::new(200000, *sd.name(), 1, vec![], owner0.clone())
-        .expect("Cannot create structured data for test");
-    let _ = incorrect_tag_sd.add_signature(&(pub_key0, priv_key0.clone()));
-    match client.delete_response(Data::Structured(incorrect_tag_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::NoSuchData),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Deleting with incorrect version
-    let mut incorrect_version_sd =
-        StructuredData::new(100000, *sd.name(), 3, vec![], owner0.clone())
-            .expect("Cannot create structured data for test");
-    let _ = incorrect_version_sd.add_signature(&(pub_key0, priv_key0.clone()));
-    match client.delete_response(Data::Structured(incorrect_version_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::InvalidSuccessor),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Deleting with incorrect signature
-    let mut incorrect_signed_sd =
-        StructuredData::new(100000, *sd.name(), 1, vec![], owner0.clone())
-            .expect("Cannot create structured data for test");
-    let _ = incorrect_signed_sd.add_signature(&(pub_key0, priv_key1.clone()));
-    match client.delete_response(Data::Structured(incorrect_signed_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::InvalidSuccessor),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Deleting
-    let mut new_sd =
-        StructuredData::new(100000, *sd.name(), 1, sd.get_data().clone(), owner0.clone())
-            .expect("Cannot create structured data for test");
-    let _ = new_sd.add_signature(&(pub_key0, priv_key0.clone()));
-    let deleted_data = Data::Structured(new_sd);
-    match client.delete_response(deleted_data.clone(), &mut nodes) {
-        Ok(data_id) => assert_eq!(data_id, sd.identifier()),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-    let null_sd = StructuredData::new(100000, *sd.name(), 1, vec![], BTreeSet::new())
-        .expect("Cannot create structured data for test");
-    assert_eq!(Data::Structured(null_sd),
-               client.get(deleted_data.identifier(), &mut nodes));
-
-    // Duplicate delete
-    let new_sd = StructuredData::new(100000, *sd.name(), 2, vec![], BTreeSet::new())
-        .expect("Cannot create structured data for test");
-    let deleted_data = Data::Structured(new_sd);
-    match client.delete_response(deleted_data.clone(), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::InvalidOperation),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Deleted data cannot be posted
-    let mut post_sd =
-        StructuredData::new(100000, *sd.name(), 2, sd.get_data().clone(), owner0.clone())
-            .expect("Cannot create structured data for test");
-    let _ = post_sd.add_signature(&(pub_key0, priv_key0.clone()));
-    match client.post_response(Data::Structured(post_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::InvalidOperation),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Deleted data cannot be put with version 0
-    let mut incorrect_reput_sd =
-        StructuredData::new(100000, *sd.name(), 0, sd.get_data().clone(), owner0.clone())
-            .expect("Cannot create structured data for test");
-    let _ = incorrect_reput_sd.add_signature(&(pub_key0, priv_key0.clone()));
-    match client.put_and_verify(Data::Structured(incorrect_reput_sd), &mut nodes) {
-        Err(Some(error)) => assert_eq!(error, MutationError::DataExists),
-        unexpected => panic!("Got unexpected response: {:?}", unexpected),
-    }
-
-    // Deleted data can be put with version + 1, even by a different owner.
-    let owner1 = iter::once(pub_key1).collect::<BTreeSet<_>>();
-    let mut reput_sd =
-        StructuredData::new(100000, *sd.name(), 2, sd.get_data().clone(), owner1.clone())
-            .expect("Cannot create structured data for test");
-    let _ = reput_sd.add_signature(&(pub_key1, priv_key1.clone()));
-    let reput_data = Data::Structured(reput_sd);
-    let _ = client.put_and_verify(reput_data.clone(), &mut nodes);
-    assert_eq!(reput_data, client.get(reput_data.identifier(), &mut nodes));
-}
+/* TODO: uncomment and fix
 
 #[test]
 #[ignore]
@@ -1119,3 +900,24 @@ fn gen_random_immutable_data_not_close_to<R: Rng>(node: &TestNode, rng: &mut R) 
 }
 
 */
+
+// Create set of owner keys.
+fn owner_keys(key: sign::PublicKey) -> BTreeSet<sign::PublicKey> {
+    let mut result = BTreeSet::new();
+    let _ = result.insert(key);
+    result
+}
+
+// Verify that every element of `data` is actually stored on the network.
+fn verify_data_is_stored(nodes: &mut [TestNode], client: &mut TestClient, data: &[MutableData]) {
+    for sent_data in data {
+        let recovered_shell =
+            unwrap!(client.get_mdata_shell_response(*sent_data.name(), sent_data.tag(), nodes));
+        let recovered_entries =
+            unwrap!(client.list_mdata_entries_response(*sent_data.name(), sent_data.tag(), nodes));
+
+        assert!(sent_data.shell() == recovered_shell, "shells don't match");
+        assert!(*sent_data.entries() == recovered_entries,
+                "entries don't match");
+    }
+}

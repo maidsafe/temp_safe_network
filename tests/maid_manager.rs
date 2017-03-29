@@ -19,8 +19,9 @@
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
 use rand::Rng;
-use routing::{AccountInfo, ClientError, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_ENTRIES,
-              MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData, TYPE_TAG_SESSION_PACKET, Value};
+use routing::{AccountInfo, ClientError, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
+              MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData,
+              TYPE_TAG_SESSION_PACKET, Value};
 use routing::mock_crust::{self, Network};
 use safe_vault::{DEFAULT_ACCOUNT_SIZE, Data, GROUP_SIZE, test_utils};
 use safe_vault::mock_crust_detail::{self, poll, test_node};
@@ -46,8 +47,12 @@ fn handle_put_without_account() {
     let event_count = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
     trace!("Processed {} events.", event_count);
 
-    let count = nodes.iter()
-        .filter(|node| node.get_maid_manager_mutation_count(client.name()).is_some())
+    let count = nodes
+        .iter()
+        .filter(|node| {
+                    node.get_maid_manager_mutation_count(client.name())
+                        .is_some()
+                })
         .count();
     assert!(0 == count,
             "mutations count {} found with {} nodes",
@@ -83,8 +88,12 @@ fn handle_put_with_account() {
     let event_count = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
     trace!("Processed {} events.", event_count);
 
-    let count = nodes.iter()
-        .filter(|node| node.get_maid_manager_mutation_count(client.name()).is_some())
+    let count = nodes
+        .iter()
+        .filter(|node| {
+                    node.get_maid_manager_mutation_count(client.name())
+                        .is_some()
+                })
         .count();
     assert!(GROUP_SIZE == count,
             "client account {} found on {} nodes",
@@ -287,8 +296,9 @@ fn maid_manager_account_adding_with_churn() {
     let mut event_count = 0;
 
     for i in 0..test_utils::iterations() {
-        for data in (0..4)
-            .map(|_| test_utils::gen_mutable_data(TEST_TAG, 10, client_key, &mut rng)) {
+        for data in (0..4).map(|_| {
+                                   test_utils::gen_mutable_data(TEST_TAG, 10, client_key, &mut rng)
+                               }) {
             let _ = client.put_mdata(data);
             mutation_count += 1;
         }
@@ -317,7 +327,8 @@ fn maid_manager_account_adding_with_churn() {
         trace!("Processed {} events.", event_count);
 
         let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
-        let node_count_stats: Vec<_> = sorted_nodes.into_iter()
+        let node_count_stats: Vec<_> = sorted_nodes
+            .into_iter()
             .map(|node| (node.name(), node.get_maid_manager_mutation_count(client.name())))
             .collect();
 
@@ -368,8 +379,12 @@ fn maid_manager_account_decrease_with_churn() {
 
         if i % 2 == 0 {
             data_list.clear();
-            for data in (0..chunks_per_iter)
-                .map(|_| test_utils::gen_mutable_data(TEST_TAG, 10, client_key, &mut rng)) {
+            for data in (0..chunks_per_iter).map(|_| {
+                                                     test_utils::gen_mutable_data(TEST_TAG,
+                                                                                  10,
+                                                                                  client_key,
+                                                                                  &mut rng)
+                                                 }) {
                 let _ = client.put_mdata(data.clone());
                 data_list.push(data);
             }
@@ -390,7 +405,8 @@ fn maid_manager_account_decrease_with_churn() {
         trace!("Processed {} events.", event_count);
 
         let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
-        let node_count_stats: Vec<_> = sorted_nodes.into_iter()
+        let node_count_stats: Vec<_> = sorted_nodes
+            .into_iter()
             .map(|node| (node.name(), node.get_maid_manager_mutation_count(client.name())))
             .collect();
 

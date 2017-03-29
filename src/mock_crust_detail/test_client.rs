@@ -20,8 +20,8 @@ use super::test_node::TestNode;
 use GROUP_SIZE;
 use rand::{Rng, XorShiftRng};
 use routing::{self, AccountInfo, Authority, ClientError, EntryAction, Event, EventStream, FullId,
-              ImmutableData, MessageId, MutableData, Response, TYPE_TAG_SESSION_PACKET, Value,
-              XorName};
+              ImmutableData, MessageId, MutableData, PermissionSet, Response,
+              TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -46,6 +46,7 @@ pub struct TestClient {
     _handle: ServiceHandle,
     routing_client: routing::Client,
     full_id: FullId,
+    client_manager: Authority<XorName>,
     rng: XorShiftRng,
 }
 
@@ -68,12 +69,22 @@ impl TestClient {
             unwrap!(routing::Client::new(Some(full_id.clone()), config, GROUP_SIZE))
         });
 
+        let client_manager = Authority::ClientManager(*full_id.public_id().name());
+
         TestClient {
             _handle: handle,
             routing_client: client,
             full_id: full_id,
+            client_manager: client_manager,
             rng: network.new_rng(),
         }
+    }
+
+    /// Set the `ClientManager` this client will send all mutation request to. By default,
+    /// it is the `ClientManager` of this client, but this can be changed for clients that
+    /// are apps.
+    pub fn set_client_manager(&mut self, name: XorName) {
+        self.client_manager = Authority::ClientManager(name);
     }
 
     /// Returns the next event received from routing, if any.
@@ -128,9 +139,9 @@ impl TestClient {
 
     /// Put immutable data
     pub fn put_idata(&mut self, data: ImmutableData) -> MessageId {
-        let dst = Authority::ClientManager(*self.full_id.public_id().name());
         let msg_id = MessageId::new();
-        unwrap!(self.routing_client.put_idata(dst, data, msg_id));
+        unwrap!(self.routing_client
+                    .put_idata(self.client_manager, data, msg_id));
         msg_id
     }
 
@@ -157,7 +168,8 @@ impl TestClient {
                               name: XorName,
                               nodes: &mut [TestNode])
                               -> Result<ImmutableData, ClientError> {
-        self.get_idata_response_with_src(name, nodes).map(|(data, _)| data)
+        self.get_idata_response_with_src(name, nodes)
+            .map(|(data, _)| data)
     }
 
     /// Try to get immutable data from the given nodes. Returns the retrieved data and
@@ -176,7 +188,11 @@ impl TestClient {
 
         loop {
             match self.try_recv() {
-                Ok(Event::Response { response: Response::GetIData { res, msg_id }, src, .. }) => {
+                Ok(Event::Response {
+                       response: Response::GetIData { res, msg_id },
+                       src,
+                       ..
+                   }) => {
                     if request_msg_id != msg_id {
                         warn!("{:?}  --   {:?}", request_msg_id, msg_id);
                     } else {
@@ -191,10 +207,10 @@ impl TestClient {
 
     /// Put mutable data
     pub fn put_mdata(&mut self, data: MutableData) -> MessageId {
-        let dst = Authority::ClientManager(*self.name());
         let msg_id = MessageId::new();
         let requester = *self.signing_public_key();
-        unwrap!(self.routing_client.put_mdata(dst, data, msg_id, requester));
+        unwrap!(self.routing_client
+                    .put_mdata(self.client_manager, data, msg_id, requester));
         msg_id
     }
 
@@ -209,16 +225,37 @@ impl TestClient {
         assert_recv_response!(self, PutMData, request_msg_id)
     }
 
+    /// Sends a `GetMDataVersion` request and wait for the response.
+    pub fn get_mdata_version_response(&mut self,
+                                      name: XorName,
+                                      tag: u64,
+                                      nodes: &mut [TestNode])
+                                      -> Result<u64, ClientError> {
+        self.flush();
+
+        let dst = Authority::NaeManager(name);
+        let msg_id = MessageId::new();
+
+        unwrap!(self.routing_client
+                    .get_mdata_version(dst, name, tag, msg_id));
+        let _ = poll::nodes_and_client(nodes, self);
+
+        assert_recv_response!(self, GetMDataVersion, msg_id)
+    }
+
     /// Sends a `GetMDataShell` request and wait for the response.
     pub fn get_mdata_shell_response(&mut self,
                                     name: XorName,
                                     tag: u64,
                                     nodes: &mut [TestNode])
                                     -> Result<MutableData, ClientError> {
+        self.flush();
+
         let dst = Authority::NaeManager(name);
         let msg_id = MessageId::new();
 
-        unwrap!(self.routing_client.get_mdata_shell(dst, name, tag, msg_id));
+        unwrap!(self.routing_client
+                    .get_mdata_shell(dst, name, tag, msg_id));
         let _ = poll::nodes_and_client(nodes, self);
 
         assert_recv_response!(self, GetMDataShell, msg_id)
@@ -230,13 +267,35 @@ impl TestClient {
                                        tag: u64,
                                        nodes: &mut [TestNode])
                                        -> Result<BTreeMap<Vec<u8>, Value>, ClientError> {
+        self.flush();
+
         let dst = Authority::NaeManager(name);
         let msg_id = MessageId::new();
 
-        unwrap!(self.routing_client.list_mdata_entries(dst, name, tag, msg_id));
+        unwrap!(self.routing_client
+                    .list_mdata_entries(dst, name, tag, msg_id));
         let _ = poll::nodes_and_client(nodes, self);
 
         assert_recv_response!(self, ListMDataEntries, msg_id)
+    }
+
+    /// Sends a `GetMDataValue` request and wait for the response.
+    pub fn get_mdata_value_response(&mut self,
+                                    name: XorName,
+                                    tag: u64,
+                                    key: Vec<u8>,
+                                    nodes: &mut [TestNode])
+                                    -> Result<Value, ClientError> {
+        self.flush();
+
+        let dst = Authority::NaeManager(name);
+        let msg_id = MessageId::new();
+
+        unwrap!(self.routing_client
+                    .get_mdata_value(dst, name, tag, key, msg_id));
+        let _ = poll::nodes_and_client(nodes, self);
+
+        assert_recv_response!(self, GetMDataValue, msg_id)
     }
 
     /// Sends a `MutateMDataEntries` request.
@@ -245,11 +304,15 @@ impl TestClient {
                                 tag: u64,
                                 actions: BTreeMap<Vec<u8>, EntryAction>)
                                 -> MessageId {
-        let dst = Authority::ClientManager(*self.name());
         let msg_id = MessageId::new();
         let requester = *self.signing_public_key();
         unwrap!(self.routing_client
-            .mutate_mdata_entries(dst, name, tag, actions, msg_id, requester));
+                    .mutate_mdata_entries(self.client_manager,
+                                          name,
+                                          tag,
+                                          actions,
+                                          msg_id,
+                                          requester));
         msg_id
     }
 
@@ -266,18 +329,132 @@ impl TestClient {
         assert_recv_response!(self, MutateMDataEntries, msg_id)
     }
 
+    /// Sends a `ListMDataPermissions` request and wait for the response.
+    pub fn list_mdata_permissions_response
+        (&mut self,
+         name: XorName,
+         tag: u64,
+         nodes: &mut [TestNode])
+         -> Result<BTreeMap<User, PermissionSet>, ClientError> {
+        self.flush();
+
+        let dst = Authority::NaeManager(name);
+        let msg_id = MessageId::new();
+
+        unwrap!(self.routing_client
+                    .list_mdata_permissions(dst, name, tag, msg_id));
+        let _ = poll::nodes_and_client(nodes, self);
+
+        assert_recv_response!(self, ListMDataPermissions, msg_id)
+    }
+
+    /// Sends a `ListMDataUserPermissions` request and wait for the response.
+    pub fn list_mdata_user_permissions_response(&mut self,
+                                                name: XorName,
+                                                tag: u64,
+                                                user: User,
+                                                nodes: &mut [TestNode])
+                                                -> Result<PermissionSet, ClientError> {
+        self.flush();
+
+        let dst = Authority::NaeManager(name);
+        let msg_id = MessageId::new();
+
+        unwrap!(self.routing_client
+                    .list_mdata_user_permissions(dst, name, tag, user, msg_id));
+        let _ = poll::nodes_and_client(nodes, self);
+
+        assert_recv_response!(self, ListMDataUserPermissions, msg_id)
+    }
+
+    /// Sends a `SetMDataUserPermissions` request and wait for the response.
+    pub fn set_mdata_user_permissions_response(&mut self,
+                                               name: XorName,
+                                               tag: u64,
+                                               user: User,
+                                               permissions: PermissionSet,
+                                               version: u64,
+                                               nodes: &mut [TestNode])
+                                               -> Result<(), ClientError> {
+        self.flush();
+
+        let msg_id = MessageId::new();
+        let requester = *self.signing_public_key();
+
+        unwrap!(self.routing_client
+                    .set_mdata_user_permissions(self.client_manager,
+                                                name,
+                                                tag,
+                                                user,
+                                                permissions,
+                                                version,
+                                                msg_id,
+                                                requester));
+        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+
+        assert_recv_response!(self, SetMDataUserPermissions, msg_id)
+    }
+
+    /// Sends a `DelMDataUserPermissions` request and wait for the response.
+    pub fn del_mdata_user_permissions_response(&mut self,
+                                               name: XorName,
+                                               tag: u64,
+                                               user: User,
+                                               version: u64,
+                                               nodes: &mut [TestNode])
+                                               -> Result<(), ClientError> {
+        self.flush();
+
+        let msg_id = MessageId::new();
+        let requester = *self.signing_public_key();
+        unwrap!(self.routing_client
+                    .del_mdata_user_permissions(self.client_manager,
+                                                name,
+                                                tag,
+                                                user,
+                                                version,
+                                                msg_id,
+                                                requester));
+        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+
+        assert_recv_response!(self, DelMDataUserPermissions, msg_id)
+    }
+
+    /// Sends a `ChangeMDataOwner` request and wait for the response.
+    pub fn change_mdata_owner_response(&mut self,
+                                       name: XorName,
+                                       tag: u64,
+                                       new_owners: BTreeSet<sign::PublicKey>,
+                                       version: u64,
+                                       nodes: &mut [TestNode])
+                                       -> Result<(), ClientError> {
+        self.flush();
+
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client
+                    .change_mdata_owner(self.client_manager,
+                                        name,
+                                        tag,
+                                        new_owners,
+                                        version,
+                                        msg_id));
+        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+
+        assert_recv_response!(self, ChangeMDataOwner, msg_id)
+    }
+
     /// Sends a GetAccountInfo request, polls the mock network and expects a GetAccountInfo response
     pub fn get_account_info_response(&mut self,
                                      nodes: &mut [TestNode])
                                      -> Result<AccountInfo, ClientError> {
         self.flush();
 
-        let dst = Authority::ClientManager(*self.name());
-        let request_msg_id = MessageId::new();
-        unwrap!(self.routing_client.get_account_info(dst, request_msg_id));
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client
+                    .get_account_info(self.client_manager, msg_id));
         let _ = poll::nodes_and_client(nodes, self);
 
-        assert_recv_response!(self, GetAccountInfo, request_msg_id)
+        assert_recv_response!(self, GetAccountInfo, msg_id)
     }
 
     /// Sends a ListAuthKeysAndVersion request and wait for the response.
@@ -286,13 +463,13 @@ impl TestClient {
          nodes: &mut [TestNode])
          -> Result<(BTreeSet<sign::PublicKey>, u64), ClientError> {
         self.flush();
-        let dst = Authority::ClientManager(*self.name());
-        let request_msg_id = MessageId::new();
 
-        unwrap!(self.routing_client.list_auth_keys_and_version(dst, request_msg_id));
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client
+                    .list_auth_keys_and_version(self.client_manager, msg_id));
         let _ = poll::nodes_and_client(nodes, self);
 
-        assert_recv_response!(self, ListAuthKeysAndVersion, request_msg_id)
+        assert_recv_response!(self, ListAuthKeysAndVersion, msg_id)
     }
 
     /// Sends a InsAuthKey request and wait for the response.
@@ -302,13 +479,13 @@ impl TestClient {
                                  nodes: &mut [TestNode])
                                  -> Result<(), ClientError> {
         self.flush();
-        let dst = Authority::ClientManager(*self.name());
-        let request_msg_id = MessageId::new();
 
-        unwrap!(self.routing_client.ins_auth_key(dst, key, version, request_msg_id));
+        let msg_id = MessageId::new();
+        unwrap!(self.routing_client
+                    .ins_auth_key(self.client_manager, key, version, msg_id));
         let _ = poll::nodes_and_client(nodes, self);
 
-        assert_recv_response!(self, InsAuthKey, request_msg_id)
+        assert_recv_response!(self, InsAuthKey, msg_id)
     }
 
     /// Return a full id for this client

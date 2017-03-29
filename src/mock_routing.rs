@@ -274,11 +274,11 @@ impl NodeBuilder {
         let name = rand::random();
 
         Ok(Node {
-            name: name,
-            routing_table: RoutingTable::new(name, GROUP_SIZE),
-            sent_requests: Default::default(),
-            sent_responses: Default::default(),
-        })
+               name: name,
+               routing_table: RoutingTable::new(name, GROUP_SIZE),
+               sent_requests: Default::default(),
+               sent_responses: Default::default(),
+           })
     }
 }
 

@@ -305,29 +305,33 @@ fn handle_node_added() {
 
     assert_eq!(fragments.len(), 4);
 
-    let check = fragments.iter().any(|fragment| match *fragment {
-        FragmentInfo::ImmutableData(ref name) if name == data0.name() => true,
-        _ => false,
-    });
+    let check = fragments
+        .iter()
+        .any(|fragment| match *fragment {
+                 FragmentInfo::ImmutableData(ref name) if name == data0.name() => true,
+                 _ => false,
+             });
     assert!(check);
 
-    let check = fragments.iter().any(|fragment| match *fragment {
-        FragmentInfo::MutableDataShell { name, tag, version, .. } if name == *data1.name() &&
-                                                                     tag == data1.tag() &&
-                                                                     version == data1.version() => {
-            true
-        }
-        _ => false,
-    });
+    let check = fragments
+        .iter()
+        .any(|fragment| match *fragment {
+                 FragmentInfo::MutableDataShell { name, tag, version, .. }
+                     if name == *data1.name() && tag == data1.tag() &&
+                        version == data1.version() => true,
+                 _ => false,
+             });
     assert!(check);
 
     for entry_key in data1.keys() {
-        let check = fragments.iter().any(|fragment| match *fragment {
-            FragmentInfo::MutableDataEntry { name, tag, ref key, .. } if name == *data1.name() &&
-                                                                         tag == data1.tag() &&
-                                                                         *key == *entry_key => true,
-            _ => false,
-        });
+        let check = fragments
+            .iter()
+            .any(|fragment| match *fragment {
+                     FragmentInfo::MutableDataEntry { name, tag, ref key, .. }
+                         if name == *data1.name() && tag == data1.tag() &&
+                            *key == *entry_key => true,
+                     _ => false,
+                 });
         assert!(check);
     }
 
@@ -363,7 +367,10 @@ fn idata_with_churn() {
 
     // New node receives the refresh from at least QUORUM other nodes. The message
     // should now accumulate.
-    for name in old_node_names.iter().skip(1).take(ACCUMULATOR_QUORUM - 1) {
+    for name in old_node_names
+            .iter()
+            .skip(1)
+            .take(ACCUMULATOR_QUORUM - 1) {
         unwrap!(new_dm.handle_refresh(&mut new_node, *name, &refresh_payload));
     }
 
@@ -593,7 +600,9 @@ fn mdata_parallel_mutations() {
 
     // Issue two mutations in parallel. Only the first one should result in group
     // refresh being sent.
-    let actions = EntryActions::new().ins(b"key0".to_vec(), b"value0".to_vec(), 0).into();
+    let actions = EntryActions::new()
+        .ins(b"key0".to_vec(), b"value0".to_vec(), 0)
+        .into();
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
                                            client_manager_0,
@@ -604,7 +613,9 @@ fn mdata_parallel_mutations() {
                                            msg_id_0,
                                            client_key_0));
 
-    let actions = EntryActions::new().ins(b"key1".to_vec(), b"value1".to_vec(), 0).into();
+    let actions = EntryActions::new()
+        .ins(b"key1".to_vec(), b"value1".to_vec(), 0)
+        .into();
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
                                            client_manager_1,
@@ -681,9 +692,11 @@ fn take_get_mdata_shell_request(node: &mut RoutingNode) -> (MessageId, XorName) 
     let result = node.sent_requests
         .iter()
         .filter_map(|(msg_id, message)| match (&message.request, message.dst) {
-            (&Request::GetMDataShell { .. }, Authority::ManagedNode(dst)) => Some((*msg_id, dst)),
-            _ => None,
-        })
+                        (&Request::GetMDataShell { .. }, Authority::ManagedNode(dst)) => {
+                            Some((*msg_id, dst))
+                        }
+                        _ => None,
+                    })
         .next();
     let (msg_id, dst) = unwrap!(result);
     let _ = node.sent_requests.remove(&msg_id);
@@ -696,11 +709,11 @@ fn take_get_mdata_value_requests(node: &mut RoutingNode) -> Vec<(MessageId, XorN
     let result: Vec<_> = node.sent_requests
         .iter()
         .filter_map(|(msg_id, message)| match (&message.request, message.dst) {
-            (&Request::GetMDataValue { ref key, .. }, Authority::ManagedNode(dst)) => {
-                Some((*msg_id, dst, key.clone()))
-            }
-            _ => None,
-        })
+                        (&Request::GetMDataValue { ref key, .. }, Authority::ManagedNode(dst)) => {
+                            Some((*msg_id, dst, key.clone()))
+                        }
+                        _ => None,
+                    })
         .collect();
 
     for &(msg_id, _, _) in &result {

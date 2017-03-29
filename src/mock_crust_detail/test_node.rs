@@ -163,7 +163,7 @@ pub fn create_nodes(network: &Network,
 /// Add node to the mock network
 pub fn add_node(network: &Network, nodes: &mut Vec<TestNode>, index: usize, use_cache: bool) {
     let config = mock_crust::Config::with_contacts(&[nodes[index].endpoint()]);
-    nodes.push(TestNode::new(network, Some(config.clone()), None, false, use_cache));
+    nodes.push(TestNode::new(network, Some(config), None, false, use_cache));
 }
 
 /// Add node to the mock network with specified config

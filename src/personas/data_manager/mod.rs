@@ -73,16 +73,16 @@ impl DataManager {
         let chunk_store = ChunkStore::new(chunk_store_root, capacity)?;
 
         Ok(DataManager {
-            chunk_store: chunk_store,
-            refresh_accumulator:
-                Accumulator::with_duration(ACCUMULATOR_QUORUM,
-                                           Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
-            cache: Default::default(),
-            immutable_data_count: 0,
-            mutable_data_count: 0,
-            client_get_requests: 0,
-            logging_time: Instant::now(),
-        })
+               chunk_store: chunk_store,
+               refresh_accumulator:
+                   Accumulator::with_duration(ACCUMULATOR_QUORUM,
+                                              Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
+               cache: Default::default(),
+               immutable_data_count: 0,
+               mutable_data_count: 0,
+               client_get_requests: 0,
+               logging_time: Instant::now(),
+           })
     }
 
     pub fn handle_refresh(&mut self,
@@ -92,11 +92,14 @@ impl DataManager {
                           -> Result<(), InternalError> {
         let fragments: Vec<FragmentInfo> = serialisation::deserialise(serialised_refresh)?;
         for fragment in fragments {
-            if self.cache.register_needed_fragment_with_holder(fragment.clone(), src) {
+            if self.cache
+                   .register_needed_fragment_with_holder(fragment.clone(), src) {
                 continue;
             }
 
-            if let Some(holders) = self.refresh_accumulator.add(fragment.clone(), src).cloned() {
+            if let Some(holders) = self.refresh_accumulator
+                   .add(fragment.clone(), src)
+                   .cloned() {
                 self.refresh_accumulator.delete(&fragment);
 
                 let needed = match fragment {
@@ -110,7 +113,13 @@ impl DataManager {
                             Ok(_) => unreachable!(),
                         }
                     }
-                    FragmentInfo::MutableDataEntry { name, tag, ref key, version, .. } => {
+                    FragmentInfo::MutableDataEntry {
+                        name,
+                        tag,
+                        ref key,
+                        version,
+                        ..
+                    } => {
                         if let Ok(Data::Mutable(data)) =
                             self.chunk_store.get(&DataId::Mutable(name, tag)) {
                             match data.get(key) {
@@ -129,7 +138,8 @@ impl DataManager {
                 }
 
                 for holder in holders {
-                    self.cache.insert_needed_fragment(fragment.clone(), holder);
+                    self.cache
+                        .insert_needed_fragment(fragment.clone(), holder);
                 }
             }
         }
@@ -142,12 +152,21 @@ impl DataManager {
                                 routing_node: &mut RoutingNode,
                                 serialised_refresh: &[u8])
                                 -> Result<(), InternalError> {
-        let DataInfo { data_id, hash: refresh_hash } =
-            serialisation::deserialise(serialised_refresh)?;
+        let DataInfo {
+            data_id,
+            hash: refresh_hash,
+        } = serialisation::deserialise(serialised_refresh)?;
         let mut success = false;
 
-        for PendingWrite { mutation, src, dst, message_id, hash, rejected, .. } in
-            self.cache.take_pending_writes(&data_id) {
+        for PendingWrite {
+                mutation,
+                src,
+                dst,
+                message_id,
+                hash,
+                rejected,
+                ..
+            } in self.cache.take_pending_writes(&data_id) {
             if hash != refresh_hash {
                 if !rejected {
                     trace!("{:?} did not accumulate. Sending failure", data_id);
@@ -186,7 +205,8 @@ impl DataManager {
         if !success {
             if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
                 for node in &group {
-                    let _ = self.cache.register_needed_data_with_holder(&data_id, *node);
+                    let _ = self.cache
+                        .register_needed_data_with_holder(&data_id, *node);
                 }
 
                 self.request_needed_fragments(routing_node)?;
@@ -269,7 +289,9 @@ impl DataManager {
                                     src: XorName,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        if self.cache.stop_needed_fragment_request(&src, msg_id).is_none() {
+        if self.cache
+               .stop_needed_fragment_request(&src, msg_id)
+               .is_none() {
             return Err(InternalError::InvalidMessage);
         }
 
@@ -315,6 +337,7 @@ impl DataManager {
                             msg_id: MessageId,
                             _requester: sign::PublicKey)
                             -> Result<(), InternalError> {
+
         let data_id = DataId::Mutable(*data.name(), data.tag());
         let rejected = if self.chunk_store.has(&data_id) {
             trace!("DM sending PutMData failure for data {:?}, it already exists.",
@@ -326,8 +349,8 @@ impl DataManager {
 
             if self.chunk_store_full() {
                 let err = ClientError::NetworkFull;
-                routing_node.send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
-                return Err(From::from(err));
+                routing_node.send_put_mdata_response(dst, src, Err(err), msg_id)?;
+                return Ok(());
             }
 
             false
@@ -430,7 +453,9 @@ impl DataManager {
                                           src: XorName,
                                           msg_id: MessageId)
                                           -> Result<(), InternalError> {
-        if self.cache.stop_needed_fragment_request(&src, msg_id).is_none() {
+        if self.cache
+               .stop_needed_fragment_request(&src, msg_id)
+               .is_none() {
             return Err(InternalError::InvalidMessage);
         }
 
@@ -504,10 +529,11 @@ impl DataManager {
                                   key: Vec<u8>,
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
-        let res = self.read_mdata(&src,
-                                  name,
-                                  tag,
-                                  |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry));
+        let res =
+            self.read_mdata(&src,
+                            name,
+                            tag,
+                            |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry));
         routing_node.send_get_mdata_value_response(dst, src, res, msg_id)?;
         Ok(())
     }
@@ -522,8 +548,13 @@ impl DataManager {
             let actual_hash = utils::mdata_value_hash(&value);
 
             match fragment {
-                FragmentInfo::MutableDataEntry { name, tag, ref key, hash, .. } if hash ==
-                                                                                   actual_hash => {
+                FragmentInfo::MutableDataEntry {
+                    name,
+                    tag,
+                    ref key,
+                    hash,
+                    ..
+                } if hash == actual_hash => {
                     self.cache.remove_needed_fragment(&fragment);
                     Some((name, tag, key.clone()))
                 }
@@ -571,7 +602,9 @@ impl DataManager {
                                           src: XorName,
                                           msg_id: MessageId)
                                           -> Result<(), InternalError> {
-        if self.cache.stop_needed_fragment_request(&src, msg_id).is_none() {
+        if self.cache
+               .stop_needed_fragment_request(&src, msg_id)
+               .is_none() {
             return Err(InternalError::InvalidMessage);
         }
 
@@ -689,9 +722,9 @@ impl DataManager {
         let mutation_type = PendingMutationType::ChangeMDataOwner;
         let data_id = DataId::Mutable(name, tag);
 
-        let num_owners_len = new_owners.len();
+        let new_owners_len = new_owners.len();
         let new_owner = match new_owners.into_iter().next() {
-            Some(owner) if num_owners_len == 1 => owner,
+            Some(owner) if new_owners_len == 1 => owner,
             Some(_) | None => {
                 // `new_owners` must have exactly 1 element.
                 self.send_mutation_response(routing_node,
@@ -796,7 +829,8 @@ impl DataManager {
                     // than the lost node, the lost node was not in the group in the first place.
                     if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
                         if fragment.name().closer(node_name, outer_node) {
-                            refreshes.entry(*outer_node)
+                            refreshes
+                                .entry(*outer_node)
                                 .or_insert_with(Vec::new)
                                 .push(fragment.clone());
                         }
@@ -890,8 +924,13 @@ impl DataManager {
                              message_id: MessageId,
                              rejected: bool)
                              -> Result<(), InternalError> {
-        for PendingWrite { mutation, src, dst, message_id, .. } in
-            self.cache.remove_expired_writes() {
+        for PendingWrite {
+                mutation,
+                src,
+                dst,
+                message_id,
+                ..
+            } in self.cache.remove_expired_writes() {
             let error = ClientError::from("Request expired.");
             trace!("{:?} did not accumulate. Sending failure",
                    mutation.data_id());
@@ -906,7 +945,7 @@ impl DataManager {
 
         let data_name = *mutation.data_id().name();
         if let Some(refresh) = self.cache
-            .insert_pending_write(mutation, src, dst, message_id, rejected) {
+               .insert_pending_write(mutation, src, dst, message_id, rejected) {
             self.send_group_refresh(routing_node, data_name, refresh, message_id)?;
         }
 
@@ -1071,7 +1110,8 @@ impl DataManager {
                         }
                     }
 
-                    self.cache.start_needed_fragment_request(&fragment, &holder, msg_id);
+                    self.cache
+                        .start_needed_fragment_request(&fragment, &holder, msg_id);
                 }
             }
         }
@@ -1139,7 +1179,10 @@ impl DataManager {
             .keys()
             .into_iter()
             .filter(|data_id| !self.cache.is_in_unneeded(data_id))
-            .filter_map(|data_id| self.get_version(&data_id).map(|version| (data_id, version)))
+            .filter_map(|data_id| {
+                            self.get_version(&data_id)
+                                .map(|version| (data_id, version))
+                        })
             .collect()
     }
 
@@ -1207,9 +1250,9 @@ fn create_pending_mutation_for_mdata(mutation_type: PendingMutationType,
 // Verify that the client with `client_name` is the owner of `data`.
 fn verify_mdata_owner(data: &MutableData, client_name: &XorName) -> Result<(), ClientError> {
     if data.owners()
-        .iter()
-        .map(|owner_key| utils::client_name_from_key(owner_key))
-        .any(|name| name == *client_name) {
+           .iter()
+           .map(|owner_key| utils::client_name_from_key(owner_key))
+           .any(|name| name == *client_name) {
         Ok(())
     } else {
         Err(ClientError::AccessDenied)

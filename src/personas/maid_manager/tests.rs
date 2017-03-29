@@ -18,8 +18,11 @@
 use super::*;
 use super::account::DEFAULT_ACCOUNT_SIZE;
 use rand;
-use routing::{AccountInfo, Request, Response};
+use routing::{AccountInfo, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_ENTRIES,
+              MAX_MUTABLE_DATA_SIZE_IN_BYTES, Request, Response, Value};
 use test_utils;
+
+const TEST_TAG: u64 = 12345678;
 
 #[test]
 fn account_basics() {
@@ -184,8 +187,7 @@ fn mdata_permissions_and_owners() {
     create_account(&mut node, &mut mm, client, client_manager);
 
     // Put initial mutable data
-    let tag = 123456;
-    let data = test_utils::gen_mutable_data(tag, 0, client_key, &mut rand::thread_rng());
+    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rand::thread_rng());
     let data_name = *data.name();
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_mdata(&mut node,
@@ -195,7 +197,7 @@ fn mdata_permissions_and_owners() {
                                 msg_id,
                                 client_key));
 
-    let (_, app_key) = test_utils::gen_client_authority();
+    let (app, app_key) = test_utils::gen_client_authority();
 
     // Set user permissions
     let msg_id = MessageId::new();
@@ -203,7 +205,7 @@ fn mdata_permissions_and_owners() {
                                                  client,
                                                  client_manager,
                                                  data_name,
-                                                 tag,
+                                                 TEST_TAG,
                                                  User::Key(app_key),
                                                  PermissionSet::new(),
                                                  3,
@@ -232,7 +234,7 @@ fn mdata_permissions_and_owners() {
                                                  client,
                                                  client_manager,
                                                  data_name,
-                                                 tag,
+                                                 TEST_TAG,
                                                  User::Key(app_key),
                                                  4,
                                                  msg_id,
@@ -254,15 +256,48 @@ fn mdata_permissions_and_owners() {
 
     node.sent_requests.clear();
 
-    // Change owner
+    // Attempt to change owner by unauthorised app fails.
     let mut new_owners = BTreeSet::new();
     let _ = new_owners.insert(app_key);
+    let msg_id = MessageId::new();
+    unwrap!(mm.handle_change_mdata_owner(&mut node,
+                                         app,
+                                         client_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         new_owners.clone(),
+                                         5,
+                                         msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response,
+                  Response::ChangeMDataOwner { res: Err(ClientError::AccessDenied), .. });
+
+    // Attempt to change owner even by authorised app fails.
+    let msg_id = MessageId::new();
+    unwrap!(mm.handle_ins_auth_key(&mut node, client, client_manager, app_key, 5, msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response, Response::InsAuthKey { res: Ok(()), .. });
+
+    let msg_id = MessageId::new();
+    unwrap!(mm.handle_change_mdata_owner(&mut node,
+                                         app,
+                                         client_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         new_owners.clone(),
+                                         5,
+                                         msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response,
+                  Response::ChangeMDataOwner { res: Err(ClientError::AccessDenied), .. });
+
+    // Only the client can change owner
     let msg_id = MessageId::new();
     unwrap!(mm.handle_change_mdata_owner(&mut node,
                                          client,
                                          client_manager,
                                          data_name,
-                                         tag,
+                                         TEST_TAG,
                                          new_owners,
                                          5,
                                          msg_id));
@@ -427,7 +462,7 @@ fn mutation_authorisation() {
                                            Default::default(),
                                            msg_id,
                                            owner_key);
-    // Note: No response sent here means all is good (MM sends respone to
+    // Note: No response sent here means all is good (MM sends response to
     // MutateMDataEntries request only in case of error).
     assert!(!node.sent_responses.contains_key(&msg_id));
 
@@ -454,6 +489,14 @@ fn mutation_authorisation() {
                                            msg_id,
                                            app_key);
     assert!(!node.sent_responses.contains_key(&msg_id));
+
+    // Simulate receiving mutation response from the nae manager and verify it
+    // gets forwarded to the app.
+    unwrap!(mm.handle_mutate_mdata_entries_response(&mut node, Ok(()), msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_eq!(message.src, owner_client_manager);
+    assert_eq!(message.dst, app_client);
+    assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
 
     // Attempt to mutate by requester that doesn't match the source client
     // key fails.
@@ -507,6 +550,78 @@ fn account_replication_during_churn() {
     // After new node receives the refresh, it gets the account too.
     unwrap!(new_mm.handle_refresh(&mut new_node, &payload));
     assert!(get_account_info(&mut new_node, &mut new_mm, client, client_manager).is_ok());
+}
+
+#[test]
+fn limits() {
+    let mut rng = rand::thread_rng();
+
+    let mut node = RoutingNode::new();
+    let mut mm = MaidManager::new();
+
+    let (client, client_key) = test_utils::gen_client_authority();
+    let client_manager = test_utils::gen_client_manager_authority(client_key);
+
+    // Attempt to put oversized immutable data fails.
+    let bad_data = test_utils::gen_immutable_data(MAX_IMMUTABLE_DATA_SIZE_IN_BYTES as usize + 1,
+                                                  &mut rng);
+    let msg_id = MessageId::new();
+    unwrap!(mm.handle_put_idata(&mut node,
+                                client,
+                                client_manager,
+                                bad_data,
+                                msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response,
+                  Response::PutIData { res: Err(ClientError::DataTooLarge), .. });
+
+
+    // Attempt to put mutable data with too many entries fails.
+    let mut bad_data = test_utils::gen_mutable_data(TEST_TAG,
+                                                    MAX_MUTABLE_DATA_ENTRIES as usize,
+                                                    client_key,
+                                                    &mut rng);
+    while bad_data.keys().len() <= MAX_MUTABLE_DATA_ENTRIES as usize {
+        let key = test_utils::gen_vec(10, &mut rng);
+        let content = test_utils::gen_vec(10, &mut rng);
+        let _ = bad_data.mutate_entry_without_validation(key,
+                                                         Value {
+                                                             content: content,
+                                                             entry_version: 0,
+                                                         });
+    }
+
+    let msg_id = MessageId::new();
+    unwrap!(mm.handle_put_mdata(&mut node,
+                                client,
+                                client_manager,
+                                bad_data,
+                                msg_id,
+                                client_key));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response,
+                  Response::PutMData { res: Err(ClientError::TooManyEntries), .. });
+
+    // Attempt to put oversized mutable data fails.
+    let mut bad_data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
+    let key = test_utils::gen_vec(10, &mut rng);
+    let content = test_utils::gen_vec(MAX_MUTABLE_DATA_SIZE_IN_BYTES as usize + 1, &mut rng);
+    assert!(bad_data.mutate_entry_without_validation(key,
+                                                     Value {
+                                                        content: content,
+                                                        entry_version: 0
+                                                     }));
+
+    let msg_id = MessageId::new();
+    unwrap!(mm.handle_put_mdata(&mut node,
+                                client,
+                                client_manager,
+                                bad_data,
+                                msg_id,
+                                client_key));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response,
+                  Response::PutMData { res: Err(ClientError::DataTooLarge), .. });
 }
 
 fn create_account(node: &mut RoutingNode,
