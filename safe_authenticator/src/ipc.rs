@@ -1005,6 +1005,7 @@ pub fn app_state(client: &Client,
                 .then(move |res| {
                     match res {
                         Ok(_) => Ok(AppState::Authenticated),
+                        Err(AuthError::CoreError(CoreError::EncodeDecodeError(..))) |
                         Err(AuthError::CoreError(
                             CoreError::RoutingClientError(
                                 ClientError::NoSuchEntry))) => {
