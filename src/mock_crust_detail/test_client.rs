@@ -124,16 +124,17 @@ impl TestClient {
         let request_message_id = MessageId::new();
         self.flush();
 
-        unwrap!(self.routing_client.send_get_request(dst, request, request_message_id));
+        unwrap!(self.routing_client
+                    .send_get_request(dst, request, request_message_id));
         let _ = poll::nodes_and_client(nodes, self);
 
         loop {
             match self.try_recv() {
                 Ok(Event::Response {
-                    response: Response::GetSuccess(data, response_message_id),
-                    src,
-                    ..
-                }) => {
+                       response: Response::GetSuccess(data, response_message_id),
+                       src,
+                       ..
+                   }) => {
                     if request_message_id == response_message_id {
                         return (data, src);
                     } else {
@@ -153,24 +154,28 @@ impl TestClient {
         let dst = Authority::NaeManager(*request.name());
         let request_message_id = MessageId::new();
         self.flush();
-        unwrap!(self.routing_client.send_get_request(dst.clone(), request, request_message_id));
+        unwrap!(self.routing_client
+                    .send_get_request(dst.clone(), request, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the get_response",
                events_count);
         loop {
             match self.try_recv() {
                 Ok(Event::Response {
-                    response: Response::GetSuccess(data, response_message_id),
-                    ..
-                }) => {
+                       response: Response::GetSuccess(data, response_message_id), ..
+                   }) => {
                     assert_eq!(request_message_id, response_message_id);
                     return Ok(data);
                 }
                 Ok(Event::Response {
-                    response: Response::GetFailure { id, external_error_indicator, .. },
-                    src,
-                    ..
-                }) => {
+                       response: Response::GetFailure {
+                           id,
+                           external_error_indicator,
+                           ..
+                       },
+                       src,
+                       ..
+                   }) => {
                     assert_eq!(request_message_id, id);
                     assert_eq!(src, dst);
                     let parsed_error: GetError =
@@ -190,24 +195,28 @@ impl TestClient {
                          -> Result<DataIdentifier, Option<MutationError>> {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_post_request(dst.clone(), data, request_message_id));
+        unwrap!(self.routing_client
+                    .send_post_request(dst.clone(), data, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the post_response",
                events_count);
         loop {
             match self.try_recv() {
                 Ok(Event::Response {
-                    response: Response::PostSuccess(data_id, response_message_id),
-                    ..
-                }) => {
+                       response: Response::PostSuccess(data_id, response_message_id), ..
+                   }) => {
                     assert_eq!(request_message_id, response_message_id);
                     return Ok(data_id);
                 }
                 Ok(Event::Response {
-                    response: Response::PostFailure { id, external_error_indicator, .. },
-                    src,
-                    ..
-                }) => {
+                       response: Response::PostFailure {
+                           id,
+                           external_error_indicator,
+                           ..
+                       },
+                       src,
+                       ..
+                   }) => {
                     assert_eq!(request_message_id, id);
                     assert_eq!(src, dst);
                     let parsed_error: MutationError =
@@ -227,24 +236,28 @@ impl TestClient {
                            -> Result<DataIdentifier, Option<MutationError>> {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_delete_request(dst.clone(), data, request_message_id));
+        unwrap!(self.routing_client
+                    .send_delete_request(dst.clone(), data, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the delete_response",
                events_count);
         loop {
             match self.try_recv() {
                 Ok(Event::Response {
-                    response: Response::DeleteSuccess(data_id, response_id),
-                    ..
-                }) => {
+                       response: Response::DeleteSuccess(data_id, response_id), ..
+                   }) => {
                     assert_eq!(request_message_id, response_id);
                     return Ok(data_id);
                 }
                 Ok(Event::Response {
-                    response: Response::DeleteFailure { id, external_error_indicator, .. },
-                    src,
-                    ..
-                }) => {
+                       response: Response::DeleteFailure {
+                           id,
+                           external_error_indicator,
+                           ..
+                       },
+                       src,
+                       ..
+                   }) => {
                     assert_eq!(request_message_id, id);
                     assert_eq!(src, dst);
                     let parsed_error: MutationError =
@@ -264,23 +277,31 @@ impl TestClient {
         let request_message_id = MessageId::new();
         self.flush();
         let dst = Authority::ClientManager(*self.public_id.name());
-        unwrap!(self.routing_client.send_get_account_info_request(dst, request_message_id));
+        unwrap!(self.routing_client
+                    .send_get_account_info_request(dst, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the get_account_info_response",
                events_count);
         loop {
             match self.try_recv() {
-                Ok(Event::Response { response: Response::GetAccountInfoSuccess { id,
-                                                                       data_stored,
-                                                                       space_available },
-                                     .. }) => {
+                Ok(Event::Response {
+                       response: Response::GetAccountInfoSuccess {
+                           id,
+                           data_stored,
+                           space_available,
+                       },
+                       ..
+                   }) => {
                     assert_eq!(request_message_id, id);
                     return Ok((data_stored, space_available));
                 }
                 Ok(Event::Response {
-                    response: Response::GetAccountInfoFailure { id, external_error_indicator },
-                    ..
-                }) => {
+                       response: Response::GetAccountInfoFailure {
+                           id,
+                           external_error_indicator,
+                       },
+                       ..
+                   }) => {
                     assert_eq!(request_message_id, id);
                     let parsed_error: GetError =
                         unwrap!(serialisation::deserialise(&external_error_indicator));
@@ -296,21 +317,24 @@ impl TestClient {
     pub fn post(&mut self, data: Data) {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_post_request(dst, data, request_message_id));
+        unwrap!(self.routing_client
+                    .send_post_request(dst, data, request_message_id));
     }
 
     /// Put request
     pub fn put(&mut self, data: Data) {
         let dst = Authority::ClientManager(*self.public_id.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_put_request(dst, data, request_message_id));
+        unwrap!(self.routing_client
+                    .send_put_request(dst, data, request_message_id));
     }
 
     /// Delete request
     pub fn delete(&mut self, data: Data) {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_delete_request(dst, data, request_message_id));
+        unwrap!(self.routing_client
+                    .send_delete_request(dst, data, request_message_id));
     }
 
     /// Put data and read from mock network
@@ -320,19 +344,25 @@ impl TestClient {
                           -> Result<(), Option<MutationError>> {
         let dst = Authority::ClientManager(*self.public_id.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_put_request(dst, data.clone(), request_message_id));
+        unwrap!(self.routing_client
+                    .send_put_request(dst, data.clone(), request_message_id));
         let _ = poll::poll_and_resend_unacknowledged(nodes, self);
 
         match self.try_recv() {
-            Ok(Event::Response { response: Response::PutSuccess(_, response_message_id), .. }) => {
+            Ok(Event::Response {
+                   response: Response::PutSuccess(_, response_message_id), ..
+               }) => {
                 assert_eq!(request_message_id, response_message_id);
                 Ok(())
             }
-            Ok(Event::Response { response: Response::PutFailure {
-                    id: response_id,
-                    data_id,
-                    external_error_indicator: response_error
-                }, .. }) => {
+            Ok(Event::Response {
+                   response: Response::PutFailure {
+                       id: response_id,
+                       data_id,
+                       external_error_indicator: response_error,
+                   },
+                   ..
+               }) => {
                 assert_eq!(request_message_id, response_id);
                 assert_eq!(data.identifier(), data_id);
                 let parsed_error = unwrap!(serialisation::deserialise(&response_error));
@@ -349,7 +379,8 @@ impl TestClient {
         let request_data_id = wrapper.identifier();
         let dst = Authority::NaeManager(*request_data_id.name());
         let request_message_id = MessageId::new();
-        let _ = self.routing_client.send_append_request(dst, wrapper, request_message_id);
+        let _ = self.routing_client
+            .send_append_request(dst, wrapper, request_message_id);
     }
 
     /// Append data and read from mock network
@@ -360,22 +391,25 @@ impl TestClient {
         let request_data_id = wrapper.identifier();
         let dst = Authority::NaeManager(*request_data_id.name());
         let request_message_id = MessageId::new();
-        unwrap!(self.routing_client.send_append_request(dst, wrapper, request_message_id));
+        unwrap!(self.routing_client
+                    .send_append_request(dst, wrapper, request_message_id));
         let _ = poll::poll_and_resend_unacknowledged(nodes, self);
 
         match self.try_recv() {
             Ok(Event::Response {
-                    response: Response::AppendSuccess(_, response_message_id),
-                    ..
-                }) => {
+                   response: Response::AppendSuccess(_, response_message_id), ..
+               }) => {
                 assert_eq!(request_message_id, response_message_id);
                 Ok(())
             }
-            Ok(Event::Response { response: Response::AppendFailure {
-                    id: response_id,
-                    data_id,
-                    external_error_indicator: response_error
-                }, .. }) => {
+            Ok(Event::Response {
+                   response: Response::AppendFailure {
+                       id: response_id,
+                       data_id,
+                       external_error_indicator: response_error,
+                   },
+                   ..
+               }) => {
                 assert_eq!(request_message_id, response_id);
                 assert_eq!(request_data_id, data_id);
                 let parsed_error = unwrap!(serialisation::deserialise(&response_error));

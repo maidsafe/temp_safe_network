@@ -48,7 +48,8 @@ fn handle_put_without_account() {
     client.put(Data::Immutable(immutable_data));
     event_count += poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
     trace!("Processed {} events.", event_count);
-    let count = nodes.iter()
+    let count = nodes
+        .iter()
         .filter(|node| node.get_maid_manager_put_count(client.name()).is_some())
         .count();
     assert_eq!(0,
@@ -133,7 +134,8 @@ fn handle_put_with_account() {
     client.put(Data::Immutable(immutable_data.clone()));
     let event_count = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
     trace!("Processed {} events.", event_count);
-    let count = nodes.iter()
+    let count = nodes
+        .iter()
         .filter(|node| node.get_maid_manager_put_count(client.name()).is_some())
         .count();
     assert_eq!(GROUP_SIZE,
@@ -300,11 +302,12 @@ fn maid_manager_account_adding_with_churn() {
         }
         trace!("Processed {} events.", event_count);
         let mut sorted_maid_managers =
-            nodes.iter().sorted_by(|left, right| {
-                                       client.name().cmp_distance(&left.name(), &right.name())
-                                   });
+            nodes
+                .iter()
+                .sorted_by(|left, right| client.name().cmp_distance(&left.name(), &right.name()));
         sorted_maid_managers.truncate(GROUP_SIZE);
-        let node_count_stats: Vec<(XorName, Option<u64>)> = sorted_maid_managers.into_iter()
+        let node_count_stats: Vec<(XorName, Option<u64>)> = sorted_maid_managers
+            .into_iter()
             .map(|x| (x.name(), x.get_maid_manager_put_count(client.name())))
             .collect();
         for &(_, count) in &node_count_stats {
@@ -368,11 +371,12 @@ fn maid_manager_account_decrease_with_churn() {
         }
         trace!("Processed {} events.", event_count);
         let mut sorted_maid_managers =
-            nodes.iter().sorted_by(|left, right| {
-                                       client.name().cmp_distance(&left.name(), &right.name())
-                                   });
+            nodes
+                .iter()
+                .sorted_by(|left, right| client.name().cmp_distance(&left.name(), &right.name()));
         sorted_maid_managers.truncate(GROUP_SIZE);
-        let node_count_stats: Vec<(XorName, Option<u64>)> = sorted_maid_managers.into_iter()
+        let node_count_stats: Vec<(XorName, Option<u64>)> = sorted_maid_managers
+            .into_iter()
             .map(|x| (x.name(), x.get_maid_manager_put_count(client.name())))
             .collect();
         for &(_, count) in &node_count_stats {

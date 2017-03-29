@@ -75,8 +75,9 @@ pub fn main() {
     // TODO - remove the following line once maidsafe_utilities is updated to use log4rs v4.
     let _ = fs::remove_file("Node.log");
 
-    let args: Args =
-        Docopt::new(USAGE).and_then(|docopt| docopt.decode()).unwrap_or_else(|error| error.exit());
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|docopt| docopt.decode())
+        .unwrap_or_else(|error| error.exit());
 
     let name = config_file_handler::exe_file_stem().unwrap_or_else(|_| OsString::new());
     let name_and_version = format!("{} v{}", name.to_string_lossy(), env!("CARGO_PKG_VERSION"));
