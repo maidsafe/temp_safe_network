@@ -217,9 +217,10 @@ fn mdata_mutations() {
 fn mdata_change_owner() {
     let mut rng = rand::thread_rng();
 
-    let (client_0, client_0_key) = test_utils::gen_client_authority();
+    let (_, client_key_0) = test_utils::gen_client_authority();
+    let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
 
-    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_0_key, &mut rng);
+    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
     let data_name = *data.name();
     let nae_manager = Authority::NaeManager(data_name);
 
@@ -229,16 +230,18 @@ fn mdata_change_owner() {
     // Put the data.
     dm.put_into_chunk_store(data);
 
-    let (client_1, _) = test_utils::gen_client_authority();
-    let (_, client_2_key) = test_utils::gen_client_authority();
+    let (_, client_key_1) = test_utils::gen_client_authority();
+    let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
+
+    let (_, client_key_2) = test_utils::gen_client_authority();
 
     // Attempt to change the owner by a non-owner fails.
     let mut new_owners = BTreeSet::new();
-    let _ = new_owners.insert(client_2_key);
+    let _ = new_owners.insert(client_key_2);
 
     let msg_id = MessageId::new();
     unwrap!(dm.handle_change_mdata_owner(&mut node,
-                                         client_1,
+                                         client_manager_1,
                                          nae_manager,
                                          data_name,
                                          TEST_TAG,
@@ -253,7 +256,7 @@ fn mdata_change_owner() {
     // Changing the owner by the current owner succeeds.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_change_mdata_owner(&mut node,
-                                         client_0,
+                                         client_manager_0,
                                          nae_manager,
                                          data_name,
                                          TEST_TAG,
@@ -569,6 +572,63 @@ fn mdata_with_churn_with_entries_arriving_before_shell() {
 
     // The node should not send any more requests, because it already has everything it needs.
     assert!(new_node.sent_requests.is_empty());
+}
+
+#[test]
+fn mdata_parallel_mutations() {
+    let mut rng = rand::thread_rng();
+
+    let mut node = RoutingNode::new();
+    let mut dm = create_data_manager();
+
+    let (_, client_key_0) = test_utils::gen_client_authority();
+    let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
+
+    let (_, client_key_1) = test_utils::gen_client_authority();
+    let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
+
+    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
+    dm.put_into_chunk_store(data.clone());
+    let nae_manager = Authority::NaeManager(*data.name());
+
+    // Issue two mutations in parallel. Only the first one should result in group
+    // refresh being sent.
+    let actions = EntryActions::new().ins(b"key0".to_vec(), b"value0".to_vec(), 0).into();
+    let msg_id_0 = MessageId::new();
+    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                           client_manager_0,
+                                           nae_manager,
+                                           *data.name(),
+                                           data.tag(),
+                                           actions,
+                                           msg_id_0,
+                                           client_key_0));
+
+    let actions = EntryActions::new().ins(b"key1".to_vec(), b"value1".to_vec(), 0).into();
+    let msg_id_1 = MessageId::new();
+    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                           client_manager_1,
+                                           nae_manager,
+                                           *data.name(),
+                                           data.tag(),
+                                           actions,
+                                           msg_id_1,
+                                           client_key_1));
+
+    let message = unwrap!(node.sent_requests.remove(&msg_id_0));
+    let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+
+    assert!(!node.sent_requests.contains_key(&msg_id_1));
+
+    // After receiving the group refresh, the first mutation succeeds and the second
+    // one is rejected.
+    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id_0));
+    assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id_1));
+    assert_match!(message.response, Response::MutateMDataEntries { res: Err(_), .. });
 }
 
 fn create_data_manager() -> DataManager {

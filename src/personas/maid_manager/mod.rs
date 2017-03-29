@@ -145,7 +145,7 @@ impl MaidManager {
         }
 
         let src_name = utils::client_name(&src);
-        let dst_name = utils::client_manager_name(&dst);
+        let dst_name = utils::client_name(&dst);
 
         // If the type_tag is `TYPE_TAG_SESSION_PACKET`, the account must not exist, else it must
         // exist.
@@ -504,7 +504,7 @@ impl MaidManager {
     }
 
     fn get_account(&self, dst: &Authority<XorName>) -> Result<&Account, ClientError> {
-        let client_name = utils::client_manager_name(dst);
+        let client_name = utils::client_name(dst);
         if let Some(account) = self.accounts.get(&client_name) {
             Ok(account)
         } else {
@@ -521,7 +521,7 @@ impl MaidManager {
         where F: FnOnce(&mut Account) -> Result<(), ClientError>
     {
         let client_name = utils::client_name(src);
-        let client_manager_name = utils::client_manager_name(dst);
+        let client_manager_name = utils::client_name(dst);
 
         if client_name != client_manager_name {
             // TODO (adam): is this the right error to return here?
@@ -554,7 +554,7 @@ impl MaidManager {
                               dst: &Authority<XorName>,
                               requester: Option<sign::PublicKey>)
                               -> Result<(), ClientError> {
-        let client_manager_name = utils::client_manager_name(dst);
+        let client_manager_name = utils::client_name(dst);
 
         let account = if let Some(account) = self.accounts.get_mut(&client_manager_name) {
             account

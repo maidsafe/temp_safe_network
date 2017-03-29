@@ -20,6 +20,11 @@ use routing::{Authority, MutableData, Value, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 
+/// Extract client key (a public singing key) from the authority.
+///
+/// # Panics
+///
+/// Panics when the authority is not `Client`.
 pub fn client_key(authority: &Authority<XorName>) -> &sign::PublicKey {
     if let Authority::Client { ref client_key, .. } = *authority {
         client_key
@@ -28,20 +33,21 @@ pub fn client_key(authority: &Authority<XorName>) -> &sign::PublicKey {
     }
 }
 
+/// Extract client name (a `XorName`) from the authority.
+///
+/// # Panics
+///
+/// Panics when the authority is not `Client` or `ClientManager`.
 pub fn client_name(authority: &Authority<XorName>) -> XorName {
-    client_name_from_key(client_key(authority))
+    match *authority {
+        Authority::Client { ref client_key, .. } => client_name_from_key(client_key),
+        Authority::ClientManager(name) => name,
+        _ => unreachable!("Logic error"),
+    }
 }
 
 pub fn client_name_from_key(key: &sign::PublicKey) -> XorName {
     XorName(sha256::hash(&key[..]).0)
-}
-
-pub fn client_manager_name(authority: &Authority<XorName>) -> XorName {
-    if let Authority::ClientManager(name) = *authority {
-        name
-    } else {
-        unreachable!("Logic error")
-    }
 }
 
 pub fn mdata_shell_hash(data: &MutableData) -> u64 {
