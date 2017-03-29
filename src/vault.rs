@@ -52,7 +52,9 @@ impl Vault {
             }
             Err(e) => return Err(From::from(e)),
         };
-        let builder = RoutingNode::builder().first(first_vault).deny_other_local_nodes();
+        let builder = RoutingNode::builder()
+            .first(first_vault)
+            .deny_other_local_nodes();
         match Self::vault_with_config(builder, use_cache, config.clone()) {
             Ok(vault) => Ok(vault),
             Err(InternalError::ChunkStore(e)) => {
@@ -208,48 +210,56 @@ impl Vault {
             (src @ Authority::ManagedNode(_),
              dst @ Authority::ManagedNode(_),
              Request::Get(data_id, msg_id)) => {
-                self.data_manager.handle_get(&mut self.routing_node, src, dst, data_id, msg_id)
+                self.data_manager
+                    .handle_get(&mut self.routing_node, src, dst, data_id, msg_id)
             }
             // ================== Put ==================
             (src @ Authority::Client { .. },
              dst @ Authority::ClientManager(_),
              Request::Put(data, msg_id)) => {
-                self.maid_manager.handle_put(&mut self.routing_node, src, dst, data, msg_id)
+                self.maid_manager
+                    .handle_put(&mut self.routing_node, src, dst, data, msg_id)
             }
             (src @ Authority::ClientManager(_),
              dst @ Authority::NaeManager(_),
              Request::Put(data, msg_id)) => {
-                self.data_manager.handle_put(&mut self.routing_node, src, dst, data, msg_id)
+                self.data_manager
+                    .handle_put(&mut self.routing_node, src, dst, data, msg_id)
             }
             // ================== Post ==================
             (src @ Authority::Client { .. },
              dst @ Authority::NaeManager(_),
              Request::Post(data, msg_id)) => {
-                self.data_manager.handle_post(&mut self.routing_node, src, dst, data, msg_id)
+                self.data_manager
+                    .handle_post(&mut self.routing_node, src, dst, data, msg_id)
             }
             // ================== Delete ==================
             (src @ Authority::Client { .. },
              dst @ Authority::NaeManager(_),
              Request::Delete(Data::Structured(data), msg_id)) => {
-                self.data_manager.handle_delete(&mut self.routing_node, src, dst, data, msg_id)
+                self.data_manager
+                    .handle_delete(&mut self.routing_node, src, dst, data, msg_id)
             }
             // ================== Append ==================
             (src @ Authority::Client { .. },
              dst @ Authority::NaeManager(_),
              Request::Append(wrapper, msg_id)) => {
-                self.data_manager.handle_append(&mut self.routing_node, src, dst, wrapper, msg_id)
+                self.data_manager
+                    .handle_append(&mut self.routing_node, src, dst, wrapper, msg_id)
             }
             // ================== GetAccountInfo ==================
             (src @ Authority::Client { .. },
              dst @ Authority::ClientManager(_),
              Request::GetAccountInfo(msg_id)) => {
-                self.maid_manager.handle_get_account_info(&mut self.routing_node, src, dst, msg_id)
+                self.maid_manager
+                    .handle_get_account_info(&mut self.routing_node, src, dst, msg_id)
             }
             // ================== Refresh ==================
             (Authority::ClientManager(_),
              Authority::ClientManager(_),
              Request::Refresh(serialised_msg, _)) => {
-                self.maid_manager.handle_refresh(&mut self.routing_node, &serialised_msg)
+                self.maid_manager
+                    .handle_refresh(&mut self.routing_node, &serialised_msg)
             }
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
@@ -257,12 +267,14 @@ impl Vault {
             (Authority::ManagedNode(src_name),
              Authority::NaeManager(_),
              Request::Refresh(serialised_msg, _)) => {
-                self.data_manager.handle_refresh(&mut self.routing_node, src_name, &serialised_msg)
+                self.data_manager
+                    .handle_refresh(&mut self.routing_node, src_name, &serialised_msg)
             }
             (Authority::NaeManager(_),
              Authority::NaeManager(_),
              Request::Refresh(serialised_msg, _)) => {
-                self.data_manager.handle_group_refresh(&mut self.routing_node, &serialised_msg)
+                self.data_manager
+                    .handle_group_refresh(&mut self.routing_node, &serialised_msg)
             }
             // ================== Invalid Request ==================
             (_, _, request) => Err(InternalError::UnknownRequestType(request)),
@@ -279,28 +291,36 @@ impl Vault {
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
              Response::GetSuccess(data, _)) => {
-                self.data_manager.handle_get_success(&mut self.routing_node, src_name, data)
+                self.data_manager
+                    .handle_get_success(&mut self.routing_node, src_name, data)
             }
             // ================== GetFailure ==================
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
              Response::GetFailure { data_id, .. }) => {
-                self.data_manager.handle_get_failure(&mut self.routing_node, src_name, data_id)
+                self.data_manager
+                    .handle_get_failure(&mut self.routing_node, src_name, data_id)
             }
             // ================== PutSuccess ==================
             (Authority::NaeManager(_),
              Authority::ClientManager(_),
              Response::PutSuccess(data_id, msg_id)) => {
-                self.maid_manager.handle_put_success(&mut self.routing_node, data_id, msg_id)
+                self.maid_manager
+                    .handle_put_success(&mut self.routing_node, data_id, msg_id)
             }
             // ================== PutFailure ==================
             (Authority::NaeManager(_),
              Authority::ClientManager(_),
-             Response::PutFailure { id, external_error_indicator, data_id }) => {
-                self.maid_manager.handle_put_failure(&mut self.routing_node,
-                                                     id,
-                                                     data_id,
-                                                     &external_error_indicator)
+             Response::PutFailure {
+                 id,
+                 external_error_indicator,
+                 data_id,
+             }) => {
+                self.maid_manager
+                    .handle_put_failure(&mut self.routing_node,
+                                        id,
+                                        data_id,
+                                        &external_error_indicator)
             }
             // ================== Invalid Response ==================
             (_, _, response) => Err(InternalError::UnknownResponseType(response)),
@@ -311,8 +331,10 @@ impl Vault {
                      node_added: XorName,
                      routing_table: RoutingTable<XorName>)
                      -> Result<(), InternalError> {
-        self.maid_manager.handle_node_added(&mut self.routing_node, &node_added, &routing_table);
-        self.data_manager.handle_node_added(&mut self.routing_node, &node_added, &routing_table);
+        self.maid_manager
+            .handle_node_added(&mut self.routing_node, &node_added, &routing_table);
+        self.data_manager
+            .handle_node_added(&mut self.routing_node, &node_added, &routing_table);
         Ok(())
     }
 
@@ -320,8 +342,10 @@ impl Vault {
                     node_lost: XorName,
                     routing_table: RoutingTable<XorName>)
                     -> Result<(), InternalError> {
-        self.maid_manager.handle_node_lost(&mut self.routing_node, &node_lost);
-        self.data_manager.handle_node_lost(&mut self.routing_node, &node_lost, &routing_table);
+        self.maid_manager
+            .handle_node_lost(&mut self.routing_node, &node_lost);
+        self.data_manager
+            .handle_node_lost(&mut self.routing_node, &node_lost, &routing_table);
         Ok(())
     }
 }

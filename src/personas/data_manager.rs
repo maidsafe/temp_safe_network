@@ -100,7 +100,8 @@ impl Default for Cache {
 
 impl Cache {
     fn insert_into_ongoing_gets(&mut self, idle_holder: &XorName, data_idv: &IdAndVersion) {
-        let _ = self.ongoing_gets.insert(*idle_holder, (Instant::now(), *data_idv));
+        let _ = self.ongoing_gets
+            .insert(*idle_holder, (Instant::now(), *data_idv));
     }
 
     fn handle_get_success(&mut self, src: XorName, data_id: &DataIdentifier, version: u64) {
@@ -126,7 +127,9 @@ impl Cache {
     }
 
     fn register_data_with_holder(&mut self, src: &XorName, data_idv: &IdAndVersion) -> bool {
-        if self.data_holders.values().any(|data_idvs| data_idvs.contains(data_idv)) {
+        if self.data_holders
+               .values()
+               .any(|data_idvs| data_idvs.contains(data_idv)) {
             let _ = self.data_holders
                 .entry(*src)
                 .or_insert_with(HashSet::new)
@@ -175,7 +178,8 @@ impl Cache {
             .cloned()
             .collect();
         if !pruned_unneeded_chunks.is_empty() {
-            self.unneeded_chunks.retain(|data_id| !pruned_unneeded_chunks.contains(data_id));
+            self.unneeded_chunks
+                .retain(|data_id| !pruned_unneeded_chunks.contains(data_id));
         }
         pruned_unneeded_chunks.len() as u64
     }
@@ -215,7 +219,8 @@ impl Cache {
         let lost_gets = self.ongoing_gets
             .iter()
             .filter(|&(holder, &(_, (ref data_id, _)))| {
-                        routing_table.other_closest_names(data_id.name(), GROUP_SIZE)
+                        routing_table
+                            .other_closest_names(data_id.name(), GROUP_SIZE)
                             .map_or(true, |group| !group.contains(&holder))
                     })
             .map(|(holder, _)| *holder)
@@ -261,9 +266,9 @@ impl Cache {
         for idle_holder in idle_holders {
             if let Some(data_idvs) = self.data_holders.get_mut(&idle_holder) {
                 if let Some(&data_idv) =
-                    data_idvs.iter().find(|&&(ref data_id, _)| {
-                                              !outstanding_data_ids.contains(data_id)
-                                          }) {
+                    data_idvs
+                        .iter()
+                        .find(|&&(ref data_id, _)| !outstanding_data_ids.contains(data_id)) {
                     let _ = data_idvs.remove(&data_idv);
                     let (data_id, _) = data_idv;
                     let _ = outstanding_data_ids.insert(data_id);
@@ -300,7 +305,8 @@ impl Cache {
         let expired_writes = self.pending_writes
             .iter_mut()
             .flat_map(|(_, writes)| {
-                          writes.iter()
+                          writes
+                              .iter()
                               .position(|write| write.timestamp.elapsed() > timeout)
                               .map_or_else(Vec::new, |index| writes.split_off(index))
                               .into_iter()
@@ -344,7 +350,9 @@ impl Cache {
             mutate_type: mutate_type,
             rejected: rejected,
         };
-        let mut writes = self.pending_writes.entry(data_id).or_insert_with(Vec::new);
+        let mut writes = self.pending_writes
+            .entry(data_id)
+            .or_insert_with(Vec::new);
         let result = if !rejected && writes.iter().all(|pending_write| pending_write.rejected) {
             Some(RefreshData((data_id, version), hash))
         } else {
@@ -356,7 +364,9 @@ impl Cache {
 
     /// Removes and returns all pending writes for the specified data identifier from the cache.
     fn take_pending_writes(&mut self, data_id: &DataIdentifier) -> Vec<PendingWrite> {
-        self.pending_writes.remove(data_id).unwrap_or_else(Vec::new)
+        self.pending_writes
+            .remove(data_id)
+            .unwrap_or_else(Vec::new)
     }
 }
 
@@ -663,10 +673,10 @@ impl DataManager {
                        error);
                 let append_error = serialisation::serialise(&MutationError::NoSuchData)?;
                 return Ok(routing_node.send_append_failure(dst,
-                                                           src,
-                                                           data_id,
-                                                           append_error,
-                                                           message_id)?);
+                                                   src,
+                                                   data_id,
+                                                   append_error,
+                                                   message_id)?);
             }
         };
 
@@ -677,10 +687,10 @@ impl DataManager {
                 trace!("DM sending append_failure for data {:?}, data exceeds size limit.",
                        data_id);
                 return Ok(routing_node.send_append_failure(dst,
-                                                           src,
-                                                           data_id,
-                                                           append_error,
-                                                           message_id)?);
+                                                   src,
+                                                   data_id,
+                                                   append_error,
+                                                   message_id)?);
             }
             self.update_pending_writes(routing_node,
                                        data,
@@ -844,8 +854,16 @@ impl DataManager {
         let RefreshData((data_id, version), refresh_hash) =
             serialisation::deserialise(serialised_refresh)?;
         let mut success = false;
-        for PendingWrite { data, mutate_type, src, dst, message_id, hash, rejected, .. } in
-            self.cache.take_pending_writes(&data_id) {
+        for PendingWrite {
+                data,
+                mutate_type,
+                src,
+                dst,
+                message_id,
+                hash,
+                rejected,
+                ..
+            } in self.cache.take_pending_writes(&data_id) {
             if hash == refresh_hash {
                 let already_existed = self.chunk_store.has(&data_id);
                 if let Err(error) = self.chunk_store.put(&data_id, &data) {
@@ -956,8 +974,14 @@ impl DataManager {
                              message_id: MessageId,
                              rejected: bool)
                              -> Result<(), InternalError> {
-        for PendingWrite { mutate_type, src, dst, data, message_id, .. } in
-            self.cache.remove_expired_writes() {
+        for PendingWrite {
+                mutate_type,
+                src,
+                dst,
+                data,
+                message_id,
+                ..
+            } in self.cache.remove_expired_writes() {
             let data_id = data.identifier();
             let error = MutationError::NetworkOther("Request expired.".to_owned());
             trace!("{:?} did not accumulate. Sending failure", data_id);
@@ -972,7 +996,8 @@ impl DataManager {
         let data_name = *data.name();
 
         if let Some(refresh_data) =
-            self.cache.insert_pending_write(data, mutate_type, src, dst, message_id, rejected) {
+            self.cache
+                .insert_pending_write(data, mutate_type, src, dst, message_id, rejected) {
             let _ = self.send_group_refresh(routing_node, data_name, refresh_data, message_id);
         }
         Ok(())
@@ -986,7 +1011,8 @@ impl DataManager {
         for (idle_holder, data_idv) in candidates {
             if let Some(group) = routing_node.close_group(*data_idv.0.name(), GROUP_SIZE) {
                 if group.contains(&idle_holder) {
-                    self.cache.insert_into_ongoing_gets(&idle_holder, &data_idv);
+                    self.cache
+                        .insert_into_ongoing_gets(&idle_holder, &data_idv);
                     let (data_id, _) = data_idv;
                     let dst = Authority::ManagedNode(idle_holder);
                     let msg_id = MessageId::new();
@@ -1011,12 +1037,13 @@ impl DataManager {
             let _ = self.send_gets_for_needed_data(routing_node);
         }
         let data_idvs =
-            self.cache.chain_records_in_cache(self.chunk_store
-                                                  .keys()
-                                                  .into_iter()
-                                                  .filter_map(|data_id| {
-                                                                  self.to_id_and_version(data_id)
-                                                              }));
+            self.cache
+                .chain_records_in_cache(self.chunk_store
+                                            .keys()
+                                            .into_iter()
+                                            .filter_map(|data_id| {
+                                                            self.to_id_and_version(data_id)
+                                                        }));
         let mut has_pruned_data = false;
         // Only retain data for which we're still in the close group.
         let mut data_list = Vec::new();
@@ -1090,7 +1117,10 @@ impl DataManager {
                     // than the lost node, the lost node was not in the group in the first place.
                     if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
                         if data_idv.0.name().closer(node_name, outer_node) {
-                            data_lists.entry(*outer_node).or_insert_with(Vec::new).push(data_idv);
+                            data_lists
+                                .entry(*outer_node)
+                                .or_insert_with(Vec::new)
+                                .push(data_idv);
                         }
                     }
                 }

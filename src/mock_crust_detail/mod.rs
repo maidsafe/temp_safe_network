@@ -33,11 +33,12 @@ use std::collections::{HashMap, HashSet};
 pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
     let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::identifier).collect();
     let mut data_count = HashMap::new();
-    nodes.iter().flat_map(TestNode::get_stored_names).foreach(|data_idv| if
-        deleted_data_ids.contains(&data_idv.0) {
-                                                                  *data_count.entry(data_idv)
-                                                                       .or_insert(0) += 1;
-                                                              });
+    nodes
+        .iter()
+        .flat_map(TestNode::get_stored_names)
+        .foreach(|data_idv| if deleted_data_ids.contains(&data_idv.0) {
+                     *data_count.entry(data_idv).or_insert(0) += 1;
+                 });
     for (data_id, count) in data_count {
         assert!(count < 5,
                 "Found deleted data: {:?}. count: {}",
@@ -51,7 +52,10 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
     let mut data_holders_map: HashMap<IdAndVersion, Vec<XorName>> = HashMap::new();
     for node in nodes {
         for data_idv in node.get_stored_names() {
-            data_holders_map.entry(data_idv).or_insert_with(Vec::new).push(node.name());
+            data_holders_map
+                .entry(data_idv)
+                .or_insert_with(Vec::new)
+                .push(node.name());
         }
     }
 
@@ -61,16 +65,18 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             Data::Structured(data) => (data.identifier(), data.get_version()),
             _ => unreachable!(),
         };
-        let data_holders = data_holders_map.get(&(data_id, data_version))
+        let data_holders = data_holders_map
+            .get(&(data_id, data_version))
             .cloned()
             .unwrap_or_else(Vec::new)
             .into_iter()
             .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
         let mut expected_data_holders =
-            nodes.iter().map(TestNode::name).sorted_by(|left, right| {
-                                                           data_id.name().cmp_distance(left, right)
-                                                       });
+            nodes
+                .iter()
+                .map(TestNode::name)
+                .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
         expected_data_holders.truncate(GROUP_SIZE);
 

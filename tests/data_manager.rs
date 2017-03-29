@@ -553,14 +553,15 @@ fn appendable_data_parallel_append() {
 
     for i in 0..test_utils::iterations() {
         trace!("Iteration {}", i + 1);
-        let new_data: Vec<AppendedData> = clients.iter_mut()
+        let new_data: Vec<AppendedData> = clients
+            .iter_mut()
             .map(|client| {
-                let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-                let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
-                let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
-                client.append(wrapper);
-                appended_data
-            })
+                     let pointer = DataIdentifier::Structured(rng.gen(), 12345);
+                     let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
+                     let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
+                     client.append(wrapper);
+                     appended_data
+                 })
             .collect();
 
         event_count += poll::poll_and_resend_unacknowledged_parallel(&mut nodes, &mut clients);
@@ -628,14 +629,15 @@ fn appendable_data_parallel_post() {
     let iterations = test_utils::iterations();
     for i in 0..iterations {
         trace!("Iteration {}", i + 1);
-        let new_data: Vec<PubAppendableData> = clients.iter_mut()
+        let new_data: Vec<PubAppendableData> = clients
+            .iter_mut()
             .map(|client| {
-                let new_appendable =
-                    test_utils::pub_appendable_data_version_up(&full_id, &ad, &mut rng);
-                let new_data = Data::PubAppendable(new_appendable.clone());
-                client.post(new_data);
-                new_appendable
-            })
+                     let new_appendable =
+                         test_utils::pub_appendable_data_version_up(&full_id, &ad, &mut rng);
+                     let new_data = Data::PubAppendable(new_appendable.clone());
+                     client.post(new_data);
+                     new_appendable
+                 })
             .collect();
 
         event_count += poll::poll_and_resend_unacknowledged_parallel(&mut nodes, &mut clients);

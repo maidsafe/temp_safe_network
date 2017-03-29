@@ -132,7 +132,9 @@ impl MaidManager {
                 let client_name = utils::client_name(&src);
                 self.send_refresh(routing_node,
                                   &client_name,
-                                  self.accounts.get(&client_name).expect("Account not found."),
+                                  self.accounts
+                                      .get(&client_name)
+                                      .expect("Account not found."),
                                   MessageId::zero());
                 let _ = routing_node.send_put_success(dst, src, data_id, msg_id);
                 Ok(())
@@ -157,11 +159,13 @@ impl MaidManager {
                 let client_name = utils::client_name(&src);
                 self.send_refresh(routing_node,
                                   &client_name,
-                                  self.accounts.get(&client_name).expect("Account not found."),
+                                  self.accounts
+                                      .get(&client_name)
+                                      .expect("Account not found."),
                                   MessageId::zero());
                 // Send failure response back to client
                 let error = match (data_id,
-                       serialisation::deserialise(external_error_indicator)?) {
+                                   serialisation::deserialise(external_error_indicator)?) {
                     (DataIdentifier::Structured(_, TYPE_TAG_SESSION_PACKET),
                      MutationError::DataExists) => {
                         // We wouldn't have forwarded two `Put` requests for the same account, so
@@ -408,7 +412,9 @@ impl MaidManager {
 
     #[cfg(feature = "use-mock-crust")]
     pub fn get_put_count(&self, client_name: &XorName) -> Option<u64> {
-        self.accounts.get(client_name).map(|account| account.data_stored)
+        self.accounts
+            .get(client_name)
+            .map(|account| account.data_stored)
     }
 }
 

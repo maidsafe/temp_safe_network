@@ -115,13 +115,13 @@ impl<Key, Value> ChunkStore<Key, Value>
         // Write the file.
         File::create(&file_path)
             .and_then(|mut file| {
-                file.write_all(&serialised_value)
+                          file.write_all(&serialised_value)
                     .and_then(|()| file.sync_all())
                     .and_then(|()| file.metadata())
                     .map(|metadata| {
                         self.used_space += metadata.len();
                     })
-            })
+                      })
             .map_err(From::from)
     }
 
@@ -167,12 +167,15 @@ impl<Key, Value> ChunkStore<Key, Value>
         fs::read_dir(&self.rootdir)
             .and_then(|dir_entries| {
                 let dir_entry_to_routing_name = |dir_entry: io::Result<fs::DirEntry>| {
-                    dir_entry.ok()
+                    dir_entry
+                        .ok()
                         .and_then(|entry| entry.file_name().into_string().ok())
                         .and_then(|hex_name| hex_name.from_hex().ok())
                         .and_then(|bytes| serialisation::deserialise::<Key>(&*bytes).ok())
                 };
-                Ok(dir_entries.filter_map(dir_entry_to_routing_name).collect())
+                Ok(dir_entries
+                       .filter_map(dir_entry_to_routing_name)
+                       .collect())
             })
             .unwrap_or_else(|_| Vec::new())
     }
@@ -227,10 +230,7 @@ impl<Key, Value> ChunkStore<Key, Value>
 
 impl<Key, Value> Drop for ChunkStore<Key, Value> {
     fn drop(&mut self) {
-        let _ = self.lock_file
-            .take()
-            .iter()
-            .map(File::unlock);
+        let _ = self.lock_file.take().iter().map(File::unlock);
         let _ = fs::remove_dir_all(&self.rootdir);
     }
 }
