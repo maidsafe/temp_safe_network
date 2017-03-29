@@ -256,3 +256,6 @@ pub use vault::Vault;
 
 /// The number of nodes in groups managing data and user accounts.
 pub const GROUP_SIZE: usize = 8;
+
+/// The type tag of invitations to create an account.
+pub const TYPE_TAG_INVITE: u64 = 8;

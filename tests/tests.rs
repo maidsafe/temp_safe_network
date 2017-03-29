@@ -39,6 +39,7 @@ extern crate rand;
 extern crate routing;
 extern crate rust_sodium;
 extern crate safe_vault;
+extern crate tiny_keccak;
 #[macro_use]
 extern crate unwrap;
 

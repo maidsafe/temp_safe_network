@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use GROUP_SIZE;
+use {GROUP_SIZE, TYPE_TAG_INVITE};
 use accumulator::Accumulator;
 use chunk_store::ChunkStore;
 use error::InternalError;
@@ -457,6 +457,7 @@ impl DataManager {
                       -> Result<(), InternalError> {
         let data_id = data.identifier();
         let mut valid = true;
+        let mut error_opt = None;
 
         if self.chunk_store.has(&data_id) {
             match data_id {
@@ -472,6 +473,7 @@ impl DataManager {
                         _ => false,
                     };
                     if !valid {
+                        error_opt = Some(MutationError::DataExists);
                         trace!("DM sending PutFailure for data {:?}, it already exists.",
                                data_id);
                     }
@@ -489,12 +491,8 @@ impl DataManager {
 
         let is_full = self.chunk_store_full();
 
-        let error_opt = if !valid {
-            Some(MutationError::DataExists)
-        } else if is_full {
-            Some(MutationError::NetworkFull)
-        } else {
-            None
+        if valid && is_full {
+            error_opt = Some(MutationError::NetworkFull);
         };
 
         if let Some(error) = error_opt {
@@ -547,6 +545,11 @@ impl DataManager {
                     warn!("Received a Post request for deleted data. {:?} - {:?}",
                           data_id,
                           message_id);
+                    error_opt = Some(MutationError::InvalidOperation);
+                } else if sd.get_type_tag() == TYPE_TAG_INVITE && src.is_single() {
+                    warn!("Received a Post request for invite {:?} from {:?}.",
+                          data_id,
+                          src);
                     error_opt = Some(MutationError::InvalidOperation);
                 } else if sd.replace_with_other(new_sd.clone()).is_err() {
                     error_opt = Some(MutationError::InvalidSuccessor);

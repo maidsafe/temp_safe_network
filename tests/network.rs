@@ -32,9 +32,8 @@ mod test {
     fn fill_network() {
         let network = Network::new(GROUP_SIZE, None);
         let config = Config {
-            wallet_address: None,
             max_capacity: Some(2000),
-            chunk_store_root: None,
+            ..Default::default()
         };
         // Use 8 nodes to avoid the case where four target nodes are full: In that case neither the
         // PutSuccess nor the PutFailure accumulates and client.put_and_verify() would hang.

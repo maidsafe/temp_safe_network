@@ -96,7 +96,7 @@ impl Vault {
         }?;
 
         Ok(Vault {
-               maid_manager: MaidManager::new(),
+               maid_manager: MaidManager::new(config.invite_key),
                data_manager: DataManager::new(chunk_store_root,
                                               config.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY))?,
                routing_node: routing_node,
@@ -227,6 +227,9 @@ impl Vault {
                     .handle_put(&mut self.routing_node, src, dst, data, msg_id)
             }
             // ================== Post ==================
+            (src @ Authority::ClientManager(_),
+             dst @ Authority::NaeManager(_),
+             Request::Post(data, msg_id)) |
             (src @ Authority::Client { .. },
              dst @ Authority::NaeManager(_),
              Request::Post(data, msg_id)) => {
@@ -321,6 +324,24 @@ impl Vault {
                                         id,
                                         data_id,
                                         &external_error_indicator)
+            }
+            // ================== PostSuccess ==================
+            (Authority::NaeManager(_),
+             Authority::ClientManager(client_name),
+             Response::PostSuccess(_, msg_id)) => {
+                self.maid_manager
+                    .handle_post_success(&mut self.routing_node, msg_id, client_name)
+            }
+            // ================== PostFailure ==================
+            (Authority::NaeManager(_),
+             Authority::ClientManager(_),
+             Response::PostFailure {
+                 id,
+                 external_error_indicator,
+                 ..
+             }) => {
+                self.maid_manager
+                    .handle_post_failure(&mut self.routing_node, id, &external_error_indicator)
             }
             // ================== Invalid Response ==================
             (_, _, response) => Err(InternalError::UnknownResponseType(response)),

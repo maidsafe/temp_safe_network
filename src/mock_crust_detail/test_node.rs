@@ -49,22 +49,8 @@ impl TestNode {
                                                   .take(8)
                                                   .collect::<Vec<u8>>()
                                                   .to_hex());
-        let vault_config = match config {
-            Some(config) => {
-                Config {
-                    wallet_address: config.wallet_address,
-                    max_capacity: config.max_capacity,
-                    chunk_store_root: Some(format!("{}", chunk_store_root.display())),
-                }
-            }
-            None => {
-                Config {
-                    wallet_address: None,
-                    max_capacity: None,
-                    chunk_store_root: Some(format!("{}", chunk_store_root.display())),
-                }
-            }
-        };
+        let mut vault_config = config.unwrap_or_default();
+        vault_config.chunk_store_root = Some(format!("{}", chunk_store_root.display()));
         let vault = mock_crust::make_current(&handle, || {
             unwrap!(Vault::new_with_config(first_node, use_cache, vault_config))
         });
