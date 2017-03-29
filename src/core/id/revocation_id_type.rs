@@ -18,7 +18,7 @@
 use core::id::IdTypeTags;
 use routing::XorName;
 use rust_sodium::crypto::hash::sha256;
-use rust_sodium::crypto::sign;
+use rust_sodium::crypto::sign::{self, Seed};
 
 /// `RevocationIdType`
 ///
@@ -28,7 +28,7 @@ use rust_sodium::crypto::sign;
 /// // Generating public and secret keys using rust_sodium
 /// // Create RevocationIdType
 /// use safe_core::core::id;
-/// let _an_maid = id::RevocationIdType::new::<id::MaidTypeTags>();
+/// let _an_maid = id::RevocationIdType::new::<id::MaidTypeTags>(None);
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct RevocationIdType {
@@ -42,10 +42,14 @@ impl RevocationIdType {
     /// An instance of RevocationIdType can be created by invoking the new()
     /// Default contructed RevocationIdType instance is returned
     #[allow(unsafe_code)]
-    pub fn new<TypeTags>() -> RevocationIdType
+    pub fn new<TypeTags>(seed: Option<&Seed>) -> RevocationIdType
         where TypeTags: IdTypeTags
     {
-        let (pub_sign_key, sec_sign_key) = sign::gen_keypair();
+        let (pub_sign_key, sec_sign_key) = match seed {
+            Some(s) => sign::keypair_from_seed(s),
+            None => sign::gen_keypair(),
+        };
+
         let type_tags: TypeTags = unsafe { ::std::mem::uninitialized() };
         RevocationIdType {
             type_tags: (type_tags.revocation_id_type_tag(),
@@ -107,13 +111,13 @@ mod test {
 
     impl Random for RevocationIdType {
         fn generate_random() -> RevocationIdType {
-            RevocationIdType::new::<MaidTypeTags>()
+            RevocationIdType::new::<MaidTypeTags>(None)
         }
     }
 
     #[test]
     fn create_an_mpid() {
-        let _ = RevocationIdType::new::<MpidTypeTags>();
+        let _ = RevocationIdType::new::<MpidTypeTags>(None);
     }
 
     #[test]

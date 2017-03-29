@@ -27,8 +27,8 @@ use rust_sodium::crypto::hash::sha256;
 /// ```
 /// use ::safe_core::core::id::{IdType, RevocationIdType, MaidTypeTags, PublicIdType};
 ///
-/// let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
-/// let maid = IdType::new(&revocation_maid);
+/// let revocation_maid = RevocationIdType::new::<MaidTypeTags>(None);
+/// let maid = IdType::new(&revocation_maid, None);
 /// let _public_maid  = PublicIdType::new(&maid, &revocation_maid);
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
@@ -127,16 +127,16 @@ mod test {
 
     impl Random for PublicIdType {
         fn generate_random() -> PublicIdType {
-            let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
-            let maid = IdType::new(&revocation_maid);
+            let revocation_maid = RevocationIdType::new::<MaidTypeTags>(None);
+            let maid = IdType::new(&revocation_maid, None);
             PublicIdType::new(&maid, &revocation_maid)
         }
     }
 
     #[test]
     fn create_public_mpid() {
-        let revocation_mpid = RevocationIdType::new::<MpidTypeTags>();
-        let mpid = IdType::new(&revocation_mpid);
+        let revocation_mpid = RevocationIdType::new::<MpidTypeTags>(None);
+        let mpid = IdType::new(&revocation_mpid, None);
         let _ = PublicIdType::new(&mpid, &revocation_mpid);
     }
 
@@ -161,8 +161,8 @@ mod test {
 
     #[test]
     fn invariant_check() {
-        let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
-        let maid = IdType::new(&revocation_maid);
+        let revocation_maid = RevocationIdType::new::<MaidTypeTags>(None);
+        let maid = IdType::new(&revocation_maid, None);
         let public_maid = PublicIdType::new(&maid, &revocation_maid);
         let type_tag = public_maid.type_tag;
         let public_id_keys = public_maid.public_keys;

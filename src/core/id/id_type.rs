@@ -18,8 +18,9 @@
 use core::errors::CoreError;
 use core::id::revocation_id_type::RevocationIdType;
 use routing::XorName;
-use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::box_;
 use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign::{self, Seed};
 
 /// `IdType`
 ///
@@ -28,7 +29,7 @@ use rust_sodium::crypto::hash::sha256;
 /// ```
 /// use ::safe_core::core::id::{IdType, RevocationIdType, MaidTypeTags};
 /// // Creating new IdType
-/// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>());
+/// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>(None), None);
 ///
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
@@ -40,9 +41,12 @@ pub struct IdType {
 
 impl IdType {
     /// Invoked to create an instance of IdType
-    pub fn new(revocation_id: &RevocationIdType) -> IdType {
+    pub fn new(revocation_id: &RevocationIdType, seed: Option<&Seed>) -> IdType {
         let asym_keys = box_::gen_keypair();
-        let signing_keys = sign::gen_keypair();
+        let signing_keys = match seed {
+            Some(s) => sign::keypair_from_seed(s),
+            None => sign::gen_keypair(),
+        };
 
         IdType {
             type_tag: revocation_id.type_tags().1,
@@ -112,7 +116,7 @@ mod test {
 
     impl Random for IdType {
         fn generate_random() -> IdType {
-            IdType::new(&RevocationIdType::new::<MaidTypeTags>())
+            IdType::new(&RevocationIdType::new::<MaidTypeTags>(None), None)
         }
     }
 

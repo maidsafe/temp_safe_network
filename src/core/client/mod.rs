@@ -42,13 +42,16 @@ use routing::Client as Routing;
 use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::MutationError;
 // use routing::messaging::{MpidMessage, MpidMessageWrapper};
-use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::box_;
 use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign::{self, Seed};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
 type AccPktData = (String, Vec<u8>);
+const SEED_SUBPARTS: usize = 4;
+
 
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
@@ -116,11 +119,39 @@ impl Client {
                           acc_password: &str,
                           invitation: &str)
                           -> Result<Client, CoreError> {
+        Self::create_acc_impl(acc_locator.as_bytes(),
+                              acc_password.as_bytes(),
+                              invitation,
+                              None,
+                              None)
+    }
+
+    /// This is one of the four Gateway functions to the Maidsafe network, the others being the
+    /// create_account and log_in. This will help create an account give a seed. Everything
+    /// including both account secrets and all MAID keys will be deterministically derived from the
+    /// supplied seed, so this seed needs to be strong. For ordinary users, it's recommended to use
+    /// the normal create_account function where the secrets can be what's easy to remember for the
+    /// user while also being strong.
+    pub fn create_account_with_seed(seed: &str) -> Result<Client, CoreError> {
+        let arr = Self::divide_seed(seed)?;
+
+        let id_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 2]).0);
+        let revocation_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 1]).0);
+
+        Self::create_acc_impl(arr[0], arr[1], "", Some(&id_seed), Some(&revocation_seed))
+    }
+
+    fn create_acc_impl(acc_locator: &[u8],
+                       acc_password: &[u8],
+                       invitation: &str,
+                       id_seed: Option<&Seed>,
+                       revocation_seed: Option<&Seed>)
+                       -> Result<Client, CoreError> {
         trace!("Creating an account.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
-        let account_packet = Account::new(None, None);
+        let account_packet = Account::new(None, None, id_seed, revocation_seed);
         let id_packet = FullId::with_keys((account_packet.get_maid().public_keys().1,
                                            account_packet.get_maid().secret_keys().1.clone()),
                                           (account_packet.get_maid().public_keys().0,
@@ -194,10 +225,20 @@ impl Client {
         Ok(client)
     }
 
-    /// This is one of the two Gateway functions to the Maidsafe network, the other being the
-    /// create_account. This will help log into an already created account for the user in the
-    /// SAFE-network.
+    /// Login using seeded account
+    pub fn login_with_seed(seed: &str) -> Result<Client, CoreError> {
+        let arr = Self::divide_seed(seed)?;
+        Self::login_impl(arr[0], arr[1])
+    }
+
+    /// This is one of the four Gateway functions to the Maidsafe network, the others being the
+    /// create_account and with_seed. This will help log into an already created account for the
+    /// user in the SAFE-network.
     pub fn log_in(acc_locator: &str, acc_password: &str) -> Result<Client, CoreError> {
+        Self::login_impl(acc_locator.as_bytes(), acc_password.as_bytes())
+    }
+
+    fn login_impl(acc_locator: &[u8], acc_password: &[u8]) -> Result<Client, CoreError> {
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
         let mut unregistered_client = Client::create_unregistered_client()?;
@@ -264,6 +305,24 @@ impl Client {
         } else {
             Err(CoreError::ReceivedUnexpectedData)
         }
+    }
+
+    fn divide_seed(seed: &str) -> Result<[&[u8]; SEED_SUBPARTS], CoreError> {
+        let seed = seed.as_bytes();
+        if seed.len() < SEED_SUBPARTS {
+            let e = format!("Improper Seed length of {}. Please supply bigger Seed.",
+                            seed.len());
+            return Err(CoreError::Unexpected(e));
+        }
+
+        let interval = seed.len() / SEED_SUBPARTS;
+
+        let mut arr: [&[u8]; SEED_SUBPARTS] = Default::default();
+        for (i, val) in arr.iter_mut().enumerate() {
+            *val = &seed[interval * i..interval * (i + 1)];
+        }
+
+        Ok(arr)
     }
 
     /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
@@ -891,7 +950,6 @@ impl SessionPacketEncryptionKeys {
 /// //////////////////////////////////////////////////////////////
 #[cfg(test)]
 mod test {
-
     use super::*;
     use core::client::response_getter::GetResponseGetter;
     use core::errors::CoreError;
@@ -930,6 +988,26 @@ mod test {
 
         // Correct Credentials - Login Should Pass
         let _ = unwrap!(Client::log_in(&secret_0, &secret_1));
+    }
+
+    #[test]
+    fn seeded_login() {
+        {
+            let invalid_seed = String::from("123");
+            match Client::create_account_with_seed(&invalid_seed) {
+                Err(CoreError::Unexpected(_)) => (),
+                _ => panic!("Expected a failure"),
+            }
+            match Client::login_with_seed(&invalid_seed) {
+                Err(CoreError::Unexpected(_)) => (),
+                _ => panic!("Expected a failure"),
+            }
+        }
+
+        let seed = unwrap!(utility::generate_random_string(30));
+        assert!(Client::login_with_seed(&seed).is_err());
+        let _ = unwrap!(Client::create_account_with_seed(&seed));
+        let _ = unwrap!(Client::login_with_seed(&seed));
     }
 
     #[test]
