@@ -160,11 +160,11 @@ fn add_service(client: Arc<Mutex<Client>>, dns_operations: &DnsOperations) -> Re
 
     let dir_helper = DirectoryHelper::new(client.clone());
     let (dir_listing, _) = dir_helper.create(service_home_dir_name,
-                                             UNVERSIONED_DIRECTORY_LISTING_TAG,
-                                             vec![],
-                                             false,
-                                             AccessLevel::Public,
-                                             None)?;
+                UNVERSIONED_DIRECTORY_LISTING_TAG,
+                vec![],
+                false,
+                AccessLevel::Public,
+                None)?;
 
     let mut file_helper = FileHelper::new(client.clone());
     let mut writer = file_helper.create(HOME_PAGE_FILE_NAME.to_string(), vec![], dir_listing)?;

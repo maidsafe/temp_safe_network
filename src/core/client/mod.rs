@@ -116,15 +116,9 @@ impl Client {
 
         let account_packet = Account::new(None, None);
         let id_packet = FullId::with_keys((account_packet.get_maid().public_keys().1,
-                                           account_packet.get_maid()
-                                               .secret_keys()
-                                               .1
-                                               .clone()),
+                                           account_packet.get_maid().secret_keys().1.clone()),
                                           (account_packet.get_maid().public_keys().0,
-                                           account_packet.get_maid()
-                                               .secret_keys()
-                                               .0
-                                               .clone()));
+                                           account_packet.get_maid().secret_keys().0.clone()));
 
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
@@ -172,18 +166,15 @@ impl Client {
                 let mut owners = BTreeSet::new();
                 owners.insert(owner_pubkey);
 
-                let mut sd =
-                    StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                        *session_packet_id,
-                                        0,
-                                        account.encrypt(session_packet_keys.get_password(),
-                                                        session_packet_keys.get_pin())?,
-                                        owners)?;
+                let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
+                                                 *session_packet_id,
+                                                 0,
+                                                 account.encrypt(session_packet_keys
+                                                                  .get_password(),
+                                                              session_packet_keys.get_pin())?,
+                                                 owners)?;
                 let _ = sd.add_signature(&(owner_pubkey,
-                                           account.get_maid()
-                                               .secret_keys()
-                                               .0
-                                               .clone()));
+                                           account.get_maid().secret_keys().0.clone()));
                 sd
             };
 
@@ -212,12 +203,14 @@ impl Client {
                 Account::decrypt(session_packet.get_data(), &password, &pin)?;
             let id_packet =
                 FullId::with_keys((decrypted_session_packet.get_maid().public_keys().1,
-                                   decrypted_session_packet.get_maid()
+                                   decrypted_session_packet
+                                       .get_maid()
                                        .secret_keys()
                                        .1
                                        .clone()),
                                   (decrypted_session_packet.get_maid().public_keys().0,
-                                   decrypted_session_packet.get_maid()
+                                   decrypted_session_packet
+                                       .get_maid()
                                        .secret_keys()
                                        .0
                                        .clone()));
@@ -283,7 +276,9 @@ impl Client {
 
     /// Get User's Root Directory ID if available in session packet used for current login
     pub fn get_user_root_directory_id(&self) -> Option<&XorName> {
-        self.account.as_ref().and_then(|account| account.get_user_root_dir_id())
+        self.account
+            .as_ref()
+            .and_then(|account| account.get_user_root_dir_id())
     }
 
     /// Create an entry for the Maidsafe configuration specific Root Directory ID into the
@@ -309,7 +304,9 @@ impl Client {
     /// Get Maidsafe specific configuration's Root Directory ID if available in session packet used
     /// for current login
     pub fn get_configuration_root_directory_id(&self) -> Option<&XorName> {
-        self.account.as_ref().and_then(|account| account.get_maidsafe_config_root_dir_id())
+        self.account
+            .as_ref()
+            .and_then(|account| account.get_maidsafe_config_root_dir_id())
     }
 
     /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and
@@ -331,10 +328,7 @@ impl Client {
             None => {
                 let digest = sha256::hash(&account.get_public_maid().name().0);
                 let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.0.len());
-                for it in digest.0
-                        .iter()
-                        .take(min_length)
-                        .enumerate() {
+                for it in digest.0.iter().take(min_length).enumerate() {
                     nonce_default.0[it.0] = *it.1;
                 }
                 &nonce_default
@@ -362,10 +356,7 @@ impl Client {
             None => {
                 let digest = sha256::hash(&account.get_public_maid().name().0);
                 let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.0.len());
-                for it in digest.0
-                        .iter()
-                        .take(min_length)
-                        .enumerate() {
+                for it in digest.0.iter().take(min_length).enumerate() {
                     nonce_default.0[it.0] = *it.1;
                 }
                 &nonce_default
@@ -755,7 +746,9 @@ impl Client {
 
     /// Get the default address where the PUTs will go to for this client
     pub fn get_default_client_manager_address(&self) -> Result<&XorName, CoreError> {
-        self.client_manager_addr.as_ref().ok_or(CoreError::OperationForbiddenForClient)
+        self.client_manager_addr
+            .as_ref()
+            .ok_or(CoreError::OperationForbiddenForClient)
     }
 
     /// Set the default address where the PUTs and DELETEs will go to for this client
@@ -792,14 +785,11 @@ impl Client {
                         .as_ref()
                         .ok_or(CoreError::OperationForbiddenForClient)?;
                     account.encrypt(session_packet_keys.get_password(),
-                                    session_packet_keys.get_pin())?
+                                 session_packet_keys.get_pin())?
                 };
 
                 let owner_key = account.get_public_maid().public_keys().0;
-                let signing_key = account.get_maid()
-                    .secret_keys()
-                    .0
-                    .clone();
+                let signing_key = account.get_maid().secret_keys().0.clone();
 
                 let mut owners = BTreeSet::new();
                 owners.insert(owner_key);
@@ -812,7 +802,8 @@ impl Client {
                 let _ = sd.add_signature(&(owner_key, signing_key))?;
                 sd
             };
-            self.post(Data::Structured(new_account_version), None)?.get()
+            self.post(Data::Structured(new_account_version), None)?
+                .get()
         } else {
             Err(CoreError::ReceivedUnexpectedData)
         }

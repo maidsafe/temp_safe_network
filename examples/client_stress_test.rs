@@ -92,8 +92,9 @@ fn random_structured_data<R: Rng>(type_tag: u64,
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));
 
-    let args: Args =
-        Docopt::new(USAGE).and_then(|docopt| docopt.decode()).unwrap_or_else(|error| error.exit());
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|docopt| docopt.decode())
+        .unwrap_or_else(|error| error.exit());
 
     let immutable_data_count = unwrap!(args.flag_immutable);
     let structured_data_count = unwrap!(args.flag_structured);

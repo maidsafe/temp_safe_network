@@ -291,9 +291,9 @@ fn email_stress() {
                                  continue;
                              }
                              let _ = scope.spawn(move || {
-                                    unwrap!(peer_handles_ref.lock())
+                                                     unwrap!(peer_handles_ref.lock())
                                         .push(bot.get_peer_email_handles(&peer_bot.email))
-                                });
+                                                 });
                          });
 
         // Send each email-msg from a bot in parallel to all others
@@ -334,8 +334,9 @@ fn email_stress() {
                         continue;
                     }
                     for tx_msg in &peer_bot.tx_msgs {
-                        let pos =
-                            unwrap!(rx_emails.iter().position(|rx_email| *rx_email == *tx_msg));
+                        let pos = unwrap!(rx_emails
+                                              .iter()
+                                              .position(|rx_email| *rx_email == *tx_msg));
                         let _ = rx_emails.remove(pos);
                     }
                 }

@@ -129,7 +129,9 @@ fn directory_operation(option: u32,
             println!("2. Versioned Public Directory");
             println!("3. UnVersioned Private Directory");
             println!("4. UnVersioned Public Directory");
-            match get_user_string("number corresponding to the type").trim().parse::<usize>() {
+            match get_user_string("number corresponding to the type")
+                      .trim()
+                      .parse::<usize>() {
                 Ok(index) => {
                     if index > 4 {
                         println!("Invalid input");
@@ -157,11 +159,11 @@ fn directory_operation(option: u32,
 
                     let directory_helper = DirectoryHelper::new(client.clone());
                     let _ = directory_helper.create(name.clone(),
-                                                    tag_type,
-                                                    vec![],
-                                                    versioned,
-                                                    access_level,
-                                                    Some(&mut directory))?;
+                                tag_type,
+                                vec![],
+                                versioned,
+                                access_level,
+                                Some(&mut directory))?;
                     println!("Created Directory - {}", name);
                 }
                 Err(_) => println!("Invalid input"),
@@ -288,7 +290,8 @@ fn file_operation(option: u32,
             // Read file by version
             let child = get_child_directory(client.clone(), directory)?;
             let file_name = get_user_string("File name");
-            let file = child.find_file(&file_name).ok_or(NfsError::FileNotFound)?;
+            let file = child.find_file(&file_name)
+                .ok_or(NfsError::FileNotFound)?;
             let mut file_helper = FileHelper::new(client);
             let versions = file_helper.get_versions(file, &child)?;
             let ref file_version;
@@ -349,9 +352,9 @@ fn file_operation(option: u32,
                 println!("No directories found");
                 return Ok(());
             } else {
-                match directory_metadata.iter().find(|metadata| {
-                                                         *metadata.get_name() == to_dir_name
-                                                     }) {
+                match directory_metadata
+                          .iter()
+                          .find(|metadata| *metadata.get_name() == to_dir_name) {
                     Some(to_dir) => {
                         if from_directory.get_key() == to_dir.get_key() {
                             return Err(NfsError::DestinationAndSourceAreSame);

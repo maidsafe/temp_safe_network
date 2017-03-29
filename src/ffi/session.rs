@@ -152,12 +152,12 @@ pub type SessionHandle = Arc<Mutex<Session>>;
 pub unsafe extern "C" fn create_unregistered_client(session_handle: *mut *mut SessionHandle)
                                                     -> int32_t {
     helper::catch_unwind_i32(|| {
-        trace!("FFI create unregistered client.");
+                                 trace!("FFI create unregistered client.");
 
-        let session = ffi_try!(Session::create_unregistered_client());
-        *session_handle = allocate_handle(session);
-        0
-    })
+                                 let session = ffi_try!(Session::create_unregistered_client());
+                                 *session_handle = allocate_handle(session);
+                                 0
+                             })
 }
 
 /// Create a registered client. This or any one of the other companion functions to get a

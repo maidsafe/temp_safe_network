@@ -71,7 +71,9 @@ fn main() {
 
             match Client::create_account(&secret_0, &secret_1) {
                 Ok(_) => (),
-                Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => {
+                Err(CoreError::MutationFailure {
+                        reason: MutationError::AccountExists, ..
+                    }) => {
                     println!("ERROR: This domain is already taken. Please retry with different \
                               Keyword and/or PIN");
                     return;

@@ -311,8 +311,9 @@ fn main() {
     // ------------------------------------------------------------------------------------
     assert_eq!(init_logging(), 0);
 
-    let args: Args =
-        Docopt::new(USAGE).and_then(|docopt| docopt.decode()).unwrap_or_else(|error| error.exit());
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|docopt| docopt.decode())
+        .unwrap_or_else(|error| error.exit());
 
     let mut rng = XorShiftRng::from_seed(match args.flag_seed {
                                              Some(seed) => [0, 0, 0, seed],
@@ -327,7 +328,9 @@ fn main() {
     // ------------------------------------------------------------------------
     // Create bots
     let mut now = Instant::now();
-    let bots: Vec<_> = (0..BOTS).map(|n| Bot::new(n, &mut rng, args.flag_get_only)).collect();
+    let bots: Vec<_> = (0..BOTS)
+        .map(|n| Bot::new(n, &mut rng, args.flag_get_only))
+        .collect();
     let mut duration = now.elapsed();
     info!("Create accounts for {} bots: {} secs, {} millis\n",
           BOTS,
@@ -360,9 +363,9 @@ fn main() {
                                      continue;
                                  }
                                  let _ = scope.spawn(move || {
-                                        unwrap!(peer_handles_ref.lock())
+                                                         unwrap!(peer_handles_ref.lock())
                                             .push(bot.get_peer_email_handles(&peer_bot.email))
-                                    });
+                                                     });
                              });
 
             // Send each email-msg from a bot in parallel to all others
@@ -404,8 +407,9 @@ fn main() {
                         continue;
                     }
                     for tx_msg in &peer_bot.tx_msgs {
-                        let pos =
-                            unwrap!(rx_emails.iter().position(|rx_email| *rx_email == *tx_msg));
+                        let pos = unwrap!(rx_emails
+                                              .iter()
+                                              .position(|rx_email| *rx_email == *tx_msg));
                         let _ = rx_emails.remove(pos);
                     }
                 }
