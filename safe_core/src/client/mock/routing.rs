@@ -328,12 +328,9 @@ impl Routing {
                         "list_mdata_keys",
                         GET_MDATA_ENTRIES_DELAY_MS,
                         |data| {
-            let keys = data.keys()
-                .into_iter()
-                .cloned()
-                .collect();
-            Ok(keys)
-        },
+                            let keys = data.keys().into_iter().cloned().collect();
+                            Ok(keys)
+                        },
                         |res| {
                             Response::ListMDataKeys {
                                 res: res,
@@ -356,12 +353,9 @@ impl Routing {
                         "list_mdata_values",
                         GET_MDATA_ENTRIES_DELAY_MS,
                         |data| {
-            let values = data.values()
-                .into_iter()
-                .cloned()
-                .collect();
-            Ok(values)
-        },
+                            let values = data.values().into_iter().cloned().collect();
+                            Ok(values)
+                        },
                         |res| {
                             Response::ListMDataValues {
                                 res: res,
@@ -820,10 +814,12 @@ impl Routing {
             _ => return Err(ClientError::InvalidOwners),
         };
 
-        let ok = owner_keys.iter().any(|owner_key| {
-                                           let owner_name = XorName(sha256::hash(&owner_key.0).0);
-                                           owner_name == dst_name
-                                       });
+        let ok = owner_keys
+            .iter()
+            .any(|owner_key| {
+                     let owner_name = XorName(sha256::hash(&owner_key.0).0);
+                     owner_name == dst_name
+                 });
 
         if ok {
             Ok(())
@@ -881,15 +877,19 @@ impl Routing {
     }
 
     fn network_limits_reached(&self) -> bool {
-        self.max_ops_countdown.as_ref().map_or(false, |count| count.get() == 0)
+        self.max_ops_countdown
+            .as_ref()
+            .map_or(false, |count| count.get() == 0)
     }
 
     fn update_network_limits(&self) -> Option<u64> {
-        self.max_ops_countdown.as_ref().map(|count| {
-                                                let ops = count.get();
-                                                count.set(ops - 1);
-                                                ops
-                                            })
+        self.max_ops_countdown
+            .as_ref()
+            .map(|count| {
+                     let ops = count.get();
+                     count.set(ops - 1);
+                     ops
+                 })
     }
 }
 

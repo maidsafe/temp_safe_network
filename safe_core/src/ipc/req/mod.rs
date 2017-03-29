@@ -104,7 +104,11 @@ impl AuthReq {
     /// You're now responsible for freeing the subobjects memory once you're
     /// done.
     pub fn into_repr_c(self) -> Result<ffi::AuthReq, IpcError> {
-        let AuthReq { app, app_container, containers } = self;
+        let AuthReq {
+            app,
+            app_container,
+            containers,
+        } = self;
 
         let containers = containers_into_vec(containers).map_err(StringError::from)?;
         let (containers_ptr, len, cap) = vec_into_raw_parts(containers);
@@ -199,17 +203,28 @@ impl AppExchangeInfo {
     ///
     /// You're now responsible for freeing this memory once you're done.
     pub fn into_repr_c(self) -> Result<ffi::AppExchangeInfo, IpcError> {
-        let AppExchangeInfo { id, scope, name, vendor } = self;
+        let AppExchangeInfo {
+            id,
+            scope,
+            name,
+            vendor,
+        } = self;
 
         Ok(ffi::AppExchangeInfo {
                id: CString::new(id).map_err(StringError::from)?.into_raw(),
                scope: if let Some(scope) = scope {
-                   CString::new(scope).map_err(StringError::from)?.into_raw()
+                   CString::new(scope)
+                       .map_err(StringError::from)?
+                       .into_raw()
                } else {
                    ptr::null()
                },
-               name: CString::new(name).map_err(StringError::from)?.into_raw(),
-               vendor: CString::new(vendor).map_err(StringError::from)?.into_raw(),
+               name: CString::new(name)
+                   .map_err(StringError::from)?
+                   .into_raw(),
+               vendor: CString::new(vendor)
+                   .map_err(StringError::from)?
+                   .into_raw(),
            })
     }
 }

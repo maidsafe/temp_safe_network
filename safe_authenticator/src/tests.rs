@@ -44,13 +44,16 @@ use test_utils::{access_container, compare_access_container_entries, create_acco
 #[test]
 fn user_root_dir() {
     let authenticator = create_account_and_login();
-    let std_dir_names: Vec<_> =
-        DEFAULT_PRIVATE_DIRS.iter().chain(DEFAULT_PUBLIC_DIRS.iter()).collect();
+    let std_dir_names: Vec<_> = DEFAULT_PRIVATE_DIRS
+        .iter()
+        .chain(DEFAULT_PUBLIC_DIRS.iter())
+        .collect();
 
     // Fetch the entries of the user root dir.
     let (dir, entries) = run(&authenticator, |client| {
         let dir = unwrap!(client.user_root_dir());
-        client.list_mdata_entries(dir.name, dir.type_tag)
+        client
+            .list_mdata_entries(dir.name, dir.type_tag)
             .map(move |entries| (dir, entries))
             .map_err(AuthError::from)
     });
@@ -63,7 +66,8 @@ fn user_root_dir() {
     }
 
     // Fetch all the dirs under user root dir and verify they are empty.
-    let dirs: Vec<_> = entries.into_iter()
+    let dirs: Vec<_> = entries
+        .into_iter()
         .map(|(_, value)| unwrap!(deserialise::<MDataInfo>(&value.content)))
         .collect();
 
@@ -96,7 +100,8 @@ fn config_root_dir() {
     // Fetch the entries of the config root dir.
     let (dir, entries) = run(&authenticator, |client| {
         let dir = unwrap!(client.config_root_dir());
-        client.list_mdata_entries(dir.name, dir.type_tag)
+        client
+            .list_mdata_entries(dir.name, dir.type_tag)
             .map(move |entries| (dir, entries))
             .map_err(AuthError::from)
     });
@@ -145,8 +150,11 @@ fn app_authentication() {
     let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
 
     let (received_req_id, received_auth_req) = match unwrap!(decode_ipc_msg(&authenticator,
-                                 &encoded_msg)) {
-        IpcMsg::Req { req_id, req: IpcReq::Auth(req) } => (req_id, req),
+                                                                            &encoded_msg)) {
+        IpcMsg::Req {
+            req_id,
+            req: IpcReq::Auth(req),
+        } => (req_id, req),
         x => panic!("Unexpected {:?}", x),
     };
 
@@ -169,7 +177,10 @@ fn app_authentication() {
     assert!(encoded_auth_resp.starts_with(&format!("safe-{}", base64_app_id)));
 
     let auth_granted = match unwrap!(ipc::decode_msg(&encoded_auth_resp)) {
-        IpcMsg::Resp { req_id: received_req_id, resp: IpcResp::Auth(Ok(auth_granted)) } => {
+        IpcMsg::Resp {
+            req_id: received_req_id,
+            resp: IpcResp::Auth(Ok(auth_granted)),
+        } => {
             assert_eq!(received_req_id, req_id);
             auth_granted
         }
@@ -215,7 +226,8 @@ fn app_authentication() {
         let app_dir_key = format!("apps/{}", app_id).into_bytes();
         let app_dir_key = unwrap!(user_root_dir.enc_entry_key(&app_dir_key));
 
-        client.get_mdata_value(user_root_dir.name, user_root_dir.type_tag, app_dir_key)
+        client
+            .get_mdata_value(user_root_dir.name, user_root_dir.type_tag, app_dir_key)
             .and_then(move |value| {
                           let encoded = user_root_dir.decrypt(&value.content)?;
                           let decoded = deserialise::<MDataInfo>(&encoded)?;
@@ -228,7 +240,10 @@ fn app_authentication() {
 
     // Check the app is authorised.
     let auth_keys = run(&authenticator, |client| {
-        client.list_auth_keys_and_version().map(|(keys, _)| keys).map_err(AuthError::from)
+        client
+            .list_auth_keys_and_version()
+            .map(|(keys, _)| keys)
+            .map_err(AuthError::from)
     });
 
     assert!(auth_keys.contains(&app_sign_pk));
@@ -278,8 +293,9 @@ fn authenticated_app_cannot_be_authenticated_again() {
 
     match decode_ipc_msg(&authenticator, &encoded_msg) {
         Err((code,
-             Some(IpcMsg::Resp { resp: IpcResp::Auth(Err(IpcError::AlreadyAuthorised)), .. })))
-            if code == ERR_ALREADY_AUTHORISED => (),
+             Some(IpcMsg::Resp {
+                      resp: IpcResp::Auth(Err(IpcError::AlreadyAuthorised)), ..
+                  }))) if code == ERR_ALREADY_AUTHORISED => (),
         x => panic!("Unexpected {:?}", x),
     };
 }
@@ -398,7 +414,11 @@ fn revoke_app() {
 
     let _ = run(&authenticator, move |client| {
         file_helper::create(client.clone(), videos_md2, "video.mp4", Vec::new())
-            .and_then(move |writer| writer.write(&[1u8; 10]).and_then(move |_| writer.close()))
+            .and_then(move |writer| {
+                          writer
+                              .write(&[1u8; 10])
+                              .and_then(move |_| writer.close())
+                      })
             .map_err(From::from)
     });
 
@@ -409,7 +429,9 @@ fn revoke_app() {
     let app_keys = auth_granted.app_keys;
     let app_sign_pk = app_keys.sign_pk;
 
-    let ac_md_info = auth_granted.access_container.into_mdata_info(app_keys.enc_key.clone());
+    let ac_md_info = auth_granted
+        .access_container
+        .into_mdata_info(app_keys.enc_key.clone());
     run(&authenticator, move |client| {
         access_container_entry(client, &ac_md_info, &app_id, app_keys)
             .then(move |res| match res {
@@ -422,7 +444,9 @@ fn revoke_app() {
     // related to app-sign_pk are still present, they should not be present.
     let videos_md3 = videos_md.clone();
     let perms = run(&authenticator, move |client| {
-        client.list_mdata_permissions(videos_md3.name, videos_md3.type_tag).map_err(From::from)
+        client
+            .list_mdata_permissions(videos_md3.name, videos_md3.type_tag)
+            .map_err(From::from)
     });
     assert!(!perms.contains_key(&User::Key(app_sign_pk)));
 
@@ -466,7 +490,11 @@ fn revoke_app_reencryption() {
 
     let _ = run(&authenticator, move |client| {
         file_helper::create(client.clone(), videos_md2, "video.mp4", vec![1, 2, 3])
-            .and_then(move |writer| writer.write(&[1u8; 10]).and_then(move |_| writer.close()))
+            .and_then(move |writer| {
+                          writer
+                              .write(&[1u8; 10])
+                              .and_then(move |_| writer.close())
+                      })
             .map_err(From::from)
     });
 
@@ -477,7 +505,9 @@ fn revoke_app_reencryption() {
     // related to the 2nd app are still present but not present for the revoked app.
     let videos_md3 = videos_md.clone();
     let perms = run(&authenticator, move |client| {
-        client.list_mdata_permissions(videos_md3.name, videos_md3.type_tag).map_err(From::from)
+        client
+            .list_mdata_permissions(videos_md3.name, videos_md3.type_tag)
+            .map_err(From::from)
     });
     assert!(!perms.contains_key(&User::Key(auth_granted1.app_keys.sign_pk)));
     assert!(perms.contains_key(&User::Key(auth_granted2.app_keys.sign_pk)));

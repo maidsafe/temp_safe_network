@@ -141,7 +141,8 @@ impl Authenticator {
             let (net_tx, net_rx) = mpsc::unbounded::<NetworkEvent>();
             let core_tx_clone = core_tx.clone();
 
-            let net_obs_fut = net_rx.then(move |net_event| Ok(network_observer(net_event)))
+            let net_obs_fut = net_rx
+                .then(move |net_event| Ok(network_observer(net_event)))
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
@@ -208,7 +209,8 @@ impl Authenticator {
             let (net_tx, net_rx) = mpsc::unbounded::<NetworkEvent>();
             let core_tx_clone = core_tx.clone();
 
-            let net_obs_fut = net_rx.then(move |net_event| Ok(network_observer(net_event)))
+            let net_obs_fut = net_rx
+                .then(move |net_event| Ok(network_observer(net_event)))
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 

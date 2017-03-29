@@ -44,7 +44,8 @@ fn md_created_by_app_1() {
                                              BTreeMap::new(),
                                              owners));
         let cl2 = client.clone();
-        client.put_mdata(mdata)
+        client
+            .put_mdata(mdata)
             .then(move |res| {
                 match res {
                     Ok(()) => panic!("Put should be rejected by MaidManagers"),
@@ -91,7 +92,8 @@ fn md_created_by_app_2() {
             unwrap!(MutableData::new(name.clone(), DIR_TAG, permissions, BTreeMap::new(), owners));
         let name2 = name.clone();
         let cl2 = client.clone();
-        client.put_mdata(mdata)
+        client
+            .put_mdata(mdata)
             .then(move |res| {
                       unwrap!(res);
                       cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 2)
@@ -112,7 +114,8 @@ fn md_created_by_app_2() {
         random_client(move |client| {
             let (name, sign_pk) = unwrap!(alt_client_rx.recv());
             let cl2 = client.clone();
-            client.ins_auth_key(sign_pk, 1)
+            client
+                .ins_auth_key(sign_pk, 1)
                 .then(move |res| {
                           unwrap!(res);
                           cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 2)
@@ -154,7 +157,8 @@ fn md_created_by_app_3() {
         let cl2 = client.clone();
         let cl3 = client.clone();
         let name2 = name.clone();
-        client.mutate_mdata_entries(name.clone(), DIR_TAG, actions)
+        client
+            .mutate_mdata_entries(name.clone(), DIR_TAG, actions)
             .then(move |res| {
                 unwrap!(res);
                 let mut actions = BTreeMap::new();
@@ -382,13 +386,15 @@ fn multiple_apps() {
         let cl4 = client.clone();
         let name2 = name.clone();
         let name3 = name.clone();
-        client.put_mdata(mdata)
+        client
+            .put_mdata(mdata)
             .then(move |res| {
-                unwrap!(res);
-                unwrap!(name_tx.send(name.clone()));
-                let entry_key: Vec<u8> = unwrap!(entry_rx.recv());
-                cl2.get_mdata_value(name, DIR_TAG, entry_key.clone()).map(move |v| (v, entry_key))
-            })
+                      unwrap!(res);
+                      unwrap!(name_tx.send(name.clone()));
+                      let entry_key: Vec<u8> = unwrap!(entry_rx.recv());
+                      cl2.get_mdata_value(name, DIR_TAG, entry_key.clone())
+                          .map(move |v| (v, entry_key))
+                  })
             .then(move |res| {
                 let (value, entry_key) = unwrap!(res);
                 assert_eq!(value,
@@ -403,15 +409,16 @@ fn multiple_apps() {
                       let entry_key = unwrap!(res);
                       unwrap!(mutate_again_tx.send(()));
                       unwrap!(final_check_rx.recv());
-                      cl4.list_mdata_keys(name3, DIR_TAG).map(move |x| (x, entry_key))
+                      cl4.list_mdata_keys(name3, DIR_TAG)
+                          .map(move |x| (x, entry_key))
                   })
             .then(move |res| -> Result<_, ()> {
-                let (keys, entry_key) = unwrap!(res);
-                assert_eq!(keys.len(), 1);
-                assert!(keys.contains(&entry_key));
-                unwrap!(tx.send(()));
-                Ok(())
-            })
+                      let (keys, entry_key) = unwrap!(res);
+                      assert_eq!(keys.len(), 1);
+                      assert!(keys.contains(&entry_key));
+                      unwrap!(tx.send(()));
+                      Ok(())
+                  })
             .into_box()
             .into()
     }));
@@ -427,7 +434,8 @@ fn multiple_apps() {
                                                 }));
 
         let cl2 = client.clone();
-        client.mutate_mdata_entries(name.clone(), DIR_TAG, actions)
+        client
+            .mutate_mdata_entries(name.clone(), DIR_TAG, actions)
             .then(move |res| {
                 unwrap!(res);
                 unwrap!(entry_tx.send(entry_key));
@@ -490,7 +498,8 @@ fn permissions_and_version() {
         let cl5 = client.clone();
         let cl6 = client.clone();
         let cl7 = client.clone();
-        client.put_mdata(mdata)
+        client
+            .put_mdata(mdata)
             .then(move |res| {
                 unwrap!(res);
                 let permissions = PermissionSet::new().allow(Action::Update);
@@ -501,13 +510,13 @@ fn permissions_and_version() {
                       cl3.del_mdata_user_permissions(name, DIR_TAG, User::Key(random_key), 1)
                   })
             .then(move |res| {
-                match res {
-                    Ok(()) => panic!("It should fail with invalid successor"),
-                    Err(CoreError::RoutingClientError(ClientError::InvalidSuccessor)) => (),
-                    Err(x) => panic!("Expected ClientError::InvalidSuccessor. Got {:?}", x),
-                }
-                cl4.list_mdata_permissions(name, DIR_TAG)
-            })
+                      match res {
+                          Ok(()) => panic!("It should fail with invalid successor"),
+                          Err(CoreError::RoutingClientError(ClientError::InvalidSuccessor)) => (),
+                          Err(x) => panic!("Expected ClientError::InvalidSuccessor. Got {:?}", x),
+                      }
+                      cl4.list_mdata_permissions(name, DIR_TAG)
+                  })
             .then(move |res| {
                 let permissions = unwrap!(res);
                 assert_eq!(permissions.len(), 2);
@@ -599,10 +608,13 @@ fn permissions_crud() {
         let cl8 = client.clone();
         let cl9 = client.clone();
         let cl10 = client.clone();
-        client.put_mdata(mdata)
+        client
+            .put_mdata(mdata)
             .then(move |res| {
                 unwrap!(res);
-                let permissions = PermissionSet::new().allow(Action::Insert).allow(Action::Delete);
+                let permissions = PermissionSet::new()
+                    .allow(Action::Insert)
+                    .allow(Action::Delete);
                 cl2.set_mdata_user_permissions(name,
                                                DIR_TAG,
                                                User::Key(random_key_a),
@@ -741,7 +753,9 @@ fn permissions_crud() {
                                None);
                 }
 
-                let permissions = PermissionSet::new().deny(Action::Insert).deny(Action::Delete);
+                let permissions = PermissionSet::new()
+                    .deny(Action::Insert)
+                    .deny(Action::Delete);
                 cl9.set_mdata_user_permissions(name,
                                                DIR_TAG,
                                                User::Key(random_key_b),
@@ -829,7 +843,8 @@ fn entries_crud() {
         let cl3 = client.clone();
         let cl4 = client.clone();
         let cl5 = client.clone();
-        client.put_mdata(mdata)
+        client
+            .put_mdata(mdata)
             .then(move |res| {
                 unwrap!(res);
                 let mut actions = BTreeMap::new();

@@ -255,9 +255,10 @@ mod tests {
             unsafe { unwrap!(call_vec_u8(|ud, cb| mdata_info_serialise(&app, info1_h, ud, cb))) };
 
         let info2_h = unsafe {
-            let res = call_1(|ud, cb| {
-                mdata_info_deserialise(&app, encoded.as_ptr(), encoded.len(), ud, cb)
-            });
+            let res =
+                call_1(|ud, cb| {
+                           mdata_info_deserialise(&app, encoded.as_ptr(), encoded.len(), ud, cb)
+                       });
 
             unwrap!(res)
         };

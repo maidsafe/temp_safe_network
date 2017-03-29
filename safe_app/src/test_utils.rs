@@ -119,12 +119,12 @@ pub fn create_app_with_access(access_info: HashMap<String, BTreeSet<Permission>>
 #[cfg_attr(feature="cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
 pub extern "C" fn test_create_app(o_app: *mut *mut App) -> i32 {
     catch_unwind_error_code(|| -> Result<(), AppError> {
-        let app = create_app();
-        unsafe {
-            *o_app = Box::into_raw(Box::new(app));
-        }
-        Ok(())
-    })
+                                let app = create_app();
+                                unsafe {
+                                    *o_app = Box::into_raw(Box::new(app));
+                                }
+                                Ok(())
+                            })
 }
 
 /// Create a random app instance for testing, with access to containers

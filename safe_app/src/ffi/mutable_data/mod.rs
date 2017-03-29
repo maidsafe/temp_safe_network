@@ -86,7 +86,8 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
                                user_data,
                                o_cb);
 
-            client.put_mdata(data)
+            client
+                .put_mdata(data)
                 .map_err(AppError::from)
                 .then(move |result| {
                           o_cb(user_data.0, ffi_result_code!(result));
@@ -141,7 +142,8 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
                                o_cb);
             let info = info.clone();
 
-            client.get_mdata_value(info.name, info.type_tag, key)
+            client
+                .get_mdata_value(info.name, info.type_tag, key)
                 .and_then(move |value| {
                               let content = info.decrypt(&value.content)?;
                               Ok((content, value.entry_version))
@@ -170,7 +172,8 @@ pub unsafe extern "C" fn mdata_list_entries(app: *const App,
             let context = context.clone();
             let info = info.clone();
 
-            client.list_mdata_entries(info.name, info.type_tag)
+            client
+                .list_mdata_entries(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |entries| {
                               let entries = mdata_info::decrypt_entries(&info, &entries)?;
@@ -191,7 +194,8 @@ pub unsafe extern "C" fn mdata_list_keys(app: *const App,
             let context = context.clone();
             let info = info.clone();
 
-            client.list_mdata_keys(info.name, info.type_tag)
+            client
+                .list_mdata_keys(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |keys| {
                               let keys = mdata_info::decrypt_keys(&info, &keys)?;
@@ -214,7 +218,8 @@ pub unsafe extern "C" fn mdata_list_values(app: *const App,
             let context = context.clone();
             let info = info.clone();
 
-            client.list_mdata_values(info.name, info.type_tag)
+            client
+                .list_mdata_values(info.name, info.type_tag)
                 .map_err(AppError::from)
                 .and_then(move |values| {
                               let values = mdata_info::decrypt_values(&info, &values)?;
@@ -247,7 +252,8 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
                         o_cb)
             };
 
-            client.mutate_mdata_entries(info.name, info.type_tag, actions)
+            client
+                .mutate_mdata_entries(info.name, info.type_tag, actions)
                 .map_err(AppError::from)
                 .then(move |result| {
                           o_cb(user_data.0, ffi_result_code!(result));
@@ -270,7 +276,8 @@ pub unsafe fn mdata_list_permissions(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         send_with_mdata_info(app, info_h, user_data, o_cb, move |client, context, info| {
             let context = context.clone();
-            client.list_mdata_permissions(info.name, info.type_tag)
+            client
+                .list_mdata_permissions(info.name, info.type_tag)
                 .map(move |perms| helper::insert_permissions(context.object_cache(), perms))
         })
     })
@@ -300,7 +307,8 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
 
             let context = context.clone();
 
-            client.list_mdata_user_permissions(info.name, info.type_tag, user)
+            client
+                .list_mdata_user_permissions(info.name, info.type_tag, user)
                 .map(move |set| {
                          let handle = context.object_cache().insert_mdata_permission_set(set);
                          o_cb(user_data.0, 0, handle);
@@ -334,16 +342,14 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
             let user = try_cb!(helper::get_user(context.object_cache(), user_h),
                                user_data,
                                o_cb);
-            let permission_set = *try_cb!(context.object_cache()
+            let permission_set = *try_cb!(context
+                                              .object_cache()
                                               .get_mdata_permission_set(permission_set_h),
                                           user_data,
                                           o_cb);
 
-            client.set_mdata_user_permissions(info.name,
-                                              info.type_tag,
-                                              user,
-                                              permission_set,
-                                              version)
+            client
+                .set_mdata_user_permissions(info.name, info.type_tag, user, permission_set, version)
                 .map_err(AppError::from)
                 .then(move |result| {
                           o_cb(user_data.0, ffi_result_code!(result));
@@ -376,7 +382,8 @@ pub unsafe fn mdata_del_user_permissions(app: *const App,
                                user_data,
                                o_cb);
 
-            client.del_mdata_user_permissions(info.name, info.type_tag, user, version)
+            client
+                .del_mdata_user_permissions(info.name, info.type_tag, user, version)
                 .map_err(AppError::from)
                 .then(move |result| {
                           o_cb(user_data.0, ffi_result_code!(result));
@@ -407,7 +414,8 @@ pub unsafe extern "C" fn mdata_change_owner(app: *const App,
                                      user_data,
                                      o_cb);
 
-            client.change_mdata_owner(info.name, info.type_tag, new_owner, version)
+            client
+                .change_mdata_owner(info.name, info.type_tag, new_owner, version)
                 .map_err(AppError::from)
                 .then(move |result| {
                           o_cb(user_data.0, ffi_result_code!(result));

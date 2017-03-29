@@ -56,13 +56,15 @@ use safe_app::ffi::access_container::access_container_get_container_mdata_info;
 use safe_app::ffi::ipc as app_ipc;
 use safe_app::ffi::mutable_data::entry_actions::{mdata_entry_actions_free,
                                                  mdata_entry_actions_insert,
-                                                 mdata_entry_actions_new, mdata_entry_actions_update};
+                                                 mdata_entry_actions_new,
+                                                 mdata_entry_actions_update};
 use safe_app::ffi::mutable_data::mdata_mutate_entries;
 use safe_authenticator::Authenticator;
 use safe_authenticator::ffi::{authenticator_free, create_acc};
 use safe_authenticator::ipc::{auth_decode_ipc_msg, encode_auth_resp, encode_containers_resp};
 use safe_core::ipc::req::ffi::{AppExchangeInfo, AuthReq, ContainerPermissions,
-                               ContainerPermissionsArray, ContainersReq, Permission, PermissionArray};
+                               ContainerPermissionsArray, ContainersReq, Permission,
+                               PermissionArray};
 use safe_core::ipc::resp::ffi::AuthGranted;
 use safe_core::utils;
 use std::{mem, ptr};

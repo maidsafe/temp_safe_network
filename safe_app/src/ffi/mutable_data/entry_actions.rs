@@ -34,7 +34,9 @@ pub unsafe extern "C" fn mdata_entry_actions_new(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
             let actions = Default::default();
-            Ok(context.object_cache().insert_mdata_entry_actions(actions))
+            Ok(context
+                   .object_cache()
+                   .insert_mdata_entry_actions(actions))
         })
     })
 }
@@ -102,7 +104,8 @@ pub unsafe extern "C" fn mdata_entry_actions_free(app: *const App,
                                                   o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let _ = context.object_cache().remove_mdata_entry_actions(actions_h)?;
+            let _ = context.object_cache()
+                .remove_mdata_entry_actions(actions_h)?;
             Ok(())
         })
     })
@@ -124,7 +127,8 @@ unsafe fn add_action<F>(app: *const App,
         let action = f();
 
         send_sync(app, user_data, o_cb, move |_, context| {
-            let mut actions = context.object_cache().get_mdata_entry_actions(actions_h)?;
+            let mut actions = context.object_cache()
+                .get_mdata_entry_actions(actions_h)?;
             let _ = actions.insert(key, action);
             Ok(())
         })
@@ -200,16 +204,18 @@ mod tests {
             assert_eq!(actions.len(), 3);
 
             match *unwrap!(actions.get(&key0)) {
-                EntryAction::Ins(Value { ref content, entry_version: 0 }) if *content == value0 => {
-                    ()
-                }
+                EntryAction::Ins(Value {
+                                     ref content,
+                                     entry_version: 0,
+                                 }) if *content == value0 => (),
                 _ => panic!("Unexpected action"),
             }
 
             match *unwrap!(actions.get(&key1)) {
-                EntryAction::Update(Value { ref content, entry_version }) if *content == value1 &&
-                                                                             entry_version ==
-                                                                             version1 => (),
+                EntryAction::Update(Value {
+                                        ref content,
+                                        entry_version,
+                                    }) if *content == value1 && entry_version == version1 => (),
                 _ => panic!("Unexpected action"),
             }
 
@@ -222,7 +228,10 @@ mod tests {
         unsafe { unwrap!(call_0(|ud, cb| mdata_entry_actions_free(&app, handle, ud, cb))) };
 
         run_now(&app, move |_, context| {
-            assert!(context.object_cache().get_mdata_entry_actions(handle).is_err())
+            assert!(context
+                        .object_cache()
+                        .get_mdata_entry_actions(handle)
+                        .is_err())
         });
     }
 }

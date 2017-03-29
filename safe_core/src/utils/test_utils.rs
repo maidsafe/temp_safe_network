@@ -41,12 +41,16 @@ pub fn generate_secret_keys(len: usize) -> Vec<sign::SecretKey> {
 
 /// Generates public keys of maximum size
 pub fn get_max_sized_public_keys(len: usize) -> Vec<sign::PublicKey> {
-    iter::repeat(sign::PublicKey([u8::MAX; sign::PUBLICKEYBYTES])).take(len).collect()
+    iter::repeat(sign::PublicKey([u8::MAX; sign::PUBLICKEYBYTES]))
+        .take(len)
+        .collect()
 }
 
 /// Generates secret keys of maximum size
 pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
-    iter::repeat(sign::SecretKey([u8::MAX; sign::SECRETKEYBYTES])).take(len).collect()
+    iter::repeat(sign::SecretKey([u8::MAX; sign::SECRETKEYBYTES]))
+        .take(len)
+        .collect()
 }
 
 /// Create random registered client and run it inside an event loop. Use this to
@@ -115,7 +119,8 @@ pub fn setup_client_with_net_obs<Create, NetObs, Run, I, T, E>(c: Create,
     let (net_tx, net_rx) = mpsc::unbounded();
     let client = unwrap!(c(el_h.clone(), core_tx.clone(), net_tx));
 
-    let net_fut = net_rx.for_each(move |net_event| Ok(n(net_event)))
+    let net_fut = net_rx
+        .for_each(move |net_event| Ok(n(net_event)))
         .map_err(|e| panic!("Network event stream error: {:?}", e));
     el_h.spawn(net_fut);
 

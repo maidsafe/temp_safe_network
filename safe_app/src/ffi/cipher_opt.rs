@@ -105,7 +105,9 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-                        let handle = context.object_cache().insert_cipher_opt(CipherOpt::PlainText);
+                        let handle = context
+                            .object_cache()
+                            .insert_cipher_opt(CipherOpt::PlainText);
                         o_cb(user_data.0, 0, handle);
                         None
                     })
@@ -122,7 +124,9 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         (*app).send(move |_, context| {
-                        let handle = context.object_cache().insert_cipher_opt(CipherOpt::Symmetric);
+                        let handle = context
+                            .object_cache()
+                            .insert_cipher_opt(CipherOpt::Symmetric);
                         o_cb(user_data.0, 0, handle);
                         None
                     })
@@ -141,16 +145,18 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let pk = match context.object_cache().get_encrypt_key(peer_encrypt_key_h) {
+            let pk = match context
+                      .object_cache()
+                      .get_encrypt_key(peer_encrypt_key_h) {
                 Ok(pk) => *pk,
                 Err(e) => {
                     o_cb(user_data.0, ffi_error_code!(e), 0);
                     return None;
                 }
             };
-            let handle = context.object_cache().insert_cipher_opt(CipherOpt::Asymmetric {
-                                                                      peer_encrypt_key: pk,
-                                                                  });
+            let handle = context
+                .object_cache()
+                .insert_cipher_opt(CipherOpt::Asymmetric { peer_encrypt_key: pk });
             o_cb(user_data.0, 0, handle);
             None
         })
@@ -203,7 +209,10 @@ mod tests {
         assert_free(&app_0, cipher_opt_handle, 0);
 
         run_now(&app_0, move |client, context| {
-            assert!(context.object_cache().get_cipher_opt(cipher_opt_handle).is_err());
+            assert!(context
+                        .object_cache()
+                        .get_cipher_opt(cipher_opt_handle)
+                        .is_err());
             assert!(decrypt_and_check(client, context, &cipher_text, &plain_text));
         });
     }
@@ -225,7 +234,10 @@ mod tests {
         assert_free(&app_0, cipher_opt_handle, 0);
 
         run_now(&app_0, move |client, context| {
-            assert!(context.object_cache().get_cipher_opt(cipher_opt_handle).is_err());
+            assert!(context
+                        .object_cache()
+                        .get_cipher_opt(cipher_opt_handle)
+                        .is_err());
             assert!(decrypt_and_check(client, context, &cipher_text, &plain_text));
         });
     }

@@ -35,7 +35,8 @@ pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            context.refresh_access_info(client)
+            context
+                .refresh_access_info(client)
                 .then(move |res| {
                           o_cb(user_data.0, ffi_result_code!(res));
                           Ok(())
@@ -58,17 +59,20 @@ pub unsafe extern "C" fn access_container_get_names(app: *const App,
         let user_data = OpaqueCtx(user_data);
 
         (*app).send(move |client, context| {
-            context.get_container_names(client)
+            context
+                .get_container_names(client)
                 .and_then(move |names| {
-                    let mut c_str_vec = Vec::new();
-                    for name in names {
-                        c_str_vec.push(CString::new(name)?);
-                    }
-                    Ok(c_str_vec)
-                })
+                              let mut c_str_vec = Vec::new();
+                              for name in names {
+                                  c_str_vec.push(CString::new(name)?);
+                              }
+                              Ok(c_str_vec)
+                          })
                 .map(move |c_str_vec| {
-                         let ptr_vec: Vec<*const c_char> =
-                        c_str_vec.iter().map(|c_string| c_string.as_ptr()).collect();
+                         let ptr_vec: Vec<*const c_char> = c_str_vec
+                             .iter()
+                             .map(|c_string| c_string.as_ptr())
+                             .collect();
                          o_cb(user_data.0, 0, ptr_vec.as_ptr(), c_str_vec.len() as u32);
                      })
                 .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0); })
@@ -94,7 +98,8 @@ MDataInfoHandle)){
         (*app).send(move |client, context| {
             let context = context.clone();
 
-            context.get_container_mdata_info(client, name)
+            context
+                .get_container_mdata_info(client, name)
                 .map(move |info| {
                          let handle = context.object_cache().insert_mdata_info(info);
                          o_cb(user_data.0, 0, handle);
@@ -120,11 +125,12 @@ pub unsafe extern "C" fn access_container_is_permitted(app: *const App,
         let name = from_c_str(name)?;
 
         (*app).send(move |client, context| {
-            context.is_permitted(client, name, permission)
-                .map(move |answer| o_cb(user_data.0, 0, answer))
-                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), false))
-                .into_box()
-                .into()
-        })
+                        context
+                            .is_permitted(client, name, permission)
+                            .map(move |answer| o_cb(user_data.0, 0, answer))
+                            .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), false))
+                            .into_box()
+                            .into()
+                    })
     })
 }

@@ -36,10 +36,11 @@ pub unsafe extern "C" fn mdata_entries_new(app: *const App,
                                                                i32,
                                                                MDataEntriesHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
-        send_sync(app,
-                  user_data,
-                  o_cb,
-                  |_, context| Ok(context.object_cache().insert_mdata_entries(Default::default())))
+        send_sync(app, user_data, o_cb, |_, context| {
+            Ok(context
+                   .object_cache()
+                   .insert_mdata_entries(Default::default()))
+        })
     })
 }
 
@@ -102,7 +103,8 @@ pub unsafe extern "C" fn mdata_entries_get(app: *const App,
             let entries = context.object_cache().get_mdata_entries(entries_h);
             let entries = try_cb!(entries, user_data, o_cb);
 
-            let value = entries.get(&key)
+            let value = entries
+                .get(&key)
                 .ok_or(ClientError::NoSuchEntry)
                 .map_err(CoreError::from)
                 .map_err(AppError::from);

@@ -42,8 +42,11 @@ pub fn create_std_dirs(client: Client) -> Box<NfsFuture<()>> {
         .and_then(move |results| {
             // let results = fry!(res);
             let mut actions = BTreeMap::new();
-            for (dir, name) in
-                results.iter().zip(DEFAULT_PRIVATE_DIRS.iter().chain(DEFAULT_PUBLIC_DIRS.iter())) {
+            for (dir, name) in results
+                    .iter()
+                    .zip(DEFAULT_PRIVATE_DIRS
+                             .iter()
+                             .chain(DEFAULT_PUBLIC_DIRS.iter())) {
                 let serialised_dir = fry!(serialise(dir));
                 let encrypted_key = fry!(root_dir.enc_entry_key(name.as_bytes()));
                 let encrypted_value = fry!(root_dir.enc_entry_value(&serialised_dir));
@@ -53,7 +56,8 @@ pub fn create_std_dirs(client: Client) -> Box<NfsFuture<()>> {
                                                             entry_version: 0,
                                                         }));
             }
-            client.mutate_mdata_entries(root_dir.name, DIR_TAG, actions)
+            client
+                .mutate_mdata_entries(root_dir.name, DIR_TAG, actions)
                 .map_err(NfsError::from)
                 .into_box()
         })
@@ -77,19 +81,22 @@ mod tests {
             create_std_dirs(client.clone()).then(move |res| {
                 unwrap!(res);
                 let root_dir = unwrap!(cl2.user_root_dir());
-                cl2.list_mdata_entries(root_dir.name, DIR_TAG).then(move |mdata_entries| {
-                    let root_mdata = unwrap!(mdata_entries);
-                    assert_eq!(root_mdata.len(),
-                               DEFAULT_PUBLIC_DIRS.len() + DEFAULT_PRIVATE_DIRS.len());
-                    for key in DEFAULT_PUBLIC_DIRS.iter().chain(DEFAULT_PRIVATE_DIRS.iter()) {
-                        // let's check whether all our entires have been created properly
-                        let enc_key = root_dir.enc_entry_key(key.as_bytes()).unwrap();
-                        assert_ne!(enc_key, Vec::from(*key));
-                        assert_eq!(root_mdata.contains_key(&enc_key), true);
-                        assert_ne!(root_mdata.contains_key(&Vec::from(*key)), true);
-                    }
-                    finish()
-                })
+                cl2.list_mdata_entries(root_dir.name, DIR_TAG)
+                    .then(move |mdata_entries| {
+                        let root_mdata = unwrap!(mdata_entries);
+                        assert_eq!(root_mdata.len(),
+                                   DEFAULT_PUBLIC_DIRS.len() + DEFAULT_PRIVATE_DIRS.len());
+                        for key in DEFAULT_PUBLIC_DIRS
+                                .iter()
+                                .chain(DEFAULT_PRIVATE_DIRS.iter()) {
+                            // let's check whether all our entires have been created properly
+                            let enc_key = root_dir.enc_entry_key(key.as_bytes()).unwrap();
+                            assert_ne!(enc_key, Vec::from(*key));
+                            assert_eq!(root_mdata.contains_key(&enc_key), true);
+                            assert_ne!(root_mdata.contains_key(&Vec::from(*key)), true);
+                        }
+                        finish()
+                    })
             })
         });
     }

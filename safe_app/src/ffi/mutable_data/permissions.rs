@@ -58,7 +58,9 @@ pub unsafe extern "C" fn mdata_permission_set_new(app: *const App,
                                                                       MDataPermissionSetHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
-            Ok(context.object_cache().insert_mdata_permission_set(PermissionSet::new()))
+            Ok(context
+                   .object_cache()
+                   .insert_mdata_permission_set(PermissionSet::new()))
         })
     })
 }
@@ -119,7 +121,8 @@ pub unsafe extern "C" fn mdata_permissions_set_free(app: *const App,
                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let _ = context.object_cache().remove_mdata_permission_set(set_h)?;
+            let _ = context.object_cache()
+                .remove_mdata_permission_set(set_h)?;
             Ok(())
         })
     })
@@ -134,7 +137,9 @@ pub unsafe extern "C" fn mdata_permissions_new(app: *const App,
                                                                    MDataPermissionsHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
-            Ok(context.object_cache().insert_mdata_permissions(Default::default()))
+            Ok(context
+                   .object_cache()
+                   .insert_mdata_permissions(Default::default()))
         })
     })
 }
@@ -147,7 +152,8 @@ pub unsafe extern "C" fn mdata_permissions_len(app: *const App,
                                                o_cb: extern "C" fn(*mut c_void, i32, usize)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
+            let permissions = context.object_cache()
+                .get_mdata_permissions(permissions_h)?;
             Ok(permissions.len())
         })
     })
@@ -164,7 +170,8 @@ pub unsafe extern "C" fn mdata_permissions_get(app: *const App,
                                                                    MDataPermissionSetHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
+            let permissions = context.object_cache()
+                .get_mdata_permissions(permissions_h)?;
             let user_key = *context.object_cache().get_sign_key(user_h)?;
             let handle = *permissions.get(&User::Key(user_key))
                               .ok_or(AppError::InvalidSignKeyHandle)?;
@@ -190,7 +197,8 @@ done_cb: extern "C" fn(*mut c_void, i32)){
         let user_data = OpaqueCtx(user_data);
 
         send_sync(app, user_data.0, done_cb, move |_, context| {
-            let permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
+            let permissions = context.object_cache()
+                .get_mdata_permissions(permissions_h)?;
             for (user_key, permission_set_h) in &*permissions {
                 let user_h = match *user_key {
                     User::Key(key) => context.object_cache().insert_sign_key(key),
@@ -216,7 +224,8 @@ pub unsafe extern "C" fn mdata_permissions_insert(app: *const App,
                                                   o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let mut permissions = context.object_cache().get_mdata_permissions(permissions_h)?;
+            let mut permissions = context.object_cache()
+                .get_mdata_permissions(permissions_h)?;
             let user_key = *context.object_cache().get_sign_key(user_h)?;
             let _ = permissions.insert(User::Key(user_key), permission_set_h);
 
@@ -233,7 +242,8 @@ pub unsafe extern "C" fn mdata_permissions_free(app: *const App,
                                                 o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
-            let _ = context.object_cache().remove_mdata_permissions(permissions_h)?;
+            let _ = context.object_cache()
+                .remove_mdata_permissions(permissions_h)?;
             Ok(())
         })
     })
