@@ -213,7 +213,12 @@ impl MaidManager {
         match self.account_creation_cache.remove(&msg_id) {
             None => Err(InternalError::FailedToFindCachedRequest(msg_id)),
             Some((src, dst, data)) => {
-                let error = serialisation::deserialise(external_error_indicator)?;
+                let post_error: MutationError =
+                    serialisation::deserialise(external_error_indicator)?;
+                trace!("Failed to create account for {:?}. Invalid invitation: {:?}",
+                       src,
+                       post_error);
+                let error = MutationError::NetworkOther("invalid invitation".to_string());
                 let data_id = data.identifier();
                 self.reply_with_put_failure(routing_node, src, dst, data_id, msg_id, &error)
             }
