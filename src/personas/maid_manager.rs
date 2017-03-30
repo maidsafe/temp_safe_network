@@ -28,6 +28,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::convert::From;
 use std::time::Duration;
+use std::u64;
 use tiny_keccak::sha3_256;
 use utils;
 use vault::RoutingNode;
@@ -383,7 +384,10 @@ impl MaidManager {
                     Entry::Occupied(_) => error_opt = Some(MutationError::AccountExists),
                     Entry::Vacant(entry) => {
                         // Create the account, the SD incurs charge later on
-                        let _account_ref = entry.insert(Account::default());
+                        let account = entry.insert(Account::default());
+                        if is_admin {
+                            account.space_available = u64::MAX;
+                        }
                         info!("Managing {} client accounts.", len + 1);
                     }
                 }
