@@ -399,14 +399,8 @@ impl MaidManager {
             } else if self.accounts.contains_key(&client_name) {
                 error_opt = Some(MutationError::AccountExists);
             } else {
-                let (invitation, account_payload): (String, Vec<u8>) =
+                let (invitation, _): (String, Vec<u8>) =
                     serialisation::deserialise(data.get_data())?;
-                let account_data = StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                                       *data.name(),
-                                                       data.get_version(),
-                                                       account_payload,
-                                                       data.get_owners().clone())?;
-                let ac = (src, dst, Data::Structured(account_data));
                 let invite_hash = sha3_256(invitation.as_bytes());
                 let invite_data = Data::Structured(StructuredData::new(TYPE_TAG_INVITE,
                                                                        XorName(invite_hash),
@@ -416,6 +410,7 @@ impl MaidManager {
                 trace!("Creating account for {:?} with invitation {:?}.",
                        client_name,
                        invite_data.name());
+                let ac = (src, dst, Data::Structured(data));
                 if let Some(oac) = self.account_creation_cache.insert(msg_id, ac) {
                     debug!("Received two account creation requests with message ID {:?}. {:?} \
                             and {:?}.",
