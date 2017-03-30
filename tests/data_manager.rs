@@ -43,7 +43,7 @@ fn put_invitation() {
     let network = Network::new(GROUP_SIZE, None);
     let node_count = GROUP_SIZE;
     let vault_cfg = Config {
-        invite_key: Some(*invite_id.public_id().signing_public_key()),
+        invite_key: Some(invite_id.public_id().signing_public_key().0),
         ..Default::default()
     };
     let mut nodes = test_node::create_nodes(&network, node_count, Some(&vault_cfg), false);

@@ -25,6 +25,7 @@ use personas::data_manager::IdAndVersion;
 use personas::maid_manager::MaidManager;
 use routing::{Authority, Data, EventStream, NodeBuilder, Request, Response, RoutingTable, XorName};
 use rust_sodium;
+use rust_sodium::crypto::sign::PublicKey;
 use std::env;
 use std::path::Path;
 
@@ -96,7 +97,7 @@ impl Vault {
         }?;
 
         Ok(Vault {
-               maid_manager: MaidManager::new(config.invite_key),
+               maid_manager: MaidManager::new(config.invite_key.map(PublicKey)),
                data_manager: DataManager::new(chunk_store_root,
                                               config.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY))?,
                routing_node: routing_node,
