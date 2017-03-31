@@ -53,7 +53,10 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
     let mut data_holders_map: HashMap<(DataId, u64), Vec<XorName>> = HashMap::new();
     for node in nodes {
         for data_idv in node.get_stored_ids() {
-            data_holders_map.entry(data_idv).or_insert_with(Vec::new).push(node.name());
+            data_holders_map
+                .entry(data_idv)
+                .or_insert_with(Vec::new)
+                .push(node.name());
         }
     }
 
@@ -63,15 +66,18 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             Data::Mutable(data) => (DataId::mutable(&data), data.version()),
         };
 
-        let data_holders = data_holders_map.get(&(data_id, data_version))
+        let data_holders = data_holders_map
+            .get(&(data_id, data_version))
             .cloned()
             .unwrap_or_else(Vec::new)
             .into_iter()
             .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
-        let mut expected_data_holders = nodes.iter()
-            .map(TestNode::name)
-            .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
+        let mut expected_data_holders =
+            nodes
+                .iter()
+                .map(TestNode::name)
+                .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
         expected_data_holders.truncate(GROUP_SIZE);
 

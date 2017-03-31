@@ -45,11 +45,11 @@ impl RoutingCache for Cache {
                 .borrow_mut()
                 .get(&name)
                 .map(|data| {
-                    Response::GetIData {
-                        res: Ok(data.clone()),
-                        msg_id: msg_id,
-                    }
-                })
+                         Response::GetIData {
+                             res: Ok(data.clone()),
+                             msg_id: msg_id,
+                         }
+                     })
         } else {
             None
         }
@@ -89,7 +89,10 @@ mod tests {
         };
 
         match cache.get(&request) {
-            Some(Response::GetIData { res: Ok(cached_data), msg_id: cached_message_id }) => {
+            Some(Response::GetIData {
+                     res: Ok(cached_data),
+                     msg_id: cached_message_id,
+                 }) => {
                 assert_eq!(cached_data, data);
                 assert_eq!(cached_message_id, request_message_id);
             }

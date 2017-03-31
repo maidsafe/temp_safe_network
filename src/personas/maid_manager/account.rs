@@ -27,7 +27,7 @@ pub const DEFAULT_ACCOUNT_SIZE: u64 = 500;
 #[cfg(feature = "use-mock-crust")]
 pub const DEFAULT_ACCOUNT_SIZE: u64 = 100;
 
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Account {
     pub info: AccountInfo,
     pub auth_keys: BTreeSet<sign::PublicKey>,

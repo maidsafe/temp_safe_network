@@ -18,7 +18,7 @@
 use routing::{ImmutableData, MutableData, XorName};
 
 /// Identifier for a data (immutable or mutable)
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum DataId {
     /// Identifier of immutable data.
     Immutable(XorName),
@@ -47,7 +47,7 @@ impl DataId {
 }
 
 /// Type that can hold both immutable and mutable data.
-#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Data {
     /// Immutable data.
     Immutable(ImmutableData),

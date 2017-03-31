@@ -15,10 +15,22 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use maidsafe_utilities;
+use maidsafe_utilities::serialisation;
 use routing::{Authority, MutableData, Value, XorName};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
+use serde::Serialize;
+use tiny_keccak;
+
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash, Serialize, Deserialize)]
+pub struct SecureHash([u8; 32]);
+
+/// Compute secure hash of the given value.
+pub fn secure_hash<T: Serialize>(value: &T) -> SecureHash {
+    serialisation::serialise(value)
+        .map(|data| SecureHash(tiny_keccak::sha3_256(&data)))
+        .unwrap_or_else(|_| Default::default())
+}
 
 /// Extract client key (a public singing key) from the authority.
 ///
@@ -50,15 +62,15 @@ pub fn client_name_from_key(key: &sign::PublicKey) -> XorName {
     XorName(sha256::hash(&key[..]).0)
 }
 
-pub fn mdata_shell_hash(data: &MutableData) -> u64 {
+pub fn mdata_shell_hash(data: &MutableData) -> SecureHash {
     let shell = (*data.name(),
                  data.tag(),
                  data.version(),
                  data.owners().clone(),
                  data.permissions().clone());
-    maidsafe_utilities::big_endian_sip_hash(&shell)
+    secure_hash(&shell)
 }
 
-pub fn mdata_value_hash(value: &Value) -> u64 {
-    maidsafe_utilities::big_endian_sip_hash(&value)
+pub fn mdata_value_hash(value: &Value) -> SecureHash {
+    secure_hash(&value)
 }

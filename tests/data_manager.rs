@@ -20,8 +20,8 @@
 
 
 use rand::Rng;
-use routing::{Action, ClientError, EntryActions, Event, MAX_MUTABLE_DATA_ENTRY_ACTIONS,
-              MutableData, PermissionSet, Response, User};
+use routing::{Action, Authority, ClientError, EntryActions, Event, ImmutableData,
+              MAX_MUTABLE_DATA_ENTRY_ACTIONS, MutableData, PermissionSet, Response, User};
 use routing::mock_crust::{self, Network};
 use rust_sodium::crypto::sign;
 use safe_vault::{Data, GROUP_SIZE, test_utils};
@@ -697,6 +697,11 @@ fn mutable_data_parallel_mutations() {
 
 #[test]
 fn mutable_data_operations_with_churn() {
+    // let seed = Some([1744178832, 2594784533, 113142720, 885260897]);
+    // let node_count = 8;
+    // let operation_count = 1;
+    // let iterations = 4;
+
     let seed = None;
     let node_count = TEST_NET_SIZE;
     let operation_count = 5;
@@ -797,27 +802,26 @@ fn mutable_data_operations_with_churn() {
     verify_data_is_stored(&mut nodes, &mut client, &all_data);
 }
 
-/* TODO: uncomment and fix
-
 #[test]
-#[ignore]
 fn caching_with_data_not_close_to_proxy_node() {
-    let network = Network::new(GROUP_SIZE, None);
+    let seed = None;
     let node_count = GROUP_SIZE + 2;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
-    let mut rng = network.new_rng();
 
-    let sent_data = gen_random_immutable_data_not_close_to(&nodes[0], &mut rng);
-    let _ = client.put_and_verify(sent_data.clone(), &mut nodes);
+    let sent_data = gen_immutable_data_not_close_to(&nodes[0], &mut rng);
+    unwrap!(client.put_idata_response(sent_data.clone(), &mut nodes));
 
     // The first response is not yet cached, so it comes from a NAE manager authority.
-    let (received_data, src) = client.get_with_src(sent_data.identifier(), &mut nodes);
+    let (received_data, src) = unwrap!(client.get_idata_response_with_src(*sent_data.name(),
+                                                                          &mut nodes));
     assert_eq!(received_data, sent_data);
 
     match src {
@@ -829,7 +833,8 @@ fn caching_with_data_not_close_to_proxy_node() {
     }
 
     // The second response is cached, so it comes from a managed node authority.
-    let (received_data, src) = client.get_with_src(sent_data.identifier(), &mut nodes);
+    let (received_data, src) = unwrap!(client.get_idata_response_with_src(*sent_data.name(),
+                                                                          &mut nodes));
     assert_eq!(received_data, sent_data);
 
     match src {
@@ -843,22 +848,24 @@ fn caching_with_data_not_close_to_proxy_node() {
 
 #[test]
 fn caching_with_data_close_to_proxy_node() {
-    let network = Network::new(GROUP_SIZE, None);
+    let seed = None;
     let node_count = GROUP_SIZE + 2;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
-    let mut rng = network.new_rng();
 
-    let sent_data = gen_random_immutable_data_close_to(&nodes[0], &mut rng);
-    let _ = client.put_and_verify(sent_data.clone(), &mut nodes);
+    let sent_data = gen_immutable_data_close_to(&nodes[0], &mut rng);
+    unwrap!(client.put_idata_response(sent_data.clone(), &mut nodes));
 
     // Send two requests and verify the response is not cached in any of them
-    let (received_data, src) = client.get_with_src(sent_data.identifier(), &mut nodes);
+    let (received_data, src) = unwrap!(client.get_idata_response_with_src(*sent_data.name(),
+                                                                          &mut nodes));
     assert_eq!(received_data, sent_data);
 
     match src {
@@ -869,7 +876,8 @@ fn caching_with_data_close_to_proxy_node() {
         }
     }
 
-    let (received_data, src) = client.get_with_src(sent_data.identifier(), &mut nodes);
+    let (received_data, src) = unwrap!(client.get_idata_response_with_src(*sent_data.name(),
+                                                                          &mut nodes));
     assert_eq!(received_data, sent_data);
 
     match src {
@@ -881,25 +889,23 @@ fn caching_with_data_close_to_proxy_node() {
     }
 }
 
-fn gen_random_immutable_data_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> Data {
+fn gen_immutable_data_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> ImmutableData {
     loop {
-        let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
+        let data = test_utils::gen_immutable_data(10, rng);
         if node.routing_table().is_closest(data.name(), GROUP_SIZE) {
             return data;
         }
     }
 }
 
-fn gen_random_immutable_data_not_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> Data {
+fn gen_immutable_data_not_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> ImmutableData {
     loop {
-        let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
+        let data = test_utils::gen_immutable_data(10, rng);
         if !node.routing_table().is_closest(data.name(), GROUP_SIZE) {
             return data;
         }
     }
 }
-
-*/
 
 // Create set of owner keys.
 fn owner_keys(key: sign::PublicKey) -> BTreeSet<sign::PublicKey> {

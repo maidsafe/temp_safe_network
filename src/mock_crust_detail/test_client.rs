@@ -18,7 +18,8 @@
 use super::poll;
 use super::test_node::TestNode;
 use GROUP_SIZE;
-use rand::{Rng, XorShiftRng};
+use maidsafe_utilities::SeededRng;
+use rand::Rng;
 use routing::{self, AccountInfo, Authority, ClientError, EntryAction, Event, EventStream, FullId,
               ImmutableData, MessageId, MutableData, PermissionSet, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
@@ -47,7 +48,7 @@ pub struct TestClient {
     routing_client: routing::Client,
     full_id: FullId,
     client_manager: Authority<XorName>,
-    rng: XorShiftRng,
+    rng: SeededRng,
 }
 
 // FIXME: there are inconsistencies in how the request methods are implemented,

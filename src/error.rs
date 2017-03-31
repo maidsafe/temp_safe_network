@@ -21,6 +21,7 @@ use maidsafe_utilities::serialisation::SerialisationError;
 use routing::{InterfaceError, MessageId, Request, Response, RoutingError};
 use routing::ClientError;
 use routing::messaging;
+use serde_json;
 use std::io;
 
 quick_error! {
@@ -49,6 +50,9 @@ quick_error! {
             from()
         }
         Serialisation(error: SerialisationError) {
+            from()
+        }
+        JsonSerialisation(error: serde_json::Error) {
             from()
         }
         UnknownRequestType(request: Request)

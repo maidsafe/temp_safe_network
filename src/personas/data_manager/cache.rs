@@ -18,11 +18,10 @@
 use super::STATUS_LOG_INTERVAL;
 use super::data::{Data, DataId};
 use GROUP_SIZE;
-use maidsafe_utilities;
 use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable, Value, XorName};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
-use utils;
+use utils::{self, SecureHash};
 
 /// The timeout for cached data from requests; if no consensus is reached, the data is dropped.
 const PENDING_WRITE_TIMEOUT_SECS: u64 = 60;
@@ -265,7 +264,7 @@ impl Cache {
                                 msg_id: MessageId,
                                 rejected: bool)
                                 -> Option<DataInfo> {
-        let hash = maidsafe_utilities::big_endian_sip_hash(&mutation);
+        let hash = utils::secure_hash(&mutation);
 
         let mut writes = self.pending_writes
             .entry(mutation.data_id())
@@ -426,7 +425,7 @@ impl Default for Cache {
 // consensus and stores the chunk, or it times out and is dropped.
 pub struct PendingWrite {
     pub mutation: PendingMutation,
-    pub hash: u64,
+    pub hash: SecureHash,
     timestamp: Instant,
     pub src: Authority<XorName>,
     pub dst: Authority<XorName>,
@@ -434,7 +433,7 @@ pub struct PendingWrite {
     pub rejected: bool,
 }
 
-#[derive(RustcEncodable)]
+#[derive(Serialize)]
 pub enum PendingMutation {
     PutIData(ImmutableData),
     PutMData(MutableData),
@@ -508,21 +507,21 @@ pub enum PendingMutationType {
 /// - immutable data,
 /// - mutable data shell or,
 /// - mutable data entry.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum FragmentInfo {
     ImmutableData(XorName),
     MutableDataShell {
         name: XorName,
         tag: u64,
         version: u64,
-        hash: u64,
+        hash: SecureHash,
     },
     MutableDataEntry {
         name: XorName,
         tag: u64,
         key: Vec<u8>,
         version: u64,
-        hash: u64,
+        hash: SecureHash,
     },
 }
 
@@ -615,10 +614,10 @@ impl FragmentRequest {
     }
 }
 
-#[derive(Clone, Copy, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct DataInfo {
     pub data_id: DataId,
-    pub hash: u64,
+    pub hash: SecureHash,
 }
 
 #[cfg(test)]

@@ -662,7 +662,7 @@ impl MaidManager {
     }
 }
 
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 enum Refresh {
     Update(XorName, Account),
     Delete(XorName),

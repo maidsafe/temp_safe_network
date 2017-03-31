@@ -100,7 +100,7 @@ impl Node {
 
     // mock-only method.
     pub fn add_to_routing_table(&mut self, name: XorName) {
-        unwrap!(self.routing_table.add(name));
+        unwrap!(self.routing_table.add(name, false));
     }
 
     impl_request!(send_get_idata_request,

@@ -17,12 +17,12 @@
 
 use super::poll;
 use config_handler::Config;
+use hex::ToHex;
 use itertools::Itertools;
 use personas::data_manager::DataId;
 use rand::{self, Rng};
 use routing::{RoutingTable, XorName, Xorable};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
-use rustc_serialize::hex::ToHex;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -46,10 +46,10 @@ impl TestNode {
         let handle = network.new_service_handle(crust_config, None);
         let temp_root = env::temp_dir();
         let chunk_store_root = temp_root.join(rand::thread_rng()
-            .gen_iter()
-            .take(8)
-            .collect::<Vec<u8>>()
-            .to_hex());
+                                                  .gen_iter()
+                                                  .take(8)
+                                                  .collect::<Vec<u8>>()
+                                                  .to_hex());
         let vault_config = match config {
             Some(config) => {
                 Config {
@@ -193,7 +193,8 @@ pub fn closest_to<'a, 'b>(nodes: &'a [TestNode],
                           name: &'b XorName,
                           count: usize)
                           -> Vec<&'a TestNode> {
-    let mut sorted = nodes.iter()
+    let mut sorted = nodes
+        .iter()
         .sorted_by(|left, right| name.cmp_distance(&left.name(), &right.name()));
     sorted.truncate(count);
     sorted
