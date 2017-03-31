@@ -42,14 +42,12 @@ extern crate maidsafe_utilities;
 #[macro_use]
 extern crate unwrap;
 
-
 use docopt::Docopt;
 use rand::{Rng, SeedableRng};
 use routing::{Data, ImmutableData, StructuredData};
 use rust_sodium::crypto::sign::PublicKey;
 use safe_core::core::client::Client;
 use std::collections::BTreeSet;
-
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 static USAGE: &'static str = "
@@ -63,6 +61,7 @@ Options:
                                     Get [default: 100].
   --seed <seed>                     Seed for a pseudo-random number generator.
   --get-only                        Only Get the data, don't Put it.
+  --invite INVITATION               Use the given invite.
   -h, --help                        Display this help message and exit.
 ";
 
@@ -72,6 +71,7 @@ struct Args {
     flag_structured: Option<usize>,
     flag_seed: Option<u32>,
     flag_get_only: bool,
+    flag_invite: Option<String>,
     flag_help: bool,
 }
 
@@ -87,7 +87,6 @@ fn random_structured_data<R: Rng>(type_tag: u64,
                                 rng.gen_iter().take(10).collect(),
                                 owners))
 }
-
 
 fn main() {
     unwrap!(maidsafe_utilities::log::init(true));
@@ -111,7 +110,12 @@ fn main() {
     // Create account
     let secret_0: String = rng.gen_ascii_chars().take(20).collect();
     let secret_1: String = rng.gen_ascii_chars().take(20).collect();
-    let invitation: String = rng.gen_ascii_chars().take(20).collect();
+    // Do not try to optimise `invitation` generation because internal state of rng will change and
+    // the test will fail when run later with `--get-only` flag
+    let mut invitation = rng.gen_ascii_chars().take(20).collect();
+    if let Some(i) = args.flag_invite {
+        invitation = i;
+    }
 
     let mut client = if args.flag_get_only {
         unwrap!(Client::log_in(&secret_0, &secret_1))

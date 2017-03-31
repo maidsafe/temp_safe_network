@@ -33,7 +33,7 @@ use self::user_account::Account;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
 use core::utility;
-use maidsafe_utilities::serialisation::{deserialise, serialise};
+use maidsafe_utilities::serialisation::serialise;
 use maidsafe_utilities::thread::Joiner;
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, StructuredData,
               XorName};
@@ -49,9 +49,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
-type AccPktData = (String, Vec<u8>);
 const SEED_SUBPARTS: usize = 4;
-
 
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
@@ -134,11 +132,44 @@ impl Client {
     /// user while also being strong.
     pub fn create_account_with_seed(seed: &str) -> Result<Client, CoreError> {
         let arr = Self::divide_seed(seed)?;
-
-        let id_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 2]).0);
-        let revocation_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 1]).0);
+        let (id_seed, revocation_seed) = Self::id_and_revocation_seeds(arr);
 
         Self::create_acc_impl(arr[0], arr[1], "", Some(&id_seed), Some(&revocation_seed))
+    }
+
+    /// Calculate sign key from seed
+    pub fn sign_pk_from_seed(seed: &str) -> Result<sign::PublicKey, CoreError> {
+        let arr = Self::divide_seed(seed)?;
+        let (id_seed, revocation_seed) = Self::id_and_revocation_seeds(arr);
+        let acc = Account::new(None, None, Some(&id_seed), Some(&revocation_seed));
+
+        Ok(acc.get_maid().public_keys().0)
+    }
+
+    fn id_and_revocation_seeds(divided_seed: [&[u8]; SEED_SUBPARTS]) -> (Seed, Seed) {
+        let cap = divided_seed.iter().fold(0, |sum, &a| sum + a.len());
+        let id_seed = {
+            let mut id_vec = Vec::with_capacity(cap);
+            id_vec.extend(divided_seed[SEED_SUBPARTS - 2]);
+            for (i, arr) in divided_seed.iter().enumerate() {
+                if i != SEED_SUBPARTS - 2 {
+                    id_vec.extend(*arr);
+                }
+            }
+            Seed(sha256::hash(&id_vec).0)
+        };
+        let revocation_seed = {
+            let mut revocation_vec = Vec::with_capacity(cap);
+            revocation_vec.extend(divided_seed[SEED_SUBPARTS - 1]);
+            for (i, arr) in divided_seed.iter().enumerate() {
+                if i != SEED_SUBPARTS - 1 {
+                    revocation_vec.extend(*arr);
+                }
+            }
+            Seed(sha256::hash(&revocation_vec).0)
+        };
+
+        (id_seed, revocation_seed)
     }
 
     fn create_acc_impl(acc_locator: &[u8],
@@ -183,9 +214,7 @@ impl Client {
             _raii_joiner: raii_joiner,
             message_queue: message_queue,
             session_packet_id: Some(Account::generate_network_id(&keyword, &pin)?),
-            session_packet_keys: Some(SessionPacketEncryptionKeys::new(password,
-                                                                       pin,
-                                                                       invitation.to_string())),
+            session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
             client_manager_addr: Some(client_manager_addr),
             issued_gets: 0,
             issued_puts: 0,
@@ -195,7 +224,7 @@ impl Client {
         };
 
         {
-            let account_version = {
+            let (acc_ver_0, acc_ver_1) = {
                 let account = unwrap!(client.account.as_ref());
                 let session_packet_keys = unwrap!(client.session_packet_keys.as_ref());
 
@@ -208,18 +237,26 @@ impl Client {
                 let cipher_text = account.encrypt(session_packet_keys.get_password(),
                              session_packet_keys.get_pin())?;
 
-                let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                                 *session_packet_id,
-                                                 0,
-                                                 serialise(&(invitation, cipher_text))?,
-                                                 owners)?;
-                let _ = sd.add_signature(&(owner_pubkey,
-                                           account.get_maid().secret_keys().0.clone()));
-                sd
+                let mut sd0 = StructuredData::new(TYPE_TAG_SESSION_PACKET,
+                                                  *session_packet_id,
+                                                  0,
+                                                  serialise(&(invitation, cipher_text.clone()))?,
+                                                  owners.clone())?;
+                let _ = sd0.add_signature(&(owner_pubkey,
+                                            account.get_maid().secret_keys().0.clone()));
+
+                let mut sd1 = StructuredData::new(TYPE_TAG_SESSION_PACKET,
+                                                  *session_packet_id,
+                                                  1,
+                                                  cipher_text,
+                                                  owners)?;
+                let _ = sd1.add_signature(&(owner_pubkey,
+                                            account.get_maid().secret_keys().0.clone()));
+                (sd0, sd1)
             };
 
-            client.put(Data::Structured(account_version), None)?
-                .get()?;
+            client.put(Data::Structured(acc_ver_0), None)?.get()?;
+            client.post(Data::Structured(acc_ver_1), None)?.get()?;
         }
 
         Ok(client)
@@ -249,8 +286,8 @@ impl Client {
         let resp_getter = unregistered_client.get(session_packet_request, None)?;
 
         if let Data::Structured(session_packet) = resp_getter.get()? {
-            let data: AccPktData = deserialise(session_packet.get_data())?;
-            let decrypted_session_packet = Account::decrypt(&data.1, &password, &pin)?;
+            let decrypted_session_packet =
+                Account::decrypt(&session_packet.get_data(), &password, &pin)?;
             let id_packet =
                 FullId::with_keys((decrypted_session_packet.get_maid().public_keys().1,
                                    decrypted_session_packet
@@ -292,7 +329,7 @@ impl Client {
                 _raii_joiner: raii_joiner,
                 message_queue: message_queue,
                 session_packet_id: Some(Account::generate_network_id(&keyword, &pin)?),
-                session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin, data.0)),
+                session_packet_keys: Some(SessionPacketEncryptionKeys::new(password, pin)),
                 client_manager_addr: Some(client_manager_addr),
                 issued_gets: 0,
                 issued_puts: 0,
@@ -855,13 +892,6 @@ impl Client {
                     account.encrypt(session_packet_keys.get_password(),
                                  session_packet_keys.get_pin())?
                 };
-                let data = {
-                    let session_packet_keys = self.session_packet_keys
-                        .as_ref()
-                        .ok_or(CoreError::OperationForbiddenForClient)?;
-                    let invitation = session_packet_keys.get_invitation();
-                    serialise(&(invitation, encrypted_account))?
-                };
 
                 let owner_key = account.get_public_maid().public_keys().0;
                 let signing_key = account.get_maid().secret_keys().0.clone();
@@ -872,7 +902,7 @@ impl Client {
                 let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                  session_packet_id,
                                                  retrieved_session_packet.get_version() + 1,
-                                                 data,
+                                                 encrypted_account,
                                                  owners)?;
                 let _ = sd.add_signature(&(owner_key, signing_key))?;
                 sd
@@ -922,15 +952,13 @@ impl Client {
 struct SessionPacketEncryptionKeys {
     pin: Vec<u8>,
     password: Vec<u8>,
-    invitation: String,
 }
 
 impl SessionPacketEncryptionKeys {
-    fn new(password: Vec<u8>, pin: Vec<u8>, invitation: String) -> SessionPacketEncryptionKeys {
+    fn new(password: Vec<u8>, pin: Vec<u8>) -> SessionPacketEncryptionKeys {
         SessionPacketEncryptionKeys {
             pin: pin,
             password: password,
-            invitation: invitation,
         }
     }
 
@@ -940,10 +968,6 @@ impl SessionPacketEncryptionKeys {
 
     fn get_pin(&self) -> &[u8] {
         &self.pin[..]
-    }
-
-    fn get_invitation(&self) -> &str {
-        &self.invitation
     }
 }
 
