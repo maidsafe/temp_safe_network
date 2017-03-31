@@ -17,11 +17,11 @@
 
 use super::poll;
 use config_handler::Config;
+use hex::ToHex;
 use personas::data_manager::IdAndVersion;
 use rand::{self, Rng};
 use routing::{RoutingTable, XorName};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
-use rustc_serialize::hex::ToHex;
 use std::env;
 use std::fs;
 use std::path::PathBuf;

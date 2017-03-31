@@ -40,51 +40,32 @@
 #[macro_use]
 extern crate log;
 extern crate maidsafe_utilities;
+extern crate clap;
 extern crate config_file_handler;
-extern crate docopt;
-extern crate rustc_serialize;
 extern crate safe_vault;
 #[macro_use]
 extern crate unwrap;
 
-use docopt::Docopt;
+use clap::{App, Arg};
 use safe_vault::Vault;
 use std::ffi::OsString;
 use std::fs;
-
-#[cfg_attr(rustfmt, rustfmt_skip)]
-static USAGE: &'static str = "
-Usage:
-  safe_vault [options]
-
-Options:
-  -f, --first     Run as the first Vault of a new network.
-  -V, --version   Display version info and exit.
-  -h, --help      Display this help message and exit.
-";
-
-#[derive(PartialEq, Eq, Debug, Clone, RustcDecodable)]
-struct Args {
-    flag_first: bool,
-    flag_version: bool,
-    flag_help: bool,
-}
 
 /// Runs a SAFE Network vault.
 pub fn main() {
     // TODO - remove the following line once maidsafe_utilities is updated to use log4rs v4.
     let _ = fs::remove_file("Node.log");
 
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|docopt| docopt.decode())
-        .unwrap_or_else(|error| error.exit());
-
     let name = config_file_handler::exe_file_stem().unwrap_or_else(|_| OsString::new());
     let name_and_version = format!("{} v{}", name.to_string_lossy(), env!("CARGO_PKG_VERSION"));
-    if args.flag_version {
-        println!("{}", name_and_version);
-        return;
-    }
+
+    let matches = App::new(name.to_string_lossy())
+        .arg(Arg::with_name("first")
+                 .short("f")
+                 .long("first")
+                 .help("Run as the first Vault of a new network."))
+        .version(env!("CARGO_PKG_VERSION"))
+        .get_matches();
 
     let _ = maidsafe_utilities::log::init(false);
 
@@ -94,7 +75,7 @@ pub fn main() {
     info!("\n\n{}\n{}", message, underline);
 
     loop {
-        let mut vault = match Vault::new(args.flag_first, true) {
+        let mut vault = match Vault::new(matches.is_present("first"), true) {
             Ok(vault) => vault,
             Err(e) => {
                 println!("Cannot start vault due to error: {:?}", e);

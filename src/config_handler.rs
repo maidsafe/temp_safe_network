@@ -21,7 +21,7 @@ use routing::XorName;
 use std::ffi::OsString;
 
 /// Lets a vault configure a wallet address and storage limit.
-#[derive(Clone, Debug, Default, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Config {
     /// Used to store the address where SafeCoin will be sent.
     pub wallet_address: Option<XorName>,
@@ -49,14 +49,14 @@ pub fn read_config_file() -> Result<Config, InternalError> {
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn write_config_file(config: &Config) -> Result<::std::path::PathBuf, InternalError> {
-    use rustc_serialize::json;
+    use serde_json;
     use std::fs::File;
     use std::io::Write;
 
     let mut config_path = config_file_handler::current_bin_dir()?;
     config_path.push(get_file_name()?);
     let mut file = File::create(&config_path)?;
-    write!(&mut file, "{}", json::as_pretty_json(&config))?;
+    write!(&mut file, "{}", serde_json::to_string_pretty(&config)?)?;
     file.sync_all()?;
     Ok(config_path)
 }
@@ -75,7 +75,7 @@ mod test {
         use std::fs::File;
         use std::io::Read;
         use super::Config;
-        use rustc_serialize::json;
+        use serde_json;
 
         let path = Path::new("installer/common/sample.vault.config").to_path_buf();
 
@@ -92,7 +92,7 @@ mod test {
             panic!(format!("Error reading safe_vault.vault.config: {:?}", what));
         }
 
-        if let Err(what) = json::decode::<Config>(&encoded_contents) {
+        if let Err(what) = serde_json::from_str::<Config>(&encoded_contents) {
             panic!(format!("Error parsing safe_vault.vault.config: {:?}", what));
         }
     }

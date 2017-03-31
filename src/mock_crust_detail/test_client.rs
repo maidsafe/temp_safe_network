@@ -18,8 +18,8 @@
 use super::poll;
 use super::test_node::TestNode;
 use GROUP_SIZE;
-use maidsafe_utilities::serialisation;
-use rand::{Rng, XorShiftRng};
+use maidsafe_utilities::{SeededRng, serialisation};
+use rand::Rng;
 use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId,
               PublicId, Response, StructuredData, XorName};
 use routing::client_errors::{GetError, MutationError};
@@ -35,7 +35,7 @@ pub struct TestClient {
     full_id: FullId,
     public_id: PublicId,
     name: XorName,
-    rng: XorShiftRng,
+    rng: SeededRng,
 }
 
 impl TestClient {

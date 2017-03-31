@@ -34,13 +34,13 @@ const DEFAULT_ACCOUNT_SIZE: u64 = 500;
 #[cfg(feature = "use-mock-crust")]
 const DEFAULT_ACCOUNT_SIZE: u64 = 100;
 
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 enum Refresh {
     Update(XorName, Account),
     Delete(XorName),
 }
 
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct Account {
     data_stored: u64,
     space_available: u64,
