@@ -41,7 +41,7 @@ use std::ptr;
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
 
 /// App data stored in the authenticator configuration
-#[derive(Clone, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppInfo {
     /// Application info (id, name, vendor, etc.)
     pub info: AppExchangeInfo,

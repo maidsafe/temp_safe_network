@@ -31,7 +31,7 @@ use std::slice;
 /// IPC response
 // TODO: `TransOwnership` variant
 #[cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
-#[derive(Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum IpcResp {
     /// Authentication
     Auth(Result<AuthGranted, IpcError>),
@@ -40,7 +40,7 @@ pub enum IpcResp {
 }
 
 /// It represents the authentication response.
-#[derive(Clone, RustcEncodable, RustcDecodable, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct AuthGranted {
     /// The access keys.
     pub app_keys: AppKeys,
@@ -97,7 +97,7 @@ impl ReprC for AuthGranted {
 }
 
 /// Represents the needed keys to work with the data
-#[derive(Clone, RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct AppKeys {
     /// Owner signing public key.
     pub owner_key: sign::PublicKey,
@@ -171,7 +171,7 @@ impl ReprC for AppKeys {
 }
 
 /// Access container
-#[derive(Clone, RustcEncodable, RustcDecodable, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct AccessContInfo {
     /// ID
     pub id: XorName,

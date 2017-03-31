@@ -29,7 +29,7 @@ use std::ffi::{CString, NulError};
 
 /// IPC request
 // TODO: `TransOwnership` variant
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum IpcReq {
     /// Authentication request
     Auth(AuthReq),
@@ -38,7 +38,7 @@ pub enum IpcReq {
 }
 
 /// Represents an authorization request
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AuthReq {
     /// The application identifier for this request
     pub app: AppExchangeInfo,
@@ -141,7 +141,7 @@ impl ReprC for AuthReq {
 }
 
 /// Containers request
-#[derive(Clone, Eq, PartialEq, RustcEncodable, RustcDecodable, Debug)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub struct ContainersReq {
     /// Exchange info
     pub app: AppExchangeInfo,
@@ -186,7 +186,7 @@ impl ReprC for ContainersReq {
 }
 
 /// Represents an application ID in the process of asking permissions
-#[derive(Clone, Eq, PartialEq, RustcEncodable, RustcDecodable, Debug)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub struct AppExchangeInfo {
     /// The ID. It must be unique.
     pub id: String,

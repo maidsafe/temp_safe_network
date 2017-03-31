@@ -22,7 +22,7 @@ use std::collections::{BTreeSet, HashMap};
 
 pub const DEFAULT_MAX_MUTATIONS: u64 = 100;
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Deserialize, Serialize)]
 pub struct Vault {
     client_manager: HashMap<XorName, Account>,
     nae_manager: HashMap<XorName, Data>,
@@ -110,13 +110,13 @@ impl Vault {
     }
 }
 
-#[derive(Clone, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Deserialize, Serialize)]
 pub enum Data {
     Immutable(ImmutableData),
     Mutable(MutableData),
 }
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Deserialize, Serialize)]
 pub struct Account {
     account_info: AccountInfo,
     auth_keys: BTreeSet<sign::PublicKey>,

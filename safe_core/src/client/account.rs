@@ -23,7 +23,7 @@ use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
 use rust_sodium::crypto::hash::sha256;
 
 /// Representing the User Account information on the network
-#[derive(Debug, PartialEq, RustcDecodable, RustcEncodable)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct Account {
     /// The User Account Keys
     pub maid_keys: ClientKeys,
@@ -109,7 +109,7 @@ impl Account {
 }
 
 /// Client signing and encryption keypairs
-#[derive(Clone, Debug, PartialEq, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ClientKeys {
     /// Signing public key
     pub sign_pk: sign::PublicKey,
