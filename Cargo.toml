@@ -13,7 +13,7 @@ version = "0.13.2"
 [dependencies]
 accumulator = "~0.5.0"
 config_file_handler = "~0.4.0"
-docopt = "~0.6.86"
+clap = "~2.14.1"
 fs2 = "~0.2.5"
 itertools = "~0.5.9"
 lru_time_cache = "~0.5.0"
