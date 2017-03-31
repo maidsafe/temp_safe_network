@@ -18,6 +18,7 @@
 //! File operations
 
 
+use chrono::prelude::UTC;
 use ffi::app::App;
 use ffi::errors::FfiError;
 use ffi::file_details::{FileDetails, FileMetadata};
@@ -28,7 +29,6 @@ use nfs::file::File;
 use nfs::helper::directory_helper::DirectoryHelper;
 use nfs::helper::file_helper::FileHelper;
 use nfs::helper::writer::Mode;
-use time;
 
 
 /// Delete a file.
@@ -206,8 +206,7 @@ fn modify_file(app: &App,
     }
 
     if metadata_updated {
-        file.get_mut_metadata()
-            .set_modified_time(time::now_utc());
+        file.get_mut_metadata().set_modified_time(UTC::now());
         let _ = file_helper.update_metadata(file.clone(), &mut directory)?;
     }
 

@@ -32,7 +32,7 @@ const DNS_CONFIG_DIR_NAME: &'static str = "DnsReservedDirectory";
 const DNS_CONFIG_FILE_NAME: &'static str = "DnsConfigurationFile";
 
 /// Dns configuration. For internal use by the `dns` module.
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DnsConfiguration {
     /// Dns long name
     pub long_name: String,

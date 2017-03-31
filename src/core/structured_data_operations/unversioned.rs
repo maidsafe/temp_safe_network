@@ -29,7 +29,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 #[allow(variant_size_differences)]
-#[derive(Clone, RustcEncodable, RustcDecodable, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 enum DataTypeEncoding {
     Data(Vec<u8>),
     Map(DataMap),

@@ -1184,8 +1184,9 @@ mod tests {
             assert_eq!(appendable_data_new_pub(&app, &rand::random(), &mut ad_h), 0);
 
             // Public appendable data doens't have a private owner key
+            let err_code: i32 = FfiError::UnsupportedOperation.into();
             assert_eq!(appendable_data_encrypt_key(ad_h, &mut encrypt_key_h),
-                       FfiError::UnsupportedOperation.into());
+                       err_code);
 
             assert_eq!(appendable_data_free(ad_h), 0);
 

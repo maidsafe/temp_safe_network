@@ -255,10 +255,11 @@ mod tests {
             assert_eq!(cipher_opt_new_asymmetric(app_1_encrypt_key_handle, &mut cipher_opt_h),
                        0);
 
+            let err_code: i32 = FfiError::InvalidSelfEncryptorHandle.into();
             assert_eq!(immut_data_write_to_self_encryptor(se_writer_h,
                                                           plain_text.as_ptr(),
                                                           plain_text.len()),
-                       FfiError::InvalidSelfEncryptorHandle.into());
+                       err_code);
 
             assert_eq!(immut_data_new_self_encryptor(&app_0, &mut se_writer_h), 0);
             assert_eq!(immut_data_write_to_self_encryptor(se_writer_h,
@@ -271,22 +272,17 @@ mod tests {
                                                        &mut data_id_h),
                        0);
 
-            assert_eq!(immut_data_self_encryptor_reader_free(se_writer_h),
-                       FfiError::InvalidSelfEncryptorHandle.into());
+            assert_eq!(immut_data_self_encryptor_reader_free(se_writer_h), err_code);
             assert_eq!(immut_data_self_encryptor_writer_free(se_writer_h), 0);
-            assert_eq!(immut_data_self_encryptor_writer_free(se_writer_h),
-                       FfiError::InvalidSelfEncryptorHandle.into());
+            assert_eq!(immut_data_self_encryptor_writer_free(se_writer_h), err_code);
 
             // App-1
             let mut size = 0;
-            assert_eq!(immut_data_size(se_reader_h, &mut size),
-                       FfiError::InvalidSelfEncryptorHandle.into());
-            assert_eq!(immut_data_size(se_writer_h, &mut size),
-                       FfiError::InvalidSelfEncryptorHandle.into());
+            assert_eq!(immut_data_size(se_reader_h, &mut size), err_code);
+            assert_eq!(immut_data_size(se_writer_h, &mut size), err_code);
 
             assert!(immut_data_fetch_self_encryptor(&app_0, data_id_h, &mut se_reader_h) != 0);
-            assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h),
-                       FfiError::InvalidSelfEncryptorHandle.into());
+            assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h), err_code);
 
             assert_eq!(immut_data_fetch_self_encryptor(&app_1, data_id_h, &mut se_reader_h),
                        0);
@@ -296,13 +292,14 @@ mod tests {
             let mut data_ptr: *mut u8 = ptr::null_mut();
             let mut data_size = 0;
             let mut capacity = 0;
+            let err_code: i32 = FfiError::InvalidSelfEncryptorReadOffsets.into();
             assert_eq!(immut_data_read_from_self_encryptor(se_reader_h,
                                                            1,
                                                            size,
                                                            &mut data_ptr,
                                                            &mut data_size,
                                                            &mut capacity),
-                       FfiError::InvalidSelfEncryptorReadOffsets.into());
+                       err_code);
             assert_eq!(immut_data_read_from_self_encryptor(se_reader_h,
                                                            0,
                                                            size,
@@ -314,8 +311,8 @@ mod tests {
             assert_eq!(plain_text, plain_text_rx);
 
             assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h), 0);
-            assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h),
-                       FfiError::InvalidSelfEncryptorHandle.into());
+            let err_code: i32 = FfiError::InvalidSelfEncryptorHandle.into();
+            assert_eq!(immut_data_self_encryptor_reader_free(se_reader_h), err_code);
 
             assert_eq!(cipher_opt_free(cipher_opt_h), 0);
             assert_eq!(data_id_free(data_id_h), 0);

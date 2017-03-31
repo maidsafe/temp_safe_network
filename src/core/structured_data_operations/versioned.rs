@@ -25,7 +25,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 /// All fields updated whenever a version is appended/removed
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct VersionsInfo {
     /// Contains an ID for Vec<XorName> of versions
     ptr_to_versions: XorName,

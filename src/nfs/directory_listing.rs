@@ -31,7 +31,7 @@ use std::cmp;
 use std::sync::{Arc, Mutex};
 
 /// `DirectoryListing` is the representation of a deserialised Directory in the network
-#[derive(Debug, RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct DirectoryListing {
     metadata: DirectoryMetadata,
     sub_directories: Vec<DirectoryMetadata>,

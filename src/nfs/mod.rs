@@ -36,7 +36,7 @@ pub const VERSIONED_DIRECTORY_LISTING_TAG: u64 = ::core::CLIENT_STRUCTURED_DATA_
 pub const UNVERSIONED_DIRECTORY_LISTING_TAG: u64 = VERSIONED_DIRECTORY_LISTING_TAG + 1;
 
 /// `AccessLevel` indicates whether the container is Private or Public shared
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub enum AccessLevel {
     /// Private Directory where the directory is encrypted with users private keys
     Private,

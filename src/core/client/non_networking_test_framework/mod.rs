@@ -27,7 +27,7 @@ use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::{GetError, MutationError};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
-use rustc_serialize::Encodable;
+use serde::Serialize;
 use std;
 use std::cell::Cell;
 use std::sync::Mutex;
@@ -533,7 +533,7 @@ impl RoutingMock {
         }
     }
 
-    fn send_failure_resp<E: Encodable>(sender: &Sender<Event>,
+    fn send_failure_resp<E: Serialize>(sender: &Sender<Event>,
                                        src: Authority<XorName>,
                                        dst: Authority<XorName>,
                                        request: Request,

@@ -30,13 +30,13 @@ use rust_sodium::crypto::{box_, secretbox};
 use rust_sodium::crypto::hash::sha256;
 use std::sync::{Arc, Mutex};
 
-#[derive(RustcEncodable, RustcDecodable, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LauncherConfiguration {
     pub app_id: XorName,
     pub app_info: AppInfo,
 }
 
-#[derive(RustcEncodable, RustcDecodable, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppInfo {
     pub app_root_dir_key: DirectoryKey,
     pub asym_keys: (box_::PublicKey, box_::SecretKey),

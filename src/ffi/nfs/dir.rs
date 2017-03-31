@@ -17,6 +17,7 @@
 
 //! Directory operations.
 
+use chrono::prelude::UTC;
 use ffi::app::App;
 use ffi::directory_details::DirectoryDetails;
 use ffi::errors::FfiError;
@@ -26,7 +27,6 @@ use nfs::{AccessLevel, UNVERSIONED_DIRECTORY_LISTING_TAG, VERSIONED_DIRECTORY_LI
 use nfs::errors::NfsError;
 use nfs::helper::directory_helper::DirectoryHelper;
 use std::slice;
-use time;
 
 /// Create a new directory.
 #[no_mangle]
@@ -230,7 +230,7 @@ fn modify_dir(app: &App,
 
     dir_to_modify
         .get_mut_metadata()
-        .set_modified_time(time::now_utc());
+        .set_modified_time(UTC::now());
     let _ = directory_helper.update(&dir_to_modify)?;
 
     Ok(())

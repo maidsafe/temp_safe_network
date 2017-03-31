@@ -26,7 +26,7 @@ use rust_sodium::crypto::sign::Seed;
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also their Root
 /// Directory ID if they have put data onto the network.
-#[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Account {
     an_maid: RevocationIdType,
     maid: IdType,

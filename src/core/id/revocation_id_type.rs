@@ -30,7 +30,7 @@ use rust_sodium::crypto::sign::{self, Seed};
 /// use safe_core::core::id;
 /// let _an_maid = id::RevocationIdType::new::<id::MaidTypeTags>(None);
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RevocationIdType {
     type_tags: (u64, u64, u64), // type tags for revocation, id and public ids
     public_key: sign::PublicKey,

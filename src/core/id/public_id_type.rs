@@ -31,7 +31,7 @@ use rust_sodium::crypto::hash::sha256;
 /// let maid = IdType::new(&revocation_maid, None);
 /// let _public_maid  = PublicIdType::new(&maid, &revocation_maid);
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PublicIdType {
     type_tag: u64,
     public_keys: (sign::PublicKey, box_::PublicKey),

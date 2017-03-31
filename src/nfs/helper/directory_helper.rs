@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use chrono::prelude::UTC;
 use core::client::Client;
 use core::errors::CoreError;
 use core::structured_data_operations::{unversioned, versioned};
@@ -111,7 +112,7 @@ impl DirectoryHelper {
         Client::delete_recover(self.client.clone(), Data::Structured(delete_sd), None)?;
         parent_directory
             .get_mut_metadata()
-            .set_modified_time(::time::now_utc());
+            .set_modified_time(UTC::now());
         self.update(parent_directory)
     }
 

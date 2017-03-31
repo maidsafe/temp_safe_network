@@ -15,8 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use chrono::prelude::UTC;
 use core::{SelfEncryptionStorage, SelfEncryptionStorageError};
-
 use core::client::Client;
 use nfs::directory_listing::DirectoryListing;
 use nfs::errors::NfsError;
@@ -83,8 +83,7 @@ impl<'a> Writer<'a> {
         file.set_datamap(self.self_encryptor.close()?);
         trace!("Writer induced self-encryptor close.");
 
-        file.get_mut_metadata()
-            .set_modified_time(::time::now_utc());
+        file.get_mut_metadata().set_modified_time(UTC::now());
         file.get_mut_metadata().set_size(size);
         file.get_mut_metadata().increment_version();
 

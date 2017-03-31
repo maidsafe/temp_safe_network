@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex};
 // TODO(Spandan) Ask Routing to define this constant and use it from there
 const MAX_IMMUT_DATA_SIZE_IN_BYTES: usize = 1024 * 1024;
 
-#[derive(RustcEncodable, RustcDecodable)]
+#[derive(Serialize, Deserialize)]
 enum DataTypeEncoding {
     Serialised(Vec<u8>),
     DataMap(DataMap),

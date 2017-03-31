@@ -135,7 +135,7 @@ mod tests {
         assert_eq!(data_id_free(data_id_handle_priv_appendable), 0);
         assert_eq!(data_id_free(data_id_handle_pub_appendable), 0);
 
-        let err_code = FfiError::InvalidDataIdHandle.into();
+        let err_code: i32 = FfiError::InvalidDataIdHandle.into();
         assert_eq!(data_id_free(data_id_handle_struct), err_code);
         assert_eq!(data_id_free(data_id_handle_immut), err_code);
         assert_eq!(data_id_free(data_id_handle_priv_appendable), err_code);

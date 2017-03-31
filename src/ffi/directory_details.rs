@@ -113,8 +113,10 @@ pub struct DirectoryMetadata {
 impl DirectoryMetadata {
     fn new(dir_metadata: &NfsDirectoryMetadata) -> Result<Self, FfiError> {
         let dir_key = dir_metadata.get_key();
-        let created_time = dir_metadata.get_created_time().to_timespec();
-        let modified_time = dir_metadata.get_modified_time().to_timespec();
+        let created_time = dir_metadata.get_created_time().timestamp();
+        let created_time_ns = dir_metadata.get_created_time().timestamp_subsec_nanos();
+        let modified_time = dir_metadata.get_modified_time().timestamp();
+        let modified_time_ns = dir_metadata.get_modified_time().timestamp_subsec_nanos();
 
         let (name, name_len, name_cap) =
             helper::string_to_c_utf8(dir_metadata.get_name().to_string());
@@ -131,10 +133,10 @@ impl DirectoryMetadata {
                user_metadata_cap: user_metadata_cap,
                is_private: *dir_key.get_access_level() == ::nfs::AccessLevel::Private,
                is_versioned: dir_key.is_versioned(),
-               creation_time_sec: created_time.sec,
-               creation_time_nsec: created_time.nsec as i64,
-               modification_time_sec: modified_time.sec,
-               modification_time_nsec: modified_time.nsec as i64,
+               creation_time_sec: created_time,
+               creation_time_nsec: created_time_ns as i64,
+               modification_time_sec: modified_time,
+               modification_time_nsec: modified_time_ns as i64,
            })
     }
 

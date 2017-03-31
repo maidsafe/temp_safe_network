@@ -344,7 +344,7 @@ impl DnsOperations {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct Dns {
     long_name: String,
     services: ::std::collections::HashMap<String, DirectoryKey>,

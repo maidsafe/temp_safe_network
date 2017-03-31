@@ -673,9 +673,9 @@ mod tests {
 
 
             // Perform Invalid Operations - should error out
+            let err_code: i32 = FfiError::InvalidStructuredDataTypeTag.into();
             let mut versions = 0;
-            assert_eq!(struct_data_num_of_versions(sd_h, &mut versions),
-                       FfiError::InvalidStructuredDataTypeTag.into());
+            assert_eq!(struct_data_num_of_versions(sd_h, &mut versions), err_code);
             {
                 let mut data_ptr: *mut u8 = ptr::null_mut();
                 let mut data_size = 0;
@@ -686,7 +686,7 @@ mod tests {
                                                    &mut data_ptr,
                                                    &mut data_size,
                                                    &mut capacity),
-                           FfiError::InvalidStructuredDataTypeTag.into());
+                           err_code);
             }
 
             // Check StructData owners
@@ -705,14 +705,13 @@ mod tests {
             // Re-delete should fail - MutationError::InvalidOperation; Fetch should be successful
             assert_eq!(struct_data_delete(&app, sd_h), -26);
             assert_eq!(struct_data_free(sd_h), 0);
-            assert_eq!(struct_data_free(sd_h),
-                       FfiError::InvalidStructDataHandle.into());
+            let err_code: i32 = FfiError::InvalidStructDataHandle.into();
+            assert_eq!(struct_data_free(sd_h), err_code);
             assert!(unwrap!(object_cache()).get_sd(sd_h).is_err());
 
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
             assert_eq!(struct_data_free(sd_h), 0);
-            assert_eq!(struct_data_free(sd_h),
-                       FfiError::InvalidStructDataHandle.into());
+            assert_eq!(struct_data_free(sd_h), err_code);
 
             // Re-claim via PUT
             assert_eq!(struct_data_fetch(&app, data_id_h, &mut sd_h), 0);
@@ -829,6 +828,7 @@ mod tests {
             assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_h), 0);
 
             // Invalid client tag
+            let err_code: i32 = FfiError::InvalidStructuredDataTypeTag.into();
             assert_eq!(struct_data_new(&app,
                                        CLIENT_STRUCTURED_DATA_TAG - 1,
                                        &name,
@@ -837,7 +837,7 @@ mod tests {
                                        data0.as_ptr(),
                                        data0.len(),
                                        &mut sd_h),
-                       FfiError::InvalidStructuredDataTypeTag.into());
+                       err_code);
 
             // Create
             assert_eq!(struct_data_new(&app,
@@ -874,7 +874,7 @@ mod tests {
             // Invalid operations
             let mut num_versions = 0;
             assert_eq!(struct_data_num_of_versions(sd_h, &mut num_versions),
-                       FfiError::InvalidStructuredDataTypeTag.into());
+                       err_code);
 
             // Delete
             assert_eq!(struct_data_delete(&app, sd_h), 0);

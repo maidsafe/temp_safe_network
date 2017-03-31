@@ -31,7 +31,6 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-extern crate time;
 extern crate routing;
 extern crate safe_core;
 #[macro_use]
@@ -183,11 +182,10 @@ fn directory_operation(option: u32,
                 println!("List of directories");
                 println!("\t        Created On                  Name ");
                 println!("\t =========================       ==========");
-                for metatata in directory_metadata {
-                    println!("\t {:?} \t {}",
-                             unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
-                                                    &metatata.get_created_time())),
-                             metatata.get_name());
+                for metadata in directory_metadata {
+                    println!("\t {} \t {}",
+                             metadata.get_created_time().format("%d-%m-%Y %H:%M UTC"),
+                             metadata.get_name());
                 }
             }
         }
@@ -237,9 +235,10 @@ fn file_operation(option: u32,
                 println!("\t        Modified On                Name ");
                 println!("\t =========================      ===========");
                 for file in files {
-                    println!("\t {:?} \t {}",
-                             unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
-                                                    &file.get_metadata().get_modified_time())),
+                    println!("\t {} \t {}",
+                             file.get_metadata()
+                                 .get_modified_time()
+                                 .format("%d-%m-%Y %H:%M UTC"),
                              file.get_name());
                 }
             }
@@ -305,10 +304,12 @@ fn file_operation(option: u32,
             } else {
                 println!("Available Versions::");
                 for (i, version) in versions.iter().enumerate() {
-                    println!("\t{} Modified at {:?}",
+                    println!("\t{} Modified at {}",
                              i + 1,
-                             unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
-                                                    &version.get_metadata().get_modified_time())))
+                             version
+                                 .get_metadata()
+                                 .get_modified_time()
+                                 .format("%d-%m-%Y %H:%M UTC"))
                 }
                 match get_user_string("Number corresponding to the version")
                           .trim()

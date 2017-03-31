@@ -32,7 +32,7 @@ use rust_sodium::crypto::sign::{self, Seed};
 /// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>(None), None);
 ///
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct IdType {
     type_tag: u64,
     public_keys: (sign::PublicKey, box_::PublicKey),
