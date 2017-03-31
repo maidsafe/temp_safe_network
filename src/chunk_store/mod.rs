@@ -19,9 +19,9 @@
 //! A simple, non-persistent, disk-based key-value store.
 
 use fs2::FileExt;
+use hex::{FromHex, ToHex};
 use maidsafe_utilities::serialisation::{self, SerialisationError};
-use rustc_serialize::{Decodable, Encodable};
-use rustc_serialize::hex::{FromHex, ToHex};
+use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -79,8 +79,8 @@ pub struct ChunkStore<Key, Value> {
 }
 
 impl<Key, Value> ChunkStore<Key, Value>
-    where Key: Decodable + Encodable,
-          Value: Decodable + Encodable
+    where Key: Serialize + Deserialize,
+          Value: Serialize + Deserialize
 {
     /// Creates a new `ChunkStore` with `max_space` allowed storage space.
     ///
@@ -170,8 +170,8 @@ impl<Key, Value> ChunkStore<Key, Value>
                     dir_entry
                         .ok()
                         .and_then(|entry| entry.file_name().into_string().ok())
-                        .and_then(|hex_name| hex_name.from_hex().ok())
-                        .and_then(|bytes| serialisation::deserialise::<Key>(&*bytes).ok())
+                        .and_then(|hex_name| FromHex::from_hex(hex_name.into_bytes()).ok())
+                        .and_then(|bytes: Vec<u8>| serialisation::deserialise::<Key>(&*bytes).ok())
                 };
                 Ok(dir_entries
                        .filter_map(dir_entry_to_routing_name)

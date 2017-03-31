@@ -62,7 +62,7 @@ struct PendingWrite {
     rejected: bool,
 }
 
-#[derive(Clone, RustcEncodable)]
+#[derive(Clone, Serialize)]
 enum PendingMutationType {
     Append,
     Put,
@@ -1246,10 +1246,10 @@ impl DataManager {
 }
 
 /// A list of data held by the sender. Sent from node to node.
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 struct RefreshDataList(Vec<IdAndVersion>);
 
 /// A message from the group to itself to store the given data. If this accumulates, that means a
 /// quorum of group members approves.
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 struct RefreshData(IdAndVersion, sha3::Digest256);

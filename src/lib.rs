@@ -197,9 +197,9 @@
 
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(bad_style, exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
+#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
           unknown_crate_types, warnings)]
-#![deny(deprecated, improper_ctypes, missing_docs,
+#![deny(bad_style, deprecated, improper_ctypes, missing_docs,
         non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
         private_no_mangle_fns, private_no_mangle_statics, stable_features, unconditional_recursion,
         unknown_lints, unsafe_code, unused, unused_allocation, unused_attributes,
@@ -207,13 +207,14 @@
 #![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
         unused_qualifications, unused_results)]
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
-         missing_debug_implementations, variant_size_differences)]
+         missing_debug_implementations, variant_size_differences, non_upper_case_globals)]
 
 // TODO solve this
 #![cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
 
 extern crate accumulator;
 extern crate fs2;
+extern crate hex;
 #[macro_use]
 extern crate log;
 extern crate lru_time_cache;
@@ -225,8 +226,11 @@ extern crate quick_error;
 #[cfg(any(test, feature = "use-mock-crust"))]
 extern crate rand;
 extern crate routing;
-extern crate rustc_serialize;
 extern crate rust_sodium;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 #[cfg(test)]
 extern crate tempdir;
 extern crate tiny_keccak;
