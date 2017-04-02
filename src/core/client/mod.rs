@@ -287,7 +287,7 @@ impl Client {
 
         if let Data::Structured(session_packet) = resp_getter.get()? {
             let decrypted_session_packet =
-                Account::decrypt(&session_packet.get_data(), &password, &pin)?;
+                Account::decrypt(session_packet.get_data(), &password, &pin)?;
             let id_packet =
                 FullId::with_keys((decrypted_session_packet.get_maid().public_keys().1,
                                    decrypted_session_packet

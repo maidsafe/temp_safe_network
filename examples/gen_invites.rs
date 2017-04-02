@@ -48,6 +48,7 @@ use routing::{Data, StructuredData, XorName};
 use safe_core::core::client::Client;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::time::UNIX_EPOCH;
 use tiny_keccak::sha3_256;
 
 const INVITE_TOKEN_SIZE: usize = 90;
@@ -59,7 +60,7 @@ Usage:
 
 Options:
   --gen-seed SIZE            Only generate a random seed of given size, writing into input file.
-  --get-pk                   Only Get the public sign key given the seed, don't do anything extra.
+  --get-pk                   Only get the public sign key given the seed, don't do anything extra.
   -c, --create               Create account using seed from input file. By default it will login.
   -n, --num-invites INVITES  Number of invites to generate.
   -h, --help                 Display this help message and exit.
@@ -99,7 +100,10 @@ fn main() {
         return println!("Public Signing Key: {:?}", sign_pk.0);
     }
 
-    let mut output = unwrap!(File::create("./output"));
+    let mut output = {
+        let name = format!("./output-{}", unwrap!(UNIX_EPOCH.elapsed()).as_secs());
+        unwrap!(File::create(&name))
+    };
 
     let mut cl = if args.flag_create {
         println!("\nTrying to create an account using given seed from file...");
