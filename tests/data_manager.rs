@@ -57,14 +57,22 @@ fn put_invitation() {
     let data = Data::Structured(unwrap!(sd));
     unwrap!(admin_client.put_and_verify(data, &mut nodes));
 
+
     let name = XorName(sha3_256(b"another invitation code"));
     let sd = StructuredData::new(TYPE_TAG_INVITE, name, 0, vec![0], BTreeSet::new());
     let data = Data::Structured(unwrap!(sd));
-    let mut other_client = TestClient::new(&network, Some(config));
+    let mut other_client = TestClient::new(&network, Some(config.clone()));
     other_client.ensure_connected(&mut nodes);
-    other_client.create_account_with_invitation(&mut nodes, "invitation code");
+    assert_eq!(Err(Some(MutationError::InvalidInvitation)),
+               other_client.create_account_with_invitation(&mut nodes, "wrong invitation code"));
+    unwrap!(other_client.create_account_with_invitation(&mut nodes, "invitation code"));
     assert_eq!(Err(Some(MutationError::InvalidOperation)),
                other_client.put_and_verify(data, &mut nodes));
+
+    let mut third_client = TestClient::new(&network, Some(config));
+    third_client.ensure_connected(&mut nodes);
+    assert_eq!(Err(Some(MutationError::InvitationAlreadyClaimed)),
+               third_client.create_account_with_invitation(&mut nodes, "invitation code"));
 }
 
 

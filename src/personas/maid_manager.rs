@@ -218,7 +218,14 @@ impl MaidManager {
                 trace!("Failed to create account for {:?}. Invalid invitation: {:?}",
                        src,
                        post_error);
-                let error = MutationError::NetworkOther("invalid invitation".to_string());
+                let error = match post_error {
+                    MutationError::NoSuchData => MutationError::InvalidInvitation,
+                    MutationError::InvalidOperation |
+                    MutationError::InvalidSuccessor => MutationError::InvitationAlreadyClaimed,
+                    err => {
+                        MutationError::NetworkOther(format!("Error claiming invitation: {:?}", err))
+                    }
+                };
                 let data_id = data.identifier();
                 self.reply_with_put_failure(routing_node, src, dst, data_id, msg_id, &error)
             }

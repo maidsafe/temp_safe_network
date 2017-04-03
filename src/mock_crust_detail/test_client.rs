@@ -109,14 +109,16 @@ impl TestClient {
     }
 
     /// Creates an account using the given invitation code.
-    pub fn create_account_with_invitation(&mut self, nodes: &mut [TestNode], invitation: &str) {
+    pub fn create_account_with_invitation(&mut self,
+                                          nodes: &mut [TestNode],
+                                          invitation: &str)
+                                          -> Result<(), Option<MutationError>> {
         let owner_pubkey = *self.full_id.public_id().signing_public_key();
         let owner = iter::once(owner_pubkey).collect();
         let payload = unwrap!(serialisation::serialise(&(invitation, Vec::<u8>::new())));
         let mut account = unwrap!(StructuredData::new(0, self.rng.gen(), 0, payload, owner));
         let _ = account.add_signature(&(owner_pubkey, self.full_id.signing_private_key().clone()));
-
-        unwrap!(self.put_and_verify(Data::Structured(account), nodes));
+        self.put_and_verify(Data::Structured(account), nodes)
     }
 
     fn flush(&mut self) {
