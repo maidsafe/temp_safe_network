@@ -10,26 +10,31 @@ repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.22.4"
 
 [dependencies]
-chrono = { version = "~0.3.0", features = ["serde"] }
-config_file_handler = { git = "https://github.com/maidsafe/config_file_handler.git", branch = "master" }
+config_file_handler = "~0.6.0"
 lazy_static = "~0.2.1"
 libc = "~0.2.16"
 log = "~0.3.6"
 lru-cache = "~0.0.7"
-maidsafe_utilities = { git = "https://github.com/maidsafe/maidsafe_utilities.git", branch = "master" }
+maidsafe_utilities = "~0.11.0"
 rand = "~0.3.14"
-routing = { git = "https://github.com/nbaksalyar/routing.git", branch = "master" }
-rust_sodium = { git = "https://github.com/maidsafe/rust_sodium.git", branch = "master" }
-self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "master" }
+rust_sodium = "~0.2.0"
+self_encryption = "~0.8.0"
 serde = "~0.9.12"
 serde_derive = "~0.9.12"
 unwrap = "~1.1.0"
 
+[dependencies.chrono]
+features = ["serde"]
+version = "~0.3.0"
+
+[dependencies.routing]
+path = "../routing"
+
 [dev-dependencies]
 crossbeam = "~0.2.10"
-rustc-serialize ="~0.3.23"
 docopt = "~0.6.85"
 regex = "~0.1.77"
+rustc-serialize = "~0.3.23"
 tiny-keccak = "~1.2.0"
 
 [[example]]
@@ -43,10 +48,6 @@ name = "client_stress_test"
 [[example]]
 bench = false
 name = "self_authentication"
-
-# [[example]]
-# bench = false
-# name = "safe_client"
 
 [[example]]
 bench = false
