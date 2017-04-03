@@ -12,9 +12,9 @@ version = "0.13.0"
 
 [dependencies]
 accumulator = "~0.5.0"
+clap = "~2.14.1"
 # config_file_handler = "~0.4.0"
 config_file_handler = { git = "https://github.com/maidsafe/config_file_handler", branch = "master" }
-docopt = "~0.7.0"
 fs2 = "~0.2.5"
 hex = "~0.2.0"
 itertools = "~0.5.9"
@@ -26,8 +26,6 @@ quick-error = "~1.1.0"
 rand = "~0.3.14"
 # routing = { git = "https://github.com/maidsafe/routing", branch = "mutable-data" }
 routing = { path = "../routing" }
-# Needed for docopt
-rustc-serialize = "~0.3.23"
 # rust_sodium = "~0.1.2"
 rust_sodium = { git = "https://github.com/maidsafe/rust_sodium", branch = "master" }
 serde = "~0.9.12"

@@ -16,14 +16,14 @@
 // relating to use of the SAFE Network Software.
 
 use maidsafe_utilities::serialisation;
-use routing::{Authority, MutableData, Value, XorName};
+use routing::{Authority, MutableData, Value, XorName, sha3};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use serde::Serialize;
 use tiny_keccak;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct SecureHash([u8; 32]);
+pub struct SecureHash(sha3::Digest256);
 
 /// Compute secure hash of the given value.
 pub fn secure_hash<T: Serialize>(value: &T) -> SecureHash {
