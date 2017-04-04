@@ -22,18 +22,59 @@ use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 
 use routing::{AppendWrapper, AppendedData, Authority, Data, DataIdentifier, Event, FullId,
-              ImmutableData, PrivAppendedData, PubAppendableData, Response, StructuredData};
+              ImmutableData, PrivAppendedData, PubAppendableData, Response, StructuredData,
+              XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Network};
 use rust_sodium::crypto::{box_, sign};
-use safe_vault::{GROUP_SIZE, test_utils};
+use safe_vault::{Config, GROUP_SIZE, TYPE_TAG_INVITE, test_utils};
 use safe_vault::mock_crust_detail::{self, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::test_node::TestNode;
 use std::{cmp, iter};
 use std::collections::{BTreeSet, HashSet};
+use tiny_keccak::sha3_256;
 
 const TEST_NET_SIZE: usize = 20;
+
+#[test]
+fn put_invitation() {
+    let invite_id = FullId::new();
+    let network = Network::new(GROUP_SIZE, None);
+    let node_count = GROUP_SIZE;
+    let vault_cfg = Config {
+        invite_key: Some(invite_id.public_id().signing_public_key().0),
+        ..Default::default()
+    };
+    let mut nodes = test_node::create_nodes(&network, node_count, Some(&vault_cfg), false);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+
+    let mut admin_client = TestClient::new_with_id(&network, Some(config.clone()), invite_id);
+    admin_client.ensure_connected(&mut nodes);
+    admin_client.create_account(&mut nodes);
+    let name = XorName(sha3_256(b"invitation code"));
+    let sd = StructuredData::new(TYPE_TAG_INVITE, name, 0, vec![0], BTreeSet::new());
+    let data = Data::Structured(unwrap!(sd));
+    unwrap!(admin_client.put_and_verify(data, &mut nodes));
+
+
+    let name = XorName(sha3_256(b"another invitation code"));
+    let sd = StructuredData::new(TYPE_TAG_INVITE, name, 0, vec![0], BTreeSet::new());
+    let data = Data::Structured(unwrap!(sd));
+    let mut other_client = TestClient::new(&network, Some(config.clone()));
+    other_client.ensure_connected(&mut nodes);
+    assert_eq!(Err(Some(MutationError::InvalidInvitation)),
+               other_client.create_account_with_invitation(&mut nodes, "wrong invitation code"));
+    unwrap!(other_client.create_account_with_invitation(&mut nodes, "invitation code"));
+    assert_eq!(Err(Some(MutationError::InvalidOperation)),
+               other_client.put_and_verify(data, &mut nodes));
+
+    let mut third_client = TestClient::new(&network, Some(config));
+    third_client.ensure_connected(&mut nodes);
+    assert_eq!(Err(Some(MutationError::InvitationAlreadyClaimed)),
+               third_client.create_account_with_invitation(&mut nodes, "invitation code"));
+}
+
 
 #[test]
 fn immutable_data_operations_with_churn_with_cache() {

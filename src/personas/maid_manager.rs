@@ -15,16 +15,21 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use GROUP_SIZE;
+use {GROUP_SIZE, TYPE_TAG_INVITE};
 use error::InternalError;
 use itertools::Itertools;
+use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, RoutingTable,
               StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
+use rust_sodium::crypto::sign::PublicKey;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::convert::From;
+use std::time::Duration;
+use std::u64;
+use tiny_keccak::sha3_256;
 use utils;
 use vault::RoutingNode;
 
@@ -33,6 +38,11 @@ use vault::RoutingNode;
 const DEFAULT_ACCOUNT_SIZE: u64 = 500;
 #[cfg(feature = "use-mock-crust")]
 const DEFAULT_ACCOUNT_SIZE: u64 = 100;
+
+/// The time we wait for a response to update the invitation data, in seconds.
+const ACCOUNT_CREATION_TIMEOUT_SECS: u64 = 90;
+/// The number of ongoing account creations we keep in memory at the same time.
+const ACCOUNT_CREATION_LIMIT: usize = 100;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 enum Refresh {
@@ -80,13 +90,19 @@ impl Account {
 pub struct MaidManager {
     accounts: HashMap<XorName, Account>,
     request_cache: HashMap<MessageId, (Authority<XorName>, Authority<XorName>)>,
+    invite_key: Option<PublicKey>,
+    /// The ongoing requests from clients to create a new account.
+    account_creation_cache: LruCache<MessageId, (Authority<XorName>, Authority<XorName>, Data)>,
 }
 
 impl MaidManager {
-    pub fn new() -> MaidManager {
+    pub fn new(invite_key: Option<PublicKey>) -> MaidManager {
         MaidManager {
             accounts: HashMap::new(),
             request_cache: HashMap::new(),
+            invite_key: invite_key,
+            account_creation_cache: LruCache::with_expiry_duration_and_capacity(
+                Duration::from_secs(ACCOUNT_CREATION_TIMEOUT_SECS), ACCOUNT_CREATION_LIMIT),
         }
     }
 
@@ -186,6 +202,47 @@ impl MaidManager {
                 self.reply_with_put_failure(routing_node, src, dst, data_id, msg_id, &error)
             }
             None => Err(InternalError::FailedToFindCachedRequest(msg_id)),
+        }
+    }
+
+    pub fn handle_post_failure(&mut self,
+                               routing_node: &mut RoutingNode,
+                               msg_id: MessageId,
+                               external_error_indicator: &[u8])
+                               -> Result<(), InternalError> {
+        match self.account_creation_cache.remove(&msg_id) {
+            None => Err(InternalError::FailedToFindCachedRequest(msg_id)),
+            Some((src, dst, data)) => {
+                let post_error: MutationError =
+                    serialisation::deserialise(external_error_indicator)?;
+                trace!("Failed to create account for {:?}. Invalid invitation: {:?}",
+                       src,
+                       post_error);
+                let error = match post_error {
+                    MutationError::NoSuchData => MutationError::InvalidInvitation,
+                    MutationError::InvalidOperation |
+                    MutationError::InvalidSuccessor => MutationError::InvitationAlreadyClaimed,
+                    err => {
+                        MutationError::NetworkOther(format!("Error claiming invitation: {:?}", err))
+                    }
+                };
+                let data_id = data.identifier();
+                self.reply_with_put_failure(routing_node, src, dst, data_id, msg_id, &error)
+            }
+        }
+    }
+
+    pub fn handle_post_success(&mut self,
+                               routing_node: &mut RoutingNode,
+                               msg_id: MessageId,
+                               client_name: XorName)
+                               -> Result<(), InternalError> {
+        match self.account_creation_cache.remove(&msg_id) {
+            None => Err(InternalError::FailedToFindCachedRequest(msg_id)),
+            Some((src, dst, data)) => {
+                let _ = self.accounts.insert(client_name, Account::default());
+                self.forward_put_request(routing_node, src, dst, client_name, data, msg_id)
+            }
         }
     }
 
@@ -324,32 +381,66 @@ impl MaidManager {
         // If the type_tag is `TYPE_TAG_SESSION_PACKET`, the account must not exist, else it must
         // exist.
         let client_name = utils::client_name(&src);
+        let is_admin = match src {
+            Authority::Client { client_key, .. } => Some(client_key) == self.invite_key,
+            _ => false,
+        };
+        let mut error_opt = None;
         if data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
             if dst.name() != client_name {
                 trace!("Cannot create account for {:?} as {:?}.", src, dst);
-                let error = MutationError::InvalidOperation;
-                self.reply_with_put_failure(routing_node,
-                                            src,
-                                            dst,
-                                            data.identifier(),
-                                            msg_id,
-                                            &error)?;
-                return Err(From::from(error));
+                error_opt = Some(MutationError::InvalidOperation);
+            } else if is_admin || self.invite_key.is_none() {
+                let len = self.accounts.len();
+                match self.accounts.entry(client_name) {
+                    Entry::Occupied(_) => error_opt = Some(MutationError::AccountExists),
+                    Entry::Vacant(entry) => {
+                        // Create the account, the SD incurs charge later on
+                        let account = entry.insert(Account::default());
+                        if is_admin {
+                            account.space_available = u64::MAX;
+                        }
+                        info!("Managing {} client accounts.", len + 1);
+                    }
+                }
+            } else if self.accounts.contains_key(&client_name) {
+                error_opt = Some(MutationError::AccountExists);
+            } else {
+                let (invitation, _): (String, Vec<u8>) =
+                    serialisation::deserialise(data.get_data())?;
+                let invite_hash = sha3_256(invitation.as_bytes());
+                let invite_data = Data::Structured(StructuredData::new(TYPE_TAG_INVITE,
+                                                                       XorName(invite_hash),
+                                                                       1,
+                                                                       vec![],
+                                                                       Default::default())?);
+                trace!("Creating account for {:?} with invitation {:?}.",
+                       client_name,
+                       invite_data.name());
+                let ac = (src, dst, Data::Structured(data));
+                if let Some(oac) = self.account_creation_cache.insert(msg_id, ac) {
+                    debug!("Received two account creation requests with message ID {:?}. {:?} \
+                            and {:?}.",
+                           msg_id,
+                           oac,
+                           self.account_creation_cache.get(&msg_id));
+                }
+                let invite_dst = Authority::NaeManager(*invite_data.name());
+                routing_node.send_post_request(dst, invite_dst, invite_data, msg_id)?;
+                return Ok(());
             }
-            if self.accounts.contains_key(&client_name) {
-                let error = MutationError::AccountExists;
-                self.reply_with_put_failure(routing_node,
-                                            src,
-                                            dst,
-                                            data.identifier(),
-                                            msg_id,
-                                            &error)?;
-                return Err(From::from(error));
+        } else if data.get_type_tag() == TYPE_TAG_INVITE {
+            // Only the authorised admin client can create invitations.
+            if !is_admin {
+                trace!("Cannot put {:?} as {:?}.", data, dst);
+                error_opt = Some(MutationError::InvalidOperation);
+            } else {
+                trace!("Creating invitation {:?}.", data.name());
             }
-
-            // Create the account, the SD incurs charge later on
-            let _ = self.accounts.insert(client_name, Account::default());
-            info!("Managing {} client accounts.", self.accounts.len());
+        }
+        if let Some(error) = error_opt {
+            self.reply_with_put_failure(routing_node, src, dst, data.identifier(), msg_id, &error)?;
+            return Err(From::from(error));
         }
         let structured_data = Data::Structured(data);
         self.forward_put_request(routing_node, src, dst, client_name, structured_data, msg_id)

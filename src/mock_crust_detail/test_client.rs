@@ -24,7 +24,6 @@ use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullI
               PublicId, Response, StructuredData, XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
-use std::collections::BTreeSet;
 use std::iter;
 use std::sync::mpsc::TryRecvError;
 
@@ -39,9 +38,13 @@ pub struct TestClient {
 }
 
 impl TestClient {
-    /// Create a test client for the mock network
+    /// Creates a test client for the mock network.
     pub fn new(network: &Network, config: Option<Config>) -> Self {
-        let full_id = FullId::new();
+        Self::new_with_id(network, config, FullId::new())
+    }
+
+    /// Creates a test client for the mock network with the given ID.
+    pub fn new_with_id(network: &Network, config: Option<Config>, full_id: FullId) -> Self {
         let public_id = *full_id.public_id();
 
         let handle = network.new_service_handle(config, None);
@@ -95,14 +98,27 @@ impl TestClient {
         }
     }
 
-    /// create an account and store it
+    /// Creates an account and stores it.
     pub fn create_account(&mut self, nodes: &mut [TestNode]) {
         let owner_pubkey = *self.full_id.public_id().signing_public_key();
-        let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
+        let owner = iter::once(owner_pubkey).collect();
         let mut account = unwrap!(StructuredData::new(0, self.rng.gen(), 0, vec![], owner));
         let _ = account.add_signature(&(owner_pubkey, self.full_id.signing_private_key().clone()));
 
         unwrap!(self.put_and_verify(Data::Structured(account), nodes));
+    }
+
+    /// Creates an account using the given invitation code.
+    pub fn create_account_with_invitation(&mut self,
+                                          nodes: &mut [TestNode],
+                                          invitation: &str)
+                                          -> Result<(), Option<MutationError>> {
+        let owner_pubkey = *self.full_id.public_id().signing_public_key();
+        let owner = iter::once(owner_pubkey).collect();
+        let payload = unwrap!(serialisation::serialise(&(invitation, Vec::<u8>::new())));
+        let mut account = unwrap!(StructuredData::new(0, self.rng.gen(), 0, payload, owner));
+        let _ = account.add_signature(&(owner_pubkey, self.full_id.signing_private_key().clone()));
+        self.put_and_verify(Data::Structured(account), nodes)
     }
 
     fn flush(&mut self) {

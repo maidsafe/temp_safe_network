@@ -18,6 +18,7 @@
 use config_file_handler::{self, FileHandler};
 use error::InternalError;
 use routing::XorName;
+use rust_sodium::crypto::sign::PUBLICKEYBYTES;
 use std::ffi::OsString;
 
 /// Lets a vault configure a wallet address and storage limit.
@@ -29,6 +30,8 @@ pub struct Config {
     pub max_capacity: Option<u64>, // measured by Bytes
     /// root directory for chunk_store directories
     pub chunk_store_root: Option<String>,
+    /// Key that is allowed to put structured data for account creation invitations.
+    pub invite_key: Option<[u8; PUBLICKEYBYTES]>,
 }
 
 /// Reads the default vault config file.
