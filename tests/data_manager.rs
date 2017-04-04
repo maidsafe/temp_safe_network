@@ -91,6 +91,8 @@ fn immutable_data_operations_with_churn_without_cache() {
 
 fn immutable_data_operations_with_churn(use_cache: bool) {
     let network = Network::new(GROUP_SIZE, None);
+    let mut rng = network.new_rng();
+
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, use_cache);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -102,7 +104,6 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
     client.create_account(&mut nodes);
 
     let mut all_data = vec![];
-    let mut rng = network.new_rng();
     let mut event_count = 0;
 
     for i in 0..test_utils::iterations() {
@@ -324,8 +325,7 @@ fn mutable_data_normal_flow() {
 #[test]
 fn mutable_data_error_flow() {
     let seed = None;
-    // let node_count = TEST_NET_SIZE;
-    let node_count = 8;
+    let node_count = TEST_NET_SIZE;
 
     let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
@@ -697,11 +697,6 @@ fn mutable_data_parallel_mutations() {
 
 #[test]
 fn mutable_data_operations_with_churn() {
-    // let seed = Some([1744178832, 2594784533, 113142720, 885260897]);
-    // let node_count = 8;
-    // let operation_count = 1;
-    // let iterations = 4;
-
     let seed = None;
     let node_count = TEST_NET_SIZE;
     let operation_count = 5;
@@ -710,6 +705,7 @@ fn mutable_data_operations_with_churn() {
     let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
+
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
@@ -720,7 +716,10 @@ fn mutable_data_operations_with_churn() {
     let mut event_count = 0;
 
     for i in 0..iterations {
-        trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
+        trace!("Iteration {} of {}. Network size: {}",
+               i + 1,
+               iterations,
+               nodes.len());
         let mut new_data = Vec::with_capacity(operation_count);
         let mut mutated_data = HashSet::new();
 

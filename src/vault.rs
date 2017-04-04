@@ -33,6 +33,7 @@ pub use routing::Event;
 pub use routing::Node as RoutingNode;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
 use routing::NodeBuilder;
+#[cfg(not(feature = "use-mock-crust"))]
 use rust_sodium;
 use std::env;
 use std::path::Path;
@@ -78,6 +79,7 @@ impl Vault {
                          use_cache: bool,
                          config: Config)
                          -> Result<Self, InternalError> {
+        #[cfg(not(feature = "use-mock-crust"))]
         rust_sodium::init();
 
         let mut chunk_store_root = match config.chunk_store_root {
@@ -730,5 +732,10 @@ impl Vault {
     /// Vault routing_table
     pub fn routing_table(&self) -> RoutingTable<XorName> {
         unwrap!(self.routing_node.routing_table())
+    }
+
+    /// Sets a name to be used when the next node relocation request is received by this node.
+    pub fn set_next_node_name(&mut self, relocation_name: XorName) {
+        self.routing_node.set_next_node_name(relocation_name)
     }
 }

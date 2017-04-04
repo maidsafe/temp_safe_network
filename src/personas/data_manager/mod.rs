@@ -32,12 +32,12 @@ use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, Per
               RoutingTable, User, Value, XorName};
 use routing::ClientError;
 use rust_sodium::crypto::sign;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use utils;
+use utils::{self, HashMap, HashSet};
 use vault::RoutingNode;
 
 const MAX_FULL_PERCENT: u64 = 50;
@@ -133,13 +133,11 @@ impl DataManager {
                     }
                 };
 
-                if !needed {
-                    continue;
-                }
-
-                for holder in holders {
-                    self.cache
-                        .insert_needed_fragment(fragment.clone(), holder);
+                if needed {
+                    for holder in holders {
+                        self.cache
+                            .insert_needed_fragment(fragment.clone(), holder);
+                    }
                 }
             }
         }
@@ -815,7 +813,7 @@ impl DataManager {
             let _ = self.request_needed_fragments(routing_node);
         }
 
-        let mut refreshes = HashMap::new();
+        let mut refreshes = HashMap::default();
         for fragment in self.our_fragments() {
             match routing_table.other_closest_names(fragment.name(), GROUP_SIZE) {
                 None => {
@@ -1087,31 +1085,36 @@ impl DataManager {
         let src = Authority::ManagedNode(routing_node.name()?);
         let candidates = self.cache.unrequested_needed_fragments();
 
-        for (holder, fragment) in candidates {
-            if let Some(group) = routing_node.close_group(*fragment.name(), GROUP_SIZE) {
-                if group.contains(&holder) {
-                    let dst = Authority::ManagedNode(holder);
-                    let msg_id = MessageId::new();
+        for (fragment, holders) in candidates {
+            for holder in holders {
+                if let Some(group) = routing_node.close_group(*fragment.name(), GROUP_SIZE) {
+                    if group.contains(&holder) {
+                        let dst = Authority::ManagedNode(holder);
+                        let msg_id = MessageId::new();
 
-                    match fragment {
-                        FragmentInfo::ImmutableData(name) => {
-                            routing_node.send_get_idata_request(src, dst, name, msg_id)?;
+                        self.cache
+                            .start_needed_fragment_request(&fragment, &holder, msg_id);
+
+                        match fragment {
+                            FragmentInfo::ImmutableData(name) => {
+                                routing_node.send_get_idata_request(src, dst, name, msg_id)?;
+                            }
+                            FragmentInfo::MutableDataShell { name, tag, .. } => {
+                                routing_node.send_get_mdata_shell_request(
+                                    src, dst, name, tag, msg_id)?;
+                            }
+                            FragmentInfo::MutableDataEntry { name, tag, ref key, .. } => {
+                                routing_node.send_get_mdata_value_request(src,
+                                                                  dst,
+                                                                  name,
+                                                                  tag,
+                                                                  key.clone(),
+                                                                  msg_id)?;
+                            }
                         }
-                        FragmentInfo::MutableDataShell { name, tag, .. } => {
-                            routing_node.send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
-                        }
-                        FragmentInfo::MutableDataEntry { name, tag, ref key, .. } => {
-                            routing_node.send_get_mdata_value_request(src,
-                                                              dst,
-                                                              name,
-                                                              tag,
-                                                              key.clone(),
-                                                              msg_id)?;
-                        }
+
+                        break;
                     }
-
-                    self.cache
-                        .start_needed_fragment_request(&fragment, &holder, msg_id);
                 }
             }
         }
@@ -1122,7 +1125,7 @@ impl DataManager {
 
     // Get all fragments for the data we have in the chunk store.
     fn chunk_store_fragments(&self) -> HashSet<FragmentInfo> {
-        let mut result = HashSet::new();
+        let mut result = HashSet::default();
 
         for data_id in self.chunk_store.keys() {
             match data_id {

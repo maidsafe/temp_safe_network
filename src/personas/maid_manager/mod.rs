@@ -29,9 +29,9 @@ use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, Per
               RoutingTable, TYPE_TAG_SESSION_PACKET, User, XorName};
 use routing::ClientError;
 use rust_sodium::crypto::sign;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::collections::hash_map::Entry;
-use utils;
+use utils::{self, HashMap};
 use vault::RoutingNode;
 
 pub struct MaidManager {
@@ -42,8 +42,8 @@ pub struct MaidManager {
 impl MaidManager {
     pub fn new() -> MaidManager {
         MaidManager {
-            accounts: HashMap::new(),
-            request_cache: HashMap::new(),
+            accounts: HashMap::default(),
+            request_cache: HashMap::default(),
         }
     }
 

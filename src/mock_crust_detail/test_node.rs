@@ -19,8 +19,9 @@ use super::poll;
 use config_handler::Config;
 use hex::ToHex;
 use itertools::Itertools;
+use maidsafe_utilities::SeededRng;
 use personas::data_manager::DataId;
-use rand::{self, Rng};
+use rand::Rng;
 use routing::{RoutingTable, XorName, Xorable};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use std::env;
@@ -45,7 +46,7 @@ impl TestNode {
                -> Self {
         let handle = network.new_service_handle(crust_config, None);
         let temp_root = env::temp_dir();
-        let chunk_store_root = temp_root.join(rand::thread_rng()
+        let chunk_store_root = temp_root.join(SeededRng::thread_rng()
                                                   .gen_iter()
                                                   .take(8)
                                                   .collect::<Vec<u8>>()
@@ -69,6 +70,7 @@ impl TestNode {
         let vault = mock_crust::make_current(&handle, || {
             unwrap!(Vault::new_with_config(first_node, use_cache, vault_config))
         });
+
         TestNode {
             handle: handle,
             vault: vault,

@@ -19,9 +19,9 @@ use super::STATUS_LOG_INTERVAL;
 use super::data::{Data, DataId};
 use GROUP_SIZE;
 use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable, Value, XorName};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
-use utils::{self, SecureHash};
+use utils::{self, HashMap, HashSet, SecureHash};
 
 /// The timeout for cached data from requests; if no consensus is reached, the data is dropped.
 const PENDING_WRITE_TIMEOUT_SECS: u64 = 60;
@@ -48,7 +48,7 @@ pub struct Cache {
 
 impl Cache {
     /// Returns data fragments we need but have not requested yet.
-    pub fn unrequested_needed_fragments(&mut self) -> Vec<(XorName, FragmentInfo)> {
+    pub fn unrequested_needed_fragments(&mut self) -> Vec<(FragmentInfo, Vec<XorName>)> {
         // Reset expired requests
         for request in self.needed_fragments
                 .iter_mut()
@@ -58,14 +58,18 @@ impl Cache {
 
         // TODO (adam): should we exclude fragments of uneeded chunks?
 
-        // Return all fragments that do not already have request ongoing.
-        let mut result = HashMap::new();
+        // Find all needed fragments together with all their holders.
+        let mut result = HashMap::default();
         for (holder, fragments) in &self.needed_fragments {
             for fragment in fragments.keys() {
-                let _ = result.insert(fragment.clone(), *holder);
+                result
+                    .entry(fragment.clone())
+                    .or_insert_with(Vec::new)
+                    .push(*holder);
             }
         }
 
+        // Skip the fragments that already have request ongoing.
         for (_, fragments) in &self.needed_fragments {
             for (fragment, request) in fragments {
                 if request.is_ongoing() {
@@ -74,10 +78,7 @@ impl Cache {
             }
         }
 
-        result
-            .into_iter()
-            .map(|(fragment, holder)| (holder, fragment))
-            .collect()
+        result.into_iter().collect()
     }
 
     /// Returns all data fragments we need.
@@ -95,7 +96,7 @@ impl Cache {
     pub fn insert_needed_fragment(&mut self, fragment: FragmentInfo, holder: XorName) -> bool {
         self.needed_fragments
             .entry(holder)
-            .or_insert_with(HashMap::new)
+            .or_insert_with(HashMap::default)
             .insert(fragment, FragmentRequest::new())
             .is_none()
     }
@@ -157,7 +158,6 @@ impl Cache {
                 Some(fragments) => fragments,
                 None => return None,
             };
-
 
             if let Some(fragment) = fragments
                    .iter()
@@ -334,14 +334,14 @@ impl Cache {
         self.remove_expired_mdata_entries();
         let _ = self.mdata_entries
             .entry((name, tag))
-            .or_insert_with(HashMap::new)
+            .or_insert_with(HashMap::default)
             .insert(key, (value, Instant::now()));
     }
 
     pub fn take_mdata_entries(&mut self, name: XorName, tag: u64) -> HashMap<Vec<u8>, Value> {
         let result = self.mdata_entries
             .remove(&(name, tag))
-            .unwrap_or_else(HashMap::new)
+            .unwrap_or_else(HashMap::default)
             .into_iter()
             .map(|(key, (value, _))| (key, value))
             .collect();
@@ -411,9 +411,9 @@ impl Default for Cache {
     fn default() -> Cache {
         Cache {
             unneeded_chunks: VecDeque::new(),
-            needed_fragments: HashMap::new(),
-            pending_writes: HashMap::new(),
-            mdata_entries: HashMap::new(),
+            needed_fragments: HashMap::default(),
+            pending_writes: HashMap::default(),
+            mdata_entries: HashMap::default(),
             logging_time: Instant::now(),
             total_needed_fragments_count: 0,
             requested_needed_fragments_count: 0,
@@ -626,7 +626,7 @@ mod tests {
     use rand;
 
     #[test]
-    fn needed_fragments() {
+    fn unrequested_needed_fragments() {
         let mut cache = Cache::default();
 
         let holder0 = rand::random();
@@ -634,36 +634,53 @@ mod tests {
 
         let fragment0 = FragmentInfo::ImmutableData(rand::random());
 
-        assert!(cache.needed_fragments().is_empty());
         assert!(cache.unrequested_needed_fragments().is_empty());
 
-        // Insert a single fragment. Should be present in both collections.
+        // Insert a single fragment. It should be present in the collection.
         assert!(cache.insert_needed_fragment(fragment0.clone(), holder0));
+        let result = cache.unrequested_needed_fragments();
+        assert_eq!(result.len(), 1);
+        assert_eq!(first(result), (fragment0.clone(), vec![holder0]));
 
-        let fragments = cache.needed_fragments();
-        assert_eq!(fragments.len(), 1);
-        assert_eq!(unwrap!(fragments.into_iter().next()), fragment0);
-
-        let fragments = cache.unrequested_needed_fragments();
-        assert_eq!(fragments.len(), 1);
-        assert_eq!(fragments[0].0, holder0);
-        assert_eq!(fragments[0].1, fragment0);
-
-        // Insert the same fragment with the same holder again. The collections
+        // Insert the same fragment with the same holder again. The collection
         // should not change.
         assert!(!cache.insert_needed_fragment(fragment0.clone(), holder0));
+        let result = cache.unrequested_needed_fragments();
+        assert_eq!(result.len(), 1);
+        assert_eq!(first(result), (fragment0.clone(), vec![holder0]));
 
-        assert_eq!(cache.needed_fragments().len(), 1);
-        assert_eq!(cache.unrequested_needed_fragments().len(), 1);
-
-        // Insert the same fragment but with different holder. The collections
-        // should still include it only once.
+        // Insert the same fragment but with different holder. It should be present
+        // in the collection only one, but with both holders.
         assert!(cache.insert_needed_fragment(fragment0.clone(), holder1));
-        assert_eq!(cache.unrequested_needed_fragments().len(), 1);
+        let result = cache.unrequested_needed_fragments();
+        assert_eq!(result.len(), 1);
+        let item = first(result);
+        assert_eq!(item.0, fragment0);
+        assert_eq!(item.1.len(), 2);
+        assert!(item.1.contains(&holder0));
+        assert!(item.1.contains(&holder1));
 
-        // Start request against one holder. The fragment should not appear among the unrequested
-        // fragments even though this fragment is still unrequested in different holder.
-        cache.start_needed_fragment_request(&fragment0, &holder0, MessageId::new());
-        assert_eq!(cache.unrequested_needed_fragments().len(), 0);
+        // Start request against one holder. The fragment should not appear among
+        // the unrequested fragments even though this fragment is still unrequested
+        // in different holder.
+        let msg_id = MessageId::new();
+        cache.start_needed_fragment_request(&fragment0, &holder0, msg_id);
+        assert!(cache.unrequested_needed_fragments().is_empty());
+
+        // Stop the request. The fragment should be present in the collection again,
+        // with the other holder.
+        assert_eq!(unwrap!(cache.stop_needed_fragment_request(&holder0, msg_id)),
+                   fragment0);
+        let result = cache.unrequested_needed_fragments();
+        assert_eq!(result.len(), 1);
+        assert_eq!(first(result), (fragment0.clone(), vec![holder1]));
+
+        // Remove the fragment. It should remove it from all holders.
+        cache.remove_needed_fragment(&fragment0);
+        assert!(cache.unrequested_needed_fragments().is_empty());
+    }
+
+    fn first<I: IntoIterator<Item = T>, T>(i: I) -> T {
+        unwrap!(i.into_iter().next())
     }
 }

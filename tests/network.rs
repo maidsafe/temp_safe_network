@@ -29,6 +29,8 @@ use safe_vault::mock_crust_detail::test_client::TestClient;
 #[test]
 fn fill_network() {
     let network = Network::new(GROUP_SIZE, None);
+    let mut rng = network.new_rng();
+
     let config = Config {
         wallet_address: None,
         max_capacity: Some(2000),
@@ -40,7 +42,6 @@ fn fill_network() {
     let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(crust_config));
     let full_id = client.full_id().clone();
-    let mut rng = network.new_rng();
 
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);

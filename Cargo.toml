@@ -13,21 +13,17 @@ version = "0.13.0"
 [dependencies]
 accumulator = "~0.5.0"
 clap = "~2.14.1"
-# config_file_handler = "~0.4.0"
-config_file_handler = { git = "https://github.com/maidsafe/config_file_handler", branch = "master" }
+config_file_handler = "~0.6.0"
 fs2 = "~0.2.5"
 hex = "~0.2.0"
 itertools = "~0.5.9"
 lru_time_cache = "~0.5.0"
 log = "~0.3.6"
-# maidsafe_utilities = "~0.10.0"
-maidsafe_utilities = { git = "https://github.com/maidsafe/maidsafe_utilities", branch = "master" }
+maidsafe_utilities = "~0.11.0"
 quick-error = "~1.1.0"
 rand = "~0.3.14"
-# routing = { git = "https://github.com/maidsafe/routing", branch = "mutable-data" }
-routing = { path = "../routing" }
-# rust_sodium = "~0.1.2"
-rust_sodium = { git = "https://github.com/maidsafe/rust_sodium", branch = "master" }
+routing = { git = "https://github.com/maidsafe/routing", branch = "mutable-data" }
+rust_sodium = "~0.2.0"
 serde = "~0.9.12"
 serde_derive = "~0.9.12"
 serde_json = "~0.9.9"

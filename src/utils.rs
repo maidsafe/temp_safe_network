@@ -20,6 +20,11 @@ use routing::{Authority, MutableData, Value, XorName, sha3};
 use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use serde::Serialize;
+use std::collections;
+#[cfg(feature = "use-mock-crust")]
+use std::collections::hash_map::DefaultHasher;
+#[cfg(feature = "use-mock-crust")]
+use std::hash::BuildHasherDefault;
 use tiny_keccak;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash, Serialize, Deserialize)]
@@ -31,6 +36,18 @@ pub fn secure_hash<T: Serialize>(value: &T) -> SecureHash {
         .map(|data| SecureHash(tiny_keccak::sha3_256(&data)))
         .unwrap_or_else(|_| Default::default())
 }
+
+// Note: for testing with mock crust, use collections with deterministic hashing.
+
+#[cfg(feature = "use-mock-crust")]
+pub type HashMap<K, V> = collections::HashMap<K, V, BuildHasherDefault<DefaultHasher>>;
+#[cfg(not(feature = "use-mock-crust"))]
+pub type HashMap<K, V> = collections::HashMap<K, V>;
+
+#[cfg(feature = "use-mock-crust")]
+pub type HashSet<T> = collections::HashSet<T, BuildHasherDefault<DefaultHasher>>;
+#[cfg(not(feature = "use-mock-crust"))]
+pub type HashSet<T> = collections::HashSet<T>;
 
 /// Extract client key (a public singing key) from the authority.
 ///
