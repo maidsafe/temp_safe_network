@@ -31,7 +31,6 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-extern crate time;
 extern crate routing;
 extern crate safe_core;
 #[macro_use]
@@ -51,6 +50,7 @@ use std::sync::{Arc, Mutex};
 fn create_account() -> Result<Client, NfsError> {
     let mut secret_0 = String::new();
     let mut secret_1 = String::new();
+    let mut invitation = String::new();
 
     println!("\n\tAccount Creation");
     println!("\t================");
@@ -63,9 +63,13 @@ fn create_account() -> Result<Client, NfsError> {
     let _ = std::io::stdin().read_line(&mut secret_1);
     secret_1 = secret_1.trim().to_string();
 
+    println!("\n------------ Enter invitation ---------------");
+    let _ = std::io::stdin().read_line(&mut invitation);
+    invitation = invitation.trim().to_string();
+
     // Account Creation
     println!("\nTrying to create an account ...");
-    let _ = unwrap!(Client::create_account(&secret_0, &secret_1));
+    let _ = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
     println!("Account Created Successfully !!");
     println!("\n\n\tAuto Account Login");
     println!("\t==================");
@@ -129,7 +133,9 @@ fn directory_operation(option: u32,
             println!("2. Versioned Public Directory");
             println!("3. UnVersioned Private Directory");
             println!("4. UnVersioned Public Directory");
-            match get_user_string("number corresponding to the type").trim().parse::<usize>() {
+            match get_user_string("number corresponding to the type")
+                      .trim()
+                      .parse::<usize>() {
                 Ok(index) => {
                     if index > 4 {
                         println!("Invalid input");
@@ -157,11 +163,11 @@ fn directory_operation(option: u32,
 
                     let directory_helper = DirectoryHelper::new(client.clone());
                     let _ = directory_helper.create(name.clone(),
-                                                    tag_type,
-                                                    vec![],
-                                                    versioned,
-                                                    access_level,
-                                                    Some(&mut directory))?;
+                                tag_type,
+                                vec![],
+                                versioned,
+                                access_level,
+                                Some(&mut directory))?;
                     println!("Created Directory - {}", name);
                 }
                 Err(_) => println!("Invalid input"),
@@ -176,11 +182,10 @@ fn directory_operation(option: u32,
                 println!("List of directories");
                 println!("\t        Created On                  Name ");
                 println!("\t =========================       ==========");
-                for metatata in directory_metadata {
-                    println!("\t {:?} \t {}",
-                             unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
-                                                    &metatata.get_created_time())),
-                             metatata.get_name());
+                for metadata in directory_metadata {
+                    println!("\t {} \t {}",
+                             metadata.get_created_time().format("%d-%m-%Y %H:%M UTC"),
+                             metadata.get_name());
                 }
             }
         }
@@ -230,9 +235,10 @@ fn file_operation(option: u32,
                 println!("\t        Modified On                Name ");
                 println!("\t =========================      ===========");
                 for file in files {
-                    println!("\t {:?} \t {}",
-                             unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
-                                                    &file.get_metadata().get_modified_time())),
+                    println!("\t {} \t {}",
+                             file.get_metadata()
+                                 .get_modified_time()
+                                 .format("%d-%m-%Y %H:%M UTC"),
                              file.get_name());
                 }
             }
@@ -288,7 +294,8 @@ fn file_operation(option: u32,
             // Read file by version
             let child = get_child_directory(client.clone(), directory)?;
             let file_name = get_user_string("File name");
-            let file = child.find_file(&file_name).ok_or(NfsError::FileNotFound)?;
+            let file = child.find_file(&file_name)
+                .ok_or(NfsError::FileNotFound)?;
             let mut file_helper = FileHelper::new(client);
             let versions = file_helper.get_versions(file, &child)?;
             let ref file_version;
@@ -297,10 +304,12 @@ fn file_operation(option: u32,
             } else {
                 println!("Available Versions::");
                 for (i, version) in versions.iter().enumerate() {
-                    println!("\t{} Modified at {:?}",
+                    println!("\t{} Modified at {}",
                              i + 1,
-                             unwrap!(time::strftime("%d-%m-%Y %H:%M UTC",
-                                                    &version.get_metadata().get_modified_time())))
+                             version
+                                 .get_metadata()
+                                 .get_modified_time()
+                                 .format("%d-%m-%Y %H:%M UTC"))
                 }
                 match get_user_string("Number corresponding to the version")
                           .trim()
@@ -349,9 +358,9 @@ fn file_operation(option: u32,
                 println!("No directories found");
                 return Ok(());
             } else {
-                match directory_metadata.iter().find(|metadata| {
-                                                         *metadata.get_name() == to_dir_name
-                                                     }) {
+                match directory_metadata
+                          .iter()
+                          .find(|metadata| *metadata.get_name() == to_dir_name) {
                     Some(to_dir) => {
                         if from_directory.get_key() == to_dir.get_key() {
                             return Err(NfsError::DestinationAndSourceAreSame);

@@ -20,7 +20,7 @@ use routing::XorName;
 
 /// `DirectoryKey` represents the meta information about a directory
 /// A directory can be fetched with the `DirectoryKey`
-#[derive(Debug, RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct DirectoryKey {
     id: XorName,
     type_tag: u64,

@@ -37,10 +37,7 @@ pub fn hybrid_encrypt(plain_text: &[u8],
     let sym_nonce = secretbox::gen_nonce();
 
     let mut asym_plain_text = [0u8; secretbox::KEYBYTES + secretbox::NONCEBYTES];
-    for it in sym_key.0
-            .iter()
-            .chain(sym_nonce.0.iter())
-            .enumerate() {
+    for it in sym_key.0.iter().chain(sym_nonce.0.iter()).enumerate() {
         asym_plain_text[it.0] = *it.1;
     }
 
@@ -73,10 +70,16 @@ pub fn hybrid_decrypt(cipher_text: &[u8],
         let mut sym_key = secretbox::Key([0u8; secretbox::KEYBYTES]);
         let mut sym_nonce = secretbox::Nonce([0u8; secretbox::NONCEBYTES]);
 
-        for it in asym_plain_text.iter().take(secretbox::KEYBYTES).enumerate() {
+        for it in asym_plain_text
+                .iter()
+                .take(secretbox::KEYBYTES)
+                .enumerate() {
             sym_key.0[it.0] = *it.1;
         }
-        for it in asym_plain_text.iter().skip(secretbox::KEYBYTES).enumerate() {
+        for it in asym_plain_text
+                .iter()
+                .skip(secretbox::KEYBYTES)
+                .enumerate() {
             sym_nonce.0[it.0] = *it.1;
         }
 
@@ -106,12 +109,14 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
 }
 
 /// Derive Password, Keyword and PIN (in order)
-pub fn derive_secrets(acc_locator: &str, acc_password: &str) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-    let Digest(locator_hash) = sha512::hash(acc_locator.as_bytes());
+pub fn derive_secrets(acc_locator: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    let Digest(locator_hash) = sha512::hash(acc_locator);
 
-    let pin = sha512::hash(&locator_hash[DIGESTBYTES / 2..]).0.to_owned();
+    let pin = sha512::hash(&locator_hash[DIGESTBYTES / 2..])
+        .0
+        .to_owned();
     let keyword = locator_hash.to_owned();
-    let password = sha512::hash(acc_password.as_bytes()).0.to_owned();
+    let password = sha512::hash(acc_password).0.to_owned();
 
     (password, keyword, pin)
 }
@@ -183,7 +188,7 @@ mod test {
         {
             let secret_0 = unwrap!(generate_random_string(SIZE));
             let secret_1 = unwrap!(generate_random_string(SIZE));
-            let (password, keyword, pin) = derive_secrets(&secret_0, &secret_1);
+            let (password, keyword, pin) = derive_secrets(secret_0.as_bytes(), secret_1.as_bytes());
             assert!(pin != keyword);
             assert!(password != pin);
             assert!(password != keyword);
@@ -193,7 +198,7 @@ mod test {
         {
             let secret_0 = String::new();
             let secret_1 = String::new();
-            let (password, keyword, pin) = derive_secrets(&secret_0, &secret_1);
+            let (password, keyword, pin) = derive_secrets(secret_0.as_bytes(), secret_1.as_bytes());
             assert!(pin != keyword);
             assert!(password != pin);
             assert!(password == keyword);

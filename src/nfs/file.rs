@@ -24,7 +24,7 @@ use std::fmt;
 
 /// Representation of a File to be put into the network. Could be text, music, video etc any kind
 /// of file
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct File {
     id: XorName,
     metadata: FileMetadata,

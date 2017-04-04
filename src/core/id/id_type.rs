@@ -18,8 +18,9 @@
 use core::errors::CoreError;
 use core::id::revocation_id_type::RevocationIdType;
 use routing::XorName;
-use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::box_;
 use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign::{self, Seed};
 
 /// `IdType`
 ///
@@ -28,10 +29,10 @@ use rust_sodium::crypto::hash::sha256;
 /// ```
 /// use ::safe_core::core::id::{IdType, RevocationIdType, MaidTypeTags};
 /// // Creating new IdType
-/// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>());
+/// let _maid  = IdType::new(&RevocationIdType::new::<MaidTypeTags>(None), None);
 ///
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct IdType {
     type_tag: u64,
     public_keys: (sign::PublicKey, box_::PublicKey),
@@ -40,9 +41,12 @@ pub struct IdType {
 
 impl IdType {
     /// Invoked to create an instance of IdType
-    pub fn new(revocation_id: &RevocationIdType) -> IdType {
+    pub fn new(revocation_id: &RevocationIdType, seed: Option<&Seed>) -> IdType {
         let asym_keys = box_::gen_keypair();
-        let signing_keys = sign::gen_keypair();
+        let signing_keys = match seed {
+            Some(s) => sign::keypair_from_seed(s),
+            None => sign::gen_keypair(),
+        };
 
         IdType {
             type_tag: revocation_id.type_tags().1,
@@ -53,8 +57,10 @@ impl IdType {
 
     /// Returns name
     pub fn name(&self) -> XorName {
-        let combined_iter =
-            (&self.public_keys.0).0.into_iter().chain((&self.public_keys.1).0.into_iter());
+        let combined_iter = (&self.public_keys.0)
+            .0
+            .into_iter()
+            .chain((&self.public_keys.1).0.into_iter());
         let mut combined = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -110,7 +116,7 @@ mod test {
 
     impl Random for IdType {
         fn generate_random() -> IdType {
-            IdType::new(&RevocationIdType::new::<MaidTypeTags>())
+            IdType::new(&RevocationIdType::new::<MaidTypeTags>(None), None)
         }
     }
 
@@ -147,7 +153,10 @@ mod test {
         assert!(!(maid2 != maid2_clone));
         assert!(maid1 != maid2);
 
-        let random_bytes = rand::thread_rng().gen_iter::<u8>().take(100).collect::<Vec<u8>>();
+        let random_bytes = rand::thread_rng()
+            .gen_iter::<u8>()
+            .take(100)
+            .collect::<Vec<u8>>();
         {
             let sign1 = maid1.sign(&random_bytes);
             let sign2 = maid2.sign(&random_bytes);
@@ -166,11 +175,19 @@ mod test {
             let encrypt2 = maid2.seal(&random_bytes, &maid3.public_keys().1);
             assert!(encrypt1.0 != encrypt2.0);
 
-            assert!(maid3.open(&encrypt1.0, &encrypt1.1, &maid1.public_keys().1).is_ok());
-            assert!(maid3.open(&encrypt1.0, &encrypt1.1, &maid2.public_keys().1).is_err());
+            assert!(maid3
+                        .open(&encrypt1.0, &encrypt1.1, &maid1.public_keys().1)
+                        .is_ok());
+            assert!(maid3
+                        .open(&encrypt1.0, &encrypt1.1, &maid2.public_keys().1)
+                        .is_err());
 
-            assert!(maid3.open(&encrypt2.0, &encrypt2.1, &maid2.public_keys().1).is_ok());
-            assert!(maid3.open(&encrypt2.0, &encrypt2.1, &maid1.public_keys().1).is_err());
+            assert!(maid3
+                        .open(&encrypt2.0, &encrypt2.1, &maid2.public_keys().1)
+                        .is_ok());
+            assert!(maid3
+                        .open(&encrypt2.0, &encrypt2.1, &maid1.public_keys().1)
+                        .is_err());
         }
     }
 }

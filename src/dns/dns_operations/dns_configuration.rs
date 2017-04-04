@@ -32,7 +32,7 @@ const DNS_CONFIG_DIR_NAME: &'static str = "DnsReservedDirectory";
 const DNS_CONFIG_FILE_NAME: &'static str = "DnsConfigurationFile";
 
 /// Dns configuration. For internal use by the `dns` module.
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DnsConfiguration {
     /// Dns long name
     pub long_name: String,
@@ -94,7 +94,8 @@ pub fn write_dns_configuration_data(client: Arc<Mutex<Client>>,
     let dir_helper = DirectoryHelper::new(client.clone());
     let dir_listing =
         dir_helper.get_configuration_directory_listing(DNS_CONFIG_DIR_NAME.to_string())?;
-    let file = dir_listing.get_files()
+    let file = dir_listing
+        .get_files()
         .iter()
         .find(|file| file.get_name() == DNS_CONFIG_FILE_NAME)
         .ok_or(DnsError::DnsConfigFileNotFoundOrCorrupted)?

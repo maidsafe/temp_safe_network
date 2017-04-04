@@ -18,7 +18,7 @@
 use core::id::IdTypeTags;
 use routing::XorName;
 use rust_sodium::crypto::hash::sha256;
-use rust_sodium::crypto::sign;
+use rust_sodium::crypto::sign::{self, Seed};
 
 /// `RevocationIdType`
 ///
@@ -28,9 +28,9 @@ use rust_sodium::crypto::sign;
 /// // Generating public and secret keys using rust_sodium
 /// // Create RevocationIdType
 /// use safe_core::core::id;
-/// let _an_maid = id::RevocationIdType::new::<id::MaidTypeTags>();
+/// let _an_maid = id::RevocationIdType::new::<id::MaidTypeTags>(None);
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RevocationIdType {
     type_tags: (u64, u64, u64), // type tags for revocation, id and public ids
     public_key: sign::PublicKey,
@@ -42,10 +42,14 @@ impl RevocationIdType {
     /// An instance of RevocationIdType can be created by invoking the new()
     /// Default contructed RevocationIdType instance is returned
     #[allow(unsafe_code)]
-    pub fn new<TypeTags>() -> RevocationIdType
+    pub fn new<TypeTags>(seed: Option<&Seed>) -> RevocationIdType
         where TypeTags: IdTypeTags
     {
-        let (pub_sign_key, sec_sign_key) = sign::gen_keypair();
+        let (pub_sign_key, sec_sign_key) = match seed {
+            Some(s) => sign::keypair_from_seed(s),
+            None => sign::gen_keypair(),
+        };
+
         let type_tags: TypeTags = unsafe { ::std::mem::uninitialized() };
         RevocationIdType {
             type_tags: (type_tags.revocation_id_type_tag(),
@@ -63,10 +67,7 @@ impl RevocationIdType {
         for iter in combined_iter {
             combined.push(*iter);
         }
-        for i in self.type_tags
-                .0
-                .to_string()
-                .into_bytes() {
+        for i in self.type_tags.0.to_string().into_bytes() {
             combined.push(i);
         }
         XorName(sha256::hash(&combined).0)
@@ -110,13 +111,13 @@ mod test {
 
     impl Random for RevocationIdType {
         fn generate_random() -> RevocationIdType {
-            RevocationIdType::new::<MaidTypeTags>()
+            RevocationIdType::new::<MaidTypeTags>(None)
         }
     }
 
     #[test]
     fn create_an_mpid() {
-        let _ = RevocationIdType::new::<MpidTypeTags>();
+        let _ = RevocationIdType::new::<MpidTypeTags>(None);
     }
 
     #[test]
@@ -148,7 +149,10 @@ mod test {
         assert!(!(maid2 != maid2_clone));
         assert!(maid1 != maid2);
 
-        let random_bytes = rand::thread_rng().gen_iter::<u8>().take(100).collect::<Vec<u8>>();
+        let random_bytes = rand::thread_rng()
+            .gen_iter::<u8>()
+            .take(100)
+            .collect::<Vec<u8>>();
         {
             let sign1 = maid1.sign(&random_bytes);
             let sign2 = maid2.sign(&random_bytes);

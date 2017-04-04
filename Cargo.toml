@@ -10,24 +10,30 @@ repository = "https://github.com/maidsafe/safe_client_libs"
 version = "0.22.4"
 
 [dependencies]
-config_file_handler = "~0.4.0"
+config_file_handler = "~0.6.0"
 lazy_static = "~0.2.1"
 libc = "~0.2.16"
 log = "~0.3.6"
 lru-cache = "~0.0.7"
-maidsafe_utilities = "~0.10.0"
+maidsafe_utilities = "~0.11.0"
 rand = "~0.3.14"
-routing = "~0.28.4"
-rust_sodium = "~0.1.2"
-rustc-serialize = "~0.3.19"
-self_encryption = "~0.7.1"
-time = "~0.1.35"
+routing = { git = "https://github.com/maidsafe/routing", branch = "master" }
+rust_sodium = "~0.2.0"
+self_encryption = "~0.8.0"
+serde = "~0.9.12"
+serde_derive = "~0.9.12"
 unwrap = "~1.1.0"
+
+[dependencies.chrono]
+features = ["serde"]
+version = "~0.3.0"
 
 [dev-dependencies]
 crossbeam = "~0.2.10"
 docopt = "~0.6.85"
 regex = "~0.1.77"
+rustc-serialize = "~0.3.23"
+tiny-keccak = "~1.2.0"
 
 [[example]]
 bench = false
@@ -41,10 +47,6 @@ name = "client_stress_test"
 bench = false
 name = "self_authentication"
 
-# [[example]]
-# bench = false
-# name = "safe_client"
-
 [[example]]
 bench = false
 name = "nfs_api"
@@ -56,6 +58,10 @@ name = "simulate_browser"
 [[example]]
 bench = false
 name = "email"
+
+[[example]]
+bench = false
+name = "gen_invites"
 
 [features]
 use-mock-routing = []

@@ -33,6 +33,7 @@ use self::user_account::Account;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
 use core::utility;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::Joiner;
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, StructuredData,
               XorName};
@@ -41,11 +42,15 @@ use routing::Client as Routing;
 use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::MutationError;
 // use routing::messaging::{MpidMessage, MpidMessageWrapper};
-use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::box_;
 use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign::{self, Seed};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
+
+type AccPkt = (String, Vec<u8>);
+const SEED_SUBPARTS: usize = 4;
 
 /// The main self-authentication client instance that will interface all the request from high
 /// level API's to the actual routing layer and manage all interactions with it. This is
@@ -109,22 +114,80 @@ impl Client {
 
     /// This is one of the two Gateway functions to the Maidsafe network, the other being the
     /// log_in. This will help create a fresh account for the user in the SAFE-network.
-    pub fn create_account(acc_locator: &str, acc_password: &str) -> Result<Client, CoreError> {
+    pub fn create_account(acc_locator: &str,
+                          acc_password: &str,
+                          invitation: &str)
+                          -> Result<Client, CoreError> {
+        Self::create_acc_impl(acc_locator.as_bytes(),
+                              acc_password.as_bytes(),
+                              invitation,
+                              None,
+                              None)
+    }
+
+    /// This is one of the four Gateway functions to the Maidsafe network, the others being the
+    /// create_account and log_in. This will help create an account give a seed. Everything
+    /// including both account secrets and all MAID keys will be deterministically derived from the
+    /// supplied seed, so this seed needs to be strong. For ordinary users, it's recommended to use
+    /// the normal create_account function where the secrets can be what's easy to remember for the
+    /// user while also being strong.
+    pub fn create_account_with_seed(seed: &str) -> Result<Client, CoreError> {
+        let arr = Self::divide_seed(seed)?;
+        let (id_seed, revocation_seed) = Self::id_and_revocation_seeds(arr);
+
+        Self::create_acc_impl(arr[0], arr[1], "", Some(&id_seed), Some(&revocation_seed))
+    }
+
+    /// Calculate sign key from seed
+    pub fn sign_pk_from_seed(seed: &str) -> Result<sign::PublicKey, CoreError> {
+        let arr = Self::divide_seed(seed)?;
+        let (id_seed, revocation_seed) = Self::id_and_revocation_seeds(arr);
+        let acc = Account::new(None, None, Some(&id_seed), Some(&revocation_seed));
+
+        Ok(acc.get_maid().public_keys().0)
+    }
+
+    fn id_and_revocation_seeds(divided_seed: [&[u8]; SEED_SUBPARTS]) -> (Seed, Seed) {
+        let cap = divided_seed.iter().fold(0, |sum, &a| sum + a.len());
+        let id_seed = {
+            let mut id_vec = Vec::with_capacity(cap);
+            id_vec.extend(divided_seed[SEED_SUBPARTS - 2]);
+            for (i, arr) in divided_seed.iter().enumerate() {
+                if i != SEED_SUBPARTS - 2 {
+                    id_vec.extend(*arr);
+                }
+            }
+            Seed(sha256::hash(&id_vec).0)
+        };
+        let revocation_seed = {
+            let mut revocation_vec = Vec::with_capacity(cap);
+            revocation_vec.extend(divided_seed[SEED_SUBPARTS - 1]);
+            for (i, arr) in divided_seed.iter().enumerate() {
+                if i != SEED_SUBPARTS - 1 {
+                    revocation_vec.extend(*arr);
+                }
+            }
+            Seed(sha256::hash(&revocation_vec).0)
+        };
+
+        (id_seed, revocation_seed)
+    }
+
+    fn create_acc_impl(acc_locator: &[u8],
+                       acc_password: &[u8],
+                       invitation: &str,
+                       id_seed: Option<&Seed>,
+                       revocation_seed: Option<&Seed>)
+                       -> Result<Client, CoreError> {
         trace!("Creating an account.");
 
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
-        let account_packet = Account::new(None, None);
+        let account_packet = Account::new(None, None, id_seed, revocation_seed);
         let id_packet = FullId::with_keys((account_packet.get_maid().public_keys().1,
-                                           account_packet.get_maid()
-                                               .secret_keys()
-                                               .1
-                                               .clone()),
+                                           account_packet.get_maid().secret_keys().1.clone()),
                                           (account_packet.get_maid().public_keys().0,
-                                           account_packet.get_maid()
-                                               .secret_keys()
-                                               .0
-                                               .clone()));
+                                           account_packet.get_maid().secret_keys().0.clone()));
 
         let (routing_sender, routing_receiver) = mpsc::channel();
         let (network_event_sender, network_event_receiver) = mpsc::channel();
@@ -162,7 +225,7 @@ impl Client {
         };
 
         {
-            let account_version = {
+            let acc_ver = {
                 let account = unwrap!(client.account.as_ref());
                 let session_packet_keys = unwrap!(client.session_packet_keys.as_ref());
 
@@ -172,32 +235,39 @@ impl Client {
                 let mut owners = BTreeSet::new();
                 owners.insert(owner_pubkey);
 
-                let mut sd =
-                    StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                        *session_packet_id,
-                                        0,
-                                        account.encrypt(session_packet_keys.get_password(),
-                                                        session_packet_keys.get_pin())?,
-                                        owners)?;
+                let cipher_text = account.encrypt(session_packet_keys.get_password(),
+                             session_packet_keys.get_pin())?;
+
+                let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
+                                                 *session_packet_id,
+                                                 0,
+                                                 serialise(&(invitation, cipher_text.clone()))?,
+                                                 owners.clone())?;
                 let _ = sd.add_signature(&(owner_pubkey,
-                                           account.get_maid()
-                                               .secret_keys()
-                                               .0
-                                               .clone()));
+                                           account.get_maid().secret_keys().0.clone()));
                 sd
             };
 
-            client.put(Data::Structured(account_version), None)?
-                .get()?;
+            client.put(Data::Structured(acc_ver), None)?.get()?;
         }
 
         Ok(client)
     }
 
-    /// This is one of the two Gateway functions to the Maidsafe network, the other being the
-    /// create_account. This will help log into an already created account for the user in the
-    /// SAFE-network.
+    /// Login using seeded account
+    pub fn login_with_seed(seed: &str) -> Result<Client, CoreError> {
+        let arr = Self::divide_seed(seed)?;
+        Self::login_impl(arr[0], arr[1])
+    }
+
+    /// This is one of the four Gateway functions to the Maidsafe network, the others being the
+    /// create_account and with_seed. This will help log into an already created account for the
+    /// user in the SAFE-network.
     pub fn log_in(acc_locator: &str, acc_password: &str) -> Result<Client, CoreError> {
+        Self::login_impl(acc_locator.as_bytes(), acc_password.as_bytes())
+    }
+
+    fn login_impl(acc_locator: &[u8], acc_password: &[u8]) -> Result<Client, CoreError> {
         let (password, keyword, pin) = utility::derive_secrets(acc_locator, acc_password);
 
         let mut unregistered_client = Client::create_unregistered_client()?;
@@ -208,16 +278,22 @@ impl Client {
         let resp_getter = unregistered_client.get(session_packet_request, None)?;
 
         if let Data::Structured(session_packet) = resp_getter.get()? {
-            let decrypted_session_packet =
-                Account::decrypt(session_packet.get_data(), &password, &pin)?;
+            let decrypted_session_packet = if let Ok(acc_pkt) =
+                deserialise::<AccPkt>(session_packet.get_data()) {
+                Account::decrypt(&acc_pkt.1, &password, &pin)?
+            } else {
+                Account::decrypt(session_packet.get_data(), &password, &pin)?
+            };
             let id_packet =
                 FullId::with_keys((decrypted_session_packet.get_maid().public_keys().1,
-                                   decrypted_session_packet.get_maid()
+                                   decrypted_session_packet
+                                       .get_maid()
                                        .secret_keys()
                                        .1
                                        .clone()),
                                   (decrypted_session_packet.get_maid().public_keys().0,
-                                   decrypted_session_packet.get_maid()
+                                   decrypted_session_packet
+                                       .get_maid()
                                        .secret_keys()
                                        .0
                                        .clone()));
@@ -264,6 +340,24 @@ impl Client {
         }
     }
 
+    fn divide_seed(seed: &str) -> Result<[&[u8]; SEED_SUBPARTS], CoreError> {
+        let seed = seed.as_bytes();
+        if seed.len() < SEED_SUBPARTS {
+            let e = format!("Improper Seed length of {}. Please supply bigger Seed.",
+                            seed.len());
+            return Err(CoreError::Unexpected(e));
+        }
+
+        let interval = seed.len() / SEED_SUBPARTS;
+
+        let mut arr: [&[u8]; SEED_SUBPARTS] = Default::default();
+        for (i, val) in arr.iter_mut().enumerate() {
+            *val = &seed[interval * i..interval * (i + 1)];
+        }
+
+        Ok(arr)
+    }
+
     /// Create an entry for the Root Directory ID for the user into the session packet, encrypt and
     /// store it. It will be retrieved when the user logs into their account. Root directory ID is
     /// necessary to fetch all of the user's data as all further data is encoded as meta-information
@@ -283,7 +377,9 @@ impl Client {
 
     /// Get User's Root Directory ID if available in session packet used for current login
     pub fn get_user_root_directory_id(&self) -> Option<&XorName> {
-        self.account.as_ref().and_then(|account| account.get_user_root_dir_id())
+        self.account
+            .as_ref()
+            .and_then(|account| account.get_user_root_dir_id())
     }
 
     /// Create an entry for the Maidsafe configuration specific Root Directory ID into the
@@ -309,7 +405,9 @@ impl Client {
     /// Get Maidsafe specific configuration's Root Directory ID if available in session packet used
     /// for current login
     pub fn get_configuration_root_directory_id(&self) -> Option<&XorName> {
-        self.account.as_ref().and_then(|account| account.get_maidsafe_config_root_dir_id())
+        self.account
+            .as_ref()
+            .and_then(|account| account.get_maidsafe_config_root_dir_id())
     }
 
     /// Combined Asymmetric and Symmetric encryption. The data is encrypted using random Key and
@@ -331,10 +429,7 @@ impl Client {
             None => {
                 let digest = sha256::hash(&account.get_public_maid().name().0);
                 let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.0.len());
-                for it in digest.0
-                        .iter()
-                        .take(min_length)
-                        .enumerate() {
+                for it in digest.0.iter().take(min_length).enumerate() {
                     nonce_default.0[it.0] = *it.1;
                 }
                 &nonce_default
@@ -362,10 +457,7 @@ impl Client {
             None => {
                 let digest = sha256::hash(&account.get_public_maid().name().0);
                 let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.0.len());
-                for it in digest.0
-                        .iter()
-                        .take(min_length)
-                        .enumerate() {
+                for it in digest.0.iter().take(min_length).enumerate() {
                     nonce_default.0[it.0] = *it.1;
                 }
                 &nonce_default
@@ -755,7 +847,9 @@ impl Client {
 
     /// Get the default address where the PUTs will go to for this client
     pub fn get_default_client_manager_address(&self) -> Result<&XorName, CoreError> {
-        self.client_manager_addr.as_ref().ok_or(CoreError::OperationForbiddenForClient)
+        self.client_manager_addr
+            .as_ref()
+            .ok_or(CoreError::OperationForbiddenForClient)
     }
 
     /// Set the default address where the PUTs and DELETEs will go to for this client
@@ -792,14 +886,11 @@ impl Client {
                         .as_ref()
                         .ok_or(CoreError::OperationForbiddenForClient)?;
                     account.encrypt(session_packet_keys.get_password(),
-                                    session_packet_keys.get_pin())?
+                                 session_packet_keys.get_pin())?
                 };
 
                 let owner_key = account.get_public_maid().public_keys().0;
-                let signing_key = account.get_maid()
-                    .secret_keys()
-                    .0
-                    .clone();
+                let signing_key = account.get_maid().secret_keys().0.clone();
 
                 let mut owners = BTreeSet::new();
                 owners.insert(owner_key);
@@ -812,7 +903,8 @@ impl Client {
                 let _ = sd.add_signature(&(owner_key, signing_key))?;
                 sd
             };
-            self.post(Data::Structured(new_account_version), None)?.get()
+            self.post(Data::Structured(new_account_version), None)?
+                .get()
         } else {
             Err(CoreError::ReceivedUnexpectedData)
         }
@@ -878,7 +970,6 @@ impl SessionPacketEncryptionKeys {
 /// //////////////////////////////////////////////////////////////
 #[cfg(test)]
 mod test {
-
     use super::*;
     use core::client::response_getter::GetResponseGetter;
     use core::errors::CoreError;
@@ -893,12 +984,13 @@ mod test {
     fn account_creation() {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let _ = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         // Account creation - same secrets - should fail
-        match Client::create_account(&secret_0, &secret_1) {
+        match Client::create_account(&secret_0, &secret_1, &invitation) {
             Ok(_) => panic!("Account name hijaking should fail !"),
             Err(CoreError::MutationFailure { reason: MutationError::AccountExists, .. }) => (),
             Err(err) => panic!("{:?}", err),
@@ -909,12 +1001,33 @@ mod test {
     fn account_login() {
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
         // Creation should pass
-        let _ = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let _ = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         // Correct Credentials - Login Should Pass
         let _ = unwrap!(Client::log_in(&secret_0, &secret_1));
+    }
+
+    #[test]
+    fn seeded_login() {
+        {
+            let invalid_seed = String::from("123");
+            match Client::create_account_with_seed(&invalid_seed) {
+                Err(CoreError::Unexpected(_)) => (),
+                _ => panic!("Expected a failure"),
+            }
+            match Client::login_with_seed(&invalid_seed) {
+                Err(CoreError::Unexpected(_)) => (),
+                _ => panic!("Expected a failure"),
+            }
+        }
+
+        let seed = unwrap!(utility::generate_random_string(30));
+        assert!(Client::login_with_seed(&seed).is_err());
+        let _ = unwrap!(Client::create_account_with_seed(&seed));
+        let _ = unwrap!(Client::login_with_seed(&seed));
     }
 
     #[test]
@@ -926,9 +1039,10 @@ mod test {
         {
             let secret_0 = unwrap!(utility::generate_random_string(10));
             let secret_1 = unwrap!(utility::generate_random_string(10));
+            let invitation = unwrap!(utility::generate_random_string(10));
 
             // Creation should pass
-            let mut client = unwrap!(Client::create_account(&secret_0, &secret_1));
+            let mut client = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
             unwrap!(unwrap!(client.put(orig_data.clone(), None)).get());
         }
 
@@ -955,8 +1069,9 @@ mod test {
         // Construct Client
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
-        let mut client = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let mut client = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -978,8 +1093,9 @@ mod test {
         // Construct Client
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
-        let mut client = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let mut client = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         assert!(client.get_user_root_directory_id().is_none());
         assert!(client.get_configuration_root_directory_id().is_none());
@@ -1002,8 +1118,9 @@ mod test {
         // Construct Client
         let secret_0 = unwrap!(utility::generate_random_string(10));
         let secret_1 = unwrap!(utility::generate_random_string(10));
+        let invitation = unwrap!(utility::generate_random_string(10));
 
-        let client = unwrap!(Client::create_account(&secret_0, &secret_1));
+        let client = unwrap!(Client::create_account(&secret_0, &secret_1, &invitation));
 
         // Identical Plain Texts
         let plain_text_original_0 = vec![123u8; 1000];

@@ -53,10 +53,13 @@ extern crate lru_cache;
 extern crate maidsafe_utilities;
 extern crate rand;
 extern crate routing;
-extern crate rustc_serialize;
+#[cfg(feature = "use-mock-routing")]
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate self_encryption;
 extern crate rust_sodium;
-extern crate time;
+extern crate chrono;
 #[macro_use]
 extern crate unwrap;
 

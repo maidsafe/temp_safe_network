@@ -191,27 +191,33 @@ impl Into<i32> for CoreError {
             CoreError::MutationFailure { reason: MutationError::DataTooLarge, .. } => {
                 CLIENT_ERROR_START_RANGE - 28
             }
+            CoreError::MutationFailure { reason: MutationError::InvalidInvitation, .. } => {
+                CLIENT_ERROR_START_RANGE - 29
+            }
+            CoreError::MutationFailure {
+                reason: MutationError::InvitationAlreadyClaimed, ..
+            } => CLIENT_ERROR_START_RANGE - 30,
             CoreError::SelfEncryption(
                 SelfEncryptionError::Compression::<SelfEncryptionStorageError>) => {
-                CLIENT_ERROR_START_RANGE - 29
+                CLIENT_ERROR_START_RANGE - 31
             }
             CoreError::SelfEncryption(
                 SelfEncryptionError::Decryption::<SelfEncryptionStorageError>) => {
-                CLIENT_ERROR_START_RANGE - 30
-            }
-            CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
-                CLIENT_ERROR_START_RANGE - 31
-            }
-            CoreError::GetAccountInfoFailure { reason: GetError::NoSuchAccount, .. } => {
                 CLIENT_ERROR_START_RANGE - 32
             }
-            CoreError::GetAccountInfoFailure { .. } => CLIENT_ERROR_START_RANGE - 33,
-            CoreError::RequestTimeout => CLIENT_ERROR_START_RANGE - 34,
+            CoreError::SelfEncryption(SelfEncryptionError::Io::<SelfEncryptionStorageError>(_)) => {
+                CLIENT_ERROR_START_RANGE - 33
+            }
+            CoreError::GetAccountInfoFailure { reason: GetError::NoSuchAccount, .. } => {
+                CLIENT_ERROR_START_RANGE - 34
+            }
+            CoreError::GetAccountInfoFailure { .. } => CLIENT_ERROR_START_RANGE - 35,
+            CoreError::RequestTimeout => CLIENT_ERROR_START_RANGE - 36,
             CoreError::SelfEncryption(SelfEncryptionError
                                       ::Storage
                                       ::<SelfEncryptionStorageError>(
                                           SelfEncryptionStorageError(err))) => (*err).into(),
-            CoreError::InvalidStructuredDataTypeTag => CLIENT_ERROR_START_RANGE - 35,
+            CoreError::InvalidStructuredDataTypeTag => CLIENT_ERROR_START_RANGE - 37,
         }
     }
 }
@@ -264,7 +270,10 @@ impl Debug for CoreError {
             CoreError::MpidMessagingError(ref error) => {
                 write!(formatter, "CoreError::MpidMessagingError -> {:?}", error)
             }
-            CoreError::GetFailure { ref data_id, ref reason } => {
+            CoreError::GetFailure {
+                ref data_id,
+                ref reason,
+            } => {
                 write!(formatter,
                        "CoreError::GetFailure::{{ reason: {:?}, data_id: {:?}}}",
                        reason,
@@ -275,7 +284,10 @@ impl Debug for CoreError {
                        "CoreError::GetAccountInfoFailure::{{ reason: {:?}}}",
                        reason)
             }
-            CoreError::MutationFailure { ref data_id, ref reason } => {
+            CoreError::MutationFailure {
+                ref data_id,
+                ref reason,
+            } => {
                 write!(formatter,
                        "CoreError::MutationFailure::{{ reason: {:?}, data_id: {:?}}}",
                        reason,

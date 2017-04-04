@@ -24,7 +24,7 @@ use std::collections::HashMap;
 // not exported by Vault currently.
 pub const DEFAULT_CLIENT_ACCOUNT_SIZE: u64 = 100;
 
-#[derive(RustcEncodable, RustcDecodable)]
+#[derive(Serialize, Deserialize)]
 pub struct Storage {
     data_store: HashMap<XorName, Vec<u8>>,
     pub client_accounts: HashMap<XorName, ClientAccount>,
@@ -66,7 +66,7 @@ impl Storage {
     }
 }
 
-#[derive(RustcEncodable, RustcDecodable)]
+#[derive(Serialize, Deserialize)]
 pub struct ClientAccount {
     pub data_stored: u64,
     pub space_available: u64,

@@ -27,11 +27,11 @@ use rust_sodium::crypto::hash::sha256;
 /// ```
 /// use ::safe_core::core::id::{IdType, RevocationIdType, MaidTypeTags, PublicIdType};
 ///
-/// let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
-/// let maid = IdType::new(&revocation_maid);
+/// let revocation_maid = RevocationIdType::new::<MaidTypeTags>(None);
+/// let maid = IdType::new(&revocation_maid, None);
 /// let _public_maid  = PublicIdType::new(&maid, &revocation_maid);
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PublicIdType {
     type_tag: u64,
     public_keys: (sign::PublicKey, box_::PublicKey),
@@ -45,12 +45,13 @@ impl PublicIdType {
         let type_tag = revocation_id.type_tags().2;
         let public_keys = id_type.public_keys();
         let revocation_public_key = revocation_id.public_key();
-        let combined_iter =
-            (public_keys.0).0.into_iter().chain((public_keys.1)
-                                                    .0
-                                                    .into_iter()
-                                                    .chain(revocation_public_key.0
-                                                               .into_iter()));
+        let combined_iter = (public_keys.0)
+            .0
+            .into_iter()
+            .chain((public_keys.1)
+                       .0
+                       .into_iter()
+                       .chain(revocation_public_key.0.into_iter()));
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -60,13 +61,17 @@ impl PublicIdType {
         }
         let message_length = combined.len();
 
-        let signature = revocation_id.sign(&combined)
+        let signature = revocation_id
+            .sign(&combined)
             .into_iter()
             .skip(message_length)
             .collect::<Vec<_>>();
         let mut signature_arr = [0; sign::SIGNATUREBYTES];
 
-        for it in signature.into_iter().take(sign::SIGNATUREBYTES).enumerate() {
+        for it in signature
+                .into_iter()
+                .take(sign::SIGNATUREBYTES)
+                .enumerate() {
             signature_arr[it.0] = it.1;
         }
 
@@ -80,8 +85,10 @@ impl PublicIdType {
 
     /// Returns the name
     pub fn name(&self) -> XorName {
-        let combined_iter =
-            (self.public_keys.0).0.into_iter().chain((self.public_keys.1).0.into_iter());
+        let combined_iter = (self.public_keys.0)
+            .0
+            .into_iter()
+            .chain((self.public_keys.1).0.into_iter());
         let mut combined: Vec<u8> = Vec::new();
         for iter in combined_iter {
             combined.push(*iter);
@@ -120,16 +127,16 @@ mod test {
 
     impl Random for PublicIdType {
         fn generate_random() -> PublicIdType {
-            let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
-            let maid = IdType::new(&revocation_maid);
+            let revocation_maid = RevocationIdType::new::<MaidTypeTags>(None);
+            let maid = IdType::new(&revocation_maid, None);
             PublicIdType::new(&maid, &revocation_maid)
         }
     }
 
     #[test]
     fn create_public_mpid() {
-        let revocation_mpid = RevocationIdType::new::<MpidTypeTags>();
-        let mpid = IdType::new(&revocation_mpid);
+        let revocation_mpid = RevocationIdType::new::<MpidTypeTags>(None);
+        let mpid = IdType::new(&revocation_mpid, None);
         let _ = PublicIdType::new(&mpid, &revocation_mpid);
     }
 
@@ -154,18 +161,19 @@ mod test {
 
     #[test]
     fn invariant_check() {
-        let revocation_maid = RevocationIdType::new::<MaidTypeTags>();
-        let maid = IdType::new(&revocation_maid);
+        let revocation_maid = RevocationIdType::new::<MaidTypeTags>(None);
+        let maid = IdType::new(&revocation_maid, None);
         let public_maid = PublicIdType::new(&maid, &revocation_maid);
         let type_tag = public_maid.type_tag;
         let public_id_keys = public_maid.public_keys;
         let public_revocation_key = public_maid.revocation_public_key;
-        let combined_keys =
-            (public_id_keys.0).0.into_iter().chain((public_id_keys.1)
-                                                       .0
-                                                       .into_iter()
-                                                       .chain(public_revocation_key.0
-                                                                  .into_iter()));
+        let combined_keys = (public_id_keys.0)
+            .0
+            .into_iter()
+            .chain((public_id_keys.1)
+                       .0
+                       .into_iter()
+                       .chain(public_revocation_key.0.into_iter()));
         let mut combined = Vec::new();
 
         for iter in combined_keys {
@@ -176,7 +184,8 @@ mod test {
         }
 
         let message_length = combined.len();
-        let signature_vec = revocation_maid.sign(&combined)
+        let signature_vec = revocation_maid
+            .sign(&combined)
             .into_iter()
             .skip(message_length)
             .collect::<Vec<_>>();
@@ -185,7 +194,10 @@ mod test {
 
         let mut signature_arr = [0; sign::SIGNATUREBYTES];
 
-        for it in signature_vec.into_iter().take(sign::SIGNATUREBYTES).enumerate() {
+        for it in signature_vec
+                .into_iter()
+                .take(sign::SIGNATUREBYTES)
+                .enumerate() {
             signature_arr[it.0] = it.1;
         }
 

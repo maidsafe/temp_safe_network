@@ -39,7 +39,7 @@ pub enum CipherOpt {
     },
 }
 
-#[derive(Debug, Clone, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 enum WireFormat {
     Plain(Vec<u8>),
     Symmetric {
@@ -172,7 +172,9 @@ mod tests {
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
         assert_eq!(cipher_opt_free(cipher_opt_handle), 0);
-        assert!(unwrap!(object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
+        assert!(unwrap!(object_cache())
+                    .get_cipher_opt(cipher_opt_handle)
+                    .is_err());
         assert!(raw_data != plain_text);
 
         assert!(decrypt_and_check(&app_0, &raw_data, &plain_text));
@@ -192,7 +194,9 @@ mod tests {
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
         assert_eq!(cipher_opt_free(cipher_opt_handle), 0);
-        assert!(unwrap!(object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
+        assert!(unwrap!(object_cache())
+                    .get_cipher_opt(cipher_opt_handle)
+                    .is_err());
         assert!(raw_data != plain_text);
 
         assert!(decrypt_and_check(&app_0, &raw_data, &plain_text));
@@ -225,7 +229,9 @@ mod tests {
             unwrap!(cipher_opt.encrypt(&app_0, &plain_text))
         };
         assert_eq!(cipher_opt_free(cipher_opt_handle), 0);
-        assert!(unwrap!(object_cache()).get_cipher_opt(cipher_opt_handle).is_err());
+        assert!(unwrap!(object_cache())
+                    .get_cipher_opt(cipher_opt_handle)
+                    .is_err());
         assert!(raw_data != plain_text);
 
         assert!(!decrypt_and_check(&app_0, &raw_data, &plain_text));
@@ -247,7 +253,7 @@ mod tests {
             assert_eq!(cipher_opt_new_plaintext(&mut cipher_opt_handle_pt), 0);
             assert_eq!(cipher_opt_new_symmetric(&mut cipher_opt_handle_sym), 0);
 
-            let err_code = FfiError::InvalidEncryptKeyHandle.into();
+            let err_code: i32 = FfiError::InvalidEncryptKeyHandle.into();
             assert_eq!(cipher_opt_new_asymmetric(29293290, &mut cipher_opt_handle_asym),
                        err_code);
             assert_eq!(cipher_opt_new_asymmetric(peer_encrypt_key_handle,
@@ -266,7 +272,7 @@ mod tests {
         assert_eq!(cipher_opt_free(cipher_opt_handle_sym), 0);
         assert_eq!(cipher_opt_free(cipher_opt_handle_asym), 0);
 
-        let err_code = FfiError::InvalidCipherOptHandle.into();
+        let err_code: i32 = FfiError::InvalidCipherOptHandle.into();
         assert_eq!(cipher_opt_free(cipher_opt_handle_pt), err_code);
         assert_eq!(cipher_opt_free(cipher_opt_handle_sym), err_code);
         assert_eq!(cipher_opt_free(cipher_opt_handle_asym), err_code);

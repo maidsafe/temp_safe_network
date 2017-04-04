@@ -21,11 +21,12 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{pwhash, secretbox};
 use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign::Seed;
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also their Root
 /// Directory ID if they have put data onto the network.
-#[derive(Clone, PartialEq, Debug, RustcEncodable, RustcDecodable)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Account {
     an_maid: RevocationIdType,
     maid: IdType,
@@ -43,14 +44,16 @@ pub struct Account {
 impl Account {
     /// Create a new Session Packet with Randomly generated Maid keys for the user
     pub fn new(user_root_dir_id: Option<XorName>,
-               maidsafe_config_root_dir_id: Option<XorName>)
+               maidsafe_config_root_dir_id: Option<XorName>,
+               id_seed: Option<&Seed>,
+               revocation_seed: Option<&Seed>)
                -> Account {
-        let an_maid = RevocationIdType::new::<MaidTypeTags>();
-        let maid = IdType::new(&an_maid);
+        let an_maid = RevocationIdType::new::<MaidTypeTags>(revocation_seed);
+        let maid = IdType::new(&an_maid, id_seed);
         let public_maid = PublicIdType::new(&maid, &an_maid);
 
-        let an_mpid = RevocationIdType::new::<MpidTypeTags>();
-        let mpid = IdType::new(&an_mpid);
+        let an_mpid = RevocationIdType::new::<MpidTypeTags>(None);
+        let mpid = IdType::new(&an_mpid, None);
         let public_mpid = PublicIdType::new(&mpid, &an_mpid);
 
         Account {
@@ -211,12 +214,14 @@ impl Account {
 #[cfg(test)]
 mod test {
     use super::*;
+    use core::utility;
     use maidsafe_utilities::serialisation::{deserialise, serialise};
+    use rust_sodium::crypto::sign::Seed;
 
     #[test]
     fn generating_new_account() {
-        let account1 = Account::new(None, None);
-        let account2 = Account::new(None, None);
+        let account1 = Account::new(None, None, None, None);
+        let account2 = Account::new(None, None, None, None);
         assert!(account1 != account2);
     }
 
@@ -228,9 +233,9 @@ mod test {
                                                              0.to_string().as_bytes()));
         let user1_id2 = unwrap!(Account::generate_network_id(keyword1.as_bytes(),
                                                              1234.to_string().as_bytes()));
-        let user1_id3 = unwrap!(Account::generate_network_id(keyword1.as_bytes(),
-                                                             ::std::u32::MAX.to_string()
-                                                                 .as_bytes()));
+        let user1_id3 =
+            unwrap!(Account::generate_network_id(keyword1.as_bytes(),
+                                                 ::std::u32::MAX.to_string().as_bytes()));
 
         assert!(user1_id1 != user1_id2);
         assert!(user1_id1 != user1_id3);
@@ -264,9 +269,9 @@ mod test {
                                                               0.to_string().as_bytes()));
             let keys2 = unwrap!(Account::generate_crypto_keys(password1.as_bytes(),
                                                               1234.to_string().as_bytes()));
-            let keys3 = unwrap!(Account::generate_crypto_keys(password1.as_bytes(),
-                                                              ::std::u32::MAX.to_string()
-                                                                  .as_bytes()));
+            let keys3 =
+                unwrap!(Account::generate_crypto_keys(password1.as_bytes(),
+                                                      ::std::u32::MAX.to_string().as_bytes()));
 
             assert!(keys1 != keys2);
             assert!(keys1 != keys3);
@@ -293,14 +298,14 @@ mod test {
 
     #[test]
     fn serialisation() {
-        let account = Account::new(None, None);
+        let account = Account::new(None, None, None, None);
         let deserialised_account = unwrap!(deserialise(&unwrap!(serialise(&account))));
         assert_eq!(account, deserialised_account);
     }
 
     #[test]
     fn encryption() {
-        let account = Account::new(None, None);
+        let account = Account::new(None, None, None, None);
 
         let password = "impossible to guess".to_owned();
         let pin = 1000u16;
@@ -315,5 +320,59 @@ mod test {
                                                          password.as_bytes(),
                                                          pin.to_string().as_bytes()));
         assert_eq!(account, decrypted_account);
+    }
+
+    #[test]
+    fn seeded_account() {
+        let id_seed_0 = Seed(sha256::hash(&unwrap!(utility::generate_random_vector(10))).0);
+        let revocation_seed_0 = Seed(sha256::hash(&unwrap!(utility::generate_random_vector(10))).0);
+
+        let id_seed_1 = Seed(sha256::hash(&unwrap!(utility::generate_random_vector(10))).0);
+        let revocation_seed_1 = Seed(sha256::hash(&unwrap!(utility::generate_random_vector(10))).0);
+
+        let acc_default = Account::new(None, None, None, None);
+        let acc_default_again = Account::new(None, None, None, None);
+
+        let acc_0 = Account::new(None, None, Some(&id_seed_0), Some(&revocation_seed_0));
+        let acc_1 = Account::new(None, None, Some(&id_seed_1), Some(&revocation_seed_1));
+
+        let acc_0_again = Account::new(None, None, Some(&id_seed_0), Some(&revocation_seed_0));
+        let acc_1_again = Account::new(None, None, Some(&id_seed_1), Some(&revocation_seed_1));
+
+        let acc_mixed_0 = Account::new(None, None, Some(&id_seed_0), Some(&revocation_seed_1));
+        let acc_mixed_1 = Account::new(None, None, Some(&id_seed_1), Some(&revocation_seed_0));
+
+        assert_ne!(acc_default.get_maid().public_keys().0,
+                   acc_default_again.get_maid().public_keys().0);
+        assert_ne!(acc_default.get_maid().public_keys().0,
+                   acc_0.get_maid().public_keys().0);
+        assert_ne!(acc_default.get_maid().public_keys().0,
+                   acc_1.get_maid().public_keys().0);
+
+        // box_ keys should be unaffected by presence of seed
+        assert_ne!(acc_0.get_maid().public_keys().1,
+                   acc_0_again.get_maid().public_keys().1);
+        assert_ne!(acc_1.get_maid().public_keys().1,
+                   acc_1_again.get_maid().public_keys().1);
+
+        assert_eq!(acc_0.get_maid().public_keys().0,
+                   acc_0_again.get_maid().public_keys().0);
+        assert_eq!(acc_1.get_maid().public_keys().0,
+                   acc_1_again.get_maid().public_keys().0);
+
+        assert_ne!(acc_0.get_maid().public_keys().0,
+                   acc_1.get_maid().public_keys().0);
+
+        // Diferent revocation_seed will have no effect on sign keys but different id_seed will
+        assert_eq!(acc_0.get_maid().public_keys().0,
+                   acc_mixed_0.get_maid().public_keys().0);
+        assert_ne!(acc_0.get_maid().public_keys().0,
+                   acc_mixed_1.get_maid().public_keys().0);
+
+        // Diferent revocation_seed will have no effect on sign keys but different id_seed will
+        assert_ne!(acc_1.get_maid().public_keys().0,
+                   acc_mixed_0.get_maid().public_keys().0);
+        assert_eq!(acc_1.get_maid().public_keys().0,
+                   acc_mixed_1.get_maid().public_keys().0);
     }
 }

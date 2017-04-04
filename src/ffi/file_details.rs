@@ -111,11 +111,15 @@ pub struct FileMetadata {
 impl FileMetadata {
     /// Create new FFI file metadata wrapper.
     pub fn new(file_metadata: &NfsFileMetadata) -> Result<Self, FfiError> {
-        let created_time = file_metadata.get_created_time().to_timespec();
-        let modified_time = file_metadata.get_modified_time().to_timespec();
+        let created_time = file_metadata.get_created_time().timestamp();
+        let created_time_ns = file_metadata.get_created_time().timestamp_subsec_nanos();
+        let modified_time = file_metadata.get_modified_time().timestamp();
+        let modified_time_ns = file_metadata
+            .get_modified_time()
+            .timestamp_subsec_nanos();
 
-        let (name, name_len, name_cap) = helper::string_to_c_utf8(file_metadata.get_name()
-                                                                      .to_string());
+        let (name, name_len, name_cap) =
+            helper::string_to_c_utf8(file_metadata.get_name().to_string());
 
         let user_metadata = file_metadata.get_user_metadata().to_owned();
         let (user_metadata, user_metadata_len, user_metadata_cap) =
@@ -129,10 +133,10 @@ impl FileMetadata {
                user_metadata: user_metadata,
                user_metadata_len: user_metadata_len,
                user_metadata_cap: user_metadata_cap,
-               creation_time_sec: created_time.sec,
-               creation_time_nsec: created_time.nsec as i64,
-               modification_time_sec: modified_time.sec,
-               modification_time_nsec: modified_time.nsec as i64,
+               creation_time_sec: created_time,
+               creation_time_nsec: created_time_ns as i64,
+               modification_time_sec: modified_time,
+               modification_time_nsec: modified_time_ns as i64,
            })
     }
 

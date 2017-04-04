@@ -61,11 +61,15 @@ impl DirectoryDetails {
         };
 
         for file in listing.get_files() {
-            details.files.push(FileMetadata::new(file.get_metadata())?);
+            details
+                .files
+                .push(FileMetadata::new(file.get_metadata())?);
         }
 
         for metadata in listing.get_sub_directories() {
-            details.sub_directories.push(DirectoryMetadata::new(metadata)?);
+            details
+                .sub_directories
+                .push(DirectoryMetadata::new(metadata)?);
         }
 
         Ok(details)
@@ -109,11 +113,13 @@ pub struct DirectoryMetadata {
 impl DirectoryMetadata {
     fn new(dir_metadata: &NfsDirectoryMetadata) -> Result<Self, FfiError> {
         let dir_key = dir_metadata.get_key();
-        let created_time = dir_metadata.get_created_time().to_timespec();
-        let modified_time = dir_metadata.get_modified_time().to_timespec();
+        let created_time = dir_metadata.get_created_time().timestamp();
+        let created_time_ns = dir_metadata.get_created_time().timestamp_subsec_nanos();
+        let modified_time = dir_metadata.get_modified_time().timestamp();
+        let modified_time_ns = dir_metadata.get_modified_time().timestamp_subsec_nanos();
 
-        let (name, name_len, name_cap) = helper::string_to_c_utf8(dir_metadata.get_name()
-                                                                      .to_string());
+        let (name, name_len, name_cap) =
+            helper::string_to_c_utf8(dir_metadata.get_name().to_string());
         let user_metadata = dir_metadata.get_user_metadata().to_owned();
         let (user_metadata, user_metadata_len, user_metadata_cap) =
             helper::u8_vec_to_ptr(user_metadata);
@@ -127,10 +133,10 @@ impl DirectoryMetadata {
                user_metadata_cap: user_metadata_cap,
                is_private: *dir_key.get_access_level() == ::nfs::AccessLevel::Private,
                is_versioned: dir_key.is_versioned(),
-               creation_time_sec: created_time.sec,
-               creation_time_nsec: created_time.nsec as i64,
-               modification_time_sec: modified_time.sec,
-               modification_time_nsec: modified_time.nsec as i64,
+               creation_time_sec: created_time,
+               creation_time_nsec: created_time_ns as i64,
+               modification_time_sec: modified_time,
+               modification_time_nsec: modified_time_ns as i64,
            })
     }
 
