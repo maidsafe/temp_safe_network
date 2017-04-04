@@ -33,7 +33,7 @@ use self::user_account::Account;
 use core::errors::CoreError;
 use core::translated_events::NetworkEvent;
 use core::utility;
-use maidsafe_utilities::serialisation::serialise;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::Joiner;
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, StructuredData,
               XorName};
@@ -49,6 +49,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 
+type AccPkt = (String, Vec<u8>);
 const SEED_SUBPARTS: usize = 4;
 
 /// The main self-authentication client instance that will interface all the request from high
@@ -224,7 +225,7 @@ impl Client {
         };
 
         {
-            let (acc_ver_0, acc_ver_1) = {
+            let acc_ver = {
                 let account = unwrap!(client.account.as_ref());
                 let session_packet_keys = unwrap!(client.session_packet_keys.as_ref());
 
@@ -237,26 +238,17 @@ impl Client {
                 let cipher_text = account.encrypt(session_packet_keys.get_password(),
                              session_packet_keys.get_pin())?;
 
-                let mut sd0 = StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                                  *session_packet_id,
-                                                  0,
-                                                  serialise(&(invitation, cipher_text.clone()))?,
-                                                  owners.clone())?;
-                let _ = sd0.add_signature(&(owner_pubkey,
-                                            account.get_maid().secret_keys().0.clone()));
-
-                let mut sd1 = StructuredData::new(TYPE_TAG_SESSION_PACKET,
-                                                  *session_packet_id,
-                                                  1,
-                                                  cipher_text,
-                                                  owners)?;
-                let _ = sd1.add_signature(&(owner_pubkey,
-                                            account.get_maid().secret_keys().0.clone()));
-                (sd0, sd1)
+                let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
+                                                 *session_packet_id,
+                                                 0,
+                                                 serialise(&(invitation, cipher_text.clone()))?,
+                                                 owners.clone())?;
+                let _ = sd.add_signature(&(owner_pubkey,
+                                           account.get_maid().secret_keys().0.clone()));
+                sd
             };
 
-            client.put(Data::Structured(acc_ver_0), None)?.get()?;
-            client.post(Data::Structured(acc_ver_1), None)?.get()?;
+            client.put(Data::Structured(acc_ver), None)?.get()?;
         }
 
         Ok(client)
@@ -286,8 +278,12 @@ impl Client {
         let resp_getter = unregistered_client.get(session_packet_request, None)?;
 
         if let Data::Structured(session_packet) = resp_getter.get()? {
-            let decrypted_session_packet =
-                Account::decrypt(session_packet.get_data(), &password, &pin)?;
+            let decrypted_session_packet = if let Ok(acc_pkt) =
+                deserialise::<AccPkt>(session_packet.get_data()) {
+                Account::decrypt(&acc_pkt.1, &password, &pin)?
+            } else {
+                Account::decrypt(session_packet.get_data(), &password, &pin)?
+            };
             let id_packet =
                 FullId::with_keys((decrypted_session_packet.get_maid().public_keys().1,
                                    decrypted_session_packet
