@@ -41,10 +41,14 @@ configuration:
   - Release
 
 build_script:
+  - cargo rustc --verbose --release --lib -- -Zno-trans
   - cargo rustc --verbose --release --profile test --lib -- -Zno-trans
+  - cargo rustc --verbose --release --profile test --features use-mock-routing --lib -- -Zno-trans
+  - cargo rustc --verbose --release --profile test --features use-mock-crust --lib -- -Zno-trans
 
 test_script:
-  - cargo test --verbose --release
+  - cargo test --verbose --release --features use-mock-routing
+  - cargo test --verbose --release --features use-mock-crust
 
 before_deploy:
   - ps: . ".\ci\appveyor\before_deploy.ps1"
