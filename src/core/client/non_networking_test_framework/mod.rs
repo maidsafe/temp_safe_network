@@ -176,14 +176,13 @@ impl RoutingMock {
                 (Data::Immutable(_), Ok(Data::Immutable(_))) => None,
                 (Data::Structured(sd_new), Ok(Data::Structured(sd_stored))) => {
                     if sd_stored.is_deleted() {
-                        match sd_stored.validate_self_against_successor(&sd_new) {
-                            Ok(_) => {
-                                match storage.put_data(data_name, Data::Structured(sd_new)) {
-                                    Ok(()) => None,
-                                    Err(error) => Some(MutationError::from(error)),
-                                }
+                        if sd_stored.get_version() + 1 == sd_new.get_version() {
+                            match storage.put_data(data_name, Data::Structured(sd_new)) {
+                                Ok(()) => None,
+                                Err(error) => Some(MutationError::from(error)),
                             }
-                            Err(_) => Some(MutationError::InvalidSuccessor),
+                        } else {
+                            Some(MutationError::InvalidSuccessor)
                         }
                     } else if sd_stored.get_type_tag() == TYPE_TAG_SESSION_PACKET {
                         Some(MutationError::AccountExists)

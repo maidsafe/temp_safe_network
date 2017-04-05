@@ -735,7 +735,7 @@ mod tests {
             // API to sign SD.
 
             // Put - Reclaim
-            // assert_eq!(struct_data_put(&app, sd_h), 0);
+            assert_eq!(struct_data_put(&app, sd_h), 0);
         }
     }
 
