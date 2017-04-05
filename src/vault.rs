@@ -26,8 +26,6 @@ use mock_routing::NodeBuilder;
 #[cfg(feature = "use-mock-crust")]
 use personas::data_manager::DataId;
 use personas::data_manager::DataManager;
-#[cfg(feature = "use-mock-crust")]
-use personas::data_manager::IdAndVersion;
 use personas::maid_manager::MaidManager;
 use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
 pub use routing::Event;

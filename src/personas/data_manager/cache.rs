@@ -30,6 +30,8 @@ const FRAGMENT_REQUEST_TIMEOUT_SECS: u64 = 60;
 /// The timeout after which cached mutable data entries expire.
 const MDATA_ENTRY_TIMEOUT_SECS: u64 = 60;
 
+type CachedMDataEntries = HashMap<Vec<u8>, (Value, Instant)>;
+
 pub struct Cache {
     /// Chunks we are no longer responsible for. These can be deleted from the chunk store.
     unneeded_chunks: VecDeque<DataId>,
@@ -39,7 +41,7 @@ pub struct Cache {
     /// Maps data identifiers to the list of pending writes that affect that chunk.
     pending_writes: HashMap<DataId, Vec<PendingWrite>>,
     /// Mutable data entries that arrived before the data shell.
-    mdata_entries: HashMap<(XorName, u64), HashMap<Vec<u8>, (Value, Instant)>>,
+    mdata_entries: HashMap<(XorName, u64), CachedMDataEntries>,
 
     total_needed_fragments_count: usize,
     requested_needed_fragments_count: usize,
@@ -70,7 +72,7 @@ impl Cache {
         }
 
         // Skip the fragments that already have request ongoing.
-        for (_, fragments) in &self.needed_fragments {
+        for fragments in self.needed_fragments.values() {
             for (fragment, request) in fragments {
                 if request.is_ongoing() {
                     let _ = result.remove(fragment);
@@ -172,7 +174,7 @@ impl Cache {
         };
 
         if remove_holder {
-            let _ = self.needed_fragments.remove(&holder);
+            let _ = self.needed_fragments.remove(holder);
         }
 
         result
@@ -566,8 +568,8 @@ impl FragmentInfo {
 
     pub fn name(&self) -> &XorName {
         match *self {
-            FragmentInfo::ImmutableData(ref name) => name,
-            FragmentInfo::MutableDataShell { ref name, .. } => name,
+            FragmentInfo::ImmutableData(ref name) |
+            FragmentInfo::MutableDataShell { ref name, .. } |
             FragmentInfo::MutableDataEntry { ref name, .. } => name,
         }
     }

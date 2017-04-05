@@ -493,7 +493,7 @@ fn mdata_with_churn_with_response_failure() {
     assert!(new_dm.get_from_chunk_store(&DataId::mutable(&data)).is_none());
 
     let (_, shell_dst1) = take_get_mdata_shell_request(&mut new_node);
-    assert!(shell_dst0 != shell_dst1);
+    assert_ne!(shell_dst0, shell_dst1);
 
     // Simulate receiving failure for value request too.
     unwrap!(new_dm.handle_get_mdata_value_failure(&mut new_node,
@@ -501,7 +501,7 @@ fn mdata_with_churn_with_response_failure() {
                                                   entry_msg_id));
 
     let (_, entry_dst1, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
-    assert!(entry_dst0 != entry_dst1);
+    assert_ne!(entry_dst0, entry_dst1);
 }
 
 // Same as `mdata_with_churn` except now X receives invalid fragment.
@@ -530,7 +530,7 @@ fn mdata_with_churn_with_hash_mismatch() {
     assert!(new_dm.get_from_chunk_store(&DataId::mutable(&bad_data)).is_none());
 
     let (_, shell_dst1) = take_get_mdata_shell_request(&mut new_node);
-    assert!(shell_dst0 != shell_dst1);
+    assert_ne!(shell_dst0, shell_dst1);
 
     let bad_value = unwrap!(bad_data.values().into_iter().next()).clone();
     unwrap!(new_dm.handle_get_mdata_value_success(&mut new_node,
@@ -539,7 +539,7 @@ fn mdata_with_churn_with_hash_mismatch() {
                                                   entry_msg_id));
 
     let (_, entry_dst1, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
-    assert!(entry_dst0 != entry_dst1);
+    assert_ne!(entry_dst0, entry_dst1);
 }
 
 // Same as `mdata_with_churn`, except now X receives the entry fragments before
@@ -675,7 +675,7 @@ fn setup_churn<R: Rng>(rng: &mut R) -> (RoutingNode, DataManager, Vec<XorName>) 
 fn setup_mdata_refresh<R: Rng>(data: &MutableData, rng: &mut R) -> (RoutingNode, DataManager) {
     let (mut new_node, mut new_dm, old_node_names) = setup_churn(rng);
 
-    let fragments = FragmentInfo::mutable_data(&data);
+    let fragments = FragmentInfo::mutable_data(data);
     let refresh_payload = unwrap!(serialise(&fragments));
 
     // Node receives the refresh messages from at least QUORUM other nodes and it accumulates.

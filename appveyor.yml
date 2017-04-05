@@ -9,8 +9,7 @@ environment:
 
 branches:
   only:
-    - dev
-    - master
+    - mutable-data
 
 clone_depth: 1
 

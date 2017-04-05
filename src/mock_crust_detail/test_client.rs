@@ -34,7 +34,7 @@ macro_rules! assert_recv_response {
         match $client.try_recv() {
             Ok(Event::Response { response: Response::$resp { res, msg_id }, .. }) => {
                 assert_eq!($request_msg_id, msg_id);
-                return res;
+                res
             }
             Ok(event) => panic!("Unexpected event: {:?}", event),
             Err(error) => panic!("Unexpected error: {:?}", error),
@@ -501,7 +501,7 @@ impl TestClient {
 
     /// Return client's network name
     pub fn name(&self) -> &XorName {
-        &self.full_id.public_id().name()
+        self.full_id.public_id().name()
     }
 
     fn flush(&mut self) {

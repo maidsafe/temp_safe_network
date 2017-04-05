@@ -518,6 +518,7 @@ impl DataManager {
         Ok(())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_get_mdata_value(&mut self,
                                   routing_node: &mut RoutingNode,
                                   src: Authority<XorName>,
@@ -609,6 +610,7 @@ impl DataManager {
         self.request_needed_fragments(routing_node)
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_mutate_mdata_entries(&mut self,
                                        routing_node: &mut RoutingNode,
                                        src: Authority<XorName>,
@@ -642,6 +644,7 @@ impl DataManager {
         Ok(())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_list_mdata_user_permissions(&mut self,
                                               routing_node: &mut RoutingNode,
                                               src: Authority<XorName>,
@@ -654,11 +657,12 @@ impl DataManager {
         let res = self.read_mdata(&src,
                                   name,
                                   tag,
-                                  |data| data.user_permissions(&user).map(|p| p.clone()));
+                                  |data| data.user_permissions(&user).map(|p| *p));
         routing_node.send_list_mdata_user_permissions_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_set_mdata_user_permissions(&mut self,
                                              routing_node: &mut RoutingNode,
                                              src: Authority<XorName>,
@@ -686,6 +690,7 @@ impl DataManager {
                                    })
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_del_mdata_user_permissions(&mut self,
                                              routing_node: &mut RoutingNode,
                                              src: Authority<XorName>,
@@ -707,6 +712,7 @@ impl DataManager {
                                    |data| data.del_user_permissions(&user, version, requester))
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_change_mdata_owner(&mut self,
                                      routing_node: &mut RoutingNode,
                                      src: Authority<XorName>,
@@ -879,6 +885,7 @@ impl DataManager {
         }
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     fn handle_mdata_mutation<F>(&mut self,
                                 routing_node: &mut RoutingNode,
                                 src: Authority<XorName>,
@@ -975,6 +982,7 @@ impl DataManager {
         Ok(success)
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     fn send_mutation_response(&self,
                               routing_node: &mut RoutingNode,
                               src: Authority<XorName>,

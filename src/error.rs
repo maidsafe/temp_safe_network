@@ -25,6 +25,7 @@ use serde_json;
 use std::io;
 
 quick_error! {
+    #[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
     #[derive(Debug)]
     pub enum InternalError {
         ChunkStore(error: chunk_store::Error) {

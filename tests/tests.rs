@@ -33,8 +33,6 @@
 #![cfg(feature = "use-mock-crust")]
 #![cfg(not(feature = "use-mock-routing"))]
 
-// extern crate maidsafe_utilities;
-// extern crate itertools;
 #[macro_use]
 extern crate log;
 extern crate rand;
@@ -42,7 +40,6 @@ extern crate routing;
 extern crate rust_sodium;
 #[macro_use(assert_match)]
 extern crate safe_vault;
-extern crate tiny_keccak;
 #[macro_use]
 extern crate unwrap;
 

@@ -224,6 +224,7 @@ impl MaidManager {
         Ok(())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_mutate_mdata_entries(&mut self,
                                        routing_node: &mut RoutingNode,
                                        src: Authority<XorName>,
@@ -269,6 +270,7 @@ impl MaidManager {
         Ok(())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_set_mdata_user_permissions(&mut self,
                                              routing_node: &mut RoutingNode,
                                              src: Authority<XorName>,
@@ -320,6 +322,7 @@ impl MaidManager {
         Ok(())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_del_mdata_user_permissions(&mut self,
                                              routing_node: &mut RoutingNode,
                                              src: Authority<XorName>,
@@ -369,6 +372,7 @@ impl MaidManager {
         Ok(())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_change_mdata_owner(&mut self,
                                      routing_node: &mut RoutingNode,
                                      src: Authority<XorName>,
@@ -570,7 +574,7 @@ impl MaidManager {
         };
 
         let client_key = utils::client_key(src);
-        let client_name = utils::client_name_from_key(&client_key);
+        let client_name = utils::client_name_from_key(client_key);
 
         if let Some(requester) = requester {
             if requester != *client_key {
@@ -579,7 +583,7 @@ impl MaidManager {
         }
 
         if client_name == client_manager_name ||
-           (use_auth_keys && account.auth_keys.contains(&client_key)) {
+           (use_auth_keys && account.auth_keys.contains(client_key)) {
             account.increment_mutation_counter()
         } else {
             Err(ClientError::AccessDenied)

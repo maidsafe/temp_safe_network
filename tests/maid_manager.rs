@@ -54,10 +54,11 @@ fn handle_put_without_account() {
                         .is_some()
                 })
         .count();
-    assert!(0 == count,
-            "mutations count {} found with {} nodes",
-            count,
-            node_count);
+    assert_eq!(count,
+               0,
+               "mutations count {} found with {} nodes",
+               count,
+               node_count);
 }
 
 #[test]
@@ -95,10 +96,11 @@ fn handle_put_with_account() {
                         .is_some()
                 })
         .count();
-    assert!(GROUP_SIZE == count,
-            "client account {} found on {} nodes",
-            count,
-            node_count);
+    assert_eq!(count,
+               GROUP_SIZE,
+               "client account count {} found on {} nodes",
+               count,
+               node_count);
 
     mock_crust_detail::check_data(vec![Data::Immutable(data)], &nodes);
 
@@ -333,10 +335,11 @@ fn maid_manager_account_adding_with_churn() {
             .collect();
 
         for &(_, count) in &node_count_stats {
-            assert!(count == Some(mutation_count),
-                    "Expected {} mutations, got: {:?}",
-                    mutation_count,
-                    node_count_stats);
+            assert_eq!(count,
+                       Some(mutation_count),
+                       "Expected {} mutations, got: {:?}",
+                       mutation_count,
+                       node_count_stats);
         }
 
         mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);

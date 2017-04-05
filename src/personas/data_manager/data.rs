@@ -40,7 +40,7 @@ impl DataId {
     /// Get name of this identifier.
     pub fn name(&self) -> &XorName {
         match *self {
-            DataId::Immutable(ref name) => name,
+            DataId::Immutable(ref name) |
             DataId::Mutable(ref name, _) => name,
         }
     }

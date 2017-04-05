@@ -112,7 +112,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
             let data = test_utils::gen_immutable_data(10, &mut rng);
             trace!("Putting data {:?}.", data.name());
             let _ = client.put_idata(data.clone());
-            let _ = all_data.push(Data::Immutable(data));
+            all_data.push(Data::Immutable(data));
         }
 
         if nodes.len() <= GROUP_SIZE + 2 || !rng.gen_weighted_bool(4) {
@@ -630,10 +630,10 @@ fn mutable_data_parallel_mutations() {
         let sent_actions: Vec<_> = clients
             .iter_mut()
             .map(|client| {
-                let ref data = all_data[j];
+                let data = &all_data[j];
                 let num_actions = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize);
                 let actions =
-                    test_utils::gen_mutable_data_entry_actions(&data, num_actions, &mut rng);
+                    test_utils::gen_mutable_data_entry_actions(data, num_actions, &mut rng);
 
                 trace!("Client {:?} sending MutateMDataEntries for data with name {:?}, tag: {}.",
                        client.name(),
@@ -654,29 +654,26 @@ fn mutable_data_parallel_mutations() {
         // apply their entry actions to the local copy of the data.
         let mut successes: usize = 0;
         'client_loop: for (client, actions) in clients.iter_mut().zip(sent_actions) {
-            let ref mut data = all_data[j];
+            let data = &mut all_data[j];
 
             while let Ok(event) = client.try_recv() {
-                match event {
-                    Event::Response {
-                        response: Response::MutateMDataEntries { res, .. }, ..
-                    } => {
-                        match res {
-                            Ok(()) => {
+                if let Event::Response {
+                           response: Response::MutateMDataEntries { res, .. }, ..
+                       } = event {
+                    match res {
+                        Ok(()) => {
                                 trace!("Client {:?} received successful response.",
                                        client.name());
                                 unwrap!(data.mutate_entries(actions, *client.signing_public_key()));
                                 successes += 1;
                             }
-                            Err(error) => {
-                                trace!("Client {:?} received failed response. Reason: {:?}",
-                                       client.name(),
-                                       error);
-                            }
+                        Err(error) => {
+                            trace!("Client {:?} received failed response. Reason: {:?}",
+                                   client.name(),
+                                   error);
                         }
-                        continue 'client_loop;
                     }
-                    _ => (),
+                    continue 'client_loop;
                 }
             }
             panic!("Client {:?} received no response for data with name {:?}, tag {}.",
@@ -740,7 +737,7 @@ fn mutable_data_operations_with_churn() {
             } else {
                 // Mutate existing data.
                 let j = rng.gen_range(0, all_data.len());
-                let ref mut data = all_data[j];
+                let data = &mut all_data[j];
 
                 if !mutated_data.insert((*data.name(), data.tag())) {
                     trace!("Skipping data with name {:?}, tag {:?}.",
@@ -751,7 +748,7 @@ fn mutable_data_operations_with_churn() {
 
                 let action_count = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize + 1);
                 let actions =
-                    test_utils::gen_mutable_data_entry_actions(&data, action_count, &mut rng);
+                    test_utils::gen_mutable_data_entry_actions(data, action_count, &mut rng);
                 unwrap!(data.mutate_entries(actions.clone(), *client.signing_public_key()));
 
                 trace!("Sending MutateMDataEntries for data with name {:?}, tag: {}.",
@@ -921,8 +918,7 @@ fn verify_data_is_stored(nodes: &mut [TestNode], client: &mut TestClient, data: 
         let recovered_entries =
             unwrap!(client.list_mdata_entries_response(*sent_data.name(), sent_data.tag(), nodes));
 
-        assert!(sent_data.shell() == recovered_shell, "shells don't match");
-        assert!(*sent_data.entries() == recovered_entries,
-                "entries don't match");
+        assert_eq!(sent_data.shell(), recovered_shell);
+        assert_eq!(*sent_data.entries(), recovered_entries);
     }
 }

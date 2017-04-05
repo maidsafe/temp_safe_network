@@ -34,6 +34,7 @@ pub struct Node {
 
 macro_rules! impl_request {
     ($method:ident, $message:ident { $($pname:ident : $ptype:ty),* }) => {
+        #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
         pub fn $method(&mut self,
                        src: Authority<XorName>,
                        dst: Authority<XorName>,
@@ -300,49 +301,49 @@ pub struct RequestWrapper {
 
 fn request_id(request: &Request) -> MessageId {
     match *request {
-        Request::Refresh(_, msg_id) => msg_id,
-        Request::GetAccountInfo(msg_id) => msg_id,
-        Request::PutIData { msg_id, .. } => msg_id,
-        Request::GetIData { msg_id, .. } => msg_id,
-        Request::PutMData { msg_id, .. } => msg_id,
-        Request::GetMDataShell { msg_id, .. } => msg_id,
-        Request::GetMDataVersion { msg_id, .. } => msg_id,
-        Request::ListMDataEntries { msg_id, .. } => msg_id,
-        Request::ListMDataKeys { msg_id, .. } => msg_id,
-        Request::ListMDataValues { msg_id, .. } => msg_id,
-        Request::GetMDataValue { msg_id, .. } => msg_id,
-        Request::MutateMDataEntries { msg_id, .. } => msg_id,
-        Request::ListMDataPermissions { msg_id, .. } => msg_id,
-        Request::ListMDataUserPermissions { msg_id, .. } => msg_id,
-        Request::SetMDataUserPermissions { msg_id, .. } => msg_id,
-        Request::DelMDataUserPermissions { msg_id, .. } => msg_id,
-        Request::ChangeMDataOwner { msg_id, .. } => msg_id,
-        Request::ListAuthKeysAndVersion(msg_id) => msg_id,
-        Request::InsAuthKey { msg_id, .. } => msg_id,
+        Request::Refresh(_, msg_id) |
+        Request::GetAccountInfo(msg_id) |
+        Request::PutIData { msg_id, .. } |
+        Request::GetIData { msg_id, .. } |
+        Request::PutMData { msg_id, .. } |
+        Request::GetMDataShell { msg_id, .. } |
+        Request::GetMDataVersion { msg_id, .. } |
+        Request::ListMDataEntries { msg_id, .. } |
+        Request::ListMDataKeys { msg_id, .. } |
+        Request::ListMDataValues { msg_id, .. } |
+        Request::GetMDataValue { msg_id, .. } |
+        Request::MutateMDataEntries { msg_id, .. } |
+        Request::ListMDataPermissions { msg_id, .. } |
+        Request::ListMDataUserPermissions { msg_id, .. } |
+        Request::SetMDataUserPermissions { msg_id, .. } |
+        Request::DelMDataUserPermissions { msg_id, .. } |
+        Request::ChangeMDataOwner { msg_id, .. } |
+        Request::ListAuthKeysAndVersion(msg_id) |
+        Request::InsAuthKey { msg_id, .. } |
         Request::DelAuthKey { msg_id, .. } => msg_id,
     }
 }
 
 fn response_id(response: &Response) -> MessageId {
     match *response {
-        Response::GetAccountInfo { msg_id, .. } => msg_id,
-        Response::PutIData { msg_id, .. } => msg_id,
-        Response::GetIData { msg_id, .. } => msg_id,
-        Response::PutMData { msg_id, .. } => msg_id,
-        Response::GetMDataShell { msg_id, .. } => msg_id,
-        Response::GetMDataVersion { msg_id, .. } => msg_id,
-        Response::ListMDataEntries { msg_id, .. } => msg_id,
-        Response::ListMDataKeys { msg_id, .. } => msg_id,
-        Response::ListMDataValues { msg_id, .. } => msg_id,
-        Response::GetMDataValue { msg_id, .. } => msg_id,
-        Response::MutateMDataEntries { msg_id, .. } => msg_id,
-        Response::ListMDataPermissions { msg_id, .. } => msg_id,
-        Response::ListMDataUserPermissions { msg_id, .. } => msg_id,
-        Response::SetMDataUserPermissions { msg_id, .. } => msg_id,
-        Response::DelMDataUserPermissions { msg_id, .. } => msg_id,
-        Response::ChangeMDataOwner { msg_id, .. } => msg_id,
-        Response::ListAuthKeysAndVersion { msg_id, .. } => msg_id,
-        Response::InsAuthKey { msg_id, .. } => msg_id,
+        Response::GetAccountInfo { msg_id, .. } |
+        Response::PutIData { msg_id, .. } |
+        Response::GetIData { msg_id, .. } |
+        Response::PutMData { msg_id, .. } |
+        Response::GetMDataShell { msg_id, .. } |
+        Response::GetMDataVersion { msg_id, .. } |
+        Response::ListMDataEntries { msg_id, .. } |
+        Response::ListMDataKeys { msg_id, .. } |
+        Response::ListMDataValues { msg_id, .. } |
+        Response::GetMDataValue { msg_id, .. } |
+        Response::MutateMDataEntries { msg_id, .. } |
+        Response::ListMDataPermissions { msg_id, .. } |
+        Response::ListMDataUserPermissions { msg_id, .. } |
+        Response::SetMDataUserPermissions { msg_id, .. } |
+        Response::DelMDataUserPermissions { msg_id, .. } |
+        Response::ChangeMDataOwner { msg_id, .. } |
+        Response::ListAuthKeysAndVersion { msg_id, .. } |
+        Response::InsAuthKey { msg_id, .. } |
         Response::DelAuthKey { msg_id, .. } => msg_id,
     }
 }
