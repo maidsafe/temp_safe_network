@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -14,8 +14,6 @@
 //
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
-
-#![cfg(test)]
 
 macro_rules! assert_err {
     ($cond : expr, $error : pat) => {
@@ -166,7 +164,7 @@ fn put_and_get_value_should_be_same() {
     }
     for (index, &(ref data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let retrieved_value = unwrap!(chunk_store.get(&(index as u32)));
-        assert!(*data == retrieved_value);
+        assert_eq!(*data, retrieved_value);
     }
 }
 
@@ -179,7 +177,7 @@ fn overwrite_value() {
         unwrap!(chunk_store.put(&0, data));
         assert_eq!(chunk_store.used_space(), *size);
         let retrieved_value = unwrap!(chunk_store.get(&0));
-        assert!(*data == retrieved_value);
+        assert_eq!(*data, retrieved_value);
     }
 }
 
