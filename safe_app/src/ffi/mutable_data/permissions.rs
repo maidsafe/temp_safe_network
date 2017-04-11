@@ -175,9 +175,12 @@ pub unsafe extern "C" fn mdata_permissions_get(app: *const App,
             let permissions = context
                 .object_cache()
                 .get_mdata_permissions(permissions_h)?;
-            let user_key = *context.object_cache().get_sign_key(user_h)?;
+            let user_key = match user_h {
+                0 => User::Anyone,
+                user_h => User::Key(*context.object_cache().get_sign_key(user_h)?),
+            };
             let handle = *permissions
-                              .get(&User::Key(user_key))
+                              .get(&user_key)
                               .ok_or(AppError::InvalidSignKeyHandle)?;
 
             Ok(handle)
@@ -232,8 +235,11 @@ pub unsafe extern "C" fn mdata_permissions_insert(app: *const App,
             let mut permissions = context
                 .object_cache()
                 .get_mdata_permissions(permissions_h)?;
-            let user_key = *context.object_cache().get_sign_key(user_h)?;
-            let _ = permissions.insert(User::Key(user_key), permission_set_h);
+            let user_key = match user_h {
+                0 => User::Anyone,
+                user_h => User::Key(*context.object_cache().get_sign_key(user_h)?),
+            };
+            let _ = permissions.insert(user_key, permission_set_h);
 
             Ok(())
         })
