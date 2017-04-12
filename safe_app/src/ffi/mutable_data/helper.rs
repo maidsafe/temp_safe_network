@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use errors::AppError;
+use ffi::mutable_data::permissions::USER_ANYONE;
 use object_cache::{MDataPermissionsHandle, ObjectCache, SignKeyHandle};
 use routing::{PermissionSet, User};
 use std::collections::BTreeMap;
@@ -23,7 +24,7 @@ use std::collections::BTreeMap;
 // Retrieve the sign key corresponding to the handle from the object cache and wrap it
 // in `User`. If the handle is 0, return `User::Anyone`.
 pub fn get_user(object_cache: &ObjectCache, handle: SignKeyHandle) -> Result<User, AppError> {
-    let user = if handle != 0 {
+    let user = if handle != USER_ANYONE {
         let sign_key = object_cache.get_sign_key(handle)?;
         User::Key(*sign_key)
     } else {

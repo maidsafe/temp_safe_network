@@ -285,7 +285,7 @@ pub unsafe fn mdata_list_permissions(app: *const App,
 
 /// Get list of permissions set on the mutable data for the given user.
 ///
-/// User is either handle to a signing key, or 0 which means "anyone".
+/// User is either handle to a signing key or `USER_ANYONE`.
 #[no_mangle]
 pub unsafe fn mdata_list_user_permissions(app: *const App,
                                           info_h: MDataInfoHandle,
@@ -323,7 +323,7 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
 
 /// Set permissions set on the mutable data for the given user.
 ///
-/// User is either handle to a signing key, or 0 which means "anyone".
+/// User is either handle to a signing key or `USER_ANYONE`.
 #[no_mangle]
 pub unsafe fn mdata_set_user_permissions(app: *const App,
                                          info_h: MDataInfoHandle,
@@ -363,7 +363,7 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
 
 /// Delete permissions set on the mutable data for the given user.
 ///
-/// User is either handle to a signing key, or 0 which means "anyone".
+/// User is either handle to a signing key or `USER_ANYONE`.
 #[no_mangle]
 pub unsafe fn mdata_del_user_permissions(app: *const App,
                                          info_h: MDataInfoHandle,
