@@ -20,10 +20,15 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
+use ffi::mutable_data::helper;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle, SignKeyHandle};
 use routing::{Action, PermissionSet, User};
 use std::os::raw::c_void;
+
+/// Special value that represents `User::Anyone` in permission sets.
+#[no_mangle]
+pub static USER_ANYONE: u64 = 0;
 
 /// Permission actions.
 #[repr(C)]
@@ -161,7 +166,8 @@ pub unsafe extern "C" fn mdata_permissions_len(app: *const App,
     })
 }
 
-/// Get the permission set corresponding to the given user (0 means anyone).
+/// Get the permission set corresponding to the given user.
+/// Use a constant `USER_ANYONE` for anyone.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_get(app: *const App,
                                                permissions_h: MDataPermissionsHandle,
@@ -175,12 +181,8 @@ pub unsafe extern "C" fn mdata_permissions_get(app: *const App,
             let permissions = context
                 .object_cache()
                 .get_mdata_permissions(permissions_h)?;
-            let user_key = match user_h {
-                0 => User::Anyone,
-                user_h => User::Key(*context.object_cache().get_sign_key(user_h)?),
-            };
             let handle = *permissions
-                              .get(&user_key)
+                              .get(&helper::get_user(context.object_cache(), user_h)?)
                               .ok_or(AppError::InvalidSignKeyHandle)?;
 
             Ok(handle)
@@ -210,7 +212,7 @@ done_cb: extern "C" fn(*mut c_void, i32)){
             for (user_key, permission_set_h) in &*permissions {
                 let user_h = match *user_key {
                     User::Key(key) => context.object_cache().insert_sign_key(key),
-                    User::Anyone => 0,
+                    User::Anyone => USER_ANYONE,
                 };
                 each_cb(user_data.0, user_h, *permission_set_h);
             }
@@ -222,7 +224,7 @@ done_cb: extern "C" fn(*mut c_void, i32)){
 
 /// Insert permission set for the given user to the permissions.
 ///
-/// To insert permissions for "Anyone", pass 0 as the user handle.
+/// To insert permissions for "Anyone", pass `USER_ANYONE` as the user handle.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_permissions_insert(app: *const App,
                                                   permissions_h: MDataPermissionsHandle,
@@ -235,11 +237,8 @@ pub unsafe extern "C" fn mdata_permissions_insert(app: *const App,
             let mut permissions = context
                 .object_cache()
                 .get_mdata_permissions(permissions_h)?;
-            let user_key = match user_h {
-                0 => User::Anyone,
-                user_h => User::Key(*context.object_cache().get_sign_key(user_h)?),
-            };
-            let _ = permissions.insert(user_key, permission_set_h);
+            let _ = permissions.insert(helper::get_user(context.object_cache(), user_h)?,
+                                       permission_set_h);
 
             Ok(())
         })
