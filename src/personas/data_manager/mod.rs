@@ -228,10 +228,12 @@ impl DataManager {
 
         if let Ok(Data::Immutable(data)) = self.chunk_store.get(&DataId::Immutable(name)) {
             trace!("As {:?} sending data {:?} to {:?}", dst, data, src);
-            routing_node.send_get_idata_response(dst, src, Ok(data), msg_id)?;
+            routing_node
+                .send_get_idata_response(dst, src, Ok(data), msg_id)?;
         } else {
             trace!("DM sending get_idata_failure of {:?}", name);
-            routing_node.send_get_idata_response(dst, src, Err(ClientError::NoSuchData), msg_id)?;
+            routing_node
+                .send_get_idata_response(dst, src, Err(ClientError::NoSuchData), msg_id)?;
         }
 
         Ok(())
@@ -307,7 +309,8 @@ impl DataManager {
         if self.chunk_store.has(&data_id) {
             trace!("DM sending PutIData success for data {:?}, it already exists.",
                    data.name());
-            routing_node.send_put_idata_response(dst, src, Ok(()), msg_id)?;
+            routing_node
+                .send_put_idata_response(dst, src, Ok(()), msg_id)?;
             return Ok(());
         }
 
@@ -315,7 +318,8 @@ impl DataManager {
 
         if self.chunk_store_full() {
             let err = ClientError::NetworkFull;
-            routing_node.send_put_idata_response(dst, src, Err(err.clone()), msg_id)?;
+            routing_node
+                .send_put_idata_response(dst, src, Err(err.clone()), msg_id)?;
             return Err(From::from(err));
         }
 
@@ -340,14 +344,16 @@ impl DataManager {
         let rejected = if self.chunk_store.has(&data_id) {
             trace!("DM sending PutMData failure for data {:?}, it already exists.",
                    data_id);
-            routing_node.send_put_mdata_response(dst, src, Err(ClientError::DataExists), msg_id)?;
+            routing_node
+                .send_put_mdata_response(dst, src, Err(ClientError::DataExists), msg_id)?;
             true
         } else {
             self.clean_chunk_store();
 
             if self.chunk_store_full() {
                 let err = ClientError::NetworkFull;
-                routing_node.send_put_mdata_response(dst, src, Err(err), msg_id)?;
+                routing_node
+                    .send_put_mdata_response(dst, src, Err(err), msg_id)?;
                 return Ok(());
             }
 
@@ -371,7 +377,8 @@ impl DataManager {
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
         let res = self.read_mdata(&src, name, tag, |data| Ok(data.shell()));
-        routing_node.send_get_mdata_shell_response(dst, src, res, msg_id)?;
+        routing_node
+            .send_get_mdata_shell_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -469,7 +476,8 @@ impl DataManager {
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
         let res = self.read_mdata(&src, name, tag, |data| Ok(data.version()));
-        routing_node.send_get_mdata_version_response(dst, src, res, msg_id)?;
+        routing_node
+            .send_get_mdata_version_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -482,7 +490,8 @@ impl DataManager {
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
         let res = self.read_mdata(&src, name, tag, |data| Ok(data.entries().clone()));
-        routing_node.send_list_mdata_entries_response(dst, src, res, msg_id)?;
+        routing_node
+            .send_list_mdata_entries_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -498,7 +507,8 @@ impl DataManager {
                                   name,
                                   tag,
                                   |data| Ok(data.entries().keys().cloned().collect()));
-        routing_node.send_list_mdata_keys_response(dst, src, res, msg_id)?;
+        routing_node
+            .send_list_mdata_keys_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -514,7 +524,8 @@ impl DataManager {
                                   name,
                                   tag,
                                   |data| Ok(data.entries().values().cloned().collect()));
-        routing_node.send_list_mdata_values_response(dst, src, res, msg_id)?;
+        routing_node
+            .send_list_mdata_values_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -533,7 +544,8 @@ impl DataManager {
                             name,
                             tag,
                             |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry));
-        routing_node.send_get_mdata_value_response(dst, src, res, msg_id)?;
+        routing_node
+            .send_get_mdata_value_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -640,7 +652,8 @@ impl DataManager {
                                          msg_id: MessageId)
                                          -> Result<(), InternalError> {
         let res = self.read_mdata(&src, name, tag, |data| Ok(data.permissions().clone()));
-        routing_node.send_list_mdata_permissions_response(dst, src, res, msg_id)?;
+        routing_node
+            .send_list_mdata_permissions_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -658,7 +671,8 @@ impl DataManager {
                                   name,
                                   tag,
                                   |data| data.user_permissions(&user).map(|p| *p));
-        routing_node.send_list_mdata_user_permissions_response(dst, src, res, msg_id)?;
+        routing_node
+            .send_list_mdata_user_permissions_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -1000,35 +1014,41 @@ impl DataManager {
         match mutation_type {
             PendingMutationType::PutIData => {
                 trace!("DM sending PutIData {} for data {:?}", res_string, data_id);
-                routing_node.send_put_idata_response(dst, src, res, msg_id)?
+                routing_node
+                    .send_put_idata_response(dst, src, res, msg_id)?
             }
             PendingMutationType::PutMData => {
                 trace!("DM sending PutMData {} for data {:?}", res_string, data_id);
-                routing_node.send_put_mdata_response(dst, src, res, msg_id)?
+                routing_node
+                    .send_put_mdata_response(dst, src, res, msg_id)?
             }
             PendingMutationType::MutateMDataEntries => {
                 trace!("DM sending MutateMDataEntries {} for data {:?}",
                        res_string,
                        data_id);
-                routing_node.send_mutate_mdata_entries_response(dst, src, res, msg_id)?
+                routing_node
+                    .send_mutate_mdata_entries_response(dst, src, res, msg_id)?
             }
             PendingMutationType::SetMDataUserPermissions => {
                 trace!("DM sending SetMDataUserPermissions {} for data {:?}",
                        res_string,
                        data_id);
-                routing_node.send_set_mdata_user_permissions_response(dst, src, res, msg_id)?
+                routing_node
+                    .send_set_mdata_user_permissions_response(dst, src, res, msg_id)?
             }
             PendingMutationType::DelMDataUserPermissions => {
                 trace!("DM sending DelMDataUserPermissions {} for data {:?}",
                        res_string,
                        data_id);
-                routing_node.send_del_mdata_user_permissions_response(dst, src, res, msg_id)?
+                routing_node
+                    .send_del_mdata_user_permissions_response(dst, src, res, msg_id)?
             }
             PendingMutationType::ChangeMDataOwner => {
                 trace!("DM sending ChangeMDataOwner {} for data {:?}",
                        res_string,
                        data_id);
-                routing_node.send_change_mdata_owner_response(dst, src, res, msg_id)?
+                routing_node
+                    .send_change_mdata_owner_response(dst, src, res, msg_id)?
             }
         }
 
@@ -1061,7 +1081,8 @@ impl DataManager {
         let src = Authority::ManagedNode(routing_node.name()?);
         let serialised_refresh = serialisation::serialise(&refresh)?;
         trace!("DM sending refresh to {:?}.", dst);
-        routing_node.send_refresh_request(src, dst, serialised_refresh, MessageId::new())?;
+        routing_node
+            .send_refresh_request(src, dst, serialised_refresh, MessageId::new())?;
         Ok(())
     }
 
@@ -1074,7 +1095,8 @@ impl DataManager {
         match serialisation::serialise(&refresh) {
             Ok(serialised_data) => {
                 trace!("DM sending refresh data to group {:?}.", name);
-                routing_node.send_refresh_request(Authority::NaeManager(name),
+                routing_node
+                    .send_refresh_request(Authority::NaeManager(name),
                                           Authority::NaeManager(name),
                                           serialised_data,
                                           msg_id)?;
@@ -1105,14 +1127,16 @@ impl DataManager {
 
                         match fragment {
                             FragmentInfo::ImmutableData(name) => {
-                                routing_node.send_get_idata_request(src, dst, name, msg_id)?;
+                                routing_node
+                                    .send_get_idata_request(src, dst, name, msg_id)?;
                             }
                             FragmentInfo::MutableDataShell { name, tag, .. } => {
-                                routing_node.send_get_mdata_shell_request(
-                                    src, dst, name, tag, msg_id)?;
+                                routing_node
+                                    .send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
                             }
                             FragmentInfo::MutableDataEntry { name, tag, ref key, .. } => {
-                                routing_node.send_get_mdata_value_request(src,
+                                routing_node
+                                    .send_get_mdata_value_request(src,
                                                                   dst,
                                                                   name,
                                                                   tag,
