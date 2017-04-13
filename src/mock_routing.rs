@@ -81,7 +81,7 @@ impl Node {
     }
 
     pub fn new() -> Self {
-        unwrap!(Self::builder().create(GROUP_SIZE))
+        unwrap!(Self::builder().create())
     }
 
     pub fn name(&self) -> Result<XorName, InterfaceError> {
@@ -101,7 +101,7 @@ impl Node {
 
     // mock-only method.
     pub fn add_to_routing_table(&mut self, name: XorName) {
-        unwrap!(self.routing_table.add(name, false));
+        unwrap!(self.routing_table.add(name));
     }
 
     impl_request!(send_get_idata_request,
@@ -271,7 +271,7 @@ impl NodeBuilder {
         self
     }
 
-    pub fn create(self, _min_section_size: usize) -> Result<Node, RoutingError> {
+    pub fn create(self) -> Result<Node, RoutingError> {
         let name = rand::random();
 
         Ok(Node {

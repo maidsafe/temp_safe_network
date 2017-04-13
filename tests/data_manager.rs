@@ -135,7 +135,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
         trace!("Processed {} events.", event_count);
 
         mock_crust_detail::check_data(all_data.clone(), &nodes);
-        mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
+        mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     }
 
     for data in &all_data {
@@ -685,7 +685,7 @@ fn mutable_data_parallel_mutations() {
         assert!(successes > 0, "No MutateMDataEntry attempt succeeded.");
         mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
                                       &nodes);
-        mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
+        mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     }
 
     // Check that the stored data matches the local copy.
@@ -792,7 +792,7 @@ fn mutable_data_operations_with_churn() {
 
         mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
                                       &nodes);
-        mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
+        mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     }
 
     verify_data_is_stored(&mut nodes, &mut client, &all_data);

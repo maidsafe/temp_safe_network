@@ -342,7 +342,7 @@ fn maid_manager_account_adding_with_churn() {
                        node_count_stats);
         }
 
-        mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
+        mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     }
 }
 

@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use GROUP_SIZE;
 use cache::Cache;
 use config_handler::{self, Config};
 use error::InternalError;
@@ -89,9 +88,9 @@ impl Vault {
         chunk_store_root.push(CHUNK_STORE_DIR);
 
         let routing_node = if use_cache {
-            builder.cache(Box::new(Cache::new())).create(GROUP_SIZE)
+            builder.cache(Box::new(Cache::new())).create()
         } else {
-            builder.create(GROUP_SIZE)
+            builder.create()
         }?;
 
         Ok(Vault {
@@ -730,7 +729,7 @@ impl Vault {
     }
 
     /// Vault routing_table
-    pub fn routing_table(&self) -> RoutingTable<XorName> {
+    pub fn routing_table(&self) -> &RoutingTable<XorName> {
         unwrap!(self.routing_node.routing_table())
     }
 

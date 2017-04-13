@@ -124,7 +124,7 @@ impl TestNode {
     }
 
     /// returns the vault's routing_table.
-    pub fn routing_table(&self) -> RoutingTable<XorName> {
+    pub fn routing_table(&self) -> &RoutingTable<XorName> {
         self.vault.routing_table()
     }
 }

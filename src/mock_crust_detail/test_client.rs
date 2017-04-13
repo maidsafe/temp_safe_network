@@ -17,7 +17,6 @@
 
 use super::poll;
 use super::test_node::TestNode;
-use GROUP_SIZE;
 use maidsafe_utilities::SeededRng;
 use rand::Rng;
 use routing::{self, AccountInfo, Authority, ClientError, EntryAction, Event, EventStream, FullId,
@@ -67,7 +66,7 @@ impl TestClient {
         let full_id = FullId::new();
         let handle = network.new_service_handle(config.clone(), None);
         let client = mock_crust::make_current(&handle, || {
-            unwrap!(routing::Client::new(Some(full_id.clone()), config, GROUP_SIZE))
+            unwrap!(routing::Client::new(Some(full_id.clone()), config))
         });
 
         let client_manager = Authority::ClientManager(*full_id.public_id().name());
