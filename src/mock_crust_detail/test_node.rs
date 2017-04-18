@@ -19,9 +19,8 @@ use super::poll;
 use config_handler::Config;
 use hex::ToHex;
 use itertools::Itertools;
-use maidsafe_utilities::SeededRng;
 use personas::data_manager::DataId;
-use rand::Rng;
+use rand::{self, Rng};
 use routing::{RoutingTable, XorName, Xorable};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use std::env;
@@ -46,7 +45,11 @@ impl TestNode {
                -> Self {
         let handle = network.new_service_handle(crust_config, None);
         let temp_root = env::temp_dir();
-        let chunk_store_root = temp_root.join(SeededRng::thread_rng()
+
+        // Note: using non-deterministic rng here to prevent multiple threads to
+        // set the same chunk store root which would cause crash when running tests
+        // in parallel.
+        let chunk_store_root = temp_root.join(rand::thread_rng()
                                                   .gen_iter()
                                                   .take(8)
                                                   .collect::<Vec<u8>>()
