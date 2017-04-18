@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use chrono::prelude::{DateTime, UTC};
+use chrono::prelude::{DateTime, NaiveDateTime, UTC};
 use ffi_utils::{ReprC, vec_into_raw_parts};
 use nfs::errors::NfsError;
 use nfs::ffi::File as FfiFile;
@@ -54,8 +54,10 @@ impl File {
 
         FfiFile {
             size: self.size(),
-            created: *self.created_time(),
-            modified: *self.modified_time(),
+            created_sec: self.created_time().timestamp(),
+            created_nsec: self.created_time().timestamp_subsec_nanos(),
+            modified_sec: self.modified_time().timestamp(),
+            modified_nsec: self.modified_time().timestamp_subsec_nanos(),
             user_metadata_ptr: user_metadata_ptr,
             user_metadata_len: user_metadata_len,
             user_metadata_cap: user_metadata_cap,
@@ -125,14 +127,24 @@ impl ReprC for File {
                                                   (*repr_c).user_metadata_len)
                 .to_vec();
 
+        let created = convert_date_time((*repr_c).created_sec, (*repr_c).created_nsec)?;
+        let modified = convert_date_time((*repr_c).modified_sec, (*repr_c).modified_nsec)?;
+
         let mut file = File::new(user_metadata);
         file.set_size((*repr_c).size);
-        file.set_created_time((*repr_c).created);
-        file.set_modified_time((*repr_c).modified);
+        file.set_created_time(created);
+        file.set_modified_time(modified);
         file.set_data_map_name(XorName((*repr_c).data_map_name));
 
         Ok(file)
     }
+}
+
+#[inline]
+fn convert_date_time(sec: i64, nsec: u32) -> Result<DateTime<UTC>, NfsError> {
+    let naive = NaiveDateTime::from_timestamp_opt(sec, nsec)
+        .ok_or_else(|| NfsError::Unexpected("Invalid date format".to_string()))?;
+    Ok(DateTime::<UTC>::from_utc(naive, UTC))
 }
 
 #[cfg(test)]
