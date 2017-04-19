@@ -25,7 +25,7 @@ mod tests;
 use App;
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
+use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb, vec_clone_from_raw_parts};
 use futures::Future;
 use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle, MDataKeysHandle,
                    MDataPermissionSetHandle, MDataPermissionsHandle, MDataValuesHandle,
@@ -149,7 +149,11 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
                               Ok((content, value.entry_version))
                           })
                 .map(move |(content, version)| {
-                         o_cb(user_data.0, 0, content.as_ptr(), content.len(), version);
+                         o_cb(user_data.0,
+                              0,
+                              content.as_safe_ptr(),
+                              content.len(),
+                              version);
                      })
                 .map_err(AppError::from)
                 .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null(), 0, 0))

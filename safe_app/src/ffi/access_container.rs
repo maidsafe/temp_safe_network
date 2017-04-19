@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use App;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, from_c_str};
+use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str};
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
@@ -69,12 +69,15 @@ pub unsafe extern "C" fn access_container_get_names(app: *const App,
                               Ok(c_str_vec)
                           })
                 .map(move |c_str_vec| {
-                         let ptr_vec: Vec<*const c_char> = c_str_vec
-                             .iter()
-                             .map(|c_string| c_string.as_ptr())
-                             .collect();
-                         o_cb(user_data.0, 0, ptr_vec.as_ptr(), c_str_vec.len() as u32);
-                     })
+                    let ptr_vec: Vec<*const c_char> = c_str_vec
+                        .iter()
+                        .map(|c_string| c_string.as_ptr())
+                        .collect();
+                    o_cb(user_data.0,
+                         0,
+                         ptr_vec.as_safe_ptr(),
+                         c_str_vec.len() as u32);
+                })
                 .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0); })
                 .into_box()
                 .into()
