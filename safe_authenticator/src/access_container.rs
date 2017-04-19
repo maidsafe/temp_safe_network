@@ -56,16 +56,22 @@ pub fn access_container_entry(client: &Client,
                               access_container: &MDataInfo,
                               app_id: &str,
                               app_keys: AppKeys)
-                              -> Box<AuthFuture<(u64, AccessContainerEntry)>> {
+                              -> Box<AuthFuture<(u64, Option<AccessContainerEntry>)>> {
     let nonce = fry!(access_container_nonce(access_container));
     let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
 
     client
         .get_mdata_value(access_container.name, access_container.type_tag, key)
         .and_then(move |value| {
-                      let plaintext = symmetric_decrypt(&value.content, &app_keys.enc_key)?;
-                      Ok((value.entry_version, deserialise(&plaintext)?))
-                  })
+            if value.content.is_empty() {
+                // Access container entry has been removed
+                // FIXME(nbaksalyar): get rid of this check after proper deletion is implemented
+                Ok((value.entry_version, None))
+            } else {
+                let plaintext = symmetric_decrypt(&value.content, &app_keys.enc_key)?;
+                Ok((value.entry_version, Some(deserialise(&plaintext)?)))
+            }
+        })
         .map_err(From::from)
         .into_box()
 }

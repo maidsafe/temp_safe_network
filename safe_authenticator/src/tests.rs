@@ -432,7 +432,7 @@ fn revoke_app() {
     run(&authenticator, move |client| {
         access_container_entry(client, &ac_md_info, &app_id, app_keys)
             .then(move |res| match res {
-                Err(AuthError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+                Ok((_version, None)) => Ok(()),
                 x => panic!("Unexpected {:?}", x),
             })
     });
@@ -607,6 +607,18 @@ fn lists_of_registered_and_revoked_apps() {
 
     assert_eq!(registered.len(), 1);
     assert_eq!(revoked.len(), 1);
+
+    // Re-register the first app - now there must be 2 registered apps again
+    let _ = unwrap!(register_app(&authenticator, &auth_req1));
+
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
+    };
+    let revoked: Vec<RevokedAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
+
+    assert_eq!(registered.len(), 2);
+    assert_eq!(revoked.len(), 0);
 }
 
 fn revoke(authenticator: &Authenticator, app_id: &str) {

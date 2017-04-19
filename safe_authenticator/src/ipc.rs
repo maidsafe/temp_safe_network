@@ -90,11 +90,12 @@ pub fn decode_ipc_msg(client: &Client,
             req: IpcReq::Auth(auth_req),
             req_id,
         } => {
-            // Ok status should be returned for all app states (including Revoked and Authenticated).
+            // Ok status should be returned for all app states (including
+            // Revoked and Authenticated).
             ok!(Ok(IpcMsg::Req {
-                      req_id: req_id,
-                      req: IpcReq::Auth(auth_req),
-                  }))
+                       req_id: req_id,
+                       req: IpcReq::Auth(auth_req),
+                   }))
         }
         IpcMsg::Req {
             req: IpcReq::Containers(cont_req),
@@ -237,9 +238,12 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                                                &access_container,
                                                &app.info.id,
                                                app.keys.clone())
-                                .map(move |(version, permissions)| {
-                                         (version, app, permissions, access_container)
-                                     })
+                                .and_then(move |(version, permissions)| {
+                                              Ok((version, app,
+                                        permissions.ok_or(AuthError::IpcError(
+                                            IpcError::UnknownApp))?,
+                                        access_container))
+                                          })
                     })
                     .and_then(move |(version, app, permissions, access_container)| {
                         // Remove the revoked app from the access container
@@ -466,7 +470,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                                 .then(move |res| {
                                     let version = match res {
                                         // Updating an existing entry
-                                        Ok((version, mut existing_perms)) => {
+                                        Ok((version, Some(mut existing_perms))) => {
                                             for (key, val) in perms {
                                                 let _ = existing_perms.insert(key, val);
                                             }
@@ -476,6 +480,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                                         }
 
                                         // Adding a new access container entry
+                                        Ok((_, None)) |
                                         Err(AuthError::CoreError(
                                         CoreError::RoutingClientError(
                                             ClientError::NoSuchEntry))) => None,
@@ -776,6 +781,7 @@ fn encode_auth_resp_impl(client: &Client,
     let c5 = client.clone();
     let c6 = client.clone();
     let c7 = client.clone();
+    let c8 = client.clone();
 
     let sign_pk = app.keys.sign_pk;
     let app_keys = app.keys.clone();
@@ -810,13 +816,28 @@ fn encode_auth_resp_impl(client: &Client,
 
                 let _ = perms.insert(format!("apps/{}", app_info.id), (mdata_info, access));
             };
-            put_access_container_entry(&c6, &dir, &app_info.id, &app_keys, &perms, None)
+            access_container_entry(&c6, &dir, &app_info.id, app_keys.clone()).then(move |res| {
+                let version = match res {
+                    // Updating an existing entry
+                    Ok((version, _)) => Some(version + 1),
+                    // Adding a new access container entry
+                    Err(AuthError::CoreError(
+                            CoreError::RoutingClientError(
+                                ClientError::NoSuchEntry))) => None,
+                    // Error has occurred while trying to get an existing entry
+                    Err(e) => return Err(e),
+                };
+                Ok((version, app_info, app_keys, dir, perms))
+            })
+        })
+        .and_then(move |(version, app_info, app_keys, dir, perms)| {
+            put_access_container_entry(&c7, &dir, &app_info.id, &app_keys, &perms, version)
                 .map(move |_| (dir, app_keys))
         })
         .and_then(move |(dir, app_keys)| {
                       Ok(AuthGranted {
                              app_keys: app_keys,
-                             bootstrap_config: c7.bootstrap_config()?,
+                             bootstrap_config: c8.bootstrap_config()?,
                              access_container: AccessContInfo::from_mdata_info(dir)?,
                          })
                   })
@@ -979,8 +1000,8 @@ pub fn app_state(client: &Client,
                 .and_then(move |dir| access_container_entry(&c2, &dir, &app_id, app_keys))
                 .then(move |res| {
                     match res {
-                        Ok(_) => Ok(AppState::Authenticated),
-                        Err(AuthError::CoreError(CoreError::EncodeDecodeError(..))) |
+                        Ok((_version, Some(_))) => Ok(AppState::Authenticated),
+                        Ok((_, None)) |
                         Err(AuthError::CoreError(
                             CoreError::RoutingClientError(
                                 ClientError::NoSuchEntry))) => {
