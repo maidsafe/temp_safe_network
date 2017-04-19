@@ -107,6 +107,12 @@ impl DataManager {
            })
     }
 
+    // When a new node joins a group, the other members of the group send it "refresh"
+    // messages which contains info about the data fragments that this node needs to fetch
+    // from them.
+    //
+    // Note: refresh is a message whose source is individual node, so its accumulation
+    // must be performed manually.
     pub fn handle_refresh(&mut self,
                           routing_node: &mut RoutingNode,
                           src: XorName,
@@ -115,7 +121,7 @@ impl DataManager {
         let fragments: Vec<FragmentInfo> = serialisation::deserialise(serialised_refresh)?;
         for fragment in fragments {
             if self.cache
-                   .register_needed_fragment_with_holder(fragment.clone(), src) {
+                   .register_needed_fragment_with_another_holder(fragment.clone(), src) {
                 continue;
             }
 
@@ -165,7 +171,13 @@ impl DataManager {
         self.request_needed_fragments(routing_node)
     }
 
-    /// Handles an accumulated refresh message sent from the whole group.
+    // When a node in a group receives request to mutate some data it holds, it first sends
+    // "group refresh" message to all the other members of the group. Only when the message
+    // accumulates, the node applies the mutation to the data and updates it in the chunk
+    // store.
+    //
+    // Note: group refresh is a message whose source is group, so the accumulation is
+    // performed automatically by routing.
     pub fn handle_group_refresh(&mut self,
                                 routing_node: &mut RoutingNode,
                                 serialised_refresh: &[u8])
@@ -204,7 +216,7 @@ impl DataManager {
             let mutation_type = mutation.mutation_type();
             let fragments = mutation.fragment_infos();
 
-            if self.handle_pending_mutation(routing_node, src, dst, mutation, message_id)? {
+            if self.commit_pending_mutation(routing_node, src, dst, mutation, message_id)? {
                 match mutation_type {
                     PendingMutationType::PutIData => self.immutable_data_count += 1,
                     PendingMutationType::PutMData => self.mutable_data_count += 1,
@@ -994,7 +1006,7 @@ impl DataManager {
         Ok(())
     }
 
-    fn handle_pending_mutation(&mut self,
+    fn commit_pending_mutation(&mut self,
                                routing_node: &mut RoutingNode,
                                src: Authority<XorName>,
                                dst: Authority<XorName>,

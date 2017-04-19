@@ -105,10 +105,10 @@ impl Cache {
 
     /// Register the given fragment with the new holder, but only if we already
     /// have it registered with some other holder(s).
-    pub fn register_needed_fragment_with_holder(&mut self,
-                                                fragment: FragmentInfo,
-                                                holder: XorName)
-                                                -> bool {
+    pub fn register_needed_fragment_with_another_holder(&mut self,
+                                                        fragment: FragmentInfo,
+                                                        holder: XorName)
+                                                        -> bool {
         if self.needed_fragments
                .values()
                .any(|fragments| fragments.contains_key(&fragment)) {

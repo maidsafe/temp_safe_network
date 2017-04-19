@@ -448,7 +448,7 @@ impl MaidManager {
                                version: u64,
                                msg_id: MessageId)
                                -> Result<(), InternalError> {
-        let res = self.mutate_account(&src, &dst, version, |account| {
+        let res = self.mutate_account(routing_node, &src, &dst, version, |account| {
             let _ = account.auth_keys.insert(key);
             Ok(())
         });
@@ -465,7 +465,8 @@ impl MaidManager {
                                version: u64,
                                msg_id: MessageId)
                                -> Result<(), InternalError> {
-        let res = self.mutate_account(&src,
+        let res = self.mutate_account(routing_node,
+                                      &src,
                                       &dst,
                                       version,
                                       |account| if account.auth_keys.remove(&key) {
@@ -534,6 +535,7 @@ impl MaidManager {
     }
 
     fn mutate_account<F>(&mut self,
+                         routing_node: &mut RoutingNode,
                          src: &Authority<XorName>,
                          dst: &Authority<XorName>,
                          version: u64,
@@ -545,21 +547,27 @@ impl MaidManager {
         let client_manager_name = utils::client_name(dst);
 
         if client_name != client_manager_name {
-            // TODO (adam): is this the right error to return here?
             return Err(ClientError::AccessDenied);
         }
 
-        if let Some(account) = self.accounts.get_mut(&client_manager_name) {
+        let res = if let Some(account) = self.accounts.get_mut(&client_manager_name) {
             if version == account.version + 1 {
                 f(account)?;
                 account.version = version;
-                Ok(())
+                Ok(account.clone())
             } else {
                 Err(ClientError::InvalidSuccessor)
             }
         } else {
             Err(ClientError::NoSuchAccount)
-        }
+        };
+
+        res.map(|account| {
+                    self.send_refresh(routing_node,
+                                      &client_manager_name,
+                                      account,
+                                      MessageId::zero())
+                })
     }
 
     fn prepare_mutation(&mut self,
