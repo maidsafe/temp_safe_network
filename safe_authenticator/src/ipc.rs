@@ -90,40 +90,11 @@ pub fn decode_ipc_msg(client: &Client,
             req: IpcReq::Auth(auth_req),
             req_id,
         } => {
-            let app_id = auth_req.app.id.clone();
-            let app_id2 = app_id.clone();
-
-            let c2 = client.clone();
-
-            get_config(client)
-                .and_then(move |(_config_version, config)| app_state(&c2, &config, app_id))
-                .and_then(move |app_state| {
-                    match app_state {
-                        AppState::Authenticated => {
-                            // App is already registered
-                            let err_code =
-                                ffi_error_code!(AuthError::from(IpcError::AlreadyAuthorised));
-
-                            let auth_error = Err(IpcError::AlreadyAuthorised);
-                            let resp = encode_response(&IpcMsg::Resp {
-                                                            resp: IpcResp::Auth(auth_error),
-                                                            req_id: req_id,
-                                                        },
-                                                       &app_id2)?;
-
-                            Ok(Err((err_code, resp)))
-                        }
-                        AppState::NotAuthenticated |
-                        AppState::Revoked => {
-                            // App is not registered yet or was previously registered
-                            Ok(Ok(IpcMsg::Req {
-                                      req_id: req_id,
-                                      req: IpcReq::Auth(auth_req),
-                                  }))
-                        }
-                    }
-                })
-                .into_box()
+            // Ok status should be returned for all app states (including Revoked and Authenticated).
+            ok!(Ok(IpcMsg::Req {
+                      req_id: req_id,
+                      req: IpcReq::Auth(auth_req),
+                  }))
         }
         IpcMsg::Req {
             req: IpcReq::Containers(cont_req),
