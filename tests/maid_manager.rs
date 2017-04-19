@@ -23,8 +23,8 @@ use routing::{AccountInfo, ClientError, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
               MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData,
               TYPE_TAG_SESSION_PACKET, Value};
 use routing::mock_crust::{self, Network};
-use safe_vault::{DEFAULT_ACCOUNT_SIZE, Data, GROUP_SIZE, test_utils};
-use safe_vault::mock_crust_detail::{self, poll, test_node};
+use safe_vault::{DEFAULT_ACCOUNT_SIZE, GROUP_SIZE, test_utils};
+use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 
 const TEST_NET_SIZE: usize = 20;

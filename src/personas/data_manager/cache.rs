@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::STATUS_LOG_INTERVAL;
-use super::data::{Data, DataId};
+use super::data::{Data, DataId, ImmutableDataId, MutableDataId};
 use GROUP_SIZE;
 use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable, Value, XorName};
 use std::collections::VecDeque;
@@ -448,12 +448,12 @@ pub enum PendingMutation {
 impl PendingMutation {
     pub fn data_id(&self) -> DataId {
         match *self {
-            PendingMutation::PutIData(ref data) => DataId::immutable(data),
+            PendingMutation::PutIData(ref data) => DataId::Immutable(data.id()),
             PendingMutation::PutMData(ref data) |
             PendingMutation::MutateMDataEntries(ref data) |
             PendingMutation::SetMDataUserPermissions(ref data) |
             PendingMutation::DelMDataUserPermissions(ref data) |
-            PendingMutation::ChangeMDataOwner(ref data) => DataId::mutable(data),
+            PendingMutation::ChangeMDataOwner(ref data) => DataId::Mutable(data.id()),
         }
     }
 
@@ -469,17 +469,6 @@ impl PendingMutation {
                 PendingMutationType::DelMDataUserPermissions
             }
             PendingMutation::ChangeMDataOwner(_) => PendingMutationType::ChangeMDataOwner,
-        }
-    }
-
-    pub fn into_data(self) -> Data {
-        match self {
-            PendingMutation::PutIData(data) => Data::Immutable(data),
-            PendingMutation::PutMData(data) |
-            PendingMutation::MutateMDataEntries(data) |
-            PendingMutation::SetMDataUserPermissions(data) |
-            PendingMutation::DelMDataUserPermissions(data) |
-            PendingMutation::ChangeMDataOwner(data) => Data::Mutable(data),
         }
     }
 
@@ -576,9 +565,11 @@ impl FragmentInfo {
 
     pub fn data_id(&self) -> DataId {
         match *self {
-            FragmentInfo::ImmutableData(name) => DataId::Immutable(name),
+            FragmentInfo::ImmutableData(name) => DataId::Immutable(ImmutableDataId(name)),
             FragmentInfo::MutableDataShell { name, tag, .. } |
-            FragmentInfo::MutableDataEntry { name, tag, .. } => DataId::Mutable(name, tag),
+            FragmentInfo::MutableDataEntry { name, tag, .. } => {
+                DataId::Mutable(MutableDataId(name, tag))
+            }
         }
     }
 }

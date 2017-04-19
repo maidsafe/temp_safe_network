@@ -255,7 +255,7 @@ mod utils;
 mod vault;
 
 pub use config_handler::Config;
-pub use personas::data_manager::{Data, DataId};
+pub use personas::data_manager::DataId;
 pub use personas::maid_manager::DEFAULT_ACCOUNT_SIZE;
 pub use vault::Vault;
 

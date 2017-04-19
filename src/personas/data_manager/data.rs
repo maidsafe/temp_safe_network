@@ -17,62 +17,75 @@
 
 use routing::{ImmutableData, MutableData, XorName};
 
+/// Identifier of immutable data
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct ImmutableDataId(pub XorName);
+
+impl ImmutableDataId {
+    pub fn name(&self) -> &XorName {
+        &self.0
+    }
+}
+
+/// Identifier of mutable data
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct MutableDataId(pub XorName, pub u64);
+
+impl MutableDataId {
+    pub fn name(&self) -> &XorName {
+        &self.0
+    }
+
+    pub fn tag(&self) -> u64 {
+        self.1
+    }
+}
+
 /// Identifier for a data (immutable or mutable)
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum DataId {
     /// Identifier of immutable data.
-    Immutable(XorName),
+    Immutable(ImmutableDataId),
     /// Identifier of mutable data.
-    Mutable(XorName, u64),
+    Mutable(MutableDataId),
 }
 
 impl DataId {
-    /// Create identifier of the given immutable data.
-    pub fn immutable(data: &ImmutableData) -> Self {
-        DataId::Immutable(*data.name())
+    /// Create `DataId` for immutable data.
+    pub fn immutable(name: XorName) -> Self {
+        DataId::Immutable(ImmutableDataId(name))
     }
 
-    /// Create identifier of the given mutable data.
-    pub fn mutable(data: &MutableData) -> Self {
-        DataId::Mutable(*data.name(), data.tag())
+    /// Create `DataId` for mutable data.
+    pub fn mutable(name: XorName, tag: u64) -> Self {
+        DataId::Mutable(MutableDataId(name, tag))
     }
 
     /// Get name of this identifier.
     pub fn name(&self) -> &XorName {
         match *self {
-            DataId::Immutable(ref name) |
-            DataId::Mutable(ref name, _) => name,
+            DataId::Immutable(ref id) => id.name(),
+            DataId::Mutable(ref id) => id.name(),
         }
     }
 }
 
-/// Type that can hold both immutable and mutable data.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum Data {
-    /// Immutable data.
-    Immutable(ImmutableData),
-    /// Mutable data.
-    Mutable(MutableData),
+/// Trait that allows extracting data identifier.
+pub trait Data {
+    type Id;
+    fn id(&self) -> Self::Id;
 }
 
-impl Data {
-    /// Get `DataId` of this `Data`.
-    pub fn id(&self) -> DataId {
-        match *self {
-            Data::Immutable(ref data) => DataId::immutable(data),
-            Data::Mutable(ref data) => DataId::mutable(data),
-        }
+impl Data for ImmutableData {
+    type Id = ImmutableDataId;
+    fn id(&self) -> Self::Id {
+        ImmutableDataId(*self.name())
     }
 }
 
-impl From<ImmutableData> for Data {
-    fn from(data: ImmutableData) -> Self {
-        Data::Immutable(data)
-    }
-}
-
-impl From<MutableData> for Data {
-    fn from(data: MutableData) -> Self {
-        Data::Mutable(data)
+impl Data for MutableData {
+    type Id = MutableDataId;
+    fn id(&self) -> Self::Id {
+        MutableDataId(*self.name(), self.tag())
     }
 }

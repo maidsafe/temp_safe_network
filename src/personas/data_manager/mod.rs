@@ -22,10 +22,10 @@ mod tests;
 
 use self::cache::{Cache, DataInfo, FragmentInfo};
 use self::cache::{PendingMutation, PendingMutationType, PendingWrite};
-pub use self::data::{Data, DataId};
+pub use self::data::{Data, DataId, ImmutableDataId, MutableDataId};
 use GROUP_SIZE;
 use accumulator::Accumulator;
-use chunk_store::ChunkStore;
+use chunk_store::{Chunk, ChunkId, ChunkStore};
 use error::InternalError;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
@@ -57,8 +57,30 @@ macro_rules! log_status {
     }
 }
 
+impl Chunk<DataId> for ImmutableData {
+    type Id = ImmutableDataId;
+}
+
+impl ChunkId<DataId> for ImmutableDataId {
+    type Chunk = ImmutableData;
+    fn to_key(&self) -> DataId {
+        DataId::Immutable(*self)
+    }
+}
+
+impl Chunk<DataId> for MutableData {
+    type Id = MutableDataId;
+}
+
+impl ChunkId<DataId> for MutableDataId {
+    type Chunk = MutableData;
+    fn to_key(&self) -> DataId {
+        DataId::Mutable(*self)
+    }
+}
+
 pub struct DataManager {
-    chunk_store: ChunkStore<DataId, Data>,
+    chunk_store: ChunkStore<DataId>,
     /// Accumulates refresh messages and the peers we received them from.
     refresh_accumulator: Accumulator<FragmentInfo, XorName>,
     cache: Cache,
@@ -104,13 +126,12 @@ impl DataManager {
 
                 let needed = match fragment {
                     FragmentInfo::ImmutableData(name) => {
-                        !self.chunk_store.has(&DataId::Immutable(name))
+                        !self.chunk_store.has(&ImmutableDataId(name))
                     }
                     FragmentInfo::MutableDataShell { name, tag, version, .. } => {
-                        match self.chunk_store.get(&DataId::Mutable(name, tag)) {
+                        match self.chunk_store.get(&MutableDataId(name, tag)) {
                             Err(_) => true,
-                            Ok(Data::Mutable(data)) => data.version() < version,
-                            Ok(_) => unreachable!(),
+                            Ok(data) => data.version() < version,
                         }
                     }
                     FragmentInfo::MutableDataEntry {
@@ -120,8 +141,7 @@ impl DataManager {
                         version,
                         ..
                     } => {
-                        if let Ok(Data::Mutable(data)) =
-                            self.chunk_store.get(&DataId::Mutable(name, tag)) {
+                        if let Ok(data) = self.chunk_store.get(&MutableDataId(name, tag)) {
                             match data.get(key) {
                                 None => true,
                                 Some(value) if value.entry_version < version => true,
@@ -186,8 +206,8 @@ impl DataManager {
 
             if self.handle_pending_mutation(routing_node, src, dst, mutation, message_id)? {
                 match mutation_type {
-                    PendingMutationType::PutIData |
-                    PendingMutationType::PutMData => self.count_added_data(&data_id),
+                    PendingMutationType::PutIData => self.immutable_data_count += 1,
+                    PendingMutationType::PutMData => self.mutable_data_count += 1,
                     _ => (),
                 }
 
@@ -226,7 +246,7 @@ impl DataManager {
             log_status!(self);
         }
 
-        if let Ok(Data::Immutable(data)) = self.chunk_store.get(&DataId::Immutable(name)) {
+        if let Ok(data) = self.chunk_store.get(&ImmutableDataId(name)) {
             trace!("As {:?} sending data {:?} to {:?}", dst, data, src);
             routing_node
                 .send_get_idata_response(dst, src, Ok(data), msg_id)?;
@@ -268,7 +288,6 @@ impl DataManager {
             return Ok(());
         }
 
-        let data = Data::Immutable(data);
         let data_id = data.id();
 
         if self.chunk_store.has(&data_id) {
@@ -278,7 +297,7 @@ impl DataManager {
         self.clean_chunk_store();
         self.chunk_store.put(&data_id, &data)?;
 
-        self.count_added_data(&data_id);
+        self.immutable_data_count += 1;
         log_status!(self);
 
         Ok(())
@@ -305,8 +324,7 @@ impl DataManager {
                             data: ImmutableData,
                             msg_id: MessageId)
                             -> Result<(), InternalError> {
-        let data_id = DataId::Immutable(*data.name());
-        if self.chunk_store.has(&data_id) {
+        if self.chunk_store.has(&data.id()) {
             trace!("DM sending PutIData success for data {:?}, it already exists.",
                    data.name());
             routing_node
@@ -339,8 +357,7 @@ impl DataManager {
                             msg_id: MessageId,
                             _requester: sign::PublicKey)
                             -> Result<(), InternalError> {
-
-        let data_id = DataId::Mutable(*data.name(), data.tag());
+        let data_id = data.id();
         let rejected = if self.chunk_store.has(&data_id) {
             trace!("DM sending PutMData failure for data {:?}, it already exists.",
                    data_id);
@@ -413,14 +430,14 @@ impl DataManager {
             return Ok(());
         }
 
-        let data_id = DataId::mutable(&shell);
+        let data_id = shell.id();
         let new = match self.chunk_store.get(&data_id) {
-            Ok(Data::Mutable(ref old_data)) if old_data.version() >= shell.version() => {
+            Ok(ref old_data) if old_data.version() >= shell.version() => {
                 // The data in the chunk store is already more recent than the
                 // shell we received. Ignore it.
                 return Ok(());
             }
-            Ok(Data::Mutable(ref old_data)) => {
+            Ok(ref old_data) => {
                 // The shell is more recent than the data in the chunk store.
                 // Repace the data with the shell, but keep the entries.
                 for (key, value) in old_data.entries() {
@@ -429,7 +446,6 @@ impl DataManager {
 
                 false
             }
-            Ok(_) => unreachable!(),
             Err(_) => {
                 // If we have cached entries for this data, apply them.
                 for (key, value) in self.cache.take_mdata_entries(*shell.name(), shell.tag()) {
@@ -443,10 +459,10 @@ impl DataManager {
         };
 
         self.clean_chunk_store();
-        self.chunk_store.put(&data_id, &Data::Mutable(shell))?;
+        self.chunk_store.put(&data_id, &shell)?;
 
         if new {
-            self.count_added_data(&data_id);
+            self.mutable_data_count += 1;
             log_status!(self);
         }
 
@@ -588,16 +604,14 @@ impl DataManager {
             return Ok(());
         }
 
-        let data_id = DataId::Mutable(name, tag);
-
+        let data_id = MutableDataId(name, tag);
         match self.chunk_store.get(&data_id) {
-            Ok(Data::Mutable(mut data)) => {
+            Ok(mut data) => {
                 if data.mutate_entry_without_validation(key, value) {
                     self.clean_chunk_store();
-                    self.chunk_store.put(&data_id, &Data::Mutable(data))?;
+                    self.chunk_store.put(&data_id, &data)?;
                 }
             }
-            Ok(_) => unreachable!(),
             Err(_) => {
                 // We don't have the shell yet, so keep the entry around in the cache
                 // until we receive the shell.
@@ -738,7 +752,7 @@ impl DataManager {
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
         let mutation_type = PendingMutationType::ChangeMDataOwner;
-        let data_id = DataId::Mutable(name, tag);
+        let data_id = DataId::mutable(name, tag);
 
         let new_owners_len = new_owners.len();
         let new_owner = match new_owners.into_iter().next() {
@@ -789,14 +803,23 @@ impl DataManager {
             match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
                 None => {
                     trace!("No longer a DM for {:?}", data_id);
-                    if self.chunk_store.has(&data_id) && !self.cache.is_in_unneeded(&data_id) {
-                        self.count_removed_data(&data_id);
-                        has_pruned_data = true;
 
-                        if let DataId::Immutable(..) = data_id {
-                            self.cache.add_as_unneeded(data_id);
-                        } else {
-                            let _ = self.chunk_store.delete(&data_id);
+                    match data_id {
+                        DataId::Immutable(idata_id) => {
+                            if self.chunk_store.has(&idata_id) &&
+                               !self.cache.is_in_unneeded(&data_id) {
+                                self.immutable_data_count -= 1;
+                                has_pruned_data = true;
+                                self.cache.add_as_unneeded(data_id);
+                            }
+                        }
+                        DataId::Mutable(mdata_id) => {
+                            if self.chunk_store.has(&mdata_id) &&
+                               !self.cache.is_in_unneeded(&data_id) {
+                                self.mutable_data_count -= 1;
+                                has_pruned_data = true;
+                                let _ = self.chunk_store.delete(&mdata_id);
+                            }
                         }
                     }
                 }
@@ -879,8 +902,8 @@ impl DataManager {
             log_status!(self);
         }
 
-        let data_id = DataId::Mutable(name, tag);
-        if let Ok(Data::Mutable(data)) = self.chunk_store.get(&data_id) {
+        let data_id = MutableDataId(name, tag);
+        if let Ok(data) = self.chunk_store.get(&data_id) {
             f(&data)
         } else {
             Err(ClientError::NoSuchData)
@@ -890,8 +913,8 @@ impl DataManager {
     fn mutate_mdata<F>(&self, name: XorName, tag: u64, f: F) -> Result<MutableData, ClientError>
         where F: FnOnce(&mut MutableData) -> Result<(), ClientError>
     {
-        let data_id = DataId::Mutable(name, tag);
-        if let Ok(Data::Mutable(mut data)) = self.chunk_store.get(&data_id) {
+        let data_id = MutableDataId(name, tag);
+        if let Ok(mut data) = self.chunk_store.get(&data_id) {
             f(&mut data)?;
             Ok(data)
         } else {
@@ -928,7 +951,7 @@ impl DataManager {
                                             src,
                                             dst,
                                             mutation_type,
-                                            DataId::Mutable(name, tag),
+                                            DataId::mutable(name, tag),
                                             Err(error),
                                             msg_id)
             }
@@ -979,10 +1002,18 @@ impl DataManager {
                                msg_id: MessageId)
                                -> Result<bool, InternalError> {
         let mutation_type = mutation.mutation_type();
-        let data = mutation.into_data();
-        let data_id = data.id();
+        let data_id = mutation.data_id();
 
-        let res = if let Err(error) = self.chunk_store.put(&data_id, &data) {
+        let res = match mutation {
+            PendingMutation::PutIData(data) => self.chunk_store.put(&data.id(), &data),
+            PendingMutation::PutMData(data) |
+            PendingMutation::MutateMDataEntries(data) |
+            PendingMutation::SetMDataUserPermissions(data) |
+            PendingMutation::DelMDataUserPermissions(data) |
+            PendingMutation::ChangeMDataOwner(data) => self.chunk_store.put(&data.id(), &data),
+        };
+
+        let res = if let Err(error) = res {
             trace!("DM failed to store {:?} in chunkstore: {:?}",
                    data_id,
                    error);
@@ -1065,7 +1096,10 @@ impl DataManager {
     fn clean_chunk_store(&mut self) {
         while self.chunk_store_full() {
             if let Some(data_id) = self.cache.pop_unneeded_chunk() {
-                let _ = self.chunk_store.delete(&data_id);
+                let _ = match data_id {
+                    DataId::Immutable(data_id) => self.chunk_store.delete(&data_id),
+                    DataId::Mutable(data_id) => self.chunk_store.delete(&data_id),
+                };
             } else {
                 break;
             }
@@ -1161,11 +1195,11 @@ impl DataManager {
 
         for data_id in self.chunk_store.keys() {
             match data_id {
-                DataId::Immutable(name) => {
-                    let _ = result.insert(FragmentInfo::ImmutableData(name));
+                DataId::Immutable(data_id) => {
+                    let _ = result.insert(FragmentInfo::ImmutableData(*data_id.name()));
                 }
-                DataId::Mutable(..) => {
-                    let data = if let Ok(Data::Mutable(data)) = self.chunk_store.get(&data_id) {
+                DataId::Mutable(data_id) => {
+                    let data = if let Ok(data) = self.chunk_store.get(&data_id) {
                         data
                     } else {
                         error!("Failed to get {:?} from chunk store.", data_id);
@@ -1191,20 +1225,6 @@ impl DataManager {
             .cloned()
             .collect()
     }
-
-    fn count_added_data(&mut self, data_id: &DataId) {
-        match *data_id {
-            DataId::Immutable(..) => self.immutable_data_count += 1,
-            DataId::Mutable(..) => self.mutable_data_count += 1,
-        }
-    }
-
-    fn count_removed_data(&mut self, data_id: &DataId) {
-        match *data_id {
-            DataId::Immutable(..) => self.immutable_data_count -= 1,
-            DataId::Mutable(..) => self.mutable_data_count -= 1,
-        }
-    }
 }
 
 #[cfg(feature = "use-mock-crust")]
@@ -1224,8 +1244,8 @@ impl DataManager {
     fn get_version(&self, data_id: &DataId) -> Option<u64> {
         match *data_id {
             DataId::Immutable(_) => Some(0),
-            DataId::Mutable(..) => {
-                if let Ok(Data::Mutable(data)) = self.chunk_store.get(data_id) {
+            DataId::Mutable(ref data_id) => {
+                if let Ok(data) = self.chunk_store.get(data_id) {
                     Some(data.version())
                 } else {
                     None
@@ -1238,13 +1258,15 @@ impl DataManager {
 #[cfg(all(test, feature = "use-mock-routing"))]
 impl DataManager {
     /// For testing only - put the given data directly into the chunks store.
-    pub fn put_into_chunk_store<T: Into<Data>>(&mut self, data: T) {
-        let data = data.into();
+    pub fn put_into_chunk_store<T, I>(&mut self, data: T)
+        where T: Chunk<DataId, Id = I> + Data<Id = I>,
+              I: ChunkId<DataId>
+    {
         unwrap!(self.chunk_store.put(&data.id(), &data))
     }
 
     /// For testing only - retrieve data with the given ID from the chunk store.
-    pub fn get_from_chunk_store(&self, data_id: &DataId) -> Option<Data> {
+    pub fn get_from_chunk_store<T: ChunkId<DataId>>(&self, data_id: &T) -> Option<T::Chunk> {
         self.chunk_store.get(data_id).ok()
     }
 }

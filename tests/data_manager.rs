@@ -24,8 +24,8 @@ use routing::{Action, Authority, ClientError, EntryActions, Event, ImmutableData
               MAX_MUTABLE_DATA_ENTRY_ACTIONS, MutableData, PermissionSet, Response, User};
 use routing::mock_crust::{self, Network};
 use rust_sodium::crypto::sign;
-use safe_vault::{Data, GROUP_SIZE, test_utils};
-use safe_vault::mock_crust_detail::{self, poll};
+use safe_vault::{GROUP_SIZE, test_utils};
+use safe_vault::mock_crust_detail::{self, Data, poll};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::test_node::{self, TestNode};
 use std::cmp;

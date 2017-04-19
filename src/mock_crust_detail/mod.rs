@@ -25,9 +25,27 @@ pub mod test_node;
 use GROUP_SIZE;
 use itertools::Itertools;
 use mock_crust_detail::test_node::TestNode;
-use personas::data_manager::{Data, DataId};
-use routing::{self, XorName, Xorable};
+use personas::data_manager::DataId;
+use routing::{self, ImmutableData, MutableData, XorName, Xorable};
 use std::collections::{HashMap, HashSet};
+
+/// Type that can hold both immutable and mutable data.
+#[derive(Clone)]
+pub enum Data {
+    /// Immutable data.
+    Immutable(ImmutableData),
+    /// Mutable data.
+    Mutable(MutableData),
+}
+
+impl Data {
+    fn id(&self) -> DataId {
+        match *self {
+            Data::Immutable(ref data) => DataId::immutable(*data.name()),
+            Data::Mutable(ref data) => DataId::mutable(*data.name(), data.tag()),
+        }
+    }
+}
 
 /// Checks that none of the given nodes has any copy of the given data left.
 pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
@@ -61,9 +79,10 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
     }
 
     for data in all_data {
-        let (data_id, data_version) = match data {
-            Data::Immutable(data) => (DataId::immutable(&data), 0),
-            Data::Mutable(data) => (DataId::mutable(&data), data.version()),
+        let data_id = data.id();
+        let data_version = match data {
+            Data::Immutable(_) => 0,
+            Data::Mutable(data) => data.version(),
         };
 
         let data_holders = data_holders_map

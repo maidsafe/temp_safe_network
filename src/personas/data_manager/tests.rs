@@ -407,14 +407,14 @@ fn idata_with_churn() {
     let bad_data = test_utils::gen_immutable_data(10, &mut rng);
     let bad_data_name = *bad_data.name();
     unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, bad_data, msg_id));
-    assert!(new_dm.get_from_chunk_store(&DataId::Immutable(bad_data_name)).is_none());
+    assert!(new_dm.get_from_chunk_store(&ImmutableDataId(bad_data_name)).is_none());
     let (msg_id, dst) = verify_get_idata_request_sent(&mut new_node, data.name());
 
     // ...
 
     // New node now receives successful response. It should put the data into the chunk store.
     unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, data.clone(), msg_id));
-    assert!(new_dm.get_from_chunk_store(&DataId::Immutable(*data.name())).is_some());
+    assert!(new_dm.get_from_chunk_store(&data.id()).is_some());
 
     // New node should not send any more requests to the other holders, because it already
     // has everything it needs.
@@ -460,9 +460,8 @@ fn mdata_with_churn() {
                                                       msg_id));
     }
 
-    let stored_data = assert_match!(
-        new_dm.get_from_chunk_store(&DataId::mutable(&data)),
-        Some(Data::Mutable(data)) => data);
+    let stored_data = assert_match!(new_dm.get_from_chunk_store(&data.id()),
+                                    Some(data) => data);
     assert_eq!(stored_data, data);
 
     // NEW NODE should not send any more requests, because it already has everything it needs.
@@ -490,7 +489,7 @@ fn mdata_with_churn_with_response_failure() {
     unwrap!(new_dm.handle_get_mdata_shell_failure(&mut new_node,
                                                   shell_dst0,
                                                   shell_msg_id));
-    assert!(new_dm.get_from_chunk_store(&DataId::mutable(&data)).is_none());
+    assert!(new_dm.get_from_chunk_store(&data.id()).is_none());
 
     let (_, shell_dst1) = take_get_mdata_shell_request(&mut new_node);
     assert_ne!(shell_dst0, shell_dst1);
@@ -527,7 +526,7 @@ fn mdata_with_churn_with_hash_mismatch() {
                                                   shell_dst0,
                                                   bad_data.shell(),
                                                   shell_msg_id));
-    assert!(new_dm.get_from_chunk_store(&DataId::mutable(&bad_data)).is_none());
+    assert!(new_dm.get_from_chunk_store(&bad_data.id()).is_none());
 
     let (_, shell_dst1) = take_get_mdata_shell_request(&mut new_node);
     assert_ne!(shell_dst0, shell_dst1);
@@ -573,8 +572,8 @@ fn mdata_with_churn_with_entries_arriving_before_shell() {
                                                   data.shell(),
                                                   shell_msg_id));
 
-    let stored_data = assert_match!(new_dm.get_from_chunk_store(&DataId::mutable(&data)),
-                                    Some(Data::Mutable(data)) => data);
+    let stored_data = assert_match!(new_dm.get_from_chunk_store(&data.id()),
+                                    Some(data) => data);
     assert_eq!(stored_data, data);
 
     // The node should not send any more requests, because it already has everything it needs.
