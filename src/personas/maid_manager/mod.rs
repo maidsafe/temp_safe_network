@@ -103,7 +103,7 @@ impl MaidManager {
             return Ok(());
         }
 
-        if let Err(err) = self.increment_mutation_counter(&utils::client_name(&src)) {
+        if let Err(err) = self.prepare_mutation(&src, &dst, AuthPolicy::Key, None) {
             routing_node
                 .send_put_idata_response(dst, src, Err(err), msg_id)?;
             return Ok(());
@@ -176,7 +176,7 @@ impl MaidManager {
             info!("Managing {} client accounts.", self.accounts.len());
         }
 
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None, true) {
+        if let Err(err) = self.prepare_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
             // Undo the account creation
             if data.tag() == TYPE_TAG_SESSION_PACKET {
                 let _ = self.accounts.remove(&src_name);
@@ -246,7 +246,7 @@ impl MaidManager {
                                        msg_id: MessageId,
                                        requester: sign::PublicKey)
                                        -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester), true) {
+        if let Err(err) = self.prepare_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
             routing_node
                 .send_mutate_mdata_entries_response(dst, src, Err(err), msg_id)?;
             return Ok(());
@@ -296,7 +296,7 @@ impl MaidManager {
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester), true) {
+        if let Err(err) = self.prepare_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
             routing_node
                 .send_set_mdata_user_permissions_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
@@ -347,7 +347,7 @@ impl MaidManager {
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, Some(requester), true) {
+        if let Err(err) = self.prepare_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
             routing_node
                 .send_del_mdata_user_permissions_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
@@ -396,7 +396,7 @@ impl MaidManager {
                                      version: u64,
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_mdata_mutation(&src, &dst, None, false) {
+        if let Err(err) = self.prepare_mutation(&src, &dst, AuthPolicy::Owner, None) {
             routing_node
                 .send_change_mdata_owner_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
@@ -562,22 +562,12 @@ impl MaidManager {
         }
     }
 
-    fn increment_mutation_counter(&mut self, client_name: &XorName) -> Result<(), ClientError> {
-        if let Some(account) = self.accounts.get_mut(client_name) {
-            account.increment_mutation_counter()
-        } else {
-            Err(ClientError::NoSuchAccount)
-        }
-    }
-
-    // If `use_auth_keys` is true, then this mutation is allowed for any authorised client,
-    // otherwise it is allowed only for the account owner.
-    fn prepare_mdata_mutation(&mut self,
-                              src: &Authority<XorName>,
-                              dst: &Authority<XorName>,
-                              requester: Option<sign::PublicKey>,
-                              use_auth_keys: bool)
-                              -> Result<(), ClientError> {
+    fn prepare_mutation(&mut self,
+                        src: &Authority<XorName>,
+                        dst: &Authority<XorName>,
+                        policy: AuthPolicy,
+                        requester: Option<sign::PublicKey>)
+                        -> Result<(), ClientError> {
         let client_manager_name = utils::client_name(dst);
 
         let account = if let Some(account) = self.accounts.get_mut(&client_manager_name) {
@@ -589,18 +579,24 @@ impl MaidManager {
         let client_key = utils::client_key(src);
         let client_name = utils::client_name_from_key(client_key);
 
+        let allowed = client_name == client_manager_name ||
+                      if AuthPolicy::Key == policy {
+                          account.auth_keys.contains(client_key)
+                      } else {
+                          false
+                      };
+
+        if !allowed {
+            return Err(ClientError::AccessDenied);
+        }
+
         if let Some(requester) = requester {
             if requester != *client_key {
                 return Err(ClientError::AccessDenied);
             }
         }
 
-        if client_name == client_manager_name ||
-           (use_auth_keys && account.auth_keys.contains(client_key)) {
-            account.increment_mutation_counter()
-        } else {
-            Err(ClientError::AccessDenied)
-        }
+        account.increment_mutation_counter()
     }
 
     fn handle_mutation_response(&mut self,
@@ -692,4 +688,12 @@ struct CachedRequest {
 
     // Some(type_tag) if the request is for mutable data. None otherwise.
     tag: Option<u64>,
+}
+
+#[derive(PartialEq)]
+enum AuthPolicy {
+    // Operation allowed only for the account owner.
+    Owner,
+    // Operation allowed for any authorised client.
+    Key,
 }

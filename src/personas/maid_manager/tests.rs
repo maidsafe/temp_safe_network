@@ -402,6 +402,8 @@ fn auth_keys() {
 
 #[test]
 fn mutation_authorisation() {
+    let mut rng = rand::thread_rng();
+
     let (owner_client, owner_key) = test_utils::gen_client_authority();
     let owner_client_manager = test_utils::gen_client_manager_authority(owner_key);
     let (app_client, app_key) = test_utils::gen_client_authority();
@@ -412,16 +414,32 @@ fn mutation_authorisation() {
     // Create owner account
     create_account(&mut node, &mut mm, owner_client, owner_client_manager);
 
-    let tag = rand::random();
-    let data = test_utils::gen_mutable_data(tag, 0, owner_key, &mut rand::thread_rng());
-    let data_name = *data.name();
+    // Attempt to put immutable data by unauthorised client fails.
+    let idata = test_utils::gen_immutable_data(10, &mut rng);
+    let idata_nae_manager = Authority::NaeManager(*idata.name());
 
-    // Attempt to put by unauthorised client fails.
+    let msg_id = MessageId::new();
+    unwrap!(mm.handle_put_idata(&mut node,
+                                app_client,
+                                owner_client_manager,
+                                idata.clone(),
+                                msg_id));
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response,
+                  Response::PutIData { res: Err(ClientError::AccessDenied), ..});
+
+    // Attempt to put mutable data by unauthorised client fails.
+    let tag = rand::random();
+    let mdata = test_utils::gen_mutable_data(tag, 0, owner_key, &mut rng);
+    let mdata_name = *mdata.name();
+    let mdata_nae_manager = Authority::NaeManager(mdata_name);
+
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_mdata(&mut node,
                                 app_client,
                                 owner_client_manager,
-                                data.clone(),
+                                mdata.clone(),
                                 msg_id,
                                 app_key));
 
@@ -429,21 +447,27 @@ fn mutation_authorisation() {
     assert_match!(message.response,
                   Response::PutMData { res: Err(ClientError::AccessDenied), ..});
 
-    // Put by authorised client is ok.
+    // Put by the owner is ok.
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_mdata(&mut node,
                                 owner_client,
                                 owner_client_manager,
-                                data,
+                                mdata,
                                 msg_id,
                                 owner_key));
+
+    // Verify the request is forwarded to the NaeManager.
+    let message = unwrap!(node.sent_requests.remove(&msg_id));
+    assert_match!(message.request, Request::PutMData { .. });
+    assert_eq!(message.src, owner_client_manager);
+    assert_eq!(message.dst, mdata_nae_manager);
 
     // Attemp to mutate by unauthorised client fails.
     let msg_id = MessageId::new();
     let _ = mm.handle_mutate_mdata_entries(&mut node,
                                            app_client,
                                            owner_client_manager,
-                                           data_name,
+                                           mdata_name,
                                            tag,
                                            Default::default(),
                                            msg_id,
@@ -453,62 +477,127 @@ fn mutation_authorisation() {
             Response::MutateMDataEntries { res: Err(ClientError::AccessDenied), .. });
 
     // Mutation by the owner succeeds.
-    let msg_id = MessageId::new();
-    let _ = mm.handle_mutate_mdata_entries(&mut node,
-                                           owner_client,
-                                           owner_client_manager,
-                                           data_name,
-                                           tag,
-                                           Default::default(),
-                                           msg_id,
-                                           owner_key);
-    // Note: No response sent here means all is good (MM sends response to
-    // MutateMDataEntries request only in case of error).
-    assert!(!node.sent_responses.contains_key(&msg_id));
+    {
+        let msg_id = MessageId::new();
+        let _ = mm.handle_mutate_mdata_entries(&mut node,
+                                               owner_client,
+                                               owner_client_manager,
+                                               mdata_name,
+                                               tag,
+                                               Default::default(),
+                                               msg_id,
+                                               owner_key);
+
+        // Verify the request is forwarded to the NaeManager.
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        assert_match!(message.request, Request::MutateMDataEntries { .. });
+        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.dst, mdata_nae_manager);
+    }
 
     // Authorise the app.
     let msg_id = MessageId::new();
-    let _ = mm.handle_ins_auth_key(&mut node,
+    unwrap!(mm.handle_ins_auth_key(&mut node,
                                    owner_client,
                                    owner_client_manager,
                                    app_key,
                                    4, // current version is 3, due to the above mutations.
-                                   msg_id);
+                                   msg_id));
     assert_match!(
             unwrap!(node.sent_responses.remove(&msg_id)).response,
             Response::InsAuthKey { res: Ok(()), .. });
 
-    // Mutation by authorised app now succeeds.
-    let msg_id = MessageId::new();
-    let _ = mm.handle_mutate_mdata_entries(&mut node,
+
+    // PutIData by authorised app succeeds.
+    {
+        let msg_id = MessageId::new();
+        unwrap!(mm.handle_put_idata(&mut node, app_client, owner_client_manager, idata, msg_id));
+
+        // Verify the request is forwarded to the NaeManager.
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        assert_match!(message.request, Request::PutIData { .. });
+        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.dst, idata_nae_manager);
+
+        // Simulate receiving the response from the NaeManager and verify it gets
+        // forwarded to the app.
+        unwrap!(mm.handle_put_idata_response(&mut node, Ok(()), msg_id));
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(message.response, Response::PutIData { res: Ok(()), .. });
+        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.dst, app_client);
+    }
+
+    // PutMData by authorised app succeeds.
+    {
+        let mdata = test_utils::gen_mutable_data(tag, 0, app_key, &mut rng);
+        let mdata_nae_manager = Authority::NaeManager(*mdata.name());
+
+        let msg_id = MessageId::new();
+        unwrap!(mm.handle_put_mdata(&mut node,
+                                app_client,
+                                owner_client_manager,
+                                mdata,
+                                msg_id,
+                                app_key));
+
+        // Verify the request is forwarded to the NaeManager.
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        assert_match!(message.request, Request::PutMData { .. });
+        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.dst, mdata_nae_manager);
+
+        node.sent_requests.clear();
+
+        // Simulate receiving the response from the NaeManager and verify it gets
+        // forwarded to the app.
+        unwrap!(mm.handle_put_mdata_response(&mut node, Ok(()), msg_id));
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(message.response, Response::PutMData { res: Ok(()), .. });
+        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.dst, app_client);
+    }
+
+    // Mutation by authorised app succeeds.
+    {
+        let msg_id = MessageId::new();
+        unwrap!(mm.handle_mutate_mdata_entries(&mut node,
                                            app_client,
                                            owner_client_manager,
-                                           data_name,
+                                           mdata_name,
                                            tag,
                                            Default::default(),
                                            msg_id,
-                                           app_key);
-    assert!(!node.sent_responses.contains_key(&msg_id));
+                                           app_key));
 
-    // Simulate receiving mutation response from the nae manager and verify it
-    // gets forwarded to the app.
-    unwrap!(mm.handle_mutate_mdata_entries_response(&mut node, Ok(()), msg_id));
-    let message = unwrap!(node.sent_responses.remove(&msg_id));
-    assert_eq!(message.src, owner_client_manager);
-    assert_eq!(message.dst, app_client);
-    assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+        // Verify the request is forwarded to the NaeManager.
+        let message = unwrap!(node.sent_requests.remove(&msg_id));
+        assert_match!(message.request, Request::MutateMDataEntries { .. });
+        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.dst, mdata_nae_manager);
+
+        node.sent_requests.clear();
+
+        // Simulate receiving the response from the nae manager and verify it gets
+        // forwarded to the app.
+        unwrap!(mm.handle_mutate_mdata_entries_response(&mut node, Ok(()), msg_id));
+        let message = unwrap!(node.sent_responses.remove(&msg_id));
+        assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.dst, app_client);
+    }
 
     // Attempt to mutate by requester that doesn't match the source client
     // key fails.
     let msg_id = MessageId::new();
-    let _ = mm.handle_mutate_mdata_entries(&mut node,
+    unwrap!(mm.handle_mutate_mdata_entries(&mut node,
                                            app_client,
                                            owner_client_manager,
-                                           data_name,
+                                           mdata_name,
                                            tag,
                                            Default::default(),
                                            msg_id,
-                                           owner_key);
+                                           owner_key));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
             message.response,
