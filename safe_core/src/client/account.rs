@@ -21,6 +21,7 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{FullId, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
 use rust_sodium::crypto::hash::sha256;
+use rust_sodium::crypto::sign::Seed;
 
 /// Representing the User Account information on the network
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -123,8 +124,11 @@ pub struct ClientKeys {
 
 impl ClientKeys {
     /// Construct new `ClientKeys`
-    pub fn new() -> Self {
-        let sign = sign::gen_keypair();
+    pub fn new(seed: Option<&Seed>) -> Self {
+        let sign = match seed {
+            Some(s) => sign::keypair_from_seed(s),
+            None => sign::gen_keypair(),
+        };
         let enc = box_::gen_keypair();
 
         ClientKeys {
@@ -138,7 +142,7 @@ impl ClientKeys {
 
 impl Default for ClientKeys {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
@@ -234,6 +238,6 @@ mod tests {
         let user_root = unwrap!(MDataInfo::random_private(0));
         let config_root = unwrap!(MDataInfo::random_private(0));
 
-        Account::new(ClientKeys::new(), user_root, config_root)
+        Account::new(ClientKeys::new(None), user_root, config_root)
     }
 }

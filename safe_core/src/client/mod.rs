@@ -42,8 +42,9 @@ use routing::{AccountInfo, Authority, EntryAction, Event, FullId, ImmutableData,
               Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
-use rust_sodium::crypto::{box_, sign};
+use rust_sodium::crypto::box_;
 use rust_sodium::crypto::hash::sha256::{self, Digest};
+use rust_sodium::crypto::sign::{self, Seed};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
@@ -53,6 +54,7 @@ use std::time::Duration;
 use tokio_core::reactor::{Handle, Timeout};
 use utils::{self, FutureExt};
 
+const SEED_SUBPARTS: usize = 4;
 const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 const REQUEST_TIMEOUT_SECS: u64 = 120;
@@ -156,14 +158,62 @@ impl Client {
                      }))
     }
 
+    /// This is one of the Gateway functions to the Maidsafe network, the others being
+    /// `unregistered`, `registered`, and `login`. This will help create an account given a seed.
+    /// Everything including both account secrets and all MAID keys will be deterministically
+    /// derived from the supplied seed, so this seed needs to be strong. For ordinary users, it's
+    /// recommended to use the normal `registered` function where the secrets can be what's easy
+    /// to remember for the user while also being strong.
+    pub fn registered_with_seed<T>(seed: &str,
+                                   el_handle: Handle,
+                                   core_tx: CoreMsgTx<T>,
+                                   net_tx: NetworkTx)
+                                   -> Result<Client, CoreError>
+        where T: 'static
+    {
+        let arr = Self::divide_seed(seed)?;
+
+        let id_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 2]).0);
+
+        Self::registered_impl(arr[0],
+                              arr[1],
+                              "",
+                              el_handle,
+                              core_tx,
+                              net_tx,
+                              Some(&id_seed))
+    }
+
     /// This is a Gateway function to the Maidsafe network. This will help
     /// create a fresh acc for the user in the SAFE-network.
     pub fn registered<T>(acc_locator: &str,
                          acc_password: &str,
+                         invitation: &str,
                          el_handle: Handle,
                          core_tx: CoreMsgTx<T>,
                          net_tx: NetworkTx)
                          -> Result<Client, CoreError>
+        where T: 'static
+    {
+        Self::registered_impl(acc_locator.as_bytes(),
+                              acc_password.as_bytes(),
+                              invitation,
+                              el_handle,
+                              core_tx,
+                              net_tx,
+                              None)
+    }
+
+    /// This is a Gateway function to the Maidsafe network. This will help
+    /// create a fresh acc for the user in the SAFE-network.
+    pub fn registered_impl<T>(acc_locator: &[u8],
+                              acc_password: &[u8],
+                              invitation: &str,
+                              el_handle: Handle,
+                              core_tx: CoreMsgTx<T>,
+                              net_tx: NetworkTx,
+                              id_seed: Option<&Seed>)
+                              -> Result<Client, CoreError>
         where T: 'static
     {
         trace!("Creating an account.");
@@ -173,7 +223,7 @@ impl Client {
         let acc_loc = Account::generate_network_id(&keyword, &pin)?;
         let user_cred = UserCred::new(password, pin);
 
-        let maid_keys = ClientKeys::new();
+        let maid_keys = ClientKeys::new(id_seed);
         let pub_key = maid_keys.sign_pk;
         let full_id = Some(maid_keys.clone().into());
 
@@ -187,6 +237,10 @@ impl Client {
             b"Login".to_vec() => Value {
                 content: acc.encrypt(&user_cred.password, &user_cred.pin)?,
                 entry_version: 0,
+            },
+            b"Invitation".to_vec() => Value {
+                content: invitation.to_owned().into_bytes(),
+                entry_version: 0
             }
         ];
 
@@ -229,6 +283,18 @@ impl Client {
                      }))
     }
 
+    /// Login using seeded account
+    pub fn login_with_seed<T>(seed: &str,
+                              el_handle: Handle,
+                              core_tx: CoreMsgTx<T>,
+                              net_tx: NetworkTx)
+                              -> Result<Client, CoreError>
+        where T: 'static
+    {
+        let arr = Self::divide_seed(seed)?;
+        Self::login_impl(arr[0], arr[1], el_handle, core_tx, net_tx)
+    }
+
     /// This is a Gateway function to the Maidsafe network. This will help
     /// login to an already existing account of the user in the SAFE-network.
     pub fn login<T>(acc_locator: &str,
@@ -237,6 +303,21 @@ impl Client {
                     core_tx: CoreMsgTx<T>,
                     net_tx: NetworkTx)
                     -> Result<Client, CoreError>
+        where T: 'static
+    {
+        Self::login_impl(acc_locator.as_bytes(),
+                         acc_password.as_bytes(),
+                         el_handle,
+                         core_tx,
+                         net_tx)
+    }
+
+    fn login_impl<T>(acc_locator: &[u8],
+                     acc_password: &[u8],
+                     el_handle: Handle,
+                     core_tx: CoreMsgTx<T>,
+                     net_tx: NetworkTx)
+                     -> Result<Client, CoreError>
         where T: 'static
     {
         trace!("Attempting to log into an acc.");
@@ -382,6 +463,24 @@ impl Client {
 
     fn insert_hook(&self, msg_id: MessageId, hook: Complete<CoreEvent>) {
         let _ = self.inner_mut().hooks.insert(msg_id, hook);
+    }
+
+    fn divide_seed(seed: &str) -> Result<[&[u8]; SEED_SUBPARTS], CoreError> {
+        let seed = seed.as_bytes();
+        if seed.len() < SEED_SUBPARTS {
+            let e = format!("Improper Seed length of {}. Please supply bigger Seed.",
+                            seed.len());
+            return Err(CoreError::Unexpected(e));
+        }
+
+        let interval = seed.len() / SEED_SUBPARTS;
+
+        let mut arr: [&[u8]; SEED_SUBPARTS] = Default::default();
+        for (i, val) in arr.iter_mut().enumerate() {
+            *val = &seed[interval * i..interval * (i + 1)];
+        }
+
+        Ok(arr)
     }
 
     /// Get immutable data from the network. If the data exists locally in the cache
@@ -1081,6 +1180,45 @@ mod tests {
     use utils::test_utils::{finish, random_client, setup_client};
 
     #[test]
+    fn seeded_login() {
+        let invalid_seed = String::from("123");
+        {
+            let el = unwrap!(Core::new());
+            let (core_tx, _) = mpsc::unbounded();
+            let (net_tx, _) = mpsc::unbounded();
+
+            match Client::registered_with_seed::<()>(&invalid_seed, el.handle(), core_tx, net_tx) {
+                Err(CoreError::Unexpected(_)) => (),
+                _ => panic!("Expected a failure"),
+            }
+        }
+        {
+            let el = unwrap!(Core::new());
+            let (core_tx, _) = mpsc::unbounded();
+            let (net_tx, _) = mpsc::unbounded();
+
+            match Client::login_with_seed::<()>(&invalid_seed, el.handle(), core_tx, net_tx) {
+                Err(CoreError::Unexpected(_)) => (),
+                _ => panic!("Expected a failure"),
+            }
+        }
+
+        let seed = unwrap!(utils::generate_random_string(30));
+
+        setup_client(|el_h, core_tx, net_tx| {
+            match Client::login_with_seed(&seed, el_h.clone(), core_tx.clone(), net_tx.clone()) {
+                Err(CoreError::RoutingClientError(ClientError::NoSuchAccount)) => (),
+                x => panic!("Unexpected Login outcome: {:?}", x),
+            }
+            Client::registered_with_seed(&seed, el_h, core_tx, net_tx)
+        },
+                     |_| finish());
+
+        setup_client(|el_h, core_tx, net_tx| Client::login_with_seed(&seed, el_h, core_tx, net_tx),
+                     |_| finish());
+    }
+
+    #[test]
     fn unregistered_client() {
         let orig_data = ImmutableData::new(unwrap!(utils::generate_random_vector(30)));
 
@@ -1142,16 +1280,18 @@ mod tests {
 
         let sec_0 = unwrap!(utils::generate_random_string(10));
         let sec_1 = unwrap!(utils::generate_random_string(10));
+        let inv = unwrap!(utils::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
         let _ = unwrap!(Client::registered::<()>(&sec_0,
                                                  &sec_1,
+                                                 &inv,
                                                  el.handle(),
                                                  core_tx.clone(),
                                                  net_tx.clone()));
 
         // Account creation - same secrets - should fail
-        match Client::registered(&sec_0, &sec_1, el.handle(), core_tx, net_tx) {
+        match Client::registered(&sec_0, &sec_1, &inv, el.handle(), core_tx, net_tx) {
             Ok(_) => panic!("Account name hijacking should fail"),
             Err(CoreError::RoutingClientError(ClientError::AccountExists)) => (),
             Err(err) => panic!("{:?}", err),
@@ -1162,6 +1302,7 @@ mod tests {
     fn login() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
         let sec_1 = unwrap!(utils::generate_random_string(10));
+        let inv = unwrap!(utils::generate_random_string(10));
 
         setup_client(|el_h, core_tx, net_tx| {
             match Client::login(&sec_0,
@@ -1172,7 +1313,7 @@ mod tests {
                 Err(CoreError::RoutingClientError(ClientError::NoSuchAccount)) => (),
                 x => panic!("Unexpected Login outcome: {:?}", x),
             }
-            Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
+            Client::registered(&sec_0, &sec_1, &inv, el_h, core_tx, net_tx)
         },
                      |_| finish());
 
@@ -1184,12 +1325,13 @@ mod tests {
     fn user_root_dir_creation() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
         let sec_1 = unwrap!(utils::generate_random_string(10));
+        let inv = unwrap!(utils::generate_random_string(10));
 
         let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
         let dir_clone = dir.clone();
 
         setup_client(|el_h, core_tx, net_tx| {
-                         Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
+                         Client::registered(&sec_0, &sec_1, &inv, el_h, core_tx, net_tx)
                      },
                      move |client| {
                          assert!(client.user_root_dir().is_ok());
@@ -1208,12 +1350,13 @@ mod tests {
     fn config_root_dir_creation() {
         let sec_0 = unwrap!(utils::generate_random_string(10));
         let sec_1 = unwrap!(utils::generate_random_string(10));
+        let inv = unwrap!(utils::generate_random_string(10));
 
         let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
         let dir_clone = dir.clone();
 
         setup_client(|el_h, core_tx, net_tx| {
-                         Client::registered(&sec_0, &sec_1, el_h, core_tx, net_tx)
+                         Client::registered(&sec_0, &sec_1, &inv, el_h, core_tx, net_tx)
                      },
                      move |client| {
                          assert!(client.config_root_dir().is_ok());

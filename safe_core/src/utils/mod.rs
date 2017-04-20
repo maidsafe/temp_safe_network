@@ -97,14 +97,14 @@ pub fn generate_random_vector<T>(length: usize) -> Result<Vec<T>, CoreError>
 }
 
 /// Derive Password, Keyword and PIN (in order)
-pub fn derive_secrets(acc_locator: &str, acc_password: &str) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-    let Digest(locator_hash) = sha512::hash(acc_locator.as_bytes());
+pub fn derive_secrets(acc_locator: &[u8], acc_password: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    let Digest(locator_hash) = sha512::hash(acc_locator);
 
     let pin = sha512::hash(&locator_hash[DIGESTBYTES / 2..])
         .0
         .to_owned();
     let keyword = locator_hash.to_owned();
-    let password = sha512::hash(acc_password.as_bytes()).0.to_owned();
+    let password = sha512::hash(acc_password).0.to_owned();
 
     (password, keyword, pin)
 }
@@ -143,7 +143,7 @@ mod tests {
         {
             let secret_0 = unwrap!(generate_random_string(SIZE));
             let secret_1 = unwrap!(generate_random_string(SIZE));
-            let (password, keyword, pin) = derive_secrets(&secret_0, &secret_1);
+            let (password, keyword, pin) = derive_secrets(secret_0.as_bytes(), secret_1.as_bytes());
             assert_ne!(pin, keyword);
             assert_ne!(password, pin);
             assert_ne!(password, keyword);
@@ -153,7 +153,7 @@ mod tests {
         {
             let secret_0 = String::new();
             let secret_1 = String::new();
-            let (password, keyword, pin) = derive_secrets(&secret_0, &secret_1);
+            let (password, keyword, pin) = derive_secrets(secret_0.as_bytes(), secret_1.as_bytes());
             assert_ne!(pin, keyword);
             assert_ne!(password, pin);
             assert_eq!(password, keyword);
