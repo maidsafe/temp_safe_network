@@ -36,6 +36,7 @@ use event_loop::CoreFuture;
 use futures::{self, Complete, Future};
 use ipc::BootstrapConfig;
 use lru_cache::LruCache;
+use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::{self, Joiner};
 use routing::{AccountInfo, Authority, EntryAction, Event, FullId, ImmutableData, InterfaceError,
               MessageId, MutableData, PermissionSet, Response, TYPE_TAG_SESSION_PACKET, User,
@@ -54,10 +55,14 @@ use std::time::Duration;
 use tokio_core::reactor::{Handle, Timeout};
 use utils::{self, FutureExt};
 
+type AccPkt = (String, Vec<u8>);
+
 const SEED_SUBPARTS: usize = 4;
 const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 const REQUEST_TIMEOUT_SECS: u64 = 120;
+
+const ACC_LOGIN_ENTRY_KEY: &'static [u8] = b"Login";
 
 macro_rules! match_event {
     ($r:ident, $event:path) => {
@@ -158,6 +163,14 @@ impl Client {
                      }))
     }
 
+    /// Calculate sign key from seed
+    pub fn sign_pk_from_seed(seed: &str) -> Result<sign::PublicKey, CoreError> {
+        let arr = Self::divide_seed(seed)?;
+        let id_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 2]).0);
+        let maid_keys = ClientKeys::new(Some(&id_seed));
+        Ok(maid_keys.sign_pk)
+    }
+
     /// This is one of the Gateway functions to the Maidsafe network, the others being
     /// `unregistered`, `registered`, and `login`. This will help create an account given a seed.
     /// Everything including both account secrets and all MAID keys will be deterministically
@@ -233,14 +246,15 @@ impl Client {
         let config_dir = MDataInfo::random_private(DIR_TAG)?;
         let acc = Account::new(maid_keys, user_root_dir.clone(), config_dir.clone());
 
+        let acc_ciphertext = acc.encrypt(&user_cred.password, &user_cred.pin)?;
         let acc_data = btree_map![
-            b"Login".to_vec() => Value {
-                content: acc.encrypt(&user_cred.password, &user_cred.pin)?,
+            ACC_LOGIN_ENTRY_KEY.to_owned() => Value {
+                content: if !invitation.is_empty() {
+                    serialise(&(invitation, acc_ciphertext))?
+                } else {
+                    acc_ciphertext
+                },
                 entry_version: 0,
-            },
-            b"Invitation".to_vec() => Value {
-                content: invitation.to_owned().into_bytes(),
-                entry_version: 0
             }
         ];
 
@@ -338,7 +352,7 @@ impl Client {
                 .get_mdata_value(dst,
                                  acc_loc,
                                  TYPE_TAG_SESSION_PACKET,
-                                 b"Login".to_vec(),
+                                 ACC_LOGIN_ENTRY_KEY.to_owned(),
                                  msg_id)?;
 
             match wait_for_response!(routing_rx, Response::GetMDataValue, msg_id) {
@@ -353,7 +367,12 @@ impl Client {
             }
         };
 
-        let acc = Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?;
+        let acc = if let Ok(acc_pkt) = deserialise::<AccPkt>(&acc_content) {
+            Account::decrypt(&acc_pkt.1, &user_cred.password, &user_cred.pin)?
+        } else {
+            Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?
+        };
+
         let id_packet = acc.maid_keys.clone().into();
 
         let Digest(digest) = sha256::hash(&acc.maid_keys.sign_pk.0);
@@ -857,7 +876,7 @@ impl Client {
         };
 
         let mut actions = BTreeMap::new();
-        let _ = actions.insert(b"Login".to_vec(),
+        let _ = actions.insert(ACC_LOGIN_ENTRY_KEY.to_owned(),
                                EntryAction::Update(Value {
                                                        content: encrypted_account,
                                                        entry_version: entry_version,
