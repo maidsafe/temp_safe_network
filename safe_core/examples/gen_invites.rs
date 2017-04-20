@@ -31,145 +31,163 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-// #[macro_use]
-// extern crate unwrap;
+#[macro_use]
+extern crate unwrap;
 
-// extern crate docopt;
-// extern crate maidsafe_utilities;
-// extern crate safe_core;
-// extern crate rand;
-// extern crate routing;
-// extern crate rustc_serialize;
-// extern crate tiny_keccak;
+extern crate docopt;
+extern crate futures;
+extern crate maidsafe_utilities;
+#[macro_use]
+extern crate safe_core;
+extern crate rand;
+extern crate routing;
+extern crate rustc_serialize;
+extern crate tiny_keccak;
 
-// use docopt::Docopt;
-// use rand::{Rng, thread_rng};
-// use routing::{MutableData, XorName};
-// use safe_core::Client;
-// use std::fs::File;
-// use std::io::{Read, Write};
-// use std::time::UNIX_EPOCH;
-// use tiny_keccak::sha3_256;
+use docopt::Docopt;
+use futures::Future;
+use futures::stream::{self, Stream};
+use rand::{Rng, thread_rng};
+use routing::{Action, MutableData, PermissionSet, User, XorName};
+use safe_core::Client;
+use safe_core::utils::test_utils::{self, finish};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::time::UNIX_EPOCH;
+use tiny_keccak::sha3_256;
 
-// const INVITE_TOKEN_SIZE: usize = 90;
-// const INVITE_TOKEN_TYPE_TAG: u64 = 8;
+const INVITE_TOKEN_SIZE: usize = 90;
+const INVITE_TOKEN_TYPE_TAG: u64 = 8;
 
-// static USAGE: &'static str = "
-// Usage:
-//   gen_invites [--gen-seed SIZE | --get-pk | --check-invite INVITE | -c [-n INVITES] | \
-//                -n INVITES | -h]
+static USAGE: &'static str = "
+Usage:
+  gen_invites [--gen-seed SIZE | --get-pk | --check-invite INVITE | -c [-n INVITES] | \
+               -n INVITES | -h]
 
-// Options:
-//   --gen-seed SIZE            Only generate a random seed of given size, writing into input file.
-//   --get-pk                   Only get the public sign key given the seed, don't do anything
-//                              extra.
-//   --check-invite INVITE      Only check the status of the given invite (exists, consumed etc.).
-//   -c, --create               Create account using seed from input file. By default it will login.
-//   -n, --num-invites INVITES  Number of invites to generate (will populate the Network too).
-//   -h, --help                 Display this help message and exit.
-// ";
+Options:
+  --gen-seed SIZE            Only generate a random seed of given size, writing into input file.
+  --get-pk                   Only get the public sign key given the seed, don't do anything
+                             extra.
+  --check-invite INVITE      Only check the status of the given invite (exists, consumed etc.).
+  -c, --create               Create account using seed from input file. By default it will login.
+  -n, --num-invites INVITES  Number of invites to generate (will populate the Network too).
+  -h, --help                 Display this help message and exit.
+";
 
-// #[derive(Debug, RustcDecodable)]
-// struct Args {
-//     flag_gen_seed: Option<usize>,
-//     flag_get_pk: bool,
-//     flag_check_invite: Option<String>,
-//     flag_create: bool,
-//     flag_num_invites: Option<usize>,
-//     flag_help: bool,
-// }
+#[derive(Debug, RustcDecodable)]
+struct Args {
+    flag_gen_seed: Option<usize>,
+    flag_get_pk: bool,
+    flag_check_invite: Option<String>,
+    flag_create: bool,
+    flag_num_invites: Option<usize>,
+    flag_help: bool,
+}
 
-// fn main() {
-//     unwrap!(maidsafe_utilities::log::init(true));
+fn main() {
+    unwrap!(maidsafe_utilities::log::init(true));
 
-//     let args: Args = Docopt::new(USAGE)
-//         .and_then(|docopt| docopt.decode())
-//         .unwrap_or_else(|error| error.exit());
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|docopt| docopt.decode())
+        .unwrap_or_else(|error| error.exit());
 
-//     if let Some(size) = args.flag_gen_seed {
-//         let mut input = unwrap!(File::create("./input"), "Unable to create input file");
-//         let seed = generate_random_printable(size);
-//         unwrap!(write!(input, "{}", seed));
-//         return println!("----------- Done -----------");
-//     }
+    if let Some(size) = args.flag_gen_seed {
+        let mut input = unwrap!(File::create("./input"), "Unable to create input file");
+        let seed = generate_random_printable(size);
+        unwrap!(write!(input, "{}", seed));
+        return println!("----------- Done -----------");
+    }
 
-//     let mut seed = String::with_capacity(100);
-//     {
-//         let mut input = unwrap!(File::open("./input"), "Unable to open input file");
-//         let _ = unwrap!(input.read_to_string(&mut seed));
-//     }
+    let mut seed = String::with_capacity(100);
+    {
+        let mut input = unwrap!(File::open("./input"), "Unable to open input file");
+        let _ = unwrap!(input.read_to_string(&mut seed));
+    }
 
-//     if args.flag_get_pk {
-//         let sign_pk = unwrap!(Client::sign_pk_from_seed(&seed));
-//         return println!("Public Signing Key: {:?}", sign_pk.0);
-//     }
+    if args.flag_get_pk {
+        let sign_pk = unwrap!(Client::sign_pk_from_seed(&seed));
+        return println!("Public Signing Key: {:?}", sign_pk.0);
+    }
 
-//     if let Some(invite) = args.flag_check_invite {
-//         let mut cl = unwrap!(Client::create_unregistered_client());
-//         let id = XorName(sha3_256(invite.as_bytes()));
+    if let Some(invite) = args.flag_check_invite {
+        test_utils::setup_client(Client::unregistered, move |cl| {
+            let id = XorName(sha3_256(invite.as_bytes()));
 
-//         let data = unwrap!(unwrap!(cl.get(DataIdentifier::Structured(id, INVITE_TOKEN_TYPE_TAG),
-//                                           None))
-//                                    .get()
-//                                    .map_err(|e| format!("Invite does not exist: {:?}", e)));
-//         match data {
-//             Data::Structured(sd) => println!("Invite already consumed: {}", sd.is_deleted()),
-//             x => {
-//                 println!("Address space taken by an unexpected data-type. Expected \
-//                                 StructuredData, found: {:?}",
-//                          x);
-//             }
-//         }
-//         return;
-//     }
+            cl.get_mdata_version(id, INVITE_TOKEN_TYPE_TAG)
+                .then(move |res| {
+                          match res {
+                              Ok(version) => println!("Invite version: {}", version),
+                              Err(e) => println!("Can't find invite: {:?}", e),
+                          }
+                          finish()
+                      })
+        });
+        return;
+    }
 
-//     let mut output = {
-//         let name = format!("./output-{}", unwrap!(UNIX_EPOCH.elapsed()).as_secs());
-//         unwrap!(File::create(&name))
-//     };
+    let output = {
+        let name = format!("./output-{}", unwrap!(UNIX_EPOCH.elapsed()).as_secs());
+        unwrap!(File::create(&name))
+    };
 
-//     let mut cl = if args.flag_create {
-//         println!("\nTrying to create an account using given seed from file...");
-//         unwrap!(Client::create_account_with_seed(&seed))
-//     } else {
-//         println!("\nTrying to log into the created account using given seed from file...");
-//         unwrap!(Client::login_with_seed(&seed))
-//     };
-//     println!("Success !");
+    let flag_create = args.flag_create;
 
-//     let num_invites = args.flag_num_invites.unwrap_or_else(|| {
-//         println!("\n------------ Enter number of invitations to generate ---------------");
-//         let mut num = String::new();
-//         let _ = std::io::stdin().read_line(&mut num);
-//         num = num.trim().to_string();
-//         unwrap!(num.parse::<usize>())
-//     });
+    test_utils::setup_client(move |el_h, core_tx, net_tx| if flag_create {
+                                 println!("\nTrying to create an account \
+                                           using given seed from file...");
+                                 Client::registered_with_seed(&seed, el_h, core_tx, net_tx)
+                             } else {
+                                 println!("\nTrying to log into the created \
+                                           account using given seed from file...");
+                                 Client::login_with_seed(&seed, el_h, core_tx, net_tx)
+                             },
+                             move |cl| {
+        println!("Success !");
 
-//     for i in 0..num_invites {
-//         let invitation = generate_random_printable(INVITE_TOKEN_SIZE);
-//         let id = XorName(sha3_256(invitation.as_bytes()));
+        let num_invites = args.flag_num_invites.unwrap_or_else(|| {
+            println!("\n------------ Enter number of invitations to generate ---------------");
+            let mut num = String::new();
+            let _ = std::io::stdin().read_line(&mut num);
+            num = num.trim().to_string();
+            unwrap!(num.parse::<usize>())
+        });
 
-//         let perms = btree_map![];
-//         let data = btree_map![];
+        let owner_key = unwrap!(cl.owner_key());
+        let cl2 = cl.clone();
 
-//         let sd = unwrap!(MutableData::new(id,
-//                                           INVITE_TOKEN_TYPE_TAG,
-//                                           perms,
-//                                           0,
-//                                           data,
-//                                           btree_set![cl.owner_key()]));
+        stream::iter((0..num_invites).map(Ok))
+            .for_each(move |i| {
+                let invitation = generate_random_printable(INVITE_TOKEN_SIZE);
+                let id = XorName(sha3_256(invitation.as_bytes()));
+                let mut output2 = unwrap!(output.try_clone());
 
-//         unwrap!(unwrap!(cl.put(Data::Structured(sd), None)).get());
-//         unwrap!(write!(output, "{}\n", invitation));
+                let perms = btree_map![User::Anyone => PermissionSet::new()
+                                       .allow(Action::Insert)
+                                       .allow(Action::Update)
+                                       .allow(Action::Delete)
+                                       .allow(Action::ManagePermissions)];
+                let data = btree_map![];
 
-//         println!("Generated {} / {}", i + 1, num_invites);
-//     }
+                let md = unwrap!(MutableData::new(id,
+                                                  INVITE_TOKEN_TYPE_TAG,
+                                                  perms,
+                                                  data,
+                                                  btree_set![owner_key]));
 
-//     println!("----------- Done -----------");
-// }
+                cl2.clone()
+                    .put_mdata(md)
+                    .and_then(move |_| {
+                                  unwrap!(write!(output2, "{}\n", invitation));
+                                  println!("Generated {} / {}", i + 1, num_invites);
+                                  Ok(())
+                              })
+            })
+            .then(|_| finish())
+    });
 
-// fn generate_random_printable(len: usize) -> String {
-//     thread_rng().gen_ascii_chars().take(len).collect()
-// }
+    println!("----------- Done -----------");
+}
 
-fn main() {}
+fn generate_random_printable(len: usize) -> String {
+    thread_rng().gen_ascii_chars().take(len).collect()
+}
