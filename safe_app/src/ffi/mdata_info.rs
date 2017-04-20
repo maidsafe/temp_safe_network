@@ -18,7 +18,7 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb};
+use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::MDataInfoHandle;
 use routing::{XOR_NAME_LEN, XorName};
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(app: *const App,
                               user_data,
                               o_cb);
 
-            o_cb(user_data.0, 0, vec.as_ptr(), vec.len());
+            o_cb(user_data.0, 0, vec.as_safe_ptr(), vec.len());
 
             None
         })
@@ -149,7 +149,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(app: *const App,
                               user_data,
                               o_cb);
 
-            o_cb(user_data.0, 0, vec.as_ptr(), vec.len());
+            o_cb(user_data.0, 0, vec.as_safe_ptr(), vec.len());
 
             None
         })
@@ -192,7 +192,7 @@ pub unsafe extern "C" fn mdata_info_serialise(app: *const App,
                                o_cb);
             let encoded = try_cb!(serialise(&*info).map_err(AppError::from), user_data, o_cb);
 
-            o_cb(user_data.0, 0, encoded.as_ptr(), encoded.len());
+            o_cb(user_data.0, 0, encoded.as_safe_ptr(), encoded.len());
             None
         })
     })

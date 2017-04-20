@@ -17,7 +17,7 @@
 
 use Authenticator;
 use access_container::access_container_entry;
-use errors::{AuthError, ERR_ALREADY_AUTHORISED, ERR_UNKNOWN_APP};
+use errors::{AuthError, ERR_UNKNOWN_APP};
 use ffi::apps::*;
 use ffi_utils::{ReprC, StringError, base64_encode, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, send_via_user_data, sender_as_user_data};
@@ -283,7 +283,7 @@ fn authenticated_app_cannot_be_authenticated_again() {
         }))
     };
 
-    // Second authentication fails.
+    // Second authentication should also return the correct result.
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
         req_id: req_id,
@@ -292,10 +292,7 @@ fn authenticated_app_cannot_be_authenticated_again() {
     let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
 
     match decode_ipc_msg(&authenticator, &encoded_msg) {
-        Err((code,
-             Some(IpcMsg::Resp {
-                      resp: IpcResp::Auth(Err(IpcError::AlreadyAuthorised)), ..
-                  }))) if code == ERR_ALREADY_AUTHORISED => (),
+        Ok(IpcMsg::Req { req: IpcReq::Auth(_), .. }) => (),
         x => panic!("Unexpected {:?}", x),
     };
 }
@@ -435,7 +432,7 @@ fn revoke_app() {
     run(&authenticator, move |client| {
         access_container_entry(client, &ac_md_info, &app_id, app_keys)
             .then(move |res| match res {
-                Err(AuthError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+                Ok((_version, None)) => Ok(()),
                 x => panic!("Unexpected {:?}", x),
             })
     });
@@ -610,6 +607,18 @@ fn lists_of_registered_and_revoked_apps() {
 
     assert_eq!(registered.len(), 1);
     assert_eq!(revoked.len(), 1);
+
+    // Re-register the first app - now there must be 2 registered apps again
+    let _ = unwrap!(register_app(&authenticator, &auth_req1));
+
+    let registered: Vec<RegisteredAppId> = unsafe {
+        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
+    };
+    let revoked: Vec<RevokedAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
+
+    assert_eq!(registered.len(), 2);
+    assert_eq!(revoked.len(), 0);
 }
 
 fn revoke(authenticator: &Authenticator, app_id: &str) {

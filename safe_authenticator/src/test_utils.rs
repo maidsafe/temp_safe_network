@@ -141,7 +141,7 @@ pub fn access_container<S: Into<String>>(authenticator: &Authenticator,
     let app_id = app_id.into();
     run(authenticator, move |client| {
         access_container_entry(client, &ac_md_info, &app_id, app_keys)
-            .map(move |(_, ac_entry)| ac_entry)
+            .map(move |(_, ac_entry)| unwrap!(ac_entry, "Access container entry is empty"))
     })
 }
 

@@ -90,40 +90,12 @@ pub fn decode_ipc_msg(client: &Client,
             req: IpcReq::Auth(auth_req),
             req_id,
         } => {
-            let app_id = auth_req.app.id.clone();
-            let app_id2 = app_id.clone();
-
-            let c2 = client.clone();
-
-            get_config(client)
-                .and_then(move |(_config_version, config)| app_state(&c2, &config, app_id))
-                .and_then(move |app_state| {
-                    match app_state {
-                        AppState::Authenticated => {
-                            // App is already registered
-                            let err_code =
-                                ffi_error_code!(AuthError::from(IpcError::AlreadyAuthorised));
-
-                            let auth_error = Err(IpcError::AlreadyAuthorised);
-                            let resp = encode_response(&IpcMsg::Resp {
-                                                            resp: IpcResp::Auth(auth_error),
-                                                            req_id: req_id,
-                                                        },
-                                                       &app_id2)?;
-
-                            Ok(Err((err_code, resp)))
-                        }
-                        AppState::NotAuthenticated |
-                        AppState::Revoked => {
-                            // App is not registered yet or was previously registered
-                            Ok(Ok(IpcMsg::Req {
-                                      req_id: req_id,
-                                      req: IpcReq::Auth(auth_req),
-                                  }))
-                        }
-                    }
-                })
-                .into_box()
+            // Ok status should be returned for all app states (including
+            // Revoked and Authenticated).
+            ok!(Ok(IpcMsg::Req {
+                       req_id: req_id,
+                       req: IpcReq::Auth(auth_req),
+                   }))
         }
         IpcMsg::Req {
             req: IpcReq::Containers(cont_req),
@@ -266,9 +238,12 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                                                &access_container,
                                                &app.info.id,
                                                app.keys.clone())
-                                .map(move |(version, permissions)| {
-                                         (version, app, permissions, access_container)
-                                     })
+                                .and_then(move |(version, permissions)| {
+                                              Ok((version, app,
+                                        permissions.ok_or(AuthError::IpcError(
+                                            IpcError::UnknownApp))?,
+                                        access_container))
+                                          })
                     })
                     .and_then(move |(version, app, permissions, access_container)| {
                         // Remove the revoked app from the access container
@@ -379,7 +354,8 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                   })
                         .and_then(move |(mut config, app_state, app_id)| {
                             // Determine an app state. If it's revoked we can reuse existing
-                            // keys stored in the config.
+                            // keys stored in the config. And if it is authorised, we just
+                            // return the app info from the config.
                             match app_state {
                                 AppState::NotAuthenticated => {
                                     let owner_key = fry!(c3.owner_key().map_err(AuthError::from));
@@ -389,45 +365,68 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                         keys: keys,
                                     };
                                     insert_app_to_config(&c3, app.clone())
-                                        .map(move |_| app)
+                                        .map(move |_| (app, app_state))
                                         .into_box()
                                 }
-                                AppState::Revoked => {
+                                AppState::Authenticated | AppState::Revoked => {
                                     let app_entry_name = sha256::hash(app_id.as_bytes());
                                     if let Some(app) = config.remove(&app_entry_name) {
-                                        ok!(app)
+                                        ok!((app, app_state))
                                     } else {
                                         err!(AuthError::Unexpected("Logical error - couldn't \
                                                                     find a revoked app in config"
                                                                            .to_owned()))
                                     }
                                 }
-                                AppState::Authenticated => {
-                                    err!(AuthError::IpcError(IpcError::AlreadyAuthorised))
-                                }
                             }
                         })
-                        .and_then(move |app| {
-                            encode_auth_resp_impl(&c4, app, app_container, permissions)
+                        .and_then(move |(app, app_state)| {
+                            let granted_future = match app_state {
+                                AppState::Authenticated => {
+                                    // Return info of the already registered app
+                                    let app_keys = app.keys.clone();
+                                    let bootstrap_config = fry!(c4.bootstrap_config());
+
+                                    access_container(&c4)
+                                        .and_then(move |dir| {
+                                            let access_container =
+                                                AccessContInfo::from_mdata_info(dir)?;
+                                            Ok(AuthGranted {
+                                                   app_keys: app_keys,
+                                                   bootstrap_config: bootstrap_config,
+                                                   access_container: access_container,
+                                               })
+                                        })
+                                        .into_box()
+                                }
+                                AppState::NotAuthenticated |
+                                AppState::Revoked => {
+                                    // Register a new app or restore a previously registered app
+                                    encode_auth_resp_impl(&c4, app, app_container, permissions)
+                                }
+                            };
+
+                            granted_future
                                 .and_then(move |auth_granted| {
                                     let resp =
                                         encode_response(&IpcMsg::Resp {
-                                                            req_id: req_id,
-                                                            resp: IpcResp::Auth(Ok(auth_granted)),
-                                                        },
+                                                             req_id: req_id,
+                                                             resp: IpcResp::Auth(Ok(auth_granted)),
+                                                         },
                                                         &app_id2)?;
                                     Ok(o_cb(user_data.0, 0, resp.as_ptr()))
                                 })
                                 .or_else(move |e| -> Result<(), AuthError> {
                                     let err_code = ffi_error_code!(e);
                                     let resp = encode_response(&IpcMsg::Resp {
-                                                                   req_id: req_id,
-                                                                   resp:
-                                                                       IpcResp::Auth(Err(e.into())),
-                                                               },
+                                        req_id: req_id,
+                                        resp:
+                                        IpcResp::Auth(Err(e.into())),
+                                    },
                                                                &app_id3)?;
                                     Ok(o_cb(user_data.0, err_code, resp.as_ptr()))
                                 })
+                                .into_box()
                         })
                         .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null()))
                         .into_box()
@@ -495,7 +494,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                                 .then(move |res| {
                                     let version = match res {
                                         // Updating an existing entry
-                                        Ok((version, mut existing_perms)) => {
+                                        Ok((version, Some(mut existing_perms))) => {
                                             for (key, val) in perms {
                                                 let _ = existing_perms.insert(key, val);
                                             }
@@ -505,6 +504,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
                                         }
 
                                         // Adding a new access container entry
+                                        Ok((_, None)) |
                                         Err(AuthError::CoreError(
                                         CoreError::RoutingClientError(
                                             ClientError::NoSuchEntry))) => None,
@@ -805,6 +805,7 @@ fn encode_auth_resp_impl(client: &Client,
     let c5 = client.clone();
     let c6 = client.clone();
     let c7 = client.clone();
+    let c8 = client.clone();
 
     let sign_pk = app.keys.sign_pk;
     let app_keys = app.keys.clone();
@@ -839,13 +840,28 @@ fn encode_auth_resp_impl(client: &Client,
 
                 let _ = perms.insert(format!("apps/{}", app_info.id), (mdata_info, access));
             };
-            put_access_container_entry(&c6, &dir, &app_info.id, &app_keys, &perms, None)
+            access_container_entry(&c6, &dir, &app_info.id, app_keys.clone()).then(move |res| {
+                let version = match res {
+                    // Updating an existing entry
+                    Ok((version, _)) => Some(version + 1),
+                    // Adding a new access container entry
+                    Err(AuthError::CoreError(
+                            CoreError::RoutingClientError(
+                                ClientError::NoSuchEntry))) => None,
+                    // Error has occurred while trying to get an existing entry
+                    Err(e) => return Err(e),
+                };
+                Ok((version, app_info, app_keys, dir, perms))
+            })
+        })
+        .and_then(move |(version, app_info, app_keys, dir, perms)| {
+            put_access_container_entry(&c7, &dir, &app_info.id, &app_keys, &perms, version)
                 .map(move |_| (dir, app_keys))
         })
         .and_then(move |(dir, app_keys)| {
                       Ok(AuthGranted {
                              app_keys: app_keys,
-                             bootstrap_config: c7.bootstrap_config()?,
+                             bootstrap_config: c8.bootstrap_config()?,
                              access_container: AccessContInfo::from_mdata_info(dir)?,
                          })
                   })
@@ -1008,8 +1024,8 @@ pub fn app_state(client: &Client,
                 .and_then(move |dir| access_container_entry(&c2, &dir, &app_id, app_keys))
                 .then(move |res| {
                     match res {
-                        Ok(_) => Ok(AppState::Authenticated),
-                        Err(AuthError::CoreError(CoreError::EncodeDecodeError(..))) |
+                        Ok((_version, Some(_))) => Ok(AppState::Authenticated),
+                        Ok((_, None)) |
                         Err(AuthError::CoreError(
                             CoreError::RoutingClientError(
                                 ClientError::NoSuchEntry))) => {

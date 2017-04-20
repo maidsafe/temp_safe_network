@@ -19,7 +19,7 @@ use AccessContainerEntry;
 use AuthError;
 use Authenticator;
 use access_container::{access_container, access_container_nonce};
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, from_c_str, vec_into_raw_parts};
+use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str, vec_into_raw_parts};
 use futures::Future;
 use ipc::{AppState, app_state, get_config, remove_app_container, update_config};
 use maidsafe_utilities::serialisation::deserialise;
@@ -154,7 +154,7 @@ usize)){
                             }
                         }
 
-                        o_cb(user_data.0, 0, apps.as_ptr(), apps.len());
+                        o_cb(user_data.0, 0, apps.as_safe_ptr(), apps.len());
 
                         Ok(())
                     })
@@ -240,7 +240,7 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
                             }
                         }
 
-                        o_cb(user_data.0, 0, apps.as_ptr(), apps.len());
+                        o_cb(user_data.0, 0, apps.as_safe_ptr(), apps.len());
 
                         Ok(())
                     })
