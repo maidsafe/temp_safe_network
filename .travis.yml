@@ -65,7 +65,7 @@ script:
         (
             set -x;
             cd ffi_utils && unset Features && cargo clippy && cargo clippy --profile=test && export Features="use-mock-routing testing" &&
-            cd ../safe_core && cargo clippy && cargo clippy --profile=test --features="$Features" &&
+            cd ../safe_core && cargo clippy --features="$Features" && cargo clippy --profile=test --features="$Features" &&
             cd ../safe_app && cargo clippy --profile=test --features="$Features" &&
             cd ../safe_authenticator && cargo clippy --profile=test --features="$Features";
         )
