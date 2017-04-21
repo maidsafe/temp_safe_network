@@ -38,9 +38,9 @@ use ipc::BootstrapConfig;
 use lru_cache::LruCache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::{AccountInfo, Authority, EntryAction, Event, FullId, ImmutableData, InterfaceError,
-              MessageId, MutableData, PermissionSet, Response, TYPE_TAG_SESSION_PACKET, User,
-              Value, XorName};
+use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountRegistrationPacket, Authority, EntryAction,
+              Event, FullId, ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet,
+              Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
 use rust_sodium::crypto::box_;
@@ -55,14 +55,10 @@ use std::time::Duration;
 use tokio_core::reactor::{Handle, Timeout};
 use utils::{self, FutureExt};
 
-type AccPkt = (String, Vec<u8>);
-
 const SEED_SUBPARTS: usize = 4;
 const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
 const REQUEST_TIMEOUT_SECS: u64 = 120;
-
-const ACC_LOGIN_ENTRY_KEY: &'static [u8] = b"Login";
 
 macro_rules! match_event {
     ($r:ident, $event:path) => {
@@ -250,7 +246,10 @@ impl Client {
         let acc_data = btree_map![
             ACC_LOGIN_ENTRY_KEY.to_owned() => Value {
                 content: if !invitation.is_empty() {
-                    serialise(&(invitation, acc_ciphertext))?
+                    serialise(&AccountRegistrationPacket {
+                        invitation: invitation.to_owned(),
+                        account_ciphertext: acc_ciphertext
+                    })?
                 } else {
                     acc_ciphertext
                 },
@@ -367,8 +366,10 @@ impl Client {
             }
         };
 
-        let acc = if let Ok(acc_pkt) = deserialise::<AccPkt>(&acc_content) {
-            Account::decrypt(&acc_pkt.1, &user_cred.password, &user_cred.pin)?
+        let acc = if let Ok(acc_pkt) = deserialise::<AccountRegistrationPacket>(&acc_content) {
+            Account::decrypt(&acc_pkt.account_ciphertext,
+                             &user_cred.password,
+                             &user_cred.pin)?
         } else {
             Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?
         };
