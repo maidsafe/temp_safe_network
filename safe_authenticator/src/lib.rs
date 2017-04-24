@@ -124,6 +124,7 @@ impl Authenticator {
     /// Create a new account
     pub fn create_acc<S, NetObs>(locator: S,
                                  password: S,
+                                 invitation: S,
                                  mut network_observer: NetObs)
                                  -> Result<Self, AuthError>
         where S: Into<String>,
@@ -133,6 +134,7 @@ impl Authenticator {
 
         let locator = locator.into();
         let password = password.into();
+        let invitation = invitation.into();
 
         let joiner = thread::named("Core Event Loop", move || {
             let el = try_tx!(Core::new(), tx);
@@ -147,9 +149,13 @@ impl Authenticator {
                 .for_each(|_| Ok(()));
             el_h.spawn(net_obs_fut);
 
-            let client =
-                try_tx!(Client::registered(&locator, &password, el_h, core_tx_clone, net_tx),
-                        tx);
+            let client = try_tx!(Client::registered(&locator,
+                                                    &password,
+                                                    &invitation,
+                                                    el_h,
+                                                    core_tx_clone,
+                                                    net_tx),
+                                 tx);
 
             let tx2 = tx.clone();
             let core_tx2 = core_tx.clone();

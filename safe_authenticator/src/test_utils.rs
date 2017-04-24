@@ -37,16 +37,19 @@ use std::sync::mpsc;
 pub fn create_authenticator() -> Authenticator {
     let locator = unwrap!(utils::generate_random_string(10));
     let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
 
-    unwrap!(Authenticator::create_acc(locator, password, |_| ()))
+    unwrap!(Authenticator::create_acc(locator, password, invitation, |_| ()))
 }
 
 /// Create a random authenticator and login using the same credentials.
 pub fn create_account_and_login() -> Authenticator {
     let locator = unwrap!(utils::generate_random_string(10));
     let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
 
-    let _ = unwrap!(Authenticator::create_acc(locator.clone(), password.clone(), |_| ()));
+    let _ =
+        unwrap!(Authenticator::create_acc(locator.clone(), password.clone(), invitation, |_| ()));
     unwrap!(Authenticator::login(locator, password, |_| ()))
 }
 

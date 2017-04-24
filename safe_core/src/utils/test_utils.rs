@@ -77,7 +77,13 @@ pub fn random_client_with_net_obs<NetObs, Run, I, T, E>(n: NetObs, r: Run) -> T
     let c = |el_h, core_tx, net_tx| {
         let acc_locator = unwrap!(utils::generate_random_string(10));
         let acc_password = unwrap!(utils::generate_random_string(10));
-        Client::registered(&acc_locator, &acc_password, el_h, core_tx, net_tx)
+        let invitation = unwrap!(utils::generate_random_string(10));
+        Client::registered(&acc_locator,
+                           &acc_password,
+                           &invitation,
+                           el_h,
+                           core_tx,
+                           net_tx)
     };
     setup_client_with_net_obs(c, n, r)
 }

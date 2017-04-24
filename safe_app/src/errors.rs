@@ -68,6 +68,8 @@ mod codes {
     pub const ERR_LOW_BALANCE: i32 = -113;
     pub const ERR_NETWORK_FULL: i32 = -114;
     pub const ERR_NETWORK_OTHER: i32 = -115;
+    pub const ERR_INVALID_INVITATION: i32 = -116;
+    pub const ERR_INVITATION_ALREADY_CLAIMED: i32 = -117;
 
     // IPC errors.
     pub const ERR_AUTH_DENIED: i32 = -200;
@@ -327,6 +329,8 @@ fn core_error_code(err: &CoreError) -> i32 {
                 ClientError::LowBalance => ERR_LOW_BALANCE,
                 ClientError::NetworkFull => ERR_NETWORK_FULL,
                 ClientError::NetworkOther(_) => ERR_NETWORK_OTHER,
+                ClientError::InvalidInvitation => ERR_INVALID_INVITATION,
+                ClientError::InvitationAlreadyClaimed => ERR_INVITATION_ALREADY_CLAIMED,
             }
         }
         CoreError::UnsupportedSaltSizeForPwHash => ERR_UNSUPPORTED_SALT_SIZE_FOR_PW_HASH,

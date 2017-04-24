@@ -28,6 +28,15 @@ self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", bra
 tokio-core = "~0.1.6"
 unwrap = "~1.1.0"
 
+[dev-dependencies]
+docopt = "~0.7.0"
+tiny-keccak = "~1.2.0"
+rustc-serialize = "~0.3.23"
+
 [features]
 use-mock-routing = []
 testing = []
+
+[[example]]
+bench = false
+name = "gen_invites"

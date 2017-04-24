@@ -32,6 +32,7 @@ use std::os::raw::{c_char, c_void};
 #[no_mangle]
 pub unsafe extern "C" fn create_acc(account_locator: *const c_char,
                                     account_password: *const c_char,
+                                    invitation: *const c_char,
                                     auth_handle: *mut *mut Authenticator,
                                     user_data: *mut c_void,
                                     o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
@@ -43,9 +44,10 @@ pub unsafe extern "C" fn create_acc(account_locator: *const c_char,
 
         let acc_locator = from_c_str(account_locator)?;
         let acc_password = from_c_str(account_password)?;
+        let invitation = from_c_str(invitation)?;
 
         let authenticator =
-            Authenticator::create_acc(acc_locator, acc_password, move |net_event| {
+            Authenticator::create_acc(acc_locator, acc_password, invitation, move |net_event| {
                 let user_data: *mut c_void = user_data.into();
 
                 match net_event {
@@ -116,6 +118,7 @@ mod tests {
     fn create_account_and_login() {
         let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
         let acc_password = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
+        let invitation = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
 
         {
             let mut auth_h: *mut Authenticator = ptr::null_mut();
@@ -125,6 +128,7 @@ mod tests {
 
                 assert_eq!(create_acc(acc_locator.as_ptr(),
                                       acc_password.as_ptr(),
+                                      invitation.as_ptr(),
                                       auth_h_ptr,
                                       ptr::null_mut(),
                                       net_event_cb),
