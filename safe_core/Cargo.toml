@@ -40,4 +40,3 @@ testing = []
 [[example]]
 bench = false
 name = "gen_invites"
-required-features = ["testing", "use-mock-routing"]

@@ -43,18 +43,20 @@ extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate tiny_keccak;
+extern crate tokio_core;
 
 use docopt::Docopt;
 use futures::Future;
 use futures::stream::{self, Stream};
+use futures::sync::mpsc;
 use rand::{Rng, thread_rng};
 use routing::{Action, MutableData, PermissionSet, User, XorName};
-use safe_core::Client;
-use safe_core::utils::test_utils::{self, finish};
+use safe_core::{Client, CoreMsg, FutureExt, event_loop};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::time::UNIX_EPOCH;
 use tiny_keccak::sha3_256;
+use tokio_core::reactor::Core;
 
 const INVITE_TOKEN_SIZE: usize = 90;
 const INVITE_TOKEN_TYPE_TAG: u64 = 8;
@@ -109,22 +111,49 @@ fn main() {
         return println!("Public Signing Key: {:?}", sign_pk.0);
     }
 
+    // Setup Core event loop
+    let el = unwrap!(Core::new());
+    let el_h = el.handle();
+
+    let (core_tx, core_rx) = mpsc::unbounded();
+    let (net_tx, net_rx) = mpsc::unbounded();
+
+    let net_fut = net_rx
+        .for_each(move |_net_event| Ok(()))
+        .map_err(|e| panic!("Network event stream error: {:?}", e));
+    el_h.spawn(net_fut);
+
+    let core_tx_clone = core_tx.clone();
+
+    // Check a single invite
     if let Some(invite) = args.flag_check_invite {
-        test_utils::setup_client(Client::unregistered, move |cl| {
+        let cl = unwrap!(Client::unregistered(el_h, core_tx.clone(), net_tx.clone()));
+
+        unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
             let id = XorName(sha3_256(invite.as_bytes()));
 
-            cl.get_mdata_version(id, INVITE_TOKEN_TYPE_TAG)
-                .then(move |res| {
-                          match res {
-                              Ok(version) => println!("Invite version: {}", version),
-                              Err(e) => println!("Can't find invite: {:?}", e),
-                          }
-                          finish()
-                      })
-        });
+            client.get_mdata_version(id, INVITE_TOKEN_TYPE_TAG)
+                .then(move |res| -> Result<(), ()> {
+                    match res {
+                        Ok(version) => println!("Invite version: {}", version),
+                        Err(e) => println!("Can't find invite: {:?}", e),
+                    }
+                    Ok(())
+                })
+                .map_err(|e| panic!("{:?}", e))
+                .map(move |_| {
+                    unwrap!(core_tx_clone.send(CoreMsg::build_terminator()));
+                })
+                .into_box()
+                .into()
+        })));
+
+        event_loop::run(el, &cl, &(), core_rx);
+
         return;
     }
 
+    // Generate invites
     let output = {
         let name = format!("./output-{}", unwrap!(UNIX_EPOCH.elapsed()).as_secs());
         unwrap!(File::create(&name))
@@ -132,16 +161,17 @@ fn main() {
 
     let flag_create = args.flag_create;
 
-    test_utils::setup_client(move |el_h, core_tx, net_tx| if flag_create {
-                                 println!("\nTrying to create an account \
-                                           using given seed from file...");
-                                 Client::registered_with_seed(&seed, el_h, core_tx, net_tx)
-                             } else {
-                                 println!("\nTrying to log into the created \
-                                           account using given seed from file...");
-                                 Client::login_with_seed(&seed, el_h, core_tx, net_tx)
-                             },
-                             move |cl| {
+    let cl = unwrap!(if flag_create {
+                         println!("\nTrying to create an account \
+                                   using given seed from file...");
+                         Client::registered_with_seed(&seed, el_h, core_tx.clone(), net_tx.clone())
+                     } else {
+                         println!("\nTrying to log into the created \
+                                   account using given seed from file...");
+                         Client::login_with_seed(&seed, el_h, core_tx.clone(), net_tx.clone())
+                     });
+
+    unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
         println!("Success !");
 
         let num_invites = args.flag_num_invites.unwrap_or_else(|| {
@@ -152,8 +182,8 @@ fn main() {
             unwrap!(num.parse::<usize>())
         });
 
-        let owner_key = unwrap!(cl.owner_key());
-        let cl2 = cl.clone();
+        let owner_key = unwrap!(client.owner_key());
+        let client2 = client.clone();
 
         stream::iter((0..num_invites).map(Ok))
             .for_each(move |i| {
@@ -174,7 +204,7 @@ fn main() {
                                                   data,
                                                   btree_set![owner_key]));
 
-                cl2.clone()
+                client2.clone()
                     .put_mdata(md)
                     .and_then(move |_| {
                                   unwrap!(write!(output2, "{}\n", invitation));
@@ -182,8 +212,13 @@ fn main() {
                                   Ok(())
                               })
             })
-            .then(|_| finish())
-    });
+            .map(move |_| unwrap!(core_tx_clone.send(CoreMsg::build_terminator())))
+            .map_err(|e| panic!("{:?}", e))
+            .into_box()
+            .into()
+    })));
+
+    event_loop::run(el, &cl, &(), core_rx);
 
     println!("----------- Done -----------");
 }
