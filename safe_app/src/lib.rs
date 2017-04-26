@@ -59,6 +59,7 @@ extern crate safe_core;
 extern crate self_encryption;
 #[macro_use]
 extern crate serde_derive;
+extern crate tiny_keccak;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;

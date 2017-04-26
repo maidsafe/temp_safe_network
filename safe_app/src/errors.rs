@@ -102,6 +102,7 @@ mod codes {
     pub const ERR_INVALID_SIGN_KEY_HANDLE: i32 = -1011;
     pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1012;
     pub const ERR_IO_ERROR: i32 = -1013;
+    pub const ERR_INVALID_SECRET_KEY_HANDLE: i32 = -1014;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
@@ -141,6 +142,8 @@ pub enum AppError {
     InvalidSelfEncryptorHandle,
     /// Invalid sign key handle
     InvalidSignKeyHandle,
+    /// Invalid secret key handle
+    InvalidSecretKeyHandle,
 
     /// Error while self-encrypting data
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
@@ -290,6 +293,7 @@ impl ErrorCode for AppError {
             AppError::InvalidMDataPermissionSetHandle => ERR_INVALID_MDATA_PERMISSION_SET_HANDLE,
             AppError::InvalidSelfEncryptorHandle => ERR_INVALID_SELF_ENCRYPTOR_HANDLE,
             AppError::InvalidSignKeyHandle => ERR_INVALID_SIGN_KEY_HANDLE,
+            AppError::InvalidSecretKeyHandle => ERR_INVALID_SECRET_KEY_HANDLE,
             AppError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
             AppError::InvalidSelfEncryptorReadOffsets => ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS,
             AppError::IoError(_) => ERR_IO_ERROR,
