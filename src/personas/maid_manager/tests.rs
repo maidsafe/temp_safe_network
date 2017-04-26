@@ -178,6 +178,8 @@ fn mdata_basics() {
 
 #[test]
 fn mdata_permissions_and_owners() {
+    let mut rng = rand::thread_rng();
+
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
@@ -187,7 +189,7 @@ fn mdata_permissions_and_owners() {
     create_account(&mut node, &mut mm, client, client_manager);
 
     // Put initial mutable data
-    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rand::thread_rng());
+    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
     let data_name = *data.name();
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_mdata(&mut node,
@@ -291,6 +293,8 @@ fn mdata_permissions_and_owners() {
     assert_match!(message.response,
                   Response::ChangeMDataOwner { res: Err(ClientError::AccessDenied), .. });
 
+    node.sent_requests.clear();
+
     // Only the client can change owner
     let msg_id = MessageId::new();
     unwrap!(mm.handle_change_mdata_owner(&mut node,
@@ -315,6 +319,19 @@ fn mdata_permissions_and_owners() {
     assert_eq!(message.src, client_manager);
     assert_eq!(message.dst, client);
     assert_match!(message.response, Response::ChangeMDataOwner { res: Ok(()), .. });
+
+    // App cannot put data with itself as the owner.
+    let data = test_utils::gen_mutable_data(TEST_TAG, 0, app_key, &mut rng);
+    let msg_id = MessageId::new();
+    unwrap!(mm.handle_put_mdata(&mut node,
+                                app,
+                                client_manager,
+                                data,
+                                msg_id,
+                                app_key));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response,
+                  Response::PutMData { res: Err(ClientError::InvalidOwners), .. });
 }
 
 #[test]
@@ -507,6 +524,7 @@ fn mutation_authorisation() {
             unwrap!(node.sent_responses.remove(&msg_id)).response,
             Response::InsAuthKey { res: Ok(()), .. });
 
+    node.sent_requests.clear();
 
     // PutIData by authorised app succeeds.
     {
@@ -530,7 +548,7 @@ fn mutation_authorisation() {
 
     // PutMData by authorised app succeeds.
     {
-        let mdata = test_utils::gen_mutable_data(tag, 0, app_key, &mut rng);
+        let mdata = test_utils::gen_mutable_data(tag, 0, owner_key, &mut rng);
         let mdata_nae_manager = Authority::NaeManager(*mdata.name());
 
         let msg_id = MessageId::new();

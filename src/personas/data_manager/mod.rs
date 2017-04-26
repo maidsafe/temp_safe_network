@@ -792,7 +792,10 @@ impl DataManager {
                                    mutation_type,
                                    msg_id,
                                    |data| {
-                                       verify_mdata_owner(data, &client_name)?;
+                                       if !utils::verify_mdata_owner(data, &client_name) {
+                                           return Err(ClientError::AccessDenied);
+                                       }
+
                                        data.change_owner(new_owner, version)
                                    })
     }
@@ -1315,17 +1318,5 @@ fn create_pending_mutation_for_mdata(mutation_type: PendingMutationType,
         PendingMutationType::ChangeMDataOwner => PendingMutation::ChangeMDataOwner(data),
         PendingMutationType::PutIData |
         PendingMutationType::PutMData => unreachable!(),
-    }
-}
-
-// Verify that the client with `client_name` is the owner of `data`.
-fn verify_mdata_owner(data: &MutableData, client_name: &XorName) -> Result<(), ClientError> {
-    if data.owners()
-           .iter()
-           .map(|owner_key| utils::client_name_from_key(owner_key))
-           .any(|name| name == *client_name) {
-        Ok(())
-    } else {
-        Err(ClientError::AccessDenied)
     }
 }

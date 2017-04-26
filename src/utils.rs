@@ -91,3 +91,11 @@ pub fn mdata_shell_hash(data: &MutableData) -> SecureHash {
 pub fn mdata_value_hash(value: &Value) -> SecureHash {
     secure_hash(&value)
 }
+
+/// Verify that the client with `client_name` is the owner of `data`.
+pub fn verify_mdata_owner(data: &MutableData, client_name: &XorName) -> bool {
+    data.owners()
+        .iter()
+        .map(|owner_key| client_name_from_key(owner_key))
+        .any(|name| name == *client_name)
+}

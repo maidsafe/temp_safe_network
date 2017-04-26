@@ -153,6 +153,12 @@ impl MaidManager {
         let src_name = utils::client_name(&src);
         let dst_name = utils::client_name(&dst);
 
+        if !utils::verify_mdata_owner(&data, &dst_name) {
+            routing_node
+                .send_put_mdata_response(dst, src, Err(ClientError::InvalidOwners), msg_id)?;
+            return Ok(());
+        }
+
         // If the type_tag is `TYPE_TAG_SESSION_PACKET`, the account must not exist, else it must
         // exist.
         if data.tag() == TYPE_TAG_SESSION_PACKET {
