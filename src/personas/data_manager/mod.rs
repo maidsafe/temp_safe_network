@@ -29,7 +29,7 @@ use chunk_store::{Chunk, ChunkId, ChunkStore};
 use error::InternalError;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
-              RoutingTable, User, Value, XorName};
+              RoutingTable, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::ClientError;
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -917,6 +917,8 @@ impl DataManager {
         let data_id = MutableDataId(name, tag);
         if let Ok(data) = self.chunk_store.get(&data_id) {
             f(&data)
+        } else if tag == TYPE_TAG_SESSION_PACKET {
+            Err(ClientError::NoSuchAccount)
         } else {
             Err(ClientError::NoSuchData)
         }
