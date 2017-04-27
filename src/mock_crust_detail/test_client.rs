@@ -80,7 +80,7 @@ impl TestClient {
         }
     }
 
-    /// Set the `ClientManager` this client will send all mutation request to. By default,
+    /// Set the `ClientManager` this client will send all mutation requests to. By default,
     /// it is the `ClientManager` of this client, but this can be changed for clients that
     /// are apps.
     pub fn set_client_manager(&mut self, name: XorName) {
@@ -92,7 +92,7 @@ impl TestClient {
         self.routing_client.try_next_ev()
     }
 
-    /// empty this client event loop
+    /// Empties this clients event loop
     pub fn poll(&mut self) -> usize {
         let mut result = 0;
 
@@ -103,17 +103,17 @@ impl TestClient {
         result
     }
 
-    /// empty this client event loop
+    /// Empties this clients event loop
     pub fn poll_once(&mut self) -> bool {
         self.routing_client.poll()
     }
 
-    /// Resend all unacknowledged messages.
+    /// Resends all unacknowledged messages.
     pub fn resend_unacknowledged(&mut self) -> bool {
         self.routing_client.resend_unacknowledged()
     }
 
-    /// check client successfully connected to mock network
+    /// Checks client successfully connected to the mock network
     pub fn ensure_connected(&mut self, nodes: &mut [TestNode]) {
         let _ = poll::nodes_and_client(nodes, self);
 
@@ -123,7 +123,7 @@ impl TestClient {
         }
     }
 
-    /// create an account and store it
+    /// Creates an account and stores it
     pub fn create_account(&mut self, nodes: &mut [TestNode]) {
         let owner = *self.full_id.public_id().signing_public_key();
         let owners = iter::once(owner).collect::<BTreeSet<_>>();
@@ -137,7 +137,7 @@ impl TestClient {
         unwrap!(self.put_mdata_response(data, nodes));
     }
 
-    /// Put immutable data
+    /// Puts immutable data
     pub fn put_idata(&mut self, data: ImmutableData) -> MessageId {
         let msg_id = MessageId::new();
         unwrap!(self.routing_client
@@ -145,7 +145,7 @@ impl TestClient {
         msg_id
     }
 
-    /// Put immutable data and read from mock network
+    /// Puts immutable data and reads from the mock network
     pub fn put_idata_response(&mut self,
                               data: ImmutableData,
                               nodes: &mut [TestNode])
@@ -163,7 +163,7 @@ impl TestClient {
         }
     }
 
-    /// Try and get immutable data from nodes provided.
+    /// Gets immutable data from nodes provided.
     pub fn get_idata_response(&mut self,
                               name: XorName,
                               nodes: &mut [TestNode])
@@ -172,7 +172,7 @@ impl TestClient {
             .map(|(data, _)| data)
     }
 
-    /// Try to get immutable data from the given nodes. Returns the retrieved data and
+    /// Tries to get immutable data from the given nodes. Returns the retrieved data and
     /// the source authority the data was sent by.
     pub fn get_idata_response_with_src
         (&mut self,
@@ -205,7 +205,7 @@ impl TestClient {
         }
     }
 
-    /// Put mutable data
+    /// Puts mutable data
     pub fn put_mdata(&mut self, data: MutableData) -> MessageId {
         let msg_id = MessageId::new();
         let requester = *self.signing_public_key();
@@ -214,7 +214,7 @@ impl TestClient {
         msg_id
     }
 
-    /// Put mutable data and wait for the response.
+    /// Puts mutable data and waits for the response.
     pub fn put_mdata_response(&mut self,
                               data: MutableData,
                               nodes: &mut [TestNode])
@@ -225,7 +225,7 @@ impl TestClient {
         assert_recv_response!(self, PutMData, request_msg_id)
     }
 
-    /// Sends a `GetMDataVersion` request and wait for the response.
+    /// Sends a `GetMDataVersion` request and waits for the response.
     pub fn get_mdata_version_response(&mut self,
                                       name: XorName,
                                       tag: u64,
@@ -243,7 +243,7 @@ impl TestClient {
         assert_recv_response!(self, GetMDataVersion, msg_id)
     }
 
-    /// Sends a `GetMDataShell` request and wait for the response.
+    /// Sends a `GetMDataShell` request and waits for the response.
     pub fn get_mdata_shell_response(&mut self,
                                     name: XorName,
                                     tag: u64,
@@ -261,7 +261,7 @@ impl TestClient {
         assert_recv_response!(self, GetMDataShell, msg_id)
     }
 
-    /// Sends a `ListMDataEntries` request and wait for the response.
+    /// Sends a `ListMDataEntries` request and waits for the response.
     pub fn list_mdata_entries_response(&mut self,
                                        name: XorName,
                                        tag: u64,
@@ -279,7 +279,7 @@ impl TestClient {
         assert_recv_response!(self, ListMDataEntries, msg_id)
     }
 
-    /// Sends a `GetMDataValue` request and wait for the response.
+    /// Sends a `GetMDataValue` request and waits for the response.
     pub fn get_mdata_value_response(&mut self,
                                     name: XorName,
                                     tag: u64,
@@ -316,7 +316,7 @@ impl TestClient {
         msg_id
     }
 
-    /// Sends a `MutateMDataEntries` request and wait for the response.
+    /// Sends a `MutateMDataEntries` request and waits for the response.
     pub fn mutate_mdata_entries_response(&mut self,
                                          name: XorName,
                                          tag: u64,
@@ -329,7 +329,7 @@ impl TestClient {
         assert_recv_response!(self, MutateMDataEntries, msg_id)
     }
 
-    /// Sends a `ListMDataPermissions` request and wait for the response.
+    /// Sends a `ListMDataPermissions` request and waits for the response.
     pub fn list_mdata_permissions_response
         (&mut self,
          name: XorName,
@@ -348,7 +348,7 @@ impl TestClient {
         assert_recv_response!(self, ListMDataPermissions, msg_id)
     }
 
-    /// Sends a `ListMDataUserPermissions` request and wait for the response.
+    /// Sends a `ListMDataUserPermissions` request and waits for the response.
     pub fn list_mdata_user_permissions_response(&mut self,
                                                 name: XorName,
                                                 tag: u64,
@@ -367,7 +367,7 @@ impl TestClient {
         assert_recv_response!(self, ListMDataUserPermissions, msg_id)
     }
 
-    /// Sends a `SetMDataUserPermissions` request and wait for the response.
+    /// Sends a `SetMDataUserPermissions` request and waits for the response.
     pub fn set_mdata_user_permissions_response(&mut self,
                                                name: XorName,
                                                tag: u64,
@@ -395,7 +395,7 @@ impl TestClient {
         assert_recv_response!(self, SetMDataUserPermissions, msg_id)
     }
 
-    /// Sends a `DelMDataUserPermissions` request and wait for the response.
+    /// Sends a `DelMDataUserPermissions` request and waits for the response.
     pub fn del_mdata_user_permissions_response(&mut self,
                                                name: XorName,
                                                tag: u64,
@@ -420,7 +420,7 @@ impl TestClient {
         assert_recv_response!(self, DelMDataUserPermissions, msg_id)
     }
 
-    /// Sends a `ChangeMDataOwner` request and wait for the response.
+    /// Sends a `ChangeMDataOwner` request and waits for the response.
     pub fn change_mdata_owner_response(&mut self,
                                        name: XorName,
                                        tag: u64,
@@ -443,7 +443,8 @@ impl TestClient {
         assert_recv_response!(self, ChangeMDataOwner, msg_id)
     }
 
-    /// Sends a GetAccountInfo request, polls the mock network and expects a GetAccountInfo response
+    /// Sends a `GetAccountInfo` request, polls the mock network and expects a
+    /// `GetAccountInfo` response
     pub fn get_account_info_response(&mut self,
                                      nodes: &mut [TestNode])
                                      -> Result<AccountInfo, ClientError> {
@@ -457,7 +458,7 @@ impl TestClient {
         assert_recv_response!(self, GetAccountInfo, msg_id)
     }
 
-    /// Sends a ListAuthKeysAndVersion request and wait for the response.
+    /// Sends a `ListAuthKeysAndVersion` request and wait for the response.
     pub fn list_auth_keys_and_version_response
         (&mut self,
          nodes: &mut [TestNode])
@@ -472,7 +473,7 @@ impl TestClient {
         assert_recv_response!(self, ListAuthKeysAndVersion, msg_id)
     }
 
-    /// Sends a InsAuthKey request and wait for the response.
+    /// Sends a `InsAuthKey` request and waits for the response.
     pub fn ins_auth_key_response(&mut self,
                                  key: sign::PublicKey,
                                  version: u64,
@@ -488,17 +489,17 @@ impl TestClient {
         assert_recv_response!(self, InsAuthKey, msg_id)
     }
 
-    /// Return a full id for this client
+    /// Returns a full id for this client
     pub fn full_id(&self) -> &FullId {
         &self.full_id
     }
 
-    /// Return signing public key for this client
+    /// Returns signing public key for this client
     pub fn signing_public_key(&self) -> &sign::PublicKey {
         self.full_id.public_id().signing_public_key()
     }
 
-    /// Return client's network name
+    /// Returns client's network name
     pub fn name(&self) -> &XorName {
         self.full_id.public_id().name()
     }

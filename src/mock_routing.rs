@@ -94,9 +94,8 @@ impl Node {
             .map(|names| names.into_iter().cloned().collect())
     }
 
-    // mock-only method.
-    pub fn routing_table(&self) -> &RoutingTable<XorName> {
-        &self.routing_table
+    pub fn routing_table(&self) -> Result<&RoutingTable<XorName>, RoutingError> {
+        Ok(&self.routing_table)
     }
 
     // mock-only method.

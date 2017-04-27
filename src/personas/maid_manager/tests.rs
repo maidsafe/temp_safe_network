@@ -274,12 +274,13 @@ fn mdata_permissions_and_owners() {
     assert_match!(message.response,
                   Response::ChangeMDataOwner { res: Err(ClientError::AccessDenied), .. });
 
-    // Attempt to change owner even by authorised app fails.
+    // Authorise the app.
     let msg_id = MessageId::new();
     unwrap!(mm.handle_ins_auth_key(&mut node, client, client_manager, app_key, 5, msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response, Response::InsAuthKey { res: Ok(()), .. });
 
+    // Attempt to change owner by authorised app still fails.
     let msg_id = MessageId::new();
     unwrap!(mm.handle_change_mdata_owner(&mut node,
                                          app,
@@ -644,8 +645,7 @@ fn account_replication_during_churn() {
     old_node.add_to_routing_table(new_node_name);
     new_node.add_to_routing_table(unwrap!(old_node.name()));
 
-    let rt = old_node.routing_table().clone();
-    old_mm.handle_node_added(&mut old_node, &new_node_name, &rt);
+    unwrap!(old_mm.handle_node_added(&mut old_node, &new_node_name));
 
     // The old node sends refresh request to the client manager of each account it holds.
     let msg_id = MessageId::from_added_node(new_node_name);

@@ -168,7 +168,7 @@ impl<K> ChunkStore<K>
         }
     }
 
-    /// Lists all keys of currently-data stored.
+    /// Lists all keys of currently stored data.
     pub fn keys(&self) -> Vec<K> {
         fs::read_dir(&self.rootdir)
             .and_then(|dir_entries| {

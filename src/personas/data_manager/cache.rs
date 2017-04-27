@@ -643,7 +643,7 @@ mod tests {
         assert_eq!(first(result), (fragment0.clone(), vec![holder0]));
 
         // Insert the same fragment but with different holder. It should be present
-        // in the collection only one, but with both holders.
+        // in the collection only once, but with both holders.
         assert!(cache.insert_needed_fragment(fragment0.clone(), holder1));
         let result = cache.unrequested_needed_fragments();
         assert_eq!(result.len(), 1);

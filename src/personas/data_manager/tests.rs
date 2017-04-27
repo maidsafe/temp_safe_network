@@ -166,14 +166,14 @@ fn mdata_mutations() {
 
     // Mutate the entries and simulate refresh.
     let key_0 = test_utils::gen_vec(10, &mut rng);
-    let value_0 = test_utils::gen_vec(10, &mut rng);
+    let content_0 = test_utils::gen_vec(10, &mut rng);
 
     let key_1 = test_utils::gen_vec(10, &mut rng);
-    let value_1 = test_utils::gen_vec(10, &mut rng);
+    let content_1 = test_utils::gen_vec(10, &mut rng);
 
     let actions = EntryActions::new()
-        .ins(key_0.clone(), value_0.clone(), 0)
-        .ins(key_1.clone(), value_1.clone(), 0)
+        .ins(key_0.clone(), content_0.clone(), 0)
+        .ins(key_1.clone(), content_1.clone(), 0)
         .into();
     let msg_id = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -205,12 +205,17 @@ fn mdata_mutations() {
     let entries = assert_match!(
             message.response,
             Response::ListMDataEntries { res: Ok(entries), .. } => entries);
-    assert_eq!(entries.len(), 2);
-    let retrieved_value_0 = unwrap!(entries.get(&key_0));
-    let retrieved_value_1 = unwrap!(entries.get(&key_1));
 
-    assert_eq!(retrieved_value_0.content, value_0);
-    assert_eq!(retrieved_value_1.content, value_1);
+    let value_0 = Value {
+        content: content_0,
+        entry_version: 0,
+    };
+    let value_1 = Value {
+        content: content_1,
+        entry_version: 0,
+    };
+
+    assert_eq!(entries, vec![(key_0, value_0), (key_1, value_1)].into_iter().collect());
 }
 
 #[test]
@@ -290,8 +295,7 @@ fn handle_node_added() {
 
     // Node receives NodeAdded event. It should send all the fragments that it has
     // to the new node in a Refresh message.
-    let rt = node.routing_table().clone();
-    dm.handle_node_added(&mut node, &new_node_name, &rt);
+    unwrap!(dm.handle_node_added(&mut node, &new_node_name));
 
     assert_eq!(node.sent_requests.len(), 1);
 
@@ -428,7 +432,7 @@ fn idata_with_churn() {
 // 2. Nodes from the group send refresh message to X. The message consist of multiple
 //    fragments - one for the shell of the data, and one for each entry.
 // 3. X receives the refresh and sends requests for all the fragments of the data.
-// 4. X receives success respones to the requests. First the shell, the the entries.
+// 4. X receives success response to the requests. First the shell, the the entries.
 // 5. X puts the complete data into the chunk store and sends no more requests.
 #[test]
 fn mdata_with_churn() {
@@ -470,7 +474,7 @@ fn mdata_with_churn() {
 
 // Same as `mdata_with_churn` except now X receives response failure.
 //
-// 1. X receives response fialure
+// 1. X receives response failure
 // 2. X sends the requests again, to a different node from the group.
 #[test]
 fn mdata_with_churn_with_response_failure() {
@@ -702,7 +706,7 @@ fn take_get_mdata_shell_request(node: &mut RoutingNode) -> (MessageId, XorName) 
     (msg_id, dst)
 }
 
-// Removes GetMDataValue requests from the list of sent requests and retuns their
+// Removes GetMDataValue requests from the list of sent requests and returns their
 // entry keys, message ids and destination authority names.
 fn take_get_mdata_value_requests(node: &mut RoutingNode) -> Vec<(MessageId, XorName, Vec<u8>)> {
     let result: Vec<_> = node.sent_requests

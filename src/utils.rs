@@ -34,7 +34,10 @@ pub struct SecureHash(sha3::Digest256);
 pub fn secure_hash<T: Serialize>(value: &T) -> SecureHash {
     serialisation::serialise(value)
         .map(|data| SecureHash(tiny_keccak::sha3_256(&data)))
-        .unwrap_or_else(|_| Default::default())
+        .unwrap_or_else(|_| {
+                            error!("Serialisation failure");
+                            Default::default()
+                        })
 }
 
 // Note: for testing with mock crust, use collections with deterministic hashing.
@@ -49,7 +52,7 @@ pub type HashSet<T> = collections::HashSet<T, BuildHasherDefault<DefaultHasher>>
 #[cfg(not(feature = "use-mock-crust"))]
 pub type HashSet<T> = collections::HashSet<T>;
 
-/// Extract client key (a public singing key) from the authority.
+/// Extract client key (a public signing key) from the authority.
 ///
 /// # Panics
 ///

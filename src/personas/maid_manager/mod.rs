@@ -26,7 +26,7 @@ use error::InternalError;
 use itertools::Itertools;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
-              RoutingTable, TYPE_TAG_SESSION_PACKET, User, XorName};
+              TYPE_TAG_SESSION_PACKET, User, XorName};
 use routing::ClientError;
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -109,14 +109,12 @@ impl MaidManager {
             return Ok(());
         }
 
-        {
-            // Forwarding the request to NAE Manager.
-            let src = dst;
-            let dst = Authority::NaeManager(*data.name());
-            trace!("MM forwarding PutIData request to {:?}", dst);
-            routing_node
-                .send_put_idata_request(src, dst, data, msg_id)?;
-        }
+        // Forwarding the request to NAE Manager.
+        let fwd_src = dst;
+        let fwd_dst = Authority::NaeManager(*data.name());
+        trace!("MM forwarding PutIData request to {:?}", fwd_dst);
+        routing_node
+            .send_put_idata_request(fwd_src, fwd_dst, data, msg_id)?;
 
         self.insert_cached_request(msg_id, src, dst, None);
 
@@ -195,14 +193,12 @@ impl MaidManager {
 
         let tag = data.tag();
 
-        {
-            // Forwarding the request to NAE Manager.
-            let src = dst;
-            let dst = Authority::NaeManager(*data.name());
-            trace!("MM forwarding PutMData request to {:?}", dst);
-            routing_node
-                .send_put_mdata_request(src, dst, data, msg_id, requester)?;
-        }
+        // Forwarding the request to NAE Manager.
+        let fwd_src = dst;
+        let fwd_dst = Authority::NaeManager(*data.name());
+        trace!("MM forwarding PutMData request to {:?}", fwd_dst);
+        routing_node
+            .send_put_mdata_request(fwd_src, fwd_dst, data, msg_id, requester)?;
 
         self.insert_cached_request(msg_id, src, dst, Some(tag));
 
@@ -258,19 +254,18 @@ impl MaidManager {
             return Ok(());
         }
 
-        {
-            // Forwarding the request to NAE Manager.
-            let src = dst;
-            let dst = Authority::NaeManager(name);
-            trace!("MM forwarding MutateMDataEntries request to {:?}", dst);
-            routing_node.send_mutate_mdata_entries_request(src,
-                                                           dst,
-                                                           name,
-                                                           tag,
-                                                           actions,
-                                                           msg_id,
-                                                           requester)?;
-        }
+        // Forwarding the request to NAE Manager.
+        let fwd_src = dst;
+        let fwd_dst = Authority::NaeManager(name);
+        trace!("MM forwarding MutateMDataEntries request to {:?}", fwd_dst);
+        routing_node
+            .send_mutate_mdata_entries_request(fwd_src,
+                                               fwd_dst,
+                                               name,
+                                               tag,
+                                               actions,
+                                               msg_id,
+                                               requester)?;
 
         self.insert_cached_request(msg_id, src, dst, Some(tag));
 
@@ -308,22 +303,21 @@ impl MaidManager {
             return Ok(());
         }
 
-        {
-            // Forwarding the request to NAE Manager.
-            let src = dst;
-            let dst = Authority::NaeManager(name);
-            trace!("MM forwarding SetMDataUserPermissions request to {:?}", dst);
-            routing_node
-                .send_set_mdata_user_permissions_request(src,
-                                                         dst,
-                                                         name,
-                                                         tag,
-                                                         user,
-                                                         permissions,
-                                                         version,
-                                                         msg_id,
-                                                         requester)?;
-        }
+        // Forwarding the request to NAE Manager.
+        let fwd_src = dst;
+        let fwd_dst = Authority::NaeManager(name);
+        trace!("MM forwarding SetMDataUserPermissions request to {:?}",
+               fwd_dst);
+        routing_node
+            .send_set_mdata_user_permissions_request(fwd_src,
+                                                     fwd_dst,
+                                                     name,
+                                                     tag,
+                                                     user,
+                                                     permissions,
+                                                     version,
+                                                     msg_id,
+                                                     requester)?;
 
         self.insert_cached_request(msg_id, src, dst, Some(tag));
         Ok(())
@@ -359,21 +353,20 @@ impl MaidManager {
             return Ok(());
         }
 
-        {
-            // Forwarding the request to NAE Manager.
-            let src = dst;
-            let dst = Authority::NaeManager(name);
-            trace!("MM forwarding DelMDataUserPermissions request to {:?}", dst);
-            routing_node
-                .send_del_mdata_user_permissions_request(src,
-                                                         dst,
-                                                         name,
-                                                         tag,
-                                                         user,
-                                                         version,
-                                                         msg_id,
-                                                         requester)?;
-        }
+        // Forwarding the request to NAE Manager.
+        let fwd_src = dst;
+        let fwd_dst = Authority::NaeManager(name);
+        trace!("MM forwarding DelMDataUserPermissions request to {:?}",
+               fwd_dst);
+        routing_node
+            .send_del_mdata_user_permissions_request(fwd_src,
+                                                     fwd_dst,
+                                                     name,
+                                                     tag,
+                                                     user,
+                                                     version,
+                                                     msg_id,
+                                                     requester)?;
 
         self.insert_cached_request(msg_id, src, dst, Some(tag));
         Ok(())
@@ -408,14 +401,18 @@ impl MaidManager {
             return Ok(());
         }
 
-        {
-            // Forwarding the request to NAE Manager.
-            let src = dst;
-            let dst = Authority::NaeManager(name);
-            trace!("MM forwarding ChangeMDataOwner request to {:?}", dst);
-            routing_node
-                .send_change_mdata_owner_request(src, dst, name, tag, new_owners, version, msg_id)?;
-        }
+        // Forwarding the request to NAE Manager.
+        let fwd_src = dst;
+        let fwd_dst = Authority::NaeManager(name);
+        trace!("MM forwarding ChangeMDataOwner request to {:?}", fwd_dst);
+        routing_node
+            .send_change_mdata_owner_request(fwd_src,
+                                             fwd_dst,
+                                             name,
+                                             tag,
+                                             new_owners,
+                                             version,
+                                             msg_id)?;
 
         self.insert_cached_request(msg_id, src, dst, Some(tag));
         Ok(())
@@ -487,15 +484,18 @@ impl MaidManager {
 
     pub fn handle_node_added(&mut self,
                              routing_node: &mut RoutingNode,
-                             node_name: &XorName,
-                             routing_table: &RoutingTable<XorName>) {
+                             node_name: &XorName)
+                             -> Result<(), InternalError> {
         // Remove all accounts which we are no longer responsible for.
-        let not_close = |name: &&XorName| !routing_table.is_closest(*name, GROUP_SIZE);
-        let accounts_to_delete = self.accounts
-            .keys()
-            .filter(not_close)
-            .cloned()
-            .collect_vec();
+        let accounts_to_delete = {
+            let routing_table = routing_node.routing_table()?;
+
+            self.accounts
+                .keys()
+                .filter(|name| !routing_table.is_closest(*name, GROUP_SIZE))
+                .cloned()
+                .collect_vec()
+        };
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete = self.request_cache
             .iter()
@@ -520,15 +520,22 @@ impl MaidManager {
                               account.clone(),
                               MessageId::from_added_node(*node_name));
         }
+
+        Ok(())
     }
 
-    pub fn handle_node_lost(&mut self, routing_node: &mut RoutingNode, node_name: &XorName) {
+    pub fn handle_node_lost(&mut self,
+                            routing_node: &mut RoutingNode,
+                            node_name: &XorName)
+                            -> Result<(), InternalError> {
         for (maid_name, account) in &self.accounts {
             self.send_refresh(routing_node,
                               maid_name,
                               account.clone(),
                               MessageId::from_lost_node(*node_name));
         }
+
+        Ok(())
     }
 
     fn get_account(&self, dst: &Authority<XorName>) -> Result<&Account, ClientError> {
