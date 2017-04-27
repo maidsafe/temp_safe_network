@@ -19,7 +19,7 @@ use {App, AppContext};
 use errors::AppError;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use object_cache::{CipherOptHandle, EncryptKeyHandle};
+use object_cache::{CipherOptHandle, EncryptPubKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
 use safe_core::{Client, CoreError};
 use std::os::raw::c_void;
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
 /// Construct `CipherOpt::Asymmetric` handle
 #[no_mangle]
 pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
-                                                   peer_encrypt_key_h: EncryptKeyHandle,
+                                                   peer_encrypt_key_h: EncryptPubKeyHandle,
                                                    user_data: *mut c_void,
                                                    o_cb: extern "C" fn(*mut c_void,
                                                                        i32,
@@ -306,7 +306,7 @@ mod tests {
         let cipher_opt_handle_sym =
             unsafe { unwrap!(call_1(|ud, cb| cipher_opt_new_symmetric(&app, ud, cb))) };
         let cipher_opt_handle_asym = unsafe {
-            let err_code = AppError::InvalidEncryptKeyHandle.error_code();
+            let err_code = AppError::InvalidEncryptPubKeyHandle.error_code();
             let res: Result<CipherOptHandle, _> =
                 call_1(|ud, cb| cipher_opt_new_asymmetric(&app, 29293290, ud, cb));
             assert_eq!(unwrap!(res.err()), err_code);

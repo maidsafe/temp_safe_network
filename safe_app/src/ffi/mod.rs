@@ -37,8 +37,8 @@ pub mod immutable_data;
 pub mod ipc;
 /// `MDataInfo` operations
 pub mod mdata_info;
-/// Miscellaneous routines
-pub mod misc;
+/// Crypto-related routines
+pub mod crypto;
 /// Low level manipulation of `MutableData`
 pub mod mutable_data;
 /// NFS API

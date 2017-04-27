@@ -47,7 +47,9 @@ pub type ObjectHandle = u64;
 /// Disambiguating `ObjectHandle`
 pub type CipherOptHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type EncryptKeyHandle = ObjectHandle;
+pub type EncryptPubKeyHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type EncryptSecKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataInfoHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
@@ -74,6 +76,7 @@ pub struct ObjectCache {
     handle_gen: HandleGenerator,
     cipher_opt: Store<CipherOpt>,
     encrypt_key: Store<box_::PublicKey>,
+    secret_key: Store<box_::SecretKey>,
     mdata_info: Store<MDataInfo>,
     mdata_entries: Store<BTreeMap<Vec<u8>, Value>>,
     mdata_keys: Store<BTreeSet<Vec<u8>>>,
@@ -93,6 +96,7 @@ impl ObjectCache {
             handle_gen: HandleGenerator::new(),
             cipher_opt: Store::new(),
             encrypt_key: Store::new(),
+            secret_key: Store::new(),
             mdata_info: Store::new(),
             mdata_entries: Store::new(),
             mdata_keys: Store::new(),
@@ -111,6 +115,7 @@ impl ObjectCache {
         self.handle_gen.reset();
         self.cipher_opt.clear();
         self.encrypt_key.clear();
+        self.secret_key.clear();
         self.mdata_info.clear();
         self.mdata_entries.clear();
         self.mdata_keys.clear();
@@ -162,11 +167,18 @@ impl_cache!(cipher_opt,
             remove_cipher_opt);
 impl_cache!(encrypt_key,
             box_::PublicKey,
-            EncryptKeyHandle,
-            InvalidEncryptKeyHandle,
+            EncryptPubKeyHandle,
+            InvalidEncryptPubKeyHandle,
             get_encrypt_key,
             insert_encrypt_key,
             remove_encrypt_key);
+impl_cache!(secret_key,
+            box_::SecretKey,
+            EncryptSecKeyHandle,
+            InvalidEncryptSecKeyHandle,
+            get_secret_key,
+            insert_secret_key,
+            remove_secret_key);
 impl_cache!(mdata_info,
             MDataInfo,
             MDataInfoHandle,
