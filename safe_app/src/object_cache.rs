@@ -47,9 +47,9 @@ pub type ObjectHandle = u64;
 /// Disambiguating `ObjectHandle`
 pub type CipherOptHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type EncryptKeyHandle = ObjectHandle;
+pub type EncryptPubKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type SecretKeyHandle = ObjectHandle;
+pub type EncryptSecKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type MDataInfoHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
@@ -167,15 +167,15 @@ impl_cache!(cipher_opt,
             remove_cipher_opt);
 impl_cache!(encrypt_key,
             box_::PublicKey,
-            EncryptKeyHandle,
-            InvalidEncryptKeyHandle,
+            EncryptPubKeyHandle,
+            InvalidEncryptPubKeyHandle,
             get_encrypt_key,
             insert_encrypt_key,
             remove_encrypt_key);
 impl_cache!(secret_key,
             box_::SecretKey,
-            SecretKeyHandle,
-            InvalidSecretKeyHandle,
+            EncryptSecKeyHandle,
+            InvalidEncryptSecKeyHandle,
             get_secret_key,
             insert_secret_key,
             remove_secret_key);

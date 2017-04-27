@@ -20,12 +20,15 @@ use errors::AppError;
 use ffi::helper::send_sync;
 use ffi_utils::{OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
-use object_cache::{EncryptKeyHandle, SecretKeyHandle, SignKeyHandle};
+use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
 use std::os::raw::c_void;
 use std::ptr;
 use std::slice;
 use tiny_keccak::sha3_256;
+
+type SecKey = [u8; box_::SECRETKEYBYTES];
+type PubKey = [u8; box_::PUBLICKEYBYTES];
 
 /// Get the public signing key of the app.
 #[no_mangle]
@@ -43,7 +46,7 @@ pub unsafe extern "C" fn app_pub_sign_key(app: *const App,
 /// Create new public signing key from raw array.
 #[no_mangle]
 pub unsafe extern "C" fn sign_key_new(app: *const App,
-                                      data: *const [u8; sign::PUBLICKEYBYTES],
+                                      data: *const PubKey,
                                       user_data: *mut c_void,
                                       o_cb: extern "C" fn(*mut c_void, i32, SignKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -60,9 +63,7 @@ pub unsafe extern "C" fn sign_key_new(app: *const App,
 pub unsafe extern "C" fn sign_key_get(app: *const App,
                                       handle: SignKeyHandle,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void,
-                                                          i32,
-                                                          *const [u8; sign::PUBLICKEYBYTES])) {
+                                      o_cb: extern "C" fn(*mut c_void, i32, *const PubKey)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let key = context.object_cache().get_sign_key(handle)?;
@@ -89,7 +90,9 @@ pub unsafe extern "C" fn sign_key_free(app: *const App,
 #[no_mangle]
 pub unsafe extern "C" fn app_pub_enc_key(app: *const App,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, i32, EncryptKeyHandle)) {
+                                         o_cb: extern "C" fn(*mut c_void,
+                                                             i32,
+                                                             EncryptPubKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
             let key = client.public_encryption_key()?;
@@ -100,12 +103,12 @@ pub unsafe extern "C" fn app_pub_enc_key(app: *const App,
 
 /// Generate a new encryption key pair (public & private key).
 #[no_mangle]
-pub unsafe extern "C" fn enc_key_generate_pair(app: *const App,
+pub unsafe extern "C" fn enc_generate_key_pair(app: *const App,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
                                                                    i32,
-                                                                   EncryptKeyHandle,
-                                                                   SecretKeyHandle)) {
+                                                                   EncryptPubKeyHandle,
+                                                                   EncryptSecKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let (ourpk, oursk) = box_::gen_keypair();
         let user_data = OpaqueCtx(user_data);
@@ -123,10 +126,12 @@ pub unsafe extern "C" fn enc_key_generate_pair(app: *const App,
 
 /// Create new public encryption key from raw array.
 #[no_mangle]
-pub unsafe extern "C" fn enc_key_new(app: *const App,
-                                     data: *const [u8; box_::PUBLICKEYBYTES],
-                                     user_data: *mut c_void,
-                                     o_cb: extern "C" fn(*mut c_void, i32, EncryptKeyHandle)) {
+pub unsafe extern "C" fn enc_pub_key_new(app: *const App,
+                                         data: *const PubKey,
+                                         user_data: *mut c_void,
+                                         o_cb: extern "C" fn(*mut c_void,
+                                                             i32,
+                                                             EncryptPubKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = box_::PublicKey(*data);
         send_sync(app,
@@ -138,12 +143,10 @@ pub unsafe extern "C" fn enc_key_new(app: *const App,
 
 /// Retrieve the public encryption key as raw array.
 #[no_mangle]
-pub unsafe extern "C" fn enc_key_get(app: *const App,
-                                     handle: EncryptKeyHandle,
-                                     user_data: *mut c_void,
-                                     o_cb: extern "C" fn(*mut c_void,
-                                                         i32,
-                                                         *const [u8; box_::PUBLICKEYBYTES])) {
+pub unsafe extern "C" fn enc_pub_key_get(app: *const App,
+                                         handle: EncryptPubKeyHandle,
+                                         user_data: *mut c_void,
+                                         o_cb: extern "C" fn(*mut c_void, i32, *const PubKey)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let key = context.object_cache().get_encrypt_key(handle)?;
@@ -154,12 +157,10 @@ pub unsafe extern "C" fn enc_key_get(app: *const App,
 
 /// Retrieve the private encryption key as raw array.
 #[no_mangle]
-pub unsafe extern "C" fn secret_key_get(app: *const App,
-                                        handle: SecretKeyHandle,
-                                        user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void,
-                                                            i32,
-                                                            *const [u8; box_::SECRETKEYBYTES])) {
+pub unsafe extern "C" fn enc_secret_key_get(app: *const App,
+                                            handle: EncryptSecKeyHandle,
+                                            user_data: *mut c_void,
+                                            o_cb: extern "C" fn(*mut c_void, i32, *const SecKey)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let key = context.object_cache().get_secret_key(handle)?;
@@ -170,10 +171,12 @@ pub unsafe extern "C" fn secret_key_get(app: *const App,
 
 /// Create new public encryption key from raw array.
 #[no_mangle]
-pub unsafe extern "C" fn secret_key_new(app: *const App,
-                                        data: *const [u8; box_::SECRETKEYBYTES],
-                                        user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void, i32, SecretKeyHandle)) {
+pub unsafe extern "C" fn enc_secret_key_new(app: *const App,
+                                            data: *const SecKey,
+                                            user_data: *mut c_void,
+                                            o_cb: extern "C" fn(*mut c_void,
+                                                                i32,
+                                                                EncryptSecKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = box_::SecretKey(*data);
         send_sync(app,
@@ -185,10 +188,10 @@ pub unsafe extern "C" fn secret_key_new(app: *const App,
 
 /// Free encryption key from memory
 #[no_mangle]
-pub unsafe extern "C" fn enc_key_free(app: *const App,
-                                      handle: EncryptKeyHandle,
-                                      user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void, i32)) {
+pub unsafe extern "C" fn enc_pub_key_free(app: *const App,
+                                          handle: EncryptPubKeyHandle,
+                                          user_data: *mut c_void,
+                                          o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context.object_cache().remove_encrypt_key(handle)?;
@@ -199,10 +202,10 @@ pub unsafe extern "C" fn enc_key_free(app: *const App,
 
 /// Free private key from memory
 #[no_mangle]
-pub unsafe extern "C" fn secret_key_free(app: *const App,
-                                         handle: SecretKeyHandle,
-                                         user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, i32)) {
+pub unsafe extern "C" fn enc_secret_key_free(app: *const App,
+                                             handle: EncryptSecKeyHandle,
+                                             user_data: *mut c_void,
+                                             o_cb: extern "C" fn(*mut c_void, i32)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context.object_cache().remove_secret_key(handle)?;
@@ -217,8 +220,8 @@ pub unsafe extern "C" fn secret_key_free(app: *const App,
 pub unsafe extern "C" fn encrypt(app: *const App,
                                  data: *const u8,
                                  len: usize,
-                                 pk_h: EncryptKeyHandle,
-                                 sk_h: SecretKeyHandle,
+                                 pk_h: EncryptPubKeyHandle,
+                                 sk_h: EncryptSecKeyHandle,
                                  user_data: *mut c_void,
                                  o_cb: extern "C" fn(*mut c_void, i32, *const u8, usize)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -256,8 +259,8 @@ pub unsafe extern "C" fn encrypt(app: *const App,
 pub unsafe extern "C" fn decrypt(app: *const App,
                                  data: *const u8,
                                  len: usize,
-                                 pk_h: EncryptKeyHandle,
-                                 sk_h: SecretKeyHandle,
+                                 pk_h: EncryptPubKeyHandle,
+                                 sk_h: EncryptSecKeyHandle,
                                  user_data: *mut c_void,
                                  o_cb: extern "C" fn(*mut c_void, i32, *const u8, usize)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -296,7 +299,7 @@ pub unsafe extern "C" fn decrypt(app: *const App,
 pub unsafe extern "C" fn encrypt_sealed_box(app: *const App,
                                             data: *const u8,
                                             len: usize,
-                                            pk_h: EncryptKeyHandle,
+                                            pk_h: EncryptPubKeyHandle,
                                             user_data: *mut c_void,
                                             o_cb: extern "C" fn(*mut c_void,
                                                                 i32,
@@ -325,8 +328,8 @@ pub unsafe extern "C" fn encrypt_sealed_box(app: *const App,
 pub unsafe extern "C" fn decrypt_sealed_box(app: *const App,
                                             data: *const u8,
                                             len: usize,
-                                            pk_h: EncryptKeyHandle,
-                                            sk_h: SecretKeyHandle,
+                                            pk_h: EncryptPubKeyHandle,
+                                            sk_h: EncryptSecKeyHandle,
                                             user_data: *mut c_void,
                                             o_cb: extern "C" fn(*mut c_void,
                                                                 i32,
@@ -381,20 +384,22 @@ mod tests {
         let app1 = create_app();
         let app2 = create_app();
 
-        let (app1_pk1_h, app1_sk1_h): (SignKeyHandle, SecretKeyHandle) =
-            unsafe { unwrap!(call_2(|ud, cb| enc_key_generate_pair(&app1, ud, cb))) };
-        let (app2_pk2_h, app2_sk2_h): (SignKeyHandle, SecretKeyHandle) =
-            unsafe { unwrap!(call_2(|ud, cb| enc_key_generate_pair(&app2, ud, cb))) };
+        let (app1_pk1_h, app1_sk1_h): (EncryptPubKeyHandle, EncryptSecKeyHandle) =
+            unsafe { unwrap!(call_2(|ud, cb| enc_generate_key_pair(&app1, ud, cb))) };
+        let (app2_pk2_h, app2_sk2_h): (EncryptPubKeyHandle, EncryptSecKeyHandle) =
+            unsafe { unwrap!(call_2(|ud, cb| enc_generate_key_pair(&app2, ud, cb))) };
 
         // Copying app2 pubkey to app1 object cache
         // and app1 pubkey to app2 object cache
         let pk2_raw: [u8; XOR_NAME_LEN] =
-            unsafe { unwrap!(call_1(|ud, cb| enc_key_get(&app2, app2_pk2_h, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app2, app2_pk2_h, ud, cb))) };
         let pk1_raw: [u8; XOR_NAME_LEN] =
-            unsafe { unwrap!(call_1(|ud, cb| enc_key_get(&app1, app1_pk1_h, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app1, app1_pk1_h, ud, cb))) };
 
-        let app1_pk2_h = unsafe { unwrap!(call_1(|ud, cb| enc_key_new(&app1, &pk2_raw, ud, cb))) };
-        let app2_pk1_h = unsafe { unwrap!(call_1(|ud, cb| enc_key_new(&app2, &pk1_raw, ud, cb))) };
+        let app1_pk2_h =
+            unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_new(&app1, &pk2_raw, ud, cb))) };
+        let app2_pk1_h =
+            unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_new(&app2, &pk1_raw, ud, cb))) };
 
         // Trying to encrypt a message for app2 from app1
         let data = b"hi there";
@@ -431,15 +436,16 @@ mod tests {
         let app1 = create_app();
         let app2 = create_app();
 
-        let (app2_pk2_h, app2_sk2_h): (SignKeyHandle, SecretKeyHandle) =
-            unsafe { unwrap!(call_2(|ud, cb| enc_key_generate_pair(&app2, ud, cb))) };
+        let (app2_pk2_h, app2_sk2_h): (EncryptPubKeyHandle, EncryptSecKeyHandle) =
+            unsafe { unwrap!(call_2(|ud, cb| enc_generate_key_pair(&app2, ud, cb))) };
 
         // Copying app2 pubkey to app1 object cache
         // and app1 pubkey to app2 object cache
         let pk2_raw: [u8; XOR_NAME_LEN] =
-            unsafe { unwrap!(call_1(|ud, cb| enc_key_get(&app2, app2_pk2_h, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app2, app2_pk2_h, ud, cb))) };
 
-        let app1_pk2_h = unsafe { unwrap!(call_1(|ud, cb| enc_key_new(&app1, &pk2_raw, ud, cb))) };
+        let app1_pk2_h =
+            unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_new(&app1, &pk2_raw, ud, cb))) };
 
         // Trying to encrypt a message for app2 from app1
         let data = b"sealed box message";
@@ -510,10 +516,10 @@ mod tests {
         });
 
         let app_enc_key1_raw: [u8; XOR_NAME_LEN] =
-            unsafe { unwrap!(call_1(|ud, cb| enc_key_get(&app, app_enc_key1_h, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_get(&app, app_enc_key1_h, ud, cb))) };
 
         let app_enc_key2_h =
-            unsafe { unwrap!(call_1(|ud, cb| enc_key_new(&app, &app_enc_key1_raw, ud, cb))) };
+            unsafe { unwrap!(call_1(|ud, cb| enc_pub_key_new(&app, &app_enc_key1_raw, ud, cb))) };
 
         let app_enc_key2 = run_now(&app, move |_, context| {
             *unwrap!(context.object_cache().get_encrypt_key(app_enc_key2_h))

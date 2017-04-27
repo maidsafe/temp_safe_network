@@ -92,7 +92,7 @@ mod codes {
     // App errors
     pub const ERR_NO_SUCH_CONTAINER: i32 = -1002;
     pub const ERR_INVALID_CIPHER_OPT_HANDLE: i32 = -1003;
-    pub const ERR_INVALID_ENCRYPT_KEY_HANDLE: i32 = -1004;
+    pub const ERR_INVALID_ENCRYPT_PUB_KEY_HANDLE: i32 = -1004;
     pub const ERR_INVALID_MDATA_INFO_HANDLE: i32 = -1005;
     pub const ERR_INVALID_MDATA_ENTRIES_HANDLE: i32 = -1006;
     pub const ERR_INVALID_MDATA_ENTRY_ACTIONS_HANDLE: i32 = -1007;
@@ -102,7 +102,7 @@ mod codes {
     pub const ERR_INVALID_SIGN_KEY_HANDLE: i32 = -1011;
     pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1012;
     pub const ERR_IO_ERROR: i32 = -1013;
-    pub const ERR_INVALID_SECRET_KEY_HANDLE: i32 = -1014;
+    pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1014;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
@@ -127,7 +127,7 @@ pub enum AppError {
     /// Invalid CipherOpt handle
     InvalidCipherOptHandle,
     /// Invalid encrypt (box_) key handle
-    InvalidEncryptKeyHandle,
+    InvalidEncryptPubKeyHandle,
     /// Invalid `MDataInfo` handle
     InvalidMDataInfoHandle,
     /// Invalid MutableData enties handle
@@ -143,7 +143,7 @@ pub enum AppError {
     /// Invalid sign key handle
     InvalidSignKeyHandle,
     /// Invalid secret key handle
-    InvalidSecretKeyHandle,
+    InvalidEncryptSecKeyHandle,
 
     /// Error while self-encrypting data
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
@@ -285,7 +285,7 @@ impl ErrorCode for AppError {
             AppError::OperationForbidden => ERR_OPERATION_FORBIDDEN,
             AppError::NoSuchContainer => ERR_NO_SUCH_CONTAINER,
             AppError::InvalidCipherOptHandle => ERR_INVALID_CIPHER_OPT_HANDLE,
-            AppError::InvalidEncryptKeyHandle => ERR_INVALID_ENCRYPT_KEY_HANDLE,
+            AppError::InvalidEncryptPubKeyHandle => ERR_INVALID_ENCRYPT_PUB_KEY_HANDLE,
             AppError::InvalidMDataInfoHandle => ERR_INVALID_MDATA_INFO_HANDLE,
             AppError::InvalidMDataEntriesHandle => ERR_INVALID_MDATA_ENTRIES_HANDLE,
             AppError::InvalidMDataEntryActionsHandle => ERR_INVALID_MDATA_ENTRY_ACTIONS_HANDLE,
@@ -293,7 +293,7 @@ impl ErrorCode for AppError {
             AppError::InvalidMDataPermissionSetHandle => ERR_INVALID_MDATA_PERMISSION_SET_HANDLE,
             AppError::InvalidSelfEncryptorHandle => ERR_INVALID_SELF_ENCRYPTOR_HANDLE,
             AppError::InvalidSignKeyHandle => ERR_INVALID_SIGN_KEY_HANDLE,
-            AppError::InvalidSecretKeyHandle => ERR_INVALID_SECRET_KEY_HANDLE,
+            AppError::InvalidEncryptSecKeyHandle => ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE,
             AppError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
             AppError::InvalidSelfEncryptorReadOffsets => ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS,
             AppError::IoError(_) => ERR_IO_ERROR,
