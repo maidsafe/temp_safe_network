@@ -50,15 +50,15 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::rc::Rc;
-use std::sync::mpsc::{self, Receiver};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::Duration;
 use tokio_core::reactor::{Handle, Timeout};
 use utils::{self, FutureExt};
 
+const CONNECTION_TIMEOUT_SECS: u64 = 40;
+const REQUEST_TIMEOUT_SECS: u64 = 180;
 const SEED_SUBPARTS: usize = 4;
-const CONNECTION_TIMEOUT_SECS: u64 = 10;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
-const REQUEST_TIMEOUT_SECS: u64 = 120;
 
 macro_rules! match_event {
     ($r:ident, $event:path) => {
@@ -1137,6 +1137,9 @@ fn setup_routing(full_id: Option<FullId>,
     trace!("Waiting to get connected to the Network...");
     match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
         Ok(Event::Connected) => (),
+        Err(RecvTimeoutError::Timeout) => {
+            return Err(CoreError::RequestTimeout);
+        }
         x => {
             warn!("Could not connect to the Network. Unexpected: {:?}", x);
             // TODO: we should return more descriptive error here

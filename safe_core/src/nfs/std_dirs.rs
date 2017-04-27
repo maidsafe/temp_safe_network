@@ -64,8 +64,6 @@ pub fn create_std_dirs(client: Client) -> Box<NfsFuture<()>> {
         .into_box()
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
