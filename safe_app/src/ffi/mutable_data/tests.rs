@@ -113,11 +113,16 @@ fn md_created_by_app_2() {
         random_client(move |client| {
             let (name, sign_pk) = unwrap!(alt_client_rx.recv());
             let cl2 = client.clone();
+            let cl3 = client.clone();
             client
-                .ins_auth_key(sign_pk, 1)
+                .list_auth_keys_and_version()
+                .then(move |res| {
+                          let (_, version) = unwrap!(res);
+                          cl2.ins_auth_key(sign_pk, version + 1)
+                      })
                 .then(move |res| {
                           unwrap!(res);
-                          cl2.change_mdata_owner(name, DIR_TAG, sign_pk, 1)
+                          cl3.change_mdata_owner(name, DIR_TAG, sign_pk, 1)
                       })
                 .then(move |res| -> Result<(), ()> {
                     match res {
@@ -210,9 +215,16 @@ fn md_created_by_app_3() {
                                                  BTreeMap::new(),
                                                  owners));
             let cl2 = client.clone();
-            client.ins_auth_key(app_sign_pk, 1)
-                .and_then(move |()| {
-                    cl2.put_mdata(mdata)
+            let cl3 = client.clone();
+
+            client.list_auth_keys_and_version()
+                .then(move |res| {
+                    let (_, version) = unwrap!(res);
+                    cl2.ins_auth_key(app_sign_pk, version + 1)
+                })
+                .then(move |res| {
+                    unwrap!(res);
+                    cl3.put_mdata(mdata)
                 })
                 .map(move |()| unwrap!(name_tx.send(name)))
                 .map_err(|e| panic!("{:?}", e))
@@ -338,9 +350,16 @@ fn md_created_by_app_4() {
 
             let mdata = unwrap!(MutableData::new(name.clone(), DIR_TAG, permissions, data, owners));
             let cl2 = client.clone();
-            client.ins_auth_key(app_sign_pk, 1)
-                .and_then(move |()| {
-                    cl2.put_mdata(mdata)
+            let cl3 = client.clone();
+
+            client.list_auth_keys_and_version()
+                .then(move |res| {
+                    let (_, version) = unwrap!(res);
+                    cl2.ins_auth_key(app_sign_pk, version + 1)
+                })
+                .then(move |res| {
+                    unwrap!(res);
+                    cl3.put_mdata(mdata)
                 })
                 .map(move |()| unwrap!(name_tx.send(name)))
                 .map_err(|e| panic!("{:?}", e))

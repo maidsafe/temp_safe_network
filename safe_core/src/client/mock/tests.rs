@@ -438,7 +438,11 @@ fn mutable_data_permissions() {
     let app_sign_key = *app_full_id.public_id().signing_public_key();
 
     let msg_id = MessageId::new();
-    unwrap!(routing.ins_auth_key(client_mgr, app_sign_key, 1, msg_id));
+    unwrap!(routing.list_auth_keys_and_version(client_mgr, msg_id));
+    let (_, version) = expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.ins_auth_key(client_mgr, app_sign_key, version + 1, msg_id));
     expect_success!(routing_rx, msg_id, Response::InsAuthKey);
 
     // App can't mutate any entry, by default.
@@ -650,7 +654,11 @@ fn mutable_data_permissions() {
     let app2_sign_key = *app2_full_id.public_id().signing_public_key();
 
     let msg_id = MessageId::new();
-    unwrap!(routing.ins_auth_key(client_mgr, app2_sign_key, 2, msg_id));
+    unwrap!(routing.list_auth_keys_and_version(client_mgr, msg_id));
+    let (_, version) = expect_success!(routing_rx, msg_id, Response::ListAuthKeysAndVersion);
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.ins_auth_key(client_mgr, app2_sign_key, version + 1, msg_id));
     expect_success!(routing_rx, msg_id, Response::InsAuthKey);
 
     // The new app can't mutate entries

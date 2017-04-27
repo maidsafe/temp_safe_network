@@ -173,6 +173,7 @@ impl Account {
     pub fn increment_mutations_counter(&mut self) {
         self.account_info.mutations_done += 1;
         self.account_info.mutations_available -= 1;
+        self.version += 1;
     }
 
     fn validate_version(&self, version: u64) -> Result<(), ClientError> {
