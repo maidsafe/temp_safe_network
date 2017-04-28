@@ -253,10 +253,7 @@ impl DataManager {
                             name: XorName,
                             msg_id: MessageId)
                             -> Result<(), InternalError> {
-        if let Authority::Client { .. } = src {
-            self.client_get_requests += 1;
-            log_status!(self);
-        }
+        self.update_request_stats(&src);
 
         if let Ok(data) = self.chunk_store.get(&ImmutableDataId(name)) {
             trace!("As {:?} sending data {:?} to {:?}", dst, data, src);
@@ -405,7 +402,8 @@ impl DataManager {
                                   tag: u64,
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
-        let res = self.read_mdata(&src, name, tag, |data| Ok(data.shell()));
+        self.update_request_stats(&src);
+        let res = self.fetch_mdata(name, tag).map(|data| data.shell());
         routing_node
             .send_get_mdata_shell_response(dst, src, res, msg_id)?;
         Ok(())
@@ -503,7 +501,8 @@ impl DataManager {
                                     tag: u64,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        let res = self.read_mdata(&src, name, tag, |data| Ok(data.version()));
+        self.update_request_stats(&src);
+        let res = self.fetch_mdata(name, tag).map(|data| data.version());
         routing_node
             .send_get_mdata_version_response(dst, src, res, msg_id)?;
         Ok(())
@@ -517,7 +516,9 @@ impl DataManager {
                                      tag: u64,
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
-        let res = self.read_mdata(&src, name, tag, |data| Ok(data.entries().clone()));
+        self.update_request_stats(&src);
+        let res = self.fetch_mdata(name, tag)
+            .map(|data| data.entries().clone());
         routing_node
             .send_list_mdata_entries_response(dst, src, res, msg_id)?;
         Ok(())
@@ -531,10 +532,9 @@ impl DataManager {
                                   tag: u64,
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
-        let res = self.read_mdata(&src,
-                                  name,
-                                  tag,
-                                  |data| Ok(data.entries().keys().cloned().collect()));
+        self.update_request_stats(&src);
+        let res = self.fetch_mdata(name, tag)
+            .map(|data| data.entries().keys().cloned().collect());
         routing_node
             .send_list_mdata_keys_response(dst, src, res, msg_id)?;
         Ok(())
@@ -548,10 +548,9 @@ impl DataManager {
                                     tag: u64,
                                     msg_id: MessageId)
                                     -> Result<(), InternalError> {
-        let res = self.read_mdata(&src,
-                                  name,
-                                  tag,
-                                  |data| Ok(data.entries().values().cloned().collect()));
+        self.update_request_stats(&src);
+        let res = self.fetch_mdata(name, tag)
+            .map(|data| data.entries().values().cloned().collect());
         routing_node
             .send_list_mdata_values_response(dst, src, res, msg_id)?;
         Ok(())
@@ -567,11 +566,9 @@ impl DataManager {
                                   key: Vec<u8>,
                                   msg_id: MessageId)
                                   -> Result<(), InternalError> {
-        let res =
-            self.read_mdata(&src,
-                            name,
-                            tag,
-                            |data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry));
+        self.update_request_stats(&src);
+        let res = self.fetch_mdata(name, tag)
+            .and_then(|data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry));
         routing_node
             .send_get_mdata_value_response(dst, src, res, msg_id)?;
         Ok(())
@@ -677,7 +674,9 @@ impl DataManager {
                                          tag: u64,
                                          msg_id: MessageId)
                                          -> Result<(), InternalError> {
-        let res = self.read_mdata(&src, name, tag, |data| Ok(data.permissions().clone()));
+        self.update_request_stats(&src);
+        let res = self.fetch_mdata(name, tag)
+            .map(|data| data.permissions().clone());
         routing_node
             .send_list_mdata_permissions_response(dst, src, res, msg_id)?;
         Ok(())
@@ -693,10 +692,9 @@ impl DataManager {
                                               user: User,
                                               msg_id: MessageId)
                                               -> Result<(), InternalError> {
-        let res = self.read_mdata(&src,
-                                  name,
-                                  tag,
-                                  |data| data.user_permissions(&user).map(|p| *p));
+        self.update_request_stats(&src);
+        let res = self.fetch_mdata(name, tag)
+            .and_then(|data| data.user_permissions(&user).map(|p| *p));
         routing_node
             .send_list_mdata_user_permissions_response(dst, src, res, msg_id)?;
         Ok(())
@@ -914,22 +912,10 @@ impl DataManager {
         let _ = self.request_needed_fragments(routing_node);
     }
 
-    fn read_mdata<F, R>(&mut self,
-                        src: &Authority<XorName>,
-                        name: XorName,
-                        tag: u64,
-                        f: F)
-                        -> Result<R, ClientError>
-        where F: FnOnce(&MutableData) -> Result<R, ClientError>
-    {
-        if let Authority::Client { .. } = *src {
-            self.client_get_requests += 1;
-            log_status!(self);
-        }
-
+    fn fetch_mdata(&self, name: XorName, tag: u64) -> Result<MutableData, ClientError> {
         let data_id = MutableDataId(name, tag);
         if let Ok(data) = self.chunk_store.get(&data_id) {
-            f(&data)
+            Ok(data)
         } else if tag == TYPE_TAG_SESSION_PACKET {
             Err(ClientError::NoSuchAccount)
         } else {
@@ -937,15 +923,10 @@ impl DataManager {
         }
     }
 
-    fn mutate_mdata<F>(&self, name: XorName, tag: u64, f: F) -> Result<MutableData, ClientError>
-        where F: FnOnce(&mut MutableData) -> Result<(), ClientError>
-    {
-        let data_id = MutableDataId(name, tag);
-        if let Ok(mut data) = self.chunk_store.get(&data_id) {
-            f(&mut data)?;
-            Ok(data)
-        } else {
-            Err(ClientError::NoSuchData)
+    fn update_request_stats(&mut self, src: &Authority<XorName>) {
+        if let Authority::Client { .. } = *src {
+            self.client_get_requests += 1;
+            log_status!(self);
         }
     }
 
@@ -962,7 +943,11 @@ impl DataManager {
                                 -> Result<(), InternalError>
         where F: FnOnce(&mut MutableData) -> Result<(), ClientError>
     {
-        let res = self.mutate_mdata(name, tag, f);
+        let res = self.fetch_mdata(name, tag)
+            .and_then(|mut data| {
+                          f(&mut data)?;
+                          Ok(data)
+                      });
 
         match res {
             Ok(data) => {
