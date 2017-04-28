@@ -33,8 +33,9 @@ const MDATA_ENTRY_TIMEOUT_SECS: u64 = 60;
 type CachedMDataEntries = HashMap<Vec<u8>, (Value, Instant)>;
 
 pub struct Cache {
-    /// Chunks we are no longer responsible for. These can be deleted from the chunk store.
-    unneeded_chunks: VecDeque<DataId>,
+    /// Immutable data chunks we are no longer responsible for. These can be deleted
+    /// from the chunk store.
+    unneeded_chunks: VecDeque<ImmutableDataId>,
     /// Maps the peers to the data fragments we need from them and tracks any ongoing
     /// requests to retrieve those fragments.
     needed_fragments: HashMap<XorName, HashMap<FragmentInfo, FragmentRequest>>,
@@ -58,12 +59,22 @@ impl Cache {
             request.stop_if_expired();
         }
 
-        // TODO (adam): should we exclude fragments of uneeded chunks?
+        let unneeded: HashSet<_> = self.unneeded_chunks
+            .iter()
+            .map(ImmutableDataId::name)
+            .collect();
 
         // Find all needed fragments together with all their holders.
         let mut result = HashMap::default();
         for (holder, fragments) in &self.needed_fragments {
             for fragment in fragments.keys() {
+                // Skip unneeded chunks.
+                if let FragmentInfo::ImmutableData(ref name) = *fragment {
+                    if unneeded.contains(name) {
+                        continue;
+                    }
+                }
+
                 result
                     .entry(fragment.clone())
                     .or_insert_with(Vec::new)
@@ -88,7 +99,10 @@ impl Cache {
         self.needed_fragments
             .values()
             .flat_map(|fragments| fragments.keys().cloned())
-            .filter(|fragment| !self.unneeded_chunks.contains(&fragment.data_id()))
+            .filter(|fragment| match fragment.data_id() {
+                        DataId::Immutable(id) => !self.unneeded_chunks.contains(&id),
+                        DataId::Mutable(_) => true,
+                    })
             .collect()
     }
 
@@ -234,11 +248,11 @@ impl Cache {
         }
     }
 
-    pub fn is_in_unneeded(&self, data_id: &DataId) -> bool {
+    pub fn is_in_unneeded(&self, data_id: &ImmutableDataId) -> bool {
         self.unneeded_chunks.contains(data_id)
     }
 
-    pub fn add_as_unneeded(&mut self, data_id: DataId) {
+    pub fn add_as_unneeded(&mut self, data_id: ImmutableDataId) {
         self.unneeded_chunks.push_back(data_id);
     }
 
@@ -328,7 +342,7 @@ impl Cache {
         expired_writes
     }
 
-    pub fn pop_unneeded_chunk(&mut self) -> Option<DataId> {
+    pub fn pop_unneeded_chunk(&mut self) -> Option<ImmutableDataId> {
         self.unneeded_chunks.pop_front()
     }
 

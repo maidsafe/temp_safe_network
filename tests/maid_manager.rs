@@ -382,7 +382,7 @@ fn maid_manager_account_decrease_with_churn() {
 
         if i % 2 == 0 {
             data_list.clear();
-            for data in 0..chunks_per_iter {
+            for _ in 0..chunks_per_iter {
                 let data = test_utils::gen_mutable_data(TEST_TAG, 10, client_key, &mut rng);
                 let _ = client.put_mdata(data.clone());
                 data_list.push(data);

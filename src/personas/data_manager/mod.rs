@@ -825,15 +825,14 @@ impl DataManager {
                     match data_id {
                         DataId::Immutable(idata_id) => {
                             if self.chunk_store.has(&idata_id) &&
-                               !self.cache.is_in_unneeded(&data_id) {
+                               !self.cache.is_in_unneeded(&idata_id) {
                                 self.immutable_data_count -= 1;
                                 has_pruned_data = true;
-                                self.cache.add_as_unneeded(data_id);
+                                self.cache.add_as_unneeded(idata_id);
                             }
                         }
                         DataId::Mutable(mdata_id) => {
-                            if self.chunk_store.has(&mdata_id) &&
-                               !self.cache.is_in_unneeded(&data_id) {
+                            if self.chunk_store.has(&mdata_id) {
                                 self.mutable_data_count -= 1;
                                 has_pruned_data = true;
                                 let _ = self.chunk_store.delete(&mdata_id);
@@ -1124,10 +1123,12 @@ impl DataManager {
     fn clean_chunk_store(&mut self) {
         while self.chunk_store_full() {
             if let Some(data_id) = self.cache.pop_unneeded_chunk() {
-                let _ = match data_id {
-                    DataId::Immutable(data_id) => self.chunk_store.delete(&data_id),
-                    DataId::Mutable(data_id) => self.chunk_store.delete(&data_id),
-                };
+                if let Err(error) = self.chunk_store.delete(&data_id) {
+                    error!("DM failed to delete unneeded chunk {:?}: {:?}",
+                           data_id,
+                           error);
+                    break;
+                }
             } else {
                 break;
             }
@@ -1259,7 +1260,10 @@ impl DataManager {
         self.chunk_store
             .keys()
             .into_iter()
-            .filter(|data_id| !self.cache.is_in_unneeded(data_id))
+            .filter(|data_id| match *data_id {
+                        DataId::Immutable(ref id) => !self.cache.is_in_unneeded(id),
+                        DataId::Mutable(_) => true,
+                    })
             .filter_map(|data_id| {
                             self.get_version(&data_id)
                                 .map(|version| (data_id, version))

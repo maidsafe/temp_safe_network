@@ -32,6 +32,8 @@ pub use routing::Event;
 pub use routing::Node as RoutingNode;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
 use routing::NodeBuilder;
+#[cfg(feature = "use-mock-crust")]
+use routing::RoutingTable;
 #[cfg(not(feature = "use-mock-crust"))]
 use rust_sodium;
 use std::env;
