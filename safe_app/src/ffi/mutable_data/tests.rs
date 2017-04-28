@@ -38,11 +38,8 @@ fn md_created_by_app_1() {
         let mut owners = BTreeSet::new();
         owners.insert(unwrap!(client.public_signing_key()));
         let name: XorName = rng.gen();
-        let mdata = unwrap!(MutableData::new(name.clone(),
-                                             DIR_TAG,
-                                             BTreeMap::new(),
-                                             BTreeMap::new(),
-                                             owners));
+        let mdata =
+            unwrap!(MutableData::new(name, DIR_TAG, BTreeMap::new(), BTreeMap::new(), owners));
         let cl2 = client.clone();
         client
             .put_mdata(mdata)
@@ -87,9 +84,8 @@ fn md_created_by_app_2() {
         let owners = btree_set![unwrap!(client.owner_key())];
 
         let name: XorName = rng.gen();
-        let mdata =
-            unwrap!(MutableData::new(name.clone(), DIR_TAG, permissions, BTreeMap::new(), owners));
-        let name2 = name.clone();
+        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
+        let name2 = name;
         let cl2 = client.clone();
         client
             .put_mdata(mdata)
@@ -160,9 +156,9 @@ fn md_created_by_app_3() {
                                                 }));
         let cl2 = client.clone();
         let cl3 = client.clone();
-        let name2 = name.clone();
+        let name2 = name;
         client
-            .mutate_mdata_entries(name.clone(), DIR_TAG, actions)
+            .mutate_mdata_entries(name, DIR_TAG, actions)
             .then(move |res| {
                 unwrap!(res);
                 let mut actions = BTreeMap::new();
@@ -209,11 +205,8 @@ fn md_created_by_app_3() {
 
             let name: XorName = rng.gen();
 
-            let mdata = unwrap!(MutableData::new(name.clone(),
-                                                 DIR_TAG,
-                                                 permissions,
-                                                 BTreeMap::new(),
-                                                 owners));
+            let mdata =
+                unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
             let cl2 = client.clone();
             let cl3 = client.clone();
 
@@ -260,11 +253,11 @@ fn md_created_by_app_4() {
         let cl4 = client.clone();
         let cl5 = client.clone();
         let cl6 = client.clone();
-        let name2 = name.clone();
-        let name3 = name.clone();
-        let name4 = name.clone();
-        let name5 = name.clone();
-        client.mutate_mdata_entries(name.clone(), DIR_TAG, actions)
+        let name2 = name;
+        let name3 = name;
+        let name4 = name;
+        let name5 = name;
+        client.mutate_mdata_entries(name, DIR_TAG, actions)
             .then(move |res| {
                 match res {
                     Ok(()) => panic!("It should fail"),
@@ -348,7 +341,7 @@ fn md_created_by_app_4() {
 
             let name: XorName = rng.gen();
 
-            let mdata = unwrap!(MutableData::new(name.clone(), DIR_TAG, permissions, data, owners));
+            let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, data, owners));
             let cl2 = client.clone();
             let cl3 = client.clone();
 
@@ -397,18 +390,17 @@ fn multiple_apps() {
         owners.insert(unwrap!(client.owner_key()));
 
         let name: XorName = rng.gen();
-        let mdata =
-            unwrap!(MutableData::new(name.clone(), DIR_TAG, permissions, BTreeMap::new(), owners));
+        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
         let cl2 = client.clone();
         let cl3 = client.clone();
         let cl4 = client.clone();
-        let name2 = name.clone();
-        let name3 = name.clone();
+        let name2 = name;
+        let name3 = name;
         client
             .put_mdata(mdata)
             .then(move |res| {
                       unwrap!(res);
-                      unwrap!(name_tx.send(name.clone()));
+                      unwrap!(name_tx.send(name));
                       let entry_key: Vec<u8> = unwrap!(entry_rx.recv());
                       cl2.get_mdata_value(name, DIR_TAG, entry_key.clone())
                           .map(move |v| (v, entry_key))
@@ -453,7 +445,7 @@ fn multiple_apps() {
 
         let cl2 = client.clone();
         client
-            .mutate_mdata_entries(name.clone(), DIR_TAG, actions)
+            .mutate_mdata_entries(name, DIR_TAG, actions)
             .then(move |res| {
                 unwrap!(res);
                 unwrap!(entry_tx.send(entry_key));
@@ -508,8 +500,7 @@ fn permissions_and_version() {
         owners.insert(unwrap!(client.owner_key()));
 
         let name: XorName = rng.gen();
-        let mdata =
-            unwrap!(MutableData::new(name.clone(), DIR_TAG, permissions, BTreeMap::new(), owners));
+        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
         let cl2 = client.clone();
         let cl3 = client.clone();
         let cl4 = client.clone();
@@ -614,8 +605,7 @@ fn permissions_crud() {
         owners.insert(unwrap!(client.owner_key()));
 
         let name: XorName = rng.gen();
-        let mdata =
-            unwrap!(MutableData::new(name.clone(), DIR_TAG, permissions, BTreeMap::new(), owners));
+        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, BTreeMap::new(), owners));
 
         let cl2 = client.clone();
         let cl3 = client.clone();
@@ -855,7 +845,7 @@ fn entries_crud() {
         owners.insert(unwrap!(client.owner_key()));
 
         let name: XorName = rng.gen();
-        let mdata = unwrap!(MutableData::new(name.clone(), DIR_TAG, permissions, data, owners));
+        let mdata = unwrap!(MutableData::new(name, DIR_TAG, permissions, data, owners));
 
         let cl2 = client.clone();
         let cl3 = client.clone();

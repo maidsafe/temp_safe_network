@@ -227,7 +227,7 @@ mod tests {
 
         let encrypted = unwrap!(account.encrypt(password, pin));
         let encoded = unwrap!(serialise(&account));
-        assert!(encrypted.len() > 0);
+        assert!(!encrypted.is_empty());
         assert_ne!(encrypted, encoded);
 
         let decrypted = unwrap!(Account::decrypt(&encrypted, password, pin));

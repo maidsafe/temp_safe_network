@@ -82,7 +82,7 @@ fn immutable_data_basics() {
 
     // GetIData should fail
     let msg_id = MessageId::new();
-    unwrap!(routing.get_idata(nae_mgr.clone(), *orig_data.name(), msg_id));
+    unwrap!(routing.get_idata(nae_mgr, *orig_data.name(), msg_id));
     expect_failure!(routing_rx,
                     msg_id,
                     Response::GetIData,
@@ -90,12 +90,12 @@ fn immutable_data_basics() {
 
     // First PutIData should succeed
     let msg_id = MessageId::new();
-    unwrap!(routing.put_idata(client_mgr.clone(), orig_data.clone(), msg_id));
+    unwrap!(routing.put_idata(client_mgr, orig_data.clone(), msg_id));
     expect_success!(routing_rx, msg_id, Response::PutIData);
 
     // Now GetIData should pass
     let msg_id = MessageId::new();
-    unwrap!(routing.get_idata(nae_mgr.clone(), *orig_data.name(), msg_id));
+    unwrap!(routing.get_idata(nae_mgr, *orig_data.name(), msg_id));
     let got_data = expect_success!(routing_rx, msg_id, Response::GetIData);
     assert_eq!(got_data, orig_data);
 
@@ -106,12 +106,12 @@ fn immutable_data_basics() {
 
     // Subsequent PutIData for same data should succeed - De-duplication
     let msg_id = MessageId::new();
-    unwrap!(routing.put_idata(client_mgr.clone(), orig_data.clone(), msg_id));
+    unwrap!(routing.put_idata(client_mgr, orig_data.clone(), msg_id));
     expect_success!(routing_rx, msg_id, Response::PutIData);
 
     // GetIData should succeed
     let msg_id = MessageId::new();
-    unwrap!(routing.get_idata(nae_mgr.clone(), *orig_data.name(), msg_id));
+    unwrap!(routing.get_idata(nae_mgr, *orig_data.name(), msg_id));
     let got_data = expect_success!(routing_rx, msg_id, Response::GetIData);
     assert_eq!(got_data, orig_data);
 
@@ -142,14 +142,14 @@ fn mutable_data_basics() {
 
     // Operations on non-existing MutableData should fail.
     let msg_id = MessageId::new();
-    unwrap!(routing.get_mdata_version(nae_mgr.clone(), name, tag, msg_id));
+    unwrap!(routing.get_mdata_version(nae_mgr, name, tag, msg_id));
     expect_failure!(routing_rx,
                     msg_id,
                     Response::GetMDataVersion,
                     ClientError::NoSuchData);
 
     let msg_id = MessageId::new();
-    unwrap!(routing.list_mdata_entries(nae_mgr.clone(), name, tag, msg_id));
+    unwrap!(routing.list_mdata_entries(nae_mgr, name, tag, msg_id));
     expect_failure!(routing_rx,
                     msg_id,
                     Response::ListMDataEntries,

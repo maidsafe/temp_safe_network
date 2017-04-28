@@ -638,7 +638,7 @@ impl Client {
 
         let (hook, rx, msg_id) = oneshot!(self, CoreEvent::GetAccountInfo);
 
-        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| *a));
         let result = self.routing_mut().get_account_info(dst, msg_id);
 
         if let Err(e) = result {
@@ -741,7 +741,7 @@ impl Client {
     pub fn list_auth_keys_and_version(&self) -> Box<CoreFuture<(BTreeSet<sign::PublicKey>, u64)>> {
         trace!("ListAuthKeysAndVersion");
 
-        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| *a));
 
         self.get(CoreEvent::ListAuthKeysAndVersion,
                  |routing, msg_id| routing.list_auth_keys_and_version(dst, msg_id))
@@ -912,7 +912,7 @@ impl Client {
     fn mutate<F>(&self, req: F) -> Box<CoreFuture<()>>
         where F: FnOnce(&mut Routing, Authority<XorName>, MessageId) -> Result<(), InterfaceError>
     {
-        let dst = fry!(self.inner().client_type.cm_addr().map(|a| a.clone()));
+        let dst = fry!(self.inner().client_type.cm_addr().map(|a| *a));
 
         self.get(CoreEvent::Mutation,
                  |routing, msg_id| req(routing, dst, msg_id))
