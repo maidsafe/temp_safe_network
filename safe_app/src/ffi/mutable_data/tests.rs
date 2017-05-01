@@ -937,3 +937,181 @@ fn entries_crud() {
             .map_err(|e| panic!("{:?}", e))
     });
 }
+
+// Test `MutableData` functions from the FFI point of view.
+#[test]
+fn entries_crud_ffi() {
+    use ffi::mdata_info::*;
+    use ffi::mutable_data::*;
+    use ffi::mutable_data::entry_actions::*;
+    use ffi::mutable_data::permissions::*;
+    use ffi_utils::vec_clone_from_raw_parts;
+    use ffi_utils::test_utils::{call_0, call_1, call_vec_u8, send_via_user_data,
+                                sender_as_user_data};
+    use object_cache::{MDataEntryActionsHandle, MDataInfoHandle, MDataPermissionSetHandle,
+                       MDataPermissionsHandle};
+
+    let app = create_app();
+
+    const KEY: &[u8] = b"hello";
+    const VALUE: &[u8] = b"world";
+
+    // Create a permissions set
+    let perms_set_h: MDataPermissionSetHandle =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_permission_set_new(&app, ud, cb))) };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| {
+                           mdata_permissions_set_allow(&app,
+                                                       perms_set_h,
+                                                       MDataAction::Insert,
+                                                       ud,
+                                                       cb)
+                       }))
+    };
+
+    // Create permissions for anyone
+    let perms_h: MDataPermissionsHandle =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_permissions_new(&app, ud, cb))) };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| {
+                           mdata_permissions_insert(&app, perms_h, USER_ANYONE, perms_set_h, ud, cb)
+                       }))
+    };
+
+    // Try to create an empty public MD
+    let md_info_pub_h: MDataInfoHandle =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_public(&app, 10000, ud, cb))) };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)))
+    };
+
+    // Try to add entries to a public MD
+    let actions_h: MDataEntryActionsHandle =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_entry_actions_new(&app, ud, cb))) };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| {
+            mdata_entry_actions_insert(&app,
+                                       actions_h,
+                                       KEY.as_ptr(),
+                                       KEY.len(),
+                                       VALUE.as_ptr(),
+                                       VALUE.len(),
+                                       ud,
+                                       cb)
+        }))
+    };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_mutate_entries(&app, md_info_pub_h, actions_h, ud, cb)))
+    }
+
+    // Retrieve added entry
+    {
+        let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
+        let ud = sender_as_user_data(&tx);
+
+        unsafe {
+            mdata_get_value(&app,
+                            md_info_pub_h,
+                            KEY.as_ptr(),
+                            KEY.len(),
+                            ud,
+                            get_value_cb)
+        };
+
+        let result = unwrap!(rx.recv());
+        assert_eq!(&unwrap!(result), &VALUE, "got back invalid value");
+    }
+
+    // Check the version of a public MD
+    let ver: u64 =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_get_version(&app, md_info_pub_h, ud, cb))) };
+    assert_eq!(ver, 0);
+
+    // Try to create a private MD
+    let md_info_priv_h =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_private(&app, 10001, ud, cb))) };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_put(&app, md_info_priv_h, perms_h, ENTRIES_EMPTY, ud, cb)))
+    };
+
+    // Try to add entries to a private MD
+    let key_enc = unsafe {
+        unwrap!(call_vec_u8(|ud, cb| {
+                                mdata_info_encrypt_entry_key(&app,
+                                                             md_info_priv_h,
+                                                             KEY.as_ptr(),
+                                                             KEY.len(),
+                                                             ud,
+                                                             cb)
+                            }))
+    };
+    let value_enc = unsafe {
+        unwrap!(call_vec_u8(|ud, cb| {
+                                mdata_info_encrypt_entry_value(&app,
+                                                               md_info_priv_h,
+                                                               VALUE.as_ptr(),
+                                                               VALUE.len(),
+                                                               ud,
+                                                               cb)
+                            }))
+    };
+
+    let actions_priv_h: MDataEntryActionsHandle =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_entry_actions_new(&app, ud, cb))) };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| {
+            mdata_entry_actions_insert(&app,
+                                       actions_priv_h,
+                                       key_enc.as_ptr(),
+                                       key_enc.len(),
+                                       value_enc.as_ptr(),
+                                       value_enc.len(),
+                                       ud,
+                                       cb)
+        }))
+    };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_mutate_entries(&app, md_info_priv_h, actions_priv_h, ud, cb)))
+    }
+
+    // Retrieve added entry from private MD
+    {
+        let (tx, rx) = mpsc::channel::<Result<Vec<u8>, i32>>();
+        let ud = sender_as_user_data(&tx);
+
+        unsafe {
+            mdata_get_value(&app,
+                            md_info_priv_h,
+                            key_enc.as_ptr(),
+                            key_enc.len(),
+                            ud,
+                            get_value_cb)
+        };
+
+        let result = unwrap!(rx.recv());
+        assert_eq!(&unwrap!(result), &value_enc, "got back invalid value");
+    }
+
+    extern "C" fn get_value_cb(user_data: *mut c_void,
+                               err_code: i32,
+                               val: *const u8,
+                               len: usize,
+                               _version: u64) {
+        let result: Result<Vec<u8>, i32> = if err_code == 0 {
+            Ok(unsafe { vec_clone_from_raw_parts(val, len) })
+        } else {
+            Err(err_code)
+        };
+        unsafe {
+            send_via_user_data(user_data, result);
+        }
+    }
+}

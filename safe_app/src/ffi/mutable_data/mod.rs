@@ -35,11 +35,21 @@ use safe_core::{CoreError, FutureExt, mdata_info};
 use std::os::raw::c_void;
 use std::ptr;
 
+/// Special value that represents an empty permission set.
+#[no_mangle]
+pub static PERMISSIONS_EMPTY: u64 = 0;
+
+/// Special value that represents an empty entry set.
+#[no_mangle]
+pub static ENTRIES_EMPTY: u64 = 0;
+
 /// Create new mutable data and put it on the network.
 ///
 /// `permissions_h` is a handle to permissions to be set on the mutable data.
-/// If 0, the permissions will be empty.
-/// `entries_h` is a handle to entries for the mutable data. If 0, the entries will be empty.
+/// If `PERMISSIONS_EMPTY`, the permissions will be empty.
+///
+/// `entries_h` is a handle to entries for the mutable data.
+/// If `ENTRIES_EMPTY`, the entries will be empty.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_put(app: *const App,
                                    info_h: MDataInfoHandle,
@@ -121,6 +131,9 @@ pub unsafe extern "C" fn mdata_get_version(app: *const App,
 ///     3. pointer to content
 ///     4. content length
 ///     5. entry version
+///
+/// Please notice that if a value is fetched from a private `MutableData`,
+/// it's not automatically decrypted.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_get_value(app: *const App,
                                          info_h: MDataInfoHandle,
@@ -144,10 +157,7 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
 
             client
                 .get_mdata_value(info.name, info.type_tag, key)
-                .and_then(move |value| {
-                              let content = info.decrypt(&value.content)?;
-                              Ok((content, value.entry_version))
-                          })
+                .and_then(move |value| Ok((value.content, value.entry_version)))
                 .map(move |(content, version)| {
                          o_cb(user_data.0,
                               0,
@@ -247,17 +257,11 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
             let info = try_cb!(context.object_cache().get_mdata_info(info_h),
                                user_data,
                                o_cb);
-            let actions = {
-                let actions = try_cb!(context.object_cache().get_mdata_entry_actions(actions_h),
-                                      user_data,
-                                      o_cb);
-                try_cb!(mdata_info::encrypt_entry_actions(&info, &*actions).map_err(AppError::from),
-                        user_data,
-                        o_cb)
-            };
-
+            let actions = try_cb!(context.object_cache().get_mdata_entry_actions(actions_h),
+                                  user_data,
+                                  o_cb);
             client
-                .mutate_mdata_entries(info.name, info.type_tag, actions)
+                .mutate_mdata_entries(info.name, info.type_tag, actions.clone())
                 .map_err(AppError::from)
                 .then(move |result| {
                           o_cb(user_data.0, ffi_result_code!(result));
