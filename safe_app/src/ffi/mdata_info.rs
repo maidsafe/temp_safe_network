@@ -18,7 +18,7 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb};
+use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb, vec_clone_from_raw_parts};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::MDataInfoHandle;
 use routing::{XOR_NAME_LEN, XorName};
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(app: *const App,
                                                                             usize)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
-        let input = slice::from_raw_parts(input_ptr, input_len).to_vec();
+        let input = vec_clone_from_raw_parts(input_ptr, input_len);
 
         (*app).send(move |_, context| {
             let info = try_cb!(context.object_cache().get_mdata_info(info_h),
@@ -150,6 +150,36 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(app: *const App,
                               o_cb);
 
             o_cb(user_data.0, 0, vec.as_safe_ptr(), vec.len());
+
+            None
+        })
+    })
+}
+
+/// Decrypt mdata entry value or a key using the corresponding mdata info.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_info_decrypt(app: *const App,
+                                            info_h: MDataInfoHandle,
+                                            input_ptr: *const u8,
+                                            input_len: usize,
+                                            user_data: *mut c_void,
+                                            o_cb: extern "C" fn(*mut c_void,
+                                                                i32,
+                                                                *const u8,
+                                                                usize)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let encoded = vec_clone_from_raw_parts(input_ptr, input_len);
+
+        (*app).send(move |_, context| {
+            let info = try_cb!(context.object_cache().get_mdata_info(info_h),
+                               user_data,
+                               o_cb);
+            let decrypted = try_cb!(info.decrypt(&encoded).map_err(AppError::from),
+                                    user_data,
+                                    o_cb);
+
+            o_cb(user_data.0, 0, decrypted.as_safe_ptr(), decrypted.len());
 
             None
         })
@@ -208,7 +238,7 @@ pub unsafe extern "C" fn mdata_info_deserialise(app: *const App,
                                                                     i32,
                                                                     MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
-        let encoded = slice::from_raw_parts(ptr, len).to_vec();
+        let encoded = vec_clone_from_raw_parts(ptr, len);
 
         send_sync(app, user_data, o_cb, move |_, context| {
             let info = deserialise(&encoded)?;

@@ -1097,7 +1097,20 @@ fn entries_crud_ffi() {
         };
 
         let result = unwrap!(rx.recv());
-        assert_eq!(&unwrap!(result), &value_enc, "got back invalid value");
+        let got_value_enc = unwrap!(result);
+        assert_eq!(&got_value_enc, &value_enc, "got back invalid value");
+
+        let decrypted = unsafe {
+            unwrap!(call_vec_u8(|ud, cb| {
+                                    mdata_info_decrypt(&app,
+                                                       md_info_priv_h,
+                                                       got_value_enc.as_ptr(),
+                                                       got_value_enc.len(),
+                                                       ud,
+                                                       cb)
+                                }))
+        };
+        assert_eq!(&decrypted, &VALUE, "decrypted invalid value");
     }
 
     extern "C" fn get_value_cb(user_data: *mut c_void,
