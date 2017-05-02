@@ -128,7 +128,7 @@ impl MaidManager {
                                      -> Result<(), InternalError> {
         let CachedRequest { src, dst, .. } =
             self.handle_mutation_response(routing_node, msg_id, res.is_ok())?;
-        // Send failure response back to client
+        // Send the response back to client
         routing_node
             .send_put_idata_response(dst, src, res, msg_id)?;
         Ok(())

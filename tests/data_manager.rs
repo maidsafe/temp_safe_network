@@ -18,7 +18,6 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
-
 use rand::Rng;
 use routing::{Action, Authority, ClientError, EntryActions, Event, ImmutableData,
               MAX_MUTABLE_DATA_ENTRY_ACTIONS, MutableData, PermissionSet, Response, User};
@@ -90,15 +89,27 @@ fn immutable_data_operations_with_churn_without_cache() {
 }
 
 fn immutable_data_operations_with_churn(use_cache: bool) {
-    let network = Network::new(GROUP_SIZE, None);
+    extern crate maidsafe_utilities;
+    unwrap!(maidsafe_utilities::log::init(false));
+
+    let seed = None;
+    let iterations = 3;
+    const DATA_COUNT: usize = 50;
+    const DATA_PER_ITER: usize = 5;
+    let node_count = 9;
+
+    // let seed = None;
+    // let iterations = test_utils::iterations();
+    // const DATA_COUNT: usize = 50;
+    // const DATA_PER_ITER: usize = 5;
+    // let node_count = TEST_NET_SIZE;
+
+    let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
 
-    let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, use_cache);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
-    const DATA_COUNT: usize = 50;
-    const DATA_PER_ITER: usize = 5;
 
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
@@ -106,7 +117,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
     let mut all_data = vec![];
     let mut event_count = 0;
 
-    for i in 0..test_utils::iterations() {
+    for i in 0..iterations {
         trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
         for _ in 0..(cmp::min(DATA_PER_ITER, DATA_COUNT - all_data.len())) {
             let data = test_utils::gen_immutable_data(10, &mut rng);
@@ -503,7 +514,7 @@ fn mutable_data_error_flow() {
     app.ensure_connected(&mut nodes);
 
     // Put without authorisation fails.
-    let new_data = test_utils::gen_mutable_data(10000, 0, *app.signing_public_key(), &mut rng);
+    let new_data = test_utils::gen_mutable_data(10000, 0, *client.signing_public_key(), &mut rng);
     assert_match!(app.put_mdata_response(new_data, &mut nodes),
                   Err(ClientError::AccessDenied));
 

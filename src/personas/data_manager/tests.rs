@@ -381,28 +381,24 @@ fn idata_with_churn() {
     // Helper function to verify the node sent the get request for a data with
     // the given name. Returns the message id and the destination authority name
     // of the request.
-    fn verify_get_idata_request_sent(node: &mut RoutingNode,
-                                     data_name: &XorName)
-                                     -> (MessageId, XorName) {
+    fn verify_get_idata_request_sent(node: &mut RoutingNode, data_name: &XorName) -> XorName {
         assert_eq!(node.sent_requests.len(), 1);
-        let (msg_id, message) = unwrap!(node.sent_requests.drain().next());
+        let (_, message) = unwrap!(node.sent_requests.drain().next());
         let name = assert_match!(message.request,
                                  Request::GetIData { name, .. } => name);
         assert_eq!(name, *data_name);
-        let dst = assert_match!(message.dst, Authority::ManagedNode(name) => name);
-
-        (msg_id, dst)
+        assert_match!(message.dst, Authority::ManagedNode(name) => name)
     }
 
-    let (msg_id, dst) = verify_get_idata_request_sent(&mut new_node, data.name());
+    let dst = verify_get_idata_request_sent(&mut new_node, data.name());
 
     // One of the nodes receives the above GetIData requests and sends the
     // response. We gloss over that here, as it's not the focus of the test.
 
     // Simulate failure of the GetIData request. New node should retry the request with
     // another holder.
-    unwrap!(new_dm.handle_get_idata_failure(&mut new_node, dst, msg_id));
-    let (msg_id, dst) = verify_get_idata_request_sent(&mut new_node, data.name());
+    unwrap!(new_dm.handle_get_idata_failure(&mut new_node, dst));
+    let dst = verify_get_idata_request_sent(&mut new_node, data.name());
 
     // Again, we gloss over the request handling and response sending here.
 
@@ -410,14 +406,14 @@ fn idata_with_churn() {
     // send another request to another holder.
     let bad_data = test_utils::gen_immutable_data(10, &mut rng);
     let bad_data_name = *bad_data.name();
-    unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, bad_data, msg_id));
+    unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, bad_data));
     assert!(new_dm.get_from_chunk_store(&ImmutableDataId(bad_data_name)).is_none());
-    let (msg_id, dst) = verify_get_idata_request_sent(&mut new_node, data.name());
+    let dst = verify_get_idata_request_sent(&mut new_node, data.name());
 
     // ...
 
     // New node now receives successful response. It should put the data into the chunk store.
-    unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, data.clone(), msg_id));
+    unwrap!(new_dm.handle_get_idata_success(&mut new_node, dst, data.clone()));
     assert!(new_dm.get_from_chunk_store(&data.id()).is_some());
 
     // New node should not send any more requests to the other holders, because it already
@@ -445,7 +441,7 @@ fn mdata_with_churn() {
 
     // New node should sent one request for the shell and one request for each entry.
     assert_eq!(new_node.sent_requests.len(), 3);
-    let (shell_msg_id, shell_dst) = take_get_mdata_shell_request(&mut new_node);
+    let shell_dst = take_get_mdata_shell_request(&mut new_node);
     let entry_messages = take_get_mdata_value_requests(&mut new_node);
     assert_eq!(entry_messages.len(), 2);
 
@@ -453,15 +449,13 @@ fn mdata_with_churn() {
     // data (shell + entries) into the chunk store.
     unwrap!(new_dm.handle_get_mdata_shell_success(&mut new_node,
                                                   shell_dst,
-                                                  data.shell(),
-                                                  shell_msg_id));
+                                                  data.shell()));
 
-    for (msg_id, dst, key) in entry_messages {
+    for (dst, key) in entry_messages {
         let value = unwrap!(data.get(&key)).clone();
         unwrap!(new_dm.handle_get_mdata_value_success(&mut new_node,
                                                       dst,
-                                                      value,
-                                                      msg_id));
+                                                      value));
     }
 
     let stored_data = assert_match!(new_dm.get_from_chunk_store(&data.id()),
@@ -485,25 +479,21 @@ fn mdata_with_churn_with_response_failure() {
 
     let (mut new_node, mut new_dm) = setup_mdata_refresh(&data, &mut rng);
 
-    let (shell_msg_id, shell_dst0) = take_get_mdata_shell_request(&mut new_node);
-    let (entry_msg_id, entry_dst0, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
+    let shell_dst0 = take_get_mdata_shell_request(&mut new_node);
+    let (entry_dst0, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
 
     // Simulate receiving failure response. The node should retry the request with
     // different holder.
-    unwrap!(new_dm.handle_get_mdata_shell_failure(&mut new_node,
-                                                  shell_dst0,
-                                                  shell_msg_id));
+    unwrap!(new_dm.handle_get_mdata_shell_failure(&mut new_node, shell_dst0));
     assert!(new_dm.get_from_chunk_store(&data.id()).is_none());
 
-    let (_, shell_dst1) = take_get_mdata_shell_request(&mut new_node);
+    let shell_dst1 = take_get_mdata_shell_request(&mut new_node);
     assert_ne!(shell_dst0, shell_dst1);
 
     // Simulate receiving failure for value request too.
-    unwrap!(new_dm.handle_get_mdata_value_failure(&mut new_node,
-                                                  entry_dst0,
-                                                  entry_msg_id));
+    unwrap!(new_dm.handle_get_mdata_value_failure(&mut new_node, entry_dst0));
 
-    let (_, entry_dst1, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
+    let (entry_dst1, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
     assert_ne!(entry_dst0, entry_dst1);
 }
 
@@ -521,27 +511,25 @@ fn mdata_with_churn_with_hash_mismatch() {
 
     let (mut new_node, mut new_dm) = setup_mdata_refresh(&data, &mut rng);
 
-    let (shell_msg_id, shell_dst0) = take_get_mdata_shell_request(&mut new_node);
-    let (entry_msg_id, entry_dst0, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
+    let shell_dst0 = take_get_mdata_shell_request(&mut new_node);
+    let (entry_dst0, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
 
     // Simulate malicious node sending wrong data. The node should reject it and retry the request
     // with other holder.
     unwrap!(new_dm.handle_get_mdata_shell_success(&mut new_node,
                                                   shell_dst0,
-                                                  bad_data.shell(),
-                                                  shell_msg_id));
+                                                  bad_data.shell()));
     assert!(new_dm.get_from_chunk_store(&bad_data.id()).is_none());
 
-    let (_, shell_dst1) = take_get_mdata_shell_request(&mut new_node);
+    let shell_dst1 = take_get_mdata_shell_request(&mut new_node);
     assert_ne!(shell_dst0, shell_dst1);
 
     let bad_value = unwrap!(bad_data.values().into_iter().next()).clone();
     unwrap!(new_dm.handle_get_mdata_value_success(&mut new_node,
                                                   entry_dst0,
-                                                  bad_value,
-                                                  entry_msg_id));
+                                                  bad_value));
 
-    let (_, entry_dst1, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
+    let (entry_dst1, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
     assert_ne!(entry_dst0, entry_dst1);
 }
 
@@ -561,20 +549,18 @@ fn mdata_with_churn_with_entries_arriving_before_shell() {
 
     let (mut new_node, mut new_dm) = setup_mdata_refresh(&data, &mut rng);
 
-    let (shell_msg_id, shell_dst) = take_get_mdata_shell_request(&mut new_node);
-    let (entry_msg_id, entry_dst, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
+    let shell_dst = take_get_mdata_shell_request(&mut new_node);
+    let (entry_dst, _) = unwrap!(take_get_mdata_value_requests(&mut new_node).pop());
 
     // First the entry arrives.
     unwrap!(new_dm.handle_get_mdata_value_success(&mut new_node,
                                                   entry_dst,
-                                                  value,
-                                                  entry_msg_id));
+                                                  value));
 
     // Then the shell arrives.
     unwrap!(new_dm.handle_get_mdata_shell_success(&mut new_node,
                                                   shell_dst,
-                                                  data.shell(),
-                                                  shell_msg_id));
+                                                  data.shell()));
 
     let stored_data = assert_match!(new_dm.get_from_chunk_store(&data.id()),
                                     Some(data) => data);
@@ -585,7 +571,7 @@ fn mdata_with_churn_with_entries_arriving_before_shell() {
 }
 
 #[test]
-fn mdata_parallel_mutations() {
+fn mdata_conflicting_parallel_mutations() {
     let mut rng = rand::thread_rng();
 
     let mut node = RoutingNode::new();
@@ -601,10 +587,11 @@ fn mdata_parallel_mutations() {
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
 
-    // Issue two mutations in parallel. Only the first one should result in group
-    // refresh being sent.
+    // Issue two mutations in parallel, both touching the same key. Only the first
+    // one should result in group refresh being sent. The second one should be
+    // rejected.
     let actions = EntryActions::new()
-        .ins(b"key0".to_vec(), b"value0".to_vec(), 0)
+        .ins(b"key".to_vec(), b"value 0".to_vec(), 0)
         .into();
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -617,7 +604,7 @@ fn mdata_parallel_mutations() {
                                            client_key_0));
 
     let actions = EntryActions::new()
-        .ins(b"key1".to_vec(), b"value1".to_vec(), 0)
+        .ins(b"key".to_vec(), b"value 1".to_vec(), 0)
         .into();
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -689,9 +676,9 @@ fn setup_mdata_refresh<R: Rng>(data: &MutableData, rng: &mut R) -> (RoutingNode,
     (new_node, new_dm)
 }
 
-// Removes GetMDataShell request from the list of sent requests and returns its message id and
+// Removes GetMDataShell request from the list of sent requests and returns its
 // destination authority name.
-fn take_get_mdata_shell_request(node: &mut RoutingNode) -> (MessageId, XorName) {
+fn take_get_mdata_shell_request(node: &mut RoutingNode) -> XorName {
     let result = node.sent_requests
         .iter()
         .filter_map(|(msg_id, message)| match (&message.request, message.dst) {
@@ -703,12 +690,12 @@ fn take_get_mdata_shell_request(node: &mut RoutingNode) -> (MessageId, XorName) 
         .next();
     let (msg_id, dst) = unwrap!(result);
     let _ = node.sent_requests.remove(&msg_id);
-    (msg_id, dst)
+    dst
 }
 
 // Removes GetMDataValue requests from the list of sent requests and returns their
-// entry keys, message ids and destination authority names.
-fn take_get_mdata_value_requests(node: &mut RoutingNode) -> Vec<(MessageId, XorName, Vec<u8>)> {
+// entry keys and destination authority names.
+fn take_get_mdata_value_requests(node: &mut RoutingNode) -> Vec<(XorName, Vec<u8>)> {
     let result: Vec<_> = node.sent_requests
         .iter()
         .filter_map(|(msg_id, message)| match (&message.request, message.dst) {
@@ -724,4 +711,7 @@ fn take_get_mdata_value_requests(node: &mut RoutingNode) -> Vec<(MessageId, XorN
     }
 
     result
+        .into_iter()
+        .map(|(_, dst, key)| (dst, key))
+        .collect()
 }

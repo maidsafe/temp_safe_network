@@ -236,7 +236,7 @@ impl DataManager {
             if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
                 for node in &group {
                     let _ = self.cache
-                        .register_needed_data_with_holder(&data_id, *node);
+                        .register_needed_data_with_another_holder(&data_id, *node);
                 }
 
                 self.request_needed_fragments(routing_node)?;
@@ -271,10 +271,9 @@ impl DataManager {
     pub fn handle_get_idata_success(&mut self,
                                     routing_node: &mut RoutingNode,
                                     src: XorName,
-                                    data: ImmutableData,
-                                    msg_id: MessageId)
+                                    data: ImmutableData)
                                     -> Result<(), InternalError> {
-        let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src, msg_id) {
+        let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src) {
             match fragment {
                 FragmentInfo::ImmutableData(ref name) if *name == *data.name() => {
                     self.cache.remove_needed_fragment(&fragment);
@@ -314,12 +313,9 @@ impl DataManager {
 
     pub fn handle_get_idata_failure(&mut self,
                                     routing_node: &mut RoutingNode,
-                                    src: XorName,
-                                    msg_id: MessageId)
+                                    src: XorName)
                                     -> Result<(), InternalError> {
-        if self.cache
-               .stop_needed_fragment_request(&src, msg_id)
-               .is_none() {
+        if self.cache.stop_needed_fragment_request(&src).is_none() {
             return Err(InternalError::InvalidMessage);
         }
 
@@ -412,10 +408,9 @@ impl DataManager {
     pub fn handle_get_mdata_shell_success(&mut self,
                                           routing_node: &mut RoutingNode,
                                           src: XorName,
-                                          mut shell: MutableData,
-                                          msg_id: MessageId)
+                                          mut shell: MutableData)
                                           -> Result<(), InternalError> {
-        let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src, msg_id) {
+        let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src) {
             let actual_hash = utils::mdata_shell_hash(&shell);
 
             match fragment {
@@ -481,12 +476,9 @@ impl DataManager {
 
     pub fn handle_get_mdata_shell_failure(&mut self,
                                           routing_node: &mut RoutingNode,
-                                          src: XorName,
-                                          msg_id: MessageId)
+                                          src: XorName)
                                           -> Result<(), InternalError> {
-        if self.cache
-               .stop_needed_fragment_request(&src, msg_id)
-               .is_none() {
+        if self.cache.stop_needed_fragment_request(&src).is_none() {
             return Err(InternalError::InvalidMessage);
         }
 
@@ -577,10 +569,9 @@ impl DataManager {
     pub fn handle_get_mdata_value_success(&mut self,
                                           routing_node: &mut RoutingNode,
                                           src: XorName,
-                                          value: Value,
-                                          msg_id: MessageId)
+                                          value: Value)
                                           -> Result<(), InternalError> {
-        let info = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src, msg_id) {
+        let info = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src) {
             let actual_hash = utils::mdata_value_hash(&value);
 
             match fragment {
@@ -633,12 +624,9 @@ impl DataManager {
 
     pub fn handle_get_mdata_value_failure(&mut self,
                                           routing_node: &mut RoutingNode,
-                                          src: XorName,
-                                          msg_id: MessageId)
+                                          src: XorName)
                                           -> Result<(), InternalError> {
-        if self.cache
-               .stop_needed_fragment_request(&src, msg_id)
-               .is_none() {
+        if self.cache.stop_needed_fragment_request(&src).is_none() {
             return Err(InternalError::InvalidMessage);
         }
 
@@ -1163,15 +1151,23 @@ impl DataManager {
         let src = Authority::ManagedNode(routing_node.name()?);
         let candidates = self.cache.unrequested_needed_fragments();
 
+        // Set of holders we already sent a request to. Used to prevent sending
+        // multiple request to a single holder.
+        let mut busy_holders = HashSet::default();
+
         for (fragment, holders) in candidates {
             for holder in holders {
                 if let Some(group) = routing_node.close_group(*fragment.name(), GROUP_SIZE) {
                     if group.contains(&holder) {
+                        if !busy_holders.insert(holder) {
+                            continue;
+                        }
+
                         let dst = Authority::ManagedNode(holder);
                         let msg_id = MessageId::new();
 
                         self.cache
-                            .start_needed_fragment_request(&fragment, &holder, msg_id);
+                            .start_needed_fragment_request(&fragment, &holder);
 
                         match fragment {
                             FragmentInfo::ImmutableData(name) => {

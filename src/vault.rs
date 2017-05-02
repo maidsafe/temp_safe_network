@@ -552,22 +552,16 @@ impl Vault {
             // ================== GetIData success ==================
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetIData {
-                 res: Ok(data),
-                 msg_id,
-             }) => {
+             Response::GetIData { res: Ok(data), .. }) => {
                 self.data_manager
-                    .handle_get_idata_success(&mut self.routing_node, src_name, data, msg_id)
+                    .handle_get_idata_success(&mut self.routing_node, src_name, data)
             }
             // ================== GetIData failure ==================
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetIData {
-                 res: Err(_),
-                 msg_id,
-             }) => {
+             Response::GetIData { res: Err(_), .. }) => {
                 self.data_manager
-                    .handle_get_idata_failure(&mut self.routing_node, src_name, msg_id)
+                    .handle_get_idata_failure(&mut self.routing_node, src_name)
             }
             // ================== PutIData ==================
             (Authority::NaeManager(_),
@@ -586,42 +580,30 @@ impl Vault {
             // ================== GetMDataShell success =============
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetMDataShell {
-                 res: Ok(shell),
-                 msg_id,
-             }) => {
+             Response::GetMDataShell { res: Ok(shell), .. }) => {
                 self.data_manager
-                    .handle_get_mdata_shell_success(&mut self.routing_node, src_name, shell, msg_id)
+                    .handle_get_mdata_shell_success(&mut self.routing_node, src_name, shell)
             }
             // ================== GetMDataShell failure =============
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetMDataShell {
-                 res: Err(_),
-                 msg_id,
-             }) => {
+             Response::GetMDataShell { res: Err(_), .. }) => {
                 self.data_manager
-                    .handle_get_mdata_shell_failure(&mut self.routing_node, src_name, msg_id)
+                    .handle_get_mdata_shell_failure(&mut self.routing_node, src_name)
             }
             // ================== GetMDataValue success =============
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetMDataValue {
-                 res: Ok(value),
-                 msg_id,
-             }) => {
+             Response::GetMDataValue { res: Ok(value), .. }) => {
                 self.data_manager
-                    .handle_get_mdata_value_success(&mut self.routing_node, src_name, value, msg_id)
+                    .handle_get_mdata_value_success(&mut self.routing_node, src_name, value)
             }
             // ================== GetMDataValue failure =============
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetMDataValue {
-                 res: Err(_),
-                 msg_id,
-             }) => {
+             Response::GetMDataValue { res: Err(_), .. }) => {
                 self.data_manager
-                    .handle_get_mdata_value_failure(&mut self.routing_node, src_name, msg_id)
+                    .handle_get_mdata_value_failure(&mut self.routing_node, src_name)
             }
             // ================== MutateMDataEntries ==================
             (Authority::NaeManager(_),
