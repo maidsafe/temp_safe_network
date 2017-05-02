@@ -202,7 +202,7 @@ mod tests {
 
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_handle));
-            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, &context));
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, context));
             (plain_text, cipher_text)
         });
         assert_ne!(cipher_text, plain_text);
@@ -227,7 +227,7 @@ mod tests {
 
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_handle));
-            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, &context));
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, context));
             (plain_text, cipher_text)
         });
         assert_ne!(cipher_text, plain_text);
@@ -268,7 +268,7 @@ mod tests {
         let plain_text = unwrap!(utils::generate_random_vector::<u8>(10));
         let (plain_text, cipher_text) = run_now(&app_0, move |_, context| {
             let cipher_opt = unwrap!(context.object_cache().get_cipher_opt(cipher_opt_h));
-            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, &context));
+            let cipher_text = unwrap!(cipher_opt.encrypt(&plain_text, context));
             (plain_text, cipher_text)
         });
 

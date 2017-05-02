@@ -91,8 +91,8 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
                           })
                 .and_then(move |(mut auth_cfg, cfg_version)| {
                               let _app = fry!(auth_cfg.remove(&app_id_hash)
-                        .ok_or(AuthError::from("Logical error: app isn't found in \
-                                                authenticator config")));
+                        .ok_or_else(|| AuthError::from("Logical error: app isn't found in \
+                                                        authenticator config")));
 
                               update_config(&c3, Some(cfg_version + 1), &auth_cfg)
                           })

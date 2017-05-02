@@ -39,7 +39,8 @@
 
 #![cfg_attr(feature="cargo-clippy", deny(clippy, unicode_not_nfc, wrong_pub_self_convention,
                                    option_unwrap_used))]
-#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments))]
+// Allow `panic_params` until https://github.com/Manishearth/rust-clippy/issues/768 is resolved.
+#![cfg_attr(feature="cargo-clippy", allow(use_debug, too_many_arguments, panic_params))]
 
 #[macro_use]
 extern crate ffi_utils;
