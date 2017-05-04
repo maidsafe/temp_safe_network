@@ -645,7 +645,8 @@ fn account_replication_during_churn() {
     old_node.add_to_routing_table(new_node_name);
     new_node.add_to_routing_table(unwrap!(old_node.name()));
 
-    unwrap!(old_mm.handle_node_added(&mut old_node, &new_node_name));
+    let rt = unwrap!(old_node.routing_table()).clone();
+    unwrap!(old_mm.handle_node_added(&mut old_node, &new_node_name, &rt));
 
     // The old node sends refresh request to the client manager of each account it holds.
     let msg_id = MessageId::from_added_node(new_node_name);

@@ -26,6 +26,7 @@ use routing::mock_crust::{self, Network};
 use safe_vault::{DEFAULT_ACCOUNT_SIZE, GROUP_SIZE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
+use std::collections::BTreeSet;
 
 const TEST_NET_SIZE: usize = 20;
 const TEST_TAG: u64 = 123456;
@@ -198,11 +199,14 @@ fn create_account_twice() {
     assert_eq!(Err(ClientError::NoSuchAccount),
                client1.get_account_info_response(&mut nodes));
 
+    let mut owners = BTreeSet::new();
+    let _ = owners.insert(*client0.signing_public_key());
+
     let account = unwrap!(MutableData::new(rng.gen(),
                                            TYPE_TAG_SESSION_PACKET,
                                            Default::default(),
                                            Default::default(),
-                                           Default::default()));
+                                           owners.clone()));
 
     let expected_account_info = AccountInfo {
         mutations_done: 1,
@@ -230,7 +234,7 @@ fn create_account_twice() {
 
     // Create the same account using `client1`.
     assert_eq!(client1.put_mdata_response(account, &mut nodes),
-               Err(ClientError::AccountExists));
+               Err(ClientError::InvalidOwners));
     let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client1);
 
     // That should not succeed.
@@ -244,7 +248,7 @@ fn create_account_twice() {
                                            TYPE_TAG_SESSION_PACKET,
                                            Default::default(),
                                            Default::default(),
-                                           Default::default()));
+                                           owners));
     assert_eq!(client0.put_mdata_response(account, &mut nodes),
                Err(ClientError::AccountExists));
 }

@@ -25,9 +25,8 @@ use GROUP_SIZE;
 use error::InternalError;
 use itertools::Itertools;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
-              TYPE_TAG_SESSION_PACKET, User, XorName};
-use routing::ClientError;
+use routing::{Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData,
+              PermissionSet, RoutingTable, TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::hash_map::Entry;
@@ -484,18 +483,16 @@ impl MaidManager {
 
     pub fn handle_node_added(&mut self,
                              routing_node: &mut RoutingNode,
-                             node_name: &XorName)
+                             node_name: &XorName,
+                             routing_table: &RoutingTable<XorName>)
                              -> Result<(), InternalError> {
         // Remove all accounts which we are no longer responsible for.
-        let accounts_to_delete = {
-            let routing_table = routing_node.routing_table()?;
+        let accounts_to_delete = self.accounts
+            .keys()
+            .filter(|name| !routing_table.is_closest(*name, GROUP_SIZE))
+            .cloned()
+            .collect_vec();
 
-            self.accounts
-                .keys()
-                .filter(|name| !routing_table.is_closest(*name, GROUP_SIZE))
-                .cloned()
-                .collect_vec()
-        };
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete = self.request_cache
             .iter()

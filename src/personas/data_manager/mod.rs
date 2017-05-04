@@ -28,9 +28,8 @@ use accumulator::Accumulator;
 use chunk_store::{Chunk, ChunkId, ChunkStore};
 use error::InternalError;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
-              TYPE_TAG_SESSION_PACKET, User, Value, XorName};
-use routing::ClientError;
+use routing::{Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData,
+              PermissionSet, RoutingTable, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
@@ -788,10 +787,10 @@ impl DataManager {
 
     pub fn handle_node_added(&mut self,
                              routing_node: &mut RoutingNode,
-                             node_name: &XorName)
+                             node_name: &XorName,
+                             routing_table: &RoutingTable<XorName>)
                              -> Result<(), InternalError> {
-        if self.cache
-               .prune_needed_fragments(routing_node.routing_table()?) {
+        if self.cache.prune_needed_fragments(routing_table) {
             let _ = self.request_needed_fragments(routing_node);
         }
 
@@ -802,9 +801,7 @@ impl DataManager {
             let data_id = fragment.data_id();
 
             // Only retain fragments for which we're still in the close group.
-            match routing_node
-                      .routing_table()?
-                      .other_closest_names(data_id.name(), GROUP_SIZE) {
+            match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
                 None => {
                     trace!("No longer a DM for {:?}", data_id);
 
@@ -849,25 +846,22 @@ impl DataManager {
     /// Send to all members of group of data.
     pub fn handle_node_lost(&mut self,
                             routing_node: &mut RoutingNode,
-                            node_name: &XorName)
+                            node_name: &XorName,
+                            routing_table: &RoutingTable<XorName>)
                             -> Result<(), InternalError> {
-        let pruned_unneeded_chunks = self.cache
-            .prune_unneeded_chunks(routing_node.routing_table()?);
+        let pruned_unneeded_chunks = self.cache.prune_unneeded_chunks(routing_table);
         if pruned_unneeded_chunks != 0 {
             self.immutable_data_count += pruned_unneeded_chunks;
             log_status!(self);
         }
 
-        if self.cache
-               .prune_needed_fragments(routing_node.routing_table()?) {
-            let _ = self.request_needed_fragments(routing_node);
+        if self.cache.prune_needed_fragments(routing_table) {
+            self.request_needed_fragments(routing_node)?;
         }
 
         let mut refreshes = HashMap::default();
         for fragment in self.our_fragments() {
-            match routing_node
-                      .routing_table()?
-                      .other_closest_names(fragment.name(), GROUP_SIZE) {
+            match routing_table.other_closest_names(fragment.name(), GROUP_SIZE) {
                 None => {
                     error!("Moved out of close group of {:?} in a NodeLost event.",
                            node_name);

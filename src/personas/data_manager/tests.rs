@@ -295,7 +295,8 @@ fn handle_node_added() {
 
     // Node receives NodeAdded event. It should send all the fragments that it has
     // to the new node in a Refresh message.
-    unwrap!(dm.handle_node_added(&mut node, &new_node_name));
+    let rt = unwrap!(node.routing_table()).clone();
+    unwrap!(dm.handle_node_added(&mut node, &new_node_name, &rt));
 
     assert_eq!(node.sent_requests.len(), 1);
 

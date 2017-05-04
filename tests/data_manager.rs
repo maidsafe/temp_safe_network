@@ -89,20 +89,11 @@ fn immutable_data_operations_with_churn_without_cache() {
 }
 
 fn immutable_data_operations_with_churn(use_cache: bool) {
-    extern crate maidsafe_utilities;
-    unwrap!(maidsafe_utilities::log::init(false));
-
     let seed = None;
-    let iterations = 3;
+    let iterations = test_utils::iterations();
     const DATA_COUNT: usize = 50;
     const DATA_PER_ITER: usize = 5;
-    let node_count = 9;
-
-    // let seed = None;
-    // let iterations = test_utils::iterations();
-    // const DATA_COUNT: usize = 50;
-    // const DATA_PER_ITER: usize = 5;
-    // let node_count = TEST_NET_SIZE;
+    let node_count = TEST_NET_SIZE;
 
     let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
@@ -135,6 +126,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
             trace!("Removing {} node(s).", number);
             for _ in 0..number {
                 let node_index = rng.gen_range(1, nodes.len());
+                trace!("Removing node {:?}", nodes[node_index].name());
                 test_node::drop_node(&mut nodes, node_index);
             }
         }

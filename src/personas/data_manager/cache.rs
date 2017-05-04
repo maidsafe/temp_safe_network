@@ -91,7 +91,15 @@ impl Cache {
 
     /// Returns all data fragments we need.
     pub fn needed_fragments(&self) -> HashSet<FragmentInfo> {
-        self.fragment_index.keys().cloned().collect()
+        self.fragment_index
+            .keys()
+            .filter(|fragment| if let FragmentInfo::ImmutableData(ref name) = **fragment {
+                        !self.unneeded_chunks.contains(name)
+                    } else {
+                        true
+                    })
+            .cloned()
+            .collect()
     }
 
     /// Insert new needed fragment and register it with the given holder.

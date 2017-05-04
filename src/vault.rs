@@ -26,14 +26,12 @@ use mock_routing::NodeBuilder;
 use personas::data_manager::DataId;
 use personas::data_manager::DataManager;
 use personas::maid_manager::MaidManager;
-use routing::{Authority, EventStream, Request, Response, XorName};
+use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
 pub use routing::Event;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
 pub use routing::Node as RoutingNode;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
 use routing::NodeBuilder;
-#[cfg(feature = "use-mock-crust")]
-use routing::RoutingTable;
 #[cfg(not(feature = "use-mock-crust"))]
 use rust_sodium;
 use std::env;
@@ -120,8 +118,12 @@ impl Vault {
         let event_res = match event {
             Event::Request { request, src, dst } => self.on_request(request, src, dst),
             Event::Response { response, src, dst } => self.on_response(response, src, dst),
-            Event::NodeAdded(node_added, _) => self.on_node_added(node_added),
-            Event::NodeLost(node_lost, _) => self.on_node_lost(node_lost),
+            Event::NodeAdded(node_added, routing_table) => {
+                self.on_node_added(node_added, routing_table)
+            }
+            Event::NodeLost(node_lost, routing_table) => {
+                self.on_node_lost(node_lost, routing_table)
+            }
             Event::RestartRequired => {
                 warn!("Restarting Vault");
                 ret = Some(false);
@@ -638,19 +640,25 @@ impl Vault {
         }
     }
 
-    fn on_node_added(&mut self, node_added: XorName) -> Result<(), InternalError> {
+    fn on_node_added(&mut self,
+                     node_added: XorName,
+                     routing_table: RoutingTable<XorName>)
+                     -> Result<(), InternalError> {
         self.maid_manager
-            .handle_node_added(&mut self.routing_node, &node_added)?;
+            .handle_node_added(&mut self.routing_node, &node_added, &routing_table)?;
         self.data_manager
-            .handle_node_added(&mut self.routing_node, &node_added)?;
+            .handle_node_added(&mut self.routing_node, &node_added, &routing_table)?;
         Ok(())
     }
 
-    fn on_node_lost(&mut self, node_lost: XorName) -> Result<(), InternalError> {
+    fn on_node_lost(&mut self,
+                    node_lost: XorName,
+                    routing_table: RoutingTable<XorName>)
+                    -> Result<(), InternalError> {
         self.maid_manager
             .handle_node_lost(&mut self.routing_node, &node_lost)?;
         self.data_manager
-            .handle_node_lost(&mut self.routing_node, &node_lost)?;
+            .handle_node_lost(&mut self.routing_node, &node_lost, &routing_table)?;
         Ok(())
     }
 }

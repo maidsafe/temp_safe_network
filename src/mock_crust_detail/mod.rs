@@ -97,15 +97,14 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
                 .iter()
                 .map(TestNode::name)
                 .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
-
         expected_data_holders.truncate(GROUP_SIZE);
 
-        assert_eq!(expected_data_holders,
-                   data_holders,
-                   "Data: {:?}. expected = {:?}, actual = {:?}",
+        if expected_data_holders != data_holders {
+            panic!("Unexpected data holders for {:?}\n  expected: {:?}\n    actual: {:?}",
                    data_id,
                    expected_data_holders,
                    data_holders);
+        }
     }
 }
 
