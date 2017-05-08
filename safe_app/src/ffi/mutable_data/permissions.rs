@@ -21,7 +21,7 @@ use App;
 use errors::AppError;
 use ffi::helper::send_sync;
 use ffi::mutable_data::helper;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb};
+use ffi_utils::{FfiResult, OpaqueCtx, catch_unwind_cb};
 use object_cache::{MDataPermissionSetHandle, MDataPermissionsHandle, SignKeyHandle};
 use routing::{Action, PermissionSet, User};
 use std::os::raw::c_void;
@@ -59,7 +59,7 @@ impl Into<Action> for MDataAction {
 pub unsafe extern "C" fn mdata_permission_set_new(app: *const App,
                                                   user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
-                                                                      i32,
+                                                                      FfiResult,
                                                                       MDataPermissionSetHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
@@ -76,7 +76,7 @@ pub unsafe extern "C" fn mdata_permissions_set_allow(app: *const App,
                                                      set_h: MDataPermissionSetHandle,
                                                      action: MDataAction,
                                                      user_data: *mut c_void,
-                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                     o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn mdata_permissions_set_deny(app: *const App,
                                                     set_h: MDataPermissionSetHandle,
                                                     action: MDataAction,
                                                     user_data: *mut c_void,
-                                                    o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                    o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn mdata_permissions_set_clear(app: *const App,
                                                      set_h: MDataPermissionSetHandle,
                                                      action: MDataAction,
                                                      user_data: *mut c_void,
-                                                     o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                     o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut set = context.object_cache().get_mdata_permission_set(set_h)?;
@@ -123,7 +123,7 @@ pub unsafe extern "C" fn mdata_permissions_set_clear(app: *const App,
 pub unsafe extern "C" fn mdata_permissions_set_free(app: *const App,
                                                     set_h: MDataPermissionSetHandle,
                                                     user_data: *mut c_void,
-                                                    o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                    o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn mdata_permissions_set_free(app: *const App,
 pub unsafe extern "C" fn mdata_permissions_new(app: *const App,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
-                                                                   i32,
+                                                                   FfiResult,
                                                                    MDataPermissionsHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
@@ -155,7 +155,7 @@ pub unsafe extern "C" fn mdata_permissions_new(app: *const App,
 pub unsafe extern "C" fn mdata_permissions_len(app: *const App,
                                                permissions_h: MDataPermissionsHandle,
                                                user_data: *mut c_void,
-                                               o_cb: extern "C" fn(*mut c_void, i32, usize)) {
+                                               o_cb: extern "C" fn(*mut c_void, FfiResult, usize)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let permissions = context
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn mdata_permissions_get(app: *const App,
                                                user_h: SignKeyHandle,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
-                                                                   i32,
+                                                                   FfiResult,
                                                                    MDataPermissionSetHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -201,7 +201,7 @@ fn mdata_permissions_for_each(app: *const App,
                                                             SignKeyHandle,
                                                             MDataPermissionSetHandle),
                               user_data: *mut c_void,
-done_cb: extern "C" fn(*mut c_void, i32)){
+done_cb: extern "C" fn(*mut c_void, FfiResult )){
     catch_unwind_cb(user_data, done_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -231,7 +231,7 @@ pub unsafe extern "C" fn mdata_permissions_insert(app: *const App,
                                                   user_h: SignKeyHandle,
                                                   permission_set_h: MDataPermissionSetHandle,
                                                   user_data: *mut c_void,
-                                                  o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                  o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let mut permissions = context
@@ -250,7 +250,7 @@ pub unsafe extern "C" fn mdata_permissions_insert(app: *const App,
 pub unsafe extern "C" fn mdata_permissions_free(app: *const App,
                                                 permissions_h: MDataPermissionsHandle,
                                                 user_data: *mut c_void,
-                                                o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context

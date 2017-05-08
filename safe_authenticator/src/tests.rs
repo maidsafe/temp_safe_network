@@ -19,7 +19,7 @@ use Authenticator;
 use access_container::access_container_entry;
 use errors::{AuthError, ERR_UNKNOWN_APP};
 use ffi::apps::*;
-use ffi_utils::{ReprC, StringError, base64_encode, from_c_str};
+use ffi_utils::{FfiResult, ReprC, StringError, base64_encode, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, send_via_user_data, sender_as_user_data};
 use futures::{Future, future};
 use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp, get_config};
@@ -701,7 +701,8 @@ fn decode_ipc_msg(authenticator: &Authenticator,
         }
     }
 
-    extern "C" fn err_cb(user_data: *mut c_void, error_code: i32, response: *const c_char) {
+    #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+    extern "C" fn err_cb(user_data: *mut c_void, res: FfiResult, response: *const c_char) {
         unsafe {
             let ipc_resp = if response.is_null() {
                 None
@@ -713,7 +714,7 @@ fn decode_ipc_msg(authenticator: &Authenticator,
                 }
             };
 
-            send_via_user_data(user_data, Err::<IpcMsg, _>((error_code, ipc_resp)))
+            send_via_user_data(user_data, Err::<IpcMsg, _>((res.error_code, ipc_resp)))
         }
     }
 

@@ -27,6 +27,7 @@ use safe_core::ipc::IpcError;
 use safe_core::nfs::NfsError;
 use std::error::Error;
 use std::ffi::NulError;
+use std::fmt::{self, Display, Formatter};
 use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
@@ -118,6 +119,23 @@ pub enum AuthError {
     NoSuchPublicId,
     /// Public ID already exists
     PublicIdExists,
+}
+
+impl Display for AuthError {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        match *self {
+            AuthError::Unexpected(ref error) => {
+                write!(formatter, "Unexpected (probably a logic error): {}", error)
+            }
+            AuthError::CoreError(ref error) => write!(formatter, "Core error: {}", error),
+            AuthError::IoError(ref error) => write!(formatter, "I/O error: {}", error),
+            AuthError::NfsError(ref error) => write!(formatter, "NFS error: {:?}", error),
+            AuthError::EncodeDecodeError => write!(formatter, "Serialisation error"),
+            AuthError::IpcError(ref error) => write!(formatter, "IPC error: {:?}", error),
+            AuthError::NoSuchPublicId => write!(formatter, "Public ID not found"),
+            AuthError::PublicIdExists => write!(formatter, "Public ID already exists"),
+        }
+    }
 }
 
 impl Into<IpcError> for AuthError {

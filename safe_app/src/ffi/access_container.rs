@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use App;
-use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str};
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
@@ -30,7 +30,7 @@ use std::ptr;
 pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
                                                               user_data: *mut c_void,
                                                               o_cb: extern "C" fn(*mut c_void,
-                                                                                  i32)) {
+                                                                                  FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -38,9 +38,14 @@ pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
             context
                 .refresh_access_info(client)
                 .then(move |res| {
-                          o_cb(user_data.0, ffi_result_code!(res));
-                          Ok(())
-                      })
+                    let (error_code, description) = ffi_result!(res);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         });
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -52,7 +57,7 @@ pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
 pub unsafe extern "C" fn access_container_get_names(app: *const App,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
-                                                                        i32,
+                                                                        FfiResult,
                                                                         *const *const c_char,
                                                                         u32)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -74,11 +79,20 @@ pub unsafe extern "C" fn access_container_get_names(app: *const App,
                         .map(|c_string| c_string.as_ptr())
                         .collect();
                     o_cb(user_data.0,
-                         0,
+                         FFI_RESULT_OK,
                          ptr_vec.as_safe_ptr(),
                          c_str_vec.len() as u32);
                 })
-                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0); })
+                .map_err(move |e| {
+                    let (error_code, description) = ffi_error!(e);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         ptr::null(),
+                         0);
+                })
                 .into_box()
                 .into()
         })
@@ -92,7 +106,7 @@ fn access_container_get_container_mdata_info(app: *const App,
                                              name: *const c_char,
                                              user_data: *mut c_void,
                                              o_cb: extern "C" fn(*mut c_void,
-                                                                 i32,
+                                                                 FfiResult,
 MDataInfoHandle)){
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -105,9 +119,17 @@ MDataInfoHandle)){
                 .get_container_mdata_info(client, name)
                 .map(move |info| {
                          let handle = context.object_cache().insert_mdata_info(info);
-                         o_cb(user_data.0, 0, handle);
+                         o_cb(user_data.0, FFI_RESULT_OK, handle);
                      })
-                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), 0))
+                .map_err(move |err| {
+                    let (error_code, description) = ffi_error!(err);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         0)
+                })
                 .into_box()
                 .into()
         })
@@ -121,19 +143,27 @@ pub unsafe extern "C" fn access_container_is_permitted(app: *const App,
                                                        permission: Permission,
                                                        user_data: *mut c_void,
                                                        o_cb: extern "C" fn(*mut c_void,
-                                                                           i32,
+                                                                           FfiResult,
                                                                            bool)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let name = from_c_str(name)?;
 
         (*app).send(move |client, context| {
-                        context
-                            .is_permitted(client, name, permission)
-                            .map(move |answer| o_cb(user_data.0, 0, answer))
-                            .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), false))
-                            .into_box()
-                            .into()
-                    })
+            context
+                .is_permitted(client, name, permission)
+                .map(move |answer| o_cb(user_data.0, FFI_RESULT_OK, answer))
+                .map_err(move |err| {
+                    let (error_code, description) = ffi_error!(err);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         false)
+                })
+                .into_box()
+                .into()
+        })
     })
 }

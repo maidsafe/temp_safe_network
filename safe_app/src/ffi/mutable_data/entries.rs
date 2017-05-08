@@ -20,7 +20,8 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb, vec_clone_from_raw_parts};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
+                vec_clone_from_raw_parts};
 use ffi_utils::callback::Callback;
 use object_cache::{MDataEntriesHandle, MDataKeysHandle, MDataValuesHandle};
 use routing::{ClientError, Value};
@@ -33,7 +34,7 @@ use std::os::raw::c_void;
 pub unsafe extern "C" fn mdata_entries_new(app: *const App,
                                            user_data: *mut c_void,
                                            o_cb: extern "C" fn(*mut c_void,
-                                                               i32,
+                                                               FfiResult,
                                                                MDataEntriesHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
@@ -53,7 +54,7 @@ pub unsafe extern "C" fn mdata_entries_insert(app: *const App,
                                               value_ptr: *const u8,
                                               value_len: usize,
                                               user_data: *mut c_void,
-                                              o_cb: extern "C" fn(*mut c_void, i32)) {
+                                              o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = vec_clone_from_raw_parts(key_ptr, key_len);
         let value = vec_clone_from_raw_parts(value_ptr, value_len);
@@ -75,7 +76,7 @@ pub unsafe extern "C" fn mdata_entries_insert(app: *const App,
 pub unsafe extern "C" fn mdata_entries_len(app: *const App,
                                            entries_h: MDataEntriesHandle,
                                            user_data: *mut c_void,
-                                           o_cb: extern "C" fn(*mut c_void, i32, usize)) {
+                                           o_cb: extern "C" fn(*mut c_void, FfiResult, usize)) {
     catch_unwind_cb(user_data,
                     o_cb,
                     || with_entries(app, entries_h, user_data, o_cb, |entries| Ok(entries.len())))
@@ -91,7 +92,7 @@ pub unsafe extern "C" fn mdata_entries_get(app: *const App,
                                            key_len: usize,
                                            user_data: *mut c_void,
                                            o_cb: extern "C" fn(*mut c_void,
-                                                               i32,
+                                                               FfiResult,
                                                                *const u8,
                                                                usize,
                                                                u64)) {
@@ -111,7 +112,7 @@ pub unsafe extern "C" fn mdata_entries_get(app: *const App,
             let value = try_cb!(value, user_data, o_cb);
 
             o_cb(user_data.0,
-                 0,
+                 FFI_RESULT_OK,
                  value.content.as_safe_ptr(),
                  value.content.len(),
                  value.entry_version);
@@ -138,7 +139,7 @@ pub unsafe extern "C" fn mdata_entries_for_each(app: *const App,
                                                                         usize,
                                                                         u64),
                                                 user_data: *mut c_void,
-                                                o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -162,7 +163,7 @@ pub unsafe extern "C" fn mdata_entries_for_each(app: *const App,
 pub unsafe extern "C" fn mdata_entries_free(app: *const App,
                                             entries_h: MDataEntriesHandle,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(*mut c_void, i32)) {
+                                            o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context.object_cache().remove_mdata_entries(entries_h)?;
@@ -176,7 +177,7 @@ pub unsafe extern "C" fn mdata_entries_free(app: *const App,
 pub unsafe extern "C" fn mdata_keys_len(app: *const App,
                                         keys_h: MDataKeysHandle,
                                         user_data: *mut c_void,
-                                        o_cb: extern "C" fn(*mut c_void, i32, usize)) {
+                                        o_cb: extern "C" fn(*mut c_void, FfiResult, usize)) {
     catch_unwind_cb(user_data,
                     o_cb,
                     || with_keys(app, keys_h, user_data, o_cb, |keys| Ok(keys.len())))
@@ -195,7 +196,7 @@ pub unsafe extern "C" fn mdata_keys_for_each(app: *const App,
                                                                           *const u8,
                                                                           usize),
                                              user_data: *mut c_void,
-                                             o_cb: extern "C" fn(*mut c_void, i32)) {
+                                             o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -214,7 +215,7 @@ pub unsafe extern "C" fn mdata_keys_for_each(app: *const App,
 pub unsafe extern "C" fn mdata_keys_free(app: *const App,
                                          keys_h: MDataKeysHandle,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, i32)) {
+                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context.object_cache().remove_mdata_keys(keys_h)?;
@@ -228,7 +229,7 @@ pub unsafe extern "C" fn mdata_keys_free(app: *const App,
 pub unsafe extern "C" fn mdata_values_len(app: *const App,
                                           values_h: MDataValuesHandle,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, i32, usize)) {
+                                          o_cb: extern "C" fn(*mut c_void, FfiResult, usize)) {
     catch_unwind_cb(user_data,
                     o_cb,
                     || with_values(app, values_h, user_data, o_cb, |values| Ok(values.len())))
@@ -248,7 +249,7 @@ pub unsafe extern "C" fn mdata_values_for_each(app: *const App,
                                                                               usize,
                                                                               u64),
                                                user_data: *mut c_void,
-                                               o_cb: extern "C" fn(*mut c_void, i32)) {
+                                               o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
 
@@ -270,7 +271,7 @@ pub unsafe extern "C" fn mdata_values_for_each(app: *const App,
 pub unsafe extern "C" fn mdata_values_free(app: *const App,
                                            values_h: MDataValuesHandle,
                                            user_data: *mut c_void,
-                                           o_cb: extern "C" fn(*mut c_void, i32)) {
+                                           o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context.object_cache().remove_mdata_values(values_h)?;
@@ -367,12 +368,14 @@ mod tests {
         assert_eq!(len, 2);
 
         let (tx, rx) = mpsc::channel::<Value>();
+
+        #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
         extern "C" fn get_cb(user_data: *mut c_void,
-                             error_code: i32,
+                             res: FfiResult,
                              ptr: *const u8,
                              len: usize,
                              version: u64) {
-            assert_eq!(error_code, 0);
+            assert_eq!(res.error_code, 0);
 
             unsafe {
                 let value = vec_clone_from_raw_parts(ptr, len);
@@ -431,8 +434,9 @@ mod tests {
             }
         }
 
-        extern "C" fn done_cb(user_data: *mut c_void, error_code: i32) {
-            assert_eq!(error_code, 0);
+        #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+        extern "C" fn done_cb(user_data: *mut c_void, res: FfiResult) {
+            assert_eq!(res.error_code, 0);
             let user_data = user_data as *mut (Sender<_>, BTreeMap<Vec<u8>, Value>);
 
             unsafe {

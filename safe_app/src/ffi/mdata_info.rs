@@ -18,7 +18,8 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb, vec_clone_from_raw_parts};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
+                vec_clone_from_raw_parts};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::MDataInfoHandle;
 use routing::{XOR_NAME_LEN, XorName};
@@ -33,7 +34,7 @@ pub unsafe extern "C" fn mdata_info_new_public(app: *const App,
                                                type_tag: u64,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
-                                                                   i32,
+                                                                   FfiResult,
                                                                    MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
@@ -52,7 +53,7 @@ pub unsafe extern "C" fn mdata_info_new_private(app: *const App,
                                                 type_tag: u64,
                                                 user_data: *mut c_void,
                                                 o_cb: extern "C" fn(*mut c_void,
-                                                                    i32,
+                                                                    FfiResult,
                                                                     MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
@@ -70,7 +71,7 @@ pub unsafe extern "C" fn mdata_info_random_public(app: *const App,
                                                   type_tag: u64,
                                                   user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
-                                                                      i32,
+                                                                      FfiResult,
                                                                       MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -86,7 +87,7 @@ pub unsafe extern "C" fn mdata_info_random_private(app: *const App,
                                                    type_tag: u64,
                                                    user_data: *mut c_void,
                                                    o_cb: extern "C" fn(*mut c_void,
-                                                                       i32,
+                                                                       FfiResult,
                                                                        MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
@@ -104,7 +105,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(app: *const App,
                                                       input_len: usize,
                                                       user_data: *mut c_void,
                                                       o_cb: extern "C" fn(*mut c_void,
-                                                                          i32,
+                                                                          FfiResult,
                                                                           *const u8,
                                                                           usize)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -119,7 +120,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_key(app: *const App,
                               user_data,
                               o_cb);
 
-            o_cb(user_data.0, 0, vec.as_safe_ptr(), vec.len());
+            o_cb(user_data.0, FFI_RESULT_OK, vec.as_safe_ptr(), vec.len());
 
             None
         })
@@ -134,7 +135,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(app: *const App,
                                                         input_len: usize,
                                                         user_data: *mut c_void,
                                                         o_cb: extern "C" fn(*mut c_void,
-                                                                            i32,
+                                                                            FfiResult,
                                                                             *const u8,
                                                                             usize)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -149,7 +150,7 @@ pub unsafe extern "C" fn mdata_info_encrypt_entry_value(app: *const App,
                               user_data,
                               o_cb);
 
-            o_cb(user_data.0, 0, vec.as_safe_ptr(), vec.len());
+            o_cb(user_data.0, FFI_RESULT_OK, vec.as_safe_ptr(), vec.len());
 
             None
         })
@@ -164,7 +165,7 @@ pub unsafe extern "C" fn mdata_info_decrypt(app: *const App,
                                             input_len: usize,
                                             user_data: *mut c_void,
                                             o_cb: extern "C" fn(*mut c_void,
-                                                                i32,
+                                                                FfiResult,
                                                                 *const u8,
                                                                 usize)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -179,7 +180,10 @@ pub unsafe extern "C" fn mdata_info_decrypt(app: *const App,
                                     user_data,
                                     o_cb);
 
-            o_cb(user_data.0, 0, decrypted.as_safe_ptr(), decrypted.len());
+            o_cb(user_data.0,
+                 FFI_RESULT_OK,
+                 decrypted.as_safe_ptr(),
+                 decrypted.len());
 
             None
         })
@@ -192,7 +196,7 @@ pub unsafe extern "C" fn mdata_info_extract_name_and_type_tag(app: *const App,
                                                               info_h: MDataInfoHandle,
                                                               user_data: *mut c_void,
                                                               o_cb: extern "C" fn(*mut c_void,
-                                                                                  i32,
+                                                                                  FfiResult,
                                                                                   *const [u8;
                                                                                    XOR_NAME_LEN],
 u64)){
@@ -210,7 +214,7 @@ pub unsafe extern "C" fn mdata_info_serialise(app: *const App,
                                               info_h: MDataInfoHandle,
                                               user_data: *mut c_void,
                                               o_cb: extern "C" fn(*mut c_void,
-                                                                  i32,
+                                                                  FfiResult,
                                                                   *const u8,
                                                                   usize)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -222,7 +226,10 @@ pub unsafe extern "C" fn mdata_info_serialise(app: *const App,
                                o_cb);
             let encoded = try_cb!(serialise(&*info).map_err(AppError::from), user_data, o_cb);
 
-            o_cb(user_data.0, 0, encoded.as_safe_ptr(), encoded.len());
+            o_cb(user_data.0,
+                 FFI_RESULT_OK,
+                 encoded.as_safe_ptr(),
+                 encoded.len());
             None
         })
     })
@@ -235,7 +242,7 @@ pub unsafe extern "C" fn mdata_info_deserialise(app: *const App,
                                                 len: usize,
                                                 user_data: *mut c_void,
                                                 o_cb: extern "C" fn(*mut c_void,
-                                                                    i32,
+                                                                    FfiResult,
                                                                     MDataInfoHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let encoded = vec_clone_from_raw_parts(ptr, len);

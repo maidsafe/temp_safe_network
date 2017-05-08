@@ -17,6 +17,7 @@
 
 //! Helpers to work with extern "C" callbacks.
 
+use super::FfiResult;
 use std::os::raw::c_void;
 use std::ptr;
 
@@ -28,35 +29,35 @@ pub trait Callback {
 
     /// Call the callback, passing the user data pointer, error code and any
     /// additional arguments.
-    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args);
+    fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args);
 }
 
-impl Callback for extern "C" fn(*mut c_void, i32) {
+impl Callback for extern "C" fn(*mut c_void, FfiResult) {
     type Args = ();
-    fn call(&self, user_data: *mut c_void, error: i32, _args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: FfiResult, _args: Self::Args) {
         self(user_data, error)
     }
 }
 
-impl<T: CallbackArgs> Callback for extern "C" fn(*mut c_void, i32, a: T) {
+impl<T: CallbackArgs> Callback for extern "C" fn(*mut c_void, FfiResult, a: T) {
     type Args = T;
-    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args) {
         self(user_data, error, args)
     }
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs> Callback
-    for extern "C" fn(*mut c_void, i32, a0: T0, a1: T1) {
+    for extern "C" fn(*mut c_void, FfiResult, a0: T0, a1: T1) {
     type Args = (T0, T1);
-    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args) {
         self(user_data, error, args.0, args.1)
     }
 }
 
 impl<T0: CallbackArgs, T1: CallbackArgs, T2: CallbackArgs> Callback
-    for extern "C" fn(*mut c_void, i32, a0: T0, a1: T1, a2: T2) {
+    for extern "C" fn(*mut c_void, FfiResult, a0: T0, a1: T1, a2: T2) {
     type Args = (T0, T1, T2);
-    fn call(&self, user_data: *mut c_void, error: i32, args: Self::Args) {
+    fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args) {
         self(user_data, error, args.0, args.1, args.2)
     }
 }

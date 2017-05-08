@@ -18,7 +18,7 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
-use ffi_utils::{OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::FutureExt;
@@ -34,7 +34,7 @@ pub unsafe extern "C" fn file_fetch(app: *const App,
                                     parent_h: MDataInfoHandle,
                                     file_name: *const c_char,
                                     user_data: *mut c_void,
-                                    o_cb: extern "C" fn(*mut c_void, i32, *const File, u64)) {
+                                    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File, u64)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file_name = from_c_str(file_name)?;
         let user_data = OpaqueCtx(user_data);
@@ -47,10 +47,19 @@ pub unsafe extern "C" fn file_fetch(app: *const App,
             file_helper::fetch(client.clone(), parent.clone(), file_name)
                 .map(move |(version, file)| {
                          let ffi_file = file.into_repr_c();
-                         o_cb(user_data.0, 0, &ffi_file, version)
+                         o_cb(user_data.0, FFI_RESULT_OK, &ffi_file, version)
                      })
                 .map_err(AppError::from)
-                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null(), 0))
+                .map_err(move |err| {
+                    let (error_code, description) = ffi_error!(err);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         ptr::null(),
+                         0)
+                })
                 .into_box()
                 .into()
         })
@@ -64,7 +73,7 @@ pub unsafe extern "C" fn file_insert(app: *const App,
                                      file_name: *const c_char,
                                      file: *const File,
                                      user_data: *mut c_void,
-                                     o_cb: extern "C" fn(*mut c_void, i32)) {
+                                     o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
@@ -84,7 +93,7 @@ pub unsafe extern "C" fn file_update(app: *const App,
                                      file: *const File,
                                      version: u64,
                                      user_data: *mut c_void,
-                                     o_cb: extern "C" fn(*mut c_void, i32)) {
+                                     o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;

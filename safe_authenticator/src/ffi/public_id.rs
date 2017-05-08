@@ -17,7 +17,7 @@
 
 use AuthError;
 use Authenticator;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, from_c_str};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, from_c_str};
 use futures::Future;
 use public_id;
 use safe_core::FutureExt;
@@ -30,7 +30,8 @@ use std::ptr;
 pub unsafe extern "C" fn authenticator_public_id_create(auth: *const Authenticator,
                                                         public_id: *const c_char,
                                                         user_data: *mut c_void,
-                                                        o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                        o_cb: extern "C" fn(*mut c_void,
+                                                                            FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let public_id = from_c_str(public_id)?;
@@ -38,9 +39,14 @@ pub unsafe extern "C" fn authenticator_public_id_create(auth: *const Authenticat
         (*auth).send(move |client| {
             public_id::create(client, public_id)
                 .then(move |res| {
-                          o_cb(user_data.0, ffi_result_code!(res));
-                          Ok(())
-                      })
+                    let (error_code, description) = ffi_result!(res);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         });
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -52,7 +58,7 @@ pub unsafe extern "C" fn authenticator_public_id_create(auth: *const Authenticat
 pub unsafe extern "C" fn authenticator_public_id(auth: *const Authenticator,
                                                  user_data: *mut c_void,
                                                  o_cb: extern "C" fn(*mut c_void,
-                                                                     i32,
+                                                                     FfiResult,
                                                                      *const c_char)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -63,14 +69,27 @@ pub unsafe extern "C" fn authenticator_public_id(auth: *const Authenticator,
                     let c_str = match CString::new(public_id) {
                         Ok(c_str) => c_str,
                         Err(e) => {
+                            let e = AuthError::from(e);
+                            let (error_code, description) = ffi_error!(e);
                             return o_cb(user_data.0,
-                                        ffi_error_code!(AuthError::from(e)),
-                                        ptr::null())
+                                        FfiResult {
+                                            error_code,
+                                            description: description.as_ptr(),
+                                        },
+                                        ptr::null());
                         }
                     };
-                    o_cb(user_data.0, 0, c_str.as_ptr());
+                    o_cb(user_data.0, FFI_RESULT_OK, c_str.as_ptr());
                 })
-                .map_err(move |err| o_cb(user_data.0, ffi_error_code!(err), ptr::null()))
+                .map_err(move |err| {
+                    let (error_code, description) = ffi_error!(err);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         ptr::null())
+                })
                 .into_box()
                 .into()
         })
