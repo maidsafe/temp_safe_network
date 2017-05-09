@@ -15,6 +15,29 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+/// Converts a result into a pair of `(error_code: i32, description: CString)`
+/// to be used in `FfiResult`
+#[macro_export]
+macro_rules! ffi_error {
+    ($error:expr) => {{
+        let err_code = ffi_error_code!($error);
+        let err_desc = format!("{}", $error);
+        (err_code, unwrap!(::std::ffi::CString::new(err_desc)))
+    }}
+}
+
+/// Converts a result into a pair of `(error_code: i32, description: CString)`
+/// to be used in `FfiResult`
+#[macro_export]
+macro_rules! ffi_result {
+    ($res:expr) => {
+        match $res {
+            Ok(_) => (0, ::std::ffi::CString::default()),
+            Err(error) => ffi_error!(error)
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! ffi_result_code {
     ($res:expr) => {
@@ -52,7 +75,11 @@ macro_rules! try_cb {
                 #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
                 #[allow(unused)]
                 use $crate::callback::{Callback, CallbackArgs};
-                $cb.call($user_data.into(), ffi_error_code!(err), CallbackArgs::default());
+                let (error_code, description) = ffi_error!(err);
+                $cb.call($user_data.into(), FfiResult {
+                    error_code,
+                    description: description.as_ptr()
+                }, CallbackArgs::default());
                 return None;
             }
         }

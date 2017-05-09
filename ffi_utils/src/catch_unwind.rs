@@ -15,9 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use super::ErrorCode;
+use super::{ErrorCode, FfiResult};
 use super::callback::{Callback, CallbackArgs};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::os::raw::c_void;
 use std::panic::{self, AssertUnwindSafe};
 
@@ -45,11 +45,15 @@ pub fn catch_unwind_cb<'a, U, C, F, E>(user_data: U, cb: C, f: F)
     where U: Into<*mut c_void>,
           C: Callback,
           F: FnOnce() -> Result<(), E>,
-          E: Debug + ErrorCode + From<&'a str>
+          E: Debug + Display + ErrorCode + From<&'a str>
 {
     if let Err(err) = catch_unwind_result(f) {
+        let (error_code, description) = ffi_result!(Err::<(), E>(err));
         cb.call(user_data.into(),
-                ffi_error_code!(err),
+                FfiResult {
+                    error_code,
+                    description: description.as_ptr(),
+                },
                 CallbackArgs::default());
     }
 }

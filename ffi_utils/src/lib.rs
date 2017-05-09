@@ -65,7 +65,7 @@ pub use self::catch_unwind::{catch_unwind_cb, catch_unwind_error_code};
 pub use self::repr_c::ReprC;
 pub use self::string::{StringError, from_c_str};
 pub use self::vec::{SafePtr, vec_clone_from_raw_parts, vec_into_raw_parts};
-use std::os::raw::c_void;
+use std::os::raw::{c_char, c_void};
 
 /// Type that holds opaque user data handed into FFI functions
 #[derive(Clone, Copy)]
@@ -83,3 +83,18 @@ pub trait ErrorCode {
     /// Return the error code corresponding to this instance.
     fn error_code(&self) -> i32;
 }
+
+/// FFI result wrapper
+#[repr(C)]
+pub struct FfiResult {
+    /// Unique error code
+    pub error_code: i32,
+    /// Error description
+    pub description: *const c_char,
+}
+
+/// Constant value to be used for OK result
+pub const FFI_RESULT_OK: FfiResult = FfiResult {
+    error_code: 0,
+    description: 0 as *const c_char,
+};

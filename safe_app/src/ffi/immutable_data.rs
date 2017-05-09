@@ -18,7 +18,7 @@
 use super::cipher_opt::CipherOpt;
 use App;
 use errors::AppError;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, vec_clone_from_raw_parts};
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{CipherOptHandle, SelfEncryptorReaderHandle, SelfEncryptorWriterHandle};
@@ -37,7 +37,7 @@ type XorNamePtr = *const [u8; XOR_NAME_LEN];
 pub unsafe extern "C" fn idata_new_self_encryptor(app: *const App,
                                                   user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
-                                                                      i32,
+                                                                      FfiResult,
                                                                       SEWriterHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -50,9 +50,17 @@ pub unsafe extern "C" fn idata_new_self_encryptor(app: *const App,
                 .map_err(AppError::from)
                 .map(move |se| {
                          let handle = context.object_cache().insert_se_writer(se);
-                         o_cb(user_data.0, 0, handle);
+                         o_cb(user_data.0, FFI_RESULT_OK, handle);
                      })
-                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), 0); })
+                .map_err(move |e| {
+                    let (error_code, description) = ffi_error!(e);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         0);
+                })
                 .into_box();
 
             Some(fut)
@@ -67,7 +75,8 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(app: *const App,
                                                        data: *const u8,
                                                        size: usize,
                                                        user_data: *mut c_void,
-                                                       o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                       o_cb: extern "C" fn(*mut c_void,
+                                                                           FfiResult)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
@@ -78,16 +87,26 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(app: *const App,
                 match context.object_cache().get_se_writer(se_h) {
                     Ok(writer) => writer.write(&data_slice),
                     Err(e) => {
-                        o_cb(user_data.0, ffi_error_code!(e));
+                        let (error_code, description) = ffi_error!(e);
+                        o_cb(user_data.0,
+                             FfiResult {
+                                 error_code,
+                                 description: description.as_ptr(),
+                             });
                         return None;
                     }
                 }
             };
             let fut = fut.map_err(AppError::from)
                 .then(move |res| {
-                          o_cb(user_data.0, ffi_result_code!(res));
-                          Ok(())
-                      })
+                    let (error_code, description) = ffi_result!(res);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         });
+                    Ok(())
+                })
                 .into_box();
             Some(fut)
         })
@@ -101,7 +120,7 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                                                     cipher_opt_h: CipherOptHandle,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
-                                                                        i32,
+                                                                        FfiResult,
                                                                         XorNamePtr)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -140,12 +159,20 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                                   .map(move |_| name)
                           })
                 .then(move |result| {
-                          match result {
-                              Ok(name) => o_cb(user_data.0, 0, &name.0),
-                              Err(e) => o_cb(user_data.0, ffi_error_code!(e), ptr::null()),
-                          }
-                          Ok(())
-                      })
+                    match result {
+                        Ok(name) => o_cb(user_data.0, FFI_RESULT_OK, &name.0),
+                        Err(e) => {
+                            let (error_code, description) = ffi_error!(e);
+                            o_cb(user_data.0,
+                                 FfiResult {
+                                     error_code,
+                                     description: description.as_ptr(),
+                                 },
+                                 ptr::null())
+                        }
+                    }
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -158,7 +185,7 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
                                                     name: XorNamePtr,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
-                                                                        i32,
+                                                                        FfiResult,
                                                                         SEReaderHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -185,9 +212,17 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
                           })
                 .map(move |se_reader| {
                          let handle = context3.object_cache().insert_se_reader(se_reader);
-                         o_cb(user_data.0, 0, handle);
+                         o_cb(user_data.0, FFI_RESULT_OK, handle);
                      })
-                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), 0); })
+                .map_err(move |e| {
+                    let (error_code, description) = ffi_error!(e);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         0);
+                })
                 .into_box()
                 .into()
         })
@@ -199,17 +234,23 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
 pub unsafe extern "C" fn idata_size(app: *const App,
                                     se_h: SEReaderHandle,
                                     user_data: *mut c_void,
-                                    o_cb: extern "C" fn(*mut c_void, i32, u64)) {
+                                    o_cb: extern "C" fn(*mut c_void, FfiResult, u64)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
             match context.object_cache().get_se_reader(se_h) {
                 Ok(se) => {
-                    o_cb(user_data.0, 0, se.len());
+                    o_cb(user_data.0, FFI_RESULT_OK, se.len());
                 }
                 Err(e) => {
-                    o_cb(user_data.0, ffi_error_code!(e), 0);
+                    let (error_code, description) = ffi_error!(e);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         0);
                 }
             };
             None
@@ -226,7 +267,7 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
                                                         len: u64,
                                                         user_data: *mut c_void,
                                                         o_cb: extern "C" fn(*mut c_void,
-                                                                            i32,
+                                                                            FfiResult,
                                                                             *const u8,
                                                                             usize)) {
     let user_data = OpaqueCtx(user_data);
@@ -236,23 +277,44 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
             let se = match context.object_cache().get_se_reader(se_h) {
                 Ok(r) => r,
                 Err(e) => {
-                    o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0);
+                    let (error_code, description) = ffi_error!(e);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         ptr::null(),
+                         0);
                     return None;
                 }
             };
 
             if from_pos + len > se.len() {
+                let (error_code, description) =
+                    ffi_error!(AppError::InvalidSelfEncryptorReadOffsets);
                 o_cb(user_data.0,
-                     ffi_error_code!(AppError::InvalidSelfEncryptorReadOffsets),
+                     FfiResult {
+                         error_code,
+                         description: description.as_ptr(),
+                     },
                      ptr::null_mut(),
                      0);
                 return None;
             }
 
             let fut = se.read(from_pos, len)
-                .map(move |data| { o_cb(user_data.0, 0, data.as_ptr(), data.len()); })
+                .map(move |data| { o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len()); })
                 .map_err(AppError::from)
-                .map_err(move |e| { o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0); })
+                .map_err(move |e| {
+                    let (error_code, description) = ffi_error!(e);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         ptr::null(),
+                         0);
+                })
                 .into_box();
 
             Some(fut)
@@ -265,15 +327,21 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
 pub unsafe extern "C" fn idata_self_encryptor_writer_free(app: *const App,
                                                           handle: SEWriterHandle,
                                                           user_data: *mut c_void,
-                                                          o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                          o_cb: extern "C" fn(*mut c_void,
+                                                                              FfiResult)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-                        let res = context.object_cache().remove_se_writer(handle);
-                        o_cb(user_data.0, ffi_result_code!(res));
-                        None
-                    })
+            let res = context.object_cache().remove_se_writer(handle);
+            let (error_code, description) = ffi_result!(res);
+            o_cb(user_data.0,
+                 FfiResult {
+                     error_code,
+                     description: description.as_ptr(),
+                 });
+            None
+        })
     });
 }
 
@@ -282,15 +350,21 @@ pub unsafe extern "C" fn idata_self_encryptor_writer_free(app: *const App,
 pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
                                                           handle: SEReaderHandle,
                                                           user_data: *mut c_void,
-                                                          o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                          o_cb: extern "C" fn(*mut c_void,
+                                                                              FfiResult)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-                        let res = context.object_cache().remove_se_reader(handle);
-                        o_cb(user_data.0, ffi_result_code!(res));
-                        None
-                    })
+            let res = context.object_cache().remove_se_reader(handle);
+            let (error_code, description) = ffi_result!(res);
+            o_cb(user_data.0,
+                 FfiResult {
+                     error_code,
+                     description: description.as_ptr(),
+                 });
+            None
+        })
     })
 }
 

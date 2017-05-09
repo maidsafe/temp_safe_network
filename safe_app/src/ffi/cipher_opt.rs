@@ -17,7 +17,7 @@
 
 use {App, AppContext};
 use errors::AppError;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{CipherOptHandle, EncryptPubKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, secretbox};
@@ -99,7 +99,7 @@ impl CipherOpt {
 pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
                                                   user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
-                                                                      i32,
+                                                                      FfiResult,
                                                                       CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
                         let handle = context
                             .object_cache()
                             .insert_cipher_opt(CipherOpt::PlainText);
-                        o_cb(user_data.0, 0, handle);
+                        o_cb(user_data.0, FFI_RESULT_OK, handle);
                         None
                     })
     });
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn cipher_opt_new_plaintext(app: *const App,
 pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
                                                   user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
-                                                                      i32,
+                                                                      FfiResult,
                                                                       CipherOptHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
@@ -127,7 +127,7 @@ pub unsafe extern "C" fn cipher_opt_new_symmetric(app: *const App,
                         let handle = context
                             .object_cache()
                             .insert_cipher_opt(CipherOpt::Symmetric);
-                        o_cb(user_data.0, 0, handle);
+                        o_cb(user_data.0, FFI_RESULT_OK, handle);
                         None
                     })
     })
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
                                                    peer_encrypt_key_h: EncryptPubKeyHandle,
                                                    user_data: *mut c_void,
                                                    o_cb: extern "C" fn(*mut c_void,
-                                                                       i32,
+                                                                       FfiResult,
                                                                        CipherOptHandle)) {
     let user_data = OpaqueCtx(user_data);
 
@@ -150,14 +150,20 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
                       .get_encrypt_key(peer_encrypt_key_h) {
                 Ok(pk) => *pk,
                 Err(e) => {
-                    o_cb(user_data.0, ffi_error_code!(e), 0);
+                    let (error_code, description) = ffi_error!(e);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         0);
                     return None;
                 }
             };
             let handle = context
                 .object_cache()
                 .insert_cipher_opt(CipherOpt::Asymmetric { peer_encrypt_key: pk });
-            o_cb(user_data.0, 0, handle);
+            o_cb(user_data.0, FFI_RESULT_OK, handle);
             None
         })
     });
@@ -168,15 +174,20 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
 pub unsafe extern "C" fn cipher_opt_free(app: *const App,
                                          handle: CipherOptHandle,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, i32)) {
+                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-                        let res = context.object_cache().remove_cipher_opt(handle);
-                        o_cb(user_data.0, ffi_result_code!(res));
-                        None
-                    })
+            let res = context.object_cache().remove_cipher_opt(handle);
+            let (error_code, description) = ffi_result!(res);
+            o_cb(user_data.0,
+                 FfiResult {
+                     error_code,
+                     description: description.as_ptr(),
+                 });
+            None
+        })
     });
 }
 

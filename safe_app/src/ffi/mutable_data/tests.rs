@@ -947,7 +947,7 @@ fn entries_crud_ffi() {
     use ffi::mutable_data::entry_actions::*;
     use ffi::mutable_data::permissions::*;
     use ffi::mutable_data::entries::*;
-    use ffi_utils::vec_clone_from_raw_parts;
+    use ffi_utils::{FfiResult, vec_clone_from_raw_parts};
     use ffi_utils::test_utils::{call_0, call_1, call_vec_u8, send_via_user_data,
                                 sender_as_user_data};
     use object_cache::{MDataEntryActionsHandle, MDataInfoHandle, MDataPermissionSetHandle,
@@ -1215,15 +1215,16 @@ fn entries_crud_ffi() {
         }
     }
 
+    #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
     extern "C" fn get_value_cb(user_data: *mut c_void,
-                               err_code: i32,
+                               res: FfiResult,
                                val: *const u8,
                                len: usize,
                                _version: u64) {
-        let result: Result<Vec<u8>, i32> = if err_code == 0 {
+        let result: Result<Vec<u8>, i32> = if res.error_code == 0 {
             Ok(unsafe { vec_clone_from_raw_parts(val, len) })
         } else {
-            Err(err_code)
+            Err(res.error_code)
         };
         unsafe {
             send_via_user_data(user_data, result);
@@ -1247,7 +1248,8 @@ fn entries_crud_ffi() {
         }
     }
 
-    extern "C" fn iter_done_cb(user_data: *mut c_void, _err_code: i32) {
+    #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+    extern "C" fn iter_done_cb(user_data: *mut c_void, _res: FfiResult) {
         unsafe {
             send_via_user_data::<Option<Vec<u8>>>(user_data, None);
         }

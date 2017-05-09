@@ -18,7 +18,7 @@
 use App;
 use errors::AppError;
 use ffi::helper::send_sync;
-use ffi_utils::{OpaqueCtx, catch_unwind_cb};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
@@ -34,7 +34,9 @@ type PubKey = [u8; box_::PUBLICKEYBYTES];
 #[no_mangle]
 pub unsafe extern "C" fn app_pub_sign_key(app: *const App,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, i32, SignKeyHandle)) {
+                                          o_cb: extern "C" fn(*mut c_void,
+                                                              FfiResult,
+                                                              SignKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
             let key = client.public_signing_key()?;
@@ -48,7 +50,7 @@ pub unsafe extern "C" fn app_pub_sign_key(app: *const App,
 pub unsafe extern "C" fn sign_key_new(app: *const App,
                                       data: *const PubKey,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void, i32, SignKeyHandle)) {
+                                      o_cb: extern "C" fn(*mut c_void, FfiResult, SignKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = sign::PublicKey(*data);
         send_sync(app,
@@ -63,7 +65,7 @@ pub unsafe extern "C" fn sign_key_new(app: *const App,
 pub unsafe extern "C" fn sign_key_get(app: *const App,
                                       handle: SignKeyHandle,
                                       user_data: *mut c_void,
-                                      o_cb: extern "C" fn(*mut c_void, i32, *const PubKey)) {
+                                      o_cb: extern "C" fn(*mut c_void, FfiResult, *const PubKey)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let key = context.object_cache().get_sign_key(handle)?;
@@ -77,7 +79,7 @@ pub unsafe extern "C" fn sign_key_get(app: *const App,
 pub unsafe extern "C" fn sign_key_free(app: *const App,
                                        handle: SignKeyHandle,
                                        user_data: *mut c_void,
-                                       o_cb: extern "C" fn(*mut c_void, i32)) {
+                                       o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context.object_cache().remove_sign_key(handle)?;
@@ -91,7 +93,7 @@ pub unsafe extern "C" fn sign_key_free(app: *const App,
 pub unsafe extern "C" fn app_pub_enc_key(app: *const App,
                                          user_data: *mut c_void,
                                          o_cb: extern "C" fn(*mut c_void,
-                                                             i32,
+                                                             FfiResult,
                                                              EncryptPubKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |client, context| {
@@ -106,7 +108,7 @@ pub unsafe extern "C" fn app_pub_enc_key(app: *const App,
 pub unsafe extern "C" fn enc_generate_key_pair(app: *const App,
                                                user_data: *mut c_void,
                                                o_cb: extern "C" fn(*mut c_void,
-                                                                   i32,
+                                                                   FfiResult,
                                                                    EncryptPubKeyHandle,
                                                                    EncryptSecKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -117,7 +119,7 @@ pub unsafe extern "C" fn enc_generate_key_pair(app: *const App,
                         let pk_h = context.object_cache().insert_encrypt_key(ourpk);
                         let sk_h = context.object_cache().insert_secret_key(oursk);
 
-                        o_cb(user_data.0, 0, pk_h, sk_h);
+                        o_cb(user_data.0, FFI_RESULT_OK, pk_h, sk_h);
 
                         None
                     })
@@ -130,7 +132,7 @@ pub unsafe extern "C" fn enc_pub_key_new(app: *const App,
                                          data: *const PubKey,
                                          user_data: *mut c_void,
                                          o_cb: extern "C" fn(*mut c_void,
-                                                             i32,
+                                                             FfiResult,
                                                              EncryptPubKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = box_::PublicKey(*data);
@@ -146,7 +148,9 @@ pub unsafe extern "C" fn enc_pub_key_new(app: *const App,
 pub unsafe extern "C" fn enc_pub_key_get(app: *const App,
                                          handle: EncryptPubKeyHandle,
                                          user_data: *mut c_void,
-                                         o_cb: extern "C" fn(*mut c_void, i32, *const PubKey)) {
+                                         o_cb: extern "C" fn(*mut c_void,
+                                                             FfiResult,
+                                                             *const PubKey)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let key = context.object_cache().get_encrypt_key(handle)?;
@@ -160,7 +164,9 @@ pub unsafe extern "C" fn enc_pub_key_get(app: *const App,
 pub unsafe extern "C" fn enc_secret_key_get(app: *const App,
                                             handle: EncryptSecKeyHandle,
                                             user_data: *mut c_void,
-                                            o_cb: extern "C" fn(*mut c_void, i32, *const SecKey)) {
+                                            o_cb: extern "C" fn(*mut c_void,
+                                                                FfiResult,
+                                                                *const SecKey)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let key = context.object_cache().get_secret_key(handle)?;
@@ -175,7 +181,7 @@ pub unsafe extern "C" fn enc_secret_key_new(app: *const App,
                                             data: *const SecKey,
                                             user_data: *mut c_void,
                                             o_cb: extern "C" fn(*mut c_void,
-                                                                i32,
+                                                                FfiResult,
                                                                 EncryptSecKeyHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let key = box_::SecretKey(*data);
@@ -191,7 +197,7 @@ pub unsafe extern "C" fn enc_secret_key_new(app: *const App,
 pub unsafe extern "C" fn enc_pub_key_free(app: *const App,
                                           handle: EncryptPubKeyHandle,
                                           user_data: *mut c_void,
-                                          o_cb: extern "C" fn(*mut c_void, i32)) {
+                                          o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context.object_cache().remove_encrypt_key(handle)?;
@@ -205,7 +211,7 @@ pub unsafe extern "C" fn enc_pub_key_free(app: *const App,
 pub unsafe extern "C" fn enc_secret_key_free(app: *const App,
                                              handle: EncryptSecKeyHandle,
                                              user_data: *mut c_void,
-                                             o_cb: extern "C" fn(*mut c_void, i32)) {
+                                             o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context.object_cache().remove_secret_key(handle)?;
@@ -223,7 +229,7 @@ pub unsafe extern "C" fn encrypt(app: *const App,
                                  pk_h: EncryptPubKeyHandle,
                                  sk_h: EncryptSecKeyHandle,
                                  user_data: *mut c_void,
-                                 o_cb: extern "C" fn(*mut c_void, i32, *const u8, usize)) {
+                                 o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let plaintext = slice::from_raw_parts(data, len);
@@ -239,10 +245,15 @@ pub unsafe extern "C" fn encrypt(app: *const App,
             let ciphertext = box_::seal(plaintext, &nonce, &pk, &sk);
 
             match serialise(&(nonce, ciphertext)) {
-                Ok(result) => o_cb(user_data.0, 0, result.as_ptr(), result.len()),
+                Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
                 Err(e) => {
+                    let e = AppError::from(e);
+                    let (error_code, description) = ffi_error!(e);
                     o_cb(user_data.0,
-                         ffi_error_code!(AppError::from(e)),
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
                          ptr::null(),
                          0)
                 }
@@ -262,7 +273,7 @@ pub unsafe extern "C" fn decrypt(app: *const App,
                                  pk_h: EncryptPubKeyHandle,
                                  sk_h: EncryptSecKeyHandle,
                                  user_data: *mut c_void,
-                                 o_cb: extern "C" fn(*mut c_void, i32, *const u8, usize)) {
+                                 o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let plaintext = slice::from_raw_parts(data, len);
@@ -278,11 +289,19 @@ pub unsafe extern "C" fn decrypt(app: *const App,
                     let plaintext =
                         try_cb!(box_::open(&ciphertext, &nonce, &pk, &sk)
                                 .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
-                    o_cb(user_data.0, 0, plaintext.as_ptr(), plaintext.len());
+                    o_cb(user_data.0,
+                         FFI_RESULT_OK,
+                         plaintext.as_ptr(),
+                         plaintext.len());
                 }
                 Err(e) => {
+                    let e = AppError::from(e);
+                    let (error_code, description) = ffi_error!(e);
                     o_cb(user_data.0,
-                         ffi_error_code!(AppError::from(e)),
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
                          ptr::null(),
                          0)
                 }
@@ -302,7 +321,7 @@ pub unsafe extern "C" fn encrypt_sealed_box(app: *const App,
                                             pk_h: EncryptPubKeyHandle,
                                             user_data: *mut c_void,
                                             o_cb: extern "C" fn(*mut c_void,
-                                                                i32,
+                                                                FfiResult,
                                                                 *const u8,
                                                                 usize)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -315,7 +334,10 @@ pub unsafe extern "C" fn encrypt_sealed_box(app: *const App,
                               o_cb);
 
             let ciphertext = sealedbox::seal(plaintext, &pk);
-            o_cb(user_data.0, 0, ciphertext.as_ptr(), ciphertext.len());
+            o_cb(user_data.0,
+                 FFI_RESULT_OK,
+                 ciphertext.as_ptr(),
+                 ciphertext.len());
 
             None
         })
@@ -332,7 +354,7 @@ pub unsafe extern "C" fn decrypt_sealed_box(app: *const App,
                                             sk_h: EncryptSecKeyHandle,
                                             user_data: *mut c_void,
                                             o_cb: extern "C" fn(*mut c_void,
-                                                                i32,
+                                                                FfiResult,
                                                                 *const u8,
                                                                 usize)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -348,7 +370,10 @@ pub unsafe extern "C" fn decrypt_sealed_box(app: *const App,
             let plaintext =
                 try_cb!(sealedbox::open(plaintext, &pk, &sk)
                                     .map_err(|()| AppError::EncodeDecodeError), user_data, o_cb);
-            o_cb(user_data.0, 0, plaintext.as_ptr(), plaintext.len());
+            o_cb(user_data.0,
+                 FFI_RESULT_OK,
+                 plaintext.as_ptr(),
+                 plaintext.len());
 
             None
         })
@@ -360,13 +385,13 @@ pub unsafe extern "C" fn decrypt_sealed_box(app: *const App,
 pub unsafe extern "C" fn sha3_hash(data: *const u8,
                                    len: usize,
                                    user_data: *mut c_void,
-                                   o_cb: extern "C" fn(*mut c_void, i32, *const u8, usize)) {
+                                   o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize)) {
     catch_unwind_cb(user_data, o_cb, || -> Result<(), AppError> {
         let plaintext = slice::from_raw_parts(data, len);
         let user_data = OpaqueCtx(user_data);
 
         let hash = sha3_256(plaintext);
-        o_cb(user_data.0, 0, hash.as_ptr(), hash.len());
+        o_cb(user_data.0, FFI_RESULT_OK, hash.as_ptr(), hash.len());
 
         Ok(())
     });

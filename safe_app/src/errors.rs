@@ -26,6 +26,7 @@ use safe_core::nfs::NfsError;
 use self_encryption::SelfEncryptionError;
 use std::error::Error;
 use std::ffi::NulError;
+use std::fmt::{self, Display, Formatter};
 use std::io::Error as IoError;
 use std::str::Utf8Error;
 use std::sync::mpsc::{RecvError, RecvTimeoutError};
@@ -147,13 +148,62 @@ pub enum AppError {
 
     /// Error while self-encrypting data
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
-    /// Invalid offsets (from-position and lenght combination) provided for
+    /// Invalid offsets (from-position and length combination) provided for
     /// reading form SelfEncryptor. Would have probably caused an overflow.
     InvalidSelfEncryptorReadOffsets,
     /// Input/output Error
     IoError(IoError),
     /// Unexpected error
     Unexpected(String),
+}
+
+impl Display for AppError {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        match *self {
+            AppError::CoreError(ref error) => write!(formatter, "Core error: {}", error),
+            AppError::IpcError(ref error) => write!(formatter, "IPC error: {:?}", error),
+            AppError::NfsError(ref error) => write!(formatter, "NFS error: {:?}", error),
+            AppError::EncodeDecodeError => write!(formatter, "Serialisation error"),
+            AppError::OperationForbidden => write!(formatter, "Forbidden operation"),
+            AppError::NoSuchContainer => write!(formatter, "Container not found"),
+            AppError::InvalidCipherOptHandle => write!(formatter, "Invalid CipherOpt handle"),
+            AppError::InvalidEncryptPubKeyHandle => {
+                write!(formatter, "Invalid encrypt (box_) key handle")
+            }
+            AppError::InvalidMDataInfoHandle => write!(formatter, "Invalid `MDataInfo` handle"),
+            AppError::InvalidMDataEntriesHandle => {
+                write!(formatter, "Invalid MutableData enties handle")
+            }
+            AppError::InvalidMDataEntryActionsHandle => {
+                write!(formatter, "Invalid MutableData entry actions handle")
+            }
+            AppError::InvalidMDataPermissionsHandle => {
+                write!(formatter, "Invalid MutableData permissions handle")
+            }
+            AppError::InvalidMDataPermissionSetHandle => {
+                write!(formatter, "Invalid MutableData permission set handle")
+            }
+            AppError::InvalidSelfEncryptorHandle => {
+                write!(formatter, "Invalid Self Encryptor handle")
+            }
+            AppError::InvalidSignKeyHandle => write!(formatter, "Invalid sign key handle"),
+            AppError::InvalidEncryptSecKeyHandle => write!(formatter, "Invalid secret key handle"),
+            AppError::SelfEncryption(ref error) => {
+                write!(formatter, "Self-encryption error: {}", error)
+            }
+            AppError::InvalidSelfEncryptorReadOffsets => {
+                write!(formatter,
+                       "Invalid offsets (from-position \
+                        and length combination) provided for \
+                        reading form SelfEncryptor. Would have \
+                        probably caused an overflow.")
+            }
+            AppError::IoError(ref error) => write!(formatter, "I/O error: {}", error),
+            AppError::Unexpected(ref error) => {
+                write!(formatter, "Unexpected (probably a logic error): {}", error)
+            }
+        }
+    }
 }
 
 impl From<CoreError> for AppError {

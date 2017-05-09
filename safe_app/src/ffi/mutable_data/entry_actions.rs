@@ -19,7 +19,7 @@
 
 use App;
 use ffi::helper::send_sync;
-use ffi_utils::{catch_unwind_cb, vec_clone_from_raw_parts};
+use ffi_utils::{FfiResult, catch_unwind_cb, vec_clone_from_raw_parts};
 use object_cache::MDataEntryActionsHandle;
 use routing::{EntryAction, Value};
 use std::os::raw::c_void;
@@ -29,7 +29,7 @@ use std::os::raw::c_void;
 pub unsafe extern "C" fn mdata_entry_actions_new(app: *const App,
                                                  user_data: *mut c_void,
                                                  o_cb: extern "C" fn(*mut c_void,
-                                                                     i32,
+                                                                     FfiResult,
                                                                      MDataEntryActionsHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, |_, context| {
@@ -50,7 +50,7 @@ pub unsafe extern "C" fn mdata_entry_actions_insert(app: *const App,
                                                     value_ptr: *const u8,
                                                     value_len: usize,
                                                     user_data: *mut c_void,
-                                                    o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                    o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Ins(Value {
                              content: vec_clone_from_raw_parts(value_ptr, value_len),
@@ -69,7 +69,7 @@ pub unsafe extern "C" fn mdata_entry_actions_update(app: *const App,
                                                     value_len: usize,
                                                     entry_version: u64,
                                                     user_data: *mut c_void,
-                                                    o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                    o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     add_action(app, actions_h, key_ptr, key_len, user_data, o_cb, || {
         EntryAction::Update(Value {
                                 content: vec_clone_from_raw_parts(value_ptr, value_len),
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn mdata_entry_actions_delete(app: *const App,
                                                     key_len: usize,
                                                     entry_version: u64,
                                                     user_data: *mut c_void,
-                                                    o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                    o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     add_action(app,
                actions_h,
                key_ptr,
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn mdata_entry_actions_delete(app: *const App,
 pub unsafe extern "C" fn mdata_entry_actions_free(app: *const App,
                                                   actions_h: MDataEntryActionsHandle,
                                                   user_data: *mut c_void,
-                                                  o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                  o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         send_sync(app, user_data, o_cb, move |_, context| {
             let _ = context
@@ -119,7 +119,7 @@ unsafe fn add_action<F>(app: *const App,
                         key_ptr: *const u8,
                         key_len: usize,
                         user_data: *mut c_void,
-                        o_cb: extern "C" fn(*mut c_void, i32),
+                        o_cb: extern "C" fn(*mut c_void, FfiResult),
                         f: F)
     where F: FnOnce() -> EntryAction
 {

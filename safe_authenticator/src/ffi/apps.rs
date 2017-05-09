@@ -19,7 +19,8 @@ use AccessContainerEntry;
 use AuthError;
 use Authenticator;
 use access_container::{access_container, access_container_nonce};
-use ffi_utils::{OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str, vec_into_raw_parts};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str,
+                vec_into_raw_parts};
 use futures::Future;
 use ipc::{AppState, app_state, get_config, remove_app_container, update_config};
 use maidsafe_utilities::serialisation::deserialise;
@@ -60,7 +61,7 @@ impl Drop for RegisteredApp {
 pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator,
                                                       app_id: *const c_char,
                                                       user_data: *mut c_void,
-                                                      o_cb: extern "C" fn(*mut c_void, i32)) {
+                                                      o_cb: extern "C" fn(*mut c_void, FfiResult)) {
 
     let user_data = OpaqueCtx(user_data);
 
@@ -98,9 +99,14 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
                           })
                 .and_then(move |_| remove_app_container(c4, &app_id2))
                 .then(move |res| {
-                          o_cb(user_data.0, ffi_result_code!(res));
-                          Ok(())
-                      })
+                    let (error_code, description) = ffi_result!(res);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         });
+                    Ok(())
+                })
                 .into_box()
                 .into()
         })
@@ -111,7 +117,7 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
 pub unsafe extern "C" fn authenticator_revoked_apps(auth: *const Authenticator,
                                                     user_data: *mut c_void,
                                                     o_cb: extern "C" fn(*mut c_void,
-                                                                        i32,
+                                                                        FfiResult,
                                                                         *const ffi::AppExchangeInfo,
 usize)){
     let user_data = OpaqueCtx(user_data);
@@ -154,11 +160,20 @@ usize)){
                             }
                         }
 
-                        o_cb(user_data.0, 0, apps.as_safe_ptr(), apps.len());
+                        o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
 
                         Ok(())
                     })
-                    .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0))
+                    .map_err(move |e| {
+                        let (error_code, description) = ffi_error!(e);
+                        o_cb(user_data.0,
+                             FfiResult {
+                                 error_code,
+                                 description: description.as_ptr(),
+                             },
+                             ptr::null(),
+                             0)
+                    })
                     .into_box()
                     .into()
             })?;
@@ -172,7 +187,7 @@ usize)){
 pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticator,
                                                        user_data: *mut c_void,
                                                        o_cb: extern "C" fn(*mut c_void,
-                                                                           i32,
+                                                                           FfiResult,
                                                                            *const RegisteredApp,
                                                                            usize)) {
     let user_data = OpaqueCtx(user_data);
@@ -240,11 +255,20 @@ pub unsafe extern "C" fn authenticator_registered_apps(auth: *const Authenticato
                             }
                         }
 
-                        o_cb(user_data.0, 0, apps.as_safe_ptr(), apps.len());
+                        o_cb(user_data.0, FFI_RESULT_OK, apps.as_safe_ptr(), apps.len());
 
                         Ok(())
                     })
-                    .map_err(move |e| o_cb(user_data.0, ffi_error_code!(e), ptr::null(), 0))
+                    .map_err(move |e| {
+                        let (error_code, description) = ffi_error!(e);
+                        o_cb(user_data.0,
+                             FfiResult {
+                                 error_code,
+                                 description: description.as_ptr(),
+                             },
+                             ptr::null(),
+                             0)
+                    })
                     .into_box()
                     .into()
             })?;
