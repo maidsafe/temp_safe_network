@@ -74,7 +74,7 @@ fn fill_network() {
         let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
         trace!("Adding node with bootstrap node {}.", index);
         test_node::add_node(&network, &mut nodes, index, true);
-        let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
+        let _ = poll::nodes_and_client(&mut nodes, &mut client);
 
         let data = test_utils::gen_immutable_data(100, &mut rng);
         let data_id = data.debug_id();

@@ -45,7 +45,7 @@ fn handle_put_without_account() {
 
     let data = test_utils::gen_immutable_data(1024, &mut rng);
     let _ = client.put_idata(data);
-    let event_count = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
+    let event_count = poll::nodes_and_client(&mut nodes, &mut client);
     trace!("Processed {} events.", event_count);
 
     let count = nodes
@@ -87,7 +87,7 @@ fn handle_put_with_account() {
 
     let data = test_utils::gen_immutable_data(1024, &mut rng);
     let _ = client.put_idata(data.clone());
-    let event_count = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
+    let event_count = poll::nodes_and_client(&mut nodes, &mut client);
     trace!("Processed {} events.", event_count);
 
     let count = nodes
@@ -224,7 +224,7 @@ fn create_account_twice() {
     // Create the account again using `client0`.
     assert_eq!(client0.put_mdata_response(account.clone(), &mut nodes),
                Err(ClientError::AccountExists));
-    let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client0);
+    let _ = poll::nodes_and_client(&mut nodes, &mut client0);
 
     // That should not have changed anything.
     assert_eq!(unwrap!(client0.get_account_info_response(&mut nodes)),
@@ -235,7 +235,7 @@ fn create_account_twice() {
     // Create the same account using `client1`.
     assert_eq!(client1.put_mdata_response(account, &mut nodes),
                Err(ClientError::InvalidOwners));
-    let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client1);
+    let _ = poll::nodes_and_client(&mut nodes, &mut client1);
 
     // That should not succeed.
     assert_eq!(unwrap!(client0.get_account_info_response(&mut nodes)),
@@ -286,7 +286,8 @@ fn storing_till_client_account_full() {
 
 #[test]
 fn maid_manager_account_adding_with_churn() {
-    let network = Network::new(GROUP_SIZE, None);
+    let seed = None;
+    let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
 
     let node_count = 15;
@@ -324,12 +325,7 @@ fn maid_manager_account_adding_with_churn() {
             }
         }
 
-        event_count += poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
-
-        for node in &mut nodes {
-            node.clear_state();
-        }
-
+        event_count += poll::nodes_and_client(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
         let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
@@ -399,11 +395,7 @@ fn maid_manager_account_decrease_with_churn() {
             }
         }
 
-        event_count += poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
-
-        for node in &mut nodes {
-            node.clear_state();
-        }
+        event_count += poll::nodes_and_client(&mut nodes, &mut client);
 
         trace!("Processed {} events.", event_count);
 

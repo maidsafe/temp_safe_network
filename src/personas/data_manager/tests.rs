@@ -18,7 +18,7 @@
 use super::*;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::{self, Rng};
-use routing::{EntryActions, Request, Response};
+use routing::{Action, EntryActions, Request, Response, User};
 use std::env;
 use test_utils;
 
@@ -257,6 +257,8 @@ fn mdata_change_owner() {
     assert_match!(
             message.response,
             Response::ChangeMDataOwner { res: Err(ClientError::AccessDenied), .. });
+
+    dm.clear_cache();
 
     // Changing the owner by the current owner succeeds.
     let msg_id = MessageId::new();
@@ -572,6 +574,83 @@ fn mdata_with_churn_with_entries_arriving_before_shell() {
 }
 
 #[test]
+fn mdata_non_conflicting_parallel_mutations() {
+    let mut rng = rand::thread_rng();
+
+    let mut node = RoutingNode::new();
+    let mut dm = create_data_manager();
+
+    let (_, client_key_0) = test_utils::gen_client_authority();
+    let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
+
+    let (_, client_key_1) = test_utils::gen_client_authority();
+    let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
+
+    let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
+    unwrap!(data.set_user_permissions(User::Anyone,
+                                      PermissionSet::new()
+                                          .allow(Action::Insert)
+                                          .allow(Action::Update)
+                                          .allow(Action::Delete),
+                                      1,
+                                      client_key_0));
+
+    dm.put_into_chunk_store(data.clone());
+    let nae_manager = Authority::NaeManager(*data.name());
+
+    // Issue two mutations in parallel, each touching different key. Both should be
+    // accepted.
+    let actions = EntryActions::new()
+        .ins(b"key0".to_vec(), b"value 0".to_vec(), 0)
+        .into();
+    let msg_id_0 = MessageId::new();
+    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                           client_manager_0,
+                                           nae_manager,
+                                           *data.name(),
+                                           data.tag(),
+                                           actions,
+                                           msg_id_0,
+                                           client_key_0));
+
+    let actions = EntryActions::new()
+        .ins(b"key1".to_vec(), b"value 1".to_vec(), 0)
+        .into();
+    let msg_id_1 = MessageId::new();
+    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                           client_manager_1,
+                                           nae_manager,
+                                           *data.name(),
+                                           data.tag(),
+                                           actions,
+                                           msg_id_1,
+                                           client_key_1));
+
+    let message = unwrap!(node.sent_requests.remove(&msg_id_0));
+    let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+
+    let message = unwrap!(node.sent_requests.remove(&msg_id_1));
+    let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id_0));
+    assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id_1));
+    assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+
+    let stored_data = unwrap!(dm.get_from_chunk_store(&data.id()));
+    let value0 = unwrap!(stored_data.get(b"key0"));
+    assert_eq!(&value0.content, b"value 0");
+    assert_eq!(value0.entry_version, 0);
+
+    let value1 = unwrap!(stored_data.get(b"key1"));
+    assert_eq!(&value1.content, b"value 1");
+    assert_eq!(value1.entry_version, 0);
+}
+
+#[test]
 fn mdata_conflicting_parallel_mutations() {
     let mut rng = rand::thread_rng();
 
@@ -584,7 +663,16 @@ fn mdata_conflicting_parallel_mutations() {
     let (_, client_key_1) = test_utils::gen_client_authority();
     let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
 
-    let data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
+    let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
+    unwrap!(data.set_user_permissions(User::Anyone,
+                                      PermissionSet::new()
+                                          .allow(Action::Insert)
+                                          .allow(Action::Update)
+                                          .allow(Action::Delete),
+                                      1,
+                                      client_key_0));
+
+
     dm.put_into_chunk_store(data.clone());
     let nae_manager = Authority::NaeManager(*data.name());
 

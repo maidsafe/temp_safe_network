@@ -696,16 +696,6 @@ impl Vault {
         self.maid_manager.get_mutation_count(client_name)
     }
 
-    /// Resend all unacknowledged messages.
-    pub fn resend_unacknowledged(&mut self) -> bool {
-        self.routing_node.resend_unacknowledged()
-    }
-
-    /// Clear routing node state.
-    pub fn clear_state(&mut self) {
-        self.routing_node.clear_state()
-    }
-
     /// Vault node name
     pub fn name(&self) -> XorName {
         unwrap!(self.routing_node.name())
@@ -714,10 +704,5 @@ impl Vault {
     /// Vault routing_table
     pub fn routing_table(&self) -> &RoutingTable<XorName> {
         unwrap!(self.routing_node.routing_table())
-    }
-
-    /// Sets a name to be used when the next node relocation request is received by this node.
-    pub fn set_next_node_name(&mut self, relocation_name: XorName) {
-        self.routing_node.set_next_node_name(relocation_name)
     }
 }

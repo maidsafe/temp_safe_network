@@ -111,16 +111,6 @@ impl TestNode {
         self.vault.get_maid_manager_mutation_count(client_name)
     }
 
-    /// Resend all unacknowledged messages.
-    pub fn resend_unacknowledged(&mut self) -> bool {
-        self.vault.resend_unacknowledged()
-    }
-
-    /// Clear routing node state..
-    pub fn clear_state(&mut self) {
-        self.vault.clear_state()
-    }
-
     /// name of vault.
     pub fn name(&self) -> XorName {
         self.vault.name()
@@ -160,12 +150,12 @@ pub fn create_nodes(network: &Network,
                                  config.clone(),
                                  false,
                                  use_cache));
-        poll::nodes(&mut nodes);
+        let _ = poll::nodes(&mut nodes);
     }
 
     // (Last node consumes the config objects.)
     nodes.push(TestNode::new(network, Some(crust_config), config, false, use_cache));
-    poll::nodes(&mut nodes);
+    let _ = poll::nodes(&mut nodes);
 
     nodes
 }

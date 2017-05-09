@@ -54,7 +54,6 @@ pub struct TestClient {
 // for no apparent reason:
 //
 // - some do `flush`, so don't.
-// - some use `poll::nodes_and_client`, some `poll::poll_and_resend_unacknowledged`.
 // - some panic when no response received, some return error.
 //
 // We should either make them consistent, or document clearly why the inconsistency
@@ -108,11 +107,6 @@ impl TestClient {
         self.routing_client.poll()
     }
 
-    /// Resends all unacknowledged messages.
-    pub fn resend_unacknowledged(&mut self) -> bool {
-        self.routing_client.resend_unacknowledged()
-    }
-
     /// Checks client successfully connected to the mock network
     pub fn ensure_connected(&mut self, nodes: &mut [TestNode]) {
         let _ = poll::nodes_and_client(nodes, self);
@@ -151,7 +145,7 @@ impl TestClient {
                               nodes: &mut [TestNode])
                               -> Result<(), ClientError> {
         let request_msg_id = self.put_idata(data);
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+        let _ = poll::nodes_and_client(nodes, self);
 
         match self.try_recv() {
             Ok(Event::Response { response: Response::PutIData { res, msg_id }, .. }) => {
@@ -220,7 +214,7 @@ impl TestClient {
                               nodes: &mut [TestNode])
                               -> Result<(), ClientError> {
         let request_msg_id = self.put_mdata(data);
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+        let _ = poll::nodes_and_client(nodes, self);
 
         assert_recv_response!(self, PutMData, request_msg_id)
     }
@@ -325,7 +319,7 @@ impl TestClient {
                                          -> Result<(), ClientError> {
         self.flush();
         let msg_id = self.mutate_mdata_entries(name, tag, actions);
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+        let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, MutateMDataEntries, msg_id)
     }
 
@@ -390,7 +384,7 @@ impl TestClient {
                                                 version,
                                                 msg_id,
                                                 requester));
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+        let _ = poll::nodes_and_client(nodes, self);
 
         assert_recv_response!(self, SetMDataUserPermissions, msg_id)
     }
@@ -415,7 +409,7 @@ impl TestClient {
                                                 version,
                                                 msg_id,
                                                 requester));
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+        let _ = poll::nodes_and_client(nodes, self);
 
         assert_recv_response!(self, DelMDataUserPermissions, msg_id)
     }
@@ -438,7 +432,7 @@ impl TestClient {
                                         new_owners,
                                         version,
                                         msg_id));
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+        let _ = poll::nodes_and_client(nodes, self);
 
         assert_recv_response!(self, ChangeMDataOwner, msg_id)
     }

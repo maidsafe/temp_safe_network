@@ -17,12 +17,13 @@
 
 mod cache;
 mod data;
+mod mutation;
 #[cfg(all(test, feature = "use-mock-routing"))]
 mod tests;
 
-use self::cache::{Cache, DataInfo, FragmentInfo};
-use self::cache::{PendingMutation, PendingMutationType, PendingWrite};
+use self::cache::{Cache, FragmentInfo, MutationVote, PendingWrite};
 pub use self::data::{Data, DataId, ImmutableDataId, MutableDataId};
+use self::mutation::{Mutation, MutationType};
 use GROUP_SIZE;
 use accumulator::Accumulator;
 use chunk_store::{Chunk, ChunkId, ChunkStore};
@@ -35,8 +36,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
-use utils::{self, HashMap, HashSet};
+use std::time::Duration;
+use utils::{self, HashMap, HashSet, Instant};
 use vault::RoutingNode;
 
 const MAX_FULL_PERCENT: u64 = 50;
@@ -181,65 +182,47 @@ impl DataManager {
                                 routing_node: &mut RoutingNode,
                                 serialised_refresh: &[u8])
                                 -> Result<(), InternalError> {
-        let DataInfo {
-            data_id,
-            hash: refresh_hash,
-        } = serialisation::deserialise(serialised_refresh)?;
-        let mut success = false;
+        let MutationVote { data_id, hash } = serialisation::deserialise(serialised_refresh)?;
+        let write = match self.cache.take_pending_write(&data_id, &hash) {
+            Some(write) => write,
+            None => return Ok(()),
+        };
 
-        for PendingWrite {
-                mutation,
-                src,
-                dst,
-                message_id,
-                hash,
-                rejected,
-                ..
-            } in self.cache.take_pending_writes(&data_id) {
-            if hash != refresh_hash {
-                if !rejected {
-                    trace!("{:?} did not accumulate. Sending failure", data_id);
-                    let error = ClientError::from("Concurrent modification.");
-                    self.send_mutation_response(routing_node,
-                                                src,
-                                                dst,
-                                                mutation.mutation_type(),
-                                                mutation.data_id(),
-                                                Err(error),
-                                                message_id)?;
-                }
+        let PendingWrite {
+            mutation,
+            src,
+            dst,
+            message_id,
+            ..
+        } = write;
 
-                continue;
-            }
+        let mutation_type = mutation.mutation_type();
+        let fragments = self.commit_pending_mutation(routing_node, src, dst, mutation, message_id)?;
 
-            let mutation_type = mutation.mutation_type();
-            let fragments = mutation.fragment_infos();
-
-            if self.commit_pending_mutation(routing_node, src, dst, mutation, message_id)? {
-                match mutation_type {
-                    PendingMutationType::PutIData => self.immutable_data_count += 1,
-                    PendingMutationType::PutMData => self.mutable_data_count += 1,
-                    _ => (),
-                }
-
-                log_status!(self);
-                success = true;
-            }
-
-            self.send_refresh(routing_node,
-                              Authority::NaeManager(*data_id.name()),
-                              fragments)?;
+        if fragments.is_empty() {
+            // The commit wasn't successful.
+            return Ok(());
         }
 
-        if !success {
-            if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
-                for node in &group {
-                    let _ = self.cache
-                        .register_needed_data_with_another_holder(&data_id, *node);
-                }
+        match mutation_type {
+            MutationType::PutIData => self.immutable_data_count += 1,
+            MutationType::PutMData => self.mutable_data_count += 1,
+            _ => (),
+        }
 
-                self.request_needed_fragments(routing_node)?;
+        log_status!(self);
+
+        self.send_refresh(routing_node,
+                          Authority::NaeManager(*data_id.name()),
+                          fragments)?;
+
+        if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
+            for node in &group {
+                let _ = self.cache
+                    .register_needed_data_with_another_holder(&data_id, *node);
             }
+
+            self.request_needed_fragments(routing_node)?;
         }
 
         Ok(())
@@ -346,7 +329,7 @@ impl DataManager {
         }
 
         self.update_pending_writes(routing_node,
-                                   PendingMutation::PutIData(data),
+                                   Mutation::PutIData(data),
                                    src,
                                    dst,
                                    msg_id,
@@ -382,7 +365,7 @@ impl DataManager {
         };
 
         self.update_pending_writes(routing_node,
-                                   PendingMutation::PutMData(data),
+                                   Mutation::PutMData(data),
                                    src,
                                    dst,
                                    msg_id,
@@ -643,14 +626,14 @@ impl DataManager {
                                        msg_id: MessageId,
                                        requester: sign::PublicKey)
                                        -> Result<(), InternalError> {
-        self.handle_mdata_mutation(routing_node,
-                                   src,
-                                   dst,
-                                   name,
-                                   tag,
-                                   PendingMutationType::MutateMDataEntries,
-                                   msg_id,
-                                   |data| data.mutate_entries(actions, requester))
+        let mutation = Mutation::MutateMDataEntries {
+            name: name,
+            tag: tag,
+            actions: actions.clone(),
+        };
+        let res = self.fetch_mdata(name, tag)
+            .and_then(|mut data| data.mutate_entries(actions.clone(), requester));
+        self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
     pub fn handle_list_mdata_permissions(&mut self,
@@ -700,19 +683,19 @@ impl DataManager {
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        self.handle_mdata_mutation(routing_node,
-                                   src,
-                                   dst,
-                                   name,
-                                   tag,
-                                   PendingMutationType::SetMDataUserPermissions,
-                                   msg_id,
-                                   |data| {
-                                       data.set_user_permissions(user,
-                                                                 permissions,
-                                                                 version,
-                                                                 requester)
-                                   })
+        let mutation = Mutation::SetMDataUserPermissions {
+            name: name,
+            tag: tag,
+            user: user,
+            permissions: permissions,
+            version: version,
+        };
+        let res =
+            self.fetch_mdata(name, tag)
+                .and_then(|mut data| {
+                              data.set_user_permissions(user, permissions, version, requester)
+                          });
+        self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
@@ -727,14 +710,15 @@ impl DataManager {
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        self.handle_mdata_mutation(routing_node,
-                                   src,
-                                   dst,
-                                   name,
-                                   tag,
-                                   PendingMutationType::DelMDataUserPermissions,
-                                   msg_id,
-                                   |data| data.del_user_permissions(&user, version, requester))
+        let mutation = Mutation::DelMDataUserPermissions {
+            name: name,
+            tag: tag,
+            user: user,
+            version: version,
+        };
+        let res = self.fetch_mdata(name, tag)
+            .and_then(|mut data| data.del_user_permissions(&user, version, requester));
+        self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
@@ -748,41 +732,26 @@ impl DataManager {
                                      version: u64,
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
-        let mutation_type = PendingMutationType::ChangeMDataOwner;
-        let data_id = DataId::mutable(name, tag);
-
-        let new_owners_len = new_owners.len();
-        let new_owner = match new_owners.into_iter().next() {
-            Some(owner) if new_owners_len == 1 => owner,
-            Some(_) | None => {
-                // `new_owners` must have exactly 1 element.
-                self.send_mutation_response(routing_node,
-                                            src,
-                                            dst,
-                                            mutation_type,
-                                            data_id,
-                                            Err(ClientError::InvalidOwners),
-                                            msg_id)?;
-                return Ok(());
-            }
+        let mutation = Mutation::ChangeMDataOwner {
+            name: name,
+            tag: tag,
+            new_owners: new_owners.clone(),
+            version: version,
         };
 
-        let client_name = utils::client_name(&src);
+        let res = self.fetch_mdata(name, tag)
+            .and_then(|mut data| {
+                let client_name = utils::client_name(&src);
+                let new_owner = extract_owner(new_owners)?;
 
-        self.handle_mdata_mutation(routing_node,
-                                   src,
-                                   dst,
-                                   name,
-                                   tag,
-                                   mutation_type,
-                                   msg_id,
-                                   |data| {
-                                       if !utils::verify_mdata_owner(data, &client_name) {
-                                           return Err(ClientError::AccessDenied);
-                                       }
+                if utils::verify_mdata_owner(&data, &client_name) {
+                    data.change_owner(new_owner, version)
+                } else {
+                    Err(ClientError::AccessDenied)
+                }
+            });
 
-                                       data.change_owner(new_owner, version)
-                                   })
+        self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
     pub fn handle_node_added(&mut self,
@@ -912,49 +881,9 @@ impl DataManager {
         }
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    fn handle_mdata_mutation<F>(&mut self,
-                                routing_node: &mut RoutingNode,
-                                src: Authority<XorName>,
-                                dst: Authority<XorName>,
-                                name: XorName,
-                                tag: u64,
-                                mutation_type: PendingMutationType,
-                                msg_id: MessageId,
-                                f: F)
-                                -> Result<(), InternalError>
-        where F: FnOnce(&mut MutableData) -> Result<(), ClientError>
-    {
-        let res = self.fetch_mdata(name, tag)
-            .and_then(|mut data| {
-                          f(&mut data)?;
-                          Ok(data)
-                      });
-
-        match res {
-            Ok(data) => {
-                self.update_pending_writes(routing_node,
-                                           create_pending_mutation_for_mdata(mutation_type, data),
-                                           src,
-                                           dst,
-                                           msg_id,
-                                           false)
-            }
-            Err(error) => {
-                self.send_mutation_response(routing_node,
-                                            src,
-                                            dst,
-                                            mutation_type,
-                                            DataId::mutable(name, tag),
-                                            Err(error),
-                                            msg_id)
-            }
-        }
-    }
-
     fn update_pending_writes(&mut self,
                              routing_node: &mut RoutingNode,
-                             mutation: PendingMutation,
+                             mutation: Mutation,
                              src: Authority<XorName>,
                              dst: Authority<XorName>,
                              message_id: MessageId,
@@ -966,7 +895,7 @@ impl DataManager {
                 dst,
                 message_id,
                 ..
-            } in self.cache.remove_expired_writes() {
+            } in self.cache.remove_expired_pending_writes() {
             let error = ClientError::from("Request expired.");
             trace!("{:?} did not accumulate. Sending failure",
                    mutation.data_id());
@@ -979,46 +908,122 @@ impl DataManager {
                                         message_id)?;
         }
 
-        let data_name = *mutation.data_id().name();
+        let mutation_type = mutation.mutation_type();
+        let data_id = mutation.data_id();
+
         if let Some(refresh) = self.cache
                .insert_pending_write(mutation, src, dst, message_id, rejected) {
-            self.send_group_refresh(routing_node, data_name, refresh, message_id)?;
+            self.send_group_refresh(routing_node, *data_id.name(), refresh, message_id)?;
+        } else if !rejected {
+            let error = ClientError::from("Conflicting concurrent mutation");
+            self.send_mutation_response(routing_node,
+                                        src,
+                                        dst,
+                                        mutation_type,
+                                        data_id,
+                                        Err(error),
+                                        message_id)?;
         }
 
         Ok(())
+    }
+
+    fn start_pending_mutation(&mut self,
+                              routing_node: &mut RoutingNode,
+                              src: Authority<XorName>,
+                              dst: Authority<XorName>,
+                              mutation: Mutation,
+                              res: Result<(), ClientError>,
+                              msg_id: MessageId)
+                              -> Result<(), InternalError> {
+        let mutation_type = mutation.mutation_type();
+        let data_id = mutation.data_id();
+
+        self.update_pending_writes(routing_node, mutation, src, dst, msg_id, res.is_err())?;
+
+        if let Err(error) = res {
+            self.send_mutation_response(routing_node,
+                                        src,
+                                        dst,
+                                        mutation_type,
+                                        data_id,
+                                        Err(error),
+                                        msg_id)
+        } else {
+            Ok(())
+        }
     }
 
     fn commit_pending_mutation(&mut self,
                                routing_node: &mut RoutingNode,
                                src: Authority<XorName>,
                                dst: Authority<XorName>,
-                               mutation: PendingMutation,
+                               mutation: Mutation,
                                msg_id: MessageId)
-                               -> Result<bool, InternalError> {
+                               -> Result<Vec<FragmentInfo>, InternalError> {
         let mutation_type = mutation.mutation_type();
         let data_id = mutation.data_id();
 
         let res = match mutation {
-            PendingMutation::PutIData(data) => self.chunk_store.put(&data.id(), &data),
-            PendingMutation::PutMData(data) |
-            PendingMutation::MutateMDataEntries(data) |
-            PendingMutation::SetMDataUserPermissions(data) |
-            PendingMutation::DelMDataUserPermissions(data) |
-            PendingMutation::ChangeMDataOwner(data) => self.chunk_store.put(&data.id(), &data),
+            Mutation::PutIData(data) => {
+                let fragments = vec![FragmentInfo::ImmutableData(*data.name())];
+                put_into_chunk_store(&mut self.chunk_store, data).map(|_| fragments)
+            }
+            Mutation::PutMData(data) => {
+                let fragments = FragmentInfo::mutable_data(&data);
+                put_into_chunk_store(&mut self.chunk_store, data).map(|_| fragments)
+            }
+            Mutation::MutateMDataEntries { name, tag, actions } => {
+                self.with_mdata(name, tag, |data| {
+                    data.mutate_entries_without_validation(actions);
+                    FragmentInfo::mutable_data_entries(&data)
+                })
+            }
+            Mutation::SetMDataUserPermissions {
+                name,
+                tag,
+                user,
+                permissions,
+                version,
+            } => {
+                self.with_mdata(name, tag, |data| {
+                    data.set_user_permissions_without_validation(user, permissions, version);
+                    vec![FragmentInfo::mutable_data_shell(&data)]
+                })
+            }
+            Mutation::DelMDataUserPermissions {
+                name,
+                tag,
+                user,
+                version,
+            } => {
+                self.with_mdata(name, tag, |data| {
+                    data.del_user_permissions_without_validation(&user, version);
+                    vec![FragmentInfo::mutable_data_shell(&data)]
+                })
+            }
+            Mutation::ChangeMDataOwner {
+                name,
+                tag,
+                new_owners,
+                version,
+            } => {
+                self.with_mdata(name, tag, |data| {
+                    if let Some(new_owner) = new_owners.into_iter().next() {
+                        data.change_owner_without_validation(new_owner, version);
+                    }
+                    vec![FragmentInfo::mutable_data_shell(&data)]
+                })
+            }
         };
 
-        let res = if let Err(error) = res {
-            trace!("DM failed to store {:?} in chunkstore: {:?}",
-                   data_id,
-                   error);
-            Err(ClientError::from(format!("Failed to store chunk: {:?}", error)))
-        } else {
-            Ok(())
+        let (res, fragments) = match res {
+            Ok(fragments) => (Ok(()), fragments),
+            Err(error) => (Err(error), Vec::new()),
         };
 
-        let success = res.is_ok();
         self.send_mutation_response(routing_node, src, dst, mutation_type, data_id, res, msg_id)?;
-        Ok(success)
+        Ok(fragments)
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
@@ -1026,7 +1031,7 @@ impl DataManager {
                               routing_node: &mut RoutingNode,
                               src: Authority<XorName>,
                               dst: Authority<XorName>,
-                              mutation_type: PendingMutationType,
+                              mutation_type: MutationType,
                               data_id: DataId,
                               res: Result<(), ClientError>,
                               msg_id: MessageId)
@@ -1037,38 +1042,38 @@ impl DataManager {
         };
 
         match mutation_type {
-            PendingMutationType::PutIData => {
+            MutationType::PutIData => {
                 trace!("DM sending PutIData {} for data {:?}", res_string, data_id);
                 routing_node
                     .send_put_idata_response(dst, src, res, msg_id)?
             }
-            PendingMutationType::PutMData => {
+            MutationType::PutMData => {
                 trace!("DM sending PutMData {} for data {:?}", res_string, data_id);
                 routing_node
                     .send_put_mdata_response(dst, src, res, msg_id)?
             }
-            PendingMutationType::MutateMDataEntries => {
+            MutationType::MutateMDataEntries => {
                 trace!("DM sending MutateMDataEntries {} for data {:?}",
                        res_string,
                        data_id);
                 routing_node
                     .send_mutate_mdata_entries_response(dst, src, res, msg_id)?
             }
-            PendingMutationType::SetMDataUserPermissions => {
+            MutationType::SetMDataUserPermissions => {
                 trace!("DM sending SetMDataUserPermissions {} for data {:?}",
                        res_string,
                        data_id);
                 routing_node
                     .send_set_mdata_user_permissions_response(dst, src, res, msg_id)?
             }
-            PendingMutationType::DelMDataUserPermissions => {
+            MutationType::DelMDataUserPermissions => {
                 trace!("DM sending DelMDataUserPermissions {} for data {:?}",
                        res_string,
                        data_id);
                 routing_node
                     .send_del_mdata_user_permissions_response(dst, src, res, msg_id)?
             }
-            PendingMutationType::ChangeMDataOwner => {
+            MutationType::ChangeMDataOwner => {
                 trace!("DM sending ChangeMDataOwner {} for data {:?}",
                        res_string,
                        data_id);
@@ -1119,7 +1124,7 @@ impl DataManager {
     fn send_group_refresh(&self,
                           routing_node: &mut RoutingNode,
                           name: XorName,
-                          refresh: DataInfo,
+                          refresh: MutationVote,
                           msg_id: MessageId)
                           -> Result<(), InternalError> {
         match serialisation::serialise(&refresh) {
@@ -1227,6 +1232,16 @@ impl DataManager {
         result.extend(self.chunk_store_fragments());
         result
     }
+
+    // Load mutable data from the chunk store, apply the given function to it put it back.
+    fn with_mdata<F, R>(&mut self, name: XorName, tag: u64, f: F) -> Result<R, ClientError>
+        where F: FnOnce(&mut MutableData) -> R
+    {
+        let mut data = get_from_chunk_store(&self.chunk_store, &MutableDataId(name, tag))?;
+        let result = f(&mut data);
+        put_into_chunk_store(&mut self.chunk_store, data)?;
+        Ok(result)
+    }
 }
 
 #[cfg(feature = "use-mock-crust")]
@@ -1274,6 +1289,11 @@ impl DataManager {
     pub fn get_from_chunk_store<T: ChunkId<DataId>>(&self, data_id: &T) -> Option<T::Chunk> {
         self.chunk_store.get(data_id).ok()
     }
+
+    /// Clear the cache
+    pub fn clear_cache(&mut self) {
+        self.cache.clear()
+    }
 }
 
 impl Debug for DataManager {
@@ -1292,19 +1312,40 @@ fn close_to_address(routing_node: &mut RoutingNode, address: &XorName) -> bool {
     routing_node.close_group(*address, GROUP_SIZE).is_some()
 }
 
-fn create_pending_mutation_for_mdata(mutation_type: PendingMutationType,
-                                     data: MutableData)
-                                     -> PendingMutation {
-    match mutation_type {
-        PendingMutationType::MutateMDataEntries => PendingMutation::MutateMDataEntries(data),
-        PendingMutationType::SetMDataUserPermissions => {
-            PendingMutation::SetMDataUserPermissions(data)
-        }
-        PendingMutationType::DelMDataUserPermissions => {
-            PendingMutation::DelMDataUserPermissions(data)
-        }
-        PendingMutationType::ChangeMDataOwner => PendingMutation::ChangeMDataOwner(data),
-        PendingMutationType::PutIData |
-        PendingMutationType::PutMData => unreachable!(),
+// `owners` must have exactly 1 element.
+fn extract_owner(owners: BTreeSet<sign::PublicKey>) -> Result<sign::PublicKey, ClientError> {
+    let len = owners.len();
+    match owners.into_iter().next() {
+        Some(owner) if len == 1 => Ok(owner),
+        Some(_) | None => Err(ClientError::InvalidOwners),
     }
+}
+
+fn get_from_chunk_store<T: ChunkId<DataId> + Debug>(chunk_store: &ChunkStore<DataId>,
+                                                    data_id: &T)
+                                                    -> Result<T::Chunk, ClientError> {
+    chunk_store
+        .get(data_id)
+        .map_err(|error| {
+                     trace!("DM failed to load {:?} from chunkstore: {:?}",
+                            data_id,
+                            error);
+                     ClientError::from(format!("Failed to load chunk: {:?}", error))
+                 })
+}
+
+fn put_into_chunk_store<T, I>(chunk_store: &mut ChunkStore<DataId>,
+                              data: T)
+                              -> Result<(), ClientError>
+    where T: Chunk<DataId, Id = I> + Data<Id = I>,
+          I: ChunkId<DataId> + Debug
+{
+    chunk_store
+        .put(&data.id(), &data)
+        .map_err(|error| {
+                     trace!("DM failed to store {:?} in chunkstore: {:?}",
+                            data.id(),
+                            error);
+                     ClientError::from(format!("Failed to store chunk: {:?}", error))
+                 })
 }

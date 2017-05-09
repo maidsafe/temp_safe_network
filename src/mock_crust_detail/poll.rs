@@ -19,34 +19,17 @@ use super::test_client::TestClient;
 use super::test_node::TestNode;
 
 /// Empty event queue of nodes provided
-pub fn nodes(nodes: &mut [TestNode]) {
-    loop {
-        let mut next = false;
-
-        for node in nodes.iter_mut() {
-            if node.poll() > 0 {
-                next = true;
-                break;
-            }
-        }
-
-        if !next {
-            break;
-        }
-    }
+pub fn nodes(nodes: &mut [TestNode]) -> usize {
+    nodes_and_clients(nodes, &mut [])
 }
 
-/// Resends all unacknowledged messages on all nodes.
-pub fn resend_unacknowledged(nodes: &mut [TestNode], client: &mut TestClient) -> bool {
-    let mut result = false;
-    for node in nodes {
-        result = result || node.resend_unacknowledged();
-    }
-    result || client.resend_unacknowledged()
+/// Empty event queue of nodes and the client provided
+pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
+    nodes_and_clients(nodes, ref_slice_mut(client))
 }
 
 /// Empty event queue of nodes and clients provided
-pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
+pub fn nodes_and_clients(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
     let mut count: usize = 0;
     loop {
         let prev_count = count;
@@ -55,7 +38,37 @@ pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usiz
             count += node.poll();
         }
 
-        count += client.poll();
+        for client in clients.iter_mut() {
+            count += client.poll();
+        }
+
+        if prev_count == count {
+            break;
+        }
+    }
+
+    count
+}
+
+/// Empty event queue of nodes and clients.
+/// Handles more than one client and handles only one event per round for each node and client,
+/// to better simulate simultaneous requests.
+pub fn nodes_and_clients_parallel(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
+    let mut count = 0;
+    loop {
+        let prev_count = count;
+
+        for node in nodes.iter_mut() {
+            if node.poll_once() {
+                count += 1;
+            }
+        }
+
+        for client in clients.iter_mut() {
+            if client.poll_once() {
+                count += 1;
+            }
+        }
 
         if prev_count == count {
             break;
@@ -64,54 +77,9 @@ pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usiz
     count
 }
 
-/// Empty event queue of nodes and clients and resend unacknowledged messages.
-pub fn poll_and_resend_unacknowledged(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
-    let mut count = 0;
-    loop {
-        let new_count = nodes_and_client(nodes, client);
-        count += new_count;
-        if !resend_unacknowledged(nodes, client) && new_count == 0 {
-            return count;
-        }
-    }
-}
-
-/// Empty event queue of nodes and clients and resend unacknowledged messages.
-/// Handles more than one client and handles only one event per round for each node and client,
-/// to better simulate simultaneous requests.
-pub fn poll_and_resend_unacknowledged_parallel(nodes: &mut [TestNode],
-                                               clients: &mut [TestClient])
-                                               -> usize {
-    let mut event_count = 0;
-    loop {
-        let mut new_count = 0;
-        loop {
-            let prev_count = new_count;
-            for node in nodes.iter_mut() {
-                if node.poll_once() {
-                    new_count += 1;
-                }
-            }
-            for client in clients.iter_mut() {
-                if client.poll_once() {
-                    new_count += 1;
-                }
-            }
-            if prev_count == new_count {
-                break;
-            }
-        }
-        event_count += new_count;
-        let mut result = false;
-        for node in nodes.iter_mut() {
-            result = result || node.resend_unacknowledged()
-        }
-        for client in clients.iter_mut() {
-            result = result || client.resend_unacknowledged();
-        }
-        if !result && new_count == 0 {
-            break;
-        }
-    }
-    event_count
+// Converts a reference to `A` into a slice of length 1 (without copying).
+#[allow(unsafe_code)]
+fn ref_slice_mut<A>(s: &mut A) -> &mut [A] {
+    use std::slice;
+    unsafe { slice::from_raw_parts_mut(s, 1) }
 }

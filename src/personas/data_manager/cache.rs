@@ -16,12 +16,14 @@
 // relating to use of the SAFE Network Software.
 
 use super::STATUS_LOG_INTERVAL;
-use super::data::{Data, DataId, ImmutableDataId, MutableDataId};
+use super::data::{DataId, ImmutableDataId, MutableDataId};
+use super::mutation::Mutation;
 use GROUP_SIZE;
-use routing::{Authority, ImmutableData, MessageId, MutableData, RoutingTable, Value, XorName};
+use routing::{Authority, MessageId, MutableData, RoutingTable, Value, XorName};
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
-use utils::{self, HashMap, HashSet, SecureHash};
+use std::collections::hash_map::Entry;
+use std::time::Duration;
+use utils::{self, HashMap, HashSet, Instant, SecureHash};
 
 /// The timeout for cached data from requests; if no consensus is reached, the data is dropped.
 const PENDING_WRITE_TIMEOUT_SECS: u64 = 60;
@@ -283,52 +285,87 @@ impl Cache {
         (before - self.unneeded_chunks.len()) as u64
     }
 
-    /// Inserts the given mutation as a pending write. If it is the first for that
-    /// data identifier, it returns a refresh message to send to ourselves as a group.
+    /// Inserts the given mutation as a pending write. If the mutation doesn't
+    /// conflict with any existing pending mutations and is accepted (`rejected`
+    /// is false), returns `MutationVote` to send to the other member of the group.
+    /// Otherwise, returns `None`.
     pub fn insert_pending_write(&mut self,
-                                mutation: PendingMutation,
+                                mutation: Mutation,
                                 src: Authority<XorName>,
                                 dst: Authority<XorName>,
                                 msg_id: MessageId,
                                 rejected: bool)
-                                -> Option<DataInfo> {
+                                -> Option<MutationVote> {
         let hash = utils::secure_hash(&mutation);
+        let data_id = mutation.data_id();
 
         let mut writes = self.pending_writes
-            .entry(mutation.data_id())
+            .entry(data_id)
             .or_insert_with(Vec::new);
-        let result = if !rejected && writes.iter().all(|pending_write| pending_write.rejected) {
-            Some(DataInfo {
-                     data_id: mutation.data_id(),
+
+        if !rejected &&
+           writes
+               .iter()
+               .any(|other| !other.rejected && other.mutation.conflicts_with(&mutation)) {
+            return None;
+        } else {
+            writes.push(PendingWrite {
+                            hash: hash,
+                            mutation: mutation,
+                            timestamp: Instant::now(),
+                            src: src,
+                            dst: dst,
+                            message_id: msg_id,
+                            rejected: rejected,
+                        });
+        }
+
+        if rejected {
+            None
+        } else {
+            Some(MutationVote {
+                     data_id: data_id,
                      hash: hash,
                  })
-        } else {
-            None
-        };
-
-        let pending_write = PendingWrite {
-            hash: hash,
-            mutation: mutation,
-            timestamp: Instant::now(),
-            src: src,
-            dst: dst,
-            message_id: msg_id,
-            rejected: rejected,
-        };
-        writes.insert(0, pending_write);
-
-        result
+        }
     }
 
-    /// Removes and returns all pending writes for the specified data identifier from the cache.
-    pub fn take_pending_writes(&mut self, data_id: &DataId) -> Vec<PendingWrite> {
-        self.pending_writes
-            .remove(data_id)
-            .unwrap_or_else(Vec::new)
+    /// Removes and returns the pending write for the specified data identifier
+    /// and having the specified hash.
+    pub fn take_pending_write(&mut self,
+                              data_id: &DataId,
+                              hash: &SecureHash)
+                              -> Option<PendingWrite> {
+        // If there is more than one matching pending write, remove all of them,
+        // but return only the non-rejected one.
+        if let Entry::Occupied(mut entry) = self.pending_writes.entry(*data_id) {
+            let mut accepted = Vec::new();
+            let mut rejected = Vec::new();
+
+            while let Some(index) = entry.get().iter().position(|write| write.hash == *hash) {
+                let write = entry.get_mut().remove(index);
+                if write.rejected {
+                    rejected.push(write)
+                } else {
+                    accepted.push(write)
+                }
+            }
+
+            if entry.get().is_empty() {
+                let _ = entry.remove();
+            }
+
+            accepted
+                .into_iter()
+                .next()
+                .or_else(|| rejected.into_iter().next())
+        } else {
+            None
+        }
     }
 
     /// Removes and returns all timed out pending writes.
-    pub fn remove_expired_writes(&mut self) -> Vec<PendingWrite> {
+    pub fn remove_expired_pending_writes(&mut self) -> Vec<PendingWrite> {
         let timeout = Duration::from_secs(PENDING_WRITE_TIMEOUT_SECS);
         let expired_writes: Vec<_> = self.pending_writes
             .iter_mut()
@@ -437,6 +474,20 @@ impl Cache {
     }
 }
 
+#[cfg(all(test, feature = "use-mock-routing"))]
+impl Cache {
+    /// Clear the cache.
+    pub fn clear(&mut self) {
+        self.unneeded_chunks.clear();
+        self.fragment_holders.clear();
+        self.fragment_index.clear();
+        self.pending_writes.clear();
+        self.mdata_entries.clear();
+        self.total_needed_fragments_count = 0;
+        self.requested_needed_fragments_count = 0;
+    }
+}
+
 impl Default for Cache {
     fn default() -> Cache {
         Cache {
@@ -456,7 +507,7 @@ impl Default for Cache {
 // A pending write to the chunk store. This is cached in memory until the group either reaches
 // consensus and stores the chunk, or it times out and is dropped.
 pub struct PendingWrite {
-    pub mutation: PendingMutation,
+    pub mutation: Mutation,
     pub hash: SecureHash,
     timestamp: Instant,
     pub src: Authority<XorName>,
@@ -465,63 +516,10 @@ pub struct PendingWrite {
     pub rejected: bool,
 }
 
-#[derive(Serialize)]
-pub enum PendingMutation {
-    PutIData(ImmutableData),
-    PutMData(MutableData),
-    MutateMDataEntries(MutableData),
-    SetMDataUserPermissions(MutableData),
-    DelMDataUserPermissions(MutableData),
-    ChangeMDataOwner(MutableData),
-}
-
-impl PendingMutation {
-    pub fn data_id(&self) -> DataId {
-        match *self {
-            PendingMutation::PutIData(ref data) => DataId::Immutable(data.id()),
-            PendingMutation::PutMData(ref data) |
-            PendingMutation::MutateMDataEntries(ref data) |
-            PendingMutation::SetMDataUserPermissions(ref data) |
-            PendingMutation::DelMDataUserPermissions(ref data) |
-            PendingMutation::ChangeMDataOwner(ref data) => DataId::Mutable(data.id()),
-        }
-    }
-
-    pub fn mutation_type(&self) -> PendingMutationType {
-        match *self {
-            PendingMutation::PutIData(_) => PendingMutationType::PutIData,
-            PendingMutation::PutMData(_) => PendingMutationType::PutMData,
-            PendingMutation::MutateMDataEntries(_) => PendingMutationType::MutateMDataEntries,
-            PendingMutation::SetMDataUserPermissions(_) => {
-                PendingMutationType::SetMDataUserPermissions
-            }
-            PendingMutation::DelMDataUserPermissions(_) => {
-                PendingMutationType::DelMDataUserPermissions
-            }
-            PendingMutation::ChangeMDataOwner(_) => PendingMutationType::ChangeMDataOwner,
-        }
-    }
-
-    pub fn fragment_infos(&self) -> Vec<FragmentInfo> {
-        match *self {
-            PendingMutation::PutIData(ref data) => vec![FragmentInfo::ImmutableData(*data.name())],
-            PendingMutation::PutMData(ref data) |
-            PendingMutation::MutateMDataEntries(ref data) |
-            PendingMutation::SetMDataUserPermissions(ref data) |
-            PendingMutation::DelMDataUserPermissions(ref data) |
-            PendingMutation::ChangeMDataOwner(ref data) => FragmentInfo::mutable_data(data),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum PendingMutationType {
-    PutIData,
-    PutMData,
-    MutateMDataEntries,
-    SetMDataUserPermissions,
-    DelMDataUserPermissions,
-    ChangeMDataOwner,
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct MutationVote {
+    pub data_id: DataId,
+    pub hash: SecureHash,
 }
 
 /// Information about a data fragment:
@@ -572,16 +570,20 @@ impl FragmentInfo {
         }
     }
 
+    /// Create `FragmentInfo` for each entry in the mutable data.
+    pub fn mutable_data_entries(data: &MutableData) -> Vec<Self> {
+        data.entries()
+            .iter()
+            .map(|(key, value)| Self::mutable_data_entry(data, key.clone(), value))
+            .collect()
+    }
+
     // Get all fragments for the given mutable data.
     pub fn mutable_data(data: &MutableData) -> Vec<Self> {
         let mut result = Vec::with_capacity(1 + data.entries().len());
 
         result.push(Self::mutable_data_shell(data));
-
-        for (key, value) in data.entries() {
-            result.push(Self::mutable_data_entry(data, key.clone(), value));
-        }
-
+        result.append(&mut Self::mutable_data_entries(data));
         result
     }
 
@@ -602,12 +604,6 @@ impl FragmentInfo {
             }
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub struct DataInfo {
-    pub data_id: DataId,
-    pub hash: SecureHash,
 }
 
 struct FragmentHolder {
@@ -740,6 +736,12 @@ impl UnneededChunks {
         for name in removed {
             let _ = self.set.remove(&name);
         }
+    }
+
+    #[cfg(all(test, feature = "use-mock-routing"))]
+    fn clear(&mut self) {
+        self.queue.clear();
+        self.set.clear();
     }
 }
 
