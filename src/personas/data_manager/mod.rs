@@ -31,6 +31,7 @@ use error::InternalError;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData,
               PermissionSet, RoutingTable, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
+use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
@@ -255,16 +256,14 @@ impl DataManager {
                                     src: XorName,
                                     data: ImmutableData)
                                     -> Result<(), InternalError> {
-        let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src) {
-            match fragment {
-                FragmentInfo::ImmutableData(ref name) if *name == *data.name() => {
+        let mut valid = false;
+        if let Some(fragment) = self.cache.stop_needed_fragment_request(&src) {
+            if let FragmentInfo::ImmutableData(ref name) = fragment {
+                if *name == *data.name() && *name == recompute_idata_name(&data) {
                     self.cache.remove_needed_fragment(&fragment);
-                    true
+                    valid = true;
                 }
-                _ => false,
             }
-        } else {
-            false
         };
 
         self.request_needed_fragments(routing_node)?;
@@ -975,8 +974,18 @@ impl DataManager {
             }
             Mutation::MutateMDataEntries { name, tag, actions } => {
                 self.with_mdata(name, tag, |data| {
+                    let keys: Vec<_> = actions.keys().cloned().collect();
                     data.mutate_entries_without_validation(actions);
-                    FragmentInfo::mutable_data_entries(&data)
+                    keys.into_iter()
+                        .filter_map(|key| {
+                                        data.get(&key)
+                                            .map(|value| {
+                                                     FragmentInfo::mutable_data_entry(&data,
+                                                                                      key,
+                                                                                      value)
+                                                 })
+                                    })
+                        .collect()
                 })
             }
             Mutation::SetMDataUserPermissions {
@@ -1310,6 +1319,10 @@ impl Debug for DataManager {
 
 fn close_to_address(routing_node: &mut RoutingNode, address: &XorName) -> bool {
     routing_node.close_group(*address, GROUP_SIZE).is_some()
+}
+
+fn recompute_idata_name(data: &ImmutableData) -> XorName {
+    XorName(sha256::hash(data.value()).0)
 }
 
 // `owners` must have exactly 1 element.

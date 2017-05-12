@@ -570,20 +570,16 @@ impl FragmentInfo {
         }
     }
 
-    /// Create `FragmentInfo` for each entry in the mutable data.
-    pub fn mutable_data_entries(data: &MutableData) -> Vec<Self> {
-        data.entries()
-            .iter()
-            .map(|(key, value)| Self::mutable_data_entry(data, key.clone(), value))
-            .collect()
-    }
-
     // Get all fragments for the given mutable data.
     pub fn mutable_data(data: &MutableData) -> Vec<Self> {
         let mut result = Vec::with_capacity(1 + data.entries().len());
 
         result.push(Self::mutable_data_shell(data));
-        result.append(&mut Self::mutable_data_entries(data));
+
+        for (key, value) in data.entries() {
+            result.push(Self::mutable_data_entry(data, key.clone(), value));
+        }
+
         result
     }
 
