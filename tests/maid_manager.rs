@@ -285,12 +285,15 @@ fn storing_till_client_account_full() {
 }
 
 #[test]
-fn maid_manager_account_adding_with_churn() {
+fn account_mutation_count_increase_with_churn() {
     let seed = None;
+    let iterations = test_utils::iterations();
+    let node_count = 15;
+    let data_count = 4;
+
     let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
 
-    let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
@@ -302,10 +305,9 @@ fn maid_manager_account_adding_with_churn() {
     let mut mutation_count = 1; // Session packet.
     let mut event_count = 0;
 
-    for i in 0..test_utils::iterations() {
-        for data in (0..4).map(|_| {
-                                   test_utils::gen_mutable_data(TEST_TAG, 10, client_key, &mut rng)
-                               }) {
+    for i in 0..iterations {
+        for _ in 0..data_count {
+            let data = test_utils::gen_mutable_data(TEST_TAG, 10, client_key, &mut rng);
             let _ = client.put_mdata(data);
             mutation_count += 1;
         }
@@ -347,7 +349,7 @@ fn maid_manager_account_adding_with_churn() {
 }
 
 #[test]
-fn maid_manager_account_decrease_with_churn() {
+fn account_mutation_count_decrease_with_churn() {
     let network = Network::new(GROUP_SIZE, None);
     let mut rng = network.new_rng();
 

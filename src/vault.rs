@@ -225,6 +225,16 @@ impl Vault {
                 self.data_manager
                     .handle_put_mdata(&mut self.routing_node, src, dst, data, msg_id, requester)
             }
+            // ========== GetMData ==========
+            (Authority::Client { .. },
+             Authority::NaeManager(_),
+             Request::GetMData { name, tag, msg_id }) |
+            (Authority::ManagedNode(_),
+             Authority::ManagedNode(_),
+             Request::GetMData { name, tag, msg_id }) => {
+                self.data_manager
+                    .handle_get_mdata(&mut self.routing_node, src, dst, name, tag, msg_id)
+            }
             // ========== GetMDataShell ==========
             (Authority::Client { .. },
              Authority::NaeManager(_),
@@ -578,6 +588,20 @@ impl Vault {
              Response::PutMData { res, msg_id }) => {
                 self.maid_manager
                     .handle_put_mdata_response(&mut self.routing_node, res, msg_id)
+            }
+            // ================== GetMData success =============
+            (Authority::ManagedNode(src_name),
+             Authority::ManagedNode(_),
+             Response::GetMData { res: Ok(shell), .. }) => {
+                self.data_manager
+                    .handle_get_mdata_success(&mut self.routing_node, src_name, shell)
+            }
+            // ================== GetMData failure =============
+            (Authority::ManagedNode(src_name),
+             Authority::ManagedNode(_),
+             Response::GetMData { res: Err(_), .. }) => {
+                self.data_manager
+                    .handle_get_mdata_failure(&mut self.routing_node, src_name)
             }
             // ================== GetMDataShell success =============
             (Authority::ManagedNode(src_name),

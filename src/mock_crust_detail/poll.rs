@@ -31,6 +31,7 @@ pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usiz
 /// Empty event queue of nodes and clients provided
 pub fn nodes_and_clients(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
     let mut count: usize = 0;
+
     loop {
         let prev_count = count;
 

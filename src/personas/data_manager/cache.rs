@@ -29,10 +29,6 @@ use utils::{self, HashMap, HashSet, Instant, SecureHash};
 const PENDING_WRITE_TIMEOUT_SECS: u64 = 60;
 /// The timeout for retrieving data fragments from individual peers.
 const FRAGMENT_REQUEST_TIMEOUT_SECS: u64 = 60;
-/// The timeout after which cached mutable data entries expire.
-const MDATA_ENTRY_TIMEOUT_SECS: u64 = 60;
-
-type CachedMDataEntries = HashMap<Vec<u8>, (Value, Instant)>;
 
 pub struct Cache {
     /// Immutable data chunks we are no longer responsible for. These can be deleted
@@ -44,12 +40,10 @@ pub struct Cache {
     fragment_holders: HashMap<XorName, FragmentHolder>,
     /// Maps fragments to the list of holders that have it and tracks whether there
     /// is an ongoing request to retrieve it.
-    fragment_index: HashMap<FragmentInfo, FragmentState>,
+    fragment_index: FragmentIndex,
 
     /// Maps data identifiers to the list of pending writes that affect that chunk.
     pending_writes: HashMap<DataId, Vec<PendingWrite>>,
-    /// Mutable data entries that arrived before the data shell.
-    mdata_entries: HashMap<(XorName, u64), CachedMDataEntries>,
 
     total_needed_fragments_count: usize,
     requested_needed_fragments_count: usize,
@@ -57,9 +51,22 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// Returns data fragments we need but have not requested yet.
-    pub fn unrequested_needed_fragments(&mut self) -> Vec<(FragmentInfo, Vec<XorName>)> {
-        self.reset_expired_requests();
+    // Returns IDs of all chunks we need.
+    pub fn needed_chunks(&self) -> HashSet<DataId> {
+        self.fragment_index
+            .keys()
+            .filter(|fragment| if let FragmentInfo::ImmutableData(ref name) = **fragment {
+                        !self.unneeded_chunks.contains(name)
+                    } else {
+                        true
+                    })
+            .map(FragmentInfo::data_id)
+            .collect()
+    }
+
+    /// Returns data fragments we need and want to request from other nodes.
+    pub fn needed_fragments(&mut self) -> Vec<(FragmentInfo, Vec<XorName>)> {
+        self.stop_expired_requests();
 
         let mut result = HashMap::default();
 
@@ -75,10 +82,19 @@ impl Cache {
                     }
                 }
 
-                if self.fragment_index
-                       .get(fragment)
-                       .map_or(false, |state| state.requested) {
-                    continue;
+                // For all fragment types except `MutableData`, there can be
+                // at most one request at a time. For `MutableData` we allow
+                // multiple requests, because we need to request it from every
+                // member of its group.
+                match *fragment {
+                    FragmentInfo::MutableData(..) => (),
+                    _ => {
+                        if self.fragment_index
+                               .get(fragment)
+                               .map_or(false, |state| state.is_requested()) {
+                            continue;
+                        }
+                    }
                 }
 
                 result
@@ -91,19 +107,6 @@ impl Cache {
         result.into_iter().collect()
     }
 
-    /// Returns all data fragments we need.
-    pub fn needed_fragments(&self) -> HashSet<FragmentInfo> {
-        self.fragment_index
-            .keys()
-            .filter(|fragment| if let FragmentInfo::ImmutableData(ref name) = **fragment {
-                        !self.unneeded_chunks.contains(name)
-                    } else {
-                        true
-                    })
-            .cloned()
-            .collect()
-    }
-
     /// Insert new needed fragment and register it with the given holder.
     pub fn insert_needed_fragment(&mut self, fragment: FragmentInfo, holder: XorName) {
         if self.fragment_holders
@@ -111,11 +114,7 @@ impl Cache {
                .or_insert_with(FragmentHolder::new)
                .fragments
                .insert(fragment.clone()) {
-            let _ = self.fragment_index
-                .entry(fragment.clone())
-                .or_insert_with(FragmentState::new)
-                .holders
-                .insert(holder);
+            index_needed_fragment(&mut self.fragment_index, fragment, holder);
         }
     }
 
@@ -168,7 +167,7 @@ impl Cache {
             holder.start_request(fragment.clone());
 
             if let Some(state) = self.fragment_index.get_mut(fragment) {
-                state.requested = true;
+                state.start_request();
             }
         }
     }
@@ -179,9 +178,16 @@ impl Cache {
 
         if let Some(holder) = self.fragment_holders.get_mut(holder_name) {
             if let Some(fragment) = holder.stop_request() {
-                if let Some(state) = self.fragment_index.get_mut(&fragment) {
-                    state.requested = false;
-                    let _ = state.holders.remove(holder_name);
+                let remove_index = self.fragment_index
+                    .get_mut(&fragment)
+                    .map_or(false, |state| {
+                        state.stop_request();
+                        let _ = state.holders.remove(holder_name);
+                        state.holders.is_empty()
+                    });
+
+                if remove_index {
+                    let _ = self.fragment_index.remove(&fragment);
                 }
 
                 result = Some(fragment);
@@ -222,16 +228,7 @@ impl Cache {
             }
 
             for fragment in &lost {
-                let remove = if let Some(state) = self.fragment_index.get_mut(fragment) {
-                    let _ = state.holders.remove(holder_name);
-                    state.holders.is_empty()
-                } else {
-                    false
-                };
-
-                if remove {
-                    let _ = self.fragment_index.remove(fragment);
-                }
+                unindex_needed_fragment(&mut self.fragment_index, fragment, holder_name);
             }
 
             if holder.fragments.is_empty() {
@@ -253,9 +250,7 @@ impl Cache {
 
             for holder_name in state.holders {
                 if let Some(holder) = self.fragment_holders.get_mut(&holder_name) {
-                    holder.stop_request_for(fragment);
-
-                    let _ = holder.fragments.remove(fragment);
+                    holder.remove_fragment(fragment);
                     if holder.fragments.is_empty() {
                         empty_holders.push(holder_name);
                     }
@@ -395,58 +390,21 @@ impl Cache {
         self.unneeded_chunks.pop().map(ImmutableDataId)
     }
 
-    pub fn insert_mdata_entry(&mut self, name: XorName, tag: u64, key: Vec<u8>, value: Value) {
-        self.remove_expired_mdata_entries();
-        let _ = self.mdata_entries
-            .entry((name, tag))
-            .or_insert_with(HashMap::default)
-            .insert(key, (value, Instant::now()));
-    }
+    fn stop_expired_requests(&mut self) {
+        let mut empty_holders = Vec::new();
 
-    pub fn take_mdata_entries(&mut self, name: XorName, tag: u64) -> HashMap<Vec<u8>, Value> {
-        let result = self.mdata_entries
-            .remove(&(name, tag))
-            .unwrap_or_else(HashMap::default)
-            .into_iter()
-            .map(|(key, (value, _))| (key, value))
-            .collect();
+        for (holder_name, holder) in &mut self.fragment_holders {
+            if let Some(fragment) = holder.stop_request_if_expired() {
+                if holder.fragments.is_empty() {
+                    empty_holders.push(*holder_name);
+                }
 
-        self.remove_expired_mdata_entries();
-
-        result
-    }
-
-    fn reset_expired_requests(&mut self) {
-        for holder in self.fragment_holders.values_mut() {
-            holder.reset_expired_request()
-        }
-    }
-
-    fn remove_expired_mdata_entries(&mut self) {
-        let mut remove = Vec::new();
-
-        for (data_id, entries) in &mut self.mdata_entries {
-            let expired_keys: Vec<_> = entries
-                .iter()
-                .filter_map(|(key, &(_, instant))| if instant.elapsed().as_secs() >
-                                                      MDATA_ENTRY_TIMEOUT_SECS {
-                                Some(key.clone())
-                            } else {
-                                None
-                            })
-                .collect();
-
-            for key in expired_keys {
-                let _ = entries.remove(&key);
-            }
-
-            if entries.is_empty() {
-                remove.push(*data_id);
+                unindex_needed_fragment(&mut self.fragment_index, &fragment, holder_name);
             }
         }
 
-        for data_id in remove {
-            let _ = self.mdata_entries.remove(&data_id);
+        for holder in empty_holders {
+            let _ = self.fragment_holders.remove(&holder);
         }
     }
 
@@ -482,7 +440,6 @@ impl Cache {
         self.fragment_holders.clear();
         self.fragment_index.clear();
         self.pending_writes.clear();
-        self.mdata_entries.clear();
         self.total_needed_fragments_count = 0;
         self.requested_needed_fragments_count = 0;
     }
@@ -495,7 +452,6 @@ impl Default for Cache {
             fragment_holders: HashMap::default(),
             fragment_index: HashMap::default(),
             pending_writes: HashMap::default(),
-            mdata_entries: HashMap::default(),
             logging_time: Instant::now(),
             total_needed_fragments_count: 0,
             requested_needed_fragments_count: 0,
@@ -524,11 +480,13 @@ pub struct MutationVote {
 
 /// Information about a data fragment:
 /// - immutable data,
+/// - whole mutable data,
 /// - mutable data shell or,
 /// - mutable data entry.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum FragmentInfo {
     ImmutableData(XorName),
+    MutableData(XorName, u64),
     MutableDataShell {
         name: XorName,
         tag: u64,
@@ -583,9 +541,18 @@ impl FragmentInfo {
         result
     }
 
+    // Get fragment representing whole data.
+    pub fn data(data_id: DataId) -> Self {
+        match data_id {
+            DataId::Immutable(ImmutableDataId(name)) => FragmentInfo::ImmutableData(name),
+            DataId::Mutable(MutableDataId(name, tag)) => FragmentInfo::MutableData(name, tag),
+        }
+    }
+
     pub fn name(&self) -> &XorName {
         match *self {
             FragmentInfo::ImmutableData(ref name) |
+            FragmentInfo::MutableData(ref name, ..) |
             FragmentInfo::MutableDataShell { ref name, .. } |
             FragmentInfo::MutableDataEntry { ref name, .. } => name,
         }
@@ -594,6 +561,7 @@ impl FragmentInfo {
     pub fn data_id(&self) -> DataId {
         match *self {
             FragmentInfo::ImmutableData(name) => DataId::Immutable(ImmutableDataId(name)),
+            FragmentInfo::MutableData(name, tag) |
             FragmentInfo::MutableDataShell { name, tag, .. } |
             FragmentInfo::MutableDataEntry { name, tag, .. } => {
                 DataId::Mutable(MutableDataId(name, tag))
@@ -638,6 +606,7 @@ impl FragmentHolder {
         if self.request
                .as_ref()
                .map_or(false, |request| request.fragment == *fragment) {
+            let _ = self.fragments.remove(fragment);
             self.request = None;
             true
         } else {
@@ -645,11 +614,25 @@ impl FragmentHolder {
         }
     }
 
-    fn reset_expired_request(&mut self) {
-        if self.request
+    // If the ongoing request expired, stops it and returns the requested fragment.
+    fn stop_request_if_expired(&mut self) -> Option<FragmentInfo> {
+        let request = if self.request
                .as_ref()
-               .map_or(false, |request| request.is_expired()) {
-            self.request = None;
+               .map_or(false, FragmentRequest::is_expired) {
+            self.request.take()
+        } else {
+            None
+        };
+
+        request.map(|request| {
+                        let _ = self.fragments.remove(&request.fragment);
+                        request.fragment
+                    })
+    }
+
+    fn remove_fragment(&mut self, fragment: &FragmentInfo) {
+        if !self.stop_request_for(fragment) {
+            let _ = self.fragments.remove(fragment);
         }
     }
 }
@@ -674,15 +657,27 @@ impl FragmentRequest {
 
 struct FragmentState {
     holders: HashSet<XorName>,
-    requested: bool,
+    request_count: usize,
 }
 
 impl FragmentState {
     fn new() -> Self {
         FragmentState {
             holders: HashSet::default(),
-            requested: false,
+            request_count: 0,
         }
+    }
+
+    fn is_requested(&self) -> bool {
+        self.request_count > 0
+    }
+
+    fn start_request(&mut self) {
+        self.request_count = self.request_count.saturating_add(1)
+    }
+
+    fn stop_request(&mut self) {
+        self.request_count = self.request_count.saturating_sub(1)
     }
 }
 
@@ -741,40 +736,64 @@ impl UnneededChunks {
     }
 }
 
+type FragmentIndex = HashMap<FragmentInfo, FragmentState>;
+
+fn index_needed_fragment(index: &mut FragmentIndex, fragment: FragmentInfo, holder: XorName) {
+    let _ = index
+        .entry(fragment)
+        .or_insert_with(FragmentState::new)
+        .holders
+        .insert(holder);
+}
+
+fn unindex_needed_fragment(index: &mut FragmentIndex, fragment: &FragmentInfo, holder: &XorName) {
+    let remove = if let Some(state) = index.get_mut(fragment) {
+        let _ = state.holders.remove(holder);
+        state.holders.is_empty()
+    } else {
+        false
+    };
+
+    if remove {
+        let _ = index.remove(fragment);
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand;
+    use fake_clock::FakeClock;
+    use rand::{self, Rng};
 
     #[test]
-    fn unrequested_needed_fragments() {
+    fn needed_fragments() {
+        let mut rng = rand::thread_rng();
         let mut cache = Cache::default();
 
-        let holder0 = rand::random();
-        let holder1 = rand::random();
+        let holder0 = rng.gen();
+        let holder1 = rng.gen();
 
         let fragment0 = FragmentInfo::ImmutableData(rand::random());
 
-        assert!(cache.unrequested_needed_fragments().is_empty());
+        assert!(cache.needed_fragments().is_empty());
 
         // Insert a single fragment. It should be present in the collection.
         cache.insert_needed_fragment(fragment0.clone(), holder0);
-        let result = cache.unrequested_needed_fragments();
+        let result = cache.needed_fragments();
         assert_eq!(result.len(), 1);
         assert_eq!(first(result), (fragment0.clone(), vec![holder0]));
 
         // Insert the same fragment with the same holder again. The collection
         // should not change.
         cache.insert_needed_fragment(fragment0.clone(), holder0);
-        let result = cache.unrequested_needed_fragments();
+        let result = cache.needed_fragments();
         assert_eq!(result.len(), 1);
         assert_eq!(first(result), (fragment0.clone(), vec![holder0]));
 
         // Insert the same fragment but with different holder. It should be present
         // in the collection only once, but with both holders.
         cache.insert_needed_fragment(fragment0.clone(), holder1);
-        let result = cache.unrequested_needed_fragments();
+        let result = cache.needed_fragments();
         assert_eq!(result.len(), 1);
         let item = first(result);
         assert_eq!(item.0, fragment0);
@@ -786,19 +805,77 @@ mod tests {
         // the unrequested fragments even though this fragment is still unrequested
         // in different holder.
         cache.start_needed_fragment_request(&fragment0, &holder0);
-        assert!(cache.unrequested_needed_fragments().is_empty());
+        assert!(cache.needed_fragments().is_empty());
 
         // Stop the request. The fragment should be present in the collection again,
         // with the other holder.
         assert_eq!(unwrap!(cache.stop_needed_fragment_request(&holder0)),
                    fragment0);
-        let result = cache.unrequested_needed_fragments();
+        let result = cache.needed_fragments();
         assert_eq!(result.len(), 1);
         assert_eq!(first(result), (fragment0.clone(), vec![holder1]));
 
         // Remove the fragment. It should remove it from all holders.
         cache.remove_needed_fragment(&fragment0);
-        assert!(cache.unrequested_needed_fragments().is_empty());
+        assert!(cache.needed_fragments().is_empty());
+
+        // TODO: test that if the fragment is mutable data, it is returned even
+        // if previously requested, because for mutable data we need to fire
+        // one requests to every member of the group simultaneously.
+    }
+
+    #[test]
+    fn needed_fragments_lifecycle() {
+        let mut rng = rand::thread_rng();
+        let mut cache = Cache::default();
+
+        let fragment = FragmentInfo::MutableData(rng.gen(), rng.gen());
+        let holder0 = rng.gen();
+        let holder1 = rng.gen();
+
+        assert!(cache.fragment_holders.is_empty());
+        assert!(cache.fragment_index.is_empty());
+
+        // Start multiple requests, then stop them. Assert that the needed fragment
+        // data strucutres ramain empty afterwards.
+        cache.insert_needed_fragment(fragment.clone(), holder0);
+        cache.start_needed_fragment_request(&fragment, &holder0);
+
+        cache.insert_needed_fragment(fragment.clone(), holder1);
+        cache.start_needed_fragment_request(&fragment, &holder1);
+
+        assert_eq!(cache.fragment_holders.len(), 2);
+        assert_eq!(cache.fragment_index.len(), 1);
+
+        assert_eq!(cache.stop_needed_fragment_request(&holder0),
+                   Some(fragment.clone()));
+        assert_eq!(cache.fragment_holders.len(), 1);
+        assert_eq!(cache.fragment_index.len(), 1);
+
+        assert_eq!(cache.stop_needed_fragment_request(&holder1),
+                   Some(fragment.clone()));
+        assert_eq!(cache.fragment_holders.len(), 0);
+        assert_eq!(cache.fragment_index.len(), 0);
+
+        // Now do the same, but instead of stopping, let one of the request expire.
+        cache.insert_needed_fragment(fragment.clone(), holder0);
+        cache.start_needed_fragment_request(&fragment, &holder0);
+
+        cache.insert_needed_fragment(fragment.clone(), holder1);
+        cache.start_needed_fragment_request(&fragment, &holder1);
+
+        assert_eq!(cache.fragment_holders.len(), 2);
+        assert_eq!(cache.fragment_index.len(), 1);
+
+        assert_eq!(cache.stop_needed_fragment_request(&holder0),
+                   Some(fragment.clone()));
+        assert_eq!(cache.fragment_holders.len(), 1);
+        assert_eq!(cache.fragment_index.len(), 1);
+
+        FakeClock::advance_time((FRAGMENT_REQUEST_TIMEOUT_SECS + 1) * 1000);
+        cache.stop_expired_requests();
+        assert_eq!(cache.fragment_holders.len(), 0);
+        assert_eq!(cache.fragment_index.len(), 0);
     }
 
     fn first<I: IntoIterator<Item = T>, T>(i: I) -> T {

@@ -115,6 +115,13 @@ impl Node {
                       msg_id: MessageId,
                   });
 
+    impl_request!(send_get_mdata_request,
+                  GetMData {
+                      name: XorName,
+                      tag: u64,
+                      msg_id: MessageId,
+                  });
+
     impl_request!(send_put_mdata_request,
                   PutMData {
                       data: MutableData,
@@ -189,6 +196,7 @@ impl Node {
     impl_response!(send_get_idata_response, GetIData, ImmutableData);
     impl_response!(send_put_idata_response, PutIData);
     impl_response!(send_put_mdata_response, PutMData);
+    impl_response!(send_get_mdata_response, GetMData, MutableData);
     impl_response!(send_get_mdata_shell_response, GetMDataShell, MutableData);
     impl_response!(send_get_mdata_version_response, GetMDataVersion, u64);
     impl_response!(send_list_mdata_entries_response,
@@ -305,6 +313,7 @@ fn request_id(request: &Request) -> MessageId {
         Request::PutIData { msg_id, .. } |
         Request::GetIData { msg_id, .. } |
         Request::PutMData { msg_id, .. } |
+        Request::GetMData { msg_id, .. } |
         Request::GetMDataShell { msg_id, .. } |
         Request::GetMDataVersion { msg_id, .. } |
         Request::ListMDataEntries { msg_id, .. } |
@@ -329,6 +338,7 @@ fn response_id(response: &Response) -> MessageId {
         Response::PutIData { msg_id, .. } |
         Response::GetIData { msg_id, .. } |
         Response::PutMData { msg_id, .. } |
+        Response::GetMData { msg_id, .. } |
         Response::GetMDataShell { msg_id, .. } |
         Response::GetMDataVersion { msg_id, .. } |
         Response::ListMDataEntries { msg_id, .. } |

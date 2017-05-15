@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 pub use fake_clock::FakeClock as Instant;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, MutableData, Value, XorName, sha3};
@@ -27,7 +27,7 @@ use std::collections;
 use std::collections::hash_map::DefaultHasher;
 #[cfg(feature = "use-mock-crust")]
 use std::hash::BuildHasherDefault;
-#[cfg(not(any(feature = "use-mock-crust", feature = "use-mock-routing")))]
+#[cfg(not(any(test, feature = "use-mock-crust", feature = "use-mock-routing")))]
 pub use std::time::Instant;
 use tiny_keccak;
 

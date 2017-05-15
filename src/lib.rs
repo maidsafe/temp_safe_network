@@ -210,7 +210,7 @@
          missing_debug_implementations, variant_size_differences)]
 
 extern crate accumulator;
-#[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate fake_clock;
 extern crate fs2;
 extern crate hex;

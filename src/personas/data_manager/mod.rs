@@ -1,28 +1,13 @@
-// Copyright 2015 MaidSafe.net limited.
-//
-// This SAFE Network Software is licensed to you under (1) the MaidSafe.net Commercial License,
-// version 1.0 or later, or (2) The General Public License (GPL), version 3, depending on which
-// licence you accepted on initial access to the Software (the "Licences").
-//
-// By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
-//
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.
-//
-// Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.
-
 mod cache;
 mod data;
+mod mutable_data_cache;
 mod mutation;
 #[cfg(all(test, feature = "use-mock-routing"))]
 mod tests;
 
 use self::cache::{Cache, FragmentInfo, MutationVote, PendingWrite};
 pub use self::data::{Data, DataId, ImmutableDataId, MutableDataId};
+use self::mutable_data_cache::MutableDataCache;
 use self::mutation::{Mutation, MutationType};
 use GROUP_SIZE;
 use accumulator::Accumulator;
@@ -85,6 +70,7 @@ pub struct DataManager {
     /// Accumulates refresh messages and the peers we received them from.
     refresh_accumulator: Accumulator<FragmentInfo, XorName>,
     cache: Cache,
+    mdata_cache: MutableDataCache,
     immutable_data_count: u64,
     mutable_data_count: u64,
     client_get_requests: u64,
@@ -101,6 +87,7 @@ impl DataManager {
                    Accumulator::with_duration(ACCUMULATOR_QUORUM,
                                               Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
                cache: Default::default(),
+               mdata_cache: MutableDataCache::new(),
                immutable_data_count: 0,
                mutable_data_count: 0,
                client_get_requests: 0,
@@ -109,7 +96,7 @@ impl DataManager {
     }
 
     // When a new node joins a group, the other members of the group send it "refresh"
-    // messages which contains info about the data fragments that this node needs to fetch
+    // messages which contains info about the data chunks that this node needs to fetch
     // from them.
     //
     // Note: refresh is a message whose source is individual node, so its accumulation
@@ -134,6 +121,9 @@ impl DataManager {
                 let needed = match fragment {
                     FragmentInfo::ImmutableData(name) => {
                         !self.chunk_store.has(&ImmutableDataId(name))
+                    }
+                    FragmentInfo::MutableData(name, tag) => {
+                        !self.chunk_store.has(&MutableDataId(name, tag))
                     }
                     FragmentInfo::MutableDataShell { name, tag, version, .. } => {
                         match self.chunk_store.get(&MutableDataId(name, tag)) {
@@ -335,6 +325,99 @@ impl DataManager {
                                    false)
     }
 
+    pub fn handle_get_mdata(&mut self,
+                            routing_node: &mut RoutingNode,
+                            src: Authority<XorName>,
+                            dst: Authority<XorName>,
+                            name: XorName,
+                            tag: u64,
+                            msg_id: MessageId)
+                            -> Result<(), InternalError> {
+        self.update_request_stats(&src);
+
+        let id = MutableDataId(name, tag);
+
+        if let Ok(data) = self.chunk_store.get(&id) {
+            trace!("As {:?} sending GetMData success of {:?} to {:?}",
+                   dst,
+                   id,
+                   src);
+            routing_node
+                .send_get_mdata_response(dst, src, Ok(data), msg_id)?;
+        } else {
+            trace!("As {:?} sending GetMData failure of {:?} to {:?}",
+                   dst,
+                   id,
+                   src);
+            routing_node
+                .send_get_mdata_response(dst, src, Err(ClientError::NoSuchData), msg_id)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn handle_get_mdata_success(&mut self,
+                                    routing_node: &mut RoutingNode,
+                                    src: XorName,
+                                    data: MutableData)
+                                    -> Result<(), InternalError> {
+
+        let _ = self.cache.stop_needed_fragment_request(&src);
+        self.request_needed_fragments(routing_node)?;
+
+        // If we're no longer in the close group, return.
+        if !close_to_address(routing_node, data.name()) {
+            return Ok(());
+        }
+
+        let data_id = data.id();
+        let (shell, entries) = self.mdata_cache.accumulate(data, src);
+
+        let (data, new) = match (shell, self.chunk_store.get(&data_id)) {
+            (Some(mut shell), Ok(mut data)) => {
+                if shell.version() > data.version() {
+                    merge_mdata_entries(&mut shell, data.take_entries());
+                    (Some(shell), false)
+                } else {
+                    (Some(data), false)
+                }
+            }
+            (Some(mut shell), Err(_)) => {
+                let entries = self.mdata_cache.take_entries(&data_id);
+                merge_mdata_entries(&mut shell, entries);
+                (Some(shell), true)
+            }
+            (None, Ok(data)) => (Some(data), false),
+            (None, Err(_)) => (None, false),
+        };
+
+        if let Some(mut data) = data {
+            merge_mdata_entries(&mut data, entries);
+            self.clean_chunk_store();
+            self.chunk_store.put(&data.id(), &data)?;
+        } else {
+            self.mdata_cache.insert_entries(data_id, entries);
+        }
+
+        if new {
+            self.mutable_data_count += 1;
+            log_status!(self);
+        }
+
+        Ok(())
+    }
+
+    pub fn handle_get_mdata_failure(&mut self,
+                                    routing_node: &mut RoutingNode,
+                                    src: XorName)
+                                    -> Result<(), InternalError> {
+        if self.cache.stop_needed_fragment_request(&src).is_none() {
+            return Err(InternalError::InvalidMessage);
+        }
+
+        self.request_needed_fragments(routing_node)
+    }
+
     pub fn handle_put_mdata(&mut self,
                             routing_node: &mut RoutingNode,
                             src: Authority<XorName>,
@@ -434,7 +517,7 @@ impl DataManager {
             }
             Err(_) => {
                 // If we have cached entries for this data, apply them.
-                for (key, value) in self.cache.take_mdata_entries(*shell.name(), shell.tag()) {
+                for (key, value) in self.mdata_cache.take_entries(&shell.id()) {
                     // OK to ingore the return value here because as the shell has no
                     // entries, this call can never fail.
                     let _ = shell.mutate_entry_without_validation(key, value);
@@ -596,7 +679,7 @@ impl DataManager {
             Err(_) => {
                 // We don't have the shell yet, so keep the entry around in the cache
                 // until we receive the shell.
-                self.cache.insert_mdata_entry(name, tag, key, value);
+                self.mdata_cache.insert_entry(data_id, key, value);
             }
         }
 
@@ -765,10 +848,8 @@ impl DataManager {
         let mut refresh = Vec::new();
         let mut has_pruned_data = false;
 
-        for fragment in self.our_fragments() {
-            let data_id = fragment.data_id();
-
-            // Only retain fragments for which we're still in the close group.
+        for data_id in self.our_chunks() {
+            // Only retain chunks for which we're still in the close group.
             match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
                 None => {
                     trace!("No longer a DM for {:?}", data_id);
@@ -793,7 +874,7 @@ impl DataManager {
                 }
                 Some(close_group) => {
                     if close_group.contains(&node_name) {
-                        refresh.push(fragment.clone());
+                        refresh.push(FragmentInfo::data(data_id))
                     }
                 }
             }
@@ -828,8 +909,8 @@ impl DataManager {
         }
 
         let mut refreshes = HashMap::default();
-        for fragment in self.our_fragments() {
-            match routing_table.other_closest_names(fragment.name(), GROUP_SIZE) {
+        for data_id in self.our_chunks() {
+            match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
                 None => {
                     error!("Moved out of close group of {:?} in a NodeLost event.",
                            node_name);
@@ -840,11 +921,11 @@ impl DataManager {
                     // replaced at all. Otherwise, if the group's last node is closer to the data
                     // than the lost node, the lost node was not in the group in the first place.
                     if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
-                        if fragment.name().closer(node_name, outer_node) {
+                        if data_id.name().closer(node_name, outer_node) {
                             refreshes
                                 .entry(*outer_node)
                                 .or_insert_with(Vec::new)
-                                .push(fragment.clone());
+                                .push(FragmentInfo::data(data_id))
                         }
                     }
                 }
@@ -1157,46 +1238,48 @@ impl DataManager {
                                 routing_node: &mut RoutingNode)
                                 -> Result<(), InternalError> {
         let src = Authority::ManagedNode(routing_node.name()?);
-        let candidates = self.cache.unrequested_needed_fragments();
+        let candidates = self.cache.needed_fragments();
 
         // Set of holders we already sent a request to. Used to prevent sending
         // multiple request to a single holder.
         let mut busy_holders = HashSet::default();
 
+        // For each fragment type except `MutableData`, send at most one request.
+        // For `MutableData`, send a request to each member of its close group.
         for (fragment, holders) in candidates {
             for holder in holders {
-                if let Some(group) = routing_node.close_group(*fragment.name(), GROUP_SIZE) {
-                    if group.contains(&holder) {
-                        if !busy_holders.insert(holder) {
-                            continue;
-                        }
+                if !is_in_close_group(routing_node, fragment.name(), &holder) {
+                    continue;
+                }
 
-                        let dst = Authority::ManagedNode(holder);
-                        let msg_id = MessageId::new();
+                if !busy_holders.insert(holder) {
+                    continue;
+                }
 
-                        self.cache
-                            .start_needed_fragment_request(&fragment, &holder);
+                self.cache
+                    .start_needed_fragment_request(&fragment, &holder);
 
-                        match fragment {
-                            FragmentInfo::ImmutableData(name) => {
-                                routing_node
-                                    .send_get_idata_request(src, dst, name, msg_id)?;
-                            }
-                            FragmentInfo::MutableDataShell { name, tag, .. } => {
-                                routing_node
-                                    .send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
-                            }
-                            FragmentInfo::MutableDataEntry { name, tag, ref key, .. } => {
-                                routing_node
-                                    .send_get_mdata_value_request(src,
-                                                                  dst,
-                                                                  name,
-                                                                  tag,
-                                                                  key.clone(),
-                                                                  msg_id)?;
-                            }
-                        }
+                let dst = Authority::ManagedNode(holder);
+                let msg_id = MessageId::new();
 
+                match fragment {
+                    FragmentInfo::ImmutableData(name) => {
+                        routing_node
+                            .send_get_idata_request(src, dst, name, msg_id)?;
+                        break;
+                    }
+                    FragmentInfo::MutableData(name, tag) => {
+                        routing_node
+                            .send_get_mdata_request(src, dst, name, tag, msg_id)?;
+                    }
+                    FragmentInfo::MutableDataShell { name, tag, .. } => {
+                        routing_node
+                            .send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
+                        break;
+                    }
+                    FragmentInfo::MutableDataEntry { name, tag, key, .. } => {
+                        routing_node
+                            .send_get_mdata_value_request(src, dst, name, tag, key, msg_id)?;
                         break;
                     }
                 }
@@ -1207,38 +1290,11 @@ impl DataManager {
         Ok(())
     }
 
-    // Get all fragments for the data we have in the chunk store.
-    fn chunk_store_fragments(&self) -> HashSet<FragmentInfo> {
-        let mut result = HashSet::default();
-
-        for data_id in self.chunk_store.keys() {
-            match data_id {
-                DataId::Immutable(data_id) => {
-                    let _ = result.insert(FragmentInfo::ImmutableData(*data_id.name()));
-                }
-                DataId::Mutable(data_id) => {
-                    let data = if let Ok(data) = self.chunk_store.get(&data_id) {
-                        data
-                    } else {
-                        error!("Failed to get {:?} from chunk store.", data_id);
-                        continue;
-                    };
-
-                    for fragment in FragmentInfo::mutable_data(&data) {
-                        let _ = result.insert(fragment);
-                    }
-                }
-            }
-        }
-
-        result
-    }
-
-    // Get all fragments we are responsible for (irrespective of whether we already
-    // have them or not).
-    fn our_fragments(&self) -> HashSet<FragmentInfo> {
-        let mut result = self.cache.needed_fragments();
-        result.extend(self.chunk_store_fragments());
+    // Get IDs of all the data chunks we are responsible for, regardless of whether
+    // we already have them or not.
+    fn our_chunks(&self) -> HashSet<DataId> {
+        let mut result = self.cache.needed_chunks();
+        result.extend(self.chunk_store.keys());
         result
     }
 
@@ -1301,7 +1357,8 @@ impl DataManager {
 
     /// Clear the cache
     pub fn clear_cache(&mut self) {
-        self.cache.clear()
+        self.cache.clear();
+        self.mdata_cache.clear();
     }
 }
 
@@ -1321,8 +1378,27 @@ fn close_to_address(routing_node: &mut RoutingNode, address: &XorName) -> bool {
     routing_node.close_group(*address, GROUP_SIZE).is_some()
 }
 
+// Is `name` in the close group of `group_name`?
+fn is_in_close_group(routing_node: &mut RoutingNode, group_name: &XorName, name: &XorName) -> bool {
+    routing_node
+        .close_group(*group_name, GROUP_SIZE)
+        .map_or(false, |group| group.contains(name))
+}
+
 fn recompute_idata_name(data: &ImmutableData) -> XorName {
     XorName(sha256::hash(data.value()).0)
+}
+
+/// Merges the entries that are currently in the data with the new entries.
+/// Entries that are not present in the data are inserted. Those that are present
+/// are overwritten if the new version is higher than the old version, otherwise
+/// ignored.
+fn merge_mdata_entries<I>(data: &mut MutableData, entries: I)
+    where I: IntoIterator<Item = (Vec<u8>, Value)>
+{
+    for (key, value) in entries.into_iter() {
+        data.mutate_entry_without_validation(key, value);
+    }
 }
 
 // `owners` must have exactly 1 element.
