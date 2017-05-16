@@ -160,7 +160,7 @@ impl MaidManager {
         // exist.
         if data.tag() == TYPE_TAG_SESSION_PACKET {
             if dst_name != src_name {
-                trace!("Cannot create account for {:?} as {:?}.", src, dst);
+                trace!("MM Cannot create account for {:?} as {:?}.", src, dst);
                 let err = ClientError::InvalidOperation;
                 routing_node
                     .send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
@@ -169,6 +169,7 @@ impl MaidManager {
 
             if self.accounts.contains_key(&src_name) {
                 let err = ClientError::AccountExists;
+                trace!("MM Cannot create account for {:?} - it already exists", src);
                 routing_node
                     .send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
                 return Ok(());
@@ -180,6 +181,7 @@ impl MaidManager {
         }
 
         if let Err(err) = self.prepare_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
+            trace!("MM PutMData request failed: {:?}", err);
             // Undo the account creation
             if data.tag() == TYPE_TAG_SESSION_PACKET {
                 let _ = self.accounts.remove(&src_name);
@@ -502,14 +504,17 @@ impl MaidManager {
         for msg_id in msg_ids_to_delete {
             let _ = self.request_cache.remove(&msg_id);
         }
+
+        for maid_name in &accounts_to_delete {
+            trace!("No longer a MM for {}", maid_name);
+            let _ = self.accounts.remove(maid_name);
+        }
+
         if !accounts_to_delete.is_empty() {
             info!("Managing {} client accounts.",
                   self.accounts.len() - accounts_to_delete.len());
         }
-        for maid_name in accounts_to_delete {
-            trace!("No longer a MM for {}", maid_name);
-            let _ = self.accounts.remove(&maid_name);
-        }
+
         // Send refresh messages for the remaining accounts.
         for (maid_name, account) in &self.accounts {
             self.send_refresh(routing_node,

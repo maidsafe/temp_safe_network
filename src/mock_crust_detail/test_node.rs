@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::poll;
+use chunk_store::Error as ChunkStoreError;
 use config_handler::Config;
 use hex::ToHex;
 use itertools::Itertools;
@@ -102,8 +103,8 @@ impl TestNode {
     }
 
     /// Return IDs of all data stored on mock network
-    pub fn get_stored_ids(&self) -> Vec<(DataId, u64)> {
-        self.vault.get_stored_ids()
+    pub fn get_stored_ids_and_versions(&self) -> Result<Vec<(DataId, u64)>, ChunkStoreError> {
+        self.vault.get_stored_ids_and_versions()
     }
 
     /// return the number of mutations performed by the given client

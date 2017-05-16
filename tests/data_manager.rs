@@ -131,7 +131,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
             }
         }
 
-        event_count += poll::nodes_and_client(&mut nodes, &mut client);
+        event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
         mock_crust_detail::check_data(all_data.clone(), &nodes);
@@ -644,7 +644,7 @@ fn mutable_data_parallel_mutations() {
             })
             .collect();
 
-        event_count += poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
+        event_count += poll::nodes_and_clients_parallel_with_resend(&mut nodes, &mut clients);
         trace!("Processed {} events.", event_count);
 
         // Collect the responses from the clients. For those that succeed,
@@ -781,7 +781,7 @@ fn mutable_data_operations_with_churn() {
             trace!("Removing {} node(s): {:?}", count, removed_nodes);
         }
 
-        event_count += poll::nodes_and_client(&mut nodes, &mut client);
+        event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
         mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),

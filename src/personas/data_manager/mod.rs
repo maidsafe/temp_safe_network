@@ -12,6 +12,8 @@ use self::mutation::{Mutation, MutationType};
 use GROUP_SIZE;
 use accumulator::Accumulator;
 use chunk_store::{Chunk, ChunkId, ChunkStore};
+#[cfg(feature = "use-mock-crust")]
+use chunk_store::Error as ChunkStoreError;
 use error::InternalError;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData,
@@ -427,22 +429,27 @@ impl DataManager {
                             _requester: sign::PublicKey)
                             -> Result<(), InternalError> {
         let data_id = data.id();
-        let rejected = if self.chunk_store.has(&data_id) {
-            trace!("DM sending PutMData failure for data {:?}, it already exists.",
-                   data_id);
-            routing_node
-                .send_put_mdata_response(dst, src, Err(ClientError::DataExists), msg_id)?;
-            true
+
+        let res = if self.chunk_store.has(&data_id) {
+            Err(ClientError::DataExists)
         } else {
             self.clean_chunk_store();
 
             if self.chunk_store_full() {
-                let err = ClientError::NetworkFull;
-                routing_node
-                    .send_put_mdata_response(dst, src, Err(err), msg_id)?;
-                return Ok(());
+                Err(ClientError::NetworkFull)
+            } else {
+                Ok(())
             }
+        };
 
+        let rejected = if let Err(error) = res {
+            trace!("DM sending PutMData failure for data {:?}: {:?}",
+                   data_id,
+                   error);
+            routing_node
+                .send_put_mdata_response(dst, src, Err(error), msg_id)?;
+            true
+        } else {
             false
         };
 
@@ -1186,9 +1193,9 @@ impl DataManager {
         while self.chunk_store_full() {
             if let Some(data_id) = self.cache.pop_unneeded_chunk() {
                 if let Err(error) = self.chunk_store.delete(&data_id) {
-                    error!("DM failed to delete unneeded chunk {:?}: {:?}",
-                           data_id,
-                           error);
+                    warn!("DM failed to delete unneeded chunk {:?}: {:?}",
+                          data_id,
+                          error);
                     break;
                 }
             } else {
@@ -1311,30 +1318,29 @@ impl DataManager {
 
 #[cfg(feature = "use-mock-crust")]
 impl DataManager {
-    pub fn get_stored_ids(&self) -> Vec<(DataId, u64)> {
-        self.chunk_store
-            .keys()
-            .into_iter()
-            .filter(|data_id| match *data_id {
-                        DataId::Immutable(ref id) => !self.cache.is_in_unneeded(id),
-                        DataId::Mutable(_) => true,
-                    })
-            .filter_map(|data_id| {
-                            self.get_version(&data_id)
-                                .map(|version| (data_id, version))
-                        })
-            .collect()
+    pub fn get_stored_ids_and_versions(&self) -> Result<Vec<(DataId, u64)>, ChunkStoreError> {
+        let data_ids = self.chunk_store.keys();
+        let mut result = Vec::with_capacity(data_ids.len());
+
+        for data_id in data_ids {
+            if let DataId::Immutable(ref id) = data_id {
+                if self.cache.is_in_unneeded(id) {
+                    continue;
+                }
+            }
+
+            let version = self.get_version(&data_id)?;
+            result.push((data_id, version));
+        }
+
+        Ok(result)
     }
 
-    fn get_version(&self, data_id: &DataId) -> Option<u64> {
+    fn get_version(&self, data_id: &DataId) -> Result<u64, ChunkStoreError> {
         match *data_id {
-            DataId::Immutable(_) => Some(0),
+            DataId::Immutable(_) => Ok(0),
             DataId::Mutable(ref data_id) => {
-                if let Ok(data) = self.chunk_store.get(data_id) {
-                    Some(data.version())
-                } else {
-                    None
-                }
+                self.chunk_store.get(data_id).map(|data| data.version())
             }
         }
     }

@@ -52,7 +52,9 @@ pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
     let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::id).collect();
     let mut data_count = HashMap::new();
 
-    for data_idv in nodes.iter().flat_map(TestNode::get_stored_ids) {
+    for data_idv in nodes
+            .iter()
+            .flat_map(|node| unwrap!(node.get_stored_ids_and_versions())) {
         if deleted_data_ids.contains(&data_idv.0) {
             *data_count.entry(data_idv).or_insert(0) += 1;
         }
@@ -70,7 +72,7 @@ pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
 pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
     let mut data_holders_map: HashMap<(DataId, u64), Vec<XorName>> = HashMap::new();
     for node in nodes {
-        for data_idv in node.get_stored_ids() {
+        for data_idv in unwrap!(node.get_stored_ids_and_versions()) {
             data_holders_map
                 .entry(data_idv)
                 .or_insert_with(Vec::new)

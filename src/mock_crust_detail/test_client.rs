@@ -19,8 +19,8 @@ use super::poll;
 use super::test_node::TestNode;
 use maidsafe_utilities::SeededRng;
 use rand::Rng;
-use routing::{self, AccountInfo, Authority, ClientError, EntryAction, Event, EventStream, FullId,
-              ImmutableData, MessageId, MutableData, PermissionSet, Response,
+use routing::{AccountInfo, Authority, Client, ClientError, EntryAction, Event, EventStream,
+              FullId, ImmutableData, MessageId, MutableData, PermissionSet, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
 use rust_sodium::crypto::sign;
@@ -44,7 +44,7 @@ macro_rules! assert_recv_response {
 /// Client for use in tests only
 pub struct TestClient {
     _handle: ServiceHandle,
-    routing_client: routing::Client,
+    routing_client: Client,
     full_id: FullId,
     client_manager: Authority<XorName>,
     rng: SeededRng,
@@ -65,7 +65,7 @@ impl TestClient {
         let full_id = FullId::new();
         let handle = network.new_service_handle(config.clone(), None);
         let client = mock_crust::make_current(&handle, || {
-            unwrap!(routing::Client::new(Some(full_id.clone()), config))
+            unwrap!(Client::new(Some(full_id.clone()), config))
         });
 
         let client_manager = Authority::ClientManager(*full_id.public_id().name());
@@ -153,7 +153,7 @@ impl TestClient {
                 res
             }
             Ok(response) => panic!("Unexpected response: {:?}", response),
-            Err(error) => Err(ClientError::from(format!("{:?}", error))),
+            Err(error) => panic!("Unexpected error: {:?}", error),
         }
     }
 
