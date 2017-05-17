@@ -211,7 +211,7 @@ impl DataManager {
 
         if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
             for node in &group {
-                let _ = self.cache
+                self.cache
                     .register_needed_data_with_another_holder(&data_id, *node);
             }
 
@@ -1054,11 +1054,11 @@ impl DataManager {
         let res = match mutation {
             Mutation::PutIData(data) => {
                 let fragments = vec![FragmentInfo::ImmutableData(*data.name())];
-                put_into_chunk_store(&mut self.chunk_store, data).map(|_| fragments)
+                put_into_chunk_store(&mut self.chunk_store, &data).map(|_| fragments)
             }
             Mutation::PutMData(data) => {
                 let fragments = FragmentInfo::mutable_data(&data);
-                put_into_chunk_store(&mut self.chunk_store, data).map(|_| fragments)
+                put_into_chunk_store(&mut self.chunk_store, &data).map(|_| fragments)
             }
             Mutation::MutateMDataEntries { name, tag, actions } => {
                 self.with_mdata(name, tag, |data| {
@@ -1068,7 +1068,7 @@ impl DataManager {
                         .filter_map(|key| {
                                         data.get(&key)
                                             .map(|value| {
-                                                     FragmentInfo::mutable_data_entry(&data,
+                                                     FragmentInfo::mutable_data_entry(data,
                                                                                       key,
                                                                                       value)
                                                  })
@@ -1085,7 +1085,7 @@ impl DataManager {
             } => {
                 self.with_mdata(name, tag, |data| {
                     data.set_user_permissions_without_validation(user, permissions, version);
-                    vec![FragmentInfo::mutable_data_shell(&data)]
+                    vec![FragmentInfo::mutable_data_shell(data)]
                 })
             }
             Mutation::DelMDataUserPermissions {
@@ -1096,7 +1096,7 @@ impl DataManager {
             } => {
                 self.with_mdata(name, tag, |data| {
                     data.del_user_permissions_without_validation(&user, version);
-                    vec![FragmentInfo::mutable_data_shell(&data)]
+                    vec![FragmentInfo::mutable_data_shell(data)]
                 })
             }
             Mutation::ChangeMDataOwner {
@@ -1109,7 +1109,7 @@ impl DataManager {
                     if let Some(new_owner) = new_owners.into_iter().next() {
                         data.change_owner_without_validation(new_owner, version);
                     }
-                    vec![FragmentInfo::mutable_data_shell(&data)]
+                    vec![FragmentInfo::mutable_data_shell(data)]
                 })
             }
         };
@@ -1311,7 +1311,7 @@ impl DataManager {
     {
         let mut data = get_from_chunk_store(&self.chunk_store, &MutableDataId(name, tag))?;
         let result = f(&mut data);
-        put_into_chunk_store(&mut self.chunk_store, data)?;
+        put_into_chunk_store(&mut self.chunk_store, &data)?;
         Ok(result)
     }
 }
@@ -1402,7 +1402,7 @@ fn recompute_idata_name(data: &ImmutableData) -> XorName {
 fn merge_mdata_entries<I>(data: &mut MutableData, entries: I)
     where I: IntoIterator<Item = (Vec<u8>, Value)>
 {
-    for (key, value) in entries.into_iter() {
+    for (key, value) in entries {
         data.mutate_entry_without_validation(key, value);
     }
 }
@@ -1430,13 +1430,13 @@ fn get_from_chunk_store<T: ChunkId<DataId> + Debug>(chunk_store: &ChunkStore<Dat
 }
 
 fn put_into_chunk_store<T, I>(chunk_store: &mut ChunkStore<DataId>,
-                              data: T)
+                              data: &T)
                               -> Result<(), ClientError>
     where T: Chunk<DataId, Id = I> + Data<Id = I>,
           I: ChunkId<DataId> + Debug
 {
     chunk_store
-        .put(&data.id(), &data)
+        .put(&data.id(), data)
         .map_err(|error| {
                      trace!("DM failed to store {:?} in chunkstore: {:?}",
                             data.id(),

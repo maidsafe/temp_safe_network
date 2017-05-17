@@ -89,7 +89,7 @@ impl Mutation {
                   name: name1,
                   tag: tag1,
                   actions: ref actions1,
-              }) => name0 == name1 && tag0 == tag1 && keys_intersect(&actions0, &actions1),
+              }) => name0 == name1 && tag0 == tag1 && keys_intersect(actions0, actions1),
             (&Mutation::SetMDataUserPermissions {
                   name: name0,
                   tag: tag0,

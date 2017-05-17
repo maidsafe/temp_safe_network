@@ -714,11 +714,12 @@ fn limits() {
     let mut bad_data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
     let key = test_utils::gen_vec(10, &mut rng);
     let content = test_utils::gen_vec(MAX_MUTABLE_DATA_SIZE_IN_BYTES as usize + 1, &mut rng);
-    assert!(bad_data.mutate_entry_without_validation(key,
-                                                     Value {
-                                                        content: content,
-                                                        entry_version: 0
-                                                     }));
+    let res = bad_data.mutate_entry_without_validation(key,
+                                                       Value {
+                                                           content: content,
+                                                           entry_version: 0,
+                                                       });
+    assert!(res);
 
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_mdata(&mut node,

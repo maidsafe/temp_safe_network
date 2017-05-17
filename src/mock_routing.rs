@@ -227,10 +227,14 @@ impl Node {
                     dst: Authority<XorName>,
                     request: Request)
                     -> Result<(), InterfaceError> {
-        assert!(self.sent_requests
+        let prev = self.sent_requests
             .insert(request_id(&request),
-                    RequestWrapper { src: src, dst: dst, request: request })
-            .is_none());
+                    RequestWrapper {
+                        src: src,
+                        dst: dst,
+                        request: request,
+                    });
+        assert!(prev.is_none());
         Ok(())
     }
 
@@ -239,10 +243,14 @@ impl Node {
                      dst: Authority<XorName>,
                      response: Response)
                      -> Result<(), InterfaceError> {
-        assert!(self.sent_responses
+        let prev = self.sent_responses
             .insert(response_id(&response),
-                    ResponseWrapper { src: src, dst: dst, response: response })
-            .is_none());
+                    ResponseWrapper {
+                        src: src,
+                        dst: dst,
+                        response: response,
+                    });
+        assert!(prev.is_none());
         Ok(())
     }
 }

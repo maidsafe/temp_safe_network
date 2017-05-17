@@ -56,7 +56,9 @@ impl MutableDataCache {
             hash: utils::secure_hash(&data),
         };
 
-        let result_shell = if let Some(_) = self.shell_accumulator.add(shell_key.clone(), src) {
+        let result_shell = if self.shell_accumulator
+               .add(shell_key.clone(), src)
+               .is_some() {
             self.shell_accumulator.delete(&shell_key);
             Some(data)
         } else {
@@ -71,7 +73,9 @@ impl MutableDataCache {
                 hash: utils::secure_hash(&value),
             };
 
-            if let Some(_) = self.entry_accumulator.add(entry_key.clone(), src) {
+            if self.entry_accumulator
+                   .add(entry_key.clone(), src)
+                   .is_some() {
                 self.entry_accumulator.delete(&entry_key);
                 let _ = result_entries.insert(entry_key.key, value);
             }
@@ -100,7 +104,7 @@ impl MutableDataCache {
             .entry(id)
             .or_insert_with(HashMap::default);
 
-        for (key, value) in entries.into_iter() {
+        for (key, value) in entries {
             let _ = map.insert(key, (value, Instant::now()));
         }
     }

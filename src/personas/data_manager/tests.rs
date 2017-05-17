@@ -534,7 +534,7 @@ fn mdata_with_churn_with_entries_accumulating_before_shell() {
     let (other_key, _) = sign::gen_keypair();
     assert!(data_with_bad_shell.change_owner_without_validation(other_key, 1));
 
-    let node_name = unwrap!(other_node_names.iter().skip(QUORUM - 1).next());
+    let node_name = unwrap!(other_node_names.get(QUORUM - 1));
     unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, data_with_bad_shell));
 
     // The remaining nodes send data with the correct shell but no entries.
