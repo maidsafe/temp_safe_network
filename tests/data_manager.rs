@@ -19,8 +19,9 @@
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
 use rand::Rng;
-use routing::{Action, Authority, ClientError, EntryActions, Event, ImmutableData,
-              MAX_MUTABLE_DATA_ENTRY_ACTIONS, MutableData, PermissionSet, Response, User};
+use routing::{Action, Authority, ClientError, EntryAction, EntryActions, Event, ImmutableData,
+              MAX_MUTABLE_DATA_ENTRY_ACTIONS, MessageId, MutableData, PermissionSet, Response,
+              User};
 use routing::mock_crust::{self, Network};
 use rust_sodium::crypto::sign;
 use safe_vault::{GROUP_SIZE, test_utils};
@@ -28,7 +29,7 @@ use safe_vault::mock_crust_detail::{self, Data, poll};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::test_node::{self, TestNode};
 use std::cmp;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 const TEST_NET_SIZE: usize = 20;
 
@@ -685,6 +686,266 @@ fn mutable_data_parallel_mutations() {
         mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     }
 
+    // Check that the stored data matches the local copy.
+    verify_data_is_stored(&mut nodes, &mut clients[0], &all_data);
+}
+
+// Client trying to mutate a mutable_data concurrently with two different sets of actions.
+// The responses to the two mutate attempts shall be:
+//  1, both succeeded, when there is no conflicting mutation
+//  2, only one succeeded, when there is conflicting mutation (updating the same key)
+#[test]
+fn mutable_data_concurrent_mutations() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+    let data_count = 5;
+    let iterations = test_utils::iterations();
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+    let mut event_count = 0;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    // Put some data to the network.
+    let mut all_data = vec![];
+
+    // Allow any mutations for anyone.
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(User::Anyone,
+                               PermissionSet::new()
+                                   .allow(Action::Insert)
+                                   .allow(Action::Update)
+                                   .allow(Action::Delete));
+
+    for _ in 0..data_count {
+        let name = rng.gen();
+        let tag = rng.gen_range(10001, 20000);
+
+        let mut owners = BTreeSet::new();
+        let _ = owners.insert(*client.signing_public_key());
+
+        let num_entries = rng.gen_range(1, 10);
+        let entries = test_utils::gen_mutable_data_entries(num_entries, &mut rng);
+
+        let data = unwrap!(MutableData::new(name, tag, permissions.clone(), entries, owners));
+
+        trace!("Putting mutable data with name {:?}, tag {}.",
+               data.name(),
+               data.tag());
+        unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
+        all_data.push(data);
+    }
+
+    let mut expected_mutation_count = data_count + 1;
+    for i in 0..iterations {
+        trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
+
+        let mut sent_actions: HashMap<MessageId, BTreeMap<Vec<u8>, EntryAction>> = HashMap::new();
+        let mut expected_successes: usize = 2;
+        let index = rng.gen_range(0, all_data.len());
+        {
+            let data = &all_data[index];
+            for _ in 0..2 {
+                let num_actions = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize);
+                let actions =
+                    test_utils::gen_mutable_data_entry_actions(data, num_actions, &mut rng);
+
+                if !sent_actions.is_empty() &&
+                   sent_actions
+                       .iter()
+                       .any(|(_, prev_actions)| {
+                                prev_actions
+                                    .iter()
+                                    .any(|(key, _)| actions.contains_key(key))
+                            }) {
+                    expected_successes = 1;
+                }
+
+                trace!("Updating data {:?} with actions {:?}", data.name(), actions);
+                let msg_id = client.mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
+                let _ = sent_actions.insert(msg_id, actions);
+            }
+        }
+
+        event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
+        trace!("Processed {} events.", event_count);
+
+        let mut successes: usize = 0;
+
+        while let Ok(event) = client.try_recv() {
+            if let Event::Response {
+                       response: Response::MutateMDataEntries { res, msg_id }, ..
+                   } = event {
+                match res {
+                    Ok(()) => {
+                        trace!("Client {:?} received successful response.",
+                               client.name());
+                        let actions = unwrap!(sent_actions.remove(&msg_id));
+                        unwrap!(all_data[index].mutate_entries(actions,
+                                                               *client.signing_public_key()));
+                        successes += 1;
+                    }
+                    Err(error) => {
+                        trace!("Client {:?} received failed response. Reason: {:?}",
+                               client.name(),
+                               error);
+                    }
+                }
+            }
+        }
+
+        assert_eq!(successes, expected_successes);
+        mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
+                                      &nodes);
+
+        let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+        let node_count_stats: Vec<_> = sorted_nodes
+            .into_iter()
+            .map(|node| (node.name(), node.get_maid_manager_mutation_count(client.name())))
+            .collect();
+        expected_mutation_count += successes;
+        for &(_, count) in &node_count_stats {
+            assert_eq!(Some(expected_mutation_count as u64),
+                       count,
+                       "Expected {} mutations got: {:?}",
+                       expected_mutation_count,
+                       node_count_stats);
+        }
+    }
+
+    mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
+    // Check that the stored data matches the local copy.
+    verify_data_is_stored(&mut nodes, &mut client, &all_data);
+}
+
+// Two clients concurrently mutating same data with same actions, one with permission, the other not.
+// Only the one with permission shall succeed.
+#[test]
+fn no_permission_mutable_data_concurrent_mutations() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+    let data_count = 5;
+    let iterations = test_utils::iterations();
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+    let mut event_count = 0;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+    let mut clients: Vec<_> = (0..2)
+        .map(|_| {
+                 let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
+                 let config = mock_crust::Config::with_contacts(&[endpoint]);
+                 TestClient::new(&network, Some(config.clone()))
+             })
+        .collect();
+
+    for client in &mut clients {
+        client.ensure_connected(&mut nodes);
+        client.create_account(&mut nodes);
+    }
+
+    // Put some data to the network.
+    let mut all_data = vec![];
+
+    // Allow mutations only for the first client.
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(User::Key(*clients[0].signing_public_key()),
+                               PermissionSet::new()
+                                   .allow(Action::Insert)
+                                   .allow(Action::Update)
+                                   .allow(Action::Delete));
+
+    for _ in 0..data_count {
+        let name = rng.gen();
+        let tag = rng.gen_range(10001, 20000);
+
+        let mut owners = BTreeSet::new();
+        let _ = owners.insert(*clients[0].signing_public_key());
+
+        let num_entries = rng.gen_range(1, 10);
+        let entries = test_utils::gen_mutable_data_entries(num_entries, &mut rng);
+
+        let data = unwrap!(MutableData::new(name, tag, permissions.clone(), entries, owners));
+
+        trace!("Putting mutable data with name {:?}, tag {}.",
+               data.name(),
+               data.tag());
+        unwrap!(clients[0].put_mdata_response(data.clone(), &mut nodes));
+        all_data.push(data);
+    }
+
+    for i in 0..iterations {
+        trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
+
+        let index = rng.gen_range(0, all_data.len());
+        let data_name = *all_data[index].name();
+        let data_tag = all_data[index].tag();
+
+        let num_actions = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize);
+        let actions =
+            test_utils::gen_mutable_data_entry_actions(&all_data[index], num_actions, &mut rng);
+
+        trace!("Updating data {:?} with actions {:?}", data_name, actions);
+        let _ = clients[0].mutate_mdata_entries(data_name, data_tag, actions.clone());
+        let _ = clients[1].mutate_mdata_entries(data_name, data_tag, actions.clone());
+
+        event_count += poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
+        trace!("Processed {} events.", event_count);
+
+        let mut network_responded = false;
+        while let Ok(event) = clients[0].try_recv() {
+            if let Event::Response {
+                       response: Response::MutateMDataEntries { res, .. }, ..
+                   } = event {
+                network_responded = true;
+                match res {
+                    Ok(()) => {
+                        trace!("Client {:?} received successful response.",
+                               clients[0].name());
+                        unwrap!(all_data[index].mutate_entries(actions.clone(),
+                                                               *clients[0].signing_public_key()));
+                    }
+                    Err(error) => {
+                        panic!("Client {:?} received failed response. Reason: {:?}",
+                               clients[0].name(),
+                               error);
+                    }
+                }
+            }
+        }
+        assert!(network_responded,
+                "Client {:?} shall receive a response from network",
+                clients[0].name());
+
+        network_responded = false;
+        while let Ok(event) = clients[1].try_recv() {
+            if let Event::Response {
+                       response: Response::MutateMDataEntries { res, .. }, ..
+                   } = event {
+                network_responded = true;
+                match res {
+                    Ok(()) => {
+                        panic!("Client {:?} shall not receive successful response.",
+                               clients[1].name());
+                    }
+                    Err(error) => assert_eq!(error, ClientError::AccessDenied),
+                }
+            }
+        }
+        assert!(network_responded,
+                "Client {:?} shall receive a response from network",
+                clients[1].name());
+
+        mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
+                                      &nodes);
+    }
+
+    mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
     // Check that the stored data matches the local copy.
     verify_data_is_stored(&mut nodes, &mut clients[0], &all_data);
 }
