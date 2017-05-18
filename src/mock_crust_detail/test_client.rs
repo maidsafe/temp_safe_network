@@ -157,6 +157,28 @@ impl TestClient {
         }
     }
 
+    /// Puts immutable data and try reads from the mock network
+    pub fn put_idata_may_response(&mut self,
+                                  data: ImmutableData,
+                                  nodes: &mut [TestNode])
+                                  -> Result<(), ClientError> {
+        let request_msg_id = self.put_idata(data.clone());
+        let _ = poll::nodes_and_client_with_resend(nodes, self);
+
+        match self.try_recv() {
+            Ok(Event::Response { response: Response::PutIData { res, msg_id }, .. }) => {
+                trace!("received {:?} - {:?}", msg_id, res);
+                assert_eq!(request_msg_id, msg_id);
+                res
+            }
+            Ok(response) => panic!("Unexpected response: {:?}", response),
+            Err(error) => {
+                trace!("Unexpected error: {:?}", error);
+                Err(ClientError::NetworkOther("No Response".to_string()))
+            }
+        }
+    }
+
     /// Gets immutable data from nodes provided.
     pub fn get_idata_response(&mut self,
                               name: XorName,

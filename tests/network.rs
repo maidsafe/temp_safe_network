@@ -26,6 +26,12 @@ use safe_vault::{Config, GROUP_SIZE, test_utils};
 use safe_vault::mock_crust_detail::{poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 
+// Keeps storing data till network is full. Then keeps adding nodes till network can store a new
+// chunk again.
+// Among the GROUP_SIZE vauls of a chunk, the response to the client can be:
+// 1, Put succeed when majority of vaults are able to store the data.
+// 2, Put failed (NetworkFull) when majority of vaults don't have space to store the data.
+// 3, No response, when part of vaults have space but part of vaults don't, and none accumulates.
 #[test]
 fn fill_network() {
     let network = Network::new(GROUP_SIZE, None);
@@ -36,8 +42,7 @@ fn fill_network() {
         max_capacity: Some(2000),
         chunk_store_root: None,
     };
-    // Use 8 nodes to avoid the case where four target nodes are full: In that case neither the
-    // PutSuccess nor the PutFailure accumulates and client.put_and_verify() would hang.
+
     let mut nodes = test_node::create_nodes(&network, 8, Some(config), true);
     let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(crust_config));
@@ -74,12 +79,12 @@ fn fill_network() {
         let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
         trace!("Adding node with bootstrap node {}.", index);
         test_node::add_node(&network, &mut nodes, index, true);
-        let _ = poll::nodes_and_client(&mut nodes, &mut client);
+        let _ = poll::nodes_and_client_with_resend(&mut nodes, &mut client);
 
         let data = test_utils::gen_immutable_data(100, &mut rng);
         let data_id = data.debug_id();
 
-        match client.put_idata_response(data, &mut nodes) {
+        match client.put_idata_may_response(data, &mut nodes) {
             Ok(()) => {
                     trace!("Stored {}", data_id);
                     return;
