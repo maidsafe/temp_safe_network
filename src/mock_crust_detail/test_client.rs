@@ -91,7 +91,7 @@ impl TestClient {
         self.routing_client.try_next_ev()
     }
 
-    /// Empties this clients event loop
+    /// Empties this client's event loop
     pub fn poll(&mut self) -> usize {
         let mut result = 0;
 
@@ -102,7 +102,7 @@ impl TestClient {
         result
     }
 
-    /// Empties this clients event loop
+    /// Empties this client's event loop
     pub fn poll_once(&mut self) -> bool {
         self.routing_client.poll()
     }

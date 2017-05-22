@@ -660,7 +660,7 @@ fn mutable_data_parallel_mutations() {
                        } = event {
                     match res {
                         Ok(()) => {
-                                trace!("Client {:?} received successful response.",
+                                trace!("Client {:?} received success response.",
                                        client.name());
                                 unwrap!(data.mutate_entries(actions, *client.signing_public_key()));
                                 successes += 1;
@@ -694,6 +694,7 @@ fn mutable_data_parallel_mutations() {
 // The responses to the two mutate attempts shall be:
 //  1, both succeeded, when there is no conflicting mutation
 //  2, only one succeeded, when there is conflicting mutation (updating the same key)
+//  3, both failed, when there is conflicting mutation and 50-50 votes happens
 #[test]
 fn mutable_data_concurrent_mutations() {
     let seed = None;
@@ -746,7 +747,7 @@ fn mutable_data_concurrent_mutations() {
         trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
 
         let mut sent_actions: HashMap<MessageId, BTreeMap<Vec<u8>, EntryAction>> = HashMap::new();
-        let mut expected_successes: usize = 2;
+        let mut expect_successes: usize = 2;
         let index = rng.gen_range(0, all_data.len());
         {
             let data = &all_data[index];
@@ -754,16 +755,18 @@ fn mutable_data_concurrent_mutations() {
                 let num_actions = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize);
                 let actions =
                     test_utils::gen_mutable_data_entry_actions(data, num_actions, &mut rng);
-
-                if !sent_actions.is_empty() &&
-                   sent_actions
-                       .iter()
-                       .any(|(_, prev_actions)| {
-                                prev_actions
-                                    .iter()
-                                    .any(|(key, _)| actions.contains_key(key))
-                            }) {
-                    expected_successes = 1;
+                {
+                    let intersect_check = |prev_actions: &BTreeMap<Vec<u8>, EntryAction>| {
+                        prev_actions
+                            .iter()
+                            .any(|(key, _)| actions.contains_key(key))
+                    };
+                    if !sent_actions.is_empty() &&
+                       sent_actions
+                           .iter()
+                           .any(|(_, prev_actions)| intersect_check(prev_actions)) {
+                        expect_successes = 1;
+                    }
                 }
 
                 trace!("Updating data {:?} with actions {:?}", data.name(), actions);
@@ -783,7 +786,7 @@ fn mutable_data_concurrent_mutations() {
                    } = event {
                 match res {
                     Ok(()) => {
-                        trace!("Client {:?} received successful response.",
+                        trace!("Client {:?} received success response.",
                                client.name());
                         let actions = unwrap!(sent_actions.remove(&msg_id));
                         unwrap!(all_data[index].mutate_entries(actions,
@@ -799,7 +802,12 @@ fn mutable_data_concurrent_mutations() {
             }
         }
 
-        assert_eq!(successes, expected_successes);
+        if expect_successes == 1 {
+            // When there is conflicting mutations, there is chance one succeed or none.
+            assert!(successes <= expect_successes);
+        } else {
+            assert_eq!(successes, expect_successes);
+        }
         mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
                                       &nodes);
 
@@ -905,7 +913,7 @@ fn no_permission_mutable_data_concurrent_mutations() {
                 network_responded = true;
                 match res {
                     Ok(()) => {
-                        trace!("Client {:?} received successful response.",
+                        trace!("Client {:?} received success response.",
                                clients[0].name());
                         unwrap!(all_data[index].mutate_entries(actions.clone(),
                                                                *clients[0].signing_public_key()));
@@ -930,7 +938,7 @@ fn no_permission_mutable_data_concurrent_mutations() {
                 network_responded = true;
                 match res {
                     Ok(()) => {
-                        panic!("Client {:?} shall not receive successful response.",
+                        panic!("Client {:?} shall not receive success response.",
                                clients[1].name());
                     }
                     Err(error) => assert_eq!(error, ClientError::AccessDenied),

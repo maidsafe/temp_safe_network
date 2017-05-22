@@ -337,23 +337,14 @@ impl DataManager {
                             -> Result<(), InternalError> {
         self.update_request_stats(&src);
 
-        let id = MutableDataId(name, tag);
-
-        if let Ok(data) = self.chunk_store.get(&id) {
-            trace!("As {:?} sending GetMData success of {:?} to {:?}",
-                   dst,
-                   id,
-                   src);
-            routing_node
-                .send_get_mdata_response(dst, src, Ok(data), msg_id)?;
-        } else {
-            trace!("As {:?} sending GetMData failure of {:?} to {:?}",
-                   dst,
-                   id,
-                   src);
-            routing_node
-                .send_get_mdata_response(dst, src, Err(ClientError::NoSuchData), msg_id)?;
-        }
+        let res = self.fetch_mdata(name, tag);
+        trace!("As {:?} sending GetMData response {:?} of {:?} to {:?}",
+               dst,
+               res,
+               name,
+               src);
+        routing_node
+            .send_get_mdata_response(dst, src, res, msg_id)?;
 
         Ok(())
     }

@@ -167,16 +167,18 @@ impl MaidManager {
                 return Ok(());
             }
 
-            if self.accounts.contains_key(&src_name) {
-                let err = ClientError::AccountExists;
-                trace!("MM Cannot create account for {:?} - it already exists", src);
-                routing_node
-                    .send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
-                return Ok(());
+            match self.accounts.entry(src_name) {
+                Entry::Vacant(entry) => {
+                    let _ = entry.insert(Account::default());
+                }
+                Entry::Occupied(_) => {
+                    let err = ClientError::AccountExists;
+                    trace!("MM Cannot create account for {:?} - it already exists", src);
+                    routing_node
+                        .send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
+                    return Ok(());
+                }
             }
-
-            // Create the account.
-            let _ = self.accounts.insert(src_name, Account::default());
             info!("Managing {} client accounts.", self.accounts.len());
         }
 
