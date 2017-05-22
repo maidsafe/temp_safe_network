@@ -24,7 +24,7 @@ maidsafe_utilities = "~0.11.2"
 quick-error = "~1.1.0"
 rand = "~0.3.14"
 # routing = { git = "https://github.com/maidsafe/routing", branch = "mutable-data" }
-routing = { git = "https://github.com/madadam/routing", branch = "mutable-data" }
+routing = { git = "https://github.com/maqi/routing", branch = "mutable_update" }
 rust_sodium = "~0.2.0"
 serde = "~0.9.13"
 serde_derive = "~0.9.13"

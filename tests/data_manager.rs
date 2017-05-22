@@ -553,6 +553,8 @@ fn mutable_data_error_flow() {
                   Err(ClientError::AccessDenied));
 }
 
+// Multiple clients mutate multiple data chunks concurrently.
+// This test uses parallel polling.
 #[test]
 fn mutable_data_parallel_mutations() {
     let seed = None;
@@ -823,8 +825,8 @@ fn mutable_data_concurrent_mutations() {
     verify_data_is_stored(&mut nodes, &mut client, &all_data);
 }
 
-// Two clients concurrently mutating same data with same actions, one with permission, the other not.
-// Only the one with permission shall succeed.
+// Two clients concurrently mutating same data with same actions, one with permission,
+// the other not. Only the one with permission shall succeed.
 #[test]
 fn no_permission_mutable_data_concurrent_mutations() {
     let seed = None;
