@@ -772,7 +772,7 @@ fn mutable_data_concurrent_mutations() {
             }
         }
 
-        event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
+        event_count += poll::nodes_and_client(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
         let mut successes: usize = 0;
