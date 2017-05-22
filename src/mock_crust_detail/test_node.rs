@@ -144,7 +144,7 @@ pub fn create_nodes(network: &Network,
     let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
 
     // Create other nodes using the seed node endpoint as bootstrap contact.
-    for _ in 1..size - 1 {
+    for _ in 1..size {
         // (2nd to N-1th node clone the config objects.)
         nodes.push(TestNode::new(network,
                                  Some(crust_config.clone()),
@@ -153,10 +153,7 @@ pub fn create_nodes(network: &Network,
                                  use_cache));
         let _ = poll::nodes(&mut nodes);
     }
-
-    // (Last node consumes the config objects.)
-    nodes.push(TestNode::new(network, Some(crust_config), config, false, use_cache));
-    let _ = poll::nodes(&mut nodes);
+    drop(config);
 
     nodes
 }
