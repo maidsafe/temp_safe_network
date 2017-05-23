@@ -25,10 +25,10 @@ use routing::{Data, DataIdentifier, StructuredData, XorName};
 use routing::TYPE_TAG_DNS_PACKET;
 use routing::client_errors::{GetError, MutationError};
 use rust_sodium::crypto::{box_, sign};
-use rust_sodium::crypto::hash::sha256;
 use std::collections::BTreeSet;
 use std::convert::From;
 use std::sync::{Arc, Mutex};
+use tiny_keccak::sha3_256;
 
 pub mod dns_configuration;
 
@@ -76,7 +76,7 @@ impl DnsOperations {
                .any(|config| config.long_name == long_name) {
             Err(DnsError::DnsNameAlreadyRegistered)
         } else {
-            let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
+            let identifier = XorName(sha3_256(long_name.as_bytes()));
 
             let dns_record = Dns {
                 long_name: long_name.clone(),
@@ -338,7 +338,7 @@ impl DnsOperations {
         trace!("Fetch capsule from network for dns with name: {}",
                long_name);
 
-        let identifier = XorName(sha256::hash(long_name.as_bytes()).0);
+        let identifier = XorName(sha3_256(long_name.as_bytes()));
         let request = DataIdentifier::Structured(identifier, TYPE_TAG_DNS_PACKET);
         let response_getter = unwrap!(self.client.lock()).get(request, None)?;
         if let Data::Structured(struct_data) = response_getter.get()? {

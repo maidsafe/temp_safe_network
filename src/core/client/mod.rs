@@ -43,11 +43,11 @@ use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::MutationError;
 // use routing::messaging::{MpidMessage, MpidMessageWrapper};
 use rust_sodium::crypto::box_;
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign::{self, Seed};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
+use tiny_keccak::sha3_256;
 
 type AccPkt = (String, Vec<u8>);
 const SEED_SUBPARTS: usize = 4;
@@ -157,7 +157,7 @@ impl Client {
                     id_vec.extend(*arr);
                 }
             }
-            Seed(sha256::hash(&id_vec).0)
+            Seed(sha3_256(&id_vec))
         };
         let revocation_seed = {
             let mut revocation_vec = Vec::with_capacity(cap);
@@ -167,7 +167,7 @@ impl Client {
                     revocation_vec.extend(*arr);
                 }
             }
-            Seed(sha256::hash(&revocation_vec).0)
+            Seed(sha3_256(&revocation_vec))
         };
 
         (id_seed, revocation_seed)
@@ -206,8 +206,8 @@ impl Client {
         }
         trace!("Connected to the Network.");
 
-        let hash_sign_key = sha256::hash(&(account_packet.get_maid().public_keys().0).0);
-        let client_manager_addr = XorName(hash_sign_key.0);
+        let hash_sign_key = sha3_256(&(account_packet.get_maid().public_keys().0).0);
+        let client_manager_addr = XorName(hash_sign_key);
 
         let mut client = Client {
             account: Some(account_packet),
@@ -316,9 +316,8 @@ impl Client {
             }
             trace!("Connected to the Network.");
 
-            let hash_sign_key =
-                sha256::hash(&(decrypted_session_packet.get_maid().public_keys().0).0);
-            let client_manager_addr = XorName(hash_sign_key.0);
+            let hash_sign_key = sha3_256(&(decrypted_session_packet.get_maid().public_keys().0).0);
+            let client_manager_addr = XorName(hash_sign_key);
 
             let client = Client {
                 account: Some(decrypted_session_packet),
@@ -428,9 +427,9 @@ impl Client {
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
             None => {
-                let digest = sha256::hash(&account.get_public_maid().name().0);
-                let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.0.len());
-                for it in digest.0.iter().take(min_length).enumerate() {
+                let digest = sha3_256(&account.get_public_maid().name().0);
+                let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.len());
+                for it in digest.iter().take(min_length).enumerate() {
                     nonce_default.0[it.0] = *it.1;
                 }
                 &nonce_default
@@ -456,9 +455,9 @@ impl Client {
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
             None => {
-                let digest = sha256::hash(&account.get_public_maid().name().0);
-                let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.0.len());
-                for it in digest.0.iter().take(min_length).enumerate() {
+                let digest = sha3_256(&account.get_public_maid().name().0);
+                let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.len());
+                for it in digest.iter().take(min_length).enumerate() {
                     nonce_default.0[it.0] = *it.1;
                 }
                 &nonce_default

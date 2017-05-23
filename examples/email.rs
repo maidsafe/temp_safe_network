@@ -22,8 +22,8 @@ extern crate unwrap;
 
 extern crate rust_sodium;
 extern crate safe_core;
+extern crate tiny_keccak;
 
-use rust_sodium::crypto::hash::sha256::{self, Digest};
 use safe_core::ffi::app::*;
 use safe_core::ffi::low_level_api::appendable_data::*;
 use safe_core::ffi::low_level_api::cipher_opt::*;
@@ -32,6 +32,7 @@ use safe_core::ffi::low_level_api::immut_data::*;
 use safe_core::ffi::low_level_api::misc::*;
 use safe_core::ffi::session::*;
 use std::{ptr, slice};
+use tiny_keccak::sha3_256;
 
 unsafe fn self_auth(session_h: *mut *mut SessionHandle) {
     unwrap!(maidsafe_utilities::log::init(true));
@@ -93,7 +94,7 @@ unsafe fn create_email(app_h: *mut App) {
     let _ = std::io::stdin().read_line(&mut email);
     email = email.trim().to_string();
 
-    let Digest(digest) = sha256::hash(email.as_bytes());
+    let digest = sha3_256(email.as_bytes());
 
     let mut ad_h = 0;
     assert_eq!(appendable_data_new_priv(app_h, &digest, &mut ad_h), 0);
@@ -114,7 +115,7 @@ unsafe fn send_email(app_h: *mut App) {
     let _ = std::io::stdin().read_line(&mut msg);
     msg = msg.trim().to_string();
 
-    let Digest(digest) = sha256::hash(email.as_bytes());
+    let digest = sha3_256(email.as_bytes());
 
     let mut data_id_h = 0;
     assert_eq!(data_id_new_appendable_data(&digest, true, &mut data_id_h),
@@ -157,7 +158,7 @@ unsafe fn read_email(app_h: *mut App) {
     let _ = std::io::stdin().read_line(&mut email);
     email = email.trim().to_string();
 
-    let Digest(digest) = sha256::hash(email.as_bytes());
+    let digest = sha3_256(email.as_bytes());
 
     let mut data_id_h = 0;
     assert_eq!(data_id_new_appendable_data(&digest, true, &mut data_id_h),

@@ -25,7 +25,6 @@ use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, Int
               MessageId, Request, Response, RoutingError, XorName};
 use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::{GetError, MutationError};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use serde::Serialize;
 use std;
@@ -33,6 +32,7 @@ use std::cell::Cell;
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
+use tiny_keccak::sha3_256;
 
 const NETWORK_CONNECT_DELAY_SIMULATION_THREAD: &'static str = "NetworkConnectDelaySimulation";
 
@@ -604,7 +604,7 @@ impl RoutingMock {
 
     fn client_name(&self) -> XorName {
         match self.client_auth {
-            Authority::Client { ref client_key, .. } => XorName(sha256::hash(&client_key[..]).0),
+            Authority::Client { ref client_key, .. } => XorName(sha3_256(&client_key[..])),
             _ => panic!("This authority must be Client"),
         }
     }

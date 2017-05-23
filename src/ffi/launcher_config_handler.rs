@@ -27,8 +27,8 @@ use nfs::helper::writer::Mode::Overwrite;
 use nfs::metadata::directory_key::DirectoryKey;
 use routing::XorName;
 use rust_sodium::crypto::{box_, secretbox};
-use rust_sodium::crypto::hash::sha256;
 use std::sync::{Arc, Mutex};
+use tiny_keccak::sha3_256;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LauncherConfiguration {
@@ -104,7 +104,7 @@ impl ConfigHandler {
         let mut id_str = String::new();
         id_str.push_str(app_key);
         id_str.push_str(vendor);
-        XorName(sha256::hash(id_str.as_bytes()).0)
+        XorName(sha3_256(id_str.as_bytes()))
     }
 
     fn get_app_dir_name(&self, app_name: &str, directory_listing: &DirectoryListing) -> String {

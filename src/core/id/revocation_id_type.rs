@@ -17,8 +17,8 @@
 
 use core::id::IdTypeTags;
 use routing::XorName;
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign::{self, Seed};
+use tiny_keccak::sha3_256;
 
 /// `RevocationIdType`
 ///
@@ -70,7 +70,7 @@ impl RevocationIdType {
         for i in self.type_tags.0.to_string().into_bytes() {
             combined.push(i);
         }
-        XorName(sha256::hash(&combined).0)
+        XorName(sha3_256(&combined))
     }
 
     /// Returns type tags
