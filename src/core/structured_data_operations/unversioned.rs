@@ -226,7 +226,7 @@ mod test {
                                 Some(data_decryption_keys));
             match get_data(client.clone(), &unwrap!(result), Some(data_decryption_keys)) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
-                Err(_) => panic!("Failed to fetch"),
+                Err(e) => panic!("Failed to fetch {:?}", e),
             }
         }
         // Data of size 75 KB
@@ -325,7 +325,7 @@ mod test {
                                 None);
             match get_data(client.clone(), &unwrap!(result), None) {
                 Ok(fetched_data) => assert_eq!(fetched_data, data),
-                Err(_) => panic!("Failed to fetch"),
+                Err(e) => panic!("Failed to fetch {:?}", e),
             }
         }
         // Data of size 200 KB
