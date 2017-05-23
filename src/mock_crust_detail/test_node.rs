@@ -145,7 +145,7 @@ pub fn create_nodes(network: &Network,
 
     // Create other nodes using the seed node endpoint as bootstrap contact.
     for _ in 1..size {
-        // (2nd to N-1th node clone the config objects.)
+        // (2nd to Nth node clone the config objects.)
         nodes.push(TestNode::new(network,
                                  Some(crust_config.clone()),
                                  config.clone(),

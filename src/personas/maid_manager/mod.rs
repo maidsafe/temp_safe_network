@@ -83,7 +83,7 @@ impl MaidManager {
                                    dst: Authority<XorName>,
                                    msg_id: MessageId)
                                    -> Result<(), InternalError> {
-        let res = self.get_account(&dst).map(|account| account.info);
+        let res = self.get_account(&src, &dst).map(|account| account.info);
         routing_node
             .send_get_account_info_response(dst, src, res, msg_id)?;
         Ok(())
@@ -439,7 +439,7 @@ impl MaidManager {
                                              dst: Authority<XorName>,
                                              msg_id: MessageId)
                                              -> Result<(), InternalError> {
-        let res = self.get_account(&dst)
+        let res = self.get_account(&src, &dst)
             .map(|account| (account.auth_keys.clone(), account.version));
         routing_node
             .send_list_auth_keys_and_version_response(dst, src, res, msg_id)?;
@@ -542,8 +542,18 @@ impl MaidManager {
         Ok(())
     }
 
-    fn get_account(&self, dst: &Authority<XorName>) -> Result<&Account, ClientError> {
+    fn get_account(&self,
+                   src: &Authority<XorName>,
+                   dst: &Authority<XorName>)
+                   -> Result<&Account, ClientError> {
+        let requestor_name = utils::client_name(src);
         let client_name = utils::client_name(dst);
+        if requestor_name != client_name {
+            trace!("MM Cannot allow requestor {:?} accessing account {:?}.",
+                   src,
+                   dst);
+            return Err(ClientError::AccessDenied);
+        }
         if let Some(account) = self.accounts.get(&client_name) {
             Ok(account)
         } else {
