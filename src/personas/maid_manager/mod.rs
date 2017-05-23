@@ -454,7 +454,7 @@ impl MaidManager {
                                version: u64,
                                msg_id: MessageId)
                                -> Result<(), InternalError> {
-        let res = self.mutate_account(routing_node, &src, &dst, version, |account| {
+        let res = self.mutate_account(routing_node, &src, &dst, version, msg_id, |account| {
             let _ = account.auth_keys.insert(key);
             Ok(())
         });
@@ -475,6 +475,7 @@ impl MaidManager {
                                       &src,
                                       &dst,
                                       version,
+                                      msg_id,
                                       |account| if account.auth_keys.remove(&key) {
                                           Ok(())
                                       } else {
@@ -566,6 +567,7 @@ impl MaidManager {
                          src: &Authority<XorName>,
                          dst: &Authority<XorName>,
                          version: u64,
+                         msg_id: MessageId,
                          f: F)
                          -> Result<(), ClientError>
         where F: FnOnce(&mut Account) -> Result<(), ClientError>
@@ -589,12 +591,7 @@ impl MaidManager {
             Err(ClientError::NoSuchAccount)
         };
 
-        res.map(|account| {
-                    self.send_refresh(routing_node,
-                                      &client_manager_name,
-                                      account,
-                                      MessageId::zero())
-                })
+        res.map(|account| self.send_refresh(routing_node, &client_manager_name, account, msg_id))
     }
 
     fn prepare_mutation(&mut self,
@@ -653,7 +650,7 @@ impl MaidManager {
             return Err(InternalError::NoSuchAccount);
         };
 
-        self.send_refresh(routing_node, &client_name, account, MessageId::zero());
+        self.send_refresh(routing_node, &client_name, account, msg_id);
 
         Ok(CachedRequest {
                src: src,
