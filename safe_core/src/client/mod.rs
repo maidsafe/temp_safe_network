@@ -574,6 +574,17 @@ impl Client {
                     })
     }
 
+    /// Get a shell (bare bones) version of `MutableData` from the network.
+    pub fn get_mdata_shell(&self, name: XorName, tag: u64) -> Box<CoreFuture<MutableData>> {
+        trace!("GetMDataShell for {:?}", name);
+
+        self.get(CoreEvent::GetMDataShell, |routing, msg_id| {
+                routing.get_mdata_shell(Authority::NaeManager(name), name, tag, msg_id)
+            })
+            .and_then(|event| match_event!(event, CoreEvent::GetMDataShell))
+            .into_box()
+    }
+
     /// Get a current version of `MutableData` from the network.
     pub fn get_mdata_version(&self, name: XorName, tag: u64) -> Box<CoreFuture<u64>> {
         trace!("GetMDataVersion for {:?}", name);
