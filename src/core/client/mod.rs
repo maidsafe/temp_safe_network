@@ -1086,7 +1086,7 @@ mod test {
         assert!(client.get_configuration_root_directory_id().is_none());
 
         let root_dir_id = XorName([99u8; XOR_NAME_LEN]);
-        unwrap!(client.set_user_root_directory_id(root_dir_id.clone()));
+        unwrap!(client.set_user_root_directory_id(root_dir_id));
 
         // Correct Credentials - Login Should Pass
         let client = unwrap!(Client::log_in(&secret_0, &secret_1));
@@ -1110,7 +1110,7 @@ mod test {
         assert!(client.get_configuration_root_directory_id().is_none());
 
         let root_dir_id = XorName([99u8; XOR_NAME_LEN]);
-        unwrap!(client.set_configuration_root_directory_id(root_dir_id.clone()));
+        unwrap!(client.set_configuration_root_directory_id(root_dir_id));
 
         // Correct Credentials - Login Should Pass
         let client = unwrap!(Client::log_in(&secret_0, &secret_1));
@@ -1223,7 +1223,7 @@ mod test {
             let id: XorName = rand::random();
 
             let struct_data =
-                unwrap!(StructuredData::new(TYPE_TAG, id.clone(), 0, Vec::new(), BTreeSet::new()));
+                unwrap!(StructuredData::new(TYPE_TAG, id, 0, Vec::new(), BTreeSet::new()));
             let data = Data::Structured(struct_data);
 
             unwrap!(unwrap!(client.put(data.clone(), None)).get());

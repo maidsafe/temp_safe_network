@@ -381,7 +381,7 @@ mod test {
 
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         let file = unwrap!(app_root_dir.find_file("test_file.txt"));
-        assert!(file.get_metadata().get_user_metadata().len() > 0);
+        assert!(!file.get_metadata().get_user_metadata().is_empty());
         assert_eq!(file.get_metadata().get_user_metadata(), METADATA.as_bytes());
     }
 

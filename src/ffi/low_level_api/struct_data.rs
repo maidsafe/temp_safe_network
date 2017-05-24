@@ -253,7 +253,7 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
             ::UNVERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let raw_data =
                     ffi_try!(unversioned::get_data(client, ffi_try!(obj_cache.get_sd(sd_h)), None));
-                ffi_try!(CipherOpt::decrypt(&app, &raw_data))
+                ffi_try!(CipherOpt::decrypt(app, &raw_data))
             }
             ::VERSIONED_STRUCT_DATA_TYPE_TAG => {
                 let immut_data_final_name =
@@ -266,13 +266,13 @@ pub unsafe extern "C" fn struct_data_extract_data(app: *const App,
                     _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
                 };
 
-                let ser_immut_data = ffi_try!(CipherOpt::decrypt(&app, immut_data_final.value()));
+                let ser_immut_data = ffi_try!(CipherOpt::decrypt(app, immut_data_final.value()));
                 let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
                                               .map_err(FfiError::from));
                 ffi_try!(immut_data_operations::get_data_from_immut_data(client, immut_data, None))
             }
             x if x >= CLIENT_STRUCTURED_DATA_TAG => {
-                ffi_try!(CipherOpt::decrypt(&app, ffi_try!(obj_cache.get_sd(sd_h)).get_data()))
+                ffi_try!(CipherOpt::decrypt(app, ffi_try!(obj_cache.get_sd(sd_h)).get_data()))
             }
             _ => ffi_try!(Err(FfiError::InvalidStructuredDataTypeTag)),
         };
@@ -294,7 +294,7 @@ pub unsafe extern "C" fn struct_data_num_of_versions(sd_h: StructDataHandle,
     helper::catch_unwind_i32(|| {
                                  let mut obj_cache = unwrap!(object_cache());
                                  let sd = ffi_try!(obj_cache.get_sd(sd_h));
-                                 let num = ffi_try!(versioned::version_count(&sd)
+                                 let num = ffi_try!(versioned::version_count(sd)
                                                         .map_err(FfiError::from));
                                  ptr::write(o_num, num as usize);
                                  0
@@ -339,7 +339,7 @@ pub unsafe extern "C" fn struct_data_nth_version(app: *const App,
             _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
         };
 
-        let ser_immut_data = ffi_try!(CipherOpt::decrypt(&app, immut_data_final.value()));
+        let ser_immut_data = ffi_try!(CipherOpt::decrypt(app, immut_data_final.value()));
         let immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_immut_data)
                                       .map_err(FfiError::from));
         let mut plain_text =

@@ -158,11 +158,11 @@ mod test {
             let sign2 = maid2.sign(&random_bytes);
             assert!(sign1 != sign2);
 
-            assert!(sign::verify(&sign1, &maid1.public_key()).is_ok());
-            assert!(sign::verify(&sign2, &maid1.public_key()).is_err());
+            assert!(sign::verify(&sign1, maid1.public_key()).is_ok());
+            assert!(sign::verify(&sign2, maid1.public_key()).is_err());
 
-            assert!(sign::verify(&sign2, &maid2.public_key()).is_ok());
-            assert!(sign::verify(&sign2, &maid1.public_key()).is_err());
+            assert!(sign::verify(&sign2, maid2.public_key()).is_ok());
+            assert!(sign::verify(&sign2, maid1.public_key()).is_err());
         }
     }
 }

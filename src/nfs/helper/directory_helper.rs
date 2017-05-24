@@ -588,8 +588,7 @@ mod test {
         let client = Arc::new(Mutex::new(test_client));
         let dir_helper = DirectoryHelper::new(client.clone());
         let config_dir = unwrap!(dir_helper.get_configuration_directory_listing("DNS".to_string()));
-        assert_eq!(config_dir.get_metadata().get_name().clone(),
-                   "DNS".to_string());
+        assert_eq!(config_dir.get_metadata().get_name(), "DNS".to_string());
         let id = config_dir.get_key().get_id();
         let config_dir = unwrap!(dir_helper.get_configuration_directory_listing("DNS".to_string()));
         assert_eq!(config_dir.get_key().get_id(), id);
@@ -625,13 +624,13 @@ mod test {
         let rxd_dir_listing =
             unwrap!(dir_helper.get_by_version(dir_listing.get_key().get_id(),
                                               dir_listing.get_key().get_access_level(),
-                                              versions[versions.len() - 1].clone()));
+                                              versions[versions.len() - 1]));
         assert_eq!(rxd_dir_listing, dir_listing);
 
         let rxd_dir_listing =
             unwrap!(dir_helper.get_by_version(dir_listing.get_key().get_id(),
                                               dir_listing.get_key().get_access_level(),
-                                              versions[0].clone()));
+                                              versions[0]));
         assert_eq!(*rxd_dir_listing.get_metadata().get_name(),
                    "DirName2".to_string());
     }

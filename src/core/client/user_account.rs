@@ -314,7 +314,7 @@ mod test {
         let encrypted_account = unwrap!(account.encrypt(password.as_bytes(),
                                                         pin.to_string().as_bytes()));
         let serialised_account = unwrap!(serialise(&account));
-        assert!(encrypted_account.len() > 0);
+        assert!(!encrypted_account.is_empty());
         assert!(encrypted_account != serialised_account);
 
         let decrypted_account = unwrap!(Account::decrypt(&encrypted_account,
