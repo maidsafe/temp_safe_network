@@ -35,11 +35,11 @@ use core::translated_events::NetworkEvent;
 use core::utility;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::Joiner;
+use routing::{AccountPacket, TYPE_TAG_SESSION_PACKET};
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, StructuredData,
               XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
-use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::MutationError;
 // use routing::messaging::{MpidMessage, MpidMessageWrapper};
 use rust_sodium::crypto::box_;
@@ -48,15 +48,6 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 use tiny_keccak::sha3_256;
-
-#[derive(Serialize, Deserialize)]
-enum AccountPacket {
-    WithInvitation {
-        invitation_string: String,
-        acc_pkt: Vec<u8>,
-    },
-    AccPkt(Vec<u8>),
-}
 
 const SEED_SUBPARTS: usize = 4;
 
