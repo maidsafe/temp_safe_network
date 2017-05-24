@@ -19,10 +19,11 @@
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
 use rand::Rng;
-use routing::{AccountInfo, BootstrapConfig, ClientError, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
-              MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData,
+use routing::{AccountInfo, BootstrapConfig, ClientError, Event, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
+              MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData, Response,
               TYPE_TAG_SESSION_PACKET, Value};
 use routing::mock_crust::Network;
+use rust_sodium::crypto::sign;
 use safe_vault::{DEFAULT_ACCOUNT_SIZE, GROUP_SIZE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
@@ -411,5 +412,220 @@ fn account_mutation_count_decrease_with_churn() {
         for &(_, count) in &node_count_stats {
             assert_eq!(count, Some(chunks_per_iter * (i / 2 + 1) + 1));
         }
+    }
+}
+
+// Client trying to mutate an account concurrently: insert and delete a key at the same time.
+// The result could be:
+//  1, both succeeds, when all MMs accumulate deletion after insertion.
+//  2, insertion succeeds and deletion fails with `InvalidSuccessor`,
+//     when most of MMs receives deletion request after accumulate insertion.
+//  3, insertion succeeds and deletion fails with `ExpiredRequest`,
+//     when part of MMs receives deletion request after accumulate insertion.
+#[test]
+fn account_concurrent_insert_delete_key() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+    let iterations = test_utils::iterations();
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut event_count = 0;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    let mut version = 1;
+    let mut auth_keys = BTreeSet::new();
+    for i in 0..iterations {
+        trace!("Iteration {}.", i + 1);
+        let (app_key, _) = sign::gen_keypair();
+        let _ = client.ins_auth_key(app_key, version + 1);
+        let _ = client.del_auth_key(app_key, version + 2);
+
+        event_count += poll::nodes_and_client(&mut nodes, &mut client);
+        trace!("Processed {} events.", event_count);
+
+        let mut ins_success = false;
+        let mut del_success = false;
+
+        while let Ok(event) = client.try_recv() {
+            if let Event::Response { response: Response::InsAuthKey { res, .. }, .. } =
+                event.clone() {
+                match res {
+                    Ok(()) => ins_success = true,
+                    Err(error) => {
+                        trace!("Received failed response of insertion. Reason: {:?}", error);
+                    }
+                }
+            }
+            if let Event::Response { response: Response::DelAuthKey { res, .. }, .. } = event {
+                match res {
+                    Ok(()) => del_success = true,
+                    Err(error) => {
+                        trace!("Received failed response of deletion. Reason: {:?}", error);
+                    }
+                }
+            }
+        }
+
+        match (ins_success, del_success) {
+            (true, true) => version += 2,
+            (true, false) => {
+                version += 1;
+                let _ = auth_keys.insert(app_key);
+            }
+            // TODO: advance clock and create another even to trigger expiration check.
+            (false, false) => panic!("Insertion is expected to always succeed"),
+            (false, true) => panic!("Deletion shall not be succeed when insertion is failed"),
+        }
+
+        match client.list_auth_keys_and_version_response(&mut nodes) {
+            Ok(result) => assert_eq!(result, (auth_keys.clone(), version)),
+            Err(err) => panic!("Unexpected error {:?} when list auth_keys and version", err),
+        }
+    }
+}
+
+// Client trying to concurrently insert keys into an account.
+// The result could be:
+//  1, one succeeds and the other fails with `InvalidSuccessor`.
+#[test]
+fn account_concurrent_insert_keys() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+    let iterations = test_utils::iterations();
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut event_count = 0;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    let mut version = 1;
+    let mut auth_keys = BTreeSet::new();
+    for i in 0..iterations {
+        trace!("Iteration {}.", i + 1);
+        let (app_key_1, _) = sign::gen_keypair();
+        let (app_key_2, _) = sign::gen_keypair();
+        let msg_id_1 = client.ins_auth_key(app_key_1, version + 1);
+        let _ = client.ins_auth_key(app_key_2, version + 1);
+
+        event_count += poll::nodes_and_client(&mut nodes, &mut client);
+        trace!("Processed {} events.", event_count);
+
+        // TODO: advance clock and create another even to trigger expiration check.
+        while let Ok(event) = client.try_recv() {
+            if let Event::Response { response: Response::InsAuthKey { res, msg_id }, .. } = event {
+                match res {
+                    Ok(()) => {
+                        version += 1;
+                        if msg_id == msg_id_1 {
+                            let _ = auth_keys.insert(app_key_1);
+                        } else {
+                            let _ = auth_keys.insert(app_key_2);
+                        }
+                    }
+                    Err(error) => {
+                        trace!("Received failed response of insertion {:?}. Reason: {:?}",
+                               msg_id,
+                               error);
+                    }
+                }
+            }
+        }
+
+        match client.list_auth_keys_and_version_response(&mut nodes) {
+            Ok(result) => assert_eq!(result, (auth_keys.clone(), version)),
+            Err(err) => panic!("Unexpected error {:?} when list auth_keys and version", err),
+        }
+    }
+}
+
+// Client trying to concurrently insert a key and put a data.
+// The result could be:
+//  1, both succeed.
+#[test]
+fn account_concurrent_insert_key_put_data() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+    let iterations = test_utils::iterations();
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+    let mut event_count = 0;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    let mut version = 1;
+    let mut auth_keys = BTreeSet::new();
+    let mut mutate_count = 1;
+    for i in 0..iterations {
+        trace!("Iteration {}.", i + 1);
+        let data = test_utils::gen_immutable_data(1024, &mut rng);
+        let msg_id_d = client.put_idata(data);
+
+        let (app_key, _) = sign::gen_keypair();
+        let msg_id_k = client.ins_auth_key(app_key, version + 1);
+        let _ = client.ins_auth_key(app_key, version + 1);
+
+        event_count += poll::nodes_and_client(&mut nodes, &mut client);
+        trace!("Processed {} events.", event_count);
+
+        // TODO: advance clock and create another even to trigger expiration check.
+        while let Ok(event) = client.try_recv() {
+            if let Event::Response { response: Response::InsAuthKey { res, .. }, .. } =
+                event.clone() {
+                match res {
+                    Ok(()) => {
+                        version += 1;
+                        let _ = auth_keys.insert(app_key);
+                    }
+                    Err(error) => {
+                        trace!("Received failed response of insertion {:?}. Reason: {:?}",
+                               msg_id_k,
+                               error);
+                    }
+                }
+            }
+            if let Event::Response { response: Response::PutIData { res, .. }, .. } = event {
+                match res {
+                    Ok(()) => {
+                        mutate_count += 1;
+                        // TODO: check why this is required.
+                        version += 1;
+                    }
+                    Err(error) => {
+                        trace!("Received failed response of put data {:?}. Reason: {:?}",
+                               msg_id_d,
+                               error);
+                    }
+                }
+            }
+        }
+
+        match client.list_auth_keys_and_version_response(&mut nodes) {
+            Ok(result) => assert_eq!(result, (auth_keys.clone(), version)),
+            Err(err) => panic!("Unexpected error {:?} when list auth_keys and version", err),
+        }
+    }
+
+    let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
+    let node_count_stats: Vec<_> = sorted_nodes
+        .into_iter()
+        .map(|node| (node.name(), node.get_maid_manager_mutation_count(client.name())))
+        .collect();
+
+    for &(_, count) in &node_count_stats {
+        assert_eq!(count, Some(mutate_count));
     }
 }

@@ -489,6 +489,22 @@ impl TestClient {
         assert_recv_response!(self, ListAuthKeysAndVersion, msg_id)
     }
 
+    /// Sends a `DelAuthKey` request.
+    pub fn del_auth_key(&mut self, key: sign::PublicKey, version: u64) -> MessageId {
+        let msg_id = MessageId::new();
+        let _ = self.routing_client
+            .del_auth_key(self.client_manager, key, version, msg_id);
+        msg_id
+    }
+
+    /// Sends a `InsAuthKey` request.
+    pub fn ins_auth_key(&mut self, key: sign::PublicKey, version: u64) -> MessageId {
+        let msg_id = MessageId::new();
+        let _ = self.routing_client
+            .ins_auth_key(self.client_manager, key, version, msg_id);
+        msg_id
+    }
+
     /// Sends a `InsAuthKey` request and waits for the response.
     pub fn ins_auth_key_response(&mut self,
                                  key: sign::PublicKey,
