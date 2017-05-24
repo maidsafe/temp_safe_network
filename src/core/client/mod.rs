@@ -49,7 +49,15 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
 use tiny_keccak::sha3_256;
 
-type AccPkt = (String, Vec<u8>);
+#[derive(Serialize, Deserialize)]
+enum AccountPacket {
+    WithInvitation {
+        invitation_string: String,
+        acc_pkt: Vec<u8>,
+    },
+    AccPkt(Vec<u8>),
+}
+
 const SEED_SUBPARTS: usize = 4;
 
 /// The main self-authentication client instance that will interface all the request from high
@@ -239,10 +247,15 @@ impl Client {
                     .encrypt(session_packet_keys.get_password(),
                              session_packet_keys.get_pin())?;
 
+                let session_packet_data = serialise(&AccountPacket::WithInvitation {
+                                                         invitation_string: invitation.to_owned(),
+                                                         acc_pkt: cipher_text.clone(),
+                                                     })?;
+
                 let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                  *session_packet_id,
                                                  0,
-                                                 serialise(&(invitation, cipher_text.clone()))?,
+                                                 session_packet_data,
                                                  owners.clone())?;
                 let _ = sd.add_signature(&(owner_pubkey,
                                            account.get_maid().secret_keys().0.clone()));
@@ -279,12 +292,14 @@ impl Client {
         let resp_getter = unregistered_client.get(session_packet_request, None)?;
 
         if let Data::Structured(session_packet) = resp_getter.get()? {
-            let decrypted_session_packet = if let Ok(acc_pkt) =
-                deserialise::<AccPkt>(session_packet.get_data()) {
-                Account::decrypt(&acc_pkt.1, &password, &pin)?
-            } else {
-                Account::decrypt(session_packet.get_data(), &password, &pin)?
-            };
+            let decrypted_session_packet =
+                match deserialise::<AccountPacket>(session_packet.get_data())? {
+                    AccountPacket::WithInvitation { acc_pkt: encrypted, .. } |
+                    AccountPacket::AccPkt(encrypted) => {
+                        Account::decrypt(&encrypted, &password, &pin)?
+                    }
+                };
+
             let id_packet =
                 FullId::with_keys((decrypted_session_packet.get_maid().public_keys().1,
                                    decrypted_session_packet
@@ -896,10 +911,12 @@ impl Client {
                 let mut owners = BTreeSet::new();
                 owners.insert(owner_key);
 
+                let data = serialise(&AccountPacket::AccPkt(encrypted_account))?;
+
                 let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                  session_packet_id,
                                                  retrieved_session_packet.get_version() + 1,
-                                                 encrypted_account,
+                                                 data,
                                                  owners)?;
                 let _ = sd.add_signature(&(owner_key, signing_key))?;
                 sd
