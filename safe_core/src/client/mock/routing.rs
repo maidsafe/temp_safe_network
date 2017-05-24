@@ -78,8 +78,7 @@ impl Routing {
         });
 
         let client_auth = Authority::Client {
-            client_key: sign::gen_keypair().0,
-            peer_id: rand::random(),
+            client_id: *FullId::new().public_id(),
             proxy_node_name: rand::random(),
         };
 
@@ -719,7 +718,7 @@ impl Routing {
 
     fn client_name(&self) -> XorName {
         match self.client_auth {
-            Authority::Client { ref client_key, .. } => XorName(sha256::hash(&client_key[..]).0),
+            Authority::Client { ref client_id, .. } => *client_id.name(),
             _ => panic!("This authority must be Client"),
         }
     }
