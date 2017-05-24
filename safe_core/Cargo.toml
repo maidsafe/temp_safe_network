@@ -40,3 +40,7 @@ testing = []
 [[example]]
 bench = false
 name = "gen_invites"
+
+[[example]]
+bench = false
+name = "client_stress_test"
