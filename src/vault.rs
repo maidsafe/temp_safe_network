@@ -709,14 +709,22 @@ impl Vault {
     /// Non-blocking call to process any events in the event queue, returning true if
     /// any received, otherwise returns false.
     pub fn poll(&mut self) -> bool {
+        use maidsafe_utilities::SeededRng;
+        use rand::Rng;
+
         let mut processed = self.routing_node.poll();
 
+        let mut events = Vec::new();
         while let Ok(event) = self.routing_node.try_next_ev() {
+            events.push(event);
+        }
+        SeededRng::thread_rng().shuffle(&mut events);
+
+        for event in events {
             if let EventResult::Processed = self.process_event(event) {
                 processed = true;
             }
         }
-
         processed
     }
 
