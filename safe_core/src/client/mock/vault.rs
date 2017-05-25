@@ -16,9 +16,9 @@
 // relating to use of the SAFE Network Software.
 
 use routing::{AccountInfo, Authority, ClientError, ImmutableData, MutableData, XorName};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeSet, HashMap};
+use tiny_keccak::sha3_256;
 
 pub const DEFAULT_MAX_MUTATIONS: u64 = 100;
 
@@ -80,7 +80,7 @@ impl Vault {
         };
 
         // Check if we are the owner or app.
-        let owner_name = XorName(sha256::hash(&sign_pk[..]).0);
+        let owner_name = XorName(sha3_256(&sign_pk[..]));
         if owner_name == dst_name || account.auth_keys.contains(sign_pk) {
             true
         } else {

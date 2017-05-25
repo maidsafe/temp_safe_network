@@ -44,7 +44,6 @@ use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, EntryA
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
 use rust_sodium::crypto::box_;
-use rust_sodium::crypto::hash::sha256::{self, Digest};
 use rust_sodium::crypto::sign::{self, Seed};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -52,6 +51,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::Duration;
+use tiny_keccak::sha3_256;
 use tokio_core::reactor::{Handle, Timeout};
 use utils::{self, FutureExt};
 
@@ -162,7 +162,7 @@ impl Client {
     /// Calculate sign key from seed
     pub fn sign_pk_from_seed(seed: &str) -> Result<sign::PublicKey, CoreError> {
         let arr = Self::divide_seed(seed)?;
-        let id_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 2]).0);
+        let id_seed = Seed(sha3_256(arr[SEED_SUBPARTS - 2]));
         let maid_keys = ClientKeys::new(Some(&id_seed));
         Ok(maid_keys.sign_pk)
     }
@@ -182,7 +182,7 @@ impl Client {
     {
         let arr = Self::divide_seed(seed)?;
 
-        let id_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 2]).0);
+        let id_seed = Seed(sha3_256(arr[SEED_SUBPARTS - 2]));
 
         Self::registered_impl(arr[0],
                               arr[1],
@@ -263,7 +263,7 @@ impl Client {
                                       acc_data,
                                       btree_set![pub_key])?;
 
-        let Digest(digest) = sha256::hash(&pub_key.0);
+        let digest = sha3_256(&pub_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         let msg_id = MessageId::new();
@@ -375,7 +375,7 @@ impl Client {
 
         let id_packet = acc.maid_keys.clone().into();
 
-        let Digest(digest) = sha256::hash(&acc.maid_keys.sign_pk.0);
+        let digest = sha3_256(&acc.maid_keys.sign_pk.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         trace!("Creating an actual routing...");
@@ -1036,7 +1036,7 @@ enum ClientType {
 
 impl ClientType {
     fn from_keys(keys: ClientKeys, owner_key: sign::PublicKey) -> Self {
-        let Digest(digest) = sha256::hash(&owner_key.0);
+        let digest = sha3_256(&owner_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         ClientType::FromKeys {

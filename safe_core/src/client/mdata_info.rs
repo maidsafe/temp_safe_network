@@ -18,9 +18,9 @@
 use errors::CoreError;
 use rand::{OsRng, Rng};
 use routing::{EntryAction, Value, XorName};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::secretbox;
 use std::collections::{BTreeMap, BTreeSet};
+use tiny_keccak::sha3_256;
 use utils::{symmetric_decrypt, symmetric_encrypt};
 
 /// Information allowing to locate and access mutable data on the network.
@@ -78,8 +78,7 @@ impl MDataInfo {
                 Some(secretbox::Nonce(ref dir_nonce)) => {
                     let mut pt = plain_text.to_vec();
                     pt.extend_from_slice(&dir_nonce[..]);
-                    unwrap!(secretbox::Nonce::from_slice(&sha256::hash(&pt)
-                                                              [..secretbox::NONCEBYTES]))
+                    unwrap!(secretbox::Nonce::from_slice(&sha3_256(&pt)[..secretbox::NONCEBYTES]))
                 }
                 None => secretbox::gen_nonce(),
             };

@@ -21,10 +21,10 @@ use rand;
 use routing::{AccountInfo, Action, Authority, ClientError, EntryAction, EntryActions, Event,
               FullId, ImmutableData, MessageId, MutableData, PermissionSet, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
+use tiny_keccak::sha3_256;
 use utils;
 
 // Helper macro to receive a routing event and assert it's a response
@@ -904,7 +904,7 @@ fn create_account(routing: &mut Routing,
                   routing_rx: &Receiver<Event>,
                   owner_key: sign::PublicKey)
                   -> Authority<XorName> {
-    let account_name = XorName(sha256::hash(&owner_key[..]).0);
+    let account_name = XorName(sha3_256(&owner_key[..]));
     let account_data = unwrap!(MutableData::new(account_name,
                                                 TYPE_TAG_SESSION_PACKET,
                                                 Default::default(),

@@ -58,6 +58,7 @@ extern crate routing;
 extern crate serde_derive;
 extern crate rust_sodium;
 extern crate self_encryption;
+extern crate tiny_keccak;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;

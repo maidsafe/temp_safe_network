@@ -21,7 +21,6 @@ use rand;
 use routing::{Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, ImmutableData,
               InterfaceError, MessageId, MutableData, PermissionSet, Response, RoutingError,
               TYPE_TAG_SESSION_PACKET, User, XorName};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use std;
 use std::cell::Cell;
@@ -29,6 +28,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
+use tiny_keccak::sha3_256;
 
 const CONNECT_THREAD_NAME: &'static str = "Mock routing connect";
 const DELAY_THREAD_NAME: &'static str = "Mock routing delay";
@@ -559,7 +559,7 @@ impl Routing {
         };
 
         let requester = *self.full_id.public_id().signing_public_key();
-        let requester_name = XorName(sha256::hash(&requester[..]).0);
+        let requester_name = XorName(sha3_256(&requester[..]));
 
         self.mutate_mdata(dst,
                           name,
@@ -877,7 +877,7 @@ impl Routing {
         let ok = owner_keys
             .iter()
             .any(|owner_key| {
-                     let owner_name = XorName(sha256::hash(&owner_key.0).0);
+                     let owner_name = XorName(sha3_256(&owner_key.0));
                      owner_name == dst_name
                  });
 
