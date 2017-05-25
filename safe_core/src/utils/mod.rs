@@ -50,6 +50,12 @@ macro_rules! btree_map {
     }}
 }
 
+#[derive(Serialize, Deserialize)]
+struct SymmetricEnc {
+    nonce: [u8; secretbox::NONCEBYTES],
+    cipher_text: Vec<u8>,
+}
+
 /// Symmetric encryption
 pub fn symmetric_encrypt(plain_text: &[u8],
                          secret_key: &secretbox::Key,
@@ -62,15 +68,18 @@ pub fn symmetric_encrypt(plain_text: &[u8],
 
     let cipher_text = secretbox::seal(plain_text, &nonce, secret_key);
 
-    Ok(serialise(&(nonce, cipher_text))?)
+    Ok(serialise(&SymmetricEnc {
+                      nonce: nonce.0,
+                      cipher_text,
+                  })?)
 }
 
 /// Symmetric decryption
 pub fn symmetric_decrypt(cipher_text: &[u8],
                          secret_key: &secretbox::Key)
                          -> Result<Vec<u8>, CoreError> {
-    let (nonce, cipher_text) = deserialise::<(secretbox::Nonce, Vec<u8>)>(cipher_text)?;
-    secretbox::open(&cipher_text, &nonce, secret_key)
+    let SymmetricEnc { nonce, cipher_text } = deserialise::<SymmetricEnc>(cipher_text)?;
+    secretbox::open(&cipher_text, &secretbox::Nonce(nonce), secret_key)
         .map_err(|_| CoreError::SymmetricDecipherFailure)
 }
 

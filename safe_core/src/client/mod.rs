@@ -38,8 +38,8 @@ use ipc::BootstrapConfig;
 use lru_cache::LruCache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountRegistrationPacket, Authority, EntryAction,
-              Event, FullId, ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet,
+use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, EntryAction, Event,
+              FullId, ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet,
               Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
@@ -245,14 +245,14 @@ impl Client {
         let acc_ciphertext = acc.encrypt(&user_cred.password, &user_cred.pin)?;
         let acc_data = btree_map![
             ACC_LOGIN_ENTRY_KEY.to_owned() => Value {
-                content: if !invitation.is_empty() {
-                    serialise(&AccountRegistrationPacket {
-                        invitation: invitation.to_owned(),
-                        account_ciphertext: acc_ciphertext
-                    })?
+                content: serialise(&if !invitation.is_empty() {
+                    AccountPacket::WithInvitation {
+                        invitation_string: invitation.to_owned(),
+                        acc_pkt: acc_ciphertext
+                    }
                 } else {
-                    acc_ciphertext
-                },
+                    AccountPacket::AccPkt(acc_ciphertext)
+                })?,
                 entry_version: 0,
             }
         ];
@@ -366,12 +366,11 @@ impl Client {
             }
         };
 
-        let acc = if let Ok(acc_pkt) = deserialise::<AccountRegistrationPacket>(&acc_content) {
-            Account::decrypt(&acc_pkt.account_ciphertext,
-                             &user_cred.password,
-                             &user_cred.pin)?
-        } else {
-            Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?
+        let acc = match deserialise::<AccountPacket>(&acc_content)? {
+            AccountPacket::AccPkt(acc_content) |
+            AccountPacket::WithInvitation { acc_pkt: acc_content, .. } => {
+                Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?
+            }
         };
 
         let id_packet = acc.maid_keys.clone().into();
@@ -887,11 +886,13 @@ impl Client {
             inner.session_packet_version
         };
 
+        let content = fry!(serialise(&AccountPacket::AccPkt(encrypted_account)));
+
         let mut actions = BTreeMap::new();
         let _ = actions.insert(ACC_LOGIN_ENTRY_KEY.to_owned(),
                                EntryAction::Update(Value {
-                                                       content: encrypted_account,
-                                                       entry_version: entry_version,
+                                                       content,
+                                                       entry_version,
                                                    }));
 
         self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, actions)
