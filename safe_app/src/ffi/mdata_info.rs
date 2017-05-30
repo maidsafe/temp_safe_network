@@ -23,6 +23,7 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb,
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::MDataInfoHandle;
 use routing::{XOR_NAME_LEN, XorName};
+use rust_sodium::crypto::secretbox;
 use safe_core::MDataInfo;
 use std::os::raw::c_void;
 use std::slice;
@@ -46,11 +47,14 @@ pub unsafe extern "C" fn mdata_info_new_public(app: *const App,
     })
 }
 
-/// Create encrypted mdata info with explicit data name.
+/// Create encrypted mdata info with explicit data name and a
+/// provided private key.
 #[no_mangle]
 pub unsafe extern "C" fn mdata_info_new_private(app: *const App,
                                                 name: *const [u8; XOR_NAME_LEN],
                                                 type_tag: u64,
+                                                secret_key: *const [u8; secretbox::KEYBYTES],
+                                                nonce: *const [u8; secretbox::NONCEBYTES],
                                                 user_data: *mut c_void,
                                                 o_cb: extern "C" fn(*mut c_void,
                                                                     FfiResult,
@@ -58,8 +62,15 @@ pub unsafe extern "C" fn mdata_info_new_private(app: *const App,
     catch_unwind_cb(user_data, o_cb, || {
         let name = XorName(*name);
 
+        let sk = secretbox::Key(*secret_key);
+        let nonce = if nonce.is_null() {
+            None
+        } else {
+            Some(secretbox::Nonce(*nonce))
+        };
+
         send_sync(app, user_data, o_cb, move |_, context| {
-            let info = MDataInfo::new_private(name, type_tag);
+            let info = MDataInfo::new_private(name, type_tag, (sk, nonce));
             Ok(context.object_cache().insert_mdata_info(info))
         })
     })
@@ -254,11 +265,28 @@ pub unsafe extern "C" fn mdata_info_deserialise(app: *const App,
     })
 }
 
+/// Free `MDataInfo` from memory.
+#[no_mangle]
+pub unsafe extern "C" fn mdata_info_free(app: *const App,
+                                         info_h: MDataInfoHandle,
+                                         user_data: *mut c_void,
+                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+
+    catch_unwind_cb(user_data, o_cb, || {
+        send_sync(app, user_data, o_cb, move |_, context| {
+            let _ = context.object_cache().remove_mdata_info(info_h);
+            Ok(())
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffi_utils::test_utils::{call_1, call_vec_u8};
+    use ffi_utils::test_utils::{call_0, call_1, call_vec_u8};
     use rand;
+    use routing::XOR_NAME_LEN;
+    use rust_sodium::crypto::secretbox;
     use safe_core::MDataInfo;
     use test_utils::{create_app, run_now};
 
@@ -275,6 +303,44 @@ mod tests {
             assert_eq!(info.type_tag, type_tag);
             assert!(info.enc_info.is_none());
         })
+    }
+
+    #[test]
+    fn create_private() {
+        let app = create_app();
+        let type_tag: u64 = rand::random();
+
+        let rand_info_h =
+            unsafe { unwrap!(call_1(|ud, cb| mdata_info_random_private(&app, type_tag, ud, cb))) };
+
+        let key = secretbox::gen_key();
+        let nonce = secretbox::gen_nonce();
+        let new_info_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                mdata_info_new_private(&app, &[2; XOR_NAME_LEN], type_tag, &key.0, &nonce.0, ud, cb)
+            }))
+        };
+
+        run_now(&app, move |_, context| {
+            {
+                let rand_info = unwrap!(context.object_cache().get_mdata_info(rand_info_h));
+                assert_eq!(rand_info.type_tag, type_tag);
+                assert!(rand_info.enc_info.is_some());
+            }
+
+            {
+                let new_info = unwrap!(context.object_cache().get_mdata_info(new_info_h));
+                assert_eq!(new_info.type_tag, type_tag);
+                match new_info.enc_info {
+                    Some((ref got_key, ref got_nonce)) => {
+                        assert!(got_nonce.is_some());
+                        assert_eq!(*got_key, key);
+                        assert_eq!(unwrap!(*got_nonce), nonce);
+                    }
+                    None => panic!("Unexpected result: no enc_info in private MDataInfo"),
+                }
+            }
+        });
     }
 
     #[test]
@@ -300,10 +366,14 @@ mod tests {
             unwrap!(res)
         };
 
-        let info2 = run_now(&app, move |_, context| {
-            unwrap!(context.object_cache().remove_mdata_info(info2_h))
+        run_now(&app, move |_, context| {
+            let info2 = unwrap!(context.object_cache().get_mdata_info(info2_h));
+            assert_eq!(info1, *info2);
         });
 
-        assert_eq!(info1, info2);
+        unsafe {
+            unwrap!(call_0(|ud, cb| mdata_info_free(&app, info1_h, ud, cb)));
+            unwrap!(call_0(|ud, cb| mdata_info_free(&app, info2_h, ud, cb)));
+        }
     }
 }

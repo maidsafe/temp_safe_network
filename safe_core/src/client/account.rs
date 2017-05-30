@@ -20,8 +20,8 @@ use errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{FullId, XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{box_, pwhash, secretbox, sign};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign::Seed;
+use tiny_keccak::sha3_256;
 
 /// Representing the User Account information on the network
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -89,10 +89,10 @@ impl Account {
         let mut salt = pwhash::Salt([0; pwhash::SALTBYTES]);
         {
             let pwhash::Salt(ref mut salt_bytes) = salt;
-            if salt_bytes.len() == sha256::DIGESTBYTES {
-                let hashed_pin = sha256::hash(user_salt);
+            if salt_bytes.len() == 32 {
+                let hashed_pin = sha3_256(user_salt);
                 for it in salt_bytes.iter_mut().enumerate() {
-                    *it.1 = hashed_pin.0[it.0];
+                    *it.1 = hashed_pin[it.0];
                 }
             } else {
                 return Err(CoreError::UnsupportedSaltSizeForPwHash);

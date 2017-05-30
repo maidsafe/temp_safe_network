@@ -21,7 +21,6 @@ use rand;
 use routing::{Authority, BootstrapConfig, ClientError, EntryAction, Event, FullId, ImmutableData,
               InterfaceError, MessageId, MutableData, PermissionSet, Response, RoutingError,
               TYPE_TAG_SESSION_PACKET, User, XorName};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use std;
 use std::cell::Cell;
@@ -29,6 +28,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
+use tiny_keccak::sha3_256;
 
 const CONNECT_THREAD_NAME: &'static str = "Mock routing connect";
 const DELAY_THREAD_NAME: &'static str = "Mock routing delay";
@@ -42,6 +42,7 @@ const GET_IDATA_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 
 const PUT_MDATA_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const GET_MDATA_VERSION_DELAY_MS: u64 = DEFAULT_DELAY_MS;
+const GET_MDATA_SHELL_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const GET_MDATA_ENTRIES_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const SET_MDATA_ENTRIES_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 const GET_MDATA_PERMISSIONS_DELAY_MS: u64 = DEFAULT_DELAY_MS;
@@ -78,8 +79,7 @@ impl Routing {
         });
 
         let client_auth = Authority::Client {
-            client_key: sign::gen_keypair().0,
-            peer_id: rand::random(),
+            client_id: *FullId::new().public_id(),
             proxy_node_name: rand::random(),
         };
 
@@ -286,6 +286,28 @@ impl Routing {
                         |data| Ok(data.version()),
                         |res| {
                             Response::GetMDataVersion {
+                                res: res,
+                                msg_id: msg_id,
+                            }
+                        })
+    }
+
+    /// Fetches a shell of given MutableData.
+    pub fn get_mdata_shell(&mut self,
+                           dst: Authority<XorName>,
+                           name: XorName,
+                           tag: u64,
+                           msg_id: MessageId)
+                           -> Result<(), InterfaceError> {
+        self.read_mdata(dst,
+                        name,
+                        tag,
+                        msg_id,
+                        "get_mdata_shell",
+                        GET_MDATA_SHELL_DELAY_MS,
+                        |data| Ok(data.shell()),
+                        |res| {
+                            Response::GetMDataShell {
                                 res: res,
                                 msg_id: msg_id,
                             }
@@ -537,7 +559,7 @@ impl Routing {
         };
 
         let requester = *self.full_id.public_id().signing_public_key();
-        let requester_name = XorName(sha256::hash(&requester[..]).0);
+        let requester_name = XorName(sha3_256(&requester[..]));
 
         self.mutate_mdata(dst,
                           name,
@@ -719,7 +741,7 @@ impl Routing {
 
     fn client_name(&self) -> XorName {
         match self.client_auth {
-            Authority::Client { ref client_key, .. } => XorName(sha256::hash(&client_key[..]).0),
+            Authority::Client { ref client_id, .. } => *client_id.name(),
             _ => panic!("This authority must be Client"),
         }
     }
@@ -855,7 +877,7 @@ impl Routing {
         let ok = owner_keys
             .iter()
             .any(|owner_key| {
-                     let owner_name = XorName(sha256::hash(&owner_key.0).0);
+                     let owner_name = XorName(sha3_256(&owner_key.0));
                      owner_name == dst_name
                  });
 

@@ -82,6 +82,9 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
            Response::GetIData { res, msg_id } => {
                (msg_id, CoreEvent::GetIData(res.map_err(CoreError::from)))
            }
+           Response::GetMData { res, msg_id } => {
+               (msg_id, CoreEvent::GetMData(res.map_err(CoreError::from)))
+           }
            Response::GetMDataValue { res, msg_id } => {
                (msg_id, CoreEvent::GetMDataValue(res.map_err(CoreError::from)))
            }

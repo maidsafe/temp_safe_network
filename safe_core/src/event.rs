@@ -52,6 +52,8 @@ pub enum CoreEvent {
     ListAuthKeysAndVersion(Result<(BTreeSet<sign::PublicKey>, u64), CoreError>),
     /// Result of getting a mutable data shell
     GetMDataShell(Result<MutableData, CoreError>),
+    /// Result of getting entire mutable data
+    GetMData(Result<MutableData, CoreError>),
 }
 
 /// Netowork Events that Client Modules need to deal with

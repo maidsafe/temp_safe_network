@@ -18,9 +18,9 @@
 use errors::CoreError;
 use rand::{OsRng, Rng};
 use routing::{EntryAction, Value, XorName};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::secretbox;
 use std::collections::{BTreeMap, BTreeSet};
+use tiny_keccak::sha3_256;
 use utils::{symmetric_decrypt, symmetric_encrypt};
 
 /// Information allowing to locate and access mutable data on the network.
@@ -36,22 +36,24 @@ pub struct MDataInfo {
 }
 
 impl MDataInfo {
-    /// Construct `MDataInfo` for private (encrypted) data.
-    pub fn new_private(name: XorName, type_tag: u64) -> Self {
-        let enc_info = Some((secretbox::gen_key(), Some(secretbox::gen_nonce())));
-
+    /// Construct `MDataInfo` for private (encrypted) data with a
+    /// provided private key.
+    pub fn new_private(name: XorName,
+                       type_tag: u64,
+                       enc_info: (secretbox::Key, Option<secretbox::Nonce>))
+                       -> Self {
         MDataInfo {
-            name: name,
-            type_tag: type_tag,
-            enc_info: enc_info,
+            name,
+            type_tag,
+            enc_info: Some(enc_info),
         }
     }
 
     /// Construct `MDataInfo` for public data.
     pub fn new_public(name: XorName, type_tag: u64) -> Self {
         MDataInfo {
-            name: name,
-            type_tag: type_tag,
+            name,
+            type_tag,
             enc_info: None,
         }
     }
@@ -59,8 +61,10 @@ impl MDataInfo {
     /// Generate random `MDataInfo` for private (encrypted) mutable data.
     pub fn random_private(type_tag: u64) -> Result<Self, CoreError> {
         let mut rng = os_rng()?;
-        Ok(Self::new_private(rng.gen(), type_tag))
+        let enc_info = (secretbox::gen_key(), Some(secretbox::gen_nonce()));
+        Ok(Self::new_private(rng.gen(), type_tag, enc_info))
     }
+
     /// Generate random `MDataInfo` for public mutable data.
     pub fn random_public(type_tag: u64) -> Result<Self, CoreError> {
         let mut rng = os_rng()?;
@@ -74,8 +78,7 @@ impl MDataInfo {
                 Some(secretbox::Nonce(ref dir_nonce)) => {
                     let mut pt = plain_text.to_vec();
                     pt.extend_from_slice(&dir_nonce[..]);
-                    unwrap!(secretbox::Nonce::from_slice(&sha256::hash(&pt)
-                                                              [..secretbox::NONCEBYTES]))
+                    unwrap!(secretbox::Nonce::from_slice(&sha3_256(&pt)[..secretbox::NONCEBYTES]))
                 }
                 None => secretbox::gen_nonce(),
             };

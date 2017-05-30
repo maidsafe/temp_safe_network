@@ -38,13 +38,12 @@ use ipc::BootstrapConfig;
 use lru_cache::LruCache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountRegistrationPacket, Authority, EntryAction,
-              Event, FullId, ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet,
+use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, EntryAction, Event,
+              FullId, ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet,
               Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
 use rust_sodium::crypto::box_;
-use rust_sodium::crypto::hash::sha256::{self, Digest};
 use rust_sodium::crypto::sign::{self, Seed};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -52,6 +51,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::Duration;
+use tiny_keccak::sha3_256;
 use tokio_core::reactor::{Handle, Timeout};
 use utils::{self, FutureExt};
 
@@ -162,7 +162,7 @@ impl Client {
     /// Calculate sign key from seed
     pub fn sign_pk_from_seed(seed: &str) -> Result<sign::PublicKey, CoreError> {
         let arr = Self::divide_seed(seed)?;
-        let id_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 2]).0);
+        let id_seed = Seed(sha3_256(arr[SEED_SUBPARTS - 2]));
         let maid_keys = ClientKeys::new(Some(&id_seed));
         Ok(maid_keys.sign_pk)
     }
@@ -182,7 +182,7 @@ impl Client {
     {
         let arr = Self::divide_seed(seed)?;
 
-        let id_seed = Seed(sha256::hash(arr[SEED_SUBPARTS - 2]).0);
+        let id_seed = Seed(sha3_256(arr[SEED_SUBPARTS - 2]));
 
         Self::registered_impl(arr[0],
                               arr[1],
@@ -245,14 +245,14 @@ impl Client {
         let acc_ciphertext = acc.encrypt(&user_cred.password, &user_cred.pin)?;
         let acc_data = btree_map![
             ACC_LOGIN_ENTRY_KEY.to_owned() => Value {
-                content: if !invitation.is_empty() {
-                    serialise(&AccountRegistrationPacket {
-                        invitation: invitation.to_owned(),
-                        account_ciphertext: acc_ciphertext
-                    })?
+                content: serialise(&if !invitation.is_empty() {
+                    AccountPacket::WithInvitation {
+                        invitation_string: invitation.to_owned(),
+                        acc_pkt: acc_ciphertext
+                    }
                 } else {
-                    acc_ciphertext
-                },
+                    AccountPacket::AccPkt(acc_ciphertext)
+                })?,
                 entry_version: 0,
             }
         ];
@@ -263,7 +263,7 @@ impl Client {
                                       acc_data,
                                       btree_set![pub_key])?;
 
-        let Digest(digest) = sha256::hash(&pub_key.0);
+        let digest = sha3_256(&pub_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         let msg_id = MessageId::new();
@@ -366,17 +366,16 @@ impl Client {
             }
         };
 
-        let acc = if let Ok(acc_pkt) = deserialise::<AccountRegistrationPacket>(&acc_content) {
-            Account::decrypt(&acc_pkt.account_ciphertext,
-                             &user_cred.password,
-                             &user_cred.pin)?
-        } else {
-            Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?
+        let acc = match deserialise::<AccountPacket>(&acc_content)? {
+            AccountPacket::AccPkt(acc_content) |
+            AccountPacket::WithInvitation { acc_pkt: acc_content, .. } => {
+                Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?
+            }
         };
 
         let id_packet = acc.maid_keys.clone().into();
 
-        let Digest(digest) = sha256::hash(&acc.maid_keys.sign_pk.0);
+        let digest = sha3_256(&acc.maid_keys.sign_pk.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         trace!("Creating an actual routing...");
@@ -572,6 +571,17 @@ impl Client {
         self.mutate(|routing, dst, msg_id| {
                         routing.mutate_mdata_entries(dst, name, tag, actions, msg_id, requester)
                     })
+    }
+
+    /// Get a shell (bare bones) version of `MutableData` from the network.
+    pub fn get_mdata_shell(&self, name: XorName, tag: u64) -> Box<CoreFuture<MutableData>> {
+        trace!("GetMDataShell for {:?}", name);
+
+        self.get(CoreEvent::GetMDataShell, |routing, msg_id| {
+                routing.get_mdata_shell(Authority::NaeManager(name), name, tag, msg_id)
+            })
+            .and_then(|event| match_event!(event, CoreEvent::GetMDataShell))
+            .into_box()
     }
 
     /// Get a current version of `MutableData` from the network.
@@ -876,11 +886,13 @@ impl Client {
             inner.session_packet_version
         };
 
+        let content = fry!(serialise(&AccountPacket::AccPkt(encrypted_account)));
+
         let mut actions = BTreeMap::new();
         let _ = actions.insert(ACC_LOGIN_ENTRY_KEY.to_owned(),
                                EntryAction::Update(Value {
-                                                       content: encrypted_account,
-                                                       entry_version: entry_version,
+                                                       content,
+                                                       entry_version,
                                                    }));
 
         self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, actions)
@@ -1024,7 +1036,7 @@ enum ClientType {
 
 impl ClientType {
     fn from_keys(keys: ClientKeys, owner_key: sign::PublicKey) -> Self {
-        let Digest(digest) = sha256::hash(&owner_key.0);
+        let digest = sha3_256(&owner_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         ClientType::FromKeys {
