@@ -635,7 +635,7 @@ fn account_replication_during_churn() {
 
     let mut new_node = RoutingNode::new();
     let mut new_mm = MaidManager::new();
-    let new_node_name = unwrap!(new_node.name());
+    let new_node_name = *unwrap!(new_node.id()).name();
 
     // The new node doesn't have the account initially.
     let res = get_account_info(&mut new_node, &mut new_mm, client, client_manager);
@@ -643,7 +643,7 @@ fn account_replication_during_churn() {
 
     // Simulate the new node joining the group.
     old_node.add_to_routing_table(new_node_name);
-    new_node.add_to_routing_table(unwrap!(old_node.name()));
+    new_node.add_to_routing_table(*unwrap!(old_node.id()).name());
 
     let rt = unwrap!(old_node.routing_table()).clone();
     unwrap!(old_mm.handle_node_added(&mut old_node, &new_node_name, &rt));
@@ -737,7 +737,8 @@ fn create_account(node: &mut RoutingNode,
                   mm: &mut MaidManager,
                   src: Authority<XorName>,
                   dst: Authority<XorName>) {
-    let client_key = assert_match!(src, Authority::Client { client_key, .. } => client_key);
+    let client_key =
+        assert_match!(src, Authority::Client { client_id, .. } => *client_id.signing_public_key());
     let account_packet = test_utils::gen_mutable_data(TYPE_TAG_SESSION_PACKET,
                                                       0,
                                                       client_key,

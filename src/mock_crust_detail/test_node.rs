@@ -22,7 +22,7 @@ use hex::ToHex;
 use itertools::Itertools;
 use personas::data_manager::DataId;
 use rand::{self, Rng};
-use routing::{RoutingTable, XorName, Xorable};
+use routing::{BootstrapConfig, PublicId, RoutingTable, XorName, Xorable};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use std::env;
 use std::fs;
@@ -31,15 +31,15 @@ use vault::Vault;
 
 /// Test node for mock network
 pub struct TestNode {
-    handle: ServiceHandle,
+    handle: ServiceHandle<PublicId>,
     vault: Vault,
     chunk_store_root: PathBuf,
 }
 
 impl TestNode {
     /// create a test node for mock network
-    pub fn new(network: &Network,
-               crust_config: Option<mock_crust::Config>,
+    pub fn new(network: &Network<PublicId>,
+               crust_config: Option<BootstrapConfig>,
                config: Option<Config>,
                first_node: bool,
                use_cache: bool)
@@ -130,7 +130,7 @@ impl Drop for TestNode {
 }
 
 /// Create nodes for mock network
-pub fn create_nodes(network: &Network,
+pub fn create_nodes(network: &Network<PublicId>,
                     size: usize,
                     config: Option<Config>,
                     use_cache: bool)
@@ -141,7 +141,7 @@ pub fn create_nodes(network: &Network,
     nodes.push(TestNode::new(network, None, config.clone(), true, use_cache));
     while nodes[0].poll() > 0 {}
 
-    let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let crust_config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
 
     // Create other nodes using the seed node endpoint as bootstrap contact.
     for _ in 1..size {
@@ -159,18 +159,21 @@ pub fn create_nodes(network: &Network,
 }
 
 /// Add node to the mock network
-pub fn add_node(network: &Network, nodes: &mut Vec<TestNode>, index: usize, use_cache: bool) {
-    let config = mock_crust::Config::with_contacts(&[nodes[index].endpoint()]);
+pub fn add_node(network: &Network<PublicId>,
+                nodes: &mut Vec<TestNode>,
+                index: usize,
+                use_cache: bool) {
+    let config = BootstrapConfig::with_contacts(&[nodes[index].endpoint()]);
     nodes.push(TestNode::new(network, Some(config), None, false, use_cache));
 }
 
 /// Add node to the mock network with specified config
-pub fn add_node_with_config(network: &Network,
+pub fn add_node_with_config(network: &Network<PublicId>,
                             nodes: &mut Vec<TestNode>,
                             config: Config,
                             index: usize,
                             use_cache: bool) {
-    let crust_config = mock_crust::Config::with_contacts(&[nodes[index].endpoint()]);
+    let crust_config = BootstrapConfig::with_contacts(&[nodes[index].endpoint()]);
     nodes.push(TestNode::new(network, Some(crust_config), Some(config), false, use_cache));
 }
 

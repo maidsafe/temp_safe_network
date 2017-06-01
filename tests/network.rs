@@ -20,8 +20,8 @@
 
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
-use routing::{ImmutableData, MutableData};
-use routing::mock_crust::{self, Network};
+use routing::{BootstrapConfig, ImmutableData, MutableData};
+use routing::mock_crust::Network;
 use safe_vault::{Config, GROUP_SIZE, test_utils};
 use safe_vault::mock_crust_detail::{poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
@@ -44,7 +44,7 @@ fn fill_network() {
     };
 
     let mut nodes = test_node::create_nodes(&network, 8, Some(config), true);
-    let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let crust_config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(crust_config));
     let full_id = client.full_id().clone();
 

@@ -18,7 +18,7 @@
 use super::test_client::TestClient;
 use super::test_node::TestNode;
 use fake_clock::FakeClock;
-use routing::test_consts::{ACK_TIMEOUT_SECS, NODE_CONNECT_TIMEOUT_SECS};
+use routing::test_consts::{ACK_TIMEOUT_SECS, CONNECTED_PEER_TIMEOUT_SECS};
 
 // Maximum number of times to try and poll in a loop.  This is several orders higher than the
 // anticipated upper limit for any test, and if hit is likely to indicate an infinite loop.
@@ -117,7 +117,7 @@ fn with_resend<F>(mut f: F) -> usize
         count += f();
         if count > prev_count {
             clock_advanced_by_ms = 0;
-        } else if clock_advanced_by_ms > (NODE_CONNECT_TIMEOUT_SECS * 1000) {
+        } else if clock_advanced_by_ms > (CONNECTED_PEER_TIMEOUT_SECS * 1000) {
             return count;
         }
 

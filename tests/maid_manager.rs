@@ -19,10 +19,10 @@
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
 use rand::Rng;
-use routing::{AccountInfo, ClientError, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
+use routing::{AccountInfo, BootstrapConfig, ClientError, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
               MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData,
               TYPE_TAG_SESSION_PACKET, Value};
-use routing::mock_crust::{self, Network};
+use routing::mock_crust::Network;
 use safe_vault::{DEFAULT_ACCOUNT_SIZE, GROUP_SIZE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
@@ -39,7 +39,7 @@ fn handle_put_without_account() {
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
 
@@ -69,7 +69,7 @@ fn handle_put_with_account() {
 
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
     client.ensure_connected(&mut nodes);
@@ -119,7 +119,7 @@ fn put_oversized_data() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, TEST_NET_SIZE, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
     client.ensure_connected(&mut nodes);
@@ -187,7 +187,7 @@ fn create_account_twice() {
 
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client0 = TestClient::new(&network, Some(config.clone()));
     let mut client1 = TestClient::new(&network, Some(config.clone()));
 
@@ -260,7 +260,7 @@ fn storing_till_client_account_full() {
 
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     let client_key = *client.full_id().public_id().signing_public_key();
 
@@ -295,7 +295,7 @@ fn account_mutation_count_increase_with_churn() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     let client_key = *client.full_id().public_id().signing_public_key();
 
@@ -358,7 +358,7 @@ fn account_mutation_count_decrease_with_churn() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let client_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let client_config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(client_config));
     let client_key = *client.full_id().public_id().signing_public_key();
 

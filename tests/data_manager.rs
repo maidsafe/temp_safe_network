@@ -19,10 +19,10 @@
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
 use rand::Rng;
-use routing::{Action, Authority, ClientError, EntryAction, EntryActions, Event, ImmutableData,
-              MAX_MUTABLE_DATA_ENTRY_ACTIONS, MessageId, MutableData, PermissionSet, Response,
-              User};
-use routing::mock_crust::{self, Network};
+use routing::{Action, Authority, BootstrapConfig, ClientError, EntryAction, EntryActions, Event,
+              ImmutableData, MAX_MUTABLE_DATA_ENTRY_ACTIONS, MessageId, MutableData,
+              PermissionSet, Response, User};
+use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
 use safe_vault::{GROUP_SIZE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll};
@@ -42,7 +42,7 @@ fn immutable_data_normal_flow() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
     client.ensure_connected(&mut nodes);
@@ -67,7 +67,7 @@ fn immutable_data_error_flow() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
     client.ensure_connected(&mut nodes);
@@ -100,7 +100,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, use_cache);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
     client.ensure_connected(&mut nodes);
@@ -160,7 +160,7 @@ fn mutable_data_normal_flow() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config.clone()));
 
     client.ensure_connected(&mut nodes);
@@ -332,7 +332,7 @@ fn mutable_data_error_flow() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config.clone()));
 
     client.ensure_connected(&mut nodes);
@@ -570,7 +570,7 @@ fn mutable_data_parallel_mutations() {
     let mut clients: Vec<_> = (0..client_count)
         .map(|_| {
                  let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
-                 let config = mock_crust::Config::with_contacts(&[endpoint]);
+                 let config = BootstrapConfig::with_contacts(&[endpoint]);
                  TestClient::new(&network, Some(config.clone()))
              })
         .collect();
@@ -709,7 +709,7 @@ fn mutable_data_concurrent_mutations() {
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
 
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
@@ -849,7 +849,7 @@ fn no_permission_mutable_data_concurrent_mutations() {
     let mut clients: Vec<_> = (0..2)
         .map(|_| {
                  let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
-                 let config = mock_crust::Config::with_contacts(&[endpoint]);
+                 let config = BootstrapConfig::with_contacts(&[endpoint]);
                  TestClient::new(&network, Some(config.clone()))
              })
         .collect();
@@ -971,7 +971,7 @@ fn mutable_data_operations_with_churn() {
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
     client.ensure_connected(&mut nodes);
@@ -1072,7 +1072,7 @@ fn caching_with_data_not_close_to_proxy_node() {
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
@@ -1116,7 +1116,7 @@ fn caching_with_data_close_to_proxy_node() {
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
-    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);

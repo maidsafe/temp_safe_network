@@ -306,7 +306,7 @@ fn handle_node_added() {
 
     let (_, message) = unwrap!(node.sent_requests.drain().next());
 
-    assert_eq!(message.src, Authority::ManagedNode(unwrap!(node.name())));
+    assert_eq!(message.src, Authority::ManagedNode(*unwrap!(node.id()).name()));
     assert_eq!(message.dst, Authority::ManagedNode(new_node_name));
 
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);

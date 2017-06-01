@@ -62,8 +62,8 @@ pub type HashSet<T> = collections::HashSet<T>;
 ///
 /// Panics when the authority is not `Client`.
 pub fn client_key(authority: &Authority<XorName>) -> &sign::PublicKey {
-    if let Authority::Client { ref client_key, .. } = *authority {
-        client_key
+    if let Authority::Client { ref client_id, .. } = *authority {
+        client_id.signing_public_key()
     } else {
         unreachable!("Logic error")
     }
@@ -76,7 +76,9 @@ pub fn client_key(authority: &Authority<XorName>) -> &sign::PublicKey {
 /// Panics when the authority is not `Client` or `ClientManager`.
 pub fn client_name(authority: &Authority<XorName>) -> XorName {
     match *authority {
-        Authority::Client { ref client_key, .. } => client_name_from_key(client_key),
+        Authority::Client { ref client_id, .. } => {
+            client_name_from_key(client_id.signing_public_key())
+        }
         Authority::ClientManager(name) => name,
         _ => unreachable!("Logic error"),
     }

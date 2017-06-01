@@ -1201,7 +1201,7 @@ impl DataManager {
                     refresh: Vec<FragmentInfo>)
                     -> Result<(), InternalError> {
         // FIXME - We need to handle >2MB chunks
-        let src = Authority::ManagedNode(routing_node.name()?);
+        let src = Authority::ManagedNode(*routing_node.id()?.name());
         let serialised_refresh = serialisation::serialise(&refresh)?;
         trace!("DM sending refresh to {:?}.", dst);
         routing_node
@@ -1235,7 +1235,7 @@ impl DataManager {
     fn request_needed_fragments(&mut self,
                                 routing_node: &mut RoutingNode)
                                 -> Result<(), InternalError> {
-        let src = Authority::ManagedNode(routing_node.name()?);
+        let src = Authority::ManagedNode(*routing_node.id()?.name());
         let candidates = self.cache.needed_fragments();
 
         // Set of holders we already sent a request to. Used to prevent sending

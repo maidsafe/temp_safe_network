@@ -16,17 +16,16 @@
 // relating to use of the SAFE Network Software.
 
 use GROUP_SIZE;
-use rand;
-use routing::{AccountInfo, Authority, Cache, ClientError, EntryAction, Event, EventStream,
-              ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, Request,
-              Response, RoutingError, RoutingTable, User, Value, XorName};
+use routing::{AccountInfo, Authority, Cache, ClientError, EntryAction, Event, EventStream, FullId,
+              ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, PublicId,
+              Request, Response, RoutingError, RoutingTable, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
 
 /// Mock routing node for unit testing.
 pub struct Node {
-    name: XorName,
+    id: PublicId,
     routing_table: RoutingTable<XorName>,
     pub sent_requests: HashMap<MessageId, RequestWrapper>,
     pub sent_responses: HashMap<MessageId, ResponseWrapper>,
@@ -84,8 +83,8 @@ impl Node {
         unwrap!(Self::builder().create())
     }
 
-    pub fn name(&self) -> Result<XorName, InterfaceError> {
-        Ok(self.name)
+    pub fn id(&self) -> Result<PublicId, InterfaceError> {
+        Ok(self.id)
     }
 
     pub fn close_group(&self, name: XorName, count: usize) -> Option<Vec<XorName>> {
@@ -287,11 +286,11 @@ impl NodeBuilder {
     }
 
     pub fn create(self) -> Result<Node, RoutingError> {
-        let name = rand::random();
+        let id = *FullId::new().public_id();
 
         Ok(Node {
-               name: name,
-               routing_table: RoutingTable::new(name, GROUP_SIZE),
+               id: id,
+               routing_table: RoutingTable::new(*id.name(), GROUP_SIZE),
                sent_requests: Default::default(),
                sent_responses: Default::default(),
            })

@@ -732,7 +732,7 @@ impl Vault {
 
     /// Vault node name
     pub fn name(&self) -> XorName {
-        unwrap!(self.routing_node.name())
+        *unwrap!(self.routing_node.id()).name()
     }
 
     /// Vault routing_table

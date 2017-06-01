@@ -19,10 +19,10 @@ use super::poll;
 use super::test_node::TestNode;
 use maidsafe_utilities::SeededRng;
 use rand::Rng;
-use routing::{AccountInfo, Authority, Client, ClientError, EntryAction, Event, EventStream,
-              FullId, ImmutableData, MessageId, MutableData, PermissionSet, Response,
-              TYPE_TAG_SESSION_PACKET, User, Value, XorName};
-use routing::mock_crust::{self, Config, Network, ServiceHandle};
+use routing::{AccountInfo, Authority, BootstrapConfig, Client, ClientError, EntryAction, Event,
+              EventStream, FullId, ImmutableData, MessageId, MutableData, PermissionSet, PublicId,
+              Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
+use routing::mock_crust::{self, Network, ServiceHandle};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
@@ -43,7 +43,7 @@ macro_rules! assert_recv_response {
 
 /// Client for use in tests only
 pub struct TestClient {
-    _handle: ServiceHandle,
+    _handle: ServiceHandle<PublicId>,
     routing_client: Client,
     full_id: FullId,
     client_manager: Authority<XorName>,
@@ -61,7 +61,7 @@ pub struct TestClient {
 
 impl TestClient {
     /// Create a test client for the mock network
-    pub fn new(network: &Network, config: Option<Config>) -> Self {
+    pub fn new(network: &Network<PublicId>, config: Option<BootstrapConfig>) -> Self {
         let full_id = FullId::new();
         let handle = network.new_service_handle(config.clone(), None);
         let client = mock_crust::make_current(&handle, || {
