@@ -19,7 +19,6 @@
 pub use fake_clock::FakeClock as Instant;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, MutableData, Value, XorName, sha3};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use serde::Serialize;
 use std::collections;
@@ -76,16 +75,14 @@ pub fn client_key(authority: &Authority<XorName>) -> &sign::PublicKey {
 /// Panics when the authority is not `Client` or `ClientManager`.
 pub fn client_name(authority: &Authority<XorName>) -> XorName {
     match *authority {
-        Authority::Client { ref client_id, .. } => {
-            client_name_from_key(client_id.signing_public_key())
-        }
+        Authority::Client { ref client_id, .. } => *client_id.name(),
         Authority::ClientManager(name) => name,
         _ => unreachable!("Logic error"),
     }
 }
 
 pub fn client_name_from_key(key: &sign::PublicKey) -> XorName {
-    XorName(sha256::hash(&key[..]).0)
+    XorName(tiny_keccak::sha3_256(&key[..]))
 }
 
 pub fn mdata_shell_hash(data: &MutableData) -> SecureHash {
