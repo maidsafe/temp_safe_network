@@ -18,13 +18,13 @@ use error::InternalError;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData,
               PermissionSet, RoutingTable, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::path::PathBuf;
 use std::time::Duration;
+use tiny_keccak;
 use utils::{self, HashMap, HashSet, Instant};
 use vault::RoutingNode;
 
@@ -1383,7 +1383,7 @@ fn is_in_close_group(routing_node: &mut RoutingNode, group_name: &XorName, name:
 }
 
 fn recompute_idata_name(data: &ImmutableData) -> XorName {
-    XorName(sha256::hash(data.value()).0)
+    XorName(tiny_keccak::sha3_256(data.value()))
 }
 
 /// Merges the entries that are currently in the data with the new entries.
