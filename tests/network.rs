@@ -44,6 +44,7 @@ fn fill_network() {
         wallet_address: None,
         max_capacity: Some(2000),
         chunk_store_root: None,
+        invite_key: None,
     };
 
     let mut nodes = test_node::create_nodes(&network, 8, Some(config), true);

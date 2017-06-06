@@ -55,28 +55,29 @@ pub type HashSet<T> = collections::HashSet<T, BuildHasherDefault<DefaultHasher>>
 #[cfg(not(feature = "use-mock-crust"))]
 pub type HashSet<T> = collections::HashSet<T>;
 
-/// Extract client key (a public signing key) from the authority.
-///
-/// # Panics
-///
-/// Panics when the authority is not `Client`.
-pub fn client_key(authority: &Authority<XorName>) -> &sign::PublicKey {
-    if let Authority::Client { ref client_id, .. } = *authority {
-        client_id.signing_public_key()
-    } else {
-        unreachable!("Logic error")
-    }
-}
-
 /// Extract client name (a `XorName`) from the authority.
 ///
 /// # Panics
 ///
 /// Panics when the authority is not `Client` or `ClientManager`.
-pub fn client_name(authority: &Authority<XorName>) -> XorName {
+pub fn client_name(authority: &Authority<XorName>) -> &XorName {
     match *authority {
-        Authority::Client { ref client_id, .. } => *client_id.name(),
-        Authority::ClientManager(name) => name,
+        Authority::Client { ref client_id, .. } => client_id.name(),
+        Authority::ClientManager(ref name) => name,
+        _ => unreachable!("Logic error"),
+    }
+}
+
+/// Extract client name and key from the authority.
+///
+/// # Panics
+///
+/// Panics when the authority is not `Client`.
+pub fn client_name_and_key(authority: &Authority<XorName>) -> (&XorName, &sign::PublicKey) {
+    match *authority {
+        Authority::Client { ref client_id, .. } => {
+            (client_id.name(), client_id.signing_public_key())
+        }
         _ => unreachable!("Logic error"),
     }
 }

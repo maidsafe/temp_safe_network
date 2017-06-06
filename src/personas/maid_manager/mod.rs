@@ -25,14 +25,18 @@ pub use self::account::DEFAULT_MAX_OPS_COUNT;
 use self::message_id_accumulator::MessageIdAccumulator;
 use GROUP_SIZE;
 use QUORUM;
+use TYPE_TAG_INVITE;
 use error::InternalError;
+use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData,
-              PermissionSet, RoutingTable, TYPE_TAG_SESSION_PACKET, User, XorName};
+use routing::{ACC_LOGIN_ENTRY_KEY, Authority, ClientError, EntryAction, EntryActions,
+              ImmutableData, MessageId, MutableData, PermissionSet, RoutingTable,
+              TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::hash_map::Entry;
 use std::time::Duration;
+use tiny_keccak;
 use utils::{self, HashMap};
 use vault::Refresh as VaultRefresh;
 use vault::RoutingNode;
@@ -40,19 +44,34 @@ use vault::RoutingNode;
 /// The timeout for accumulating refresh messages.
 const ACCUMULATOR_TIMEOUT_SECS: u64 = 180;
 
+/// The time we wait for a response to update the invitation data, in seconds.
+const ACCOUNT_CREATION_TIMEOUT_SECS: u64 = 90;
+/// The number of ongoing account creations we keep in memory at the same time.
+const ACCOUNT_CREATION_LIMIT: usize = 100;
+
+const INVITE_CLAIMED_KEY: &'static [u8] = b"claimed";
+const INVITE_CLAIMED_VALUE: &'static [u8] = &[1];
+
 pub struct MaidManager {
     accounts: HashMap<XorName, Account>,
     data_ops_msg_id_accumulator: MessageIdAccumulator<(XorName, MessageId)>,
     request_cache: HashMap<MessageId, CachedRequest>,
+    invite_key: Option<sign::PublicKey>,
+    /// The ongoing requests from clients to create a new account.
+    account_creation_cache: LruCache<MessageId, CachedAccountCreation>,
 }
 
 impl MaidManager {
-    pub fn new() -> MaidManager {
+    pub fn new(invite_key: Option<sign::PublicKey>) -> MaidManager {
         MaidManager {
             accounts: HashMap::default(),
             data_ops_msg_id_accumulator:
                 MessageIdAccumulator::new(QUORUM, Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
             request_cache: HashMap::default(),
+            invite_key: invite_key,
+            account_creation_cache: LruCache::with_expiry_duration_and_capacity(
+                Duration::from_secs(ACCOUNT_CREATION_TIMEOUT_SECS),
+                ACCOUNT_CREATION_LIMIT),
         }
     }
 
@@ -156,69 +175,33 @@ impl MaidManager {
                             msg_id: MessageId,
                             requester: sign::PublicKey)
                             -> Result<(), InternalError> {
-        if let Err(err) = data.validate() {
-            routing_node
-                .send_put_mdata_response(dst, src, Err(err), msg_id)?;
-            return Ok(());
-        }
+        match self.prepare_put_mdata(src, dst, data, msg_id, requester) {
+            Ok(PutMDataAction::Claim(invite_name)) => {
+                let invite_src = dst;
+                let invite_dst = Authority::NaeManager(invite_name);
+                let actions = EntryActions::new()
+                    .ins(INVITE_CLAIMED_KEY.to_vec(),
+                         INVITE_CLAIMED_VALUE.to_vec(),
+                         0)
+                    .into();
 
-        let src_name = utils::client_name(&src);
-        let dst_name = utils::client_name(&dst);
-
-        if !utils::verify_mdata_owner(&data, &dst_name) {
-            routing_node
-                .send_put_mdata_response(dst, src, Err(ClientError::InvalidOwners), msg_id)?;
-            return Ok(());
-        }
-
-        // If the type_tag is `TYPE_TAG_SESSION_PACKET`, the account must not exist, else it must
-        // exist.
-        if data.tag() == TYPE_TAG_SESSION_PACKET {
-            if dst_name != src_name {
-                trace!("MM Cannot create account for {:?} as {:?}.", src, dst);
-                let err = ClientError::InvalidOperation;
                 routing_node
-                    .send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
-                return Ok(());
+                    .send_mutate_mdata_entries_request(invite_src,
+                                                       invite_dst,
+                                                       invite_name,
+                                                       TYPE_TAG_INVITE,
+                                                       actions,
+                                                       msg_id,
+                                                       requester)?;
             }
-
-            match self.accounts.entry(src_name) {
-                Entry::Vacant(entry) => {
-                    let _ = entry.insert(Account::default());
-                }
-                Entry::Occupied(_) => {
-                    let err = ClientError::AccountExists;
-                    trace!("MM Cannot create account for {:?} - it already exists", src);
-                    routing_node
-                        .send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
-                    return Ok(());
-                }
+            Ok(PutMDataAction::Forward(data)) => {
+                self.forward_put_mdata(routing_node, src, dst, data, msg_id, requester)?;
             }
-            info!("Managing {} client accounts.", self.accounts.len());
+            Err(error) => {
+                routing_node
+                    .send_put_mdata_response(dst, src, Err(error), msg_id)?;
+            }
         }
-
-        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
-            trace!("MM PutMData request failed: {:?}", err);
-            // Undo the account creation
-            if data.tag() == TYPE_TAG_SESSION_PACKET {
-                let _ = self.accounts.remove(&src_name);
-            }
-
-            routing_node
-                .send_put_mdata_response(dst, src, Err(err.clone()), msg_id)?;
-            return Ok(());
-        }
-
-        let tag = data.tag();
-
-        // Forwarding the request to NAE Manager.
-        let fwd_src = dst;
-        let fwd_dst = Authority::NaeManager(*data.name());
-        trace!("MM forwarding PutMData request to {:?}", fwd_dst);
-        routing_node
-            .send_put_mdata_request(fwd_src, fwd_dst, data, msg_id, requester)?;
-
-        self.insert_into_request_cache(msg_id, src, dst, Some(tag));
 
         Ok(())
     }
@@ -237,10 +220,14 @@ impl MaidManager {
                 // We wouldn't have forwarded two `Put` requests for the same account, so
                 // it must have been created via another client manager.
                 let client_name = utils::client_name(&src);
-                let _ = self.accounts.remove(&client_name);
+                let _ = self.accounts.remove(client_name);
 
                 trace!("MM sending delete refresh for account {}", client_name);
-                self.send_refresh(routing_node, dst, dst, Refresh::Delete(client_name), msg_id)?;
+                self.send_refresh(routing_node,
+                                  dst,
+                                  dst,
+                                  Refresh::Delete(*client_name),
+                                  msg_id)?;
 
                 Err(ClientError::AccountExists)
             }
@@ -293,8 +280,39 @@ impl MaidManager {
                                                 res: Result<(), ClientError>,
                                                 msg_id: MessageId)
                                                 -> Result<(), InternalError> {
-        let CachedRequest { src, dst, .. } =
-            self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
+        let (src, dst, res) = if let Some(CachedAccountCreation { src, dst, data }) =
+            self.account_creation_cache.remove(&msg_id) {
+
+            let res = match res {
+                Ok(()) => {
+                    let (client_name, client_key) = utils::client_name_and_key(&src);
+                    let _ = self.accounts.insert(*client_name, Account::default());
+                    return self.forward_put_mdata(routing_node,
+                                                  src,
+                                                  dst,
+                                                  data,
+                                                  msg_id,
+                                                  *client_key);
+                }
+                Err(error) => {
+                    let error = match error {
+                        ClientError::NoSuchData => ClientError::InvalidInvitation,
+                        ClientError::InvalidOperation |
+                        ClientError::InvalidSuccessor => ClientError::InvitationAlreadyClaimed,
+                        _ => ClientError::from(format!("Error claiming invitation {:?}", error)),
+                    };
+
+                    Err(error)
+                }
+            };
+
+            (src, dst, res)
+        } else {
+            let CachedRequest { src, dst, .. } =
+                self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
+            (src, dst, res)
+        };
+
         routing_node
             .send_mutate_mdata_entries_response(dst, src, res, msg_id)?;
         Ok(())
@@ -573,19 +591,126 @@ impl MaidManager {
         Ok(())
     }
 
+    fn prepare_put_mdata(&mut self,
+                         src: Authority<XorName>,
+                         dst: Authority<XorName>,
+                         data: MutableData,
+                         msg_id: MessageId,
+                         requester: sign::PublicKey)
+                         -> Result<PutMDataAction, ClientError> {
+        data.validate()?;
+
+        let (src_name, src_key) = utils::client_name_and_key(&src);
+        let dst_name = utils::client_name(&dst);
+        let is_admin = Some(*src_key) == self.invite_key;
+
+        if !utils::verify_mdata_owner(&data, dst_name) {
+            return Err(ClientError::InvalidOwners);
+        }
+
+        match data.tag() {
+            TYPE_TAG_SESSION_PACKET => {
+                if dst_name != src_name {
+                    trace!("MM Cannot create account for {:?} as {:?}.", src, dst);
+                    return Err(ClientError::InvalidOperation);
+                }
+
+                if is_admin || self.invite_key.is_none() {
+                    let len = self.accounts.len();
+                    match self.accounts.entry(*src_name) {
+                        Entry::Vacant(entry) => {
+                            let _ = entry.insert(Account::default());
+                            info!("Managing {} client accounts.", len + 1);
+                        }
+                        Entry::Occupied(_) => {
+                            trace!("MM Cannot create account for {:?} - it already exists", src);
+                            return Err(ClientError::AccountExists);
+                        }
+                    }
+                } else if self.accounts.contains_key(src_name) {
+                    trace!("MM Cannot create account for {:?} - it already exists", src);
+                    return Err(ClientError::AccountExists);
+                } else {
+                    let invite_name = get_invite_name(&data)?;
+                    trace!("Creating account for {:?} with invitation {:?}.",
+                           src_name,
+                           invite_name);
+
+                    let item = CachedAccountCreation {
+                        src: src,
+                        dst: dst,
+                        data: data,
+                    };
+                    if let Some(old) = self.account_creation_cache.insert(msg_id, item) {
+                        debug!("Received two account creation requests with message ID {:?}. {:?} \
+                            and {:?}.",
+                               msg_id,
+                               old,
+                               self.account_creation_cache.get(&msg_id));
+                    }
+
+                    return Ok(PutMDataAction::Claim(invite_name));
+                }
+            }
+            TYPE_TAG_INVITE => {
+                // Only the authorised admin client can create invitations.
+                if !is_admin {
+                    trace!("Cannot put {:?} as {:?}.", data, dst);
+                    return Err(ClientError::InvalidOperation);
+                } else {
+                    trace!("Creating invitation {:?}.", data.name());
+                }
+            }
+            _ => (),
+        }
+
+        self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester))
+            .map_err(|error| {
+                trace!("MM PutMData request failed: {:?}", error);
+                // Undo the account creation
+                if data.tag() == TYPE_TAG_SESSION_PACKET {
+                    let _ = self.accounts.remove(src_name);
+                }
+
+                error
+            })?;
+
+        Ok(PutMDataAction::Forward(data))
+    }
+
+    fn forward_put_mdata(&mut self,
+                         routing_node: &mut RoutingNode,
+                         src: Authority<XorName>,
+                         dst: Authority<XorName>,
+                         data: MutableData,
+                         msg_id: MessageId,
+                         requester: sign::PublicKey)
+                         -> Result<(), InternalError> {
+        let fwd_src = dst;
+        let fwd_dst = Authority::NaeManager(*data.name());
+        let tag = data.tag();
+
+        trace!("MM forwarding PutMData request to {:?}", fwd_dst);
+        routing_node
+            .send_put_mdata_request(fwd_src, fwd_dst, data, msg_id, requester)?;
+        self.insert_into_request_cache(msg_id, src, dst, Some(tag));
+
+        Ok(())
+    }
+
     fn get_account(&self,
                    src: &Authority<XorName>,
                    dst: &Authority<XorName>)
                    -> Result<&Account, ClientError> {
-        let requestor_name = utils::client_name(src);
+        let requester_name = utils::client_name(src);
         let client_name = utils::client_name(dst);
-        if requestor_name != client_name {
-            trace!("MM Cannot allow requestor {:?} accessing account {:?}.",
+        if requester_name != client_name {
+            trace!("MM Cannot allow requester {:?} accessing account {:?}.",
                    src,
                    dst);
             return Err(ClientError::AccessDenied);
         }
-        if let Some(account) = self.accounts.get(&client_name) {
+        if let Some(account) = self.accounts.get(client_name) {
             Ok(account)
         } else {
             Err(ClientError::NoSuchAccount)
@@ -608,7 +733,7 @@ impl MaidManager {
                                   dst,
                                   dst,
                                   Refresh::UpdateKeys {
-                                      name: utils::client_name(&src),
+                                      name: *utils::client_name(&src),
                                       keys: keys,
                                       ops_count: version,
                                   },
@@ -647,7 +772,7 @@ impl MaidManager {
         }
 
         let account = self.accounts
-            .get_mut(&client_manager_name)
+            .get_mut(client_manager_name)
             .ok_or(ClientError::NoSuchAccount)?;
 
         if version != account.keys_ops_count + 1 {
@@ -673,11 +798,9 @@ impl MaidManager {
         let client_manager_name = utils::client_name(dst);
 
         let account = self.accounts
-            .get(&client_manager_name)
+            .get(client_manager_name)
             .ok_or(ClientError::NoSuchAccount)?;
-        let client_key = utils::client_key(src);
-        let client_name = utils::client_name_from_key(client_key);
-
+        let (client_name, client_key) = utils::client_name_and_key(src);
         let allowed = client_name == client_manager_name ||
                       if AuthPolicy::Key == policy {
                           account.keys.contains(client_key)
@@ -712,7 +835,7 @@ impl MaidManager {
             self.send_refresh(routing_node,
                               req.dst,
                               req.dst,
-                              Refresh::InsertDataOp(utils::client_name(&req.dst)),
+                              Refresh::InsertDataOp(*utils::client_name(&req.dst)),
                               msg_id)?;
         }
         Ok(req)
@@ -935,4 +1058,30 @@ struct CachedRequest {
     src: Authority<XorName>,
     dst: Authority<XorName>,
     tag: Option<u64>,
+}
+
+#[derive(Debug)]
+struct CachedAccountCreation {
+    src: Authority<XorName>,
+    dst: Authority<XorName>,
+    data: MutableData,
+}
+
+// What to do when handling `PutMData`.
+enum PutMDataAction {
+    // Claim the invite with the given name.
+    Claim(XorName),
+    // Forward the request to the `NaeManager`.
+    Forward(MutableData),
+}
+
+fn get_invite_name(data: &MutableData) -> Result<XorName, ClientError> {
+    let content = &data.get(ACC_LOGIN_ENTRY_KEY)
+                       .ok_or(ClientError::InvalidInvitation)?
+                       .content;
+
+    let (code, _): (String, Vec<u8>) = serialisation::deserialise(content)
+        .map_err(|_| ClientError::InvalidInvitation)?;
+
+    Ok(XorName(tiny_keccak::sha3_256(code.as_bytes())))
 }

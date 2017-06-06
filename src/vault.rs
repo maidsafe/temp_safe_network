@@ -37,6 +37,7 @@ pub use routing::Node as RoutingNode;
 use routing::NodeBuilder;
 #[cfg(not(feature = "use-mock-crust"))]
 use rust_sodium;
+use rust_sodium::crypto::sign;
 use std::env;
 use std::path::Path;
 
@@ -97,7 +98,7 @@ impl Vault {
         }?;
 
         Ok(Vault {
-               maid_manager: MaidManager::new(),
+               maid_manager: MaidManager::new(config.invite_key.map(sign::PublicKey)),
                data_manager: DataManager::new(chunk_store_root,
                                               config.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY))?,
                routing_node: routing_node,
