@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -19,9 +19,10 @@
 //! A simple, non-persistent, disk-based key-value store.
 
 use fs2::FileExt;
+use hex::{FromHex, ToHex};
 use maidsafe_utilities::serialisation::{self, SerialisationError};
-use rustc_serialize::{Decodable, Encodable};
-use rustc_serialize::hex::{FromHex, ToHex};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::cmp;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -64,93 +65,99 @@ quick_error! {
     }
 }
 
+pub trait Chunk<K>: Serialize + DeserializeOwned {
+    type Id: ChunkId<K>;
+}
 
+pub trait ChunkId<K>: Serialize {
+    type Chunk: Chunk<K>;
+    fn to_key(&self) -> K;
+}
 
 /// `ChunkStore` is a store of data held as serialised files on disk, implementing a maximum disk
 /// usage to restrict storage.
 ///
 /// The data chunks are deleted when the `ChunkStore` goes out of scope.
-pub struct ChunkStore<Key, Value> {
+pub struct ChunkStore<K> {
     rootdir: PathBuf,
     lock_file: Option<File>,
     max_space: u64,
     used_space: u64,
-    phantom: PhantomData<(Key, Value)>,
+    phantom: PhantomData<K>,
 }
 
-impl<Key, Value> ChunkStore<Key, Value>
-    where Key: Decodable + Encodable,
-          Value: Decodable + Encodable
+impl<K> ChunkStore<K>
+    where K: DeserializeOwned + Serialize
 {
     /// Creates a new `ChunkStore` with `max_space` allowed storage space.
     ///
     /// The data is stored in a root directory. If `root` doesn't exist, it will be created.
-    pub fn new(root: PathBuf, max_space: u64) -> Result<ChunkStore<Key, Value>, Error> {
+    pub fn new(root: PathBuf, max_space: u64) -> Result<Self, Error> {
         let lock_file = Self::lock_and_clear_dir(&root)?;
         Ok(ChunkStore {
-            rootdir: root,
-            lock_file: Some(lock_file),
-            max_space: max_space,
-            used_space: 0,
-            phantom: PhantomData,
-        })
+               rootdir: root,
+               lock_file: Some(lock_file),
+               max_space: max_space,
+               used_space: 0,
+               phantom: PhantomData,
+           })
     }
 
-    /// Stores a new data chunk under `key`.
+    /// Stores a new data chunk.
     ///
     /// If there is not enough storage space available, returns `Error::NotEnoughSpace`.  In case of
     /// an IO error, it returns `Error::Io`.
     ///
-    /// If the key already exists, it will be overwritten.
-    pub fn put(&mut self, key: &Key, value: &Value) -> Result<(), Error> {
+    /// If a data with the same id already exists, it will be overwritten.
+    pub fn put<T: Chunk<K>>(&mut self, id: &T::Id, value: &T) -> Result<(), Error> {
         let serialised_value = serialisation::serialise(value)?;
         if self.used_space + serialised_value.len() as u64 > self.max_space {
             return Err(Error::NotEnoughSpace);
         }
 
-        // If a file corresponding to 'key' already exists, delete it.
-        let file_path = self.file_path(key)?;
+        // If a file corresponding to the chunk id already exists, delete it.
+        let file_path = self.file_path(id)?;
         let _ = self.do_delete(&file_path);
 
         // Write the file.
         File::create(&file_path)
             .and_then(|mut file| {
-                file.write_all(&serialised_value)
+                          file.write_all(&serialised_value)
                     .and_then(|()| file.sync_all())
                     .and_then(|()| file.metadata())
                     .map(|metadata| {
                         self.used_space += metadata.len();
                     })
-            })
+                      })
             .map_err(From::from)
     }
 
-    /// Deletes the data chunk stored under `key`.
+    /// Deletes the data chunk stored under `id`.
     ///
     /// If the data doesn't exist, it does nothing and returns `Ok`.  In the case of an IO error, it
     /// returns `Error::Io`.
-    pub fn delete(&mut self, key: &Key) -> Result<(), Error> {
-        let file_path = self.file_path(key)?;
+    pub fn delete<I: ChunkId<K>>(&mut self, id: &I) -> Result<(), Error> {
+        let file_path = self.file_path(id)?;
         self.do_delete(&file_path)
     }
 
-    /// Returns a data chunk previously stored under `key`.
+    /// Returns a data chunk previously stored under `id`.
     ///
     /// If the data file can't be accessed, it returns `Error::ChunkNotFound`.
-    pub fn get(&self, key: &Key) -> Result<Value, Error> {
-        match File::open(self.file_path(key)?) {
+    pub fn get<I: ChunkId<K>>(&self, id: &I) -> Result<I::Chunk, Error> {
+        match File::open(self.file_path(id)?) {
             Ok(mut file) => {
                 let mut contents = Vec::<u8>::new();
                 let _ = file.read_to_end(&mut contents)?;
-                Ok(serialisation::deserialise::<Value>(&contents)?)
+                Ok(serialisation::deserialise(&contents)?)
             }
             Err(_) => Err(Error::NotFound),
         }
     }
 
-    /// Tests if a data chunk has been previously stored under `key`.
-    pub fn has(&self, key: &Key) -> bool {
-        let file_path = if let Ok(path) = self.file_path(key) {
+    /// Tests if a data chunk has been previously stored under `id`.
+    pub fn has<I: ChunkId<K>>(&self, id: &I) -> bool {
+        let file_path = if let Ok(path) = self.file_path(id) {
             path
         } else {
             return false;
@@ -162,17 +169,20 @@ impl<Key, Value> ChunkStore<Key, Value>
         }
     }
 
-    /// Lists all keys of currently-data stored.
-    pub fn keys(&self) -> Vec<Key> {
+    /// Lists all keys of currently stored data.
+    pub fn keys(&self) -> Vec<K> {
         fs::read_dir(&self.rootdir)
             .and_then(|dir_entries| {
                 let dir_entry_to_routing_name = |dir_entry: io::Result<fs::DirEntry>| {
-                    dir_entry.ok()
+                    dir_entry
+                        .ok()
                         .and_then(|entry| entry.file_name().into_string().ok())
-                        .and_then(|hex_name| hex_name.from_hex().ok())
-                        .and_then(|bytes| serialisation::deserialise::<Key>(&*bytes).ok())
+                        .and_then(|hex_name| Vec::from_hex(hex_name).ok())
+                        .and_then(|bytes| serialisation::deserialise(&*bytes).ok())
                 };
-                Ok(dir_entries.filter_map(dir_entry_to_routing_name).collect())
+                Ok(dir_entries
+                       .filter_map(dir_entry_to_routing_name)
+                       .collect())
             })
             .unwrap_or_else(|_| Vec::new())
     }
@@ -218,14 +228,14 @@ impl<Key, Value> ChunkStore<Key, Value>
         }
     }
 
-    fn file_path(&self, key: &Key) -> Result<PathBuf, Error> {
-        let filename = serialisation::serialise(key)?.to_hex();
+    fn file_path<I: ChunkId<K>>(&self, id: &I) -> Result<PathBuf, Error> {
+        let filename = serialisation::serialise(&id.to_key())?.to_hex();
         let path_name = Path::new(&filename);
         Ok(self.rootdir.join(path_name))
     }
 }
 
-impl<Key, Value> Drop for ChunkStore<Key, Value> {
+impl<K> Drop for ChunkStore<K> {
     fn drop(&mut self) {
         let _ = self.lock_file.take().iter().map(File::unlock);
         let _ = fs::remove_dir_all(&self.rootdir);

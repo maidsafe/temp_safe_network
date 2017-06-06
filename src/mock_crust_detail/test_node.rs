@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -16,12 +16,14 @@
 // relating to use of the SAFE Network Software.
 
 use super::poll;
+use chunk_store::Error as ChunkStoreError;
 use config_handler::Config;
-use personas::data_manager::IdAndVersion;
+use hex::ToHex;
+use itertools::Itertools;
+use personas::data_manager::DataId;
 use rand::{self, Rng};
-use routing::{RoutingTable, XorName};
+use routing::{BootstrapConfig, PublicId, RoutingTable, XorName, Xorable};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
-use rustc_serialize::hex::ToHex;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -29,26 +31,30 @@ use vault::Vault;
 
 /// Test node for mock network
 pub struct TestNode {
-    handle: ServiceHandle,
+    handle: ServiceHandle<PublicId>,
     vault: Vault,
     chunk_store_root: PathBuf,
 }
 
 impl TestNode {
     /// create a test node for mock network
-    pub fn new(network: &Network,
-               crust_config: Option<mock_crust::Config>,
+    pub fn new(network: &Network<PublicId>,
+               crust_config: Option<BootstrapConfig>,
                config: Option<Config>,
                first_node: bool,
                use_cache: bool)
                -> Self {
         let handle = network.new_service_handle(crust_config, None);
         let temp_root = env::temp_dir();
+
+        // Note: using non-deterministic rng here to prevent multiple threads to
+        // set the same chunk store root which would cause crash when running tests
+        // in parallel.
         let chunk_store_root = temp_root.join(rand::thread_rng()
-            .gen_iter()
-            .take(8)
-            .collect::<Vec<u8>>()
-            .to_hex());
+                                                  .gen_iter()
+                                                  .take(8)
+                                                  .collect::<Vec<u8>>()
+                                                  .to_hex());
         let vault_config = match config {
             Some(config) => {
                 Config {
@@ -68,6 +74,7 @@ impl TestNode {
         let vault = mock_crust::make_current(&handle, || {
             unwrap!(Vault::new_with_config(first_node, use_cache, vault_config))
         });
+
         TestNode {
             handle: handle,
             vault: vault,
@@ -95,24 +102,14 @@ impl TestNode {
         self.handle.endpoint()
     }
 
-    /// return names of all data stored on mock network
-    pub fn get_stored_names(&self) -> Vec<IdAndVersion> {
-        self.vault.get_stored_names()
+    /// Return IDs of all data stored on mock network
+    pub fn get_stored_ids_and_versions(&self) -> Result<Vec<(DataId, u64)>, ChunkStoreError> {
+        self.vault.get_stored_ids_and_versions()
     }
 
-    /// return the number of account packets stored for the given client
-    pub fn get_maid_manager_put_count(&self, client_name: &XorName) -> Option<u64> {
-        self.vault.get_maid_manager_put_count(client_name)
-    }
-
-    /// Resend all unacknowledged messages.
-    pub fn resend_unacknowledged(&mut self) -> bool {
-        self.vault.resend_unacknowledged()
-    }
-
-    /// Clear routing node state..
-    pub fn clear_state(&mut self) {
-        self.vault.clear_state()
+    /// return the number of mutations performed by the given client
+    pub fn get_maid_manager_mutation_count(&self, client_name: &XorName) -> Option<u64> {
+        self.vault.get_maid_manager_mutation_count(client_name)
     }
 
     /// name of vault.
@@ -121,13 +118,19 @@ impl TestNode {
     }
 
     /// returns the vault's routing_table.
-    pub fn routing_table(&self) -> RoutingTable<XorName> {
+    pub fn routing_table(&self) -> &RoutingTable<XorName> {
         self.vault.routing_table()
     }
 }
 
+impl Drop for TestNode {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.chunk_store_root);
+    }
+}
+
 /// Create nodes for mock network
-pub fn create_nodes(network: &Network,
+pub fn create_nodes(network: &Network<PublicId>,
                     size: usize,
                     config: Option<Config>,
                     use_cache: bool)
@@ -138,34 +141,39 @@ pub fn create_nodes(network: &Network,
     nodes.push(TestNode::new(network, None, config.clone(), true, use_cache));
     while nodes[0].poll() > 0 {}
 
-    let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let crust_config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
 
     // Create other nodes using the seed node endpoint as bootstrap contact.
     for _ in 1..size {
+        // (2nd to Nth node clone the config objects.)
         nodes.push(TestNode::new(network,
                                  Some(crust_config.clone()),
                                  config.clone(),
                                  false,
                                  use_cache));
-        poll::nodes(&mut nodes);
+        let _ = poll::nodes(&mut nodes);
     }
+    drop(config);
 
     nodes
 }
 
 /// Add node to the mock network
-pub fn add_node(network: &Network, nodes: &mut Vec<TestNode>, index: usize, use_cache: bool) {
-    let config = mock_crust::Config::with_contacts(&[nodes[index].endpoint()]);
-    nodes.push(TestNode::new(network, Some(config.clone()), None, false, use_cache));
+pub fn add_node(network: &Network<PublicId>,
+                nodes: &mut Vec<TestNode>,
+                index: usize,
+                use_cache: bool) {
+    let config = BootstrapConfig::with_contacts(&[nodes[index].endpoint()]);
+    nodes.push(TestNode::new(network, Some(config), None, false, use_cache));
 }
 
 /// Add node to the mock network with specified config
-pub fn add_node_with_config(network: &Network,
+pub fn add_node_with_config(network: &Network<PublicId>,
                             nodes: &mut Vec<TestNode>,
                             config: Config,
                             index: usize,
                             use_cache: bool) {
-    let crust_config = mock_crust::Config::with_contacts(&[nodes[index].endpoint()]);
+    let crust_config = BootstrapConfig::with_contacts(&[nodes[index].endpoint()]);
     nodes.push(TestNode::new(network, Some(crust_config), Some(config), false, use_cache));
 }
 
@@ -181,8 +189,14 @@ fn _poll_all(nodes: &mut [TestNode]) {
     while nodes.iter_mut().any(|node| node.poll() > 0) {}
 }
 
-impl Drop for TestNode {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.chunk_store_root);
-    }
+/// Get `count` closest nodes to the given name.
+pub fn closest_to<'a, 'b>(nodes: &'a [TestNode],
+                          name: &'b XorName,
+                          count: usize)
+                          -> Vec<&'a TestNode> {
+    let mut sorted = nodes
+        .iter()
+        .sorted_by(|left, right| name.cmp_distance(&left.name(), &right.name()));
+    sorted.truncate(count);
+    sorted
 }

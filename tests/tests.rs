@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -31,17 +31,15 @@
          missing_debug_implementations, variant_size_differences)]
 
 #![cfg(feature = "use-mock-crust")]
+#![cfg(not(feature = "use-mock-routing"))]
 
-extern crate itertools;
+extern crate fake_clock;
 #[macro_use]
 extern crate log;
-#[macro_use]
-#[cfg_attr(feature="cargo-clippy", allow(useless_attribute))]
-#[allow(unused_extern_crates)] // Only using macros from maidsafe_utilites
-extern crate maidsafe_utilities;
 extern crate rand;
 extern crate routing;
 extern crate rust_sodium;
+#[macro_use(assert_match)]
 extern crate safe_vault;
 #[macro_use]
 extern crate unwrap;

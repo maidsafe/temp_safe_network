@@ -6,12 +6,13 @@ environment:
     RUST_BACKTRACE: 1
   matrix:
     - RUST_VERSION: stable
+
 branches:
   only:
-    - dev
-    - master
+    - mutable-data
 
-clone_depth: 50
+clone_depth: 1
+
 skip_tags: true
 
 cache:
@@ -20,11 +21,9 @@ cache:
 
 install:
   - ps: |
-        $url = "https://github.com/maidsafe/QA/raw/master/Powershell%20Scripts/AppVeyor"
-        Start-FileDownload "$url/Install%20Rustup.ps1" -FileName "Install Rustup.ps1"
-        Start-FileDownload "$url/Build.ps1" -FileName "Build.ps1"
-        Start-FileDownload "$url/Run%20Tests.ps1" -FileName "Run Tests.ps1"
-        . ".\Install Rustup.ps1"
+        $url = "https://github.com/maidsafe/QA/raw/master/appveyor/install_rustup.ps1"
+        Invoke-WebRequest $url -OutFile "install_rustup.ps1"
+        . ".\install_rustup.ps1"
 
         $commit_message = "$env:APPVEYOR_REPO_COMMIT_MESSAGE $env:APPVEYOR_REPO_COMMIT_MESSAGE_EXTENDED"
 
@@ -41,10 +40,14 @@ configuration:
   - Release
 
 build_script:
-  - ps: . ".\Build.ps1"
+  - cargo rustc --verbose --release --lib -- -Zno-trans
+  - cargo rustc --verbose --release --profile test --lib -- -Zno-trans
+  - cargo rustc --verbose --release --profile test --features use-mock-routing --lib -- -Zno-trans
+  - cargo rustc --verbose --release --profile test --features use-mock-crust --lib -- -Zno-trans
 
 test_script:
-  - ps: . ".\Run Tests.ps1"
+  - cargo test --verbose --release --features use-mock-routing
+  - cargo test --verbose --release --features use-mock-crust
 
 before_deploy:
   - ps: . ".\ci\appveyor\before_deploy.ps1"

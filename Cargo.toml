@@ -1,29 +1,34 @@
 [package]
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 build = "build.rs"
-description = "This is Pre alpha, and not useful, no code worth looking at."
-documentation = "http://docs.maidsafe.net/safe_vault/latest"
-homepage = "http://maidsafe.net"
+description = "Implementation of the 'Vault' node for the SAFE Network."
+documentation = "https://docs.rs/safe_vault"
+homepage = "https://maidsafe.net"
 license = "GPL-3.0"
 name = "safe_vault"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_vault"
-version = "0.13.0"
+version = "0.14.0"
 
 [dependencies]
 accumulator = "~0.5.0"
-config_file_handler = "~0.4.0"
-docopt = "~0.6.86"
+config_file_handler = "~0.7.0"
+clap = "~2.14.1"
+fake_clock = "~0.1.0"
 fs2 = "~0.2.5"
+hex = "~0.2.0"
 itertools = "~0.5.9"
-lru_time_cache = "~0.5.0"
-log = "~0.3.6"
-maidsafe_utilities = "~0.10.0"
+lru_time_cache = "~0.6.0"
+log = "~0.3.7"
+maidsafe_utilities = "~0.12.1"
 quick-error = "~1.1.0"
 rand = "~0.3.14"
-routing = { git = "https://github.com/maidsafe/routing" }
-rustc-serialize = "~0.3.19"
-rust_sodium = "~0.1.2"
+routing = { git = "https://github.com/maidsafe/routing", branch = "mutable-data" }
+rust_sodium = "~0.3.0"
+serde = "~1.0.6"
+serde_derive = "~1.0.6"
+serde_json = "~1.0.2"
+tiny-keccak = "~1.2.1"
 unwrap = "~1.1.0"
 
 [build-dependencies]
@@ -34,7 +39,8 @@ tempdir = "~0.3.5"
 
 [features]
 generate-diagrams = ["hyper"]
-use-mock-crust = ["routing/use-mock-crust"]
+use-mock-crust = ["routing/use-mock-crust", "lru_time_cache/fake_clock"]
+use-mock-routing = ["lru_time_cache/fake_clock"]
 
 [[test]]
 name = "tests"

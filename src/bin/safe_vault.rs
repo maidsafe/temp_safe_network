@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -20,8 +20,8 @@
 
 #![doc(html_logo_url =
            "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-       html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-       html_root_url = "http://maidsafe.github.io/safe_vault")]
+       html_favicon_url = "https://maidsafe.net/img/favicon.ico",
+       html_root_url = "https://docs.rs/safe_vault")]
 
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
@@ -39,63 +39,43 @@
 
 #[macro_use]
 extern crate log;
-#[macro_use]
 extern crate maidsafe_utilities;
+extern crate clap;
 extern crate config_file_handler;
-extern crate docopt;
-extern crate rustc_serialize;
 extern crate safe_vault;
 #[macro_use]
 extern crate unwrap;
 
-use docopt::Docopt;
+use clap::{App, Arg};
 use safe_vault::Vault;
 use std::ffi::OsString;
 use std::fs;
-
-#[cfg_attr(rustfmt, rustfmt_skip)]
-static USAGE: &'static str = "
-Usage:
-  safe_vault [options]
-
-Options:
-  -f, --first     Run as the first Vault of a new network.
-  -V, --version   Display version info and exit.
-  -h, --help      Display this help message and exit.
-";
-
-#[derive(PartialEq, Eq, Debug, Clone, RustcDecodable)]
-struct Args {
-    flag_first: bool,
-    flag_version: bool,
-    flag_help: bool,
-}
 
 /// Runs a SAFE Network vault.
 pub fn main() {
     // TODO - remove the following line once maidsafe_utilities is updated to use log4rs v4.
     let _ = fs::remove_file("Node.log");
 
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|docopt| docopt.decode())
-        .unwrap_or_else(|error| error.exit());
-
     let name = config_file_handler::exe_file_stem().unwrap_or_else(|_| OsString::new());
     let name_and_version = format!("{} v{}", name.to_string_lossy(), env!("CARGO_PKG_VERSION"));
-    if args.flag_version {
-        println!("{}", name_and_version);
-        return;
-    }
+
+    let matches = App::new(name.to_string_lossy())
+        .arg(Arg::with_name("first")
+                 .short("f")
+                 .long("first")
+                 .help("Run as the first Vault of a new network."))
+        .version(env!("CARGO_PKG_VERSION"))
+        .get_matches();
 
     let _ = maidsafe_utilities::log::init(false);
 
     let mut message = String::from("Running ");
     message.push_str(&name_and_version);
-    let underline = unwrap!(String::from_utf8(vec!['=' as u8; message.len()]));
+    let underline = unwrap!(String::from_utf8(vec![b'='; message.len()]));
     info!("\n\n{}\n{}", message, underline);
 
     loop {
-        let mut vault = match Vault::new(args.flag_first, true) {
+        let mut vault = match Vault::new(matches.is_present("first"), true) {
             Ok(vault) => vault,
             Err(e) => {
                 println!("Cannot start vault due to error: {:?}", e);

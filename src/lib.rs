@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.1.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -197,9 +197,9 @@
 
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-#![forbid(bad_style, exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
+#![forbid(exceeding_bitshifts, mutable_transmutes, no_mangle_const_items,
           unknown_crate_types, warnings)]
-#![deny(deprecated, improper_ctypes, missing_docs,
+#![deny(bad_style, deprecated, improper_ctypes, missing_docs,
         non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
         private_no_mangle_fns, private_no_mangle_statics, stable_features, unconditional_recursion,
         unknown_lints, unsafe_code, unused, unused_allocation, unused_attributes,
@@ -210,42 +210,63 @@
          missing_debug_implementations, variant_size_differences)]
 
 extern crate accumulator;
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
+extern crate fake_clock;
 extern crate fs2;
+extern crate hex;
+#[cfg(feature = "use-mock-crust")]
+extern crate itertools;
 #[macro_use]
 extern crate log;
 extern crate lru_time_cache;
-extern crate itertools;
-#[macro_use]
 extern crate maidsafe_utilities;
 extern crate config_file_handler;
 #[macro_use]
 extern crate quick_error;
-#[cfg(any(test, feature = "use-mock-crust"))]
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate rand;
 extern crate routing;
-extern crate rustc_serialize;
 extern crate rust_sodium;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(any(test, feature = "use-mock-crust"))]
+extern crate tiny_keccak;
 #[macro_use]
 extern crate unwrap;
+
+/// For unit and integration tests only
+#[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]
+#[macro_use]
+pub mod test_utils;
+
+/// For integration tests only
+#[cfg(all(feature = "use-mock-crust", not(feature = "use-mock-routing")))]
+pub mod mock_crust_detail;
 
 mod cache;
 mod chunk_store;
 mod config_handler;
 mod error;
-/// For integration tests only
-#[cfg(feature = "use-mock-crust")]
-pub mod test_utils;
+#[cfg(all(test, feature = "use-mock-routing"))]
+mod mock_routing;
 mod personas;
 mod utils;
 mod vault;
-/// For integration tests only
-#[cfg(feature = "use-mock-crust")]
-pub mod mock_crust_detail;
+
 pub use config_handler::Config;
+pub use personas::data_manager::DataId;
+#[cfg(feature = "use-mock-crust")]
+pub use personas::data_manager::PENDING_WRITE_TIMEOUT_SECS;
+pub use personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
 pub use vault::Vault;
 
 /// The number of nodes in groups managing data and user accounts.
 pub const GROUP_SIZE: usize = 8;
+/// The minimal number of nodes in group to reach consensus.
+pub const QUORUM: usize = GROUP_SIZE / 2 + 1;
+
+/// The type tag of invitations to create an account.
+pub const TYPE_TAG_INVITE: u64 = 8;

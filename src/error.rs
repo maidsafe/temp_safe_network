@@ -5,8 +5,8 @@
 // licence you accepted on initial access to the Software (the "Licences").
 //
 // By contributing code to the SAFE Network Software, or to this project generally, you agree to be
-// bound by the terms of the MaidSafe Contributor Agreement, version 1.0.  This, along with the
-// Licenses can be found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
+// bound by the terms of the MaidSafe Contributor Agreement.  This, along with the Licenses can be
+// found in the root directory of this project at LICENSE, COPYING and CONTRIBUTOR.
 //
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -19,20 +19,16 @@ use chunk_store;
 use config_file_handler;
 use maidsafe_utilities::serialisation::SerialisationError;
 use routing::{InterfaceError, MessageId, Request, Response, RoutingError};
-use routing::client_errors::{GetError, MutationError};
+use routing::ClientError;
 use routing::messaging;
+use serde_json;
 use std::io;
 
 quick_error! {
+    #[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
     #[derive(Debug)]
     pub enum InternalError {
         ChunkStore(error: chunk_store::Error) {
-            from()
-        }
-        ClientGet(error: GetError) {
-            from()
-        }
-        ClientMutation(error: MutationError) {
             from()
         }
         FailedToFindCachedRequest(message_id: MessageId)
@@ -48,14 +44,21 @@ quick_error! {
         Routing(error: InterfaceError) {
             from()
         }
+        RoutingClient(error: ClientError) {
+            from()
+        }
         RoutingInternal(error: RoutingError) {
             from()
         }
         Serialisation(error: SerialisationError) {
             from()
         }
+        JsonSerialisation(error: serde_json::Error) {
+            from()
+        }
         UnknownRequestType(request: Request)
         UnknownResponseType(response: Response)
         InvalidMessage
+        NoSuchAccount
     }
 }
