@@ -15,8 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use super::{ACCUMULATOR_QUORUM, ACCUMULATOR_TIMEOUT_SECS};
+use super::ACCUMULATOR_TIMEOUT_SECS;
 use super::data::{Data, MutableDataId};
+use QUORUM;
 use accumulator::Accumulator;
 use routing::{MutableData, Value, XorName};
 use std::time::Duration;
@@ -36,8 +37,8 @@ impl MutableDataCache {
         let duration = Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS);
 
         MutableDataCache {
-            shell_accumulator: Accumulator::with_duration(ACCUMULATOR_QUORUM, duration),
-            entry_accumulator: Accumulator::with_duration(ACCUMULATOR_QUORUM, duration),
+            shell_accumulator: Accumulator::with_duration(QUORUM, duration),
+            entry_accumulator: Accumulator::with_duration(QUORUM, duration),
             entry_cache: Default::default(),
         }
     }

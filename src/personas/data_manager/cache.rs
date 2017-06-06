@@ -19,21 +19,28 @@ use super::STATUS_LOG_INTERVAL;
 use super::data::{DataId, ImmutableDataId, MutableDataId};
 use super::mutation::Mutation;
 use GROUP_SIZE;
+use QUORUM;
 use routing::{Authority, MessageId, MutableData, RoutingTable, Value, XorName};
 use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
 use std::time::Duration;
 use utils::{self, HashMap, HashSet, Instant, SecureHash};
 
+#[cfg(not(feature = "use-mock-crust"))]
 /// The timeout for cached data from requests; if no consensus is reached, the data is dropped.
 const PENDING_WRITE_TIMEOUT_SECS: u64 = 60;
+#[cfg(feature = "use-mock-crust")]
+/// The timeout for cached data from requests; if no consensus is reached, the data is dropped.
+pub const PENDING_WRITE_TIMEOUT_SECS: u64 = 60;
+/// The timeout for retrieving mutable data chunks.
+const MUTABLE_CHUNK_REQUEST_TIMEOUT_SECS: u64 = 60;
 /// The timeout for retrieving data fragments from individual peers.
 const FRAGMENT_REQUEST_TIMEOUT_SECS: u64 = 60;
 
 pub struct Cache {
     /// Immutable data chunks we are no longer responsible for. These can be deleted
     /// from the chunk store.
-    unneeded_chunks: UnneededChunks,
+    unneeded_immutable_chunks: UnneededChunks,
 
     /// Maps data fragment holders to the list of data fragments we need from them.
     /// Also tracks any ongoing requests to retrieve those fragments.
@@ -41,6 +48,12 @@ pub struct Cache {
     /// Maps fragments to the list of holders that have it and tracks whether there
     /// is an ongoing request to retrieve it.
     fragment_index: FragmentIndex,
+
+    /// Mutable data chunks we need, but have not requested yet.
+    needed_mutable_chunks: HashSet<MutableDataId>,
+    /// Mutable data chunk we are currently requesting (if any). Tracks the number of nodes
+    /// we already received response from.
+    needed_mutable_chunk_request: Option<ChunkRequest>,
 
     /// Maps data identifiers to the list of pending writes that affect that chunk.
     pending_writes: HashMap<DataId, Vec<PendingWrite>>,
@@ -56,17 +69,90 @@ impl Cache {
         self.fragment_index
             .keys()
             .filter(|fragment| if let FragmentInfo::ImmutableData(ref name) = **fragment {
-                        !self.unneeded_chunks.contains(name)
+                        !self.unneeded_immutable_chunks.contains(name)
                     } else {
                         true
                     })
             .map(FragmentInfo::data_id)
+            .chain(self.needed_mutable_chunks
+                       .iter()
+                       .map(|id| DataId::Mutable(*id)))
+            .chain(self.needed_mutable_chunk_request
+                       .iter()
+                       .map(|request| DataId::Mutable(request.data_id)))
             .collect()
+    }
+
+    /// Returns the next mutable data chunk we need (if any)
+    pub fn needed_mutable_chunk(&mut self) -> Option<MutableDataId> {
+        self.stop_expired_needed_mutable_chunk_request();
+
+        if self.needed_mutable_chunk_request.is_some() {
+            return None;
+        }
+
+        self.needed_mutable_chunks.iter().cloned().next()
+    }
+
+    /// Insert needed mutable data chunk.
+    pub fn insert_needed_mutable_chunk(&mut self, data_id: MutableDataId) {
+        if let Some(request) = self.needed_mutable_chunk_request.as_ref() {
+            if request.data_id == data_id {
+                return;
+            }
+        }
+
+        let _ = self.needed_mutable_chunks.insert(data_id);
+    }
+
+    /// Mark the request to retrieve the given chunk as started.
+    pub fn start_needed_mutable_chunk_request(&mut self,
+                                              data_id: MutableDataId,
+                                              msg_id: MessageId) {
+        let _ = self.needed_mutable_chunks.remove(&data_id);
+        self.needed_mutable_chunk_request = Some(ChunkRequest::new(data_id, msg_id));
+    }
+
+    /// Register successful response to a needed mutable chunk request. If we receive
+    /// responses from at least `QUORUM` nodes, the request is considered to be successfully
+    /// finished.
+    pub fn handle_needed_mutable_chunk_success(&mut self,
+                                               data_id: MutableDataId,
+                                               src: XorName,
+                                               msg_id: MessageId) {
+        let done = self.needed_mutable_chunk_request
+            .as_mut()
+            .map_or(false,
+                    |request| if request.data_id == data_id && request.msg_id == msg_id {
+                        let _ = request.successes.insert(src);
+                        request.did_accumulate()
+                    } else {
+                        false
+                    });
+
+        if done {
+            self.needed_mutable_chunk_request = None;
+        }
+    }
+
+    pub fn handle_needed_mutable_chunk_failure(&mut self, src: XorName, msg_id: MessageId) {
+        let done = self.needed_mutable_chunk_request
+            .as_mut()
+            .map_or(false, |request| if request.msg_id == msg_id {
+                let _ = request.failures.insert(src);
+                !request.can_accumulate()
+            } else {
+                false
+            });
+
+        if done {
+            self.needed_mutable_chunk_request = None;
+        }
     }
 
     /// Returns data fragments we need and want to request from other nodes.
     pub fn needed_fragments(&mut self) -> Vec<(FragmentInfo, Vec<XorName>)> {
-        self.stop_expired_requests();
+        self.stop_expired_fragment_requests();
 
         let mut result = HashMap::default();
 
@@ -77,24 +163,15 @@ impl Cache {
 
             for fragment in &holder.fragments {
                 if let FragmentInfo::ImmutableData(ref name) = *fragment {
-                    if self.unneeded_chunks.contains(name) {
+                    if self.unneeded_immutable_chunks.contains(name) {
                         continue;
                     }
                 }
 
-                // For all fragment types except `MutableData`, there can be
-                // at most one request at a time. For `MutableData` we allow
-                // multiple requests, because we need to request it from every
-                // member of its group.
-                match *fragment {
-                    FragmentInfo::MutableData(..) => (),
-                    _ => {
-                        if self.fragment_index
-                               .get(fragment)
-                               .map_or(false, |state| state.is_requested()) {
-                            continue;
-                        }
-                    }
+                if self.fragment_index
+                       .get(fragment)
+                       .map_or(false, FragmentState::is_requested) {
+                    continue;
                 }
 
                 result
@@ -264,20 +341,20 @@ impl Cache {
     }
 
     pub fn is_in_unneeded(&self, data_id: &ImmutableDataId) -> bool {
-        self.unneeded_chunks.contains(data_id.name())
+        self.unneeded_immutable_chunks.contains(data_id.name())
     }
 
     pub fn add_as_unneeded(&mut self, data_id: ImmutableDataId) {
-        self.unneeded_chunks.push(*data_id.name());
+        self.unneeded_immutable_chunks.push(*data_id.name());
     }
 
     pub fn prune_unneeded_chunks(&mut self, routing_table: &RoutingTable<XorName>) -> u64 {
-        let before = self.unneeded_chunks.len();
+        let before = self.unneeded_immutable_chunks.len();
 
-        self.unneeded_chunks
+        self.unneeded_immutable_chunks
             .retain(|name| !routing_table.is_closest(name, GROUP_SIZE));
 
-        (before - self.unneeded_chunks.len()) as u64
+        (before - self.unneeded_immutable_chunks.len()) as u64
     }
 
     /// Inserts the given mutation as a pending write. If the mutation doesn't
@@ -387,10 +464,20 @@ impl Cache {
     }
 
     pub fn pop_unneeded_chunk(&mut self) -> Option<ImmutableDataId> {
-        self.unneeded_chunks.pop().map(ImmutableDataId)
+        self.unneeded_immutable_chunks
+            .pop()
+            .map(ImmutableDataId)
     }
 
-    fn stop_expired_requests(&mut self) {
+    fn stop_expired_needed_mutable_chunk_request(&mut self) {
+        if self.needed_mutable_chunk_request
+               .as_ref()
+               .map_or(false, ChunkRequest::is_expired) {
+            self.needed_mutable_chunk_request = None;
+        }
+    }
+
+    fn stop_expired_fragment_requests(&mut self) {
         let mut empty_holders = Vec::new();
 
         for (holder_name, holder) in &mut self.fragment_holders {
@@ -436,9 +523,11 @@ impl Cache {
 impl Cache {
     /// Clear the cache.
     pub fn clear(&mut self) {
-        self.unneeded_chunks.clear();
+        self.unneeded_immutable_chunks.clear();
         self.fragment_holders.clear();
         self.fragment_index.clear();
+        self.needed_mutable_chunks.clear();
+        self.needed_mutable_chunk_request = None;
         self.pending_writes.clear();
         self.total_needed_fragments_count = 0;
         self.requested_needed_fragments_count = 0;
@@ -448,9 +537,11 @@ impl Cache {
 impl Default for Cache {
     fn default() -> Cache {
         Cache {
-            unneeded_chunks: UnneededChunks::new(),
+            unneeded_immutable_chunks: UnneededChunks::new(),
             fragment_holders: HashMap::default(),
             fragment_index: HashMap::default(),
+            needed_mutable_chunks: HashSet::default(),
+            needed_mutable_chunk_request: None,
             pending_writes: HashMap::default(),
             logging_time: Instant::now(),
             total_needed_fragments_count: 0,
@@ -480,13 +571,11 @@ pub struct MutationVote {
 
 /// Information about a data fragment:
 /// - immutable data,
-/// - whole mutable data,
 /// - mutable data shell or,
 /// - mutable data entry.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum FragmentInfo {
     ImmutableData(XorName),
-    MutableData(XorName, u64),
     MutableDataShell {
         name: XorName,
         tag: u64,
@@ -541,18 +630,9 @@ impl FragmentInfo {
         result
     }
 
-    // Get fragment representing whole data.
-    pub fn data(data_id: DataId) -> Self {
-        match data_id {
-            DataId::Immutable(ImmutableDataId(name)) => FragmentInfo::ImmutableData(name),
-            DataId::Mutable(MutableDataId(name, tag)) => FragmentInfo::MutableData(name, tag),
-        }
-    }
-
     pub fn name(&self) -> &XorName {
         match *self {
             FragmentInfo::ImmutableData(ref name) |
-            FragmentInfo::MutableData(ref name, ..) |
             FragmentInfo::MutableDataShell { ref name, .. } |
             FragmentInfo::MutableDataEntry { ref name, .. } => name,
         }
@@ -561,7 +641,6 @@ impl FragmentInfo {
     pub fn data_id(&self) -> DataId {
         match *self {
             FragmentInfo::ImmutableData(name) => DataId::Immutable(ImmutableDataId(name)),
-            FragmentInfo::MutableData(name, tag) |
             FragmentInfo::MutableDataShell { name, tag, .. } |
             FragmentInfo::MutableDataEntry { name, tag, .. } => {
                 DataId::Mutable(MutableDataId(name, tag))
@@ -678,6 +757,39 @@ impl FragmentState {
 
     fn stop_request(&mut self) {
         self.request_count = self.request_count.saturating_sub(1)
+    }
+}
+
+struct ChunkRequest {
+    data_id: MutableDataId,
+    msg_id: MessageId,
+    successes: HashSet<XorName>,
+    failures: HashSet<XorName>,
+    timestamp: Instant,
+}
+
+impl ChunkRequest {
+    fn new(data_id: MutableDataId, msg_id: MessageId) -> Self {
+        ChunkRequest {
+            data_id: data_id,
+            msg_id: msg_id,
+            successes: HashSet::default(),
+            failures: HashSet::default(),
+            timestamp: Instant::now(),
+        }
+    }
+
+    fn is_expired(&self) -> bool {
+        self.timestamp.elapsed().as_secs() > MUTABLE_CHUNK_REQUEST_TIMEOUT_SECS
+    }
+
+    fn can_accumulate(&self) -> bool {
+        // `GROUP_SIZE - 1` means everyone in the group except us.
+        GROUP_SIZE - 1 - self.failures.len() >= QUORUM
+    }
+
+    fn did_accumulate(&self) -> bool {
+        self.successes.len() >= QUORUM
     }
 }
 
@@ -829,7 +941,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let mut cache = Cache::default();
 
-        let fragment = FragmentInfo::MutableData(rng.gen(), rng.gen());
+        let fragment = FragmentInfo::ImmutableData(rng.gen());
         let holder0 = rng.gen();
         let holder1 = rng.gen();
 
@@ -837,7 +949,7 @@ mod tests {
         assert!(cache.fragment_index.is_empty());
 
         // Start multiple requests, then stop them. Assert that the needed fragment
-        // data strucutres ramain empty afterwards.
+        // data structure remains empty afterwards.
         cache.insert_needed_fragment(fragment.clone(), holder0);
         cache.start_needed_fragment_request(&fragment, &holder0);
 
@@ -873,7 +985,7 @@ mod tests {
         assert_eq!(cache.fragment_index.len(), 1);
 
         FakeClock::advance_time((FRAGMENT_REQUEST_TIMEOUT_SECS + 1) * 1000);
-        cache.stop_expired_requests();
+        cache.stop_expired_fragment_requests();
         assert_eq!(cache.fragment_holders.len(), 0);
         assert_eq!(cache.fragment_index.len(), 0);
     }

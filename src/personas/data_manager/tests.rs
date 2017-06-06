@@ -16,13 +16,14 @@
 // relating to use of the SAFE Network Software.
 
 use super::*;
-use super::ACCUMULATOR_QUORUM as QUORUM;
+use QUORUM;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use mock_routing::RequestWrapper;
 use rand::{self, Rng};
 use routing::{Action, EntryActions, Request, Response, User};
 use std::env;
 use test_utils;
+use vault::Refresh as VaultRefresh;
 
 const CHUNK_STORE_CAPACITY: u64 = 1024;
 const CHUNK_STORE_DIR: &'static str = "test_safe_vault_chunk_store";
@@ -310,23 +311,25 @@ fn handle_node_added() {
     assert_eq!(message.dst, Authority::ManagedNode(new_node_name));
 
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
-    let fragments: Vec<FragmentInfo> = unwrap!(deserialise(&payload));
+    let refreshes: VaultRefresh = unwrap!(deserialise(&payload));
+    let refreshes = assert_match!(refreshes, VaultRefresh::DataManager(refreshes) => refreshes);
 
-    assert_eq!(fragments.len(), 2);
+    assert_eq!(refreshes.len(), 2);
 
-    let check = fragments
+    let check = refreshes
         .iter()
-        .any(|fragment| match *fragment {
-                 FragmentInfo::ImmutableData(ref name) if name == data0.name() => true,
+        .any(|refresh| match *refresh {
+                 Refresh::Fragment(FragmentInfo::ImmutableData(ref name)) if name ==
+                                                                             data0.name() => true,
                  _ => false,
              });
     assert!(check);
 
-    let check = fragments
+    let check = refreshes
         .iter()
-        .any(|fragment| match *fragment {
-                 FragmentInfo::MutableData(ref name, tag) if name == data1.name() &&
-                                                             tag == data1.tag() => true,
+        .any(|refresh| match *refresh {
+                 Refresh::Chunk(MutableDataId(ref name, tag)) if name == data1.name() &&
+                                                                 tag == data1.tag() => true,
                  _ => false,
              });
     assert!(check);
@@ -353,21 +356,18 @@ fn idata_with_churn() {
 
     let data = test_utils::gen_immutable_data(10, &mut rng);
 
-    let fragment = FragmentInfo::ImmutableData(*data.name());
-    let refresh_payload = unwrap!(serialise(&vec![fragment]));
+    let refresh = Refresh::Fragment(FragmentInfo::ImmutableData(*data.name()));
+    let refresh_payload = unwrap!(serialise(&vec![refresh]));
 
     // New node receives the refresh message from one of the old nodes. The message
     // should not accumulate yet.
-    unwrap!(new_dm.handle_refresh(&mut new_node, old_node_names[0], &refresh_payload));
+    unwrap!(new_dm.handle_serialised_refresh(&mut new_node, old_node_names[0], &refresh_payload));
     assert!(new_node.sent_requests.is_empty());
 
     // New node receives the refresh from at least QUORUM other nodes. The message
     // should now accumulate.
-    for name in old_node_names
-            .iter()
-            .skip(1)
-            .take(ACCUMULATOR_QUORUM - 1) {
-        unwrap!(new_dm.handle_refresh(&mut new_node, *name, &refresh_payload));
+    for name in old_node_names.iter().skip(1).take(QUORUM - 1) {
+        unwrap!(new_dm.handle_serialised_refresh(&mut new_node, *name, &refresh_payload));
     }
 
     // Helper function to verify the node sent the get request for a data with
@@ -433,18 +433,13 @@ fn mdata_with_churn() {
     let (mut new_node, mut new_dm, other_node_names) = setup_mdata_refresh(&data, &mut rng);
 
     // New node sends request for the mutable data to each member of the group.
-    assert_eq!(new_node.sent_requests.len(), other_node_names.len());
-
-    for node_name in &other_node_names {
-        let (data_id, _) = take_get_mdata_request(&mut new_node,
-                                                  &Authority::ManagedNode(*node_name));
-        assert_eq!(data_id, data.id());
-    }
+    let (msg_id, data_id) = take_get_mdata_request(&mut new_node);
+    assert_eq!(data_id, data.id());
 
     // New node receives responses for the above requests. It should accumulate the
     // data and put it into the chunk store.
     for node_name in &other_node_names {
-        unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, data.clone()));
+        unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, data.clone(), msg_id));
     }
 
     let stored_data = unwrap!(new_dm.get_from_chunk_store(&data.id()));
@@ -466,10 +461,7 @@ fn mdata_with_churn_with_partial_accumulation() {
     let (mut new_node, mut new_dm, other_node_names) = setup_mdata_refresh(&data, &mut rng);
 
     // New node should send request for the mutable data.
-    assert_eq!(new_node.sent_requests.len(), other_node_names.len());
-    for node_name in &other_node_names {
-        let _ = take_get_mdata_request(&mut new_node, &Authority::ManagedNode(*node_name));
-    }
+    let (msg_id, _) = take_get_mdata_request(&mut new_node);
 
     // The nodes form two groups - the data they respond with differs in some of the entries.
     // None of the groups reaches quorum for their data, but the nodes together do reach
@@ -491,14 +483,20 @@ fn mdata_with_churn_with_partial_accumulation() {
     assert!(partial_data1.mutate_entry_without_validation(key2, value2));
 
     for node_name in other_node_names.iter().take(QUORUM - 1) {
-        unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, partial_data0.clone()));
+        unwrap!(new_dm.handle_get_mdata_success(&mut new_node,
+                                                *node_name,
+                                                partial_data0.clone(),
+                                                msg_id));
     }
 
     for node_name in other_node_names
             .iter()
             .skip(QUORUM - 1)
             .take(QUORUM - 1) {
-        unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, partial_data1.clone()));
+        unwrap!(new_dm.handle_get_mdata_success(&mut new_node,
+                                                *node_name,
+                                                partial_data1.clone(),
+                                                msg_id));
     }
 
     let stored_data = unwrap!(new_dm.get_from_chunk_store(&data.id()));
@@ -518,14 +516,11 @@ fn mdata_with_churn_with_entries_accumulating_before_shell() {
     let (mut new_node, mut new_dm, other_node_names) = setup_mdata_refresh(&data, &mut rng);
 
     // New node should send request for the mutable data.
-    assert_eq!(new_node.sent_requests.len(), other_node_names.len());
-    for node_name in &other_node_names {
-        let _ = take_get_mdata_request(&mut new_node, &Authority::ManagedNode(*node_name));
-    }
+    let (msg_id, _) = take_get_mdata_request(&mut new_node);
 
     // First QUORUM - 1 nodes respond with the correct data.
     for node_name in other_node_names.iter().take(QUORUM - 1) {
-        unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, data.clone()));
+        unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, data.clone(), msg_id));
     }
 
     // The next node responds with a data with the same entries but different shell.
@@ -535,12 +530,15 @@ fn mdata_with_churn_with_entries_accumulating_before_shell() {
     assert!(data_with_bad_shell.change_owner_without_validation(other_key, 1));
 
     let node_name = unwrap!(other_node_names.get(QUORUM - 1));
-    unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, data_with_bad_shell));
+    unwrap!(new_dm.handle_get_mdata_success(&mut new_node,
+                                            *node_name,
+                                            data_with_bad_shell,
+                                            msg_id));
 
     // The remaining nodes send data with the correct shell but no entries.
     // The shell accumulates now and the entries are aleady accumulated.
     for node_name in other_node_names.iter().skip(QUORUM) {
-        unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, data.shell()));
+        unwrap!(new_dm.handle_get_mdata_success(&mut new_node, *node_name, data.shell(), msg_id));
     }
 
     let stored_data = unwrap!(new_dm.get_from_chunk_store(&data.id()));
@@ -730,27 +728,30 @@ fn setup_mdata_refresh<R: Rng>(data: &MutableData,
                                -> (RoutingNode, DataManager, Vec<XorName>) {
     let (mut new_node, mut new_dm, other_node_names) = setup_churn(rng);
 
-    let fragments = vec![FragmentInfo::MutableData(*data.name(), data.tag())];
-    let refresh_payload = unwrap!(serialise(&fragments));
+    let refresh = vec![Refresh::Chunk(data.id())];
+    let refresh = unwrap!(serialise(&refresh));
 
     for name in &other_node_names {
-        unwrap!(new_dm.handle_refresh(&mut new_node, *name, &refresh_payload));
+        unwrap!(new_dm.handle_serialised_refresh(&mut new_node, *name, &refresh));
     }
 
     (new_node, new_dm, other_node_names)
 }
 
-// Removes and returns `GetMData` request sent to the given destination authority.
-fn take_get_mdata_request(node: &mut RoutingNode,
-                          dst: &Authority<XorName>)
-                          -> (MutableDataId, Authority<XorName>) {
-    let message = take_request(node, |message| message.dst == *dst);
+// Removes and returns sent `GetMData` request.
+fn take_get_mdata_request(node: &mut RoutingNode) -> (MessageId, MutableDataId) {
+    let (msg_id, message) = take_request(node, |message| match message.request {
+        Request::GetMData { .. } => true,
+        _ => false,
+    });
+
     let (name, tag) =
         assert_match!(message.request, Request::GetMData { name, tag, .. } => (name, tag));
-    (MutableDataId(name, tag), message.src)
+    (msg_id, MutableDataId(name, tag))
 }
 
-fn take_request<F>(node: &mut RoutingNode, mut f: F) -> (RequestWrapper)
+// Removes and returns the sent request matching the given predicate.
+fn take_request<F>(node: &mut RoutingNode, mut f: F) -> (MessageId, RequestWrapper)
     where F: FnMut(&RequestWrapper) -> bool
 {
     let msg_id = node.sent_requests
@@ -758,5 +759,5 @@ fn take_request<F>(node: &mut RoutingNode, mut f: F) -> (RequestWrapper)
         .filter_map(|(msg_id, message)| if f(message) { Some(*msg_id) } else { None })
         .next();
     let msg_id = unwrap!(msg_id);
-    unwrap!(node.sent_requests.remove(&msg_id))
+    (msg_id, unwrap!(node.sent_requests.remove(&msg_id)))
 }

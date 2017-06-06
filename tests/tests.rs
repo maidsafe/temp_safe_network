@@ -33,6 +33,7 @@
 #![cfg(feature = "use-mock-crust")]
 #![cfg(not(feature = "use-mock-routing"))]
 
+extern crate fake_clock;
 #[macro_use]
 extern crate log;
 extern crate rand;

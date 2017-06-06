@@ -20,14 +20,15 @@ use cache::Cache;
 use chunk_store::Error as ChunkStoreError;
 use config_handler::{self, Config};
 use error::InternalError;
+use maidsafe_utilities::serialisation;
 #[cfg(all(test, feature = "use-mock-routing"))]
 pub use mock_routing::Node as RoutingNode;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use mock_routing::NodeBuilder;
+use personas::data_manager::{self, DataManager};
 #[cfg(feature = "use-mock-crust")]
 use personas::data_manager::DataId;
-use personas::data_manager::DataManager;
-use personas::maid_manager::MaidManager;
+use personas::maid_manager::{self, MaidManager};
 use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
 pub use routing::Event;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
@@ -164,18 +165,35 @@ impl Vault {
             // ================== Refresh ==================
             (Authority::ClientManager(_),
              Authority::ClientManager(_),
-             Request::Refresh(serialised_msg, _)) => {
+             Request::Refresh(serialised_msg, msg_id)) |
+            (Authority::ClientManager(_),
+             Authority::ManagedNode(_),
+             Request::Refresh(serialised_msg, msg_id)) => {
                 self.maid_manager
-                    .handle_refresh(&mut self.routing_node, &serialised_msg)
+                    .handle_serialised_refresh(&mut self.routing_node,
+                                               &serialised_msg,
+                                               msg_id,
+                                               None)
             }
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Request::Refresh(serialised_msg, _)) |
+             Request::Refresh(serialised_msg, msg_id)) => {
+                match serialisation::deserialise::<Refresh>(&serialised_msg)? {
+                    Refresh::MaidManager(refresh) => {
+                        self.maid_manager
+                            .handle_refresh(&mut self.routing_node, refresh, msg_id, Some(src_name))
+                    }
+                    Refresh::DataManager(refreshes) => {
+                        self.data_manager
+                            .handle_refreshes(&mut self.routing_node, src_name, refreshes)
+                    }
+                }
+            }
             (Authority::ManagedNode(src_name),
              Authority::NaeManager(_),
              Request::Refresh(serialised_msg, _)) => {
                 self.data_manager
-                    .handle_refresh(&mut self.routing_node, src_name, &serialised_msg)
+                    .handle_serialised_refresh(&mut self.routing_node, src_name, &serialised_msg)
             }
             (Authority::NaeManager(_),
              Authority::NaeManager(_),
@@ -239,10 +257,10 @@ impl Vault {
              Authority::NaeManager(_),
              Request::GetMData { name, tag, msg_id }) |
             (Authority::ManagedNode(_),
-             Authority::ManagedNode(_),
+             Authority::NaeManager(_),
              Request::GetMData { name, tag, msg_id }) => {
                 self.data_manager
-                    .handle_get_mdata(&mut self.routing_node, src, dst, name, tag, msg_id)
+                    .handle_get_mdata(&mut self.routing_node, src, name, tag, msg_id)
             }
             // ========== GetMDataShell ==========
             (Authority::Client { .. },
@@ -601,16 +619,22 @@ impl Vault {
             // ================== GetMData success =============
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetMData { res: Ok(shell), .. }) => {
+             Response::GetMData {
+                 res: Ok(data),
+                 msg_id,
+             }) => {
                 self.data_manager
-                    .handle_get_mdata_success(&mut self.routing_node, src_name, shell)
+                    .handle_get_mdata_success(&mut self.routing_node, src_name, data, msg_id)
             }
             // ================== GetMData failure =============
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetMData { res: Err(_), .. }) => {
+             Response::GetMData {
+                 res: Err(_),
+                 msg_id,
+             }) => {
                 self.data_manager
-                    .handle_get_mdata_failure(&mut self.routing_node, src_name)
+                    .handle_get_mdata_failure(&mut self.routing_node, src_name, msg_id)
             }
             // ================== GetMDataShell success =============
             (Authority::ManagedNode(src_name),
@@ -689,7 +713,7 @@ impl Vault {
                     routing_table: RoutingTable<XorName>)
                     -> Result<(), InternalError> {
         self.maid_manager
-            .handle_node_lost(&mut self.routing_node, &node_lost)?;
+            .handle_node_lost(&mut self.routing_node, &node_lost, &routing_table)?;
         self.data_manager
             .handle_node_lost(&mut self.routing_node, &node_lost, &routing_table)?;
         Ok(())
@@ -709,22 +733,14 @@ impl Vault {
     /// Non-blocking call to process any events in the event queue, returning true if
     /// any received, otherwise returns false.
     pub fn poll(&mut self) -> bool {
-        use maidsafe_utilities::SeededRng;
-        use rand::Rng;
-
         let mut processed = self.routing_node.poll();
 
-        let mut events = Vec::new();
         while let Ok(event) = self.routing_node.try_next_ev() {
-            events.push(event);
-        }
-        SeededRng::thread_rng().shuffle(&mut events);
-
-        for event in events {
             if let EventResult::Processed = self.process_event(event) {
                 processed = true;
             }
         }
+
         processed
     }
 
@@ -759,4 +775,10 @@ enum EventResult {
     Terminate,
     // `RestartRequired` event received.
     Restart,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
+pub enum Refresh {
+    MaidManager(maid_manager::Refresh),
+    DataManager(Vec<data_manager::Refresh>),
 }

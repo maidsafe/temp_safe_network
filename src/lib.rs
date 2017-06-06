@@ -214,10 +214,11 @@ extern crate accumulator;
 extern crate fake_clock;
 extern crate fs2;
 extern crate hex;
+#[cfg(feature = "use-mock-crust")]
+extern crate itertools;
 #[macro_use]
 extern crate log;
 extern crate lru_time_cache;
-extern crate itertools;
 extern crate maidsafe_utilities;
 extern crate config_file_handler;
 #[macro_use]
@@ -233,7 +234,6 @@ extern crate serde_json;
 #[cfg(test)]
 extern crate tempdir;
 extern crate tiny_keccak;
-#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 #[macro_use]
 extern crate unwrap;
 
@@ -258,11 +258,15 @@ mod vault;
 
 pub use config_handler::Config;
 pub use personas::data_manager::DataId;
-pub use personas::maid_manager::DEFAULT_ACCOUNT_SIZE;
+#[cfg(feature = "use-mock-crust")]
+pub use personas::data_manager::PENDING_WRITE_TIMEOUT_SECS;
+pub use personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
 pub use vault::Vault;
 
 /// The number of nodes in groups managing data and user accounts.
 pub const GROUP_SIZE: usize = 8;
+/// The minimal number of nodes in group to reach consensus.
+pub const QUORUM: usize = GROUP_SIZE / 2 + 1;
 
 /// The type tag of invitations to create an account.
 pub const TYPE_TAG_INVITE: u64 = 8;

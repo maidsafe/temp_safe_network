@@ -18,13 +18,14 @@
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
+use fake_clock::FakeClock;
 use rand::Rng;
 use routing::{Action, Authority, BootstrapConfig, ClientError, EntryAction, EntryActions, Event,
               ImmutableData, MAX_MUTABLE_DATA_ENTRY_ACTIONS, MessageId, MutableData,
               PermissionSet, Response, User};
 use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
-use safe_vault::{GROUP_SIZE, test_utils};
+use safe_vault::{GROUP_SIZE, PENDING_WRITE_TIMEOUT_SECS, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::test_node::{self, TestNode};
@@ -652,10 +653,9 @@ fn mutable_data_parallel_mutations() {
 
         // Collect the responses from the clients. For those that succeed,
         // apply their entry actions to the local copy of the data.
-        let mut successes: usize = 0;
         'client_loop: for (client, actions) in clients.iter_mut().zip(sent_actions) {
             let data = &mut all_data[j];
-
+            // When there is conflicting mutations, there is chance no response to client.
             while let Ok(event) = client.try_recv() {
                 if let Event::Response {
                            response: Response::MutateMDataEntries { res, .. }, ..
@@ -665,7 +665,6 @@ fn mutable_data_parallel_mutations() {
                                 trace!("Client {:?} received success response.",
                                        client.name());
                                 unwrap!(data.mutate_entries(actions, *client.signing_public_key()));
-                                successes += 1;
                             }
                         Err(error) => {
                             trace!("Client {:?} received failed response. Reason: {:?}",
@@ -676,13 +675,9 @@ fn mutable_data_parallel_mutations() {
                     continue 'client_loop;
                 }
             }
-            panic!("Client {:?} received no response for data with name {:?}, tag {}.",
-                   client.name(),
-                   data.name(),
-                   data.tag());
         }
-
-        assert!(successes > 0, "No MutateMDataEntry attempt succeeded.");
+        // Check the new version of data (on success) has been stored properly; or confirm the old
+        // version of data (on failure or no response) still keeps untouched.
         mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
                                       &nodes);
         mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
@@ -813,14 +808,20 @@ fn mutable_data_concurrent_mutations() {
         mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
                                       &nodes);
 
+        FakeClock::advance_time(PENDING_WRITE_TIMEOUT_SECS * 1000 + 1);
+        event_count += poll::nodes_and_client(&mut nodes, &mut client);
+        trace!(" Processed {} events.", event_count);
+
         let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
         let node_count_stats: Vec<_> = sorted_nodes
             .into_iter()
-            .map(|node| (node.name(), node.get_maid_manager_mutation_count(client.name())))
+            .map(|node| {
+                     (node.name(), unwrap!(node.get_maid_manager_mutation_count(client.name())))
+                 })
             .collect();
         expected_mutation_count += successes;
         for &(_, count) in &node_count_stats {
-            assert_eq!(Some(expected_mutation_count as u64),
+            assert_eq!(expected_mutation_count as u64,
                        count,
                        "Expected {} mutations got: {:?}",
                        expected_mutation_count,
