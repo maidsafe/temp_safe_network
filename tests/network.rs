@@ -22,7 +22,7 @@ use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 use routing::{BootstrapConfig, ImmutableData, MutableData};
 use routing::mock_crust::Network;
-use safe_vault::{Config, GROUP_SIZE, test_utils};
+use safe_vault::{Config, GROUP_SIZE, QUORUM, test_utils};
 use safe_vault::mock_crust_detail::{poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 
@@ -34,7 +34,10 @@ use safe_vault::mock_crust_detail::test_client::TestClient;
 // 3, No response, when part of vaults have space but part of vaults don't, and none accumulates.
 #[test]
 fn fill_network() {
-    let network = Network::new(GROUP_SIZE, None);
+    let seed = None;
+    let max_iterations = 100;
+
+    let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
 
     let config = Config {
@@ -75,11 +78,17 @@ fn fill_network() {
     }
 
 
-    for _ in 0..10 {
+    for i in 0..max_iterations {
         let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
         trace!("Adding node with bootstrap node {}.", index);
         test_node::add_node(&network, &mut nodes, index, true);
-        let _ = poll::nodes_and_client_with_resend(&mut nodes, &mut client);
+        let _ = poll::nodes_and_client(&mut nodes, &mut client);
+
+        // Because the original 8 nodes are all full, we need at least `QUORUM`
+        // new nodes before we have a chance of the network accepting the data.
+        if i < QUORUM - 1 {
+            continue;
+        }
 
         let data = test_utils::gen_immutable_data(100, &mut rng);
         let data_id = data.debug_id();

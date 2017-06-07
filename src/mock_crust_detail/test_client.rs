@@ -163,7 +163,7 @@ impl TestClient {
                                   nodes: &mut [TestNode])
                                   -> Result<(), ClientError> {
         let request_msg_id = self.put_idata(data.clone());
-        let _ = poll::nodes_and_client_with_resend(nodes, self);
+        let _ = poll::nodes_and_client(nodes, self);
 
         match self.try_recv() {
             Ok(Event::Response { response: Response::PutIData { res, msg_id }, .. }) => {
