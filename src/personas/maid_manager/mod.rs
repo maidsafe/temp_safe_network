@@ -297,9 +297,8 @@ impl MaidManager {
                 Err(error) => {
                     let error = match error {
                         ClientError::NoSuchData => ClientError::InvalidInvitation,
-                        ClientError::InvalidOperation |
-                        ClientError::InvalidSuccessor => ClientError::InvitationAlreadyClaimed,
-                        _ => ClientError::from(format!("Error claiming invitation {:?}", error)),
+                        ClientError::EntryExists => ClientError::InvitationAlreadyClaimed,
+                        _ => ClientError::from(format!("Error claiming invitation: {:?}", error)),
                     };
 
                     Err(error)

@@ -17,11 +17,11 @@
 
 use super::poll;
 use super::test_node::TestNode;
-use maidsafe_utilities::SeededRng;
+use maidsafe_utilities::{SeededRng, serialisation};
 use rand::Rng;
-use routing::{AccountInfo, Authority, BootstrapConfig, Client, ClientError, EntryAction, Event,
-              EventStream, FullId, ImmutableData, MessageId, MutableData, PermissionSet, PublicId,
-              Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
+use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, Authority, BootstrapConfig, Client, ClientError,
+              EntryAction, Event, EventStream, FullId, ImmutableData, MessageId, MutableData,
+              PermissionSet, PublicId, Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::{self, Network, ServiceHandle};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -62,7 +62,14 @@ pub struct TestClient {
 impl TestClient {
     /// Create a test client for the mock network
     pub fn new(network: &Network<PublicId>, config: Option<BootstrapConfig>) -> Self {
-        let full_id = FullId::new();
+        Self::with_id(network, config, FullId::new())
+    }
+
+    /// Create a test client with the given `FullId`.
+    pub fn with_id(network: &Network<PublicId>,
+                   config: Option<BootstrapConfig>,
+                   full_id: FullId)
+                   -> Self {
         let handle = network.new_service_handle(config.clone(), None);
         let client = mock_crust::make_current(&handle, || {
             unwrap!(Client::new(Some(full_id.clone()), config))
@@ -119,8 +126,8 @@ impl TestClient {
 
     /// Creates an account and stores it
     pub fn create_account(&mut self, nodes: &mut [TestNode]) {
-        let owner = *self.full_id.public_id().signing_public_key();
-        let owners = iter::once(owner).collect::<BTreeSet<_>>();
+        let owner = *self.signing_public_key();
+        let owners = iter::once(owner).collect();
 
         let data = unwrap!(MutableData::new(self.rng.gen(),
                                             TYPE_TAG_SESSION_PACKET,
@@ -129,6 +136,44 @@ impl TestClient {
                                             owners));
 
         unwrap!(self.put_mdata_response(data, nodes));
+    }
+
+    /// Creates an account using the given invitation code.
+    pub fn create_account_with_invitation(&mut self,
+                                          invitation_code: &str,
+                                          nodes: &mut [TestNode])
+                                          -> Result<(), ClientError> {
+        let owner = *self.signing_public_key();
+        let owners = iter::once(owner).collect();
+
+        let content = unwrap!(serialisation::serialise(&(invitation_code, Vec::<u8>::new())));
+        let mut entries = BTreeMap::new();
+        let _ = entries.insert(ACC_LOGIN_ENTRY_KEY.to_vec(),
+                               Value {
+                                   content: content,
+                                   entry_version: 0,
+                               });
+
+        let data = unwrap!(MutableData::new(self.rng.gen(),
+                                            TYPE_TAG_SESSION_PACKET,
+                                            Default::default(),
+                                            entries,
+                                            owners));
+
+        let request_msg_id = self.put_mdata(data);
+        let _ = poll::nodes_and_client(nodes, self);
+
+        let (res, response_msg_id) = match self.try_recv() {
+            Ok(Event::Response { response: Response::PutMData { res, msg_id }, .. }) |
+            Ok(Event::Response {
+                   response: Response::MutateMDataEntries { res, msg_id }, ..
+               }) => (res, msg_id),
+            Ok(response) => panic!("Unexpected response: {:?}", response),
+            Err(error) => panic!("Unexpected error: {:?}", error),
+        };
+
+        assert_eq!(response_msg_id, request_msg_id);
+        res
     }
 
     /// Puts immutable data

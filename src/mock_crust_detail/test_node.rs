@@ -58,10 +58,8 @@ impl TestNode {
         let vault_config = match config {
             Some(config) => {
                 Config {
-                    wallet_address: config.wallet_address,
-                    max_capacity: config.max_capacity,
                     chunk_store_root: Some(format!("{}", chunk_store_root.display())),
-                    invite_key: None,
+                    ..config
                 }
             }
             None => {
