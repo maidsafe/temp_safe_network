@@ -137,7 +137,7 @@ impl MaidManager {
             return Ok(());
         }
 
-        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, None) {
+        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, None, true) {
             routing_node
                 .send_put_idata_response(dst, src, Err(err), msg_id)?;
             return Ok(());
@@ -251,7 +251,11 @@ impl MaidManager {
                                        msg_id: MessageId,
                                        requester: sign::PublicKey)
                                        -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
+        if let Err(err) = self.prepare_data_mutation(&src,
+                                                     &dst,
+                                                     AuthPolicy::Key,
+                                                     Some(requester),
+                                                     true) {
             routing_node
                 .send_mutate_mdata_entries_response(dst, src, Err(err), msg_id)?;
             return Ok(());
@@ -330,7 +334,11 @@ impl MaidManager {
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
+        if let Err(err) = self.prepare_data_mutation(&src,
+                                                     &dst,
+                                                     AuthPolicy::Key,
+                                                     Some(requester),
+                                                     true) {
             routing_node
                 .send_set_mdata_user_permissions_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
@@ -380,7 +388,11 @@ impl MaidManager {
                                              msg_id: MessageId,
                                              requester: sign::PublicKey)
                                              -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester)) {
+        if let Err(err) = self.prepare_data_mutation(&src,
+                                                     &dst,
+                                                     AuthPolicy::Key,
+                                                     Some(requester),
+                                                     true) {
             routing_node
                 .send_del_mdata_user_permissions_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
@@ -428,7 +440,7 @@ impl MaidManager {
                                      version: u64,
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Owner, None) {
+        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Owner, None, true) {
             routing_node
                 .send_change_mdata_owner_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
@@ -607,14 +619,18 @@ impl MaidManager {
             return Err(ClientError::InvalidOwners);
         }
 
+        let mut check_balance = true;
         let res = match tag {
             TYPE_TAG_SESSION_PACKET => self.prepare_put_account(src, dst, data, msg_id),
-            TYPE_TAG_INVITE => self.prepare_put_invite(src, dst, data),
+            TYPE_TAG_INVITE => {
+                check_balance = false;
+                self.prepare_put_invite(src, dst, data)
+            }
             _ => Ok(PutMDataAction::Forward(data)),
         };
 
         if let Ok(PutMDataAction::Forward(_)) = res {
-            self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester))
+            self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester), check_balance)
                 .map_err(|error| {
                     trace!("MM PutMData request failed: {:?}", error);
                     // Undo the account creation
@@ -812,7 +828,8 @@ impl MaidManager {
                              src: &Authority<XorName>,
                              dst: &Authority<XorName>,
                              policy: AuthPolicy,
-                             requester: Option<sign::PublicKey>)
+                             requester: Option<sign::PublicKey>,
+                             check_balance: bool)
                              -> Result<(), ClientError> {
         let client_manager_name = utils::client_name(dst);
 
@@ -837,7 +854,7 @@ impl MaidManager {
             }
         }
 
-        if !account.has_balance() {
+        if check_balance && !account.has_balance() {
             return Err(ClientError::LowBalance);
         }
 
