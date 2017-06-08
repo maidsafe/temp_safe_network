@@ -256,6 +256,11 @@ fn create_account_twice() {
                Err(ClientError::AccountExists));
 }
 
+// Test the invite workflow:
+// 1. Put a new invite on the network by an admin client
+// 2. Verify only admin clients can put invites
+// 3. Create account using invite code
+// 4. Verify invite code can be used only once
 #[test]
 fn invite() {
     let seed = None;

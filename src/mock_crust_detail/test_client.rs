@@ -19,9 +19,10 @@ use super::poll;
 use super::test_node::TestNode;
 use maidsafe_utilities::{SeededRng, serialisation};
 use rand::Rng;
-use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, Authority, BootstrapConfig, Client, ClientError,
-              EntryAction, Event, EventStream, FullId, ImmutableData, MessageId, MutableData,
-              PermissionSet, PublicId, Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
+use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, BootstrapConfig, Client,
+              ClientError, EntryAction, Event, EventStream, FullId, ImmutableData, MessageId,
+              MutableData, PermissionSet, PublicId, Response, TYPE_TAG_SESSION_PACKET, User,
+              Value, XorName};
 use routing::mock_crust::{self, Network, ServiceHandle};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -146,7 +147,11 @@ impl TestClient {
         let owner = *self.signing_public_key();
         let owners = iter::once(owner).collect();
 
-        let content = unwrap!(serialisation::serialise(&(invitation_code, Vec::<u8>::new())));
+        let content = AccountPacket::WithInvitation {
+            invitation_string: invitation_code.to_owned(),
+            acc_pkt: Vec::new(),
+        };
+        let content = unwrap!(serialisation::serialise(&content));
         let mut entries = BTreeMap::new();
         let _ = entries.insert(ACC_LOGIN_ENTRY_KEY.to_vec(),
                                Value {
@@ -160,20 +165,7 @@ impl TestClient {
                                             entries,
                                             owners));
 
-        let request_msg_id = self.put_mdata(data);
-        let _ = poll::nodes_and_client(nodes, self);
-
-        let (res, response_msg_id) = match self.try_recv() {
-            Ok(Event::Response { response: Response::PutMData { res, msg_id }, .. }) |
-            Ok(Event::Response {
-                   response: Response::MutateMDataEntries { res, msg_id }, ..
-               }) => (res, msg_id),
-            Ok(response) => panic!("Unexpected response: {:?}", response),
-            Err(error) => panic!("Unexpected error: {:?}", error),
-        };
-
-        assert_eq!(response_msg_id, request_msg_id);
-        res
+        self.put_mdata_response(data, nodes)
     }
 
     /// Puts immutable data

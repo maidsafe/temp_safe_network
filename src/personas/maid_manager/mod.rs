@@ -29,8 +29,8 @@ use TYPE_TAG_INVITE;
 use error::InternalError;
 use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
-use routing::{ACC_LOGIN_ENTRY_KEY, Authority, ClientError, EntryAction, EntryActions,
-              ImmutableData, MessageId, MutableData, PermissionSet, RoutingTable,
+use routing::{ACC_LOGIN_ENTRY_KEY, AccountPacket, Authority, ClientError, EntryAction,
+              EntryActions, ImmutableData, MessageId, MutableData, PermissionSet, RoutingTable,
               TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -280,19 +280,20 @@ impl MaidManager {
                                                 res: Result<(), ClientError>,
                                                 msg_id: MessageId)
                                                 -> Result<(), InternalError> {
-        let (src, dst, res) = if let Some(CachedAccountCreation { src, dst, data }) =
+        if let Some(CachedAccountCreation { src, dst, data }) =
+            // Invitation claim.
             self.account_creation_cache.remove(&msg_id) {
 
-            let res = match res {
+            match res {
                 Ok(()) => {
                     let (client_name, client_key) = utils::client_name_and_key(&src);
                     let _ = self.accounts.insert(*client_name, Account::default());
-                    return self.forward_put_mdata(routing_node,
+                    self.forward_put_mdata(routing_node,
                                                   src,
                                                   dst,
                                                   data,
                                                   msg_id,
-                                                  *client_key);
+                                                  *client_key)?;
                 }
                 Err(error) => {
                     let error = match error {
@@ -301,19 +302,18 @@ impl MaidManager {
                         _ => ClientError::from(format!("Error claiming invitation: {:?}", error)),
                     };
 
-                    Err(error)
+                    routing_node
+                        .send_put_mdata_response(dst, src, Err(error), msg_id)?;
                 }
-            };
-
-            (src, dst, res)
+            }
         } else {
+            // Regular entries mutation.
             let CachedRequest { src, dst, .. } =
                 self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
-            (src, dst, res)
+            routing_node
+                .send_mutate_mdata_entries_response(dst, src, res, msg_id)?;
         };
 
-        routing_node
-            .send_mutate_mdata_entries_response(dst, src, res, msg_id)?;
         Ok(())
     }
 
@@ -1079,8 +1079,12 @@ fn get_invite_name(data: &MutableData) -> Result<XorName, ClientError> {
                        .ok_or(ClientError::InvalidInvitation)?
                        .content;
 
-    let (code, _): (String, Vec<u8>) = serialisation::deserialise(content)
+    let account_packet = serialisation::deserialise(content)
         .map_err(|_| ClientError::InvalidInvitation)?;
 
-    Ok(XorName(tiny_keccak::sha3_256(code.as_bytes())))
+    if let AccountPacket::WithInvitation { invitation_string, .. } = account_packet {
+        Ok(XorName(tiny_keccak::sha3_256(invitation_string.as_bytes())))
+    } else {
+        Err(ClientError::InvalidInvitation)
+    }
 }
