@@ -599,82 +599,102 @@ impl MaidManager {
                          -> Result<PutMDataAction, ClientError> {
         data.validate()?;
 
-        let (src_name, src_key) = utils::client_name_and_key(&src);
+        let tag = data.tag();
+        let src_name = utils::client_name(&src);
         let dst_name = utils::client_name(&dst);
-        let is_admin = Some(*src_key) == self.invite_key;
 
         if !utils::verify_mdata_owner(&data, dst_name) {
             return Err(ClientError::InvalidOwners);
         }
 
-        match data.tag() {
-            TYPE_TAG_SESSION_PACKET => {
-                if dst_name != src_name {
-                    trace!("MM Cannot create account for {:?} as {:?}.", src, dst);
-                    return Err(ClientError::InvalidOperation);
-                }
+        let res = match tag {
+            TYPE_TAG_SESSION_PACKET => self.prepare_put_account(src, dst, data, msg_id),
+            TYPE_TAG_INVITE => self.prepare_put_invite(src, dst, data),
+            _ => Ok(PutMDataAction::Forward(data)),
+        };
 
-                if is_admin || self.invite_key.is_none() {
-                    let len = self.accounts.len();
-                    match self.accounts.entry(*src_name) {
-                        Entry::Vacant(entry) => {
-                            let _ = entry.insert(Account::default());
-                            info!("Managing {} client accounts.", len + 1);
-                        }
-                        Entry::Occupied(_) => {
-                            trace!("MM Cannot create account for {:?} - it already exists", src);
-                            return Err(ClientError::AccountExists);
-                        }
-                    }
-                } else if self.accounts.contains_key(src_name) {
-                    trace!("MM Cannot create account for {:?} - it already exists", src);
-                    return Err(ClientError::AccountExists);
-                } else {
-                    let invite_name = get_invite_name(&data)?;
-                    trace!("Creating account for {:?} with invitation {:?}.",
-                           src_name,
-                           invite_name);
-
-                    let item = CachedAccountCreation {
-                        src: src,
-                        dst: dst,
-                        data: data,
-                    };
-                    if let Some(old) = self.account_creation_cache.insert(msg_id, item) {
-                        debug!("Received two account creation requests with message ID {:?}. {:?} \
-                            and {:?}.",
-                               msg_id,
-                               old,
-                               self.account_creation_cache.get(&msg_id));
+        if let Ok(PutMDataAction::Forward(_)) = res {
+            self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester))
+                .map_err(|error| {
+                    trace!("MM PutMData request failed: {:?}", error);
+                    // Undo the account creation
+                    if tag == TYPE_TAG_SESSION_PACKET {
+                        let _ = self.accounts.remove(src_name);
                     }
 
-                    return Ok(PutMDataAction::Claim(invite_name));
-                }
-            }
-            TYPE_TAG_INVITE => {
-                // Only the authorised admin client can create invitations.
-                if !is_admin {
-                    trace!("Cannot put {:?} as {:?}.", data, dst);
-                    return Err(ClientError::InvalidOperation);
-                } else {
-                    trace!("Creating invitation {:?}.", data.name());
-                }
-            }
-            _ => (),
+                    error
+                })?;
         }
 
-        self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester))
-            .map_err(|error| {
-                trace!("MM PutMData request failed: {:?}", error);
-                // Undo the account creation
-                if data.tag() == TYPE_TAG_SESSION_PACKET {
-                    let _ = self.accounts.remove(src_name);
+        res
+    }
+
+    fn prepare_put_account(&mut self,
+                           src: Authority<XorName>,
+                           dst: Authority<XorName>,
+                           data: MutableData,
+                           msg_id: MessageId)
+                           -> Result<PutMDataAction, ClientError> {
+        let src_name = utils::client_name(&src);
+        let dst_name = utils::client_name(&dst);
+
+        if dst_name != src_name {
+            trace!("MM Cannot create account for {:?} as {:?}.", src, dst);
+            return Err(ClientError::InvalidOperation);
+        }
+
+        if self.is_admin(&src) || self.invite_key.is_none() {
+            let len = self.accounts.len();
+            match self.accounts.entry(*src_name) {
+                Entry::Vacant(entry) => {
+                    let _ = entry.insert(Account::default());
+                    info!("Managing {} client accounts.", len + 1);
+                    Ok(PutMDataAction::Forward(data))
                 }
+                Entry::Occupied(_) => {
+                    trace!("MM Cannot create account for {:?} - it already exists", src);
+                    Err(ClientError::AccountExists)
+                }
+            }
+        } else if self.accounts.contains_key(src_name) {
+            trace!("MM Cannot create account for {:?} - it already exists", src);
+            Err(ClientError::AccountExists)
+        } else {
+            let invite_name = get_invite_name(&data)?;
+            trace!("Creating account for {:?} with invitation {:?}.",
+                   src_name,
+                   invite_name);
 
-                error
-            })?;
+            let item = CachedAccountCreation {
+                src: src,
+                dst: dst,
+                data: data,
+            };
+            if let Some(old) = self.account_creation_cache.insert(msg_id, item) {
+                debug!("Received two account creation requests with message ID {:?}. {:?} \
+                            and {:?}.",
+                       msg_id,
+                       old,
+                       self.account_creation_cache.get(&msg_id));
+            }
 
-        Ok(PutMDataAction::Forward(data))
+            Ok(PutMDataAction::Claim(invite_name))
+        }
+    }
+
+    fn prepare_put_invite(&mut self,
+                          src: Authority<XorName>,
+                          dst: Authority<XorName>,
+                          data: MutableData)
+                          -> Result<PutMDataAction, ClientError> {
+        // Only the authorised admin client can create invitations.
+        if !self.is_admin(&src) {
+            trace!("Cannot put {:?} as {:?}.", data, dst);
+            Err(ClientError::InvalidOperation)
+        } else {
+            trace!("Creating invitation {:?}.", data.name());
+            Ok(PutMDataAction::Forward(data))
+        }
     }
 
     fn forward_put_mdata(&mut self,
@@ -972,6 +992,11 @@ impl MaidManager {
                             });
 
         Some(account)
+    }
+
+    fn is_admin(&self, authority: &Authority<XorName>) -> bool {
+        let (_, src_key) = utils::client_name_and_key(authority);
+        Some(*src_key) == self.invite_key
     }
 }
 

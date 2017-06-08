@@ -152,12 +152,12 @@ impl TestClient {
             acc_pkt: Vec::new(),
         };
         let content = unwrap!(serialisation::serialise(&content));
-        let mut entries = BTreeMap::new();
-        let _ = entries.insert(ACC_LOGIN_ENTRY_KEY.to_vec(),
-                               Value {
-                                   content: content,
-                                   entry_version: 0,
-                               });
+        let entries = iter::once((ACC_LOGIN_ENTRY_KEY.to_vec(),
+                                  Value {
+                                      content: content,
+                                      entry_version: 0,
+                                  }))
+                .collect();
 
         let data = unwrap!(MutableData::new(self.rng.gen(),
                                             TYPE_TAG_SESSION_PACKET,

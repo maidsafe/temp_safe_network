@@ -298,6 +298,13 @@ fn invite() {
     let mut client1 = TestClient::new(&network, Some(config.clone()));
     client1.ensure_connected(&mut nodes);
 
+    // Attempt to create account using invalid invite code fails.
+    assert_eq!(Err(ClientError::InvalidInvitation),
+               client1.create_account_with_invitation("invalid invite", &mut nodes));
+
+    // Create account using valid invite code.
+    unwrap!(client1.create_account_with_invitation(invite_code, &mut nodes));
+
     // Attempt to put an invite by non-admin client fails.
     let name = XorName(tiny_keccak::sha3_256(b"fake invite"));
     let mut owners = BTreeSet::new();
@@ -309,13 +316,6 @@ fn invite() {
                                         owners));
     assert_eq!(Err(ClientError::InvalidOperation),
                client1.put_mdata_response(data, &mut nodes));
-
-    // Attempt to create account using invalid invite code fails.
-    assert_eq!(Err(ClientError::InvalidInvitation),
-               client1.create_account_with_invitation("invalid invite", &mut nodes));
-
-    // Create account using valid invite code.
-    unwrap!(client1.create_account_with_invitation(invite_code, &mut nodes));
 
     // Attempt to reuse already claimed invite fails.
     let mut client2 = TestClient::new(&network, Some(config));
