@@ -794,7 +794,7 @@ impl DataManager {
                 let client_name = utils::client_name(&src);
                 let new_owner = extract_owner(new_owners)?;
 
-                if utils::verify_mdata_owner(&data, &client_name) {
+                if utils::verify_mdata_owner(&data, client_name) {
                     data.change_owner(new_owner, version)
                 } else {
                     Err(ClientError::AccessDenied)

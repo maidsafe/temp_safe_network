@@ -19,15 +19,17 @@
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
 
 use rand::Rng;
-use routing::{AccountInfo, BootstrapConfig, ClientError, Event, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
-              MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData, Response,
-              TYPE_TAG_SESSION_PACKET, Value};
+use routing::{AccountInfo, Action, BootstrapConfig, ClientError, Event, FullId,
+              MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_ENTRIES,
+              MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData, PermissionSet, Response,
+              TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
-use safe_vault::{DEFAULT_MAX_OPS_COUNT, GROUP_SIZE, test_utils};
+use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, GROUP_SIZE, TYPE_TAG_INVITE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use tiny_keccak;
 
 const TEST_NET_SIZE: usize = 20;
 const TEST_TAG: u64 = 123456;
@@ -252,6 +254,75 @@ fn create_account_twice() {
                                            owners));
     assert_eq!(client0.put_mdata_response(account, &mut nodes),
                Err(ClientError::AccountExists));
+}
+
+// Test the invite workflow:
+// 1. Put a new invite on the network by an admin client
+// 2. Verify only admin clients can put invites
+// 3. Create account using invite code
+// 4. Verify invite code can be used only once
+#[test]
+fn invite() {
+    let seed = None;
+    let node_count = GROUP_SIZE;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let admin_id = FullId::new();
+    let vault_config = Config {
+        invite_key: Some(admin_id.public_id().signing_public_key().0),
+        ..Default::default()
+    };
+
+    let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+
+    let mut admin_client = TestClient::with_id(&network, Some(config.clone()), admin_id);
+    admin_client.ensure_connected(&mut nodes);
+    admin_client.create_account(&mut nodes);
+
+    let invite_code = "invite";
+
+    // Put the invite
+    let name = XorName(tiny_keccak::sha3_256(invite_code.as_bytes()));
+    let mut owners = BTreeSet::new();
+    let _ = owners.insert(*admin_client.signing_public_key());
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(User::Anyone, PermissionSet::new().allow(Action::Insert));
+    let data = unwrap!(MutableData::new(name,
+                                        TYPE_TAG_INVITE,
+                                        permissions.clone(),
+                                        Default::default(),
+                                        owners));
+    unwrap!(admin_client.put_mdata_response(data, &mut nodes));
+
+    let mut client1 = TestClient::new(&network, Some(config.clone()));
+    client1.ensure_connected(&mut nodes);
+
+    // Attempt to create account using invalid invite code fails.
+    assert_eq!(Err(ClientError::InvalidInvitation),
+               client1.create_account_with_invitation("invalid invite", &mut nodes));
+
+    // Create account using valid invite code.
+    unwrap!(client1.create_account_with_invitation(invite_code, &mut nodes));
+
+    // Attempt to put an invite by non-admin client fails.
+    let name = XorName(tiny_keccak::sha3_256(b"fake invite"));
+    let mut owners = BTreeSet::new();
+    let _ = owners.insert(*client1.signing_public_key());
+    let data = unwrap!(MutableData::new(name,
+                                        TYPE_TAG_INVITE,
+                                        permissions,
+                                        Default::default(),
+                                        owners));
+    assert_eq!(Err(ClientError::InvalidOperation),
+               client1.put_mdata_response(data, &mut nodes));
+
+    // Attempt to reuse already claimed invite fails.
+    let mut client2 = TestClient::new(&network, Some(config));
+    client2.ensure_connected(&mut nodes);
+
+    assert_eq!(Err(ClientError::InvitationAlreadyClaimed),
+               client2.create_account_with_invitation(invite_code, &mut nodes));
 }
 
 #[test]
