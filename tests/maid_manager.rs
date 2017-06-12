@@ -190,7 +190,8 @@ fn create_account_twice() {
 
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
+                                                      .endpoint()]);
     let mut client0 = TestClient::new(&network, Some(config.clone()));
     let mut client1 = TestClient::new(&network, Some(config.clone()));
 
@@ -273,8 +274,10 @@ fn invite() {
         ..Default::default()
     };
 
+    let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
+                                                      .endpoint()]);
 
     let mut admin_client = TestClient::with_id(&network, Some(config.clone()), admin_id);
     admin_client.ensure_connected(&mut nodes);
@@ -367,7 +370,7 @@ fn account_balance_with_successful_mutations_with_churn() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[1].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     let client_key = *client.full_id().public_id().signing_public_key();
 
@@ -388,14 +391,14 @@ fn account_balance_with_successful_mutations_with_churn() {
         }
 
         if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
-            let index = rng.gen_range(1, nodes.len());
+            let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
         } else {
             let number = rng.gen_range(1, 4);
             trace!("Removing {} node(s).", number);
             for _ in 0..number {
-                let node_index = rng.gen_range(1, nodes.len());
+                let node_index = rng.gen_range(2, nodes.len());
                 test_node::drop_node(&mut nodes, node_index);
             }
         }
@@ -433,7 +436,7 @@ fn account_balance_with_failed_mutations_with_churn() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let client_config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let client_config = BootstrapConfig::with_contacts(&[nodes[1].endpoint()]);
     let mut client = TestClient::new(&network, Some(client_config));
     let client_key = *client.full_id().public_id().signing_public_key();
 
@@ -463,14 +466,14 @@ fn account_balance_with_failed_mutations_with_churn() {
         }
 
         if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
-            let index = rng.gen_range(1, nodes.len());
+            let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
         } else {
             let number = rng.gen_range(1, 4);
             trace!("Removing {} node(s).", number);
             for _ in 0..number {
-                let node_index = rng.gen_range(1, nodes.len());
+                let node_index = rng.gen_range(2, nodes.len());
                 test_node::drop_node(&mut nodes, node_index);
             }
         }
@@ -515,7 +518,6 @@ fn account_concurrent_insert_delete_key() {
     let network = Network::new(GROUP_SIZE, seed);
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-
     let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
@@ -587,7 +589,6 @@ fn account_concurrent_insert_keys() {
     let network = Network::new(GROUP_SIZE, seed);
     let mut event_count = 0;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-
     let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);

@@ -101,7 +101,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, use_cache);
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[1].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
     client.ensure_connected(&mut nodes);
@@ -120,14 +120,14 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
         }
 
         if nodes.len() <= GROUP_SIZE + 2 || !rng.gen_weighted_bool(4) {
-            let index = rng.gen_range(1, nodes.len());
+            let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, use_cache);
         } else {
             let number = rng.gen_range(3, 4);
             trace!("Removing {} node(s).", number);
             for _ in 0..number {
-                let node_index = rng.gen_range(1, nodes.len());
+                let node_index = rng.gen_range(2, nodes.len());
                 trace!("Removing node {:?}", nodes[node_index].name());
                 test_node::drop_node(&mut nodes, node_index);
             }
@@ -972,7 +972,7 @@ fn mutable_data_operations_with_churn() {
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[1].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
 
     client.ensure_connected(&mut nodes);
@@ -1032,7 +1032,7 @@ fn mutable_data_operations_with_churn() {
         // Churn
         if nodes.len() <= GROUP_SIZE + 2 || rng.gen_range(0, 4) < 3 {
             // Add new node.
-            let bootstrap_node_index = rng.gen_range(1, nodes.len());
+            let bootstrap_node_index = rng.gen_range(2, nodes.len());
             let bootstrap_node_name = nodes[bootstrap_node_index].name();
             test_node::add_node(&network, &mut nodes, bootstrap_node_index, true);
             let new_node_name = nodes[nodes.len() - 1].name();
@@ -1045,7 +1045,7 @@ fn mutable_data_operations_with_churn() {
             let count = rng.gen_range(1, 4);
             let mut removed_nodes = Vec::with_capacity(count);
             for _ in 0..count {
-                let node_index = rng.gen_range(1, nodes.len());
+                let node_index = rng.gen_range(2, nodes.len());
                 removed_nodes.push(nodes[node_index].name());
                 test_node::drop_node(&mut nodes, node_index);
             }
@@ -1073,12 +1073,12 @@ fn caching_with_data_not_close_to_proxy_node() {
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[1].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let sent_data = gen_immutable_data_not_close_to(&nodes[0], &mut rng);
+    let sent_data = gen_immutable_data_not_close_to(&nodes[1], &mut rng);
     unwrap!(client.put_idata_response(sent_data.clone(), &mut nodes));
 
     // The first response is not yet cached, so it comes from a NAE manager authority.
@@ -1117,12 +1117,12 @@ fn caching_with_data_close_to_proxy_node() {
     let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
 
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[1].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let sent_data = gen_immutable_data_close_to(&nodes[0], &mut rng);
+    let sent_data = gen_immutable_data_close_to(&nodes[1], &mut rng);
     unwrap!(client.put_idata_response(sent_data.clone(), &mut nodes));
 
     // Send two requests and verify the response is not cached in any of them
