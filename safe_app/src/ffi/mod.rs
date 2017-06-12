@@ -22,10 +22,12 @@
 use super::App;
 use super::errors::AppError;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_error_code, from_c_str};
+use maidsafe_utilities::serialisation::deserialise;
 use safe_core::NetworkEvent;
-use safe_core::ipc::AuthGranted;
+use safe_core::ipc::{AuthGranted, BootstrapConfig};
 use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use std::os::raw::{c_char, c_void};
+use std::slice;
 
 /// Access container
 pub mod access_container;
@@ -49,6 +51,8 @@ mod helper;
 /// Create unregistered app.
 #[no_mangle]
 pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
+                                          bootstrap_config_ptr: *mut u8,
+                                          bootstrap_config_len: usize,
                                           network_observer_cb: unsafe extern "C" fn(*mut c_void,
                                                                                     FfiResult,
                                                                                     i32),
@@ -57,10 +61,19 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
     catch_unwind_error_code(|| -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
 
+        let config = if bootstrap_config_len == 0 || bootstrap_config_ptr.is_null() {
+            None
+        } else {
+            let config_serialised = slice::from_raw_parts(bootstrap_config_ptr,
+                                                          bootstrap_config_len);
+            Some(deserialise::<BootstrapConfig>(config_serialised)?)
+        };
+
         let app =
             App::unregistered(move |event| {
                                   call_network_observer(event, user_data.0, network_observer_cb)
-                              })?;
+                              },
+                              config)?;
 
         *o_app = Box::into_raw(Box::new(app));
 
