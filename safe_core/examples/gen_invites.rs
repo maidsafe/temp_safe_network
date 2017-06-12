@@ -127,7 +127,7 @@ fn main() {
 
     // Check a single invite
     if let Some(invite) = args.flag_check_invite {
-        let cl = unwrap!(Client::unregistered(el_h, core_tx.clone(), net_tx.clone()));
+        let cl = unwrap!(Client::unregistered(el_h, core_tx.clone(), net_tx.clone(), None));
 
         unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
             let id = XorName(sha3_256(invite.as_bytes()));

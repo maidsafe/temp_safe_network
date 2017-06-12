@@ -82,7 +82,7 @@ use maidsafe_utilities::thread::{self, Joiner};
 use rust_sodium::crypto::secretbox;
 use safe_core::{Client, ClientKeys, CoreMsg, CoreMsgTx, FutureExt, MDataInfo, NetworkEvent,
                 NetworkTx, event_loop, utils};
-use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, Permission};
+use safe_core::ipc::{AccessContInfo, AppKeys, AuthGranted, BootstrapConfig, Permission};
 use safe_core::ipc::resp::access_container_enc_key;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
@@ -112,13 +112,13 @@ pub struct App {
 
 impl App {
     /// Create unregistered app.
-    /// TODO: add a `BootstrapConfig` argument to this function and
-    /// figure out what to pass to it.
-    pub fn unregistered<N>(network_observer: N) -> Result<Self, AppError>
+    pub fn unregistered<N>(network_observer: N,
+                           config: Option<BootstrapConfig>)
+                           -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static
     {
         Self::new(network_observer, |el_h, core_tx, net_tx| {
-            let client = Client::unregistered(el_h, core_tx, net_tx)?;
+            let client = Client::unregistered(el_h, core_tx, net_tx, config)?;
             let context = AppContext::unregistered();
             Ok((client, context))
         })
