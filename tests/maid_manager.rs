@@ -21,7 +21,7 @@
 use rand::Rng;
 use routing::{AccountInfo, Action, BootstrapConfig, ClientError, Event, FullId,
               MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_ENTRIES,
-              MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData, PermissionSet, Response,
+              MAX_MUTABLE_DATA_SIZE_IN_BYTES, MessageId, MutableData, PermissionSet, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
@@ -565,7 +565,7 @@ fn account_concurrent_keys_mutation() {
         let (new_keys, new_version) =
             unwrap!(client.list_auth_keys_and_version_response(&mut nodes));
 
-        if ins_successes.len() > 0 {
+        if !ins_successes.is_empty() {
             assert_eq!(new_keys.len(), stored_keys.len() + 1);
 
             for msg_id in ins_successes {
@@ -574,7 +574,7 @@ fn account_concurrent_keys_mutation() {
             }
         }
 
-        if del_successes.len() > 0 {
+        if !del_successes.is_empty() {
             assert_eq!(new_keys.len(), stored_keys.len() - 1);
 
             for msg_id in del_successes {
@@ -666,4 +666,74 @@ fn account_concurrent_insert_key_put_data() {
     for &(_, count) in &node_count_stats {
         assert_eq!(count, Some(mutate_count));
     }
+}
+
+/// Multiple requests with the same message IDs should not be allowed.
+#[test]
+fn reusing_msg_ids() {
+    let seed = None;
+    let node_count = 8;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+
+    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes)).endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    let balance0 = unwrap!(client.get_account_info_response(&mut nodes));
+
+    // Sequential requests
+
+    let data0 = test_utils::gen_immutable_data(10, &mut rng);
+    let data1 = test_utils::gen_immutable_data(10, &mut rng);
+    let msg_id = MessageId::new();
+
+    unwrap!(client.put_idata_response_with_msg_id(data0.clone(), msg_id, &mut nodes));
+    match client.put_idata_response_with_msg_id(data1.clone(), msg_id, &mut nodes) {
+        Err(ClientError::InvalidOperation) => (),
+        Err(error) => panic!("Unexpected error: {:?}", error),
+        Ok(()) => panic!("Unexpected success"),
+    }
+
+    // Only one chunk is stored.
+    let retrieved_data = unwrap!(client.get_idata_response(*data0.name(), &mut nodes));
+    assert_eq!(retrieved_data, data0);
+    assert_eq!(client.get_idata_response(*data1.name(), &mut nodes),
+               Err(ClientError::NoSuchData));
+
+    // Only one request is charged.
+    let balance1 = unwrap!(client.get_account_info_response(&mut nodes));
+    assert_eq!(balance1.mutations_done, balance0.mutations_done + 1);
+
+    // Concurrent requests
+
+    let data0 = test_utils::gen_immutable_data(10, &mut rng);
+    let data1 = test_utils::gen_immutable_data(10, &mut rng);
+    let msg_id = MessageId::new();
+    client.put_idata_with_msg_id(data0.clone(), msg_id);
+    client.put_idata_with_msg_id(data1.clone(), msg_id);
+
+    let _ = poll::nodes_and_client(&mut nodes, &mut client);
+
+    let mut successes = 0;
+    while let Ok(event) = client.try_recv() {
+        if let Event::Response { response: Response::PutIData { res: Ok(()), .. }, .. } = event {
+            successes += 1;
+        }
+    }
+
+    // Only one request does succeed.
+    assert_eq!(successes, 1);
+
+    // Only one chunk is stored.
+    let res0 = client.get_idata_response(*data0.name(), &mut nodes);
+    let res1 = client.get_idata_response(*data1.name(), &mut nodes);
+    assert!((res0.is_ok() && res1.is_err()) || (res0.is_err() && res1.is_ok()));
+
+    // Only one request is charged.
+    let balance2 = unwrap!(client.get_account_info_response(&mut nodes));
+    assert_eq!(balance2.mutations_done, balance1.mutations_done + 1);
 }

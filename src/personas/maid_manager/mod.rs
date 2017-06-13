@@ -137,19 +137,27 @@ impl MaidManager {
             return Ok(());
         }
 
-        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, None, true) {
+        if let Err(err) = self.prepare_data_mutation(&src,
+                                                     &dst,
+                                                     AuthPolicy::Key,
+                                                     Some(msg_id),
+                                                     None) {
             routing_node
                 .send_put_idata_response(dst, src, Err(err), msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
-        let fwd_src = dst;
-        let fwd_dst = Authority::NaeManager(*data.name());
-        trace!("MM forwarding PutIData request to {:?}", fwd_dst);
-        routing_node
-            .send_put_idata_request(fwd_src, fwd_dst, data, msg_id)?;
-        self.insert_into_request_cache(msg_id, src, dst, None);
+        if self.insert_into_request_cache(msg_id, src, dst, None) {
+            let fwd_src = dst;
+            let fwd_dst = Authority::NaeManager(*data.name());
+            trace!("MM forwarding PutIData request to {:?}", fwd_dst);
+            routing_node
+                .send_put_idata_request(fwd_src, fwd_dst, data, msg_id)?;
+        } else {
+            routing_node
+                .send_put_idata_response(dst, src, Err(ClientError::InvalidOperation), msg_id)?;
+        }
 
         Ok(())
     }
@@ -254,27 +262,34 @@ impl MaidManager {
         if let Err(err) = self.prepare_data_mutation(&src,
                                                      &dst,
                                                      AuthPolicy::Key,
-                                                     Some(requester),
-                                                     true) {
+                                                     Some(msg_id),
+                                                     Some(requester)) {
             routing_node
                 .send_mutate_mdata_entries_response(dst, src, Err(err), msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
-        let fwd_src = dst;
-        let fwd_dst = Authority::NaeManager(name);
-        trace!("MM forwarding MutateMDataEntries request to {:?}", fwd_dst);
-        routing_node
-            .send_mutate_mdata_entries_request(fwd_src,
-                                               fwd_dst,
-                                               name,
-                                               tag,
-                                               actions,
-                                               msg_id,
-                                               requester)?;
+        if self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+            let fwd_src = dst;
+            let fwd_dst = Authority::NaeManager(name);
+            trace!("MM forwarding MutateMDataEntries request to {:?}", fwd_dst);
+            routing_node
+                .send_mutate_mdata_entries_request(fwd_src,
+                                                   fwd_dst,
+                                                   name,
+                                                   tag,
+                                                   actions,
+                                                   msg_id,
+                                                   requester)?;
+        } else {
+            routing_node
+                .send_mutate_mdata_entries_response(dst,
+                                                    src,
+                                                    Err(ClientError::InvalidOperation),
+                                                    msg_id)?;
+        }
 
-        self.insert_into_request_cache(msg_id, src, dst, Some(tag));
 
         Ok(())
     }
@@ -337,30 +352,37 @@ impl MaidManager {
         if let Err(err) = self.prepare_data_mutation(&src,
                                                      &dst,
                                                      AuthPolicy::Key,
-                                                     Some(requester),
-                                                     true) {
+                                                     Some(msg_id),
+                                                     Some(requester)) {
             routing_node
                 .send_set_mdata_user_permissions_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
-        let fwd_src = dst;
-        let fwd_dst = Authority::NaeManager(name);
-        trace!("MM forwarding SetMDataUserPermissions request to {:?}",
-               fwd_dst);
-        routing_node
-            .send_set_mdata_user_permissions_request(fwd_src,
-                                                     fwd_dst,
-                                                     name,
-                                                     tag,
-                                                     user,
-                                                     permissions,
-                                                     version,
-                                                     msg_id,
-                                                     requester)?;
+        if self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+            let fwd_src = dst;
+            let fwd_dst = Authority::NaeManager(name);
+            trace!("MM forwarding SetMDataUserPermissions request to {:?}",
+                   fwd_dst);
+            routing_node
+                .send_set_mdata_user_permissions_request(fwd_src,
+                                                         fwd_dst,
+                                                         name,
+                                                         tag,
+                                                         user,
+                                                         permissions,
+                                                         version,
+                                                         msg_id,
+                                                         requester)?;
+        } else {
+            routing_node
+                .send_set_mdata_user_permissions_response(dst,
+                                                          src,
+                                                          Err(ClientError::InvalidOperation),
+                                                          msg_id)?;
+        }
 
-        self.insert_into_request_cache(msg_id, src, dst, Some(tag));
         Ok(())
     }
 
@@ -391,29 +413,36 @@ impl MaidManager {
         if let Err(err) = self.prepare_data_mutation(&src,
                                                      &dst,
                                                      AuthPolicy::Key,
-                                                     Some(requester),
-                                                     true) {
+                                                     Some(msg_id),
+                                                     Some(requester)) {
             routing_node
                 .send_del_mdata_user_permissions_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
-        let fwd_src = dst;
-        let fwd_dst = Authority::NaeManager(name);
-        trace!("MM forwarding DelMDataUserPermissions request to {:?}",
-               fwd_dst);
-        routing_node
-            .send_del_mdata_user_permissions_request(fwd_src,
-                                                     fwd_dst,
-                                                     name,
-                                                     tag,
-                                                     user,
-                                                     version,
-                                                     msg_id,
-                                                     requester)?;
+        if self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+            let fwd_src = dst;
+            let fwd_dst = Authority::NaeManager(name);
+            trace!("MM forwarding DelMDataUserPermissions request to {:?}",
+                   fwd_dst);
+            routing_node
+                .send_del_mdata_user_permissions_request(fwd_src,
+                                                         fwd_dst,
+                                                         name,
+                                                         tag,
+                                                         user,
+                                                         version,
+                                                         msg_id,
+                                                         requester)?;
+        } else {
+            routing_node
+                .send_del_mdata_user_permissions_response(dst,
+                                                          src,
+                                                          Err(ClientError::InvalidOperation),
+                                                          msg_id)?;
+        }
 
-        self.insert_into_request_cache(msg_id, src, dst, Some(tag));
         Ok(())
     }
 
@@ -440,26 +469,37 @@ impl MaidManager {
                                      version: u64,
                                      msg_id: MessageId)
                                      -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src, &dst, AuthPolicy::Owner, None, true) {
+        if let Err(err) = self.prepare_data_mutation(&src,
+                                                     &dst,
+                                                     AuthPolicy::Owner,
+                                                     Some(msg_id),
+                                                     None) {
             routing_node
                 .send_change_mdata_owner_response(dst, src, Err(err.clone()), msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
-        let fwd_src = dst;
-        let fwd_dst = Authority::NaeManager(name);
-        trace!("MM forwarding ChangeMDataOwner request to {:?}", fwd_dst);
-        routing_node
-            .send_change_mdata_owner_request(fwd_src,
-                                             fwd_dst,
-                                             name,
-                                             tag,
-                                             new_owners,
-                                             version,
-                                             msg_id)?;
+        if self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+            let fwd_src = dst;
+            let fwd_dst = Authority::NaeManager(name);
+            trace!("MM forwarding ChangeMDataOwner request to {:?}", fwd_dst);
+            routing_node
+                .send_change_mdata_owner_request(fwd_src,
+                                                 fwd_dst,
+                                                 name,
+                                                 tag,
+                                                 new_owners,
+                                                 version,
+                                                 msg_id)?;
+        } else {
+            routing_node
+                .send_change_mdata_owner_response(dst,
+                                                  src,
+                                                  Err(ClientError::InvalidOperation),
+                                                  msg_id)?;
+        }
 
-        self.insert_into_request_cache(msg_id, src, dst, Some(tag));
         Ok(())
     }
 
@@ -619,18 +659,18 @@ impl MaidManager {
             return Err(ClientError::InvalidOwners);
         }
 
-        let mut check_balance = true;
+        let mut check_msg_id = Some(msg_id);
         let res = match tag {
             TYPE_TAG_SESSION_PACKET => self.prepare_put_account(src, dst, data, msg_id),
             TYPE_TAG_INVITE => {
-                check_balance = false;
+                check_msg_id = None;
                 self.prepare_put_invite(src, dst, data)
             }
             _ => Ok(PutMDataAction::Forward(data)),
         };
 
         if let Ok(PutMDataAction::Forward(_)) = res {
-            self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(requester), check_balance)
+            self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, check_msg_id, Some(requester))
                 .map_err(|error| {
                     trace!("MM PutMData request failed: {:?}", error);
                     // Undo the account creation
@@ -721,14 +761,17 @@ impl MaidManager {
                          msg_id: MessageId,
                          requester: sign::PublicKey)
                          -> Result<(), InternalError> {
-        let fwd_src = dst;
-        let fwd_dst = Authority::NaeManager(*data.name());
-        let tag = data.tag();
+        if self.insert_into_request_cache(msg_id, src, dst, Some(data.tag())) {
+            let fwd_src = dst;
+            let fwd_dst = Authority::NaeManager(*data.name());
 
-        trace!("MM forwarding PutMData request to {:?}", fwd_dst);
-        routing_node
-            .send_put_mdata_request(fwd_src, fwd_dst, data, msg_id, requester)?;
-        self.insert_into_request_cache(msg_id, src, dst, Some(tag));
+            trace!("MM forwarding PutMData request to {:?}", fwd_dst);
+            routing_node
+                .send_put_mdata_request(fwd_src, fwd_dst, data, msg_id, requester)?;
+        } else {
+            routing_node
+                .send_put_mdata_response(dst, src, Err(ClientError::InvalidOperation), msg_id)?;
+        }
 
         Ok(())
     }
@@ -828,8 +871,8 @@ impl MaidManager {
                              src: &Authority<XorName>,
                              dst: &Authority<XorName>,
                              policy: AuthPolicy,
-                             requester: Option<sign::PublicKey>,
-                             check_balance: bool)
+                             msg_id: Option<MessageId>,
+                             requester: Option<sign::PublicKey>)
                              -> Result<(), ClientError> {
         let client_manager_name = utils::client_name(dst);
 
@@ -854,8 +897,15 @@ impl MaidManager {
             }
         }
 
-        if check_balance && !account.has_balance() {
-            return Err(ClientError::LowBalance);
+        if let Some(msg_id) = msg_id {
+            if !account.has_balance() {
+                return Err(ClientError::LowBalance);
+            }
+
+            // Prevent reusing message Ids.
+            if account.data_ops_msg_ids.contains(&msg_id) {
+                return Err(ClientError::InvalidOperation);
+            }
         }
 
         Ok(())
@@ -972,14 +1022,11 @@ impl MaidManager {
                                  msg_id: MessageId,
                                  src: Authority<XorName>,
                                  dst: Authority<XorName>,
-                                 tag: Option<u64>) {
-        if let Some(prev) = self.request_cache
-               .insert(msg_id, CachedRequest { src, dst, tag }) {
-            error!("Overwrote existing cached request with {:?} from {:?} to {:?}",
-                   msg_id,
-                   prev.src,
-                   prev.dst);
-        }
+                                 tag: Option<u64>)
+                                 -> bool {
+        self.request_cache
+            .insert(msg_id, CachedRequest { src, dst, tag })
+            .is_none()
     }
 
     fn remove_from_request_cache(&mut self,

@@ -171,9 +171,14 @@ impl TestClient {
     /// Puts immutable data
     pub fn put_idata(&mut self, data: ImmutableData) -> MessageId {
         let msg_id = MessageId::new();
-        unwrap!(self.routing_client
-                    .put_idata(self.client_manager, data, msg_id));
+        self.put_idata_with_msg_id(data, msg_id);
         msg_id
+    }
+
+    /// Puts immutable data using the given message id.
+    pub fn put_idata_with_msg_id(&mut self, data: ImmutableData, msg_id: MessageId) {
+        unwrap!(self.routing_client
+                    .put_idata(self.client_manager, data, msg_id))
     }
 
     /// Puts immutable data and reads from the mock network
@@ -181,12 +186,28 @@ impl TestClient {
                               data: ImmutableData,
                               nodes: &mut [TestNode])
                               -> Result<(), ClientError> {
-        let request_msg_id = self.put_idata(data);
+        let msg_id = MessageId::new();
+        self.put_idata_response_with_msg_id(data, msg_id, nodes)
+    }
+
+    /// Puts immutable data and reads from the mock network
+    pub fn put_idata_response_with_msg_id(&mut self,
+                                          data: ImmutableData,
+                                          msg_id: MessageId,
+                                          nodes: &mut [TestNode])
+                                          -> Result<(), ClientError> {
+        self.put_idata_with_msg_id(data, msg_id);
         let _ = poll::nodes_and_client(nodes, self);
 
         match self.try_recv() {
-            Ok(Event::Response { response: Response::PutIData { res, msg_id }, .. }) => {
-                assert_eq!(request_msg_id, msg_id);
+            Ok(Event::Response {
+                   response: Response::PutIData {
+                       res,
+                       msg_id: response_msg_id,
+                   },
+                   ..
+               }) => {
+                assert_eq!(response_msg_id, msg_id);
                 res
             }
             Ok(response) => panic!("Unexpected response: {:?}", response),
