@@ -226,6 +226,7 @@ extern crate quick_error;
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate rand;
 extern crate routing;
+#[cfg(not(feature = "use-mock-crypto"))]
 extern crate rust_sodium;
 extern crate serde;
 #[macro_use]
@@ -261,6 +262,8 @@ pub use personas::data_manager::DataId;
 #[cfg(feature = "use-mock-crust")]
 pub use personas::data_manager::PENDING_WRITE_TIMEOUT_SECS;
 pub use personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 pub use vault::Vault;
 
 /// The number of nodes in groups managing data and user accounts.

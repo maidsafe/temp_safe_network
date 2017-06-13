@@ -21,14 +21,14 @@
 use rand::Rng;
 use routing::{AccountInfo, Action, BootstrapConfig, ClientError, Event, FullId,
               MAX_IMMUTABLE_DATA_SIZE_IN_BYTES, MAX_MUTABLE_DATA_ENTRIES,
-              MAX_MUTABLE_DATA_SIZE_IN_BYTES, MutableData, PermissionSet, Response,
+              MAX_MUTABLE_DATA_SIZE_IN_BYTES, MessageId, MutableData, PermissionSet, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
 use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, GROUP_SIZE, TYPE_TAG_INVITE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use tiny_keccak;
 
 const TEST_NET_SIZE: usize = 20;
@@ -274,8 +274,8 @@ fn invite() {
         ..Default::default()
     };
 
-    let mut rng = network.new_rng();
     let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
+    let mut rng = network.new_rng();
     let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
                                                       .endpoint()]);
 
@@ -326,94 +326,6 @@ fn invite() {
 
     assert_eq!(Err(ClientError::InvitationAlreadyClaimed),
                client2.create_account_with_invitation_response(invite_code, &mut nodes));
-}
-
-// Test the invite workflow:
-// 1. Put a new invite on the network by an admin client
-// 2. Have two clients concurrently claim that same invitation
-// Expect at most once succeed and verify the invitation cannot be reused.
-#[test]
-fn claiming_invitation_concurrently() {
-    let seed = None;
-    let node_count = GROUP_SIZE;
-
-    let network = Network::new(GROUP_SIZE, seed);
-    let admin_id = FullId::new();
-    let vault_config = Config {
-        invite_key: Some(admin_id.public_id().signing_public_key().0),
-        ..Default::default()
-    };
-
-    let mut rng = network.new_rng();
-    let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
-    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
-                                                      .endpoint()]);
-
-    let mut admin_client = TestClient::with_id(&network, Some(config.clone()), admin_id);
-    admin_client.ensure_connected(&mut nodes);
-    admin_client.create_account(&mut nodes);
-
-    let invite_code = "invite";
-
-    // Put the invite
-    let name = XorName(tiny_keccak::sha3_256(invite_code.as_bytes()));
-    let mut owners = BTreeSet::new();
-    let _ = owners.insert(*admin_client.signing_public_key());
-    let mut permissions = BTreeMap::new();
-    let _ = permissions.insert(User::Anyone, PermissionSet::new().allow(Action::Insert));
-    let data = unwrap!(MutableData::new(name,
-                                        TYPE_TAG_INVITE,
-                                        permissions.clone(),
-                                        Default::default(),
-                                        owners));
-    unwrap!(admin_client.put_mdata_response(data, &mut nodes));
-
-    let mut clients: Vec<_> = (0..2)
-        .map(|_| {
-                 let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
-                 let config = BootstrapConfig::with_contacts(&[endpoint]);
-                 TestClient::new(&network, Some(config.clone()))
-             })
-        .collect();
-
-    for client in &mut clients {
-        client.ensure_connected(&mut nodes);
-    }
-
-    for client in &mut clients {
-        let _ = client.create_account_with_invitation(invite_code);
-    }
-
-    let _ = poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
-
-    let mut succeeded = 0;
-    for client in &mut clients {
-        while let Ok(event) = client.try_recv() {
-            if let Event::Response { response: Response::PutMData { res, .. }, .. } = event {
-                match res {
-                    Ok(()) => succeeded += 1,
-                    Err(error) => {
-                        trace!("Client {:?} received failed response. Reason: {:?}",
-                               client.name(),
-                               error);
-                    }
-                }
-            }
-        }
-    }
-    assert!(succeeded <= 1);
-
-    // Attempt to reuse already claimed invite fails.
-    let mut client3 = TestClient::new(&network, Some(config));
-    client3.ensure_connected(&mut nodes);
-
-    match client3.create_account_with_invitation_response(invite_code, &mut nodes) {
-        Ok(()) => panic!("re-claiming a used invitation shall not succeed."),
-        // `Err(NetworkOther("Error claiming invitation: Conflicting concurrent mutation"))`
-        Err(ClientError::NetworkOther(_)) |
-        Err(ClientError::InvitationAlreadyClaimed) => {}
-        Err(err) => panic!("Received unexpected error: {:?}", err),
-    }
 }
 
 #[test]
@@ -588,137 +500,96 @@ fn account_balance_with_failed_mutations_with_churn() {
     }
 }
 
-// Client trying to mutate an account concurrently: insert and delete a key at the same time.
-// The result could be:
-//  1, both succeeds, when all MMs accumulate deletion after insertion.
-//  2, insertion succeeds and deletion fails with `InvalidSuccessor`,
-//     when most of MMs receives deletion request after accumulate insertion.
-//  3, insertion succeeds and deletion fails with `ExpiredRequest`,
-//     when part of MMs receives deletion request after accumulate insertion.
+// Multiple clients try to concurrently mutate (insert and delete) the auth keys.
+// At most one mutation should succeed. Verify the keys are in consistent state
+// by senfing `ListAuthKeysAndVersion` request and asserting the response reflect
+// the mutations (if any).
 #[test]
-// FIXME: re-enabled this test
-#[ignore]
-fn account_concurrent_insert_delete_key() {
+fn account_concurrent_keys_mutation() {
     let seed = None;
     let node_count = TEST_NET_SIZE;
     let iterations = test_utils::iterations();
+    let max_mutations = 4;
 
     let network = Network::new(GROUP_SIZE, seed);
-    let mut event_count = 0;
+    let mut rng = network.new_rng();
+
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+
     let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let mut version = 0;
-    let mut auth_keys = BTreeSet::new();
-    for i in 0..iterations {
-        trace!("Iteration {}.", i + 1);
-        let (app_key, _) = sign::gen_keypair();
-        let _ = client.ins_auth_key(app_key, version + 1);
-        let _ = client.del_auth_key(app_key, version + 2);
-
-        event_count += poll::nodes_and_client(&mut nodes, &mut client);
-        trace!("Processed {} events.", event_count);
-
-        let mut ins_success = false;
-        let mut del_success = false;
-
-        while let Ok(event) = client.try_recv() {
-            if let Event::Response { response: Response::InsAuthKey { res, .. }, .. } =
-                event.clone() {
-                match res {
-                    Ok(()) => ins_success = true,
-                    Err(error) => {
-                        trace!("Received failed response of insertion. Reason: {:?}", error);
-                    }
-                }
-            }
-            if let Event::Response { response: Response::DelAuthKey { res, .. }, .. } = event {
-                match res {
-                    Ok(()) => del_success = true,
-                    Err(error) => {
-                        trace!("Received failed response of deletion. Reason: {:?}", error);
-                    }
-                }
-            }
-        }
-
-        match (ins_success, del_success) {
-            (true, true) => version += 2,
-            (true, false) => {
-                version += 1;
-                let _ = auth_keys.insert(app_key);
-            }
-            // TODO: advance clock and create another even to trigger expiration check.
-            (false, false) => panic!("Insertion is expected to always succeed"),
-            (false, true) => panic!("Deletion shall not be succeed when insertion is failed"),
-        }
-
-        match client.list_auth_keys_and_version_response(&mut nodes) {
-            Ok(result) => assert_eq!(result, (auth_keys.clone(), version)),
-            Err(err) => panic!("Unexpected error {:?} when list auth_keys and version", err),
-        }
-    }
-}
-
-// Client trying to concurrently insert keys into an account.
-// The result could be:
-//  1, one succeeds and the other fails with `InvalidSuccessor`.
-#[test]
-// FIXME: re-enabled this test
-#[ignore]
-fn account_concurrent_insert_keys() {
-    let seed = None;
-    let node_count = TEST_NET_SIZE;
-    let iterations = test_utils::iterations();
-
-    let network = Network::new(GROUP_SIZE, seed);
     let mut event_count = 0;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-
+    let mut stored_keys = Vec::new();
+    let mut inserted_keys = HashMap::new();
+    let mut deleted_keys = HashMap::new();
     let mut version = 0;
-    let mut auth_keys = BTreeSet::new();
+
     for i in 0..iterations {
         trace!("Iteration {}.", i + 1);
-        let (app_key_1, _) = sign::gen_keypair();
-        let (app_key_2, _) = sign::gen_keypair();
-        let msg_id_1 = client.ins_auth_key(app_key_1, version + 1);
-        let _ = client.ins_auth_key(app_key_2, version + 1);
+        let mutations = rng.gen_range(2, max_mutations);
+        for _ in 0..mutations {
+            if stored_keys.is_empty() || rng.gen() {
+                // Insert key
+                let (key, _) = sign::gen_keypair();
+                let msg_id = client.ins_auth_key(key, version + 1);
+                let _ = inserted_keys.insert(msg_id, key);
+            } else {
+                // Delete key
+                let key = *unwrap!(rng.choose(&stored_keys));
+                let msg_id = client.del_auth_key(key, version + 1);
+                let _ = deleted_keys.insert(msg_id, key);
+            }
+        }
 
         event_count += poll::nodes_and_client(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
-        // TODO: advance clock and create another even to trigger expiration check.
+        let mut ins_successes = Vec::new();
+        let mut del_successes = Vec::new();
+
         while let Ok(event) = client.try_recv() {
-            if let Event::Response { response: Response::InsAuthKey { res, msg_id }, .. } = event {
-                match res {
-                    Ok(()) => {
-                        version += 1;
-                        if msg_id == msg_id_1 {
-                            let _ = auth_keys.insert(app_key_1);
-                        } else {
-                            let _ = auth_keys.insert(app_key_2);
-                        }
-                    }
-                    Err(error) => {
-                        trace!("Received failed response of insertion {:?}. Reason: {:?}",
-                               msg_id,
-                               error);
-                    }
-                }
+            match event {
+                Event::Response {
+                    response: Response::InsAuthKey { res: Ok(()), msg_id, }, ..
+                } => ins_successes.push(msg_id),
+                Event::Response {
+                    response: Response::DelAuthKey { res: Ok(()), msg_id, }, ..
+                } => del_successes.push(msg_id),
+                _ => (),
             }
         }
 
-        match client.list_auth_keys_and_version_response(&mut nodes) {
-            Ok(result) => assert_eq!(result, (auth_keys.clone(), version)),
-            Err(err) => panic!("Unexpected error {:?} when list auth_keys and version", err),
+        let successes = ins_successes.len() + del_successes.len();
+        assert!(successes <= 1, "At most one mutation may succeed");
+
+        let (new_keys, new_version) =
+            unwrap!(client.list_auth_keys_and_version_response(&mut nodes));
+
+        if !ins_successes.is_empty() {
+            assert_eq!(new_keys.len(), stored_keys.len() + 1);
+
+            for msg_id in ins_successes {
+                let key = unwrap!(inserted_keys.remove(&msg_id));
+                assert!(new_keys.contains(&key));
+            }
         }
+
+        if !del_successes.is_empty() {
+            assert_eq!(new_keys.len(), stored_keys.len() - 1);
+
+            for msg_id in del_successes {
+                let key = unwrap!(deleted_keys.remove(&msg_id));
+                assert!(!new_keys.contains(&key));
+            }
+        }
+
+        assert_eq!(new_version, version + successes as u64);
+
+        stored_keys = new_keys.into_iter().collect();
+        version = new_version;
     }
 }
 
@@ -797,5 +668,167 @@ fn account_concurrent_insert_key_put_data() {
 
     for &(_, count) in &node_count_stats {
         assert_eq!(count, Some(mutate_count));
+    }
+}
+
+/// Multiple requests with the same message IDs should not be allowed.
+#[test]
+fn reusing_msg_ids() {
+    let seed = None;
+    let node_count = 8;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+
+    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes)).endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    let balance0 = unwrap!(client.get_account_info_response(&mut nodes));
+
+    // Sequential requests
+
+    let data0 = test_utils::gen_immutable_data(10, &mut rng);
+    let data1 = test_utils::gen_immutable_data(10, &mut rng);
+    let msg_id = MessageId::new();
+
+    unwrap!(client.put_idata_response_with_msg_id(data0.clone(), msg_id, &mut nodes));
+    match client.put_idata_response_with_msg_id(data1.clone(), msg_id, &mut nodes) {
+        Err(ClientError::InvalidOperation) => (),
+        Err(error) => panic!("Unexpected error: {:?}", error),
+        Ok(()) => panic!("Unexpected success"),
+    }
+
+    // Only one chunk is stored.
+    let retrieved_data = unwrap!(client.get_idata_response(*data0.name(), &mut nodes));
+    assert_eq!(retrieved_data, data0);
+    assert_eq!(client.get_idata_response(*data1.name(), &mut nodes),
+               Err(ClientError::NoSuchData));
+
+    // Only one request is charged.
+    let balance1 = unwrap!(client.get_account_info_response(&mut nodes));
+    assert_eq!(balance1.mutations_done, balance0.mutations_done + 1);
+
+    // Concurrent requests
+
+    let data0 = test_utils::gen_immutable_data(10, &mut rng);
+    let data1 = test_utils::gen_immutable_data(10, &mut rng);
+    let msg_id = MessageId::new();
+    client.put_idata_with_msg_id(data0.clone(), msg_id);
+    client.put_idata_with_msg_id(data1.clone(), msg_id);
+
+    let _ = poll::nodes_and_client(&mut nodes, &mut client);
+
+    let mut successes = 0;
+    while let Ok(event) = client.try_recv() {
+        if let Event::Response { response: Response::PutIData { res: Ok(()), .. }, .. } = event {
+            successes += 1;
+        }
+    }
+
+    // At most one request does succeed.
+    assert!(successes <= 1);
+
+    // At most one chunk is stored and at most one request is charged.
+    let res0 = client.get_idata_response(*data0.name(), &mut nodes);
+    let res1 = client.get_idata_response(*data1.name(), &mut nodes);
+    let balance2 = unwrap!(client.get_account_info_response(&mut nodes));
+
+    if successes > 0 {
+        assert!((res0.is_ok() && res1.is_err()) || (res0.is_err() && res1.is_ok()));
+        assert_eq!(balance2.mutations_done, balance1.mutations_done + 1);
+    } else {
+        assert!(res0.is_err() && res1.is_err());
+        assert_eq!(balance2.mutations_done, balance1.mutations_done);
+    }
+}
+
+// Test the concurrently claiming invitation workflow:
+// 1. Put a new invite on the network by an admin client
+// 2. Have two clients concurrently claim that same invitation
+// Expect at most once succeed and verify the invitation cannot be reused.
+#[test]
+fn claiming_invitation_concurrently() {
+    let seed = None;
+    let node_count = GROUP_SIZE;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let admin_id = FullId::new();
+    let vault_config = Config {
+        invite_key: Some(admin_id.public_id().signing_public_key().0),
+        ..Default::default()
+    };
+
+    let mut rng = network.new_rng();
+    let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
+    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
+                                                      .endpoint()]);
+
+    let mut admin_client = TestClient::with_id(&network, Some(config.clone()), admin_id);
+    admin_client.ensure_connected(&mut nodes);
+    admin_client.create_account(&mut nodes);
+
+    let invite_code = "invite";
+
+    // Put the invite
+    let name = XorName(tiny_keccak::sha3_256(invite_code.as_bytes()));
+    let mut owners = BTreeSet::new();
+    let _ = owners.insert(*admin_client.signing_public_key());
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(User::Anyone, PermissionSet::new().allow(Action::Insert));
+    let data = unwrap!(MutableData::new(name,
+                                        TYPE_TAG_INVITE,
+                                        permissions.clone(),
+                                        Default::default(),
+                                        owners));
+    unwrap!(admin_client.put_mdata_response(data, &mut nodes));
+
+    let mut clients: Vec<_> = (0..2)
+        .map(|_| {
+                 let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
+                 let config = BootstrapConfig::with_contacts(&[endpoint]);
+                 TestClient::new(&network, Some(config.clone()))
+             })
+        .collect();
+
+    for client in &mut clients {
+        client.ensure_connected(&mut nodes);
+    }
+
+    for client in &mut clients {
+        let _ = client.create_account_with_invitation(invite_code);
+    }
+
+    let _ = poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
+
+    let mut succeeded = 0;
+    for client in &mut clients {
+        while let Ok(event) = client.try_recv() {
+            if let Event::Response { response: Response::PutMData { res, .. }, .. } = event {
+                match res {
+                    Ok(()) => succeeded += 1,
+                    Err(error) => {
+                        trace!("Client {:?} received failed response. Reason: {:?}",
+                               client.name(),
+                               error);
+                    }
+                }
+            }
+        }
+    }
+    assert!(succeeded <= 1);
+
+    // Attempt to reuse already claimed invite fails.
+    let mut client3 = TestClient::new(&network, Some(config));
+    client3.ensure_connected(&mut nodes);
+
+    match client3.create_account_with_invitation_response(invite_code, &mut nodes) {
+        Ok(()) => panic!("re-claiming a used invitation shall not succeed."),
+        // `Err(NetworkOther("Error claiming invitation: Conflicting concurrent mutation"))`
+        Err(ClientError::NetworkOther(_)) |
+        Err(ClientError::InvitationAlreadyClaimed) => {}
+        Err(err) => panic!("Received unexpected error: {:?}", err),
     }
 }
