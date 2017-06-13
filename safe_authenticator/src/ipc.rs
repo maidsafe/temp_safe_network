@@ -100,6 +100,15 @@ pub fn decode_ipc_msg(client: &Client,
                    }))
         }
         IpcMsg::Req {
+            req: IpcReq::Unregistered,
+            req_id,
+        } => {
+            ok!(Ok(IpcMsg::Req {
+                       req_id: req_id,
+                       req: IpcReq::Unregistered,
+                   }))
+        }
+        IpcMsg::Req {
             req: IpcReq::Containers(cont_req),
             req_id,
         } => {
@@ -152,6 +161,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                              o_auth: extern "C" fn(*mut c_void,
                                                                    u32,
                                                                    *const FfiAuthReq),
+                                             o_unregistered: extern "C" fn(*mut c_void, u32),
                                              o_containers: extern "C" fn(*mut c_void,
                                                                          u32,
                                                                          *const FfiContainersReq),
@@ -172,6 +182,12 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                    req_id,
                                }) => {
                                 o_auth(user_data.0, req_id, &auth_req.into_repr_c()?);
+                            }
+                            Ok(IpcMsg::Req {
+                                   req: IpcReq::Unregistered,
+                                   req_id,
+                               }) => {
+                                o_unregistered(user_data.0, req_id);
                             }
                             Ok(IpcMsg::Req {
                                    req: IpcReq::Containers(cont_req),
@@ -336,6 +352,58 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
 
         Ok(())
     });
+}
+
+/// Encodes a response to unregistered client authentication request
+#[no_mangle]
+pub unsafe extern "C" fn encode_unregistered_resp(auth: *const Authenticator,
+                                                  req_id: u32,
+                                                  is_granted: bool,
+                                                  user_data: *mut c_void,
+                                                  o_cb: extern "C" fn(*mut c_void,
+                                                                      FfiResult,
+                                                                      *const c_char)) {
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(user_data.0, o_cb, || -> Result<(), AuthError> {
+        if !is_granted {
+            let resp = encode_response(&IpcMsg::Resp {
+                                            req_id: req_id,
+                                            resp: IpcResp::Unregistered(Err(IpcError::AuthDenied)),
+                                        },
+                                       "unregistered")?;
+
+            let (error_code, description) = ffi_error!(AuthError::from(IpcError::AuthDenied));
+            o_cb(user_data.0,
+                 FfiResult {
+                     error_code,
+                     description: description.as_ptr(),
+                 },
+                 resp.as_ptr());
+        } else {
+            (*auth)
+                .send(move |client| {
+                    let bootstrap_cfg = try_cb!(client.bootstrap_config().map_err(AuthError::from),
+                                                user_data,
+                                                o_cb);
+
+                    let resp = try_cb!(encode_response(&IpcMsg::Resp {
+                                                 req_id: req_id,
+                                                 resp: IpcResp::Unregistered(Ok(bootstrap_cfg)),
+                                             },
+                                            "unregistered")
+                                    .map_err(AuthError::from),
+                            user_data,
+                            o_cb);
+
+                    o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
+
+                    None
+                })?;
+        }
+
+        Ok(())
+    })
 }
 
 /// Provides and encodes an Authenticator response

@@ -37,6 +37,8 @@ pub enum IpcResp {
     Auth(Result<AuthGranted, IpcError>),
     /// Containers
     Containers(Result<(), IpcError>),
+    /// Unregistered client
+    Unregistered(Result<BootstrapConfig, IpcError>),
 }
 
 /// It represents the authentication response.

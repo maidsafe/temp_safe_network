@@ -22,12 +22,14 @@ use ffi::apps::*;
 use ffi_utils::{FfiResult, ReprC, StringError, base64_encode, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, send_via_user_data, sender_as_user_data};
 use futures::{Future, future};
-use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp, get_config};
+use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp,
+          encode_unregistered_resp, get_config};
 use maidsafe_utilities::serialisation::deserialise;
 use routing::User;
 use rust_sodium::crypto::hash::sha256;
 use safe_core::{CoreError, MDataInfo, mdata_info};
-use safe_core::ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp, Permission};
+use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq,
+                     IpcResp, Permission};
 use safe_core::ipc::req::ffi::AppExchangeInfo as FfiAppExchangeInfo;
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
@@ -247,6 +249,54 @@ fn app_authentication() {
     });
 
     assert!(auth_keys.contains(&app_sign_pk));
+}
+
+// Test unregistered client authentication.
+#[test]
+fn unregistered_authentication() {
+    let authenticator = create_account_and_login();
+
+    let req_id = ipc::gen_req_id();
+    let msg = IpcMsg::Req {
+        req_id: req_id,
+        req: IpcReq::Unregistered,
+    };
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+
+    let received_req_id = match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
+        IpcMsg::Req {
+            req_id,
+            req: IpcReq::Unregistered,
+        } => req_id,
+        x => panic!("Unexpected {:?}", x),
+    };
+
+    assert_eq!(received_req_id, req_id);
+
+    let encoded_resp: String = unsafe {
+        unwrap!(call_1(|ud, cb| {
+                           encode_unregistered_resp(&authenticator,
+                                                    req_id,
+                                                    true, // is_granted
+                                                    ud,
+                                                    cb)
+                       }))
+    };
+    let base64_app_id = base64_encode(b"unregistered");
+    assert!(encoded_resp.starts_with(&format!("safe-{}", base64_app_id)));
+
+    let bootstrap_cfg = match unwrap!(ipc::decode_msg(&encoded_resp)) {
+        IpcMsg::Resp {
+            req_id: received_req_id,
+            resp: IpcResp::Unregistered(Ok(bootstrap_cfg)),
+        } => {
+            assert_eq!(received_req_id, req_id);
+            bootstrap_cfg
+        }
+        x => panic!("Unexpected {:?}", x),
+    };
+
+    assert_eq!(bootstrap_cfg, BootstrapConfig::default());
 }
 
 #[test]
@@ -701,6 +751,17 @@ fn decode_ipc_msg(authenticator: &Authenticator,
         }
     }
 
+    extern "C" fn unregistered_cb(user_data: *mut c_void, req_id: u32) {
+        unsafe {
+            let msg = IpcMsg::Req {
+                req_id: req_id,
+                req: IpcReq::Unregistered,
+            };
+
+            send_via_user_data(user_data, Ok::<_, (i32, Option<IpcMsg>)>(msg))
+        }
+    }
+
     #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
     extern "C" fn err_cb(user_data: *mut c_void, res: FfiResult, response: *const c_char) {
         unsafe {
@@ -726,6 +787,7 @@ fn decode_ipc_msg(authenticator: &Authenticator,
                             ffi_msg.as_ptr(),
                             sender_as_user_data(&tx),
                             auth_cb,
+                            unregistered_cb,
                             containers_cb,
                             err_cb);
     };
