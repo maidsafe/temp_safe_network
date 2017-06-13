@@ -38,6 +38,7 @@ extern crate fake_clock;
 extern crate log;
 extern crate rand;
 extern crate routing;
+#[cfg(not(feature = "use-mock-crypto"))]
 extern crate rust_sodium;
 #[macro_use(assert_match)]
 extern crate safe_vault;
@@ -48,3 +49,6 @@ extern crate tiny_keccak;
 mod network;
 mod maid_manager;
 mod data_manager;
+
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
