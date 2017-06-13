@@ -34,7 +34,7 @@ use routing::{ACC_LOGIN_ENTRY_KEY, AccountPacket, Authority, ClientError, EntryA
               TYPE_TAG_SESSION_PACKET, User, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
-use std::collections::hash_map::Entry;
+use std::collections::hash_map::{Entry, VacantEntry};
 use std::time::Duration;
 use tiny_keccak;
 use utils::{self, HashMap};
@@ -148,12 +148,13 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if self.insert_into_request_cache(msg_id, src, dst, None) {
+        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, None) {
             let fwd_src = dst;
             let fwd_dst = Authority::NaeManager(*data.name());
             trace!("MM forwarding PutIData request to {:?}", fwd_dst);
             routing_node
                 .send_put_idata_request(fwd_src, fwd_dst, data, msg_id)?;
+            insert.commit();
         } else {
             routing_node
                 .send_put_idata_response(dst, src, Err(ClientError::InvalidOperation), msg_id)?;
@@ -270,7 +271,7 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
             let fwd_src = dst;
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding MutateMDataEntries request to {:?}", fwd_dst);
@@ -282,6 +283,7 @@ impl MaidManager {
                                                    actions,
                                                    msg_id,
                                                    requester)?;
+            insert.commit();
         } else {
             routing_node
                 .send_mutate_mdata_entries_response(dst,
@@ -360,7 +362,7 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
             let fwd_src = dst;
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding SetMDataUserPermissions request to {:?}",
@@ -375,6 +377,7 @@ impl MaidManager {
                                                          version,
                                                          msg_id,
                                                          requester)?;
+            insert.commit();
         } else {
             routing_node
                 .send_set_mdata_user_permissions_response(dst,
@@ -421,7 +424,7 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
             let fwd_src = dst;
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding DelMDataUserPermissions request to {:?}",
@@ -435,6 +438,7 @@ impl MaidManager {
                                                          version,
                                                          msg_id,
                                                          requester)?;
+            insert.commit();
         } else {
             routing_node
                 .send_del_mdata_user_permissions_response(dst,
@@ -480,7 +484,7 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
             let fwd_src = dst;
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding ChangeMDataOwner request to {:?}", fwd_dst);
@@ -492,6 +496,7 @@ impl MaidManager {
                                                  new_owners,
                                                  version,
                                                  msg_id)?;
+            insert.commit();
         } else {
             routing_node
                 .send_change_mdata_owner_response(dst,
@@ -761,13 +766,14 @@ impl MaidManager {
                          msg_id: MessageId,
                          requester: sign::PublicKey)
                          -> Result<(), InternalError> {
-        if self.insert_into_request_cache(msg_id, src, dst, Some(data.tag())) {
+        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(data.tag())) {
             let fwd_src = dst;
             let fwd_dst = Authority::NaeManager(*data.name());
 
             trace!("MM forwarding PutMData request to {:?}", fwd_dst);
             routing_node
                 .send_put_mdata_request(fwd_src, fwd_dst, data, msg_id, requester)?;
+            insert.commit();
         } else {
             routing_node
                 .send_put_mdata_response(dst, src, Err(ClientError::InvalidOperation), msg_id)?;
@@ -1023,10 +1029,13 @@ impl MaidManager {
                                  src: Authority<XorName>,
                                  dst: Authority<XorName>,
                                  tag: Option<u64>)
-                                 -> bool {
-        self.request_cache
-            .insert(msg_id, CachedRequest { src, dst, tag })
-            .is_none()
+                                 -> Option<RequestCacheInsert> {
+        match self.request_cache.entry(msg_id) {
+            Entry::Vacant(entry) => {
+                Some(RequestCacheInsert(entry, CachedRequest { src, dst, tag }))
+            }
+            Entry::Occupied(_) => None,
+        }
     }
 
     fn remove_from_request_cache(&mut self,
@@ -1161,6 +1170,14 @@ enum PutMDataAction {
     Claim(XorName),
     // Forward the request to the `NaeManager`.
     Forward(MutableData),
+}
+
+struct RequestCacheInsert<'a>(VacantEntry<'a, MessageId, CachedRequest>, CachedRequest);
+
+impl<'a> RequestCacheInsert<'a> {
+    fn commit(self) {
+        let _ = self.0.insert(self.1);
+    }
 }
 
 fn get_invite_name(data: &MutableData) -> Result<XorName, ClientError> {

@@ -725,15 +725,19 @@ fn reusing_msg_ids() {
         }
     }
 
-    // Only one request does succeed.
-    assert_eq!(successes, 1);
+    // At most one request does succeed.
+    assert!(successes <= 1);
 
-    // Only one chunk is stored.
+    // At most one chunk is stored and at most one request is charged.
     let res0 = client.get_idata_response(*data0.name(), &mut nodes);
     let res1 = client.get_idata_response(*data1.name(), &mut nodes);
-    assert!((res0.is_ok() && res1.is_err()) || (res0.is_err() && res1.is_ok()));
-
-    // Only one request is charged.
     let balance2 = unwrap!(client.get_account_info_response(&mut nodes));
-    assert_eq!(balance2.mutations_done, balance1.mutations_done + 1);
+
+    if successes > 0 {
+        assert!((res0.is_ok() && res1.is_err()) || (res0.is_err() && res1.is_ok()));
+        assert_eq!(balance2.mutations_done, balance1.mutations_done + 1);
+    } else {
+        assert!(res0.is_err() && res1.is_err());
+        assert_eq!(balance2.mutations_done, balance1.mutations_done);
+    }
 }
