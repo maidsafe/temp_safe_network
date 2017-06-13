@@ -19,6 +19,7 @@
 
 use errors::AppError;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, ReprC, catch_unwind_cb, from_c_str};
+use maidsafe_utilities::serialisation::serialise;
 use safe_core::ipc::{self, AuthReq, ContainersReq, IpcError, IpcMsg, IpcReq, IpcResp};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
@@ -38,16 +39,8 @@ pub unsafe extern "C" fn encode_auth_req(req: *const FfiAuthReq,
         let req_id = ipc::gen_req_id();
         let req = AuthReq::clone_from_repr_c(req)?;
 
-        let msg = IpcMsg::Req {
-            req_id: req_id,
-            req: IpcReq::Auth(req),
-        };
-
-        let encoded = ipc::encode_msg(&msg, "safe-auth")?;
-        let encoded = CString::new(encoded)?;
-
+        let encoded = encode_ipc(req_id, IpcReq::Auth(req))?;
         o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
-
         Ok(())
     })
 }
@@ -64,18 +57,30 @@ pub unsafe extern "C" fn encode_containers_req(req: *const FfiContainersReq,
         let req_id = ipc::gen_req_id();
         let req = ContainersReq::clone_from_repr_c(req)?;
 
-        let msg = IpcMsg::Req {
-            req_id: req_id,
-            req: IpcReq::Containers(req),
-        };
-
-        let encoded = ipc::encode_msg(&msg, "safe-auth")?;
-        let encoded = CString::new(encoded)?;
-
+        let encoded = encode_ipc(req_id, IpcReq::Containers(req))?;
         o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
-
         Ok(())
     })
+}
+
+/// Encode `AuthReq` for an unregistered client.
+#[no_mangle]
+pub unsafe extern "C" fn encode_unregistered_req(user_data: *mut c_void,
+                                                 o_cb: extern "C" fn(*mut c_void,
+                                                                     FfiResult,
+                                                                     u32,
+                                                                     *const c_char)) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
+        let req_id = ipc::gen_req_id();
+        let encoded = encode_ipc(req_id, IpcReq::Unregistered)?;
+        o_cb(user_data, FFI_RESULT_OK, req_id, encoded.as_ptr());
+        Ok(())
+    })
+}
+
+unsafe fn encode_ipc(req_id: u32, req: IpcReq) -> Result<CString, AppError> {
+    let encoded = ipc::encode_msg(&IpcMsg::Req { req_id, req }, "safe-auth")?;
+    Ok(CString::new(encoded)?)
 }
 
 /// Decode IPC message.
@@ -85,6 +90,10 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
                                         o_auth: extern "C" fn(*mut c_void,
                                                               u32,
                                                               *const FfiAuthGranted),
+                                        o_unregistered: extern "C" fn(*mut c_void,
+                                                                      u32,
+                                                                      *const u8,
+                                                                      usize),
                                         o_containers: extern "C" fn(*mut c_void, u32),
                                         o_revoked: extern "C" fn(*mut c_void),
                                         o_err: extern "C" fn(*mut c_void, FfiResult, u32)) {
@@ -133,6 +142,30 @@ pub unsafe extern "C" fn decode_ipc_msg(msg: *const c_char,
             } => {
                 match res {
                     Ok(()) => o_containers(user_data, req_id),
+                    Err(err) => {
+                        let e = AppError::from(err);
+                        let (error_code, description) = ffi_error!(e);
+                        o_err(user_data,
+                              FfiResult {
+                                  error_code,
+                                  description: description.as_ptr(),
+                              },
+                              req_id);
+                    }
+                }
+            }
+            IpcMsg::Resp {
+                resp: IpcResp::Unregistered(res),
+                req_id,
+            } => {
+                match res {
+                    Ok(bootstrap_cfg) => {
+                        let serialised_cfg = serialise(&bootstrap_cfg)?;
+                        o_unregistered(user_data,
+                                       req_id,
+                                       serialised_cfg.as_ptr(),
+                                       serialised_cfg.len());
+                    }
                     Err(err) => {
                         let e = AppError::from(err);
                         let (error_code, description) = ffi_error!(e);
@@ -296,6 +329,16 @@ mod tests {
                 }
             }
 
+            extern "C" fn unregistered_cb(ctx: *mut c_void,
+                                          _req_id: u32,
+                                          _bootstrap_cfg_ptr: *const u8,
+                                          _bootstrap_cfg_len: usize) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).unexpected_cb = true;
+                }
+            }
+
             #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
             extern "C" fn err_cb(ctx: *mut c_void, _res: FfiResult, _req_id: u32) {
                 unsafe {
@@ -308,6 +351,7 @@ mod tests {
             decode_ipc_msg(encoded.as_ptr(),
                            context_ptr as *mut c_void,
                            auth_cb,
+                           unregistered_cb,
                            containers_cb,
                            revoked_cb,
                            err_cb);
@@ -366,6 +410,16 @@ mod tests {
                 }
             }
 
+            extern "C" fn unregistered_cb(ctx: *mut c_void,
+                                          _req_id: u32,
+                                          _bootstrap_cfg_ptr: *const u8,
+                                          _bootstrap_cfg_len: usize) {
+                unsafe {
+                    let ctx = ctx as *mut Context;
+                    (*ctx).unexpected_cb = true;
+                }
+            }
+
             #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
             extern "C" fn err_cb(ctx: *mut c_void, _res: FfiResult, _req_id: u32) {
                 unsafe {
@@ -378,6 +432,7 @@ mod tests {
             decode_ipc_msg(encoded.as_ptr(),
                            context_ptr as *mut c_void,
                            auth_cb,
+                           unregistered_cb,
                            containers_cb,
                            revoked_cb,
                            err_cb);

@@ -35,6 +35,8 @@ pub enum IpcReq {
     Auth(AuthReq),
     /// Containers request
     Containers(ContainersReq),
+    /// Unregistered client authenticator request, returning bootstrap config
+    Unregistered,
 }
 
 /// Represents an authorization request
