@@ -452,7 +452,10 @@ mod test {
                         .is_ok());
 
         let dir_to_modify = unwrap!(dir_helper.get(dir_key));
-        assert!(dir_to_modify.get_metadata().get_user_metadata().len() > 0);
+        assert!(!dir_to_modify
+                     .get_metadata()
+                     .get_user_metadata()
+                     .is_empty());
         assert_eq!(dir_to_modify.get_metadata().get_user_metadata(),
                    METADATA.as_bytes());
     }
@@ -470,7 +473,7 @@ mod test {
         assert_eq!(app_root_dir.get_sub_directories().len(), 2);
 
         let dst_dir_key = unwrap!(app_root_dir.find_sub_directory("test_dir_b")).get_key();
-        let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
+        let dst_dir = unwrap!(dir_helper.get(dst_dir_key));
         assert_eq!(dst_dir.get_sub_directories().len(), 0);
 
         assert!(super::move_dir(&app, "/test_dir_a", false, "/test_dir_b", false, false).is_ok());
@@ -478,7 +481,7 @@ mod test {
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         assert_eq!(app_root_dir.get_sub_directories().len(), 1);
 
-        let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
+        let dst_dir = unwrap!(dir_helper.get(dst_dir_key));
         assert_eq!(dst_dir.get_sub_directories().len(), 1);
     }
 
@@ -495,7 +498,7 @@ mod test {
         assert_eq!(app_root_dir.get_sub_directories().len(), 2);
 
         let dst_dir_key = unwrap!(app_root_dir.find_sub_directory("test_dir_b")).get_key();
-        let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
+        let dst_dir = unwrap!(dir_helper.get(dst_dir_key));
         assert_eq!(dst_dir.get_sub_directories().len(), 0);
 
         assert!(super::move_dir(&app, "/test_dir_a", false, "/test_dir_b", false, true).is_ok());
@@ -503,7 +506,7 @@ mod test {
         let app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
         assert_eq!(app_root_dir.get_sub_directories().len(), 2);
 
-        let dst_dir = unwrap!(dir_helper.get(&dst_dir_key));
+        let dst_dir = unwrap!(dir_helper.get(dst_dir_key));
         assert_eq!(dst_dir.get_sub_directories().len(), 1);
     }
 }

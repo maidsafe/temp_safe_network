@@ -139,7 +139,7 @@ pub unsafe extern "C" fn immut_data_fetch_self_encryptor(app: *const App,
             _ => ffi_try!(Err(CoreError::ReceivedUnexpectedData)),
         };
 
-        let ser_final_immut_data = ffi_try!(CipherOpt::decrypt(&app, raw_immut_data.value()));
+        let ser_final_immut_data = ffi_try!(CipherOpt::decrypt(app, raw_immut_data.value()));
         let final_immut_data = ffi_try!(deserialise::<ImmutableData>(&ser_final_immut_data)
                                             .map_err(FfiError::from));
         let ser_data_map = ffi_try!(immut_data_operations::get_data_from_immut_data(client.clone(),

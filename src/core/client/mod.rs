@@ -35,21 +35,20 @@ use core::translated_events::NetworkEvent;
 use core::utility;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::Joiner;
+use routing::{AccountPacket, TYPE_TAG_SESSION_PACKET};
 use routing::{AppendWrapper, Authority, Data, DataIdentifier, FullId, MessageId, StructuredData,
               XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
-use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::MutationError;
 // use routing::messaging::{MpidMessage, MpidMessageWrapper};
 use rust_sodium::crypto::box_;
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign::{self, Seed};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Sender;
+use tiny_keccak::sha3_256;
 
-type AccPkt = (String, Vec<u8>);
 const SEED_SUBPARTS: usize = 4;
 
 /// The main self-authentication client instance that will interface all the request from high
@@ -157,7 +156,7 @@ impl Client {
                     id_vec.extend(*arr);
                 }
             }
-            Seed(sha256::hash(&id_vec).0)
+            Seed(sha3_256(&id_vec))
         };
         let revocation_seed = {
             let mut revocation_vec = Vec::with_capacity(cap);
@@ -167,7 +166,7 @@ impl Client {
                     revocation_vec.extend(*arr);
                 }
             }
-            Seed(sha256::hash(&revocation_vec).0)
+            Seed(sha3_256(&revocation_vec))
         };
 
         (id_seed, revocation_seed)
@@ -206,8 +205,8 @@ impl Client {
         }
         trace!("Connected to the Network.");
 
-        let hash_sign_key = sha256::hash(&(account_packet.get_maid().public_keys().0).0);
-        let client_manager_addr = XorName(hash_sign_key.0);
+        let hash_sign_key = sha3_256(&(account_packet.get_maid().public_keys().0).0);
+        let client_manager_addr = XorName(hash_sign_key);
 
         let mut client = Client {
             account: Some(account_packet),
@@ -239,10 +238,15 @@ impl Client {
                     .encrypt(session_packet_keys.get_password(),
                              session_packet_keys.get_pin())?;
 
+                let session_packet_data = serialise(&AccountPacket::WithInvitation {
+                                                         invitation_string: invitation.to_owned(),
+                                                         acc_pkt: cipher_text.clone(),
+                                                     })?;
+
                 let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                  *session_packet_id,
                                                  0,
-                                                 serialise(&(invitation, cipher_text.clone()))?,
+                                                 session_packet_data,
                                                  owners.clone())?;
                 let _ = sd.add_signature(&(owner_pubkey,
                                            account.get_maid().secret_keys().0.clone()));
@@ -279,12 +283,14 @@ impl Client {
         let resp_getter = unregistered_client.get(session_packet_request, None)?;
 
         if let Data::Structured(session_packet) = resp_getter.get()? {
-            let decrypted_session_packet = if let Ok(acc_pkt) =
-                deserialise::<AccPkt>(session_packet.get_data()) {
-                Account::decrypt(&acc_pkt.1, &password, &pin)?
-            } else {
-                Account::decrypt(session_packet.get_data(), &password, &pin)?
-            };
+            let decrypted_session_packet =
+                match deserialise::<AccountPacket>(session_packet.get_data())? {
+                    AccountPacket::WithInvitation { acc_pkt: encrypted, .. } |
+                    AccountPacket::AccPkt(encrypted) => {
+                        Account::decrypt(&encrypted, &password, &pin)?
+                    }
+                };
+
             let id_packet =
                 FullId::with_keys((decrypted_session_packet.get_maid().public_keys().1,
                                    decrypted_session_packet
@@ -316,9 +322,8 @@ impl Client {
             }
             trace!("Connected to the Network.");
 
-            let hash_sign_key =
-                sha256::hash(&(decrypted_session_packet.get_maid().public_keys().0).0);
-            let client_manager_addr = XorName(hash_sign_key.0);
+            let hash_sign_key = sha3_256(&(decrypted_session_packet.get_maid().public_keys().0).0);
+            let client_manager_addr = XorName(hash_sign_key);
 
             let client = Client {
                 account: Some(decrypted_session_packet),
@@ -428,9 +433,9 @@ impl Client {
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
             None => {
-                let digest = sha256::hash(&account.get_public_maid().name().0);
-                let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.0.len());
-                for it in digest.0.iter().take(min_length).enumerate() {
+                let digest = sha3_256(&account.get_public_maid().name().0);
+                let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.len());
+                for it in digest.iter().take(min_length).enumerate() {
                     nonce_default.0[it.0] = *it.1;
                 }
                 &nonce_default
@@ -456,9 +461,9 @@ impl Client {
         let nonce = match nonce_opt {
             Some(nonce) => nonce,
             None => {
-                let digest = sha256::hash(&account.get_public_maid().name().0);
-                let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.0.len());
-                for it in digest.0.iter().take(min_length).enumerate() {
+                let digest = sha3_256(&account.get_public_maid().name().0);
+                let min_length = ::std::cmp::min(box_::NONCEBYTES, digest.len());
+                for it in digest.iter().take(min_length).enumerate() {
                     nonce_default.0[it.0] = *it.1;
                 }
                 &nonce_default
@@ -897,10 +902,12 @@ impl Client {
                 let mut owners = BTreeSet::new();
                 owners.insert(owner_key);
 
+                let data = serialise(&AccountPacket::AccPkt(encrypted_account))?;
+
                 let mut sd = StructuredData::new(TYPE_TAG_SESSION_PACKET,
                                                  session_packet_id,
                                                  retrieved_session_packet.get_version() + 1,
-                                                 encrypted_account,
+                                                 data,
                                                  owners)?;
                 let _ = sd.add_signature(&(owner_key, signing_key))?;
                 sd
@@ -1079,7 +1086,7 @@ mod test {
         assert!(client.get_configuration_root_directory_id().is_none());
 
         let root_dir_id = XorName([99u8; XOR_NAME_LEN]);
-        unwrap!(client.set_user_root_directory_id(root_dir_id.clone()));
+        unwrap!(client.set_user_root_directory_id(root_dir_id));
 
         // Correct Credentials - Login Should Pass
         let client = unwrap!(Client::log_in(&secret_0, &secret_1));
@@ -1103,7 +1110,7 @@ mod test {
         assert!(client.get_configuration_root_directory_id().is_none());
 
         let root_dir_id = XorName([99u8; XOR_NAME_LEN]);
-        unwrap!(client.set_configuration_root_directory_id(root_dir_id.clone()));
+        unwrap!(client.set_configuration_root_directory_id(root_dir_id));
 
         // Correct Credentials - Login Should Pass
         let client = unwrap!(Client::log_in(&secret_0, &secret_1));
@@ -1216,7 +1223,7 @@ mod test {
             let id: XorName = rand::random();
 
             let struct_data =
-                unwrap!(StructuredData::new(TYPE_TAG, id.clone(), 0, Vec::new(), BTreeSet::new()));
+                unwrap!(StructuredData::new(TYPE_TAG, id, 0, Vec::new(), BTreeSet::new()));
             let data = Data::Structured(struct_data);
 
             unwrap!(unwrap!(client.put(data.clone(), None)).get());

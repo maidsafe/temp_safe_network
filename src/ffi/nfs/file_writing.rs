@@ -188,7 +188,7 @@ mod test {
                                                     "/test_file.txt",
                                                     METADATA.as_bytes().to_vec(),
                                                     false));
-        unwrap!(writer.inner.write("hello world".as_bytes()));
+        unwrap!(writer.inner.write(b"hello world"));
         unwrap!(writer.close());
 
         let app_dir_key = unwrap!(app.get_app_dir_key());

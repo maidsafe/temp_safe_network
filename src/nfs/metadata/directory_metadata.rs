@@ -164,7 +164,7 @@ mod test {
                                            true,
                                            AccessLevel::Private,
                                            "Some user metadata".to_string().into_bytes(),
-                                           Some(parent_directory.clone())));
+                                           Some(parent_directory)));
         let serialised_data = unwrap!(serialise(&obj_before));
         let obj_after: DirectoryMetadata = unwrap!(deserialise(&serialised_data));
         assert_eq!(*unwrap!(obj_after.get_parent_dir_key(),

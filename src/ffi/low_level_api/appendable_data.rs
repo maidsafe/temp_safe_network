@@ -234,7 +234,7 @@ pub unsafe extern "C" fn appendable_data_post(app: *const App,
                                                          old_data.owners.clone(),
                                                          old_data.deleted_data.clone(),
                                                          old_data.filter.clone(),
-                                                         old_data.encrypt_key.clone())
+                                                         old_data.encrypt_key)
                                          .map_err(CoreError::from));
                     if include_data {
                         new_data.data = old_data.data.clone();

@@ -19,8 +19,8 @@ use core::errors::CoreError;
 use core::id::revocation_id_type::RevocationIdType;
 use routing::XorName;
 use rust_sodium::crypto::box_;
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign::{self, Seed};
+use tiny_keccak::sha3_256;
 
 /// `IdType`
 ///
@@ -68,7 +68,7 @@ impl IdType {
         for i in self.type_tag.to_string().into_bytes() {
             combined.push(i);
         }
-        XorName(sha256::hash(&combined).0)
+        XorName(sha3_256(&combined))
     }
 
     /// Returns the PublicKeys
@@ -139,7 +139,7 @@ mod test {
 
         assert_eq!(pub_sign_arr_before, pub_sign_arr_after);
         assert_eq!(pub_asym_arr_before, pub_asym_arr_after);
-        assert!(&sec_sign_arr_before[..] == &sec_sign_arr_after[..]);
+        assert!(sec_sign_arr_before[..] == sec_sign_arr_after[..]);
         assert_eq!(sec_asym_arr_before, sec_asym_arr_after);
     }
 

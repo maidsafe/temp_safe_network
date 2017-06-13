@@ -181,7 +181,7 @@ mod test {
         let app = test_utils::create_app(false);
         let dir_helper = DirectoryHelper::new(app.get_client());
         let app_root_dir_key = &unwrap!(app.get_app_dir_key());
-        let mut app_root_dir = unwrap!(dir_helper.get(&app_root_dir_key));
+        let mut app_root_dir = unwrap!(dir_helper.get(app_root_dir_key));
 
         let public_name = unwrap!(utility::generate_random_string(10));
 

@@ -20,8 +20,8 @@ use core::id::{IdType, MaidTypeTags, MpidTypeTags, PublicIdType, RevocationIdTyp
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::{pwhash, secretbox};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign::Seed;
+use tiny_keccak::sha3_256;
 
 /// Represents a Session Packet for the user. It is necessary to fetch and decode this via user
 /// supplied credentials to retrieve all the Maid/Mpid etc keys of the user and also their Root
@@ -192,10 +192,10 @@ impl Account {
         let mut salt = pwhash::Salt([0; pwhash::SALTBYTES]);
         {
             let pwhash::Salt(ref mut salt_bytes) = salt;
-            if salt_bytes.len() == sha256::DIGESTBYTES {
-                let hashed_pin = sha256::hash(user_salt);
+            if salt_bytes.len() == 32 {
+                let hashed_pin = sha3_256(user_salt);
                 for it in salt_bytes.iter_mut().enumerate() {
-                    *it.1 = hashed_pin.0[it.0];
+                    *it.1 = hashed_pin[it.0];
                 }
             } else {
                 return Err(CoreError::UnsupportedSaltSizeForPwHash);
@@ -314,7 +314,7 @@ mod test {
         let encrypted_account = unwrap!(account.encrypt(password.as_bytes(),
                                                         pin.to_string().as_bytes()));
         let serialised_account = unwrap!(serialise(&account));
-        assert!(encrypted_account.len() > 0);
+        assert!(!encrypted_account.is_empty());
         assert!(encrypted_account != serialised_account);
 
         let decrypted_account = unwrap!(Account::decrypt(&encrypted_account,
@@ -325,11 +325,11 @@ mod test {
 
     #[test]
     fn seeded_account() {
-        let id_seed_0 = Seed(sha256::hash(&unwrap!(utility::generate_random_vector(10))).0);
-        let revocation_seed_0 = Seed(sha256::hash(&unwrap!(utility::generate_random_vector(10))).0);
+        let id_seed_0 = Seed(sha3_256(&unwrap!(utility::generate_random_vector(10))));
+        let revocation_seed_0 = Seed(sha3_256(&unwrap!(utility::generate_random_vector(10))));
 
-        let id_seed_1 = Seed(sha256::hash(&unwrap!(utility::generate_random_vector(10))).0);
-        let revocation_seed_1 = Seed(sha256::hash(&unwrap!(utility::generate_random_vector(10))).0);
+        let id_seed_1 = Seed(sha3_256(&unwrap!(utility::generate_random_vector(10))));
+        let revocation_seed_1 = Seed(sha3_256(&unwrap!(utility::generate_random_vector(10))));
 
         let acc_default = Account::new(None, None, None, None);
         let acc_default_again = Account::new(None, None, None, None);

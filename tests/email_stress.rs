@@ -35,10 +35,9 @@ extern crate log;
 extern crate unwrap;
 
 extern crate crossbeam;
-extern crate rust_sodium;
 extern crate safe_core;
+extern crate tiny_keccak;
 
-use rust_sodium::crypto::hash::sha256::{self, Digest};
 use safe_core::core::utility;
 use safe_core::ffi::app::*;
 use safe_core::ffi::logging::*;
@@ -52,6 +51,7 @@ use safe_core::ffi::session::*;
 use std::{ptr, slice};
 use std::sync::Mutex;
 use std::time::Instant;
+use tiny_keccak::sha3_256;
 
 const BOTS: usize = 5;
 const MSGS_SENT_BY_EACH_BOT: usize = 5;
@@ -115,7 +115,7 @@ impl Bot {
     }
 
     fn create_email(&self) {
-        let Digest(digest) = sha256::hash(self.email.as_bytes());
+        let digest = sha3_256(self.email.as_bytes());
 
         let mut ad_h = 0;
         unsafe {
@@ -126,7 +126,7 @@ impl Bot {
     }
 
     fn get_peer_email_handles(&self, peer_email: &str) -> (AppendableDataHandle, CipherOptHandle) {
-        let Digest(digest) = sha256::hash(peer_email.as_bytes());
+        let digest = sha3_256(peer_email.as_bytes());
         let mut data_id_h = 0;
         unsafe {
             assert_eq!(data_id_new_appendable_data(&digest, true, &mut data_id_h),
@@ -174,7 +174,7 @@ impl Bot {
     }
 
     fn get_all_emails(&self) -> Vec<Vec<u8>> {
-        let Digest(digest) = sha256::hash(self.email.as_bytes());
+        let digest = sha3_256(self.email.as_bytes());
 
         let mut data_id_h = 0;
         unsafe {

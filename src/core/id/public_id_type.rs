@@ -18,7 +18,7 @@
 use core::id::{IdType, RevocationIdType};
 use routing::XorName;
 use rust_sodium::crypto::{box_, sign};
-use rust_sodium::crypto::hash::sha256;
+use tiny_keccak::sha3_256;
 
 /// `PublicIdType`
 ///
@@ -99,7 +99,7 @@ impl PublicIdType {
         for i in 0..sign::SIGNATUREBYTES {
             combined.push(self.signature.0[i]);
         }
-        XorName(sha256::hash(&combined).0)
+        XorName(sha3_256(&combined))
     }
 
     /// Returns the PublicKeys
@@ -202,6 +202,6 @@ mod test {
         }
 
         let signature = sign::Signature(signature_arr);
-        assert!(&signature.0[..] == &public_maid.signature().0[..]);
+        assert!(signature.0[..] == public_maid.signature().0[..]);
     }
 }

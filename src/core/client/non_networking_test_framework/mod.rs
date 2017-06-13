@@ -25,8 +25,6 @@ use routing::{AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, Int
               MessageId, Request, Response, RoutingError, XorName};
 use routing::TYPE_TAG_SESSION_PACKET;
 use routing::client_errors::{GetError, MutationError};
-use rust_sodium::crypto::hash::sha256;
-use rust_sodium::crypto::sign;
 use serde::Serialize;
 use std;
 use std::cell::Cell;
@@ -67,8 +65,7 @@ impl RoutingMock {
         });
 
         let client_auth = Authority::Client {
-            client_key: sign::gen_keypair().0,
-            peer_id: rand::random(),
+            client_id: *FullId::new().public_id(),
             proxy_node_name: rand::random(),
         };
         Ok(RoutingMock {
@@ -604,7 +601,7 @@ impl RoutingMock {
 
     fn client_name(&self) -> XorName {
         match self.client_auth {
-            Authority::Client { ref client_key, .. } => XorName(sha256::hash(&client_key[..]).0),
+            Authority::Client { ref client_id, .. } => *client_id.name(),
             _ => panic!("This authority must be Client"),
         }
     }
@@ -707,27 +704,27 @@ mod test {
         // First PUT should succeed
         unwrap!(do_put(&mut mock_routing,
                        message_queue.clone(),
-                       location_client_mgr.clone(),
+                       location_client_mgr,
                        orig_data.clone()));
 
         // GET ImmutableData should pass
         assert_eq!(unwrap!(do_get(&mut mock_routing,
                                   message_queue.clone(),
-                                  location_nae_mgr.clone(),
+                                  location_nae_mgr,
                                   orig_data.identifier())),
                    orig_data);
 
         // GetAccountInfo should pass and show one chunk stored
         assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
                                                message_queue.clone(),
-                                               location_client_mgr.clone())),
+                                               location_client_mgr)),
 
                    (1, DEFAULT_CLIENT_ACCOUNT_SIZE - 1));
 
         // Subsequent PUTs for same ImmutableData should succeed - De-duplication
         unwrap!(do_put(&mut mock_routing,
                        message_queue.clone(),
-                       location_client_mgr.clone(),
+                       location_client_mgr,
                        orig_data.clone()));
 
         // POSTs for ImmutableData should fail
@@ -765,7 +762,7 @@ mod test {
         // GET ImmutableData should pass
         assert_eq!(unwrap!(do_get(&mut mock_routing,
                                   message_queue.clone(),
-                                  location_nae_mgr.clone(),
+                                  location_nae_mgr,
                                   orig_data.identifier())),
                    orig_data);
 
@@ -830,13 +827,13 @@ mod test {
         // First PUT of StructuredData should succeed
         unwrap!(do_put(&mut mock_routing,
                        message_queue.clone(),
-                       location_client_mgr_struct.clone(),
+                       location_client_mgr_struct,
                        data_account_version.clone()));
 
         // PUT for ImmutableData should succeed
         unwrap!(do_put(&mut mock_routing,
                        message_queue.clone(),
-                       location_client_mgr_immut.clone(),
+                       location_client_mgr_immut,
                        orig_data.clone()));
 
         let mut received_structured_data: StructuredData;
@@ -846,7 +843,7 @@ mod test {
             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
             let data = unwrap!(do_get(&mut mock_routing,
                                       message_queue.clone(),
-                                      location_client_mgr_struct.clone(),
+                                      location_client_mgr_struct,
                                       struct_data_id));
 
             assert_eq!(data, data_account_version);
@@ -859,7 +856,7 @@ mod test {
         // GetAccountInfo should pass and show two chunks stored
         assert_eq!(unwrap!(do_get_account_info(&mut mock_routing,
                                                message_queue.clone(),
-                                               location_client_mgr_struct.clone())),
+                                               location_client_mgr_struct)),
 
                    (2, DEFAULT_CLIENT_ACCOUNT_SIZE - 2));
 
@@ -872,7 +869,7 @@ mod test {
 
             assert_eq!(unwrap!(do_get(&mut mock_routing,
                                       message_queue.clone(),
-                                      location_client_mgr_immut.clone(),
+                                      location_client_mgr_immut,
                                       immut_data_id)),
                        orig_data);
         }
@@ -884,7 +881,7 @@ mod test {
         // PUT for new ImmutableData should succeed
         unwrap!(do_put(&mut mock_routing,
                        message_queue.clone(),
-                       location_client_mgr_struct.clone(),
+                       location_client_mgr_struct,
                        new_data.clone()));
 
         // Construct StructuredData, 2nd version, for this ImmutableData - INVALID Versioning
@@ -955,7 +952,7 @@ mod test {
         // Subsequent POSTSs for existing StructuredData version should pass for valid update
         unwrap!(do_post(&mut mock_routing,
                         message_queue.clone(),
-                        location_nae_mgr_struct.clone(),
+                        location_nae_mgr_struct,
                         data_account_version.clone()));
 
         // GET for new StructuredData version should pass
@@ -963,7 +960,7 @@ mod test {
             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
             let data = unwrap!(do_get(&mut mock_routing,
                                       message_queue.clone(),
-                                      location_nae_mgr_struct.clone(),
+                                      location_nae_mgr_struct,
                                       struct_data_id));
 
             assert_eq!(data, data_account_version);
@@ -982,7 +979,7 @@ mod test {
             let immut_data_id = DataIdentifier::Immutable(location_vec[1]);
             assert_eq!(unwrap!(do_get(&mut mock_routing,
                                       message_queue.clone(),
-                                      location_nae_mgr_immut.clone(),
+                                      location_nae_mgr_immut,
                                       immut_data_id)),
                        new_data);
         }
@@ -992,7 +989,7 @@ mod test {
             let immut_data_id = DataIdentifier::Immutable(location_vec[0]);
             assert_eq!(unwrap!(do_get(&mut mock_routing,
                                       message_queue.clone(),
-                                      location_client_mgr_immut.clone(),
+                                      location_client_mgr_immut,
                                       immut_data_id)),
                        orig_data);
         }
@@ -1018,7 +1015,7 @@ mod test {
             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
             assert_eq!(unwrap!(do_get(&mut mock_routing,
                                       message_queue.clone(),
-                                      location_client_mgr_struct.clone(),
+                                      location_client_mgr_struct,
                                       struct_data_id)),
                        data_account_version);
         }
@@ -1032,7 +1029,7 @@ mod test {
         // DELETE of Structured Data with version bump should pass
         unwrap!(do_delete(&mut mock_routing,
                           message_queue.clone(),
-                          location_client_mgr_struct.clone(),
+                          location_client_mgr_struct,
                           data_account_version));
 
         // GET for DELETED StructuredData version should fail
@@ -1040,7 +1037,7 @@ mod test {
             let struct_data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
             let data = unwrap!(do_get(&mut mock_routing,
                                       message_queue.clone(),
-                                      location_nae_mgr_struct.clone(),
+                                      location_nae_mgr_struct,
                                       struct_data_id));
 
             let data = match data {
@@ -1093,13 +1090,13 @@ mod test {
 
         unwrap!(do_put(&mut mock_routing,
                        message_queue.clone(),
-                       location_client_mgr_struct.clone(),
+                       location_client_mgr_struct,
                        data_account_version.clone()));
 
         let data_id = DataIdentifier::Structured(user_id, TYPE_TAG);
         let data = unwrap!(do_get(&mut mock_routing,
                                   message_queue.clone(),
-                                  location_nae_mgr_struct.clone(),
+                                  location_nae_mgr_struct,
                                   data_id));
 
         assert_eq!(data, data_account_version);
@@ -1167,7 +1164,7 @@ mod test {
         // PUT it to the network
         unwrap!(do_put(&mut mock_routing,
                        message_queue.clone(),
-                       appendable_data_nae_mgr.clone(),
+                       appendable_data_nae_mgr,
                        Data::PubAppendable(appendable_data)));
 
         // APPEND data
@@ -1178,7 +1175,7 @@ mod test {
 
             unwrap!(do_append(&mut mock_routing,
                               message_queue.clone(),
-                              appendable_data_nae_mgr.clone(),
+                              appendable_data_nae_mgr,
                               append_wrapper));
         }
 
@@ -1186,7 +1183,7 @@ mod test {
         // previously appended data.
         let appendable_data = unwrap!(do_get(&mut mock_routing,
                                              message_queue.clone(),
-                                             appendable_data_nae_mgr.clone(),
+                                             appendable_data_nae_mgr,
                                              appendable_data_id));
 
         let appendable_data = match appendable_data {
@@ -1210,7 +1207,7 @@ mod test {
 
             unwrap!(do_append(&mut mock_routing,
                               message_queue.clone(),
-                              appendable_data_nae_mgr.clone(),
+                              appendable_data_nae_mgr,
                               append_wrapper));
         }
 
@@ -1218,7 +1215,7 @@ mod test {
         // previously appended data.
         let appendable_data = unwrap!(do_get(&mut mock_routing,
                                              message_queue.clone(),
-                                             appendable_data_nae_mgr.clone(),
+                                             appendable_data_nae_mgr,
                                              appendable_data_id));
 
         let appendable_data = match appendable_data {
@@ -1255,13 +1252,13 @@ mod test {
 
         unwrap!(do_post(&mut mock_routing,
                         message_queue.clone(),
-                        appendable_data_nae_mgr.clone(),
+                        appendable_data_nae_mgr,
                         Data::PubAppendable(appendable_data)));
 
         // GET it back and verify the filter and version are modified.
         let appendable_data = unwrap!(do_get(&mut mock_routing,
                                              message_queue.clone(),
-                                             appendable_data_nae_mgr.clone(),
+                                             appendable_data_nae_mgr,
                                              appendable_data_id));
 
         let appendable_data = match appendable_data {
@@ -1326,13 +1323,13 @@ mod test {
 
         unwrap!(do_put(&mut mock_routing,
                        message_queue.clone(),
-                       appendable_data_nae_mgr.clone(),
+                       appendable_data_nae_mgr,
                        Data::PubAppendable(appendable_data)));
 
         // GET it back and verify the appended data is there.
         let appendable_data = unwrap!(do_get(&mut mock_routing,
                                              message_queue.clone(),
-                                             appendable_data_nae_mgr.clone(),
+                                             appendable_data_nae_mgr,
                                              appendable_data_id));
 
         let appendable_data = match appendable_data {

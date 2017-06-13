@@ -59,6 +59,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate self_encryption;
 extern crate rust_sodium;
+extern crate tiny_keccak;
 extern crate chrono;
 #[macro_use]
 extern crate unwrap;
