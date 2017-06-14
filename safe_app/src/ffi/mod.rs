@@ -21,7 +21,7 @@
 
 use super::App;
 use super::errors::AppError;
-use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_error_code, from_c_str};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use maidsafe_utilities::serialisation::deserialise;
 use safe_core::NetworkEvent;
 use safe_core::ipc::{AuthGranted, BootstrapConfig};
@@ -56,9 +56,8 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
                                           network_observer_cb: unsafe extern "C" fn(*mut c_void,
                                                                                     FfiResult,
                                                                                     i32),
-                                          o_app: *mut *mut App)
-                                          -> i32 {
-    catch_unwind_error_code(|| -> Result<_, AppError> {
+                                          o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App)) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
 
         let config = if bootstrap_config_len == 0 || bootstrap_config_ptr.is_null() {
@@ -75,7 +74,7 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
                               },
                               config)?;
 
-        *o_app = Box::into_raw(Box::new(app));
+        o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
         Ok(())
     })
@@ -89,9 +88,8 @@ pub unsafe extern "C" fn app_registered(app_id: *const c_char,
                                         network_observer_cb: unsafe extern "C" fn(*mut c_void,
                                                                                   FfiResult,
                                                                                   i32),
-                                        o_app: *mut *mut App)
-                                        -> i32 {
-    catch_unwind_error_code(|| -> Result<_, AppError> {
+                                        o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App)) {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
         let app_id = from_c_str(app_id)?;
         let auth_granted = AuthGranted::clone_from_repr_c(auth_granted)?;
@@ -100,7 +98,7 @@ pub unsafe extern "C" fn app_registered(app_id: *const c_char,
             call_network_observer(event, user_data.0, network_observer_cb)
         })?;
 
-        *o_app = Box::into_raw(Box::new(app));
+        o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
         Ok(())
     })

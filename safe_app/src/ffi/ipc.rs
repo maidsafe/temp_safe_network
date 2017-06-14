@@ -78,7 +78,7 @@ pub unsafe extern "C" fn encode_unregistered_req(user_data: *mut c_void,
     })
 }
 
-unsafe fn encode_ipc(req_id: u32, req: IpcReq) -> Result<CString, AppError> {
+fn encode_ipc(req_id: u32, req: IpcReq) -> Result<CString, AppError> {
     let encoded = ipc::encode_msg(&IpcMsg::Req { req_id, req }, "safe-auth")?;
     Ok(CString::new(encoded)?)
 }

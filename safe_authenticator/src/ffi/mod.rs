@@ -22,7 +22,7 @@ pub mod apps;
 
 use Authenticator;
 use errors::AuthError;
-use ffi_utils::{OpaqueCtx, catch_unwind_error_code, from_c_str};
+use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, from_c_str};
 use std::os::raw::{c_char, c_void};
 
 /// Create a registered client. This or any one of the other companion
@@ -33,13 +33,14 @@ use std::os::raw::{c_char, c_void};
 pub unsafe extern "C" fn create_acc(account_locator: *const c_char,
                                     account_password: *const c_char,
                                     invitation: *const c_char,
-                                    auth_handle: *mut *mut Authenticator,
                                     user_data: *mut c_void,
-                                    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
-                                    -> i32 {
+                                    o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
+                                    o_cb: extern "C" fn(*mut c_void,
+                                                        FfiResult,
+                                                        *mut Authenticator)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_error_code(|| -> Result<(), AuthError> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         trace!("Authenticator - create a client account.");
 
         let acc_locator = from_c_str(account_locator)?;
@@ -56,7 +57,9 @@ pub unsafe extern "C" fn create_acc(account_locator: *const c_char,
                 }
             })?;
 
-        *auth_handle = Box::into_raw(Box::new(authenticator));
+        o_cb(user_data.0,
+             FFI_RESULT_OK,
+             Box::into_raw(Box::new(authenticator)));
 
         Ok(())
     })
@@ -69,13 +72,12 @@ pub unsafe extern "C" fn create_acc(account_locator: *const c_char,
 #[no_mangle]
 pub unsafe extern "C" fn login(account_locator: *const c_char,
                                account_password: *const c_char,
-                               auth_handle: *mut *mut Authenticator,
                                user_data: *mut c_void,
-                               o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32))
-                               -> i32 {
+                               o_network_obs_cb: unsafe extern "C" fn(*mut c_void, i32, i32),
+                               o_cb: extern "C" fn(*mut c_void, FfiResult, *mut Authenticator)) {
     let user_data = OpaqueCtx(user_data);
 
-    catch_unwind_error_code(|| -> Result<(), AuthError> {
+    catch_unwind_cb(user_data, o_cb, || -> Result<_, AuthError> {
         trace!("Authenticator - log in a registererd client.");
 
         let acc_locator = from_c_str(account_locator)?;
@@ -90,7 +92,9 @@ pub unsafe extern "C" fn login(account_locator: *const c_char,
             }
         })?;
 
-        *auth_handle = Box::into_raw(Box::new(authenticator));
+        o_cb(user_data.0,
+             FFI_RESULT_OK,
+             Box::into_raw(Box::new(authenticator)));
 
         Ok(())
     })
@@ -109,10 +113,10 @@ pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
 mod tests {
     use super::*;
     use Authenticator;
+    use ffi_utils::test_utils::call_1;
     use safe_core::utils;
     use std::ffi::CString;
     use std::os::raw::c_void;
-    use std::ptr;
 
     #[test]
     fn create_account_and_login() {
@@ -121,39 +125,30 @@ mod tests {
         let invitation = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
 
         {
-            let mut auth_h: *mut Authenticator = ptr::null_mut();
-
-            unsafe {
-                let auth_h_ptr = &mut auth_h;
-
-                assert_eq!(create_acc(acc_locator.as_ptr(),
-                                      acc_password.as_ptr(),
-                                      invitation.as_ptr(),
-                                      auth_h_ptr,
-                                      ptr::null_mut(),
-                                      net_event_cb),
-                           0);
-            }
-
+            let auth_h: *mut Authenticator = unsafe {
+                unwrap!(call_1(|ud, cb| {
+                                   create_acc(acc_locator.as_ptr(),
+                                              acc_password.as_ptr(),
+                                              invitation.as_ptr(),
+                                              ud,
+                                              net_event_cb,
+                                              cb)
+                               }))
+            };
             assert!(!auth_h.is_null());
-
             unsafe { authenticator_free(auth_h) };
         }
 
         {
-            let mut auth_h: *mut Authenticator = ptr::null_mut();
-
-            unsafe {
-                let auth_h_ptr = &mut auth_h;
-
-                assert_eq!(login(acc_locator.as_ptr(),
-                                 acc_password.as_ptr(),
-                                 auth_h_ptr,
-                                 ptr::null_mut(),
-                                 net_event_cb),
-                           0);
-            }
-
+            let auth_h: *mut Authenticator = unsafe {
+                unwrap!(call_1(|ud, cb| {
+                                   login(acc_locator.as_ptr(),
+                                         acc_password.as_ptr(),
+                                         ud,
+                                         net_event_cb,
+                                         cb)
+                               }))
+            };
             assert!(!auth_h.is_null());
             unsafe { authenticator_free(auth_h) };
         }
