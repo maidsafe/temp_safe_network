@@ -23,7 +23,6 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, StringError, base64_
 use futures::{Future, future};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{Action, ClientError, EntryActions, PermissionSet, User, Value};
-use rust_sodium::crypto::hash::sha256;
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, nfs};
 use safe_core::ipc::{self, IpcError, IpcMsg, decode_msg};
@@ -37,11 +36,17 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::ptr;
-
+use tiny_keccak::sha3_256;
 
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
 
-/// App data stored in the authenticator configuration
+/// App data stored in the authenticator configuration.
+///
+/// We need to store it even for revoked apps because we need to
+/// preserve the app keys. An app can encrypt data and create mutable data
+/// instances on its own, so we need to make sure that the app can
+/// access the encrypted data in future, even if the app was revoked
+/// at some point.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppInfo {
     /// Application info (id, name, vendor, etc.)
@@ -50,8 +55,11 @@ pub struct AppInfo {
     pub keys: AppKeys,
 }
 
+/// Maps from a SHA-3 hash of an app ID to app info
+type AuthenticatorConfig = HashMap<[u8; 32], AppInfo>;
+
 /// Retrieves the authenticator configuration file
-pub fn get_config(client: &Client) -> Box<AuthFuture<(u64, HashMap<sha256::Digest, AppInfo>)>> {
+pub fn get_config(client: &Client) -> Box<AuthFuture<(u64, AuthenticatorConfig)>> {
     let parent = fry!(client.config_root_dir());
     let key = fry!(parent.enc_entry_key(CONFIG_FILE));
 
@@ -73,7 +81,7 @@ pub fn get_config(client: &Client) -> Box<AuthFuture<(u64, HashMap<sha256::Diges
 
 /// Retrieves an app info by the given key from the config file
 pub fn app_info(client: &Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>>> {
-    let app_id_hash = sha256::hash(app_id.as_bytes());
+    let app_id_hash = sha3_256(app_id.as_bytes());
     get_config(client)
         .and_then(move |(_, config)| Ok(config.get(&app_id_hash).cloned()))
         .into_box()
@@ -471,7 +479,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                         .into_box()
                                 }
                                 AppState::Authenticated | AppState::Revoked => {
-                                    let app_entry_name = sha256::hash(app_id.as_bytes());
+                                    let app_entry_name = sha3_256(app_id.as_bytes());
                                     if let Some(app) = config.remove(&app_entry_name) {
                                         ok!((app, app_state))
                                     } else {
@@ -516,6 +524,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                                              resp: IpcResp::Auth(Ok(auth_granted)),
                                                          },
                                                         &app_id2)?;
+
                                     Ok(o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr()))
                                 })
                                 .or_else(move |e| -> Result<(), AuthError> {
@@ -678,7 +687,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
 /// Updates the authenticator configuration file and returns the updated `File` struct.
 pub fn update_config(client: &Client,
                      version: Option<u64>,
-                     auth_cfg: &HashMap<sha256::Digest, AppInfo>)
+                     auth_cfg: &AuthenticatorConfig)
                      -> Box<AuthFuture<()>> {
     let parent = fry!(client.config_root_dir());
 
@@ -701,7 +710,7 @@ pub fn update_config(client: &Client,
 /// Adds the given app info to the configuration file
 fn insert_app_to_config(client: &Client, app: AppInfo) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
-    let app_id_hash = sha256::hash(app.info.id.as_bytes());
+    let app_id_hash = sha3_256(app.info.id.as_bytes());
 
     get_config(client)
         .and_then(move |(version, mut auth_cfg)| {
@@ -1095,6 +1104,12 @@ fn check_app_container(client: Client,
         .get_mdata_value(root.name, root.type_tag, key)
         .then(move |res| {
             match res {
+                Ok(ref v) if v.content.is_empty() => {
+                    // Proceed to create a container
+                    create_app_container(client, &app_id, app_sign_pk)
+                        .map(Some)
+                        .into_box()
+                }
                 Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => {
                     // Proceed to create a container
                     create_app_container(client, &app_id, app_sign_pk)
@@ -1103,7 +1118,8 @@ fn check_app_container(client: Client,
                 }
                 Err(e) => err!(e),
                 Ok(val) => {
-                    let mdata_info = fry!(deserialise::<MDataInfo>(&val.content));
+                    let plaintext = fry!(root.decrypt(&val.content));
+                    let mdata_info = fry!(deserialise::<MDataInfo>(&plaintext));
                     ok!(Some(mdata_info))
                 }
             }
@@ -1133,11 +1149,11 @@ pub enum AppState {
 /// an entry in the config but not in the access container, and `NotAuthenticated`
 /// if it's not registered anywhere).
 pub fn app_state(client: &Client,
-                 config: &HashMap<sha256::Digest, AppInfo>,
+                 config: &AuthenticatorConfig,
                  app_id: String)
                  -> Box<AuthFuture<AppState>> {
     let c2 = client.clone();
-    let app_id_hash = sha256::hash(app_id.clone().as_bytes());
+    let app_id_hash = sha3_256(app_id.clone().as_bytes());
 
     match config.get(&app_id_hash) {
         Some(app) => {

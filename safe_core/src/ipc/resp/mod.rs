@@ -25,8 +25,9 @@ use ffi_utils::{ReprC, vec_into_raw_parts};
 use ipc::IpcError;
 use maidsafe_utilities::serialisation::{SerialisationError, deserialise, serialise};
 use routing::{BootstrapConfig, XorName};
-use rust_sodium::crypto::{box_, hash, secretbox, sign};
+use rust_sodium::crypto::{box_, secretbox, sign};
 use std::slice;
+use tiny_keccak::sha3_256;
 
 /// IPC response
 // TODO: `TransOwnership` variant
@@ -241,9 +242,8 @@ pub fn access_container_enc_key(app_id: &str,
     let mut key_pt = key.to_vec();
     key_pt.extend_from_slice(&access_container_nonce[..]);
 
-    let key_nonce = secretbox::Nonce::from_slice(&hash::sha256::hash(&key_pt)
-                                                      [..secretbox::NONCEBYTES])
-            .ok_or(IpcError::EncodeDecodeError)?;
+    let key_nonce = secretbox::Nonce::from_slice(&sha3_256(&key_pt)[..secretbox::NONCEBYTES])
+        .ok_or(IpcError::EncodeDecodeError)?;
 
     Ok(secretbox::seal(key, &key_nonce, app_enc_key))
 }

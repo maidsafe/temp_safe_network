@@ -54,6 +54,7 @@ extern crate serde_derive;
 extern crate rust_sodium;
 #[macro_use]
 extern crate safe_core;
+extern crate tiny_keccak;
 extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;

@@ -24,7 +24,6 @@ use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, f
 use futures::Future;
 use ipc::{AppState, app_state, get_config, remove_app_container, update_config};
 use maidsafe_utilities::serialisation::deserialise;
-use rust_sodium::crypto::hash::sha256;
 use safe_core::FutureExt;
 use safe_core::ipc::{IpcError, access_container_enc_key};
 use safe_core::ipc::req::ffi::{self, ContainerPermissions};
@@ -32,6 +31,7 @@ use safe_core::utils::symmetric_decrypt;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 use std::ptr;
+use tiny_keccak::sha3_256;
 
 /// Application registered in the authenticator
 #[repr(C)]
@@ -58,6 +58,7 @@ impl Drop for RegisteredApp {
 }
 
 /// Removes a revoked app from the authenticator config
+#[no_mangle]
 pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator,
                                                       app_id: *const c_char,
                                                       user_data: *mut c_void,
@@ -68,7 +69,7 @@ pub unsafe extern "C" fn authenticator_rm_revoked_app(auth: *const Authenticator
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
         let app_id = from_c_str(app_id)?;
         let app_id2 = app_id.clone();
-        let app_id_hash = sha256::hash(app_id.clone().as_bytes());
+        let app_id_hash = sha3_256(app_id.clone().as_bytes());
 
         (*auth).send(move |client| {
             let c2 = client.clone();
