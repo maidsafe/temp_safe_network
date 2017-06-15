@@ -38,10 +38,15 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::ptr;
 
-
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
 
-/// App data stored in the authenticator configuration
+/// App data stored in the authenticator configuration.
+///
+/// We need to store it even for revoked apps because we need to
+/// preserve the app keys. An app can encrypt data and create mutable data
+/// instances on its own, so we need to make sure that the app can
+/// access the encrypted data in future, even if the app was revoked
+/// at some point.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppInfo {
     /// Application info (id, name, vendor, etc.)
@@ -516,6 +521,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                                              resp: IpcResp::Auth(Ok(auth_granted)),
                                                          },
                                                         &app_id2)?;
+
                                     Ok(o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr()))
                                 })
                                 .or_else(move |e| -> Result<(), AuthError> {
@@ -1095,6 +1101,12 @@ fn check_app_container(client: Client,
         .get_mdata_value(root.name, root.type_tag, key)
         .then(move |res| {
             match res {
+                Ok(ref v) if v.content.is_empty() => {
+                    // Proceed to create a container
+                    create_app_container(client, &app_id, app_sign_pk)
+                        .map(Some)
+                        .into_box()
+                }
                 Err(CoreError::RoutingClientError(ClientError::NoSuchEntry)) => {
                     // Proceed to create a container
                     create_app_container(client, &app_id, app_sign_pk)
@@ -1103,7 +1115,8 @@ fn check_app_container(client: Client,
                 }
                 Err(e) => err!(e),
                 Ok(val) => {
-                    let mdata_info = fry!(deserialise::<MDataInfo>(&val.content));
+                    let plaintext = fry!(root.decrypt(&val.content));
+                    let mdata_info = fry!(deserialise::<MDataInfo>(&plaintext));
                     ok!(Some(mdata_info))
                 }
             }

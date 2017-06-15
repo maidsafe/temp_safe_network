@@ -453,6 +453,7 @@ fn revoke_app() {
 
     let auth_granted = unwrap!(register_app(&authenticator, &auth_req));
     let app_id = auth_req.app.id.clone();
+    let app_id2 = app_id.clone();
 
     // Put some entries into videos folder before revoking the app
     let mut ac_entries = access_container(&authenticator, app_id.clone(), auth_granted.clone());
@@ -502,6 +503,19 @@ fn revoke_app() {
     run(&authenticator, move |client| {
         file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
             Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
+            x => panic!("Unexpected {:?}", x),
+        })
+    });
+
+    // Reauthorise a revoked app - it should be able to read the images folder again.
+    let auth_granted = unwrap!(register_app(&authenticator, &auth_req));
+
+    let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted.clone());
+    let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+
+    run(&authenticator, move |client| {
+        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
+            Ok((0, _file)) => Ok(()),
             x => panic!("Unexpected {:?}", x),
         })
     });
