@@ -139,11 +139,22 @@ impl TestClient {
         unwrap!(self.put_mdata_response(data, nodes));
     }
 
-    /// Creates an account using the given invitation code.
-    pub fn create_account_with_invitation(&mut self,
-                                          invitation_code: &str,
-                                          nodes: &mut [TestNode])
-                                          -> Result<(), ClientError> {
+    /// Creates an account using the given invitation code, expect response
+    pub fn create_account_with_invitation_response(&mut self,
+                                                   invitation_code: &str,
+                                                   nodes: &mut [TestNode])
+                                                   -> Result<(), ClientError> {
+        let data = unwrap!(self.compose_account_data(invitation_code));
+        self.put_mdata_response(data, nodes)
+    }
+
+    /// Creates an account using the given invitation code, doesn't expect response.
+    pub fn create_account_with_invitation(&mut self, invitation_code: &str) -> MessageId {
+        let data = unwrap!(self.compose_account_data(invitation_code));
+        self.put_mdata(data)
+    }
+
+    fn compose_account_data(&mut self, invitation_code: &str) -> Result<MutableData, ClientError> {
         let owner = *self.signing_public_key();
         let owners = iter::once(owner).collect();
 
@@ -159,13 +170,11 @@ impl TestClient {
                                   }))
                 .collect();
 
-        let data = unwrap!(MutableData::new(self.rng.gen(),
-                                            TYPE_TAG_SESSION_PACKET,
-                                            Default::default(),
-                                            entries,
-                                            owners));
-
-        self.put_mdata_response(data, nodes)
+        MutableData::new(self.rng.gen(),
+                         TYPE_TAG_SESSION_PACKET,
+                         Default::default(),
+                         entries,
+                         owners)
     }
 
     /// Puts immutable data

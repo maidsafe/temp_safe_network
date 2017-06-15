@@ -190,7 +190,8 @@ fn create_account_twice() {
 
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
+                                                      .endpoint()]);
     let mut client0 = TestClient::new(&network, Some(config.clone()));
     let mut client1 = TestClient::new(&network, Some(config.clone()));
 
@@ -274,7 +275,9 @@ fn invite() {
     };
 
     let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let mut rng = network.new_rng();
+    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
+                                                      .endpoint()]);
 
     let mut admin_client = TestClient::with_id(&network, Some(config.clone()), admin_id);
     admin_client.ensure_connected(&mut nodes);
@@ -300,10 +303,10 @@ fn invite() {
 
     // Attempt to create account using invalid invite code fails.
     assert_eq!(Err(ClientError::InvalidInvitation),
-               client1.create_account_with_invitation("invalid invite", &mut nodes));
+               client1.create_account_with_invitation_response("invalid invite", &mut nodes));
 
     // Create account using valid invite code.
-    unwrap!(client1.create_account_with_invitation(invite_code, &mut nodes));
+    unwrap!(client1.create_account_with_invitation_response(invite_code, &mut nodes));
 
     // Attempt to put an invite by non-admin client fails.
     let name = XorName(tiny_keccak::sha3_256(b"fake invite"));
@@ -322,7 +325,7 @@ fn invite() {
     client2.ensure_connected(&mut nodes);
 
     assert_eq!(Err(ClientError::InvitationAlreadyClaimed),
-               client2.create_account_with_invitation(invite_code, &mut nodes));
+               client2.create_account_with_invitation_response(invite_code, &mut nodes));
 }
 
 #[test]
@@ -367,7 +370,7 @@ fn account_balance_with_successful_mutations_with_churn() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let config = BootstrapConfig::with_contacts(&[nodes[1].endpoint()]);
     let mut client = TestClient::new(&network, Some(config));
     let client_key = *client.full_id().public_id().signing_public_key();
 
@@ -388,14 +391,14 @@ fn account_balance_with_successful_mutations_with_churn() {
         }
 
         if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
-            let index = rng.gen_range(1, nodes.len());
+            let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
         } else {
             let number = rng.gen_range(1, 4);
             trace!("Removing {} node(s).", number);
             for _ in 0..number {
-                let node_index = rng.gen_range(1, nodes.len());
+                let node_index = rng.gen_range(2, nodes.len());
                 test_node::drop_node(&mut nodes, node_index);
             }
         }
@@ -433,7 +436,7 @@ fn account_balance_with_failed_mutations_with_churn() {
     let mut rng = network.new_rng();
 
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-    let client_config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let client_config = BootstrapConfig::with_contacts(&[nodes[1].endpoint()]);
     let mut client = TestClient::new(&network, Some(client_config));
     let client_key = *client.full_id().public_id().signing_public_key();
 
@@ -463,14 +466,14 @@ fn account_balance_with_failed_mutations_with_churn() {
         }
 
         if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
-            let index = rng.gen_range(1, nodes.len());
+            let index = rng.gen_range(2, nodes.len());
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
         } else {
             let number = rng.gen_range(1, 4);
             trace!("Removing {} node(s).", number);
             for _ in 0..number {
-                let node_index = rng.gen_range(1, nodes.len());
+                let node_index = rng.gen_range(2, nodes.len());
                 test_node::drop_node(&mut nodes, node_index);
             }
         }
@@ -739,5 +742,93 @@ fn reusing_msg_ids() {
     } else {
         assert!(res0.is_err() && res1.is_err());
         assert_eq!(balance2.mutations_done, balance1.mutations_done);
+    }
+}
+
+// Test the concurrently claiming invitation workflow:
+// 1. Put a new invite on the network by an admin client
+// 2. Have two clients concurrently claim that same invitation
+// Expect at most once succeed and verify the invitation cannot be reused.
+#[test]
+fn claiming_invitation_concurrently() {
+    let seed = None;
+    let node_count = GROUP_SIZE;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let admin_id = FullId::new();
+    let vault_config = Config {
+        invite_key: Some(admin_id.public_id().signing_public_key().0),
+        ..Default::default()
+    };
+
+    let mut rng = network.new_rng();
+    let mut nodes = test_node::create_nodes(&network, node_count, Some(vault_config), false);
+    let config = BootstrapConfig::with_contacts(&[unwrap!(rng.choose(&nodes), "no nodes found")
+                                                      .endpoint()]);
+
+    let mut admin_client = TestClient::with_id(&network, Some(config.clone()), admin_id);
+    admin_client.ensure_connected(&mut nodes);
+    admin_client.create_account(&mut nodes);
+
+    let invite_code = "invite";
+
+    // Put the invite
+    let name = XorName(tiny_keccak::sha3_256(invite_code.as_bytes()));
+    let mut owners = BTreeSet::new();
+    let _ = owners.insert(*admin_client.signing_public_key());
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(User::Anyone, PermissionSet::new().allow(Action::Insert));
+    let data = unwrap!(MutableData::new(name,
+                                        TYPE_TAG_INVITE,
+                                        permissions.clone(),
+                                        Default::default(),
+                                        owners));
+    unwrap!(admin_client.put_mdata_response(data, &mut nodes));
+
+    let mut clients: Vec<_> = (0..2)
+        .map(|_| {
+                 let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
+                 let config = BootstrapConfig::with_contacts(&[endpoint]);
+                 TestClient::new(&network, Some(config.clone()))
+             })
+        .collect();
+
+    for client in &mut clients {
+        client.ensure_connected(&mut nodes);
+    }
+
+    for client in &mut clients {
+        let _ = client.create_account_with_invitation(invite_code);
+    }
+
+    let _ = poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
+
+    let mut succeeded = 0;
+    for client in &mut clients {
+        while let Ok(event) = client.try_recv() {
+            if let Event::Response { response: Response::PutMData { res, .. }, .. } = event {
+                match res {
+                    Ok(()) => succeeded += 1,
+                    Err(error) => {
+                        trace!("Client {:?} received failed response. Reason: {:?}",
+                               client.name(),
+                               error);
+                    }
+                }
+            }
+        }
+    }
+    assert!(succeeded <= 1);
+
+    // Attempt to reuse already claimed invite fails.
+    let mut client3 = TestClient::new(&network, Some(config));
+    client3.ensure_connected(&mut nodes);
+
+    match client3.create_account_with_invitation_response(invite_code, &mut nodes) {
+        Ok(()) => panic!("re-claiming a used invitation shall not succeed."),
+        // `Err(NetworkOther("Error claiming invitation: Conflicting concurrent mutation"))`
+        Err(ClientError::NetworkOther(_)) |
+        Err(ClientError::InvitationAlreadyClaimed) => {}
+        Err(err) => panic!("Received unexpected error: {:?}", err),
     }
 }
