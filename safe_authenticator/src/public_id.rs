@@ -20,8 +20,8 @@ use errors::AuthError;
 use futures::{Future, IntoFuture};
 use maidsafe_utilities::serialisation::serialise;
 use routing::{ClientError, EntryActions, MutableData, XorName};
-use rust_sodium::crypto::hash::sha256;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, PUBLIC_ID_TAG};
+use tiny_keccak::sha3_256;
 
 // TODO: could we use the same value for both of these?
 const PUBLIC_ID_USER_ROOT_ENTRY_KEY: &'static [u8] = b"_publicId";
@@ -44,7 +44,7 @@ pub fn create<T: Into<String>>(client: &Client, public_id: T) -> Box<AuthFuture<
     let client6 = client.clone();
 
     let public_id = public_id.into();
-    let name = XorName(sha256::hash(public_id.as_bytes()).0);
+    let name = XorName(sha3_256(public_id.as_bytes()));
 
     client.user_root_dir()
         .and_then(|user_root_dir| {

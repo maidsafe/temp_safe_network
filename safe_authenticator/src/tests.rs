@@ -26,7 +26,6 @@ use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp,
           encode_unregistered_resp, get_config};
 use maidsafe_utilities::serialisation::deserialise;
 use routing::User;
-use rust_sodium::crypto::hash::sha256;
 use safe_core::{CoreError, MDataInfo, mdata_info};
 use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, IpcMsg, IpcReq,
                      IpcResp, Permission};
@@ -41,6 +40,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
                  rand_app, register_app, run};
+use tiny_keccak::sha3_256;
 
 // Test creation and content of std dirs after account creation.
 #[test]
@@ -215,7 +215,7 @@ fn app_authentication() {
     let config = run(&authenticator,
                      |client| get_config(client).map(|(_, config)| config));
 
-    let app_config_key = sha256::hash(app_id.as_bytes());
+    let app_config_key = sha3_256(app_id.as_bytes());
     let app_info = unwrap!(config.get(&app_config_key));
 
     assert_eq!(app_info.info, app_exchange_info);
