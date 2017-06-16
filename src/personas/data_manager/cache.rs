@@ -17,12 +17,15 @@
 
 use super::STATUS_LOG_INTERVAL;
 use super::data::{DataId, ImmutableDataId, MutableDataId};
-use super::mutation::Mutation;
+use super::mutation::{self, Mutation};
 use GROUP_SIZE;
 use QUORUM;
-use routing::{Authority, MessageId, MutableData, RoutingTable, Value, XorName};
+use maidsafe_utilities::serialisation::serialised_size;
+use routing::{Authority, MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MessageId,
+              MutableData, RoutingTable, Value, XorName};
 use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
+use std::iter;
 use std::time::Duration;
 use utils::{self, HashMap, HashSet, Instant, SecureHash};
 
@@ -371,26 +374,18 @@ impl Cache {
         let hash = utils::secure_hash(&mutation);
         let data_id = mutation.data_id();
 
-        let mut writes = self.pending_writes
+        self.pending_writes
             .entry(data_id)
-            .or_insert_with(Vec::new);
-
-        if !rejected &&
-           writes
-               .iter()
-               .any(|other| !other.rejected && other.mutation.conflicts_with(&mutation)) {
-            return None;
-        } else {
-            writes.push(PendingWrite {
-                            hash: hash,
-                            mutation: mutation,
-                            timestamp: Instant::now(),
-                            src: src,
-                            dst: dst,
-                            message_id: msg_id,
-                            rejected: rejected,
-                        });
-        }
+            .or_insert_with(Vec::new)
+            .push(PendingWrite {
+                      hash: hash,
+                      mutation: mutation,
+                      timestamp: Instant::now(),
+                      src: src,
+                      dst: dst,
+                      message_id: msg_id,
+                      rejected: rejected,
+                  });
 
         if rejected {
             None
@@ -469,6 +464,84 @@ impl Cache {
             .map(ImmutableDataId)
     }
 
+    /// Validate that the new mutation can be applied to the given data together with
+    /// all the pending mutations for that data.
+    pub fn validate_concurrent_mutations(&self,
+                                         existing_data: Option<&MutableData>,
+                                         new_mutation: &Mutation)
+                                         -> bool {
+        let writes = if let Some(writes) = self.pending_writes.get(&new_mutation.data_id()) {
+            writes
+        } else {
+            // Always accept if there are no other pending mutations.
+            return true;
+        };
+
+        for write in writes {
+            if !write.rejected && write.mutation.conflicts_with(new_mutation) {
+                return false;
+            }
+        }
+
+        let data = if let Some(data) = existing_data {
+            data
+        } else {
+            return true;
+        };
+
+        // Allow the new mutation only if together with all the existing pending mutations
+        // it increases the entry count and size by at most half the remaining allowance.
+        // Only consider mutations that increase (as opposed to decrease) entry count
+        // and/or size.
+
+        let mutations = || {
+            writes
+                .iter()
+                .filter(|w| !w.rejected)
+                .map(|w| &w.mutation)
+                .chain(iter::once(new_mutation))
+        };
+
+        let size_before = serialised_size(data);
+        let size_after = mutation::compute_size_after_increase(data, mutations());
+
+        if !check_limit(size_before, size_after, MAX_MUTABLE_DATA_SIZE_IN_BYTES) {
+            return false;
+        }
+
+        let count_before = data.entries().len() as u64;
+        let count_after = mutation::compute_entry_count_after_increase(data, mutations());
+
+        if !check_limit(count_before, count_after, MAX_MUTABLE_DATA_ENTRIES) {
+            return false;
+        }
+
+        true
+    }
+
+    pub fn print_stats(&mut self) {
+        if self.logging_time.elapsed().as_secs() < STATUS_LOG_INTERVAL {
+            return;
+        }
+        self.logging_time = Instant::now();
+
+        let new_total = self.fragment_index.len();
+        let new_requested = self.fragment_holders
+            .iter()
+            .filter(|&(_, holder)| holder.is_requested())
+            .count();
+
+        if new_total != self.total_needed_fragments_count ||
+           new_requested != self.requested_needed_fragments_count {
+            self.total_needed_fragments_count = new_total;
+            self.requested_needed_fragments_count = new_requested;
+
+            info!("Cache Stats: {} requested / {} total needed fragments.",
+                  new_requested,
+                  new_total);
+        }
+    }
+
     fn stop_expired_needed_mutable_chunk_request(&mut self) {
         if self.needed_mutable_chunk_request
                .as_ref()
@@ -492,29 +565,6 @@ impl Cache {
 
         for holder in empty_holders {
             let _ = self.fragment_holders.remove(&holder);
-        }
-    }
-
-    pub fn print_stats(&mut self) {
-        if self.logging_time.elapsed().as_secs() < STATUS_LOG_INTERVAL {
-            return;
-        }
-        self.logging_time = Instant::now();
-
-        let new_total = self.fragment_index.len();
-        let new_requested = self.fragment_holders
-            .iter()
-            .filter(|&(_, holder)| holder.is_requested())
-            .count();
-
-        if new_total != self.total_needed_fragments_count ||
-           new_requested != self.requested_needed_fragments_count {
-            self.total_needed_fragments_count = new_total;
-            self.requested_needed_fragments_count = new_requested;
-
-            info!("Cache Stats: {} requested / {} total needed fragments.",
-                  new_requested,
-                  new_total);
         }
     }
 }
@@ -869,6 +919,13 @@ fn unindex_needed_fragment(index: &mut FragmentIndex, fragment: &FragmentInfo, h
     if remove {
         let _ = index.remove(fragment);
     }
+}
+
+fn check_limit(before: u64, after: u64, max: u64) -> bool {
+    let diff = after.saturating_sub(before);
+    let remaining = max.saturating_sub(before);
+
+    diff * 2 <= remaining + 1
 }
 
 #[cfg(test)]
