@@ -901,18 +901,18 @@ impl Routing {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "testing", test))]
     pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
         self.max_ops_countdown = max_ops_count.map(Cell::new)
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "testing", test))]
     pub fn simulate_disconnect(&self) {
         let sender = self.sender.clone();
-        let _ = std::thread::spawn(move || unwrap!(sender.send(Event::RestartRequired)));
+        let _ = std::thread::spawn(move || unwrap!(sender.send(Event::Terminate)));
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "testing", test))]
     pub fn set_simulate_timeout(&mut self, enable: bool) {
         self.timeout_simulation = enable;
     }
@@ -950,11 +950,5 @@ impl Routing {
                      count.set(ops - 1);
                      ops
                  })
-    }
-}
-
-impl Drop for Routing {
-    fn drop(&mut self) {
-        let _ = self.sender.send(Event::Terminate);
     }
 }
