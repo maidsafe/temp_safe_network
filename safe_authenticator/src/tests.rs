@@ -366,7 +366,7 @@ fn containers_unknown_app() {
 
     // Invoke Authenticator's decode_ipc_msg and expect to get Failure back via
     // callback with error code for IpcError::UnknownApp
-    // Check that the returned FfiString is "safe_<app-id-base64>:payload" where payload is
+    // Check that the returned string is "safe_<app-id-base64>:payload" where payload is
     // IpcMsg::Resp(IpcResp::Auth(Err(UnknownApp)))"
     match decode_ipc_msg(&authenticator, &encoded_msg) {
         Err((code, Some(IpcMsg::Resp { resp: IpcResp::Auth(Err(IpcError::UnknownApp)), .. })))
@@ -418,7 +418,7 @@ fn containers_access_request() {
         }))
     };
 
-    // Check the FfiString to contain "safe-<app-id-base64>:payload" where payload is
+    // Check the string to contain "safe-<app-id-base64>:payload" where payload is
     // IpcMsg::Resp(IpcResp::Auth(Containers(Ok())))".
     assert!(encoded_containers_resp.starts_with(&format!("safe-{}", base64_app_id)));
 
