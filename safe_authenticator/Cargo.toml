@@ -15,11 +15,11 @@ futures = "~0.1.11"
 log = "~0.3.7"
 maidsafe_utilities = "~0.12.0"
 # routing = "~0.27.1"
-routing = { git = "https://github.com/maidsafe/routing.git", branch = "mutable-data" }
+routing = { git = "https://github.com/maidsafe/routing.git" }
 rust_sodium = "~0.3.0"
 serde = "~1.0.8"
 serde_derive = "~1.0.8"
-safe_core = { path = "../safe_core", version = "~0.22.0" }
+safe_core = { path = "../safe_core", version = "~0.23.0" }
 tokio-core = "~0.1.6"
 tiny-keccak = "~1.2.1"
 unwrap = "~1.1.0"

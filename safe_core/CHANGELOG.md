@@ -1,5 +1,35 @@
 # Safe Core - Change Log
 
+## [0.23.0]
+- Integrate with routing 0.28.5
+- Invitation based account creation support in client (API change)
+- Invitation-generator and populator example binary
+- New error types for ivitation errors
+- Serde instead of rustc-serialize in production
+- Use chrono instead of time crate (default serde serialisable)
+- Fix bugs concerning to unclaimable SD and re-claiming SD via PUT; test cases updated
+
+## [0.22.4]
+- Integrate with routing 0.28.4 (0.28.3 is skipped and is yanked from crates).
+- Use rust 1.16.0, nightly-2017-03-16 and clippy 0.0.120
+- Add a few trace messages for better diagnostics.
+- Cleanup README.md
+
+## [0.22.3]
+- Integrate with routing 0.28.2
+
+## [0.22.2]
+- Integrate with routing 0.28.0
+
+## [0.22.1]
+- API to get MAID-Public signing key.
+
+## [0.22.0]
+- New error type - MutationError::DataTooLarge.
+- New Delete handling and update of code and test cases.
+- New APIs - Put to re-claim deleted data (specify version), make data unclaimable.
+- Changes and fixes in mock-routing to conform to routing and vaults for error deduction and error types.
+
 ## [0.21.2]
 - Serialisation and deserialisation for Sign Keys.
 - API for getting Filtered keys from AppendableData.
