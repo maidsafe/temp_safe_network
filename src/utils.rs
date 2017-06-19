@@ -15,13 +15,94 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use routing::{Authority, XorName};
-use rust_sodium::crypto::hash::sha256;
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
+pub use fake_clock::FakeClock as Instant;
+use maidsafe_utilities::serialisation;
+use routing::{Authority, MutableData, Value, XorName, sha3};
+use rust_sodium::crypto::sign;
+use serde::Serialize;
+use std::collections;
+#[cfg(feature = "use-mock-crust")]
+use std::collections::hash_map::DefaultHasher;
+#[cfg(feature = "use-mock-crust")]
+use std::hash::BuildHasherDefault;
+#[cfg(not(any(test, feature = "use-mock-crust", feature = "use-mock-routing")))]
+pub use std::time::Instant;
+use tiny_keccak;
 
-pub fn client_name(authority: &Authority<XorName>) -> XorName {
-    if let Authority::Client { ref client_key, .. } = *authority {
-        XorName(sha256::hash(&client_key.0[..]).0)
-    } else {
-        unreachable!("Logic error")
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash, Serialize, Deserialize)]
+pub struct SecureHash(sha3::Digest256);
+
+/// Compute secure hash of the given value.
+pub fn secure_hash<T: Serialize>(value: &T) -> SecureHash {
+    serialisation::serialise(value)
+        .map(|data| SecureHash(tiny_keccak::sha3_256(&data)))
+        .unwrap_or_else(|_| {
+                            error!("Serialisation failure");
+                            Default::default()
+                        })
+}
+
+// Note: for testing with mock crust, use collections with deterministic hashing.
+
+#[cfg(feature = "use-mock-crust")]
+pub type HashMap<K, V> = collections::HashMap<K, V, BuildHasherDefault<DefaultHasher>>;
+#[cfg(not(feature = "use-mock-crust"))]
+pub type HashMap<K, V> = collections::HashMap<K, V>;
+
+#[cfg(feature = "use-mock-crust")]
+pub type HashSet<T> = collections::HashSet<T, BuildHasherDefault<DefaultHasher>>;
+#[cfg(not(feature = "use-mock-crust"))]
+pub type HashSet<T> = collections::HashSet<T>;
+
+/// Extract client name (a `XorName`) from the authority.
+///
+/// # Panics
+///
+/// Panics when the authority is not `Client` or `ClientManager`.
+pub fn client_name(authority: &Authority<XorName>) -> &XorName {
+    match *authority {
+        Authority::Client { ref client_id, .. } => client_id.name(),
+        Authority::ClientManager(ref name) => name,
+        _ => unreachable!("Logic error"),
     }
+}
+
+/// Extract client name and key from the authority.
+///
+/// # Panics
+///
+/// Panics when the authority is not `Client`.
+pub fn client_name_and_key(authority: &Authority<XorName>) -> (&XorName, &sign::PublicKey) {
+    match *authority {
+        Authority::Client { ref client_id, .. } => {
+            (client_id.name(), client_id.signing_public_key())
+        }
+        _ => unreachable!("Logic error"),
+    }
+}
+
+pub fn client_name_from_key(key: &sign::PublicKey) -> XorName {
+    XorName(tiny_keccak::sha3_256(&key[..]))
+}
+
+pub fn mdata_shell_hash(data: &MutableData) -> SecureHash {
+    let shell = (*data.name(),
+                 data.tag(),
+                 data.version(),
+                 data.owners().clone(),
+                 data.permissions().clone());
+    secure_hash(&shell)
+}
+
+pub fn mdata_value_hash(value: &Value) -> SecureHash {
+    secure_hash(&value)
+}
+
+/// Verify that the client with `client_name` is the owner of `data`.
+pub fn verify_mdata_owner(data: &MutableData, client_name: &XorName) -> bool {
+    data.owners()
+        .iter()
+        .map(|owner_key| client_name_from_key(owner_key))
+        .any(|name| name == *client_name)
 }

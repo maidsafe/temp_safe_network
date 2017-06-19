@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use lru_time_cache::LruCache;
-use routing::{Data, DataIdentifier, ImmutableData, Request, Response, XorName};
+use routing::{ImmutableData, Request, Response, XorName};
 use routing::Cache as RoutingCache;
 use std::cell::RefCell;
 use std::time::Duration;
@@ -40,18 +40,23 @@ impl Cache {
 
 impl RoutingCache for Cache {
     fn get(&self, request: &Request) -> Option<Response> {
-        if let Request::Get(DataIdentifier::Immutable(name), message_id) = *request {
+        if let Request::GetIData { name, msg_id } = *request {
             self.store
                 .borrow_mut()
                 .get(&name)
-                .map(|data| Response::GetSuccess(Data::Immutable(data.clone()), message_id))
+                .map(|data| {
+                         Response::GetIData {
+                             res: Ok(data.clone()),
+                             msg_id: msg_id,
+                         }
+                     })
         } else {
             None
         }
     }
 
     fn put(&self, response: Response) {
-        if let Response::GetSuccess(Data::Immutable(data), _) = response {
+        if let Response::GetIData { res: Ok(data), .. } = response {
             let _ = self.store.borrow_mut().insert(*data.name(), data);
         }
     }
@@ -60,7 +65,7 @@ impl RoutingCache for Cache {
 #[cfg(test)]
 mod tests {
     use super::Cache;
-    use routing::{Data, ImmutableData, MessageId, Request, Response};
+    use routing::{ImmutableData, MessageId, Request, Response};
     use routing::Cache as RoutingCache;
 
     #[test]
@@ -68,17 +73,26 @@ mod tests {
         let cache = Cache::new();
 
         let data = "hello world".bytes().collect();
-        let data = Data::Immutable(ImmutableData::new(data));
+        let data = ImmutableData::new(data);
         let response_message_id = MessageId::new();
 
-        let response = Response::GetSuccess(data.clone(), response_message_id);
+        let response = Response::GetIData {
+            res: Ok(data.clone()),
+            msg_id: response_message_id,
+        };
         cache.put(response);
 
         let request_message_id = MessageId::new();
-        let request = Request::Get(data.identifier(), request_message_id);
+        let request = Request::GetIData {
+            name: *data.name(),
+            msg_id: request_message_id,
+        };
 
         match cache.get(&request) {
-            Some(Response::GetSuccess(cached_data, cached_message_id)) => {
+            Some(Response::GetIData {
+                     res: Ok(cached_data),
+                     msg_id: cached_message_id,
+                 }) => {
                 assert_eq!(cached_data, data);
                 assert_eq!(cached_message_id, request_message_id);
             }

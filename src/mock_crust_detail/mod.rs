@@ -25,20 +25,41 @@ pub mod test_node;
 use GROUP_SIZE;
 use itertools::Itertools;
 use mock_crust_detail::test_node::TestNode;
-use personas::data_manager::IdAndVersion;
-use routing::{self, Data, XorName, Xorable};
+use personas::data_manager::DataId;
+use routing::{self, ImmutableData, MutableData, XorName, Xorable};
 use std::collections::{HashMap, HashSet};
+
+/// Type that can hold both immutable and mutable data.
+#[derive(Clone)]
+pub enum Data {
+    /// Immutable data.
+    Immutable(ImmutableData),
+    /// Mutable data.
+    Mutable(MutableData),
+}
+
+impl Data {
+    fn id(&self) -> DataId {
+        match *self {
+            Data::Immutable(ref data) => DataId::immutable(*data.name()),
+            Data::Mutable(ref data) => DataId::mutable(*data.name(), data.tag()),
+        }
+    }
+}
 
 /// Checks that none of the given nodes has any copy of the given data left.
 pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
-    let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::identifier).collect();
+    let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::id).collect();
     let mut data_count = HashMap::new();
-    nodes
-        .iter()
-        .flat_map(TestNode::get_stored_names)
-        .foreach(|data_idv| if deleted_data_ids.contains(&data_idv.0) {
-                     *data_count.entry(data_idv).or_insert(0) += 1;
-                 });
+
+    for data_idv in nodes
+            .iter()
+            .flat_map(|node| unwrap!(node.get_stored_ids_and_versions())) {
+        if deleted_data_ids.contains(&data_idv.0) {
+            *data_count.entry(data_idv).or_insert(0) += 1;
+        }
+    }
+
     for (data_id, count) in data_count {
         assert!(count < 5,
                 "Found deleted data: {:?}. count: {}",
@@ -49,9 +70,9 @@ pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
 
 /// Checks that the given `nodes` store the expected number of copies of the given data.
 pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
-    let mut data_holders_map: HashMap<IdAndVersion, Vec<XorName>> = HashMap::new();
+    let mut data_holders_map: HashMap<(DataId, u64), Vec<XorName>> = HashMap::new();
     for node in nodes {
-        for data_idv in node.get_stored_names() {
+        for data_idv in unwrap!(node.get_stored_ids_and_versions()) {
             data_holders_map
                 .entry(data_idv)
                 .or_insert_with(Vec::new)
@@ -60,11 +81,12 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
     }
 
     for data in all_data {
-        let (data_id, data_version) = match data {
-            Data::Immutable(data) => (data.identifier(), 0),
-            Data::Structured(data) => (data.identifier(), data.get_version()),
-            _ => unreachable!(),
+        let data_id = data.id();
+        let data_version = match data {
+            Data::Immutable(_) => 0,
+            Data::Mutable(data) => data.version(),
         };
+
         let data_holders = data_holders_map
             .get(&(data_id, data_version))
             .cloned()
@@ -77,20 +99,19 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
                 .iter()
                 .map(TestNode::name)
                 .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
-
         expected_data_holders.truncate(GROUP_SIZE);
 
-        assert_eq!(expected_data_holders,
-                   data_holders,
-                   "Data: {:?}. expected = {:?}, actual = {:?}",
+        if expected_data_holders != data_holders {
+            panic!("Unexpected data holders for {:?}\n  expected: {:?}\n    actual: {:?}",
                    data_id,
                    expected_data_holders,
                    data_holders);
+        }
     }
 }
 
 /// Verify that the network invariant is upheld for all nodes.
-pub fn verify_kademlia_invariant_for_all_nodes(nodes: &[TestNode]) {
+pub fn verify_network_invariant_for_all_nodes(nodes: &[TestNode]) {
     let routing_tables = nodes.iter().map(TestNode::routing_table).collect_vec();
-    routing::verify_network_invariant(routing_tables.iter());
+    routing::verify_network_invariant(routing_tables);
 }

@@ -31,18 +31,24 @@
          missing_debug_implementations, variant_size_differences)]
 
 #![cfg(feature = "use-mock-crust")]
+#![cfg(not(feature = "use-mock-routing"))]
 
-extern crate itertools;
+extern crate fake_clock;
 #[macro_use]
 extern crate log;
 extern crate rand;
 extern crate routing;
+#[cfg(not(feature = "use-mock-crypto"))]
 extern crate rust_sodium;
+#[macro_use(assert_match)]
 extern crate safe_vault;
-extern crate tiny_keccak;
 #[macro_use]
 extern crate unwrap;
+extern crate tiny_keccak;
 
 mod network;
 mod maid_manager;
 mod data_manager;
+
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;

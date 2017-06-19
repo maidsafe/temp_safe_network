@@ -192,8 +192,8 @@
 
 #![doc(html_logo_url =
            "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-       html_favicon_url = "https://maidsafe.net/img/favicon.ico",
-       html_root_url = "https://docs.rs/safe_vault")]
+       html_favicon_url = "http://maidsafe.net/img/favicon.ico",
+       html_root_url = "http://maidsafe.github.io/safe_vault")]
 
 // For explanation of lint checks, run `rustc -W help` or see
 // https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
@@ -207,25 +207,26 @@
 #![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
         unused_qualifications, unused_results)]
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
-         missing_debug_implementations, variant_size_differences, non_upper_case_globals)]
-
-// TODO solve this
-#![cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
+         missing_debug_implementations, variant_size_differences)]
 
 extern crate accumulator;
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
+extern crate fake_clock;
 extern crate fs2;
 extern crate hex;
+#[cfg(feature = "use-mock-crust")]
+extern crate itertools;
 #[macro_use]
 extern crate log;
 extern crate lru_time_cache;
-extern crate itertools;
 extern crate maidsafe_utilities;
 extern crate config_file_handler;
 #[macro_use]
 extern crate quick_error;
-#[cfg(any(test, feature = "use-mock-crust"))]
+#[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate rand;
 extern crate routing;
+#[cfg(not(feature = "use-mock-crypto"))]
 extern crate rust_sodium;
 extern crate serde;
 #[macro_use]
@@ -234,28 +235,41 @@ extern crate serde_json;
 #[cfg(test)]
 extern crate tempdir;
 extern crate tiny_keccak;
-#[cfg(any(test, feature = "use-mock-crust"))]
 #[macro_use]
 extern crate unwrap;
+
+/// For unit and integration tests only
+#[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]
+#[macro_use]
+pub mod test_utils;
+
+/// For integration tests only
+#[cfg(all(feature = "use-mock-crust", not(feature = "use-mock-routing")))]
+pub mod mock_crust_detail;
 
 mod cache;
 mod chunk_store;
 mod config_handler;
 mod error;
-/// For integration tests only
-#[cfg(feature = "use-mock-crust")]
-pub mod test_utils;
+#[cfg(all(test, feature = "use-mock-routing"))]
+mod mock_routing;
 mod personas;
 mod utils;
 mod vault;
-/// For integration tests only
-#[cfg(feature = "use-mock-crust")]
-pub mod mock_crust_detail;
+
 pub use config_handler::Config;
+pub use personas::data_manager::DataId;
+#[cfg(feature = "use-mock-crust")]
+pub use personas::data_manager::PENDING_WRITE_TIMEOUT_SECS;
+pub use personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
 pub use vault::Vault;
 
 /// The number of nodes in groups managing data and user accounts.
 pub const GROUP_SIZE: usize = 8;
+/// The minimal number of nodes in group to reach consensus.
+pub const QUORUM: usize = GROUP_SIZE / 2 + 1;
 
 /// The type tag of invitations to create an account.
 pub const TYPE_TAG_INVITE: u64 = 8;

@@ -15,14 +15,26 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![cfg(feature = "use-mock-crust")]
+use rand::{self, Rand, Rng};
+use routing::{Authority, EntryAction, EntryActions, ImmutableData, MutableData, Value, XorName};
+use rust_sodium::crypto::sign;
+use std::cmp;
+use std::collections::{BTreeMap, BTreeSet};
+use utils;
 
-use rand::Rng;
-use routing::{AppendedData, DataIdentifier, Filter, FullId, ImmutableData, PrivAppendableData,
-              PrivAppendedData, PubAppendableData, StructuredData};
-use rust_sodium::crypto::box_;
-use std::collections::BTreeSet;
-use std::iter;
+#[macro_export]
+macro_rules! assert_match {
+    ($e:expr, $p:pat => $r:expr) => {
+        match $e {
+            $p => $r,
+            ref x => panic!("Unexpected {:?} (expecting: {})", x, stringify!($p)),
+        }
+    };
+
+    ($e:expr, $p:pat) => {
+        assert_match!($e, $p => ())
+    }
+}
 
 /// Toggle iterations for quick test environment variable
 pub fn iterations() -> usize {
@@ -33,123 +45,103 @@ pub fn iterations() -> usize {
     }
 }
 
-/// Creates random immutable data - tests only
-pub fn random_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
-    ImmutableData::new(rng.gen_iter().take(size).collect())
+/// Generate random vector of the given length.
+pub fn gen_vec<T: Rand, R: Rng>(size: usize, rng: &mut R) -> Vec<T> {
+    rng.gen_iter().take(size).collect()
 }
 
-/// Creates random structured data - tests only
-pub fn random_structured_data<R: Rng>(type_tag: u64,
-                                      full_id: &FullId,
-                                      rng: &mut R)
-                                      -> StructuredData {
-    random_structured_data_with_size(type_tag, full_id, 10, rng)
+/// Generate random immutable data
+pub fn gen_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
+    ImmutableData::new(gen_vec(size, rng))
 }
 
-/// Creates random structured data with size - tests only
-pub fn random_structured_data_with_size<R: Rng>(type_tag: u64,
-                                                full_id: &FullId,
-                                                size: usize,
-                                                rng: &mut R)
-                                                -> StructuredData {
-    let owner_pubkey = *full_id.public_id().signing_public_key();
-    let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
-    let mut sd = StructuredData::new(type_tag,
-                                     rng.gen(),
-                                     0,
-                                     rng.gen_iter().take(size).collect(),
-                                     owner)
-            .expect("Cannot create structured data for test");
-    let _ = sd.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
-    sd
+/// Generate mutable data with the given tag, number of entries and owner.
+pub fn gen_mutable_data<R: Rng>(tag: u64,
+                                num_entries: usize,
+                                owner: sign::PublicKey,
+                                rng: &mut R)
+                                -> MutableData {
+    let entries = gen_mutable_data_entries(num_entries, rng);
+    let mut owners = BTreeSet::new();
+    let _ = owners.insert(owner);
+    unwrap!(MutableData::new(rng.gen(), tag, Default::default(), entries, owners))
 }
 
-/// Creates random public appendable data - tests only
-pub fn random_pub_appendable_data<R: Rng>(full_id: &FullId, rng: &mut R) -> PubAppendableData {
-    random_pub_appendable_data_with_size(full_id, 0, rng)
-}
-
-/// Creates random public appendable data with size - tests only
-pub fn random_pub_appendable_data_with_size<R: Rng>(full_id: &FullId,
-                                                    size: usize,
-                                                    rng: &mut R)
-                                                    -> PubAppendableData {
-    let owner_pubkey = *full_id.public_id().signing_public_key();
-    let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
-    let mut ad = PubAppendableData::new(rng.gen(),
-                                        0,
-                                        owner,
-                                        BTreeSet::new(),
-                                        Filter::black_list(None))
-            .expect("Cannot create public appendable data for test");
-
-    for _ in 0..size / 128 {
-        let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-        let appended_data =
-            unwrap!(AppendedData::new(pointer, owner_pubkey, full_id.signing_private_key()));
-        ad.append(appended_data);
+/// Generate the given number of mutable data entries.
+pub fn gen_mutable_data_entries<R: Rng>(num: usize, rng: &mut R) -> BTreeMap<Vec<u8>, Value> {
+    let mut entries = BTreeMap::new();
+    while entries.len() < num {
+        let (key, value) = gen_mutable_data_entry(rng);
+        let _ = entries.insert(key, value);
     }
 
-    let _ = ad.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
-    ad
+    entries
 }
 
-/// Creates a new public appendable data with an incremented version number
-pub fn pub_appendable_data_version_up<R: Rng>(full_id: &FullId,
-                                              old_ad: &PubAppendableData,
+/// Generate mutable data entry (key, value) pair.
+pub fn gen_mutable_data_entry<R: Rng>(rng: &mut R) -> (Vec<u8>, Value) {
+    let key_size = rng.gen_range(1, 10);
+    let key = gen_vec(key_size, rng);
+
+    let value_size = rng.gen_range(1, 10);
+    let value = Value {
+        content: gen_vec(value_size, rng),
+        entry_version: 0,
+    };
+
+    (key, value)
+}
+
+/// Generate random entry actions to mutate the given mutable data.
+pub fn gen_mutable_data_entry_actions<R: Rng>(data: &MutableData,
+                                              count: usize,
                                               rng: &mut R)
-                                              -> PubAppendableData {
-    let owner_pubkey = *full_id.public_id().signing_public_key();
-    let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
-    let mut new_ad = PubAppendableData::new(*old_ad.name(),
-                                            old_ad.get_version() + 1,
-                                            owner,
-                                            BTreeSet::new(),
-                                            Filter::black_list(None))
-            .expect("Cannot create public appendable data for test");
-    for data in old_ad.get_data() {
-        new_ad.append(data.clone());
-    }
-    let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-    let appended_data =
-        unwrap!(AppendedData::new(pointer, owner_pubkey, full_id.signing_private_key()));
-    new_ad.append(appended_data);
-    let _ = new_ad.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
-    new_ad
-}
+                                              -> BTreeMap<Vec<u8>, EntryAction> {
+    let mut actions = EntryActions::new();
 
-/// Creates random private appendable data - tests only
-pub fn random_priv_appendable_data<R: Rng>(full_id: &FullId,
-                                           encrypt_key: box_::PublicKey,
-                                           rng: &mut R)
-                                           -> PrivAppendableData {
-    random_priv_appendable_data_with_size(full_id, encrypt_key, 0, rng)
-}
+    let modify_count = cmp::min(rng.gen_range(0, count + 1), data.keys().len());
+    let insert_count = count - modify_count;
 
-/// Creates random private appendable data with size - tests only
-pub fn random_priv_appendable_data_with_size<R: Rng>(full_id: &FullId,
-                                                     encrypt_key: box_::PublicKey,
-                                                     size: usize,
-                                                     rng: &mut R)
-                                                     -> PrivAppendableData {
-    let owner_pubkey = *full_id.public_id().signing_public_key();
-    let owner = iter::once(owner_pubkey).collect::<BTreeSet<_>>();
-    let mut ad = PrivAppendableData::new(rng.gen(),
-                                         0,
-                                         owner,
-                                         BTreeSet::new(),
-                                         Filter::black_list(None),
-                                         encrypt_key)
-            .expect("Cannot create private appendable data for test");
+    let keys_to_modify = rand::sample(rng, data.keys().into_iter().cloned(), modify_count);
+    for key in keys_to_modify {
+        let version = unwrap!(data.get(&key)).entry_version + 1;
 
-    for _ in 0..size / 128 {
-        let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-        let appended_data =
-            unwrap!(AppendedData::new(pointer, owner_pubkey, full_id.signing_private_key()));
-        let priv_appended_data = unwrap!(PrivAppendedData::new(&appended_data, &encrypt_key));
-        ad.append(priv_appended_data, &owner_pubkey);
+        if rng.gen() {
+            actions = actions.del(key, version);
+        } else {
+            let content = gen_vec(10, rng);
+            actions = actions.update(key, content, version);
+        }
     }
 
-    let _ = ad.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
-    ad
+    for _ in 0..insert_count {
+        let key = gen_vec(10, rng);
+        if data.get(&key).is_some() {
+            continue;
+        }
+
+        let content = gen_vec(10, rng);
+        actions = actions.ins(key, content, 0);
+    }
+
+    actions.into()
+}
+
+/// Generate random `Client` authority and return it together with its client key.
+#[cfg(not(feature = "use-mock-crust"))]
+pub fn gen_client_authority() -> (Authority<XorName>, sign::PublicKey) {
+    use routing::FullId;
+    let full_id = FullId::new();
+
+    let client = Authority::Client {
+        client_id: *full_id.public_id(),
+        proxy_node_name: rand::random(),
+    };
+
+    (client, *full_id.public_id().signing_public_key())
+}
+
+/// Generate `ClientManager` authority for the client with the given client key.
+pub fn gen_client_manager_authority(client_key: sign::PublicKey) -> Authority<XorName> {
+    Authority::ClientManager(utils::client_name_from_key(&client_key))
 }
