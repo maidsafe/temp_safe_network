@@ -1,0 +1,21 @@
+[package]
+authors = ["MaidSafe Developers <dev@maidsafe.net>"]
+description = "Integration tests"
+documentation = "https://docs.rs/safe_core-tests"
+homepage = "https://maidsafe.net"
+license = "GPL-3.0"
+name = "tests"
+readme = "README.md"
+repository = "https://github.com/maidsafe/safe_client_libs"
+version = "0.1.0"
+
+[dependencies]
+log = "~0.3.6"
+ffi_utils = { path = "../ffi_utils" }
+safe_app = { path = "../safe_app" }
+safe_authenticator = { path = "../safe_authenticator" }
+safe_core = { path = "../safe_core" }
+unwrap = "~1.1.0"
+
+[features]
+use-mock-routing = ["safe_core/use-mock-routing"]

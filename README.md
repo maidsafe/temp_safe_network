@@ -2,28 +2,19 @@
 
 **Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
 
-|Crate|Documentation|Linux/OS X|Windows|Issues|
-|:---:|:-----------:|:--------:|:-----:|:----:|
-|[![](http://meritbadge.herokuapp.com/safe_core)](https://crates.io/crates/safe_core)|[![Documentation](https://docs.rs/safe_core/badge.svg)](https://docs.rs/safe_core)|[![Build Status](https://travis-ci.org/maidsafe/safe_client_libs.svg?branch=master)](https://travis-ci.org/maidsafe/safe_client_libs)|[![Build status](https://ci.appveyor.com/api/projects/status/c61jthx04us5j57j/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-client-libs/branch/master)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_client_libs.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_client_libs)|
+|Linux/OS X|Windows|Issues|
+|:--------:|:-----:|:----:|
+|[![Build Status](https://travis-ci.org/maidsafe/safe_client_libs.svg?branch=dev)](https://travis-ci.org/maidsafe/safe_client_libs)|[![Build status](https://ci.appveyor.com/api/projects/status/qyvxnojplcwcey4l/branch/dev?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-client-libs/branch/dev)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_client_libs.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_client_libs)|
 
 | [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
-|:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
+|:-------:|:-------:|:-------:|
 
-## Build Instructions
+This is the project workspace. Please refer to individual members for details:
 
-`safe_client_libs` can interface conditionally against either the routing crate or a mock used for local testing.
-
-To use it with the Mock:
-```
-cargo build --features "use-mock-routing"
-cargo test --features "use-mock-routing"
-```
-
-To interface it with actual routing (default):
-```
-cargo build
-cargo test
-```
+- [safe_core](safe_core/README.md)
+- [ffi_utils](ffi_utils/README.md)
+- [safe_authenticator](safe_authenticator/README.md)
+- [safe_app](safe_app/README.md)
 
 ## License
 
