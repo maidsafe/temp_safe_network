@@ -11,10 +11,6 @@ rust:
   - 1.17.0
   - nightly-2017-04-28
 sudo: false
-branches:
-  only:
-    - master
-    - dev
 cache:
   cargo: true
 
