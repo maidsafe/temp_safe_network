@@ -49,16 +49,22 @@ pub mod nfs;
 mod helper;
 
 /// Create unregistered app.
+/// The `user_data` parameter corresponds to the first parameter of the
+/// `o_cb` callback, while `network_cb_user_data` corresponds to the
+/// first parameter of `o_network_observer_cb`.
 #[no_mangle]
-pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
-                                          bootstrap_config_ptr: *mut u8,
+pub unsafe extern "C" fn app_unregistered(bootstrap_config_ptr: *const u8,
                                           bootstrap_config_len: usize,
-                                          network_observer_cb: unsafe extern "C" fn(*mut c_void,
+                                          network_cb_user_data: *mut c_void,
+                                          user_data: *mut c_void,
+                                          o_network_observer_cb: unsafe extern "C" fn(*mut c_void,
                                                                                     FfiResult,
                                                                                     i32),
-                                          o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App)) {
+                                          o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App))
+{
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
+        let network_cb_user_data = OpaqueCtx(network_cb_user_data);
 
         let config = if bootstrap_config_len == 0 || bootstrap_config_ptr.is_null() {
             None
@@ -68,11 +74,12 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
             Some(deserialise::<BootstrapConfig>(config_serialised)?)
         };
 
-        let app =
-            App::unregistered(move |event| {
-                                  call_network_observer(event, user_data.0, network_observer_cb)
-                              },
-                              config)?;
+        let app = App::unregistered(move |event| {
+                                        call_network_observer(event,
+                                                              network_cb_user_data.0,
+                                                              o_network_observer_cb)
+                                    },
+                                    config)?;
 
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
 
@@ -80,22 +87,27 @@ pub unsafe extern "C" fn app_unregistered(user_data: *mut c_void,
     })
 }
 
-/// Create registered app.
+/// Create a registered app.
+/// The `user_data` parameter corresponds to the first parameter of the
+/// `o_cb` callback, while `network_cb_user_data` corresponds to the
+/// first parameter of `o_network_observer_cb`.
 #[no_mangle]
 pub unsafe extern "C" fn app_registered(app_id: *const c_char,
                                         auth_granted: *const FfiAuthGranted,
+                                        network_cb_user_data: *mut c_void,
                                         user_data: *mut c_void,
-                                        network_observer_cb: unsafe extern "C" fn(*mut c_void,
-                                                                                  FfiResult,
-                                                                                  i32),
+                                        o_network_observer_cb: unsafe extern "C" fn(*mut c_void,
+                                                                                    FfiResult,
+                                                                                    i32),
                                         o_cb: extern "C" fn(*mut c_void, FfiResult, *mut App)) {
     catch_unwind_cb(user_data, o_cb, || -> Result<_, AppError> {
         let user_data = OpaqueCtx(user_data);
+        let network_cb_user_data = OpaqueCtx(network_cb_user_data);
         let app_id = from_c_str(app_id)?;
         let auth_granted = AuthGranted::clone_from_repr_c(auth_granted)?;
 
         let app = App::registered(app_id, auth_granted, move |event| {
-            call_network_observer(event, user_data.0, network_observer_cb)
+            call_network_observer(event, network_cb_user_data.0, o_network_observer_cb)
         })?;
 
         o_cb(user_data.0, FFI_RESULT_OK, Box::into_raw(Box::new(app)));
@@ -126,6 +138,59 @@ unsafe fn call_network_observer(event: Result<NetworkEvent, AppError>,
                      description: description.as_ptr(),
                  },
                  0)
+        }
+    }
+}
+
+#[cfg(all(test, feature = "use-mock-routing"))]
+mod tests {
+    use super::*;
+    use App;
+    use ffi_utils::test_utils::{call_1, send_via_user_data, sender_as_user_data};
+    use maidsafe_utilities::serialisation::serialise;
+    use safe_core::NetworkEvent;
+    use safe_core::ipc::BootstrapConfig;
+    use std::os::raw::c_void;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    #[test]
+    fn network_status_callback() {
+        {
+            let (tx, rx) = mpsc::channel();
+
+            let bootstrap_cfg = unwrap!(serialise(&BootstrapConfig::default()));
+
+            let app: *mut App = unsafe {
+                unwrap!(call_1(|ud, cb| {
+                                   app_unregistered(bootstrap_cfg.as_ptr(),
+                                                    bootstrap_cfg.len(),
+                                                    sender_as_user_data(&tx),
+                                                    ud,
+                                                    net_event_cb,
+                                                    cb)
+                               }))
+            };
+
+            unsafe {
+                unwrap!((*app).send(move |client, _| {
+                                        client.simulate_network_disconnect();
+                                        None
+                                    }));
+            }
+
+            let (error_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            assert_eq!(error_code, 0);
+
+            let disconnected: i32 = NetworkEvent::Disconnected.into();
+            assert_eq!(event, disconnected);
+
+            unsafe { app_free(app) };
+        }
+
+        #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+        unsafe extern "C" fn net_event_cb(user_data: *mut c_void, res: FfiResult, event: i32) {
+            send_via_user_data(user_data, (res.error_code, event));
         }
     }
 }

@@ -37,8 +37,9 @@ pub fn run<T>(routing_rx: &Receiver<Event>, mut core_tx: CoreMsgTx<T>, net_tx: &
                     break;
                 }
             }
-            Event::RestartRequired => {
-                if net_tx.send(NetworkEvent::Disconnected).is_err() {
+            Event::Terminate => {
+                if let Err(e) = net_tx.send(NetworkEvent::Disconnected) {
+                    trace!("Couldn't send NetworkEvent::Disconnected: {:?}", e);
                     break;
                 }
 
@@ -51,11 +52,11 @@ pub fn run<T>(routing_rx: &Receiver<Event>, mut core_tx: CoreMsgTx<T>, net_tx: &
                                  })
                 };
 
-                if core_tx.send(msg).is_err() {
-                    break;
+                if let Err(e) = core_tx.send(msg) {
+                    trace!("Couldn't restart routing: {:?}", e);
                 }
+                break;
             }
-            Event::Terminate => break,
             x => {
                 debug!("Routing Event {:?} is not handled in context of routing event loop.",
                        x);

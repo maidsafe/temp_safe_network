@@ -462,7 +462,9 @@ impl Client {
             }
         };
 
-        let _ = net_tx.send(NetworkEvent::Connected);
+        if let Err(e) = net_tx.send(NetworkEvent::Connected) {
+            trace!("Couldn't send: {:?}", e);
+        }
 
         let joiner = spawn_routing_thread(routing_rx, core_tx, net_tx);
 
@@ -976,7 +978,8 @@ impl Client {
     }
 }
 
-#[cfg(all(test, feature = "use-mock-routing"))]
+#[cfg(any(all(test, feature = "use-mock-routing"),
+          all(feature = "testing", feature = "use-mock-routing")))]
 impl Client {
     #[doc(hidden)]
     pub fn set_network_limits(&self, max_ops_count: Option<u64>) {
