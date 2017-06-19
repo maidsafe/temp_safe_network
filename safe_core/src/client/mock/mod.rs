@@ -21,3 +21,53 @@ mod tests;
 mod vault;
 
 pub use self::routing::Routing;
+use routing::XorName;
+
+/// Identifier of immutable data
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct ImmutableDataId(pub XorName);
+
+impl ImmutableDataId {
+    pub fn name(&self) -> &XorName {
+        &self.0
+    }
+}
+
+/// Identifier of mutable data
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct MutableDataId(pub XorName, pub u64);
+
+impl MutableDataId {
+    pub fn name(&self) -> &XorName {
+        &self.0
+    }
+}
+
+/// Identifier for a data (immutable or mutable)
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+pub enum DataId {
+    /// Identifier of immutable data.
+    Immutable(ImmutableDataId),
+    /// Identifier of mutable data.
+    Mutable(MutableDataId),
+}
+
+impl DataId {
+    /// Create `DataId` for immutable data.
+    pub fn immutable(name: XorName) -> Self {
+        DataId::Immutable(ImmutableDataId(name))
+    }
+
+    /// Create `DataId` for mutable data.
+    pub fn mutable(name: XorName, tag: u64) -> Self {
+        DataId::Mutable(MutableDataId(name, tag))
+    }
+
+    /// Get name of this identifier.
+    pub fn name(&self) -> &XorName {
+        match *self {
+            DataId::Immutable(ref id) => id.name(),
+            DataId::Mutable(ref id) => id.name(),
+        }
+    }
+}

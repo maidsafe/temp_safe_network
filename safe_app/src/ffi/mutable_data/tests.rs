@@ -18,7 +18,8 @@
 use futures::Future;
 use maidsafe_utilities::thread;
 use rand::{OsRng, Rng};
-use routing::{Action, ClientError, EntryAction, MutableData, PermissionSet, User, Value, XorName};
+use routing::{Action, ClientError, EntryAction, MutableData, PermissionSet, User, Value,
+              XOR_NAME_LEN, XorName};
 use rust_sodium::crypto::sign;
 use safe_core::{CoreError, DIR_TAG, FutureExt};
 use safe_core::utils::test_utils::random_client;
@@ -27,7 +28,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 use test_utils::{create_app, run};
 
-// MD created by App. App lists it's own sign_pk in owners field: Put should
+// MD created by App. App lists its own sign_pk in owners field: Put should
 // fail - Rejected by MaidManagers. Should pass when it lists the owner's
 // sign_pk instead
 #[test]
@@ -64,7 +65,7 @@ fn md_created_by_app_1() {
 }
 
 // MD created by App properly: Should pass. App tries to change ownership -
-// Should Fail by MaidManagers. App creates it's own account with the
+// Should Fail by MaidManagers. App creates its own account with the
 // maid-managers. Now it tries changing ownership by routing it through it's MM
 // instead of owners. It should still fail as DataManagers should enforce that
 // the request is coming from MM of the owner (listed in the owners field of the
@@ -136,7 +137,7 @@ fn md_created_by_app_2() {
 }
 
 // MD created by owner and given to a permitted App. Owner has listed that app
-// is allowed to insert only. App tries to insert -should pass. App tries to
+// is allowed to insert only. App tries to insert - should pass. App tries to
 // update - should fail. App tries to change permission to allow itself to
 // update - should fail to change permissions.
 #[test]
@@ -228,7 +229,7 @@ fn md_created_by_app_3() {
 }
 
 // MD created by owner and given to a permitted App. Owner has listed that app
-// is allowed to manage-permissions only. App tries to insert -should fail. App
+// is allowed to manage-permissions only. App tries to insert - should fail. App
 // tries to update - should fail. App tries to change permission to allow itself
 // to insert and delete - should pass to change permissions. Now App tires to
 // insert again - should pass. App tries to update. Should fail. App tries to
@@ -948,7 +949,7 @@ fn entries_crud_ffi() {
     use ffi::mutable_data::permissions::*;
     use ffi::mutable_data::entries::*;
     use ffi_utils::{FfiResult, vec_clone_from_raw_parts};
-    use ffi_utils::test_utils::{call_0, call_1, call_vec_u8, send_via_user_data,
+    use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8, send_via_user_data,
                                 sender_as_user_data};
     use object_cache::{MDataEntryActionsHandle, MDataInfoHandle, MDataPermissionSetHandle,
                        MDataPermissionsHandle};
@@ -988,6 +989,25 @@ fn entries_crud_ffi() {
 
     unsafe {
         unwrap!(call_0(|ud, cb| mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)))
+    };
+
+    // Try to create a MD instance using the same name & type tag - it should fail.
+    let res =
+        unsafe { call_0(|ud, cb| mdata_put(&app, md_info_pub_h, perms_h, ENTRIES_EMPTY, ud, cb)) };
+    match res {
+        Err(_) => (),
+        x => panic!("Failed test: unexpected {:?}, expected error", x),
+    }
+
+    // Try to create a MD instance using the same name & a different type tag - it should pass.
+    let (xor_name, _type_tag): ([u8; XOR_NAME_LEN], u64) = unsafe {
+        unwrap!(call_2(|ud, cb| mdata_info_extract_name_and_type_tag(&app, md_info_pub_h, ud, cb)))
+    };
+    let md_info_pub_2_h: MDataInfoHandle =
+        unsafe { unwrap!(call_1(|ud, cb| mdata_info_new_public(&app, &xor_name, 10001, ud, cb))) };
+
+    unsafe {
+        unwrap!(call_0(|ud, cb| mdata_put(&app, md_info_pub_2_h, perms_h, ENTRIES_EMPTY, ud, cb)))
     };
 
     // Try to add entries to a public MD

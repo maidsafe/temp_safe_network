@@ -160,6 +160,19 @@ fn mutable_data_basics() {
     unwrap!(routing.put_mdata(client_mgr, data, msg_id, owner_key));
     expect_success!(routing_rx, msg_id, Response::PutMData);
 
+    // It should be possible to put an MData using the same name but a
+    // different type tag
+    let tag2 = 1001u64;
+
+    let data2 = unwrap!(MutableData::new(name,
+                                         tag2,
+                                         Default::default(),
+                                         Default::default(),
+                                         btree_set!(owner_key)));
+    let msg_id = MessageId::new();
+    unwrap!(routing.put_mdata(client_mgr, data2, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::PutMData);
+
     // GetMDataVersion should respond with 0
     let msg_id = MessageId::new();
     unwrap!(routing.get_mdata_version(nae_mgr, name, tag, msg_id));
@@ -217,6 +230,12 @@ fn mutable_data_basics() {
     let entry = unwrap!(entries.get(&key1[..]));
     assert_eq!(entry.content, value1_v0);
     assert_eq!(entry.entry_version, 0);
+
+    // Second MData with a diff. type tag still should be empty
+    let msg_id = MessageId::new();
+    unwrap!(routing.list_mdata_entries(nae_mgr, name, tag2, msg_id));
+    let entries = expect_success!(routing_rx, msg_id, Response::ListMDataEntries);
+    assert!(entries.is_empty());
 
     // ListMDataKeys
     let msg_id = MessageId::new();

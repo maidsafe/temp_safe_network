@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use super::DataId;
 use routing::{AccountInfo, Authority, ClientError, ImmutableData, MutableData, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeSet, HashMap};
@@ -25,7 +26,7 @@ pub const DEFAULT_MAX_MUTATIONS: u64 = 100;
 #[derive(Deserialize, Serialize)]
 pub struct Vault {
     client_manager: HashMap<XorName, Account>,
-    nae_manager: HashMap<XorName, Data>,
+    nae_manager: HashMap<DataId, Data>,
 }
 
 impl Vault {
@@ -90,17 +91,17 @@ impl Vault {
     }
 
     // Check if data with the given name is in the storage.
-    pub fn contains_data(&self, name: &XorName) -> bool {
+    pub fn contains_data(&self, name: &DataId) -> bool {
         self.nae_manager.contains_key(name)
     }
 
     // Load data with the given name from the storage.
-    pub fn get_data(&self, name: &XorName) -> Option<Data> {
+    pub fn get_data(&self, name: &DataId) -> Option<Data> {
         self.nae_manager.get(name).cloned()
     }
 
     // Save the data to the storage.
-    pub fn insert_data(&mut self, name: XorName, data: Data) {
+    pub fn insert_data(&mut self, name: DataId, data: Data) {
         let _ = self.nae_manager.insert(name, data);
     }
 

@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use super::DataId;
 use super::vault::{Data, Vault};
 use maidsafe_utilities::thread;
 use rand;
@@ -145,12 +146,12 @@ impl Routing {
             self.authorise_mutation(&dst);
 
             let mut vault = unwrap!(VAULT.lock());
-            match vault.get_data(data.name()) {
+            match vault.get_data(&DataId::immutable(*data.name())) {
                 // Immutable data is de-duplicated so always allowed
                 Some(Data::Immutable(_)) => Ok(()),
                 Some(_) => Err(ClientError::DataExists),
                 None => {
-                    vault.insert_data(data_name, Data::Immutable(data));
+                    vault.insert_data(DataId::immutable(data_name), Data::Immutable(data));
                     Ok(())
                 }
             }
@@ -187,7 +188,7 @@ impl Routing {
             self.authorise_read(&dst, &name);
 
             let vault = unwrap!(VAULT.lock());
-            match vault.get_data(&name) {
+            match vault.get_data(&DataId::immutable(name)) {
                 Some(Data::Immutable(data)) => Ok(data),
                 _ => Err(ClientError::NoSuchData),
             }
@@ -215,7 +216,7 @@ impl Routing {
             return Ok(());
         }
 
-        let data_name = *data.name();
+        let data_name = DataId::mutable(*data.name(), data.tag());
 
         let res = if let Err(err) = self.verify_network_limits(msg_id, "put_mdata") {
             Err(err)
@@ -259,7 +260,7 @@ impl Routing {
             res
         };
 
-        let nae_auth = Authority::NaeManager(data_name);
+        let nae_auth = Authority::NaeManager(*data_name.name());
         self.send_response(PUT_MDATA_DELAY_MS,
                            nae_auth,
                            self.client_auth,
@@ -786,7 +787,7 @@ impl Routing {
     {
         let mutate = |mut data: MutableData, vault: &mut Vault| {
             let output = f(&mut data)?;
-            vault.insert_data(name, Data::Mutable(data));
+            vault.insert_data(DataId::mutable(name, tag), Data::Mutable(data));
             vault.sync();
             Ok(output)
         };
@@ -827,7 +828,7 @@ impl Routing {
             Err(err)
         } else {
             let mut vault = unwrap!(VAULT.lock());
-            match vault.get_data(&name) {
+            match vault.get_data(&DataId::mutable(name, tag)) {
                 Some(Data::Mutable(data)) => f(data, &mut *vault),
                 _ => {
                     if tag == TYPE_TAG_SESSION_PACKET {
