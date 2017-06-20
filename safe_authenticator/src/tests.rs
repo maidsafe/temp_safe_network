@@ -16,7 +16,6 @@
 // relating to use of the SAFE Network Software.
 
 use Authenticator;
-use access_container::access_container_entry;
 use errors::{AuthError, ERR_UNKNOWN_APP};
 use ffi::apps::*;
 use ffi_utils::{FfiResult, ReprC, StringError, base64_encode, from_c_str};
@@ -32,14 +31,14 @@ use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, Ip
 use safe_core::ipc::req::ffi::AppExchangeInfo as FfiAppExchangeInfo;
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, NfsError, file_helper};
+use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, File, NfsError, file_helper};
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 use std::sync::mpsc;
 use std::time::Duration;
 use test_utils::{access_container, compare_access_container_entries, create_account_and_login,
-                 rand_app, register_app, run};
+                 rand_app, register_app, run, try_access_container, try_run};
 use tiny_keccak::sha3_256;
 
 // Test creation and content of std dirs after account creation.
@@ -438,161 +437,109 @@ fn containers_access_request() {
     compare_access_container_entries(&authenticator, app_sign_pk, access_container, expected);
 }
 
+// The app revocation and re-authorization workflow.
 #[test]
-fn revoke_app() {
+fn app_revocation() {
     let authenticator = create_account_and_login();
 
-    // Create IpcMsg::AuthReq for a random App (random id, name, vendor etc), ask for app_container
-    // and containers "documents with permission to insert", "videos with all the permissions
-    // possible",
-    let auth_req = AuthReq {
-        app: unwrap!(rand_app()),
-        app_container: true,
-        containers: create_containers_req(),
-    };
-
-    let auth_granted = unwrap!(register_app(&authenticator, &auth_req));
-    let app_id = auth_req.app.id.clone();
-    let app_id2 = app_id.clone();
-
-    // Put some entries into videos folder before revoking the app
-    let mut ac_entries = access_container(&authenticator, app_id.clone(), auth_granted.clone());
-    let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
-    let videos_md2 = videos_md.clone();
-
-    let _ = run(&authenticator, move |client| {
-        file_helper::create(client.clone(), videos_md2, "video.mp4", Vec::new())
-            .and_then(move |writer| {
-                          writer
-                              .write(&[1u8; 10])
-                              .and_then(move |_| writer.close())
-                      })
-            .map_err(From::from)
-    });
-
-    // Invoke `authenticator_revoke_app` for the app-id
-    revoke(&authenticator, &app_id);
-
-    // Search the access container, the entry corresponding to app-id should no longer be there.
-    let app_keys = auth_granted.app_keys;
-    let app_sign_pk = app_keys.sign_pk;
-
-    let ac_md_info = auth_granted
-        .access_container
-        .into_mdata_info(app_keys.enc_key.clone());
-    run(&authenticator, move |client| {
-        access_container_entry(client, &ac_md_info, &app_id, app_keys)
-            .then(move |res| match res {
-                Ok((_version, None)) => Ok(()),
-                x => panic!("Unexpected {:?}", x),
-            })
-    });
-
-    // Use the previous MDataInfo for images to check if the permissions
-    // related to app-sign_pk are still present, they should not be present.
-    let videos_md3 = videos_md.clone();
-    let perms = run(&authenticator, move |client| {
-        client
-            .list_mdata_permissions(videos_md3.name, videos_md3.type_tag)
-            .map_err(From::from)
-    });
-    assert!(!perms.contains_key(&User::Key(app_sign_pk)));
-
-    // Try reading the entries of images folder, should not be able to read as everything
-    // is reencrypted using new keys.
-    run(&authenticator, move |client| {
-        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
-            Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
-            x => panic!("Unexpected {:?}", x),
-        })
-    });
-
-    // Reauthorise a revoked app - it should be able to read the images folder again.
-    let auth_granted = unwrap!(register_app(&authenticator, &auth_req));
-
-    let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted.clone());
-    let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
-
-    run(&authenticator, move |client| {
-        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
-            Ok((0, _file)) => Ok(()),
-            x => panic!("Unexpected {:?}", x),
-        })
-    });
-}
-
-// Modifies `revoke_app` to involve two apps - and do the same thing for one of them.
-#[test]
-fn revoke_app_reencryption() {
-    let authenticator = create_account_and_login();
-
+    // Create and authorise two apps.
     let auth_req1 = AuthReq {
         app: unwrap!(rand_app()),
-        app_container: true,
+        app_container: false,
         containers: create_containers_req(),
     };
+    let app_id1 = auth_req1.app.id.clone();
+    let auth_granted1 = unwrap!(register_app(&authenticator, &auth_req1));
 
     let auth_req2 = AuthReq {
         app: unwrap!(rand_app()),
         app_container: true,
         containers: create_containers_req(),
     };
-
-    let app_id1 = auth_req1.app.id.clone();
     let app_id2 = auth_req2.app.id.clone();
-
-    let auth_granted1 = unwrap!(register_app(&authenticator, &auth_req1));
     let auth_granted2 = unwrap!(register_app(&authenticator, &auth_req2));
 
-    // Put some entries into videos folder before revoking the first app
+    // Put one file by each app into a shared container.
+    let mut ac_entries = access_container(&authenticator, app_id1.clone(), auth_granted1.clone());
+    let (videos_md1, _) = unwrap!(ac_entries.remove("_videos"));
+    unwrap!(create_file(&authenticator, videos_md1.clone(), "1.mp4", vec![1; 10]));
+
     let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
-    let (videos_md, _) = unwrap!(ac_entries.remove("_videos"));
-    let videos_md2 = videos_md.clone();
+    let (videos_md2, _) = unwrap!(ac_entries.remove("_videos"));
+    unwrap!(create_file(&authenticator, videos_md2.clone(), "2.mp4", vec![1; 10]));
 
-    let _ = run(&authenticator, move |client| {
-        file_helper::create(client.clone(), videos_md2, "video.mp4", vec![1, 2, 3])
-            .and_then(move |writer| {
-                          writer
-                              .write(&[1u8; 10])
-                              .and_then(move |_| writer.close())
-                      })
-            .map_err(From::from)
-    });
+    // Both apps can access both files.
+    let _ = unwrap!(fetch_file(&authenticator, videos_md1.clone(), "1.mp4"));
+    let _ = unwrap!(fetch_file(&authenticator, videos_md1.clone(), "2.mp4"));
 
-    // Invoke `authenticator_revoke_app` for the first app
+    let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "1.mp4"));
+    let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "2.mp4"));
+
+    // Revoke the first app.
     revoke(&authenticator, &app_id1);
 
-    // Use the previous MDataInfo for images to check if the permissions
-    // related to the 2nd app are still present but not present for the revoked app.
-    let videos_md3 = videos_md.clone();
+    // The first app is no longer be in the access container.
+    let ac = try_access_container(&authenticator, app_id1.clone(), auth_granted1.clone());
+    assert!(ac.is_none());
+
+    // Container permissions includes only the second app.
+    let (name, tag) = (videos_md2.name, videos_md2.type_tag);
     let perms = run(&authenticator, move |client| {
         client
-            .list_mdata_permissions(videos_md3.name, videos_md3.type_tag)
+            .list_mdata_permissions(name, tag)
             .map_err(From::from)
     });
     assert!(!perms.contains_key(&User::Key(auth_granted1.app_keys.sign_pk)));
     assert!(perms.contains_key(&User::Key(auth_granted2.app_keys.sign_pk)));
 
-    // Try reading the entries of images folder, should not be able to read as everything
-    // is reencrypted using new keys.
-    run(&authenticator, move |client| {
-        file_helper::fetch(client.clone(), videos_md, "video.mp4").then(move |res| match res {
-            Err(NfsError::CoreError(CoreError::EncodeDecodeError(..))) => Ok(()),
-            x => panic!("Unexpected {:?}", x),
-        })
-    });
+    // The first app can no longer access the files.
+    match fetch_file(&authenticator, videos_md1.clone(), "1.mp4") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
 
-    // The second app can still read its entry in access-container to update its
-    // information about new MDataInfo for images.
+    match fetch_file(&authenticator, videos_md1.clone(), "2.mp4") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // The second app can still access both files after re-fetching the access container.
     let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
-    let (new_videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+    let (videos_md2, _) = unwrap!(ac_entries.remove("_videos"));
 
-    // With new information, try to re-read the images container entires.
-    let (_version, file) = run(&authenticator, move |client| {
-        file_helper::fetch(client.clone(), new_videos_md, "video.mp4").map_err(From::from)
-    });
-    assert_eq!(file.size(), 10);
-    assert_eq!(file.user_metadata().to_owned(), vec![1u8, 2u8, 3u8]);
+    let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "1.mp4"));
+    let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "2.mp4"));
+
+    // Re-authorize the first app.
+    let auth_granted1 = unwrap!(register_app(&authenticator, &auth_req1));
+    let mut ac_entries = access_container(&authenticator, app_id1.clone(), auth_granted1.clone());
+    let (videos_md1, _) = unwrap!(ac_entries.remove("_videos"));
+
+    // The first app can access the files again.
+    let _ = unwrap!(fetch_file(&authenticator, videos_md1.clone(), "1.mp4"));
+    let _ = unwrap!(fetch_file(&authenticator, videos_md1.clone(), "2.mp4"));
+
+    // The second app as well.
+    let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "1.mp4"));
+    let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "2.mp4"));
+
+    // Revoke the first app again. Only the second app can access the files.
+    revoke(&authenticator, &app_id1);
+
+    match fetch_file(&authenticator, videos_md1.clone(), "1.mp4") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    match fetch_file(&authenticator, videos_md1.clone(), "2.mp4") {
+        Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    let mut ac_entries = access_container(&authenticator, app_id2.clone(), auth_granted2.clone());
+    let (videos_md2, _) = unwrap!(ac_entries.remove("_videos"));
+    let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "1.mp4"));
+    let _ = unwrap!(fetch_file(&authenticator, videos_md2.clone(), "2.mp4"));
 }
 
 struct RegisteredAppId(String);
@@ -685,6 +632,37 @@ fn lists_of_registered_and_revoked_apps() {
     assert_eq!(revoked.len(), 0);
 }
 
+// Create file in the given container, with the given name and content.
+fn create_file<T: Into<String>>(authenticator: &Authenticator,
+                                container_info: MDataInfo,
+                                name: T,
+                                content: Vec<u8>)
+                                -> Result<(), AuthError> {
+    let name = name.into();
+    try_run(authenticator, |client| {
+        file_helper::create(client.clone(), container_info, name, vec![])
+            .and_then(move |writer| {
+                          writer
+                              .write(&content)
+                              .and_then(move |_| writer.close())
+                              .map(|_| ())
+                      })
+            .map_err(From::from)
+    })
+}
+
+fn fetch_file<T: Into<String>>(authenticator: &Authenticator,
+                               container_info: MDataInfo,
+                               name: T)
+                               -> Result<File, AuthError> {
+    let name = name.into();
+    try_run(authenticator, |client| {
+        file_helper::fetch(client.clone(), container_info, name)
+            .map(|(_, file)| file)
+            .map_err(From::from)
+    })
+}
+
 fn revoke(authenticator: &Authenticator, app_id: &str) {
     let base64_app_id = base64_encode(app_id.as_bytes());
 
@@ -704,7 +682,7 @@ fn revoke(authenticator: &Authenticator, app_id: &str) {
 }
 
 // Creates a containers request asking for "documents with permission to
-// insert", and "images with all the permissions possible",
+// insert", and "videos with all the permissions possible",
 fn create_containers_req() -> HashMap<String, BTreeSet<Permission>> {
     let mut containers = HashMap::new();
     let _ = containers.insert("_documents".to_owned(), btree_set![Permission::Insert]);
