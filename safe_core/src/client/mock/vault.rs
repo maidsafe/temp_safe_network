@@ -19,39 +19,49 @@ use super::DataId;
 use routing::{AccountInfo, Authority, ClientError, ImmutableData, MutableData, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeSet, HashMap};
+use std::time::SystemTime;
 use tiny_keccak::sha3_256;
 
 pub const DEFAULT_MAX_MUTATIONS: u64 = 100;
 
 #[derive(Deserialize, Serialize)]
-pub struct Vault {
+pub struct InnerVault {
     client_manager: HashMap<XorName, Account>,
     nae_manager: HashMap<DataId, Data>,
 }
 
+pub struct Vault {
+    storage: InnerVault,
+    #[allow(dead_code)]
+    sync_time: SystemTime,
+}
+
 impl Vault {
     pub fn new() -> Self {
-        sync::load().unwrap_or_else(|| {
-                                        Vault {
-                                            client_manager: HashMap::new(),
-                                            nae_manager: HashMap::new(),
-                                        }
-                                    })
+        let mut vault = Vault {
+            storage: InnerVault {
+                client_manager: HashMap::new(),
+                nae_manager: HashMap::new(),
+            },
+            sync_time: SystemTime::now(),
+        };
+        let _ = vault.load();
+        vault
     }
 
     // Get account for the client manager name.
     pub fn get_account(&self, name: &XorName) -> Option<&Account> {
-        self.client_manager.get(name)
+        self.storage.client_manager.get(name)
     }
 
     // Get mutable reference to account for the client manager name.
     pub fn get_account_mut(&mut self, name: &XorName) -> Option<&mut Account> {
-        self.client_manager.get_mut(name)
+        self.storage.client_manager.get_mut(name)
     }
 
     // Create account for the given client manager name.
     pub fn insert_account(&mut self, name: XorName) {
-        let _ = self.client_manager.insert(name, Account::new());
+        let _ = self.storage.client_manager.insert(name, Account::new());
     }
 
     // Authorise read (non-mutation) operation.
@@ -92,22 +102,17 @@ impl Vault {
 
     // Check if data with the given name is in the storage.
     pub fn contains_data(&self, name: &DataId) -> bool {
-        self.nae_manager.contains_key(name)
+        self.storage.nae_manager.contains_key(name)
     }
 
     // Load data with the given name from the storage.
     pub fn get_data(&self, name: &DataId) -> Option<Data> {
-        self.nae_manager.get(name).cloned()
+        self.storage.nae_manager.get(name).cloned()
     }
 
     // Save the data to the storage.
     pub fn insert_data(&mut self, name: DataId, data: Data) {
-        let _ = self.nae_manager.insert(name, data);
-    }
-
-    // Synchronize the storage with the disk.
-    pub fn sync(&self) {
-        sync::save(self)
+        let _ = self.storage.nae_manager.insert(name, data);
     }
 }
 
@@ -186,46 +191,69 @@ impl Account {
     }
 }
 
+
 #[cfg(test)]
 mod sync {
     use super::Vault;
 
-    pub fn load() -> Option<Vault> {
-        None
-    }
+    impl Vault {
+        pub fn load(&mut self) -> bool {
+            false
+        }
 
-    pub fn save(_: &Vault) {}
+        pub fn sync(&mut self) {}
+    }
 }
 
 #[cfg(not(test))]
 mod sync {
-    use super::Vault;
+    use super::{InnerVault, Vault};
     use maidsafe_utilities::serialisation::{deserialise, serialise};
     use std::env;
     use std::fs::File;
     use std::io::{Read, Write};
     use std::path::PathBuf;
+    use std::time::Duration;
 
     const FILE_NAME: &'static str = "MockVault";
 
-    pub fn load() -> Option<Vault> {
-        if let Ok(mut file) = File::open(path()) {
-            let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata()).len() as usize);
-            if file.read_to_end(&mut raw_disk_data).is_ok() && !raw_disk_data.is_empty() {
-                return deserialise(&raw_disk_data).ok();
-            }
-        }
-
-        None
-    }
-
-    pub fn save(vault: &Vault) {
-        let mut file = unwrap!(File::create(path()));
-        let _ = file.write_all(&unwrap!(serialise(vault)));
-        unwrap!(file.sync_all());
-    }
-
     fn path() -> PathBuf {
         env::temp_dir().join(FILE_NAME)
+    }
+
+    impl Vault {
+        pub fn load(&mut self) -> bool {
+            if let Ok(mut file) = File::open(path()) {
+                let mtime = unwrap!(unwrap!(file.metadata()).modified());
+                let mtime_duration = mtime
+                    .duration_since(self.sync_time)
+                    .unwrap_or(Duration::from_millis(1));
+
+                if mtime_duration.as_secs() == 0 && mtime_duration.subsec_nanos() == 0 {
+                    // Don't update vault if it's already synchronised
+                    return false;
+                }
+
+                let mut raw_disk_data = Vec::with_capacity(unwrap!(file.metadata()).len() as usize);
+                if file.read_to_end(&mut raw_disk_data).is_ok() && !raw_disk_data.is_empty() {
+                    if let Ok(storage) = deserialise::<InnerVault>(&raw_disk_data) {
+                        self.storage = storage;
+                        self.sync_time = mtime;
+                        return true;
+                    }
+                }
+            }
+
+            false
+        }
+
+        pub fn sync(&mut self) {
+            let mut file = unwrap!(File::create(path()));
+            let _ = file.write_all(&unwrap!(serialise(&self.storage)));
+            unwrap!(file.sync_all());
+
+            let mtime = unwrap!(unwrap!(file.metadata()).modified());
+            self.sync_time = mtime;
+        }
     }
 }
