@@ -26,7 +26,7 @@ use rust_sodium::crypto::sign;
 use std;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use tiny_keccak::sha3_256;
@@ -56,6 +56,12 @@ const DEL_AUTH_KEY_DELAY_MS: u64 = DEFAULT_DELAY_MS;
 
 lazy_static! {
     static ref VAULT: Mutex<Vault> = Mutex::new(Vault::new());
+}
+
+fn lock_vault() -> MutexGuard<'static, Vault> {
+    let mut vault = unwrap!(VAULT.lock());
+    let _ = vault.load();
+    vault
 }
 
 pub struct Routing {
@@ -110,9 +116,7 @@ impl Routing {
                 x => panic!("Unexpected authority: {:?}", x),
             };
 
-            let mut vault = unwrap!(VAULT.lock());
-            let _ = vault.load();
-            match vault.get_account(&name) {
+            match lock_vault().get_account(&name) {
                 Some(account) => Ok(*account.account_info()),
                 None => Err(ClientError::NoSuchAccount),
             }
@@ -141,27 +145,24 @@ impl Routing {
 
         let data_name = *data.name();
 
-        let res = if let Err(err) = self.verify_network_limits(msg_id, "put_idata") {
-            Err(err)
-        } else {
-            self.authorise_mutation(&dst);
+        let res = {
+            let mut vault = lock_vault();
 
-            let mut vault = unwrap!(VAULT.lock());
-            let _ = vault.load();
-            match vault.get_data(&DataId::immutable(*data.name())) {
-                // Immutable data is de-duplicated so always allowed
-                Some(Data::Immutable(_)) => Ok(()),
-                Some(_) => Err(ClientError::DataExists),
-                None => {
-                    vault.insert_data(DataId::immutable(data_name), Data::Immutable(data));
-                    Ok(())
-                }
-            }
+            self.verify_network_limits(msg_id, "put_idata")
+                .and_then(|_| vault.authorise_mutation(&dst, self.client_key()))
+                .and_then(|_| {
+                    match vault.get_data(&DataId::immutable(*data.name())) {
+                        // Immutable data is de-duplicated so always allowed
+                        Some(Data::Immutable(_)) => Ok(()),
+                        Some(_) => Err(ClientError::DataExists),
+                        None => {
+                            vault.insert_data(DataId::immutable(data_name), Data::Immutable(data));
+                            Ok(())
+                        }
+                    }
+                })
+                .map(|_| vault.commit_mutation(&dst))
         };
-
-        if res.is_ok() {
-            self.commit_mutation(&dst);
-        }
 
         let nae_auth = Authority::NaeManager(data_name);
         self.send_response(PUT_IDATA_DELAY_MS,
@@ -187,10 +188,8 @@ impl Routing {
         let res = if let Err(err) = self.verify_network_limits(msg_id, "get_idata") {
             Err(err)
         } else {
-            self.authorise_read(&dst, &name);
-
-            let mut vault = unwrap!(VAULT.lock());
-            let _ = vault.load();
+            let vault = lock_vault();
+            vault.authorise_read(&dst, &name);
             match vault.get_data(&DataId::immutable(name)) {
                 Some(Data::Immutable(data)) => Ok(data),
                 _ => Err(ClientError::NoSuchData),
@@ -230,8 +229,7 @@ impl Routing {
                 x => panic!("Unexpected authority: {:?}", x),
             };
 
-            let mut vault = unwrap!(VAULT.lock());
-            let _ = vault.load();
+            let mut vault = lock_vault();
             if vault.contains_data(&data_name) {
                 Err(ClientError::AccountExists)
             } else {
@@ -242,26 +240,18 @@ impl Routing {
             }
         } else {
             // Put normal data.
-            self.authorise_mutation(&dst);
+            let mut vault = lock_vault();
 
-            let res = if let Err(err) = self.verify_owner(&dst, data.owners()) {
-                Err(err)
-            } else {
-                let mut vault = unwrap!(VAULT.lock());
-                let _ = vault.load();
-                if vault.contains_data(&data_name) {
-                    Err(ClientError::DataExists)
-                } else {
-                    vault.insert_data(data_name, Data::Mutable(data));
-                    Ok(())
-                }
-            };
-
-            if res.is_ok() {
-                self.commit_mutation(&dst);
-            }
-
-            res
+            vault
+                .authorise_mutation(&dst, self.client_key())
+                .and_then(|_| self.verify_owner(&dst, data.owners()))
+                .and_then(|_| if vault.contains_data(&data_name) {
+                              Err(ClientError::DataExists)
+                          } else {
+                              vault.insert_data(data_name, Data::Mutable(data));
+                              Ok(())
+                          })
+                .map(|_| vault.commit_mutation(&dst))
         };
 
         let nae_auth = Authority::NaeManager(*data_name.name());
@@ -563,7 +553,7 @@ impl Routing {
             }
         };
 
-        let requester = *self.full_id.public_id().signing_public_key();
+        let requester = *self.client_key();
         let requester_name = XorName(sha3_256(&requester[..]));
 
         self.mutate_mdata(dst,
@@ -618,9 +608,7 @@ impl Routing {
                 x => panic!("Unexpected authority: {:?}", x),
             };
 
-            let mut vault = unwrap!(VAULT.lock());
-            let _ = vault.load();
-            if let Some(account) = vault.get_account(&name) {
+            if let Some(account) = lock_vault().get_account(&name) {
                 Ok((account.auth_keys().clone(), account.version()))
             } else {
                 Err(ClientError::NoSuchAccount)
@@ -656,8 +644,7 @@ impl Routing {
                 x => panic!("Unexpected authority: {:?}", x),
             };
 
-            let mut vault = unwrap!(VAULT.lock());
-            let _ = vault.load();
+            let mut vault = lock_vault();
             let res = if let Some(account) = vault.get_account_mut(&name) {
                 account.ins_auth_key(key, version)
             } else {
@@ -701,8 +688,7 @@ impl Routing {
                 x => panic!("Unexpected authority: {:?}", x),
             };
 
-            let mut vault = unwrap!(VAULT.lock());
-            let _ = vault.load();
+            let mut vault = lock_vault();
             let res = if let Some(account) = vault.get_account_mut(&name) {
                 account.del_auth_key(&key, version)
             } else {
@@ -767,7 +753,8 @@ impl Routing {
         where F: FnOnce(MutableData) -> Result<R, ClientError>,
               G: FnOnce(Result<R, ClientError>) -> Response
     {
-        self.authorise_read(&dst, &name);
+        lock_vault().authorise_read(&dst, &name);
+
         self.with_mdata(name,
                         tag,
                         msg_id,
@@ -793,13 +780,14 @@ impl Routing {
               G: FnOnce(Result<R, ClientError>) -> Response
     {
         let mutate = |mut data: MutableData, vault: &mut Vault| {
+            vault.authorise_mutation(&dst, self.client_key())?;
+
             let output = f(&mut data)?;
             vault.insert_data(DataId::mutable(name, tag), Data::Mutable(data));
             vault.sync();
             Ok(output)
         };
 
-        self.authorise_mutation(&dst);
         self.with_mdata(name,
                         tag,
                         msg_id,
@@ -808,7 +796,8 @@ impl Routing {
                         delay_ms,
                         mutate,
                         g)?;
-        self.commit_mutation(&dst);
+
+        lock_vault().commit_mutation(&dst);
         Ok(())
     }
 
@@ -834,8 +823,7 @@ impl Routing {
         } else if let Err(err) = self.verify_requester(requester) {
             Err(err)
         } else {
-            let mut vault = unwrap!(VAULT.lock());
-            let _ = vault.load();
+            let mut vault = lock_vault();
             match vault.get_data(&DataId::mutable(name, tag)) {
                 Some(Data::Mutable(data)) => f(data, &mut *vault),
                 _ => {
@@ -851,27 +839,6 @@ impl Routing {
         let nae_auth = Authority::NaeManager(name);
         self.send_response(delay_ms, nae_auth, self.client_auth, g(res));
         Ok(())
-    }
-
-    fn authorise_read(&self, dst: &Authority<XorName>, data_name: &XorName) {
-        let vault = unwrap!(VAULT.lock());
-        assert!(vault.authorise_read(dst, data_name));
-    }
-
-    fn authorise_mutation(&self, dst: &Authority<XorName>) {
-        let vault = unwrap!(VAULT.lock());
-        assert!(vault.authorise_mutation(dst, self.full_id.public_id().signing_public_key()));
-    }
-
-    fn commit_mutation(&self, dst: &Authority<XorName>) {
-        let mut vault = unwrap!(VAULT.lock());
-
-        {
-            let account = unwrap!(vault.get_account_mut(&dst.name()));
-            account.increment_mutations_counter();
-        }
-
-        vault.sync();
     }
 
     fn verify_owner(&self,
@@ -903,7 +870,7 @@ impl Routing {
             None => return Ok(()),
         };
 
-        if *self.full_id.public_id().signing_public_key() == requester {
+        if *self.client_key() == requester {
             Ok(())
         } else {
             Err(ClientError::from("Invalid requester"))
@@ -959,5 +926,9 @@ impl Routing {
                      count.set(ops - 1);
                      ops
                  })
+    }
+
+    fn client_key(&self) -> &sign::PublicKey {
+        self.full_id.public_id().signing_public_key()
     }
 }
