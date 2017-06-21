@@ -904,6 +904,35 @@ fn auth_keys() {
     assert_eq!(version, 2);
 }
 
+#[test]
+fn balance_check() {
+    let (mut routing, routing_rx, full_id) = setup();
+    let owner_key = *full_id.public_id().signing_public_key();
+    let client_mgr = create_account(&mut routing, &routing_rx, owner_key);
+
+    // Exhaust the account balance.
+    loop {
+        let data = ImmutableData::new(unwrap!(utils::generate_random_vector(10)));
+        let msg_id = MessageId::new();
+        unwrap!(routing.put_idata(client_mgr, data, msg_id));
+        expect_success!(routing_rx, msg_id, Response::PutIData);
+
+        let account_info = do_get_account_info(&mut routing, &routing_rx, client_mgr);
+        if account_info.mutations_available == 0 {
+            break;
+        }
+    }
+
+    // Attempt to perform another mutation fails on low balance.
+    let msg_id = MessageId::new();
+    let data = ImmutableData::new(unwrap!(utils::generate_random_vector(10)));
+    unwrap!(routing.put_idata(client_mgr, data, msg_id));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::PutIData,
+                    ClientError::LowBalance);
+}
+
 fn setup() -> (Routing, Receiver<Event>, FullId) {
     let full_id = FullId::new();
     let (routing_tx, routing_rx) = mpsc::channel();

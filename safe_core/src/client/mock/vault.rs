@@ -22,7 +22,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::time::SystemTime;
 use tiny_keccak::sha3_256;
 
-pub const DEFAULT_MAX_MUTATIONS: u64 = 100;
+pub const DEFAULT_MAX_MUTATIONS: u64 = 500;
 
 #[derive(Deserialize, Serialize)]
 pub struct InnerVault {
@@ -73,12 +73,15 @@ impl Vault {
     }
 
     // Authorise mutation operation.
-    pub fn authorise_mutation(&self, dst: &Authority<XorName>, sign_pk: &sign::PublicKey) -> bool {
+    pub fn authorise_mutation(&self,
+                              dst: &Authority<XorName>,
+                              sign_pk: &sign::PublicKey)
+                              -> Result<(), ClientError> {
         let dst_name = match *dst {
             Authority::ClientManager(name) => name,
             x => {
                 println!("Unexpected authority for mutation: {:?}", x);
-                return false;
+                return Err(ClientError::InvalidOperation);
             }
         };
 
@@ -86,18 +89,32 @@ impl Vault {
             Some(account) => account,
             None => {
                 println!("Account not found for {:?}", dst);
-                return false;
+                return Err(ClientError::NoSuchAccount);
             }
         };
 
         // Check if we are the owner or app.
         let owner_name = XorName(sha3_256(&sign_pk[..]));
-        if owner_name == dst_name || account.auth_keys.contains(sign_pk) {
-            true
-        } else {
+        if owner_name != dst_name && !account.auth_keys.contains(sign_pk) {
             println!("Mutation not authorised");
-            false
+            return Err(ClientError::AccessDenied);
         }
+
+        if account.account_info.mutations_available == 0 {
+            return Err(ClientError::LowBalance);
+        }
+
+        Ok(())
+    }
+
+    // Commit a mutation.
+    pub fn commit_mutation(&mut self, dst: &Authority<XorName>) {
+        {
+            let account = unwrap!(self.get_account_mut(&dst.name()));
+            account.increment_mutations_counter();
+        }
+
+        self.sync();
     }
 
     // Check if data with the given name is in the storage.
