@@ -101,7 +101,7 @@ pub fn register_app(authenticator: &Authenticator,
 /// Run the given closure inside the event loop of the authenticator. The closure
 /// should return a future which will then be driven to completion and its result
 /// returned.
-pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
+pub fn try_run<F, I, T>(authenticator: &Authenticator, f: F) -> Result<T, AuthError>
     where F: FnOnce(&Client) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = AuthError> + 'static,
           T: Send + 'static
@@ -120,7 +120,16 @@ pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
         Some(future)
     }));
 
-    unwrap!(unwrap!(rx.recv()))
+    unwrap!(rx.recv())
+}
+
+/// Like `try_run`, but expects success.
+pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
+    where F: FnOnce(&Client) -> I + Send + 'static,
+          I: IntoFuture<Item = T, Error = AuthError> + 'static,
+          T: Send + 'static
+{
+    unwrap!(try_run(authenticator, f))
 }
 
 /// Creates a random `AppExchangeInfo`
@@ -134,17 +143,26 @@ pub fn rand_app() -> Result<AppExchangeInfo, CoreError> {
 }
 
 /// Fetch the access container entry for the app.
-#[cfg_attr(rustfmt, rustfmt_skip)]
 pub fn access_container<S: Into<String>>(authenticator: &Authenticator,
                                          app_id: S,
                                          auth_granted: AuthGranted)
                                          -> AccessContainerEntry {
+    unwrap!(try_access_container(authenticator, app_id, auth_granted),
+            "Access container entry is empty")
+}
+
+/// Fetch the access container entry for the app.
+pub fn try_access_container<S: Into<String>>(authenticator: &Authenticator,
+                                             app_id: S,
+                                             auth_granted: AuthGranted)
+                                             -> Option<AccessContainerEntry> {
     let app_keys = auth_granted.app_keys;
-    let ac_md_info = auth_granted.access_container.into_mdata_info(app_keys.enc_key.clone());
+    let ac_md_info = auth_granted
+        .access_container
+        .into_mdata_info(app_keys.enc_key.clone());
     let app_id = app_id.into();
     run(authenticator, move |client| {
-        access_container_entry(client, &ac_md_info, &app_id, app_keys)
-            .map(move |(_, ac_entry)| unwrap!(ac_entry, "Access container entry is empty"))
+        access_container_entry(client, &ac_md_info, &app_id, app_keys).map(move |(_, entry)| entry)
     })
 }
 
