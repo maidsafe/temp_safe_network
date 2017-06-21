@@ -468,6 +468,9 @@ fn app_revocation() {
     let (videos_md2, _) = unwrap!(ac_entries.remove("_videos"));
     unwrap!(create_file(&authenticator, videos_md2.clone(), "2.mp4", vec![1; 10]));
 
+    // There should be 2 entries.
+    assert_eq!(count_mdata_entries(&authenticator, videos_md1.clone()), 2);
+
     // Both apps can access both files.
     let _ = unwrap!(fetch_file(&authenticator, videos_md1.clone(), "1.mp4"));
     let _ = unwrap!(fetch_file(&authenticator, videos_md1.clone(), "2.mp4"));
@@ -477,6 +480,10 @@ fn app_revocation() {
 
     // Revoke the first app.
     revoke(&authenticator, &app_id1);
+
+    // There should now be 4 entries - 2 deleted previous entries, 2 new,
+    // reencrypted entries.
+    assert_eq!(count_mdata_entries(&authenticator, videos_md1.clone()), 4);
 
     // The first app is no longer be in the access container.
     let ac = try_access_container(&authenticator, app_id1.clone(), auth_granted1.clone());
@@ -525,6 +532,9 @@ fn app_revocation() {
 
     // Revoke the first app again. Only the second app can access the files.
     revoke(&authenticator, &app_id1);
+
+    // There should now be 6 entries (4 deleted, 2 new).
+    assert_eq!(count_mdata_entries(&authenticator, videos_md1.clone()), 6);
 
     match fetch_file(&authenticator, videos_md1.clone(), "1.mp4") {
         Err(AuthError::NfsError(NfsError::CoreError(CoreError::EncodeDecodeError(..)))) => (),
@@ -659,6 +669,15 @@ fn fetch_file<T: Into<String>>(authenticator: &Authenticator,
     try_run(authenticator, |client| {
         file_helper::fetch(client.clone(), container_info, name)
             .map(|(_, file)| file)
+            .map_err(From::from)
+    })
+}
+
+fn count_mdata_entries(authenticator: &Authenticator, info: MDataInfo) -> usize {
+    run(authenticator, move |client| {
+        client
+            .list_mdata_entries(info.name, info.type_tag)
+            .map(|entries| entries.len())
             .map_err(From::from)
     })
 }
