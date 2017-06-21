@@ -21,8 +21,8 @@
 use fake_clock::FakeClock;
 use rand::Rng;
 use routing::{Action, Authority, BootstrapConfig, ClientError, EntryAction, EntryActions, Event,
-              ImmutableData, MAX_MUTABLE_DATA_ENTRY_ACTIONS, MessageId, MutableData,
-              PermissionSet, Response, User};
+              ImmutableData, MAX_MUTABLE_DATA_ENTRIES, MessageId, MutableData, PermissionSet,
+              Response, User};
 use routing::mock_crust::Network;
 use rust_sodium::crypto::sign;
 use safe_vault::{GROUP_SIZE, PENDING_WRITE_TIMEOUT_SECS, test_utils};
@@ -156,6 +156,8 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
 fn mutable_data_normal_flow() {
     let seed = None;
     let node_count = TEST_NET_SIZE;
+    let num_entries = 10;
+    let num_entry_actions = 10;
 
     let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
@@ -168,7 +170,8 @@ fn mutable_data_normal_flow() {
     client.create_account(&mut nodes);
 
     // Put mutable data
-    let mut data = test_utils::gen_mutable_data(10000, 10, *client.signing_public_key(), &mut rng);
+    let mut data =
+        test_utils::gen_mutable_data(10000, num_entries, *client.signing_public_key(), &mut rng);
     unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
 
     // Get the shell and entries and verify they are what we put it.
@@ -189,10 +192,7 @@ fn mutable_data_normal_flow() {
     }
 
     // Mutate and verify the data.
-    let actions = test_utils::gen_mutable_data_entry_actions(&data,
-                                                             MAX_MUTABLE_DATA_ENTRY_ACTIONS as
-                                                             usize,
-                                                             &mut rng);
+    let actions = test_utils::gen_mutable_data_entry_actions(&data, num_entry_actions, &mut rng);
     unwrap!(data.mutate_entries(actions.clone(), *client.signing_public_key()));
     unwrap!(client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes));
     let received_entries =
@@ -424,11 +424,10 @@ fn mutable_data_error_flow() {
                                                   &mut nodes),
                   Err(ClientError::NoSuchEntry));
 
-    // Mutating with too many entry actions fails.
-    let actions =
-        test_utils::gen_mutable_data_entry_actions(&data,
-                                                   MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize + 1,
-                                                   &mut rng);
+    // Mutating with too many entries fails.
+    let actions = test_utils::gen_mutable_data_entry_actions(&data,
+                                                             MAX_MUTABLE_DATA_ENTRIES as usize + 1,
+                                                             &mut rng);
     assert_match!(client.mutate_mdata_entries_response(*data.name(), 10000, actions, &mut nodes),
                   Err(ClientError::TooManyEntries));
 
@@ -635,7 +634,7 @@ fn mutable_data_parallel_mutations() {
             .iter_mut()
             .map(|client| {
                 let data = &all_data[j];
-                let num_actions = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize);
+                let num_actions = rng.gen_range(1, 10);
                 let actions =
                     test_utils::gen_mutable_data_entry_actions(data, num_actions, &mut rng);
 
@@ -648,7 +647,7 @@ fn mutable_data_parallel_mutations() {
             })
             .collect();
 
-        event_count += poll::nodes_and_clients_parallel_with_resend(&mut nodes, &mut clients);
+        event_count += poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
         trace!("Processed {} events.", event_count);
 
         // Collect the responses from the clients. For those that succeed,
@@ -662,10 +661,10 @@ fn mutable_data_parallel_mutations() {
                        } = event {
                     match res {
                         Ok(()) => {
-                                trace!("Client {:?} received success response.",
-                                       client.name());
-                                unwrap!(data.mutate_entries(actions, *client.signing_public_key()));
-                            }
+                            trace!("Client {:?} received success response.",
+                                   client.name());
+                            unwrap!(data.mutate_entries(actions, *client.signing_public_key()));
+                        }
                         Err(error) => {
                             trace!("Client {:?} received failed response. Reason: {:?}",
                                    client.name(),
@@ -676,6 +675,7 @@ fn mutable_data_parallel_mutations() {
                 }
             }
         }
+
         // Check the new version of data (on success) has been stored properly; or confirm the old
         // version of data (on failure or no response) still keeps untouched.
         mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
@@ -749,7 +749,7 @@ fn mutable_data_concurrent_mutations() {
         {
             let data = &all_data[index];
             for _ in 0..2 {
-                let num_actions = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize);
+                let num_actions = rng.gen_range(1, 10);
                 let actions =
                     test_utils::gen_mutable_data_entry_actions(data, num_actions, &mut rng);
                 {
@@ -897,7 +897,7 @@ fn no_permission_mutable_data_concurrent_mutations() {
         let data_name = *all_data[index].name();
         let data_tag = all_data[index].tag();
 
-        let num_actions = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize);
+        let num_actions = rng.gen_range(1, 10);
         let actions =
             test_utils::gen_mutable_data_entry_actions(&all_data[index], num_actions, &mut rng);
 
@@ -1015,7 +1015,7 @@ fn mutable_data_operations_with_churn() {
                     continue;
                 }
 
-                let action_count = rng.gen_range(1, MAX_MUTABLE_DATA_ENTRY_ACTIONS as usize + 1);
+                let action_count = rng.gen_range(1, 10);
                 let actions =
                     test_utils::gen_mutable_data_entry_actions(data, action_count, &mut rng);
                 unwrap!(data.mutate_entries(actions.clone(), *client.signing_public_key()));
