@@ -110,7 +110,8 @@ impl Routing {
                 x => panic!("Unexpected authority: {:?}", x),
             };
 
-            let vault = unwrap!(VAULT.lock());
+            let mut vault = unwrap!(VAULT.lock());
+            let _ = vault.load();
             match vault.get_account(&name) {
                 Some(account) => Ok(*account.account_info()),
                 None => Err(ClientError::NoSuchAccount),
@@ -146,6 +147,7 @@ impl Routing {
             self.authorise_mutation(&dst);
 
             let mut vault = unwrap!(VAULT.lock());
+            let _ = vault.load();
             match vault.get_data(&DataId::immutable(*data.name())) {
                 // Immutable data is de-duplicated so always allowed
                 Some(Data::Immutable(_)) => Ok(()),
@@ -187,7 +189,8 @@ impl Routing {
         } else {
             self.authorise_read(&dst, &name);
 
-            let vault = unwrap!(VAULT.lock());
+            let mut vault = unwrap!(VAULT.lock());
+            let _ = vault.load();
             match vault.get_data(&DataId::immutable(name)) {
                 Some(Data::Immutable(data)) => Ok(data),
                 _ => Err(ClientError::NoSuchData),
@@ -228,6 +231,7 @@ impl Routing {
             };
 
             let mut vault = unwrap!(VAULT.lock());
+            let _ = vault.load();
             if vault.contains_data(&data_name) {
                 Err(ClientError::AccountExists)
             } else {
@@ -244,7 +248,7 @@ impl Routing {
                 Err(err)
             } else {
                 let mut vault = unwrap!(VAULT.lock());
-
+                let _ = vault.load();
                 if vault.contains_data(&data_name) {
                     Err(ClientError::DataExists)
                 } else {
@@ -614,7 +618,8 @@ impl Routing {
                 x => panic!("Unexpected authority: {:?}", x),
             };
 
-            let vault = unwrap!(VAULT.lock());
+            let mut vault = unwrap!(VAULT.lock());
+            let _ = vault.load();
             if let Some(account) = vault.get_account(&name) {
                 Ok((account.auth_keys().clone(), account.version()))
             } else {
@@ -652,6 +657,7 @@ impl Routing {
             };
 
             let mut vault = unwrap!(VAULT.lock());
+            let _ = vault.load();
             let res = if let Some(account) = vault.get_account_mut(&name) {
                 account.ins_auth_key(key, version)
             } else {
@@ -696,6 +702,7 @@ impl Routing {
             };
 
             let mut vault = unwrap!(VAULT.lock());
+            let _ = vault.load();
             let res = if let Some(account) = vault.get_account_mut(&name) {
                 account.del_auth_key(&key, version)
             } else {
@@ -828,6 +835,7 @@ impl Routing {
             Err(err)
         } else {
             let mut vault = unwrap!(VAULT.lock());
+            let _ = vault.load();
             match vault.get_data(&DataId::mutable(name, tag)) {
                 Some(Data::Mutable(data)) => f(data, &mut *vault),
                 _ => {
