@@ -746,6 +746,12 @@ fn reencrypt_private_containers(client: &Client,
                 let mut mutations = EntryActions::new();
 
                 for (old_key, val) in entries {
+                    // Skip deleted entries.
+                    // TODO: we need more robust way to detect deleted entries.
+                    if val.content.is_empty() {
+                        continue;
+                    }
+
                     let key = old_mdata.decrypt(&old_key)?;
                     let content = old_mdata.decrypt(&val.content)?;
 
@@ -820,6 +826,10 @@ fn reencrypt_private_containers(client: &Client,
                     fry!(access_container_enc_key(&app.info.id, &app.keys.enc_key, nonce));
 
                 if let Some(raw) = access_cont_entries.get(&entry_name) {
+                    if raw.content.is_empty() {
+                        continue;
+                    }
+
                     let plaintext = fry!(symmetric_decrypt(&raw.content, &app.keys.enc_key));
                     let mut access_cont_entry =
                         fry!(deserialise::<AccessContainerEntry>(&plaintext));
