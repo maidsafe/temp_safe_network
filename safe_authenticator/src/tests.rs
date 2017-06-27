@@ -253,8 +253,6 @@ fn app_authentication() {
 // Test unregistered client authentication.
 #[test]
 fn unregistered_authentication() {
-    let authenticator = create_account_and_login();
-
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
         req_id: req_id,
@@ -262,7 +260,7 @@ fn unregistered_authentication() {
     };
     let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
 
-    let received_req_id = match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
+    let received_req_id = match unwrap!(unregistered_decode_ipc_msg(&encoded_msg)) {
         IpcMsg::Req {
             req_id,
             req: IpcReq::Unregistered,
@@ -274,8 +272,7 @@ fn unregistered_authentication() {
 
     let encoded_resp: String = unsafe {
         unwrap!(call_1(|ud, cb| {
-                           encode_unregistered_resp(&authenticator,
-                                                    req_id,
+                           encode_unregistered_resp(req_id,
                                                     true, // is_granted
                                                     ud,
                                                     cb)
@@ -791,6 +788,27 @@ fn decode_ipc_msg(authenticator: &Authenticator,
         }
     }
 
+    let ffi_msg = unwrap!(CString::new(msg));
+
+    unsafe {
+        use ipc::auth_decode_ipc_msg;
+        auth_decode_ipc_msg(authenticator,
+                            ffi_msg.as_ptr(),
+                            sender_as_user_data(&tx),
+                            auth_cb,
+                            containers_cb,
+                            err_cb);
+    };
+
+    match rx.recv_timeout(Duration::from_secs(15)) {
+        Ok(r) => r,
+        Err(_) => Err((-1, None)),
+    }
+}
+
+fn unregistered_decode_ipc_msg(msg: &str) -> Result<IpcMsg, (i32, Option<IpcMsg>)> {
+    let (tx, rx) = mpsc::channel::<Result<IpcMsg, (i32, Option<IpcMsg>)>>();
+
     extern "C" fn unregistered_cb(user_data: *mut c_void, req_id: u32) {
         unsafe {
             let msg = IpcMsg::Req {
@@ -802,38 +820,35 @@ fn decode_ipc_msg(authenticator: &Authenticator,
         }
     }
 
-    #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
-    extern "C" fn err_cb(user_data: *mut c_void, res: FfiResult, response: *const c_char) {
-        unsafe {
-            let ipc_resp = if response.is_null() {
-                None
-            } else {
-                let response = CStr::from_ptr(response);
-                match ipc::decode_msg(unwrap!(response.to_str())) {
-                    Ok(ipc_resp) => Some(ipc_resp),
-                    Err(_) => None,
-                }
-            };
-
-            send_via_user_data(user_data, Err::<IpcMsg, _>((res.error_code, ipc_resp)))
-        }
-    }
-
     let ffi_msg = unwrap!(CString::new(msg));
 
     unsafe {
-        use ipc::auth_decode_ipc_msg;
-        auth_decode_ipc_msg(authenticator,
-                            ffi_msg.as_ptr(),
-                            sender_as_user_data(&tx),
-                            auth_cb,
-                            unregistered_cb,
-                            containers_cb,
-                            err_cb);
+        use ipc::auth_unregistered_decode_ipc_msg;
+        auth_unregistered_decode_ipc_msg(ffi_msg.as_ptr(),
+                                         sender_as_user_data(&tx),
+                                         unregistered_cb,
+                                         err_cb);
     };
 
     match rx.recv_timeout(Duration::from_secs(15)) {
         Ok(r) => r,
         Err(_) => Err((-1, None)),
+    }
+}
+
+#[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+extern "C" fn err_cb(user_data: *mut c_void, res: FfiResult, response: *const c_char) {
+    unsafe {
+        let ipc_resp = if response.is_null() {
+            None
+        } else {
+            let response = CStr::from_ptr(response);
+            match ipc::decode_msg(unwrap!(response.to_str())) {
+                Ok(ipc_resp) => Some(ipc_resp),
+                Err(_) => None,
+            }
+        };
+
+        send_via_user_data(user_data, Err::<IpcMsg, _>((res.error_code, ipc_resp)))
     }
 }

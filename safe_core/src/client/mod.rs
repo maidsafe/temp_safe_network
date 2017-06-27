@@ -877,8 +877,8 @@ impl Client {
     }
 
     /// Returns the `crust::Config` associated with the `crust::Service` (if any).
-    pub fn bootstrap_config(&self) -> Result<BootstrapConfig, CoreError> {
-        Ok(self.inner().routing.bootstrap_config()?)
+    pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
+        Ok(Routing::bootstrap_config()?)
     }
 
     fn update_account_packet(&self) -> Box<CoreFuture<()>> {
