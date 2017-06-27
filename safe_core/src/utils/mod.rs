@@ -21,7 +21,7 @@ mod futures;
 #[cfg(any(test, feature="testing"))]
 pub mod test_utils;
 
-pub use self::futures::FutureExt;
+pub use self::futures::{FutureExt, RepeatWhile, repeat_while};
 use errors::CoreError;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use rand::Rng;

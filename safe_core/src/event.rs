@@ -26,6 +26,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub const NETWORK_EVENT_START_RANGE: i32 = 0;
 
 /// Wraps responses from routing
+#[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
 #[derive(Debug)]
 pub enum CoreEvent {
     /// Result of getting account info
@@ -54,6 +55,8 @@ pub enum CoreEvent {
     GetMDataShell(Result<MutableData, CoreError>),
     /// Result of getting entire mutable data
     GetMData(Result<MutableData, CoreError>),
+    /// Rate limit exeeded
+    RateLimitExceeded,
 }
 
 /// Netowork Events that Client Modules need to deal with

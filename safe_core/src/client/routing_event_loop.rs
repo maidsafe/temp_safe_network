@@ -37,6 +37,13 @@ pub fn run<T>(routing_rx: &Receiver<Event>, mut core_tx: CoreMsgTx<T>, net_tx: &
                     break;
                 }
             }
+            /* TODO: uncomment when `ProxyRateLimitExceeded` lands in routing
+            Event::ProxyRateLimitExceeded(msg_id) => {
+                if !fire(&mut core_tx, msg_id, CoreEvent::RateLimitExceeded) {
+                    break;
+                }
+            }
+            */
             Event::Terminate => {
                 if let Err(e) = net_tx.send(NetworkEvent::Disconnected) {
                     trace!("Couldn't send NetworkEvent::Disconnected: {:?}", e);
