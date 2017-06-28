@@ -33,6 +33,7 @@ use errors::CoreError;
 use event::{CoreEvent, NetworkEvent, NetworkTx};
 use event_loop::{CoreFuture, CoreMsgTx};
 use futures::{Complete, Future};
+use futures::future::{self, Either, FutureResult, Loop, Then};
 use futures::sync::oneshot;
 use ipc::BootstrapConfig;
 use lru_cache::LruCache;
@@ -48,6 +49,7 @@ use rust_sodium::crypto::sign::{self, Seed};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
+use std::io;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::Duration;
@@ -59,6 +61,7 @@ const CONNECTION_TIMEOUT_SECS: u64 = 40;
 const REQUEST_TIMEOUT_SECS: u64 = 180;
 const SEED_SUBPARTS: usize = 4;
 const IMMUT_DATA_CACHE_SIZE: usize = 300;
+const RETRY_DELAY_MS: u64 = 800;
 
 macro_rules! match_event {
     ($r:ident, $event:path) => {
@@ -496,9 +499,9 @@ impl<T: 'static> Client<T> {
         }
 
         let inner = Rc::downgrade(&self.inner);
-        self.get(CoreEvent::GetIData, move |routing, msg_id| {
-                routing.get_idata(Authority::NaeManager(name), name, msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.get_idata(Authority::NaeManager(name), name, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::GetIData))
             .map(move |data| {
                 if let Some(inner) = inner.upgrade() {
@@ -520,7 +523,7 @@ impl<T: 'static> Client<T> {
     pub fn put_idata(&self, data: ImmutableData) -> Box<CoreFuture<()>> {
         trace!("PutIData for {:?}", data);
 
-        self.mutate(move |routing, dst, msg_id| routing.put_idata(dst, data.clone(), msg_id))
+        self.send_mutation(move |routing, dst, msg_id| routing.put_idata(dst, data.clone(), msg_id))
     }
 
     /// Put `MutableData` onto the network.
@@ -528,9 +531,9 @@ impl<T: 'static> Client<T> {
         trace!("PutMData for {:?}", data);
 
         let requester = fry!(self.public_signing_key());
-        self.mutate(move |routing, dst, msg_id| {
-                        routing.put_mdata(dst, data.clone(), msg_id, requester)
-                    })
+        self.send_mutation(move |routing, dst, msg_id| {
+                               routing.put_mdata(dst, data.clone(), msg_id, requester)
+                           })
     }
 
     /// Mutates `MutableData` entries in bulk.
@@ -542,23 +545,23 @@ impl<T: 'static> Client<T> {
         trace!("PutMData for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
-        self.mutate(move |routing, dst, msg_id| {
-                        routing.mutate_mdata_entries(dst,
-                                                     name,
-                                                     tag,
-                                                     actions.clone(),
-                                                     msg_id,
-                                                     requester)
-                    })
+        self.send_mutation(move |routing, dst, msg_id| {
+                               routing.mutate_mdata_entries(dst,
+                                                            name,
+                                                            tag,
+                                                            actions.clone(),
+                                                            msg_id,
+                                                            requester)
+                           })
     }
 
     /// Get entire `MutableData` from the network.
     pub fn get_mdata(&self, name: XorName, tag: u64) -> Box<CoreFuture<MutableData>> {
         trace!("GetMData for {:?}", name);
 
-        self.get(CoreEvent::GetMData, move |routing, msg_id| {
-                routing.get_mdata(Authority::NaeManager(name), name, tag, msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.get_mdata(Authority::NaeManager(name), name, tag, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::GetMData))
             .into_box()
     }
@@ -567,9 +570,9 @@ impl<T: 'static> Client<T> {
     pub fn get_mdata_shell(&self, name: XorName, tag: u64) -> Box<CoreFuture<MutableData>> {
         trace!("GetMDataShell for {:?}", name);
 
-        self.get(CoreEvent::GetMDataShell, move |routing, msg_id| {
-                routing.get_mdata_shell(Authority::NaeManager(name), name, tag, msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.get_mdata_shell(Authority::NaeManager(name), name, tag, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::GetMDataShell))
             .into_box()
     }
@@ -578,9 +581,9 @@ impl<T: 'static> Client<T> {
     pub fn get_mdata_version(&self, name: XorName, tag: u64) -> Box<CoreFuture<u64>> {
         trace!("GetMDataVersion for {:?}", name);
 
-        self.get(CoreEvent::GetMDataVersion, move |routing, msg_id| {
-                routing.get_mdata_version(Authority::NaeManager(name), name, tag, msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.get_mdata_version(Authority::NaeManager(name), name, tag, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::GetMDataVersion))
             .into_box()
     }
@@ -592,9 +595,9 @@ impl<T: 'static> Client<T> {
                               -> Box<CoreFuture<BTreeMap<Vec<u8>, Value>>> {
         trace!("ListMDataEntries for {:?}", name);
 
-        self.get(CoreEvent::ListMDataEntries, move |routing, msg_id| {
-                routing.list_mdata_entries(Authority::NaeManager(name), name, tag, msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.list_mdata_entries(Authority::NaeManager(name), name, tag, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataEntries))
             .into_box()
     }
@@ -603,9 +606,9 @@ impl<T: 'static> Client<T> {
     pub fn list_mdata_keys(&self, name: XorName, tag: u64) -> Box<CoreFuture<BTreeSet<Vec<u8>>>> {
         trace!("ListMDataKeys for {:?}", name);
 
-        self.get(CoreEvent::ListMDataKeys, move |routing, msg_id| {
-                routing.list_mdata_keys(Authority::NaeManager(name), name, tag, msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.list_mdata_keys(Authority::NaeManager(name), name, tag, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataKeys))
             .into_box()
     }
@@ -614,9 +617,9 @@ impl<T: 'static> Client<T> {
     pub fn list_mdata_values(&self, name: XorName, tag: u64) -> Box<CoreFuture<Vec<Value>>> {
         trace!("ListMDataValues for {:?}", name);
 
-        self.get(CoreEvent::ListMDataValues, move |routing, msg_id| {
-                routing.list_mdata_values(Authority::NaeManager(name), name, tag, msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.list_mdata_values(Authority::NaeManager(name), name, tag, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataValues))
             .into_box()
     }
@@ -625,9 +628,13 @@ impl<T: 'static> Client<T> {
     pub fn get_mdata_value(&self, name: XorName, tag: u64, key: Vec<u8>) -> Box<CoreFuture<Value>> {
         trace!("GetMDataValue for {:?}", name);
 
-        self.get(CoreEvent::GetMDataValue, move |routing, msg_id| {
-                routing.get_mdata_value(Authority::NaeManager(name), name, tag, key.clone(), msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.get_mdata_value(Authority::NaeManager(name),
+                                              name,
+                                              tag,
+                                              key.clone(),
+                                              msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::GetMDataValue))
             .into_box()
     }
@@ -636,10 +643,8 @@ impl<T: 'static> Client<T> {
     pub fn get_account_info(&self) -> Box<CoreFuture<AccountInfo>> {
         trace!("Account info GET issued.");
 
-        let dst = fry!(self.inner.borrow().client_type.cm_addr().map(|a| *a));
-
-        self.get(CoreEvent::GetAccountInfo,
-                 move |routing, msg_id| routing.get_account_info(dst, msg_id))
+        let dst = fry!(self.cm_addr());
+        self.send(move |routing, msg_id| routing.get_account_info(dst, msg_id))
             .and_then(|event| match_event!(event, CoreEvent::GetAccountInfo))
             .into_box()
     }
@@ -651,9 +656,9 @@ impl<T: 'static> Client<T> {
                                   -> Box<CoreFuture<BTreeMap<User, PermissionSet>>> {
         trace!("ListMDataPermissions for {:?}", name);
 
-        self.get(CoreEvent::ListMDataPermissions, move |routing, msg_id| {
-                routing.list_mdata_permissions(Authority::NaeManager(name), name, tag, msg_id)
-            })
+        self.send(move |routing, msg_id| {
+                      routing.list_mdata_permissions(Authority::NaeManager(name), name, tag, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataPermissions))
             .into_box()
     }
@@ -666,11 +671,10 @@ impl<T: 'static> Client<T> {
                                        -> Box<CoreFuture<PermissionSet>> {
         trace!("ListMDataUserPermissions for {:?}", name);
 
-        self.get(CoreEvent::ListMDataUserPermissions,
-                 move |routing, msg_id| {
-                     let dst = Authority::NaeManager(name);
-                     routing.list_mdata_user_permissions(dst, name, tag, user, msg_id)
-                 })
+        self.send(move |routing, msg_id| {
+                      let dst = Authority::NaeManager(name);
+                      routing.list_mdata_user_permissions(dst, name, tag, user, msg_id)
+                  })
             .and_then(|event| match_event!(event, CoreEvent::ListMDataUserPermissions))
             .into_box()
     }
@@ -686,7 +690,7 @@ impl<T: 'static> Client<T> {
         trace!("SetMDataUserPermissions for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
-        self.mutate(move |routing, dst, msg_id| {
+        self.send_mutation(move |routing, dst, msg_id| {
             routing.set_mdata_user_permissions(dst,
                                                name,
                                                tag,
@@ -708,7 +712,7 @@ impl<T: 'static> Client<T> {
         trace!("DelMDataUserPermissions for {:?}", name);
 
         let requester = fry!(self.public_signing_key());
-        self.mutate(move |routing, dst, msg_id| {
+        self.send_mutation(move |routing, dst, msg_id| {
             routing.del_mdata_user_permissions(dst, name, tag, user, version, msg_id, requester)
         })
     }
@@ -722,24 +726,22 @@ impl<T: 'static> Client<T> {
                               -> Box<CoreFuture<()>> {
         trace!("ChangeMDataOwner for {:?}", name);
 
-        self.mutate(move |routing, dst, msg_id| {
-                        routing.change_mdata_owner(dst,
-                                                   name,
-                                                   tag,
-                                                   btree_set![new_owner],
-                                                   version,
-                                                   msg_id)
-                    })
+        self.send_mutation(move |routing, dst, msg_id| {
+                               routing.change_mdata_owner(dst,
+                                                          name,
+                                                          tag,
+                                                          btree_set![new_owner],
+                                                          version,
+                                                          msg_id)
+                           })
     }
 
     /// Fetches a list of authorised keys and version in MaidManager
     pub fn list_auth_keys_and_version(&self) -> Box<CoreFuture<(BTreeSet<sign::PublicKey>, u64)>> {
         trace!("ListAuthKeysAndVersion");
 
-        let dst = fry!(self.inner().client_type.cm_addr().map(|a| *a));
-
-        self.get(CoreEvent::ListAuthKeysAndVersion,
-                 move |routing, msg_id| routing.list_auth_keys_and_version(dst, msg_id))
+        let dst = fry!(self.cm_addr());
+        self.send(move |routing, msg_id| routing.list_auth_keys_and_version(dst, msg_id))
             .and_then(|event| match_event!(event, CoreEvent::ListAuthKeysAndVersion))
             .into_box()
     }
@@ -748,14 +750,18 @@ impl<T: 'static> Client<T> {
     pub fn ins_auth_key(&self, key: sign::PublicKey, version: u64) -> Box<CoreFuture<()>> {
         trace!("InsAuthKey ({:?})", key);
 
-        self.mutate(move |routing, dst, msg_id| routing.ins_auth_key(dst, key, version, msg_id))
+        self.send_mutation(move |routing, dst, msg_id| {
+                               routing.ins_auth_key(dst, key, version, msg_id)
+                           })
     }
 
     /// Removes an authorised key from MaidManager
     pub fn del_auth_key(&self, key: sign::PublicKey, version: u64) -> Box<CoreFuture<()>> {
         trace!("DelAuthKey ({:?})", key);
 
-        self.mutate(move |routing, dst, msg_id| routing.del_auth_key(dst, key, version, msg_id))
+        self.send_mutation(move |routing, dst, msg_id| {
+                               routing.del_auth_key(dst, key, version, msg_id)
+                           })
     }
 
     /// Create an entry for the Root Directory ID for the user into the account
@@ -883,46 +889,43 @@ impl<T: 'static> Client<T> {
         self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, actions)
     }
 
-    /// Generic GET request
-    fn get<R, F, G>(&self, err_event: F, req: G) -> Box<CoreFuture<CoreEvent>>
-        where F: Fn(Result<R, CoreError>) -> CoreEvent + 'static,
-              G: Fn(&mut Routing, MessageId) -> Result<(), InterfaceError> + 'static
+    /// Sends a request and returns a future that resolves to the response.
+    fn send<F>(&self, req: F) -> Box<CoreFuture<CoreEvent>>
+        where F: Fn(&mut Routing, MessageId) -> Result<(), InterfaceError> + 'static
     {
         let inner = Rc::downgrade(&self.inner);
-        let init = move || {
+        let func = move |_| if let Some(inner) = inner.upgrade() {
             let msg_id = MessageId::new();
-            let (hook, rx) = oneshot::channel();
-            let rx = rx.map_err(|_| CoreError::OperationAborted);
-
-            if let Some(inner) = inner.upgrade() {
-                let rx = timeout(&inner, msg_id, rx);
-                let result = req(&mut inner.borrow_mut().routing, msg_id);
-
-                if let Err(err) = result {
-                    let _ = hook.send(err_event(Err(CoreError::from(err))));
-                } else {
-                    let _ = inner.borrow_mut().hooks.insert(msg_id, hook);
-                }
-
-                rx
-            } else {
-                let _ = hook.send(err_event(Err(CoreError::OperationAborted)));
-                rx.into_box()
+            if let Err(error) = req(&mut inner.borrow_mut().routing, msg_id) {
+                return future::err(CoreError::from(error)).into_box();
             }
+
+            let (hook, rx) = oneshot::channel();
+            let _ = inner.borrow_mut().hooks.insert(msg_id, hook);
+
+            let rx = rx.map_err(|_| CoreError::OperationAborted);
+            let rx = setup_timeout_and_retry_delay(&inner, msg_id, rx);
+            let rx = rx.map(|event| if let CoreEvent::RateLimitExceeded = event {
+                                Loop::Continue(())
+                            } else {
+                                Loop::Break(event)
+                            });
+            rx.into_box()
+        } else {
+            future::err(CoreError::OperationAborted).into_box()
         };
 
-        utils::repeat_while(init, is_rate_limit_exceeded).into_box()
+        future::loop_fn((), func).into_box()
     }
 
-    /// Generic mutation request
-    fn mutate<F>(&self, req: F) -> Box<CoreFuture<()>>
+    /// Sends a mutation request.
+    fn send_mutation<F>(&self, req: F) -> Box<CoreFuture<()>>
         where F: Fn(&mut Routing, Authority<XorName>, MessageId) -> Result<(), InterfaceError>
                  + 'static
     {
-        let dst = fry!(self.inner().client_type.cm_addr().map(|a| *a));
+        let dst = fry!(self.cm_addr());
 
-        self.get(CoreEvent::Mutation,
-                 move |routing, msg_id| req(routing, dst, msg_id))
+        self.send(move |routing, msg_id| req(routing, dst, msg_id))
             .and_then(|event| match_event!(event, CoreEvent::Mutation))
             .into_box()
     }
@@ -933,6 +936,10 @@ impl<T: 'static> Client<T> {
 
     fn inner_mut(&self) -> RefMut<Inner<T>> {
         self.inner.borrow_mut()
+    }
+
+    fn cm_addr(&self) -> Result<Authority<XorName>, CoreError> {
+        self.inner().client_type.cm_addr().map(|a| *a)
     }
 }
 
@@ -959,6 +966,14 @@ impl<T: 'static> Client<T> {
             .routing
             .set_simulate_timeout(enabled);
     }
+
+    #[doc(hidden)]
+    pub fn simulate_rate_limit_errors(&self, count: usize) {
+        self.inner
+            .borrow_mut()
+            .routing
+            .simulate_rate_limit_errors(count)
+    }
 }
 
 impl<T> fmt::Debug for Client<T> {
@@ -967,29 +982,38 @@ impl<T> fmt::Debug for Client<T> {
     }
 }
 
-fn timeout<T, F, R>(inner: &Rc<RefCell<Inner<T>>>,
-                    msg_id: MessageId,
-                    future: F)
-                    -> Box<CoreFuture<R>>
-    where T: 'static,
-          F: Future<Item = R, Error = CoreError> + 'static,
-          R: 'static
+fn setup_timeout_and_retry_delay<T, F>(inner: &Rc<RefCell<Inner<T>>>,
+                                       msg_id: MessageId,
+                                       future: F)
+                                       -> Box<CoreFuture<CoreEvent>>
+    where F: Future<Item = CoreEvent, Error = CoreError> + 'static,
+          T: 'static
 {
-    let duration = inner.borrow().timeout;
-    let timeout = match Timeout::new(duration, &inner.borrow().el_handle) {
-        Ok(timeout) => timeout,
-        Err(err) => return err!(CoreError::Unexpected(format!("Timeout create error: {:?}", err))),
-    };
-
-    let inner_clone = inner.clone();
-    let timeout = timeout.then(move |result| -> Result<R, _> {
-        let _ = inner_clone.borrow_mut().hooks.remove(&msg_id);
-
-        match result {
-            Ok(()) => Err(CoreError::RequestTimeout),
-            Err(err) => Err(CoreError::Unexpected(format!("Timeout fire error {:?}", err))),
+    // Delay after rate limit exceeded.
+    let inner_weak = Rc::downgrade(inner);
+    let future = future.and_then(move |event| {
+        if let CoreEvent::RateLimitExceeded = event {
+            if let Some(inner) = inner_weak.upgrade() {
+                let delay = Duration::from_millis(RETRY_DELAY_MS);
+                let fut = timeout(delay, &inner.borrow().el_handle).or_else(move |_| Ok(event));
+                return Either::A(fut);
+            }
         }
+
+        Either::B(future::ok(event))
     });
+
+    // Fail if no response received within the timeout.
+    let duration = inner.borrow().timeout;
+    let inner_weak = Rc::downgrade(inner);
+    let timeout =
+        timeout(duration, &inner.borrow().el_handle).then(move |result| {
+            if let Some(inner) = inner_weak.upgrade() {
+                let _ = inner.borrow_mut().hooks.remove(&msg_id);
+            }
+
+            result
+        });
 
     future
         .select(timeout)
@@ -1000,13 +1024,31 @@ fn timeout<T, F, R>(inner: &Rc<RefCell<Inner<T>>>,
         .into_box()
 }
 
-fn is_rate_limit_exceeded(result: &Result<CoreEvent, CoreError>) -> bool {
-    if let Ok(CoreEvent::RateLimitExceeded) = *result {
-        true
-    } else {
-        false
+// Create a future that resolves into `CoreError::RequestTimeout` after the given time interval.
+fn timeout(duration: Duration, handle: &Handle) -> TimeoutFuture {
+    let timeout = match Timeout::new(duration, handle) {
+        Ok(timeout) => timeout,
+        Err(err) => {
+            return Either::A(future::err(CoreError::Unexpected(format!("Timeout create error: {:?}",
+                                                                       err))));
+        }
+    };
+
+    fn map_result(result: io::Result<()>) -> Result<CoreEvent, CoreError> {
+        match result {
+            Ok(()) => Err(CoreError::RequestTimeout),
+            Err(err) => Err(CoreError::Unexpected(format!("Timeout fire error {:?}", err))),
+        }
     }
+
+    Either::B(timeout.then(map_result))
 }
+
+
+type TimeoutFuture = Either<FutureResult<CoreEvent, CoreError>,
+                            Then<Timeout,
+                                 Result<CoreEvent, CoreError>,
+                                 fn(io::Result<()>) -> Result<CoreEvent, CoreError>>>;
 
 // ------------------------------------------------------------
 // Helper Struct
@@ -1429,91 +1471,6 @@ mod tests {
                      });
     }
 
-    /*
-    #[test]
-    fn put_or_reclaim_structured_data() {
-        random_client(|client| {
-            let client2 = client.clone();
-            let client3 = client.clone();
-            let client4 = client.clone();
-
-            let owner_keys = vec![unwrap!(client.public_signing_key())];
-            let owner_keys2 = owner_keys.clone();
-            let owner_keys3 = owner_keys.clone();
-            let owner_keys4 = owner_keys.clone();
-
-            let sign_sk = unwrap!(client.secret_signing_key());
-            let sign_sk2 = sign_sk.clone();
-            let sign_sk3 = sign_sk.clone();
-            let sign_sk4 = sign_sk.clone();
-
-            let tag = ::UNVERSIONED_STRUCT_DATA_TYPE_TAG;
-            let name = rand::random();
-            let value = unwrap!(utils::generate_random_vector(10));
-
-            // PUT the data to the network.
-            let data = unwrap!(StructuredData::new(tag,
-                                                   name,
-                                                   0,
-                                                   value,
-                                                   owner_keys,
-                                                   vec![],
-                                                   Some(&sign_sk)));
-
-            client.put(Data::Structured(data), None)
-                .then(move |result| {
-                    unwrap!(result);
-
-                    // DELETE it.
-                    let data = unwrap!(StructuredData::new(tag,
-                                                           name,
-                                                           1,
-                                                           vec![],
-                                                           vec![],
-                                                           owner_keys2,
-                                                           Some(&sign_sk2)));
-                    client2.delete(Data::Structured(data), None)
-                })
-                .then(move |result| {
-                    unwrap!(result);
-
-                    // Try to PUT new data under the same name. Should fail.
-                    let value = unwrap!(utils::generate_random_vector(10));
-                    let data = unwrap!(StructuredData::new(tag,
-                                                           name,
-                                                           0,
-                                                           value,
-                                                           owner_keys3,
-                                                           vec![],
-                                                           Some(&sign_sk3)));
-                    client3.put(Data::Structured(data), None)
-                })
-                .then(move |result| {
-                    match result {
-                        Err(CoreError::MutationFailure {
-                            reason: MutationError::InvalidSuccessor, ..
-                        }) => (),
-                        Ok(()) => panic!("Unexpected success"),
-                        Err(err) => panic!("{:?}", err),
-                    }
-
-                    // Not try again, but using `put_or_reclaim`. Should succeed.
-                    let value = unwrap!(utils::generate_random_vector(10));
-                    let data = unwrap!(StructuredData::new(tag,
-                                                           name,
-                                                           0,
-                                                           value,
-                                                           owner_keys4,
-                                                           vec![],
-                                                           Some(&sign_sk4)));
-                    client4.put_recover(Data::Structured(data), None, sign_sk4)
-                })
-                .map_err(|err| panic!("{:?}", err))
-                .map(|ver| assert!(ver != 0))
-        })
-    }
-*/
-
     #[cfg(feature = "use-mock-routing")]
     #[test]
     fn restart_routing() {
@@ -1577,6 +1534,33 @@ mod tests {
                           Ok(_) => panic!("Unexpected success"),
                           Err(CoreError::RequestTimeout) => Ok::<_, CoreError>(()),
                           Err(err) => panic!("Unexpected {:?}", err),
+                      })
+        })
+    }
+
+    // Test resilience against rate limit errors - the client should keep retrying
+    // any request that fails on exceeded rate limit until it succeeds.
+    #[cfg(feature = "use-mock-routing")]
+    #[test]
+    fn rate_limit_errors() {
+        random_client(|client| {
+            let client2 = client.clone();
+
+            let data = ImmutableData::new(unwrap!(utils::generate_random_vector(10)));
+            let data_name = *data.name();
+
+            client.simulate_rate_limit_errors(2);
+            client
+                .put_idata(data.clone())
+                .then(move |result| {
+                          unwrap!(result);
+                          client2.simulate_rate_limit_errors(1);
+                          client2.get_idata(data_name)
+                      })
+                .then(move |result| {
+                          let got_data = unwrap!(result);
+                          assert_eq!(got_data, data);
+                          Ok::<_, CoreError>(())
                       })
         })
     }

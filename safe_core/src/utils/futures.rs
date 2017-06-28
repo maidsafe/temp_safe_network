@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use futures::{Async, Future, Poll};
+use futures::Future;
 
 /// This is the equivalent `try!` adapted to deal with futures. It is to be
 /// read as `future-try`.  This will convert errors from `Result` into a `done`
@@ -67,50 +67,5 @@ impl<F: Future + 'static> FutureExt for F {
     // it's a no-op when called on already boxed futures.
     fn into_box(self) -> Box<Future<Item = Self::Item, Error = Self::Error>> {
         Box::new(self)
-    }
-}
-
-/// Repeatedly call `init` until `cond` returns false on the result of the returned future.
-pub fn repeat_while<I, C, F>(mut init: I, cond: C) -> RepeatWhile<I, C, F>
-    where I: FnMut() -> F,
-          C: Fn(&Result<F::Item, F::Error>) -> bool,
-          F: Future
-{
-    let future = init();
-    RepeatWhile {
-        init: init,
-        cond: cond,
-        future: future,
-    }
-}
-
-/// The future returned from `repeat_while`.
-pub struct RepeatWhile<I, C, F> {
-    init: I,
-    cond: C,
-    future: F,
-}
-
-impl<I, C, F> Future for RepeatWhile<I, C, F>
-    where I: FnMut() -> F,
-          C: Fn(&Result<F::Item, F::Error>) -> bool,
-          F: Future
-{
-    type Item = F::Item;
-    type Error = F::Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let result = match self.future.poll() {
-            Ok(Async::NotReady) => return Ok(Async::NotReady),
-            Ok(Async::Ready(item)) => Ok(item),
-            Err(error) => Err(error),
-        };
-
-        if (self.cond)(&result) {
-            self.future = (self.init)();
-            Ok(Async::NotReady)
-        } else {
-            result.map(Async::Ready)
-        }
     }
 }
