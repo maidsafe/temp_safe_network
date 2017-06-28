@@ -884,7 +884,6 @@ extern "C" fn unregistered_cb(user_data: *mut c_void, req_id: u32) {
     }
 }
 
-#[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 extern "C" fn err_cb(user_data: *mut c_void, res: FfiResult, response: *const c_char) {
     unsafe {
         let ipc_resp = if response.is_null() {

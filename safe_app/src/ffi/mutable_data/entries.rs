@@ -369,7 +369,6 @@ mod tests {
 
         let (tx, rx) = mpsc::channel::<Value>();
 
-        #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
         extern "C" fn get_cb(user_data: *mut c_void,
                              res: FfiResult,
                              ptr: *const u8,
@@ -434,7 +433,6 @@ mod tests {
             }
         }
 
-        #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
         extern "C" fn done_cb(user_data: *mut c_void, res: FfiResult) {
             assert_eq!(res.error_code, 0);
             let user_data = user_data as *mut (Sender<_>, BTreeMap<Vec<u8>, Value>);

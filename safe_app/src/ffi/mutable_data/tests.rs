@@ -1247,7 +1247,6 @@ fn entries_crud_ffi() {
         }
     }
 
-    #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
     extern "C" fn get_value_cb(user_data: *mut c_void,
                                res: FfiResult,
                                val: *const u8,
@@ -1280,7 +1279,6 @@ fn entries_crud_ffi() {
         }
     }
 
-    #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
     extern "C" fn iter_done_cb(user_data: *mut c_void, _res: FfiResult) {
         unsafe {
             send_via_user_data::<Option<Vec<u8>>>(user_data, None);
