@@ -40,20 +40,6 @@ pub fn run<T>(routing_rx: &Receiver<Event>, mut core_tx: CoreMsgTx<T>, net_tx: &
             Event::Terminate => {
                 if let Err(e) = net_tx.send(NetworkEvent::Disconnected) {
                     trace!("Couldn't send NetworkEvent::Disconnected: {:?}", e);
-                    break;
-                }
-
-                let msg = {
-                    let core_tx = core_tx.clone();
-                    let net_tx = net_tx.clone();
-                    CoreMsg::new(move |client, _| {
-                                     client.restart_routing(core_tx, net_tx);
-                                     None
-                                 })
-                };
-
-                if let Err(e) = core_tx.send(msg) {
-                    trace!("Couldn't restart routing: {:?}", e);
                 }
                 break;
             }
@@ -120,7 +106,7 @@ fn get_core_event(res: Response) -> Result<(MessageId, CoreEvent), CoreError> {
 /// loop has hung up or sending fails for some other reason, treat it as an
 /// exit condition. The return value thus signifies if the firing was
 /// successful.
-fn fire<T>(core_tx: &mut CoreMsgTx<T>, msg_id: MessageId, event: CoreEvent) -> bool {
+fn fire<T: 'static>(core_tx: &mut CoreMsgTx<T>, msg_id: MessageId, event: CoreEvent) -> bool {
     let msg = CoreMsg::new(move |client, _| {
                                client.fire_hook(&msg_id, event);
                                None

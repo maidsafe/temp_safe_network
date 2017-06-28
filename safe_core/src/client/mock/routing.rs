@@ -955,3 +955,9 @@ impl Routing {
         self.full_id.public_id().signing_public_key()
     }
 }
+
+impl Drop for Routing {
+    fn drop(&mut self) {
+        let _ = self.sender.send(Event::Terminate);
+    }
+}

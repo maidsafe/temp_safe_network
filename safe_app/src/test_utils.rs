@@ -39,7 +39,7 @@ pub fn gen_app_exchange_info() -> AppExchangeInfo {
 /// Run the given closure inside the app's event loop. The return value of
 /// the closure is returned immediately.
 pub fn run_now<F, R>(app: &App, f: F) -> R
-    where F: FnOnce(&Client, &AppContext) -> R + Send + 'static,
+    where F: FnOnce(&Client<AppContext>, &AppContext) -> R + Send + 'static,
           R: Send + 'static
 {
     let (tx, rx) = mpsc::channel();
@@ -56,7 +56,7 @@ pub fn run_now<F, R>(app: &App, f: F) -> R
 /// return a future which will then be driven to completion and its result
 /// returned.
 pub fn run<F, I, T>(app: &App, f: F) -> T
-    where F: FnOnce(&Client, &AppContext) -> I + Send + 'static,
+    where F: FnOnce(&Client<AppContext>, &AppContext) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = AppError> + 'static,
           T: Send + 'static
 {

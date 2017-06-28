@@ -117,7 +117,7 @@ pub struct Authenticator {
 impl Authenticator {
     /// Send a message to the authenticator event loop
     pub fn send<F>(&self, f: F) -> Result<(), AuthError>
-        where F: FnOnce(&Client) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static
+        where F: FnOnce(&Client<()>) -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static
     {
         let msg = CoreMsg::new(|client, _| f(client));
         let core_tx = unwrap!(self.core_tx.lock());

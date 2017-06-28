@@ -35,7 +35,7 @@ pub unsafe fn send_sync<C, F>(app: *const App,
                               f: F)
                               -> Result<(), AppError>
     where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&Client, &AppContext) -> Result<C::Args, AppError> + Send + 'static
+          F: FnOnce(&Client<AppContext>, &AppContext) -> Result<C::Args, AppError> + Send + 'static
 {
     let user_data = OpaqueCtx(user_data);
 
@@ -66,7 +66,7 @@ pub unsafe fn send_with_mdata_info<C, F, U, E>(app: *const App,
                                                f: F)
                                                -> Result<(), AppError>
     where C: Callback + Copy + Send + 'static,
-          F: FnOnce(&Client, &AppContext, &MDataInfo) -> U + Send + 'static,
+          F: FnOnce(&Client<AppContext>, &AppContext, &MDataInfo) -> U + Send + 'static,
           U: Future<Item = C::Args, Error = E> + 'static,
           E: Debug + 'static,
           AppError: From<E>

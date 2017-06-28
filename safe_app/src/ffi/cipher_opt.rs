@@ -73,7 +73,7 @@ impl CipherOpt {
     /// Decrypt something encrypted by CipherOpt::encrypt()
     pub fn decrypt(cipher_text: &[u8],
                    app_ctx: &AppContext,
-                   client: &Client)
+                   client: &Client<AppContext>)
                    -> Result<Vec<u8>, AppError> {
         if cipher_text.is_empty() {
             return Ok(Vec::new());
@@ -351,7 +351,7 @@ mod tests {
         })
     }
 
-    fn decrypt_and_check(client: &Client,
+    fn decrypt_and_check(client: &Client<AppContext>,
                          context: &AppContext,
                          cipher_text: &[u8],
                          orig_plain_text: &[u8])

@@ -56,7 +56,7 @@ pub fn get_max_sized_secret_keys(len: usize) -> Vec<sign::SecretKey> {
 /// Create random registered client and run it inside an event loop. Use this to
 /// create Client automatically and randomly,
 pub fn random_client<Run, I, T, E>(r: Run) -> T
-    where Run: FnOnce(&Client) -> I + Send + 'static,
+    where Run: FnOnce(&Client<()>) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = E> + 'static,
           T: Send + 'static,
           E: Debug
@@ -69,7 +69,7 @@ pub fn random_client<Run, I, T, E>(r: Run) -> T
 /// create Client automatically and randomly,
 pub fn random_client_with_net_obs<NetObs, Run, I, T, E>(n: NetObs, r: Run) -> T
     where NetObs: FnMut(NetworkEvent) + 'static,
-          Run: FnOnce(&Client) -> I + Send + 'static,
+          Run: FnOnce(&Client<()>) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = E> + 'static,
           T: Send + 'static,
           E: Debug
@@ -93,8 +93,8 @@ pub fn random_client_with_net_obs<NetObs, Run, I, T, E>(n: NetObs, r: Run) -> T
 /// unregistered or as a result of successful login. Use this to create Client
 /// manually,
 pub fn setup_client<Create, Run, I, T, E>(c: Create, r: Run) -> T
-    where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
-          Run: FnOnce(&Client) -> I + Send + 'static,
+    where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
+          Run: FnOnce(&Client<()>) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = E> + 'static,
           T: Send + 'static,
           E: Debug
@@ -111,9 +111,9 @@ pub fn setup_client_with_net_obs<Create, NetObs, Run, I, T, E>(c: Create,
                                                                mut n: NetObs,
                                                                r: Run)
                                                                -> T
-    where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client, CoreError>,
+    where Create: FnOnce(Handle, CoreMsgTx<()>, NetworkTx) -> Result<Client<()>, CoreError>,
           NetObs: FnMut(NetworkEvent) + 'static,
-          Run: FnOnce(&Client) -> I + Send + 'static,
+          Run: FnOnce(&Client<()>) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = E> + 'static,
           T: Send + 'static,
           E: Debug

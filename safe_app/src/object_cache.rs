@@ -19,6 +19,7 @@
 //! across FFI boundaries.
 
 use super::errors::AppError;
+use AppContext;
 use ffi::cipher_opt::CipherOpt;
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, User, Value};
@@ -84,8 +85,8 @@ pub struct ObjectCache {
     mdata_entry_actions: Store<BTreeMap<Vec<u8>, EntryAction>>,
     mdata_permissions: Store<BTreeMap<User, MDataPermissionSetHandle>>,
     mdata_permission_set: Store<PermissionSet>,
-    se_reader: Store<SelfEncryptor<SelfEncryptionStorage>>,
-    se_writer: Store<SequentialEncryptor<SelfEncryptionStorage>>,
+    se_reader: Store<SelfEncryptor<SelfEncryptionStorage<AppContext>>>,
+    se_writer: Store<SequentialEncryptor<SelfEncryptionStorage<AppContext>>>,
     sign_key: Store<sign::PublicKey>,
 }
 
@@ -229,14 +230,14 @@ impl_cache!(mdata_permission_set,
             insert_mdata_permission_set,
             remove_mdata_permission_set);
 impl_cache!(se_reader,
-            SelfEncryptor<SelfEncryptionStorage>,
+            SelfEncryptor<SelfEncryptionStorage<AppContext>>,
             SelfEncryptorReaderHandle,
             InvalidSelfEncryptorHandle,
             get_se_reader,
             insert_se_reader,
             remove_se_reader);
 impl_cache!(se_writer,
-            SequentialEncryptor<SelfEncryptionStorage>,
+            SequentialEncryptor<SelfEncryptionStorage<AppContext>>,
             SelfEncryptorWriterHandle,
             InvalidSelfEncryptorHandle,
             get_se_writer,

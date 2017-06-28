@@ -98,7 +98,7 @@ pub fn register_app(authenticator: &Authenticator,
 /// should return a future which will then be driven to completion and its result
 /// returned.
 pub fn try_run<F, I, T>(authenticator: &Authenticator, f: F) -> Result<T, AuthError>
-    where F: FnOnce(&Client) -> I + Send + 'static,
+    where F: FnOnce(&Client<()>) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = AuthError> + 'static,
           T: Send + 'static
 {
@@ -121,7 +121,7 @@ pub fn try_run<F, I, T>(authenticator: &Authenticator, f: F) -> Result<T, AuthEr
 
 /// Like `try_run`, but expects success.
 pub fn run<F, I, T>(authenticator: &Authenticator, f: F) -> T
-    where F: FnOnce(&Client) -> I + Send + 'static,
+    where F: FnOnce(&Client<()>) -> I + Send + 'static,
           I: IntoFuture<Item = T, Error = AuthError> + 'static,
           T: Send + 'static
 {

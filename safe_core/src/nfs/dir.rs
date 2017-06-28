@@ -25,7 +25,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use utils::FutureExt;
 
 /// create a new directory emulation
-pub fn create_dir(client: &Client, is_public: bool) -> Box<NfsFuture<MDataInfo>> {
+pub fn create_dir<T: 'static>(client: &Client<T>, is_public: bool) -> Box<NfsFuture<MDataInfo>> {
     match client.owner_key() {
         Ok(pub_key) => {
             let dir = if is_public {

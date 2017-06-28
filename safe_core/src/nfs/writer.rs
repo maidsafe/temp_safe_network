@@ -35,25 +35,25 @@ pub enum Mode {
 
 /// Writer is used to write contents to a File and especially in chunks if the
 /// file happens to be too large
-pub struct Writer {
-    client: Client,
+pub struct Writer<T> {
+    client: Client<T>,
     file: File,
     parent: MDataInfo,
     file_name: String,
-    self_encryptor: SequentialEncryptor<SelfEncryptionStorage>,
+    self_encryptor: SequentialEncryptor<SelfEncryptionStorage<T>>,
     version: Option<u64>,
 }
 
-impl Writer {
+impl<T: 'static> Writer<T> {
     /// Create new instance of Writer
-    pub fn new(client: Client,
-               storage: SelfEncryptionStorage,
+    pub fn new(client: Client<T>,
+               storage: SelfEncryptionStorage<T>,
                mode: Mode,
                parent: MDataInfo,
                file: File,
                file_name: String,
                version: Option<u64>)
-               -> Box<NfsFuture<Writer>> {
+               -> Box<NfsFuture<Writer<T>>> {
         let fut = match mode {
             Mode::Modify => {
                 data_map::get(&client, file.data_map_name())

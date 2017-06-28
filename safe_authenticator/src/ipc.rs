@@ -59,7 +59,7 @@ pub struct AppInfo {
 type AuthenticatorConfig = HashMap<[u8; 32], AppInfo>;
 
 /// Retrieves the authenticator configuration file
-pub fn get_config(client: &Client) -> Box<AuthFuture<(u64, AuthenticatorConfig)>> {
+pub fn get_config(client: &Client<()>) -> Box<AuthFuture<(u64, AuthenticatorConfig)>> {
     let parent = fry!(client.config_root_dir());
     let key = fry!(parent.enc_entry_key(CONFIG_FILE));
 
@@ -80,7 +80,7 @@ pub fn get_config(client: &Client) -> Box<AuthFuture<(u64, AuthenticatorConfig)>
 }
 
 /// Retrieves an app info by the given key from the config file
-pub fn app_info(client: &Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>>> {
+pub fn app_info(client: &Client<()>, app_id: &str) -> Box<AuthFuture<Option<AppInfo>>> {
     let app_id_hash = sha3_256(app_id.as_bytes());
     get_config(client)
         .and_then(move |(_, config)| Ok(config.get(&app_id_hash).cloned()))
@@ -90,7 +90,7 @@ pub fn app_info(client: &Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
 #[cfg_attr(feature="cargo-clippy", allow(type_complexity))]
-pub fn decode_ipc_msg(client: &Client,
+pub fn decode_ipc_msg(client: &Client<()>,
                       msg: IpcMsg)
                       -> Box<AuthFuture<Result<IpcMsg, (i32, CString, CString)>>> {
     match msg {
@@ -427,7 +427,7 @@ pub unsafe extern "C" fn encode_unregistered_resp(req_id: u32,
                  },
                  resp.as_ptr());
         } else {
-            let bootstrap_cfg = Client::bootstrap_config()?;
+            let bootstrap_cfg = Client::<()>::bootstrap_config()?;
 
             let resp = encode_response(&IpcMsg::Resp {
                                             req_id: req_id,
@@ -522,7 +522,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                 AppState::Authenticated => {
                                     // Return info of the already registered app
                                     let app_keys = app.keys.clone();
-                                    let bootstrap_config = fry!(Client::bootstrap_config());
+                                    let bootstrap_config = fry!(Client::<()>::bootstrap_config());
 
                                     access_container(&c4)
                                         .and_then(move |dir| {
@@ -712,7 +712,7 @@ pub unsafe extern "C" fn encode_containers_resp(auth: *const Authenticator,
 }
 
 /// Updates the authenticator configuration file and returns the updated `File` struct.
-pub fn update_config(client: &Client,
+pub fn update_config(client: &Client<()>,
                      version: Option<u64>,
                      auth_cfg: &AuthenticatorConfig)
                      -> Box<AuthFuture<()>> {
@@ -735,7 +735,7 @@ pub fn update_config(client: &Client,
 }
 
 /// Adds the given app info to the configuration file
-fn insert_app_to_config(client: &Client, app: AppInfo) -> Box<AuthFuture<()>> {
+fn insert_app_to_config(client: &Client<()>, app: AppInfo) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
     let app_id_hash = sha3_256(app.info.id.as_bytes());
 
@@ -749,7 +749,7 @@ fn insert_app_to_config(client: &Client, app: AppInfo) -> Box<AuthFuture<()>> {
 }
 
 /// Re-encrypts private containers for a revoked app
-fn reencrypt_private_containers(client: &Client,
+fn reencrypt_private_containers(client: &Client<()>,
                                 permissions: AccessContainerEntry,
                                 access_cont: MDataInfo,
                                 access_cont_entries: BTreeMap<Vec<u8>, Value>)
@@ -887,7 +887,7 @@ fn reencrypt_private_containers(client: &Client,
 }
 
 /// Revokes containers permissions
-fn revoke_container_perms(client: &Client,
+fn revoke_container_perms(client: &Client<()>,
                           permissions: &AccessContainerEntry,
                           sign_pk: sign::PublicKey)
                           -> Box<AuthFuture<()>> {
@@ -913,7 +913,7 @@ fn revoke_container_perms(client: &Client,
 }
 
 /// Updates containers permissions
-fn update_container_perms(client: &Client,
+fn update_container_perms(client: &Client<()>,
                           permissions: HashMap<String, BTreeSet<Permission>>,
                           sign_pk: sign::PublicKey)
                           -> Box<AuthFuture<AccessContainerEntry>> {
@@ -962,7 +962,7 @@ fn update_container_perms(client: &Client,
         .into_box()
 }
 
-fn encode_auth_resp_impl(client: &Client,
+fn encode_auth_resp_impl(client: &Client<()>,
                          app: AppInfo,
                          app_container: bool,
                          permissions: HashMap<String, BTreeSet<Permission>>)
@@ -1028,7 +1028,7 @@ fn encode_auth_resp_impl(client: &Client,
         .and_then(move |(dir, app_keys)| {
                       Ok(AuthGranted {
                              app_keys: app_keys,
-                             bootstrap_config: Client::bootstrap_config()?,
+                             bootstrap_config: Client::<()>::bootstrap_config()?,
                              access_container: AccessContInfo::from_mdata_info(dir)?,
                          })
                   })
@@ -1036,7 +1036,7 @@ fn encode_auth_resp_impl(client: &Client,
 }
 
 /// Creates a new app dedicated container
-fn create_app_container(client: Client,
+fn create_app_container(client: Client<()>,
                         app_id: &str,
                         app_sign_pk: sign::PublicKey)
                         -> Box<AuthFuture<MDataInfo>> {
@@ -1076,7 +1076,7 @@ fn create_app_container(client: Client,
 
 /// Removes an app's dedicated container if it's available and stored in the user's root dir.
 /// Returns `true` if it was removed successfully and `false` if it wasn't found in the parent dir.
-pub fn remove_app_container(client: Client, app_id: &str) -> Box<AuthFuture<bool>> {
+pub fn remove_app_container(client: Client<()>, app_id: &str) -> Box<AuthFuture<bool>> {
     let root = fry!(client.user_root_dir());
     let app_cont_name = format!("apps/{}", app_id);
     let key = fry!(root.enc_entry_key(app_cont_name.as_bytes()));
@@ -1129,7 +1129,7 @@ pub fn remove_app_container(client: Client, app_id: &str) -> Box<AuthFuture<bool
 
 /// Checks if an app's dedicated container is available and stored in the user's root dir.
 /// If no previously created container has been found, then it will be created.
-fn fetch_app_container(client: Client,
+fn fetch_app_container(client: Client<()>,
                        app_id: String,
                        app_sign_pk: sign::PublicKey)
                        -> Box<AuthFuture<MDataInfo>> {
@@ -1201,7 +1201,7 @@ pub enum AppState {
 /// in the config file AND the access container, `Revoked` if it has
 /// an entry in the config but not in the access container, and `NotAuthenticated`
 /// if it's not registered anywhere).
-pub fn app_state(client: &Client,
+pub fn app_state(client: &Client<()>,
                  config: &AuthenticatorConfig,
                  app_id: String)
                  -> Box<AuthFuture<AppState>> {

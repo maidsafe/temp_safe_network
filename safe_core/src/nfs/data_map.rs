@@ -27,7 +27,7 @@ use self_encryption::DataMap;
 use utils::FutureExt;
 
 // GET `DataMap` from the network.
-pub fn get(client: &Client, name: &XorName) -> Box<NfsFuture<DataMap>> {
+pub fn get<T: 'static>(client: &Client<T>, name: &XorName) -> Box<NfsFuture<DataMap>> {
     immutable_data::get_value(client, name, None)
         .map_err(From::from)
         .and_then(move |content| deserialise(&content).map_err(From::from))
@@ -35,7 +35,7 @@ pub fn get(client: &Client, name: &XorName) -> Box<NfsFuture<DataMap>> {
 }
 
 // PUT `DataMap` on the network.
-pub fn put(client: &Client, data_map: &DataMap) -> Box<NfsFuture<XorName>> {
+pub fn put<T: 'static>(client: &Client<T>, data_map: &DataMap) -> Box<NfsFuture<XorName>> {
     let client = client.clone();
     let client2 = client.clone();
 

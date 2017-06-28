@@ -31,8 +31,8 @@ use self::mock::Routing;
 use super::DIR_TAG;
 use errors::CoreError;
 use event::{CoreEvent, NetworkEvent, NetworkTx};
-use event_loop::{CoreMsg, CoreMsgTx};
 use event_loop::CoreFuture;
+use event_loop::CoreMsgTx;
 use futures::{self, Complete, Future};
 use ipc::BootstrapConfig;
 use lru_cache::LruCache;
@@ -113,12 +113,11 @@ macro_rules! wait_for_response {
 /// request from high level API's to the actual routing layer and manage all
 /// interactions with it. This is essentially a non-blocking Client with
 /// an asynchronous API using the futures abstraction from the futures-rs crate
-#[derive(Clone)]
-pub struct Client {
-    inner: Rc<RefCell<Inner>>,
+pub struct Client<T> {
+    inner: Rc<RefCell<Inner<T>>>,
 }
 
-struct Inner {
+struct Inner<T> {
     el_handle: Handle,
     routing: Routing,
     hooks: HashMap<MessageId, Complete<CoreEvent>>,
@@ -127,25 +126,29 @@ struct Inner {
     timeout: Duration,
     joiner: Joiner,
     session_packet_version: u64,
+    core_tx: CoreMsgTx<T>,
+    net_tx: NetworkTx,
 }
 
-impl Client {
+impl<T> Clone for Client<T> {
+    fn clone(&self) -> Self {
+        Client { inner: self.inner.clone() }
+    }
+}
+
+impl<T: 'static> Client<T> {
     /// This is a getter-only Gateway function to the Maidsafe network. It will
     /// create an unregistered random client, which can do very limited set of
     /// operations - eg., a Network-Get
-    pub fn unregistered<T>(el_handle: Handle,
-                           core_tx: CoreMsgTx<T>,
-                           net_tx: NetworkTx,
-                           config: Option<BootstrapConfig>)
-                           -> Result<Self, CoreError>
-        where T: 'static
-    {
+    pub fn unregistered(el_handle: Handle,
+                        core_tx: CoreMsgTx<T>,
+                        net_tx: NetworkTx,
+                        config: Option<BootstrapConfig>)
+                        -> Result<Self, CoreError> {
         trace!("Creating unregistered client.");
 
         let (routing, routing_rx) = setup_routing(None, config.clone())?;
-        let net_tx_clone = net_tx.clone();
-        let core_tx_clone = core_tx.clone();
-        let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
+        let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
                          el_handle: el_handle,
@@ -156,6 +159,8 @@ impl Client {
                          timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
                          joiner: joiner,
                          session_packet_version: 0,
+                         net_tx: net_tx,
+                         core_tx: core_tx,
                      }))
     }
 
@@ -173,11 +178,11 @@ impl Client {
     /// derived from the supplied seed, so this seed needs to be strong. For ordinary users, it's
     /// recommended to use the normal `registered` function where the secrets can be what's easy
     /// to remember for the user while also being strong.
-    pub fn registered_with_seed<T>(seed: &str,
-                                   el_handle: Handle,
-                                   core_tx: CoreMsgTx<T>,
-                                   net_tx: NetworkTx)
-                                   -> Result<Client, CoreError>
+    pub fn registered_with_seed(seed: &str,
+                                el_handle: Handle,
+                                core_tx: CoreMsgTx<T>,
+                                net_tx: NetworkTx)
+                                -> Result<Client<T>, CoreError>
         where T: 'static
     {
         let arr = Self::divide_seed(seed)?;
@@ -195,13 +200,13 @@ impl Client {
 
     /// This is a Gateway function to the Maidsafe network. This will help
     /// create a fresh acc for the user in the SAFE-network.
-    pub fn registered<T>(acc_locator: &str,
-                         acc_password: &str,
-                         invitation: &str,
-                         el_handle: Handle,
-                         core_tx: CoreMsgTx<T>,
-                         net_tx: NetworkTx)
-                         -> Result<Client, CoreError>
+    pub fn registered(acc_locator: &str,
+                      acc_password: &str,
+                      invitation: &str,
+                      el_handle: Handle,
+                      core_tx: CoreMsgTx<T>,
+                      net_tx: NetworkTx)
+                      -> Result<Client<T>, CoreError>
         where T: 'static
     {
         Self::registered_impl(acc_locator.as_bytes(),
@@ -215,14 +220,14 @@ impl Client {
 
     /// This is a Gateway function to the Maidsafe network. This will help
     /// create a fresh acc for the user in the SAFE-network.
-    pub fn registered_impl<T>(acc_locator: &[u8],
-                              acc_password: &[u8],
-                              invitation: &str,
-                              el_handle: Handle,
-                              core_tx: CoreMsgTx<T>,
-                              net_tx: NetworkTx,
-                              id_seed: Option<&Seed>)
-                              -> Result<Client, CoreError>
+    pub fn registered_impl(acc_locator: &[u8],
+                           acc_password: &[u8],
+                           invitation: &str,
+                           el_handle: Handle,
+                           core_tx: CoreMsgTx<T>,
+                           net_tx: NetworkTx,
+                           id_seed: Option<&Seed>)
+                           -> Result<Client<T>, CoreError>
         where T: 'static
     {
         trace!("Creating an account.");
@@ -280,9 +285,7 @@ impl Client {
         create_empty_dir(&mut routing, &routing_rx, cm_addr, &user_root_dir, pub_key)?;
         create_empty_dir(&mut routing, &routing_rx, cm_addr, &config_dir, pub_key)?;
 
-        let net_tx_clone = net_tx.clone();
-        let core_tx_clone = core_tx.clone();
-        let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
+        let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
                          el_handle: el_handle,
@@ -293,15 +296,17 @@ impl Client {
                          timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
                          joiner: joiner,
                          session_packet_version: 0,
+                         net_tx: net_tx,
+                         core_tx: core_tx,
                      }))
     }
 
     /// Login using seeded account
-    pub fn login_with_seed<T>(seed: &str,
-                              el_handle: Handle,
-                              core_tx: CoreMsgTx<T>,
-                              net_tx: NetworkTx)
-                              -> Result<Client, CoreError>
+    pub fn login_with_seed(seed: &str,
+                           el_handle: Handle,
+                           core_tx: CoreMsgTx<T>,
+                           net_tx: NetworkTx)
+                           -> Result<Client<T>, CoreError>
         where T: 'static
     {
         let arr = Self::divide_seed(seed)?;
@@ -310,12 +315,12 @@ impl Client {
 
     /// This is a Gateway function to the Maidsafe network. This will help
     /// login to an already existing account of the user in the SAFE-network.
-    pub fn login<T>(acc_locator: &str,
-                    acc_password: &str,
-                    el_handle: Handle,
-                    core_tx: CoreMsgTx<T>,
-                    net_tx: NetworkTx)
-                    -> Result<Client, CoreError>
+    pub fn login(acc_locator: &str,
+                 acc_password: &str,
+                 el_handle: Handle,
+                 core_tx: CoreMsgTx<T>,
+                 net_tx: NetworkTx)
+                 -> Result<Client<T>, CoreError>
         where T: 'static
     {
         Self::login_impl(acc_locator.as_bytes(),
@@ -325,12 +330,12 @@ impl Client {
                          net_tx)
     }
 
-    fn login_impl<T>(acc_locator: &[u8],
-                     acc_password: &[u8],
-                     el_handle: Handle,
-                     core_tx: CoreMsgTx<T>,
-                     net_tx: NetworkTx)
-                     -> Result<Client, CoreError>
+    fn login_impl(acc_locator: &[u8],
+                  acc_password: &[u8],
+                  el_handle: Handle,
+                  core_tx: CoreMsgTx<T>,
+                  net_tx: NetworkTx)
+                  -> Result<Client<T>, CoreError>
         where T: 'static
     {
         trace!("Attempting to log into an acc.");
@@ -380,9 +385,7 @@ impl Client {
 
         trace!("Creating an actual routing...");
         let (routing, routing_rx) = setup_routing(Some(id_packet), None)?;
-        let net_tx_clone = net_tx.clone();
-        let core_tx_clone = core_tx.clone();
-        let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
+        let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
                          el_handle: el_handle,
@@ -393,25 +396,25 @@ impl Client {
                          timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
                          joiner: joiner,
                          session_packet_version: acc_version,
+                         net_tx: net_tx,
+                         core_tx: core_tx,
                      }))
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
     /// apps to authorise using an existing pair of keys.
-    pub fn from_keys<T>(keys: ClientKeys,
-                        owner: sign::PublicKey,
-                        el_handle: Handle,
-                        core_tx: CoreMsgTx<T>,
-                        net_tx: NetworkTx,
-                        config: BootstrapConfig)
-                        -> Result<Client, CoreError>
+    pub fn from_keys(keys: ClientKeys,
+                     owner: sign::PublicKey,
+                     el_handle: Handle,
+                     core_tx: CoreMsgTx<T>,
+                     net_tx: NetworkTx,
+                     config: BootstrapConfig)
+                     -> Result<Client<T>, CoreError>
         where T: 'static
     {
         trace!("Attempting to log into an acc using client keys.");
         let (routing, routing_rx) = setup_routing(Some(keys.clone().into()), Some(config.clone()))?;
-        let net_tx_clone = net_tx.clone();
-        let core_tx_clone = core_tx.clone();
-        let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
+        let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
                          el_handle: el_handle,
@@ -422,10 +425,12 @@ impl Client {
                          timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
                          joiner: joiner,
                          session_packet_version: 0,
+                         net_tx: net_tx,
+                         core_tx: core_tx,
                      }))
     }
 
-    fn new(inner: Inner) -> Self {
+    fn new(inner: Inner<T>) -> Self {
         Client { inner: Rc::new(RefCell::new(inner)) }
     }
 
@@ -434,44 +439,27 @@ impl Client {
         self.inner_mut().timeout = duration;
     }
 
-    #[doc(hidden)]
-    pub fn restart_routing<T>(&self, core_tx: CoreMsgTx<T>, net_tx: NetworkTx)
-        where T: 'static
-    {
+    /// Restart the routing client and reconnect to the network.
+    pub fn restart_routing(&self) -> Result<(), CoreError> {
         let opt_id = match self.inner().client_type {
             ClientType::Registered { ref acc, .. } => Some(acc.maid_keys.clone().into()),
             ClientType::FromKeys { ref keys, .. } => Some(keys.clone().into()),
             ClientType::Unregistered { .. } => None,
         };
 
-        let (routing, routing_rx) = match setup_routing(opt_id,
-                                                        self.inner().client_type.config()) {
-            Ok(elt) => elt,
-            Err(e) => {
-                info!("Could not restart routing (will re-attempt, unless dropped): {:?}",
-                      e);
-                let msg = {
-                    let core_tx = core_tx.clone();
-                    let net_tx = net_tx.clone();
-                    CoreMsg::new(move |client, _| {
-                                     client.restart_routing(core_tx, net_tx);
-                                     None
-                                 })
-                };
-                let _ = core_tx.send(msg);
-                return;
-            }
-        };
+        let (routing, routing_rx) = setup_routing(opt_id, self.inner().client_type.config())?;
 
-        if let Err(e) = net_tx.send(NetworkEvent::Connected) {
-            trace!("Couldn't send: {:?}", e);
-        }
+        self.inner().net_tx.send(NetworkEvent::Connected)?;
 
-        let joiner = spawn_routing_thread(routing_rx, core_tx, net_tx);
+        let joiner = spawn_routing_thread(routing_rx,
+                                          self.inner().core_tx.clone(),
+                                          self.inner().net_tx.clone());
 
         self.inner_mut().hooks.clear();
         self.inner_mut().routing = routing;
         self.inner_mut().joiner = joiner;
+
+        Ok(())
     }
 
     #[doc(hidden)]
@@ -913,8 +901,8 @@ impl Client {
     }
 
     /// Generic GET request
-    fn get<T, F, G>(&self, err_event: F, req: G) -> Box<CoreFuture<CoreEvent>>
-        where F: FnOnce(Result<T, CoreError>) -> CoreEvent,
+    fn get<R, F, G>(&self, err_event: F, req: G) -> Box<CoreFuture<CoreEvent>>
+        where F: FnOnce(Result<R, CoreError>) -> CoreEvent,
               G: FnOnce(&mut Routing, MessageId) -> Result<(), InterfaceError>
     {
         let msg_id = MessageId::new();
@@ -946,9 +934,8 @@ impl Client {
             .into_box()
     }
 
-    fn timeout<F, T>(&self, msg_id: MessageId, future: F) -> Box<CoreFuture<T>>
-        where F: Future<Item = T, Error = CoreError> + 'static,
-              T: 'static
+    fn timeout<R: 'static, F>(&self, msg_id: MessageId, future: F) -> Box<CoreFuture<R>>
+        where F: Future<Item = R, Error = CoreError> + 'static
     {
         let duration = self.inner().timeout;
         let timeout = match Timeout::new(duration, &self.inner().el_handle) {
@@ -959,7 +946,7 @@ impl Client {
         };
 
         let client = self.clone();
-        let timeout = timeout.then(move |result| -> Result<T, _> {
+        let timeout = timeout.then(move |result| -> Result<R, _> {
             let _ = client.inner_mut().hooks.remove(&msg_id);
 
             match result {
@@ -981,18 +968,18 @@ impl Client {
         RefMut::map(self.inner.borrow_mut(), |i| &mut i.routing)
     }
 
-    fn inner(&self) -> Ref<Inner> {
+    fn inner(&self) -> Ref<Inner<T>> {
         self.inner.borrow()
     }
 
-    fn inner_mut(&self) -> RefMut<Inner> {
+    fn inner_mut(&self) -> RefMut<Inner<T>> {
         self.inner.borrow_mut()
     }
 }
 
 #[cfg(any(all(test, feature = "use-mock-routing"),
           all(feature = "testing", feature = "use-mock-routing")))]
-impl Client {
+impl<T: 'static> Client<T> {
     #[doc(hidden)]
     pub fn set_network_limits(&self, max_ops_count: Option<u64>) {
         self.routing_mut().set_network_limits(max_ops_count);
@@ -1009,7 +996,7 @@ impl Client {
     }
 }
 
-impl fmt::Debug for Client {
+impl<T> fmt::Debug for Client<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Client")
     }
@@ -1248,20 +1235,20 @@ mod tests {
         let invalid_seed = String::from("123");
         {
             let el = unwrap!(Core::new());
-            let (core_tx, _) = mpsc::unbounded();
+            let (core_tx, _): (CoreMsgTx<()>, _) = mpsc::unbounded();
             let (net_tx, _) = mpsc::unbounded();
 
-            match Client::registered_with_seed::<()>(&invalid_seed, el.handle(), core_tx, net_tx) {
+            match Client::registered_with_seed(&invalid_seed, el.handle(), core_tx, net_tx) {
                 Err(CoreError::Unexpected(_)) => (),
                 _ => panic!("Expected a failure"),
             }
         }
         {
             let el = unwrap!(Core::new());
-            let (core_tx, _) = mpsc::unbounded();
+            let (core_tx, _): (CoreMsgTx<()>, _) = mpsc::unbounded();
             let (net_tx, _) = mpsc::unbounded();
 
-            match Client::login_with_seed::<()>(&invalid_seed, el.handle(), core_tx, net_tx) {
+            match Client::login_with_seed(&invalid_seed, el.handle(), core_tx, net_tx) {
                 Err(CoreError::Unexpected(_)) => (),
                 _ => panic!("Expected a failure"),
             }
@@ -1340,7 +1327,7 @@ mod tests {
     #[test]
     fn registered_client() {
         let el = unwrap!(Core::new());
-        let (core_tx, _) = mpsc::unbounded();
+        let (core_tx, _): (CoreMsgTx<()>, _) = mpsc::unbounded();
         let (net_tx, _) = mpsc::unbounded();
 
         let sec_0 = unwrap!(utils::generate_random_string(10));
@@ -1348,12 +1335,12 @@ mod tests {
         let inv = unwrap!(utils::generate_random_string(10));
 
         // Account creation for the 1st time - should succeed
-        let _ = unwrap!(Client::registered::<()>(&sec_0,
-                                                 &sec_1,
-                                                 &inv,
-                                                 el.handle(),
-                                                 core_tx.clone(),
-                                                 net_tx.clone()));
+        let _ = unwrap!(Client::registered(&sec_0,
+                                           &sec_1,
+                                           &inv,
+                                           el.handle(),
+                                           core_tx.clone(),
+                                           net_tx.clone()));
 
         // Account creation - same secrets - should fail
         match Client::registered(&sec_0, &sec_1, &inv, el.handle(), core_tx, net_tx) {
@@ -1548,6 +1535,7 @@ mod tests {
         random_client_with_net_obs(move |net_event| unwrap!(tx.send(net_event)),
                                    move |client| {
                                        client.simulate_network_disconnect();
+                                       unwrap!(client.restart_routing());
                                        keep_alive
                                    });
     }

@@ -29,7 +29,7 @@ pub type CoreMsgRx<T> = mpsc::UnboundedReceiver<CoreMsg<T>>;
 
 /// The final future which the event loop will run.
 pub type TailFuture = Box<Future<Item = (), Error = ()>>;
-type TailFutureFn<T> = FnMut(&Client, &T) -> Option<TailFuture> + Send + 'static;
+type TailFutureFn<T> = FnMut(&Client<T>, &T) -> Option<TailFuture> + Send + 'static;
 
 /// The message format that core event loop understands.
 pub struct CoreMsg<T>(Option<Box<TailFutureFn<T>>>);
@@ -42,7 +42,7 @@ impl<T> CoreMsg<T> {
     /// return value of the given closure is optionally a future, it will be
     /// registered in the event loop.
     pub fn new<F>(f: F) -> Self
-        where F: FnOnce(&Client, &T) -> Option<TailFuture> + Send + 'static
+        where F: FnOnce(&Client<T>, &T) -> Option<TailFuture> + Send + 'static
     {
         let mut f = Some(f);
         CoreMsg(Some(Box::new(move |client, context| -> Option<TailFuture> {
@@ -60,7 +60,7 @@ impl<T> CoreMsg<T> {
 
 /// Run the core event loop. This will block until the event loop is alive.
 /// Hence must typically be called inside a spawned thread.
-pub fn run<T>(mut el: Core, client: &Client, context: &T, el_rx: CoreMsgRx<T>) {
+pub fn run<T>(mut el: Core, client: &Client<T>, context: &T, el_rx: CoreMsgRx<T>) {
     let el_h = el.handle();
 
     let keep_alive = el_rx.for_each(|core_msg| {
