@@ -184,7 +184,7 @@ pub unsafe extern "C" fn auth_unregistered_decode_ipc_msg(msg: *const c_char,
             }
             _ => {
                 let (error_code, description) =
-                    ffi_error!(AuthError::Unexpected("Unexpected msg type".to_owned()));
+                    ffi_error!(AuthError::CoreError(CoreError::OperationForbidden));
                 o_err(user_data.0,
                       FfiResult {
                           error_code,
@@ -209,6 +209,7 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                              o_containers: extern "C" fn(*mut c_void,
                                                                          u32,
                                                                          *const FfiContainersReq),
+                                             o_unregistered: extern "C" fn(*mut c_void, u32),
                                              o_err: extern "C" fn(*mut c_void,
                                                                   FfiResult,
                                                                   *const c_char)) {
@@ -235,6 +236,12 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                }) => {
                                 o_containers(user_data.0, req_id, &cont_req.into_repr_c()?);
                             }
+                            Ok(IpcMsg::Req {
+                                   req: IpcReq::Unregistered,
+                                   req_id,
+                               }) => {
+                                o_unregistered(user_data.0, req_id);
+                            }
                             Err((error_code, description, err)) => {
                                 o_err(user_data.0,
                                       FfiResult {
@@ -243,7 +250,6 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                       },
                                       err.as_ptr());
                             }
-                            Ok(IpcMsg::Req { .. }) |
                             Ok(IpcMsg::Resp { .. }) |
                             Ok(IpcMsg::Revoked { .. }) |
                             Ok(IpcMsg::Err(..)) => {

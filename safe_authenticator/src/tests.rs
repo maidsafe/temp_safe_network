@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use Authenticator;
-use errors::{AuthError, ERR_UNKNOWN_APP};
+use errors::{AuthError, ERR_INVALID_MSG, ERR_OPERATION_FORBIDDEN, ERR_UNKNOWN_APP};
 use ffi::apps::*;
 use ffi_utils::{FfiResult, ReprC, StringError, base64_encode, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, send_via_user_data, sender_as_user_data};
@@ -133,6 +133,15 @@ fn config_root_dir() {
 fn app_authentication() {
     let authenticator = create_account_and_login();
 
+    // Try to send IpcResp::Auth - it should fail
+    let msg = IpcMsg::Revoked { app_id: "hello".to_string() };
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+    match decode_ipc_msg(&authenticator, &encoded_msg) {
+        Err((ERR_INVALID_MSG, None)) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Try to send IpcReq::Auth - it should pass
     let req_id = ipc::gen_req_id();
     let app_exchange_info = unwrap!(rand_app());
     let app_id = app_exchange_info.id.clone();
@@ -251,8 +260,30 @@ fn app_authentication() {
 }
 
 // Test unregistered client authentication.
+// First, try to send a full auth request - it must fail with "Forbidden".
+// Then try to send a request for IpcReq::Unregistered, which must pass.
+// Next we invoke encode_unregistered_resp and it must return the network
+// configuration.
+// Try the same thing again when logged in - it must pass.
 #[test]
 fn unregistered_authentication() {
+    // Try to send IpcReq::Auth - it should fail
+    let msg = IpcMsg::Req {
+        req_id: ipc::gen_req_id(),
+        req: IpcReq::Auth(AuthReq {
+                              app: unwrap!(rand_app()),
+                              app_container: true,
+                              containers: create_containers_req(),
+                          }),
+    };
+    let encoded_msg = unwrap!(ipc::encode_msg(&msg, "safe-auth"));
+
+    match unregistered_decode_ipc_msg(&encoded_msg) {
+        Err((ERR_OPERATION_FORBIDDEN, None)) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Try to send IpcReq::Unregistered - it should pass
     let req_id = ipc::gen_req_id();
     let msg = IpcMsg::Req {
         req_id: req_id,
@@ -293,10 +324,26 @@ fn unregistered_authentication() {
     };
 
     assert_eq!(bootstrap_cfg, BootstrapConfig::default());
+
+    // Try to send IpcReq::Unregistered to logged in authenticator
+    let authenticator = create_account_and_login();
+
+    let received_req_id = match unwrap!(decode_ipc_msg(&authenticator, &encoded_msg)) {
+        IpcMsg::Req {
+            req_id,
+            req: IpcReq::Unregistered,
+        } => req_id,
+        x => panic!("Unexpected {:?}", x),
+    };
+
+    assert_eq!(received_req_id, req_id);
 }
 
+// Authenticate an app - it must pass.
+// Authenticate the same app again - it must return the correct response
+// with the same app details.
 #[test]
-fn authenticated_app_cannot_be_authenticated_again() {
+fn authenticated_app_can_be_authenticated_again() {
     let authenticator = create_account_and_login();
 
     let auth_req = AuthReq {
@@ -797,6 +844,7 @@ fn decode_ipc_msg(authenticator: &Authenticator,
                             sender_as_user_data(&tx),
                             auth_cb,
                             containers_cb,
+                            unregistered_cb,
                             err_cb);
     };
 
@@ -808,17 +856,6 @@ fn decode_ipc_msg(authenticator: &Authenticator,
 
 fn unregistered_decode_ipc_msg(msg: &str) -> Result<IpcMsg, (i32, Option<IpcMsg>)> {
     let (tx, rx) = mpsc::channel::<Result<IpcMsg, (i32, Option<IpcMsg>)>>();
-
-    extern "C" fn unregistered_cb(user_data: *mut c_void, req_id: u32) {
-        unsafe {
-            let msg = IpcMsg::Req {
-                req_id: req_id,
-                req: IpcReq::Unregistered,
-            };
-
-            send_via_user_data(user_data, Ok::<_, (i32, Option<IpcMsg>)>(msg))
-        }
-    }
 
     let ffi_msg = unwrap!(CString::new(msg));
 
@@ -833,6 +870,17 @@ fn unregistered_decode_ipc_msg(msg: &str) -> Result<IpcMsg, (i32, Option<IpcMsg>
     match rx.recv_timeout(Duration::from_secs(15)) {
         Ok(r) => r,
         Err(_) => Err((-1, None)),
+    }
+}
+
+extern "C" fn unregistered_cb(user_data: *mut c_void, req_id: u32) {
+    unsafe {
+        let msg = IpcMsg::Req {
+            req_id: req_id,
+            req: IpcReq::Unregistered,
+        };
+
+        send_via_user_data(user_data, Ok::<_, (i32, Option<IpcMsg>)>(msg))
     }
 }
 
