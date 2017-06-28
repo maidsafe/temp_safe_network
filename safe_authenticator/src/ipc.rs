@@ -91,10 +91,8 @@ pub fn app_info(client: &Client, app_id: &str) -> Box<AuthFuture<Option<AppInfo>
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
 #[cfg_attr(feature="cargo-clippy", allow(type_complexity))]
 pub fn decode_ipc_msg(client: &Client,
-                      msg: &str)
+                      msg: IpcMsg)
                       -> Box<AuthFuture<Result<IpcMsg, (i32, CString, CString)>>> {
-    let msg = fry!(decode_msg(msg));
-
     match msg {
         IpcMsg::Req {
             req: IpcReq::Auth(auth_req),
@@ -161,6 +159,45 @@ pub fn decode_ipc_msg(client: &Client,
     }
 }
 
+/// Decodes a given encoded IPC message without requiring an authorised account
+#[no_mangle]
+pub unsafe extern "C" fn auth_unregistered_decode_ipc_msg(msg: *const c_char,
+                                                          user_data: *mut c_void,
+                                                          o_unregistered: extern "C" fn(*mut c_void,
+                                                                                        u32),
+                                                          o_err: extern "C" fn(*mut c_void,
+                                                                  FfiResult,
+                                                                  *const c_char))
+{
+    let user_data = OpaqueCtx(user_data);
+
+    catch_unwind_cb(user_data.0, o_err, || -> Result<_, AuthError> {
+        let msg_raw = CStr::from_ptr(msg).to_str()?;
+        let msg = decode_msg(msg_raw)?;
+
+        match msg {
+            IpcMsg::Req {
+                req: IpcReq::Unregistered,
+                req_id,
+            } => {
+                o_unregistered(user_data.0, req_id);
+            }
+            _ => {
+                let (error_code, description) =
+                    ffi_error!(AuthError::CoreError(CoreError::OperationForbidden));
+                o_err(user_data.0,
+                      FfiResult {
+                          error_code,
+                          description: description.as_ptr(),
+                      },
+                      ptr::null_mut());
+            }
+        }
+
+        Ok(())
+    })
+}
+
 /// Decodes a given encoded IPC message and calls a corresponding callback
 #[no_mangle]
 pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
@@ -169,10 +206,10 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                              o_auth: extern "C" fn(*mut c_void,
                                                                    u32,
                                                                    *const FfiAuthReq),
-                                             o_unregistered: extern "C" fn(*mut c_void, u32),
                                              o_containers: extern "C" fn(*mut c_void,
                                                                          u32,
                                                                          *const FfiContainersReq),
+                                             o_unregistered: extern "C" fn(*mut c_void, u32),
                                              o_err: extern "C" fn(*mut c_void,
                                                                   FfiResult,
                                                                   *const c_char)) {
@@ -180,9 +217,11 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
 
     catch_unwind_cb(user_data.0, o_err, || -> Result<_, AuthError> {
         let msg_raw = CStr::from_ptr(msg).to_str()?;
+        let msg = decode_msg(msg_raw)?;
+
         (*auth)
             .send(move |client| {
-                decode_ipc_msg(client, msg_raw)
+                decode_ipc_msg(client, msg)
                     .and_then(move |msg| {
                         match msg {
                             Ok(IpcMsg::Req {
@@ -192,16 +231,16 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                                 o_auth(user_data.0, req_id, &auth_req.into_repr_c()?);
                             }
                             Ok(IpcMsg::Req {
-                                   req: IpcReq::Unregistered,
-                                   req_id,
-                               }) => {
-                                o_unregistered(user_data.0, req_id);
-                            }
-                            Ok(IpcMsg::Req {
                                    req: IpcReq::Containers(cont_req),
                                    req_id,
                                }) => {
                                 o_containers(user_data.0, req_id, &cont_req.into_repr_c()?);
+                            }
+                            Ok(IpcMsg::Req {
+                                   req: IpcReq::Unregistered,
+                                   req_id,
+                               }) => {
+                                o_unregistered(user_data.0, req_id);
                             }
                             Err((error_code, description, err)) => {
                                 o_err(user_data.0,
@@ -364,8 +403,7 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
 
 /// Encodes a response to unregistered client authentication request
 #[no_mangle]
-pub unsafe extern "C" fn encode_unregistered_resp(auth: *const Authenticator,
-                                                  req_id: u32,
+pub unsafe extern "C" fn encode_unregistered_resp(req_id: u32,
                                                   is_granted: bool,
                                                   user_data: *mut c_void,
                                                   o_cb: extern "C" fn(*mut c_void,
@@ -389,27 +427,16 @@ pub unsafe extern "C" fn encode_unregistered_resp(auth: *const Authenticator,
                  },
                  resp.as_ptr());
         } else {
-            (*auth)
-                .send(move |client| {
-                    let bootstrap_cfg = try_cb!(client.bootstrap_config().map_err(AuthError::from),
-                                                user_data,
-                                                o_cb);
+            let bootstrap_cfg = Client::bootstrap_config()?;
 
-                    let resp = try_cb!(encode_response(&IpcMsg::Resp {
-                                                 req_id: req_id,
-                                                 resp: IpcResp::Unregistered(Ok(bootstrap_cfg)),
-                                             },
-                                            "unregistered")
-                                    .map_err(AuthError::from),
-                            user_data,
-                            o_cb);
+            let resp = encode_response(&IpcMsg::Resp {
+                                            req_id: req_id,
+                                            resp: IpcResp::Unregistered(Ok(bootstrap_cfg)),
+                                        },
+                                       "unregistered")?;
 
-                    o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
-
-                    None
-                })?;
+            o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr());
         }
-
         Ok(())
     })
 }
@@ -495,7 +522,7 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                 AppState::Authenticated => {
                                     // Return info of the already registered app
                                     let app_keys = app.keys.clone();
-                                    let bootstrap_config = fry!(c4.bootstrap_config());
+                                    let bootstrap_config = fry!(Client::bootstrap_config());
 
                                     access_container(&c4)
                                         .and_then(move |dir| {
@@ -946,7 +973,6 @@ fn encode_auth_resp_impl(client: &Client,
     let c5 = client.clone();
     let c6 = client.clone();
     let c7 = client.clone();
-    let c8 = client.clone();
 
     let sign_pk = app.keys.sign_pk;
     let app_keys = app.keys.clone();
@@ -1002,7 +1028,7 @@ fn encode_auth_resp_impl(client: &Client,
         .and_then(move |(dir, app_keys)| {
                       Ok(AuthGranted {
                              app_keys: app_keys,
-                             bootstrap_config: c8.bootstrap_config()?,
+                             bootstrap_config: Client::bootstrap_config()?,
                              access_container: AccessContInfo::from_mdata_info(dir)?,
                          })
                   })

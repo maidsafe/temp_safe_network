@@ -65,12 +65,8 @@ pub fn register_app(authenticator: &Authenticator,
         req: IpcReq::Auth(auth_req.clone()),
     };
 
-    // Serialise it as base64 payload in "safe_auth:payload"
-    let encoded_msg = ipc::encode_msg(&msg, "safe-auth")?;
-
     // Invoke `decode_ipc_msg` and expect to get AuthReq back.
-    let ipc_req = run(authenticator,
-                      move |client| decode_ipc_msg(client, &encoded_msg));
+    let ipc_req = run(authenticator, move |client| decode_ipc_msg(client, msg));
     match ipc_req {
         Ok(IpcMsg::Req { req: IpcReq::Auth(_), .. }) => (),
         x => return Err(AuthError::Unexpected(format!("Unexpected {:?}", x))),

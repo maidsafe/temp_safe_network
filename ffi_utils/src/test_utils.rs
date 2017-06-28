@@ -109,12 +109,10 @@ pub unsafe fn call_vec_u8<F>(f: F) -> Result<Vec<u8>, i32>
     unwrap!(rx.recv())
 }
 
-#[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 extern "C" fn callback_0(user_data: *mut c_void, res: FfiResult) {
     unsafe { send_via_user_data(user_data, res.error_code) }
 }
 
-#[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 extern "C" fn callback_1<E, T>(user_data: *mut c_void, res: FfiResult, arg: T::C)
     where E: Debug,
           T: ReprC<Error = E>
@@ -129,7 +127,6 @@ extern "C" fn callback_1<E, T>(user_data: *mut c_void, res: FfiResult, arg: T::C
     }
 }
 
-#[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 extern "C" fn callback_2<E0, E1, T0, T1>(user_data: *mut c_void,
                                          res: FfiResult,
                                          arg0: T0::C,
@@ -149,10 +146,9 @@ extern "C" fn callback_2<E0, E1, T0, T1>(user_data: *mut c_void,
     }
 }
 
-#[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 extern "C" fn callback_vec<E, T, U>(user_data: *mut c_void,
                                     res: FfiResult,
-                                    array: T::C,
+                                    array: *const U,
                                     size: usize)
     where E: Debug,
           T: ReprC<C = *const U, Error = E>
@@ -173,7 +169,6 @@ extern "C" fn callback_vec<E, T, U>(user_data: *mut c_void,
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 extern "C" fn callback_vec_u8(user_data: *mut c_void, res: FfiResult, ptr: *const u8, len: usize) {
     unsafe {
         let result = if res.error_code == 0 {

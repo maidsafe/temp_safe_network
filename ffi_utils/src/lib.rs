@@ -86,6 +86,7 @@ pub trait ErrorCode {
 
 /// FFI result wrapper
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct FfiResult {
     /// Unique error code
     pub error_code: i32,

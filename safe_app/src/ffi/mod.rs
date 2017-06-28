@@ -190,7 +190,6 @@ mod tests {
             unsafe { app_free(app) };
         }
 
-        #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
         unsafe extern "C" fn net_event_cb(user_data: *mut c_void, res: FfiResult, event: i32) {
             send_via_user_data(user_data, (res.error_code, event));
         }

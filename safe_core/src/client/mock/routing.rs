@@ -916,7 +916,7 @@ impl Routing {
         self.timeout_simulation = enable;
     }
 
-    pub fn bootstrap_config(&self) -> Result<BootstrapConfig, InterfaceError> {
+    pub fn bootstrap_config() -> Result<BootstrapConfig, InterfaceError> {
         Ok(BootstrapConfig::default())
     }
 

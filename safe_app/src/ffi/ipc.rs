@@ -339,7 +339,6 @@ mod tests {
                 }
             }
 
-            #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
             extern "C" fn err_cb(ctx: *mut c_void, _res: FfiResult, _req_id: u32) {
                 unsafe {
                     let ctx = ctx as *mut Context;
@@ -420,7 +419,6 @@ mod tests {
                 }
             }
 
-            #[cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
             extern "C" fn err_cb(ctx: *mut c_void, _res: FfiResult, _req_id: u32) {
                 unsafe {
                     let ctx = ctx as *mut Context;

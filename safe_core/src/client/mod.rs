@@ -142,7 +142,7 @@ impl Client {
     {
         trace!("Creating unregistered client.");
 
-        let (routing, routing_rx) = setup_routing(None, config)?;
+        let (routing, routing_rx) = setup_routing(None, config.clone())?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
@@ -152,7 +152,7 @@ impl Client {
                          routing: routing,
                          hooks: HashMap::with_capacity(10),
                          cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-                         client_type: ClientType::Unregistered,
+                         client_type: ClientType::unreg(config),
                          timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
                          joiner: joiner,
                          session_packet_version: 0,
@@ -408,7 +408,7 @@ impl Client {
         where T: 'static
     {
         trace!("Attempting to log into an acc using client keys.");
-        let (routing, routing_rx) = setup_routing(Some(keys.clone().into()), Some(config))?;
+        let (routing, routing_rx) = setup_routing(Some(keys.clone().into()), Some(config.clone()))?;
         let net_tx_clone = net_tx.clone();
         let core_tx_clone = core_tx.clone();
         let joiner = spawn_routing_thread(routing_rx, core_tx_clone, net_tx_clone);
@@ -418,7 +418,7 @@ impl Client {
                          routing: routing,
                          hooks: HashMap::with_capacity(10),
                          cache: LruCache::new(IMMUT_DATA_CACHE_SIZE),
-                         client_type: ClientType::from_keys(keys, owner),
+                         client_type: ClientType::from_keys(keys, owner, config),
                          timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
                          joiner: joiner,
                          session_packet_version: 0,
@@ -438,13 +438,14 @@ impl Client {
     pub fn restart_routing<T>(&self, core_tx: CoreMsgTx<T>, net_tx: NetworkTx)
         where T: 'static
     {
-        let opt_id = if let ClientType::Registered { ref acc, .. } = self.inner().client_type {
-            Some(acc.maid_keys.clone().into())
-        } else {
-            None
+        let opt_id = match self.inner().client_type {
+            ClientType::Registered { ref acc, .. } => Some(acc.maid_keys.clone().into()),
+            ClientType::FromKeys { ref keys, .. } => Some(keys.clone().into()),
+            ClientType::Unregistered { .. } => None,
         };
 
-        let (routing, routing_rx) = match setup_routing(opt_id, None) {
+        let (routing, routing_rx) = match setup_routing(opt_id,
+                                                        self.inner().client_type.config()) {
             Ok(elt) => elt,
             Err(e) => {
                 info!("Could not restart routing (will re-attempt, unless dropped): {:?}",
@@ -877,8 +878,8 @@ impl Client {
     }
 
     /// Returns the `crust::Config` associated with the `crust::Service` (if any).
-    pub fn bootstrap_config(&self) -> Result<BootstrapConfig, CoreError> {
-        Ok(self.inner().routing.bootstrap_config()?)
+    pub fn bootstrap_config() -> Result<BootstrapConfig, CoreError> {
+        Ok(Routing::bootstrap_config()?)
     }
 
     fn update_account_packet(&self) -> Box<CoreFuture<()>> {
@@ -1034,7 +1035,7 @@ impl UserCred {
 
 #[cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
 enum ClientType {
-    Unregistered,
+    Unregistered { config: Option<BootstrapConfig> },
     Registered {
         acc: Account,
         acc_loc: XorName,
@@ -1045,18 +1046,20 @@ enum ClientType {
         keys: ClientKeys,
         owner_key: sign::PublicKey,
         cm_addr: Authority<XorName>,
+        config: BootstrapConfig,
     },
 }
 
 impl ClientType {
-    fn from_keys(keys: ClientKeys, owner_key: sign::PublicKey) -> Self {
+    fn from_keys(keys: ClientKeys, owner_key: sign::PublicKey, config: BootstrapConfig) -> Self {
         let digest = sha3_256(&owner_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         ClientType::FromKeys {
-            keys: keys,
-            owner_key: owner_key,
-            cm_addr: cm_addr,
+            keys,
+            owner_key,
+            cm_addr,
+            config,
         }
     }
 
@@ -1066,10 +1069,22 @@ impl ClientType {
            cm_addr: Authority<XorName>)
            -> Self {
         ClientType::Registered {
-            acc: acc,
-            acc_loc: acc_loc,
-            user_cred: user_cred,
-            cm_addr: cm_addr,
+            acc,
+            acc_loc,
+            user_cred,
+            cm_addr,
+        }
+    }
+
+    fn unreg(config: Option<BootstrapConfig>) -> Self {
+        ClientType::Unregistered { config }
+    }
+
+    fn config(&self) -> Option<BootstrapConfig> {
+        match *self {
+            ClientType::Registered { .. } => None,
+            ClientType::Unregistered { ref config, .. } => config.clone(),
+            ClientType::FromKeys { ref config, .. } => Some(config.clone()),
         }
     }
 
@@ -1077,7 +1092,7 @@ impl ClientType {
         match *self {
             ClientType::Registered { ref acc, .. } => Ok(acc),
             ClientType::FromKeys { .. } |
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1085,7 +1100,7 @@ impl ClientType {
         match *self {
             ClientType::Registered { ref mut acc, .. } => Ok(acc),
             ClientType::FromKeys { .. } |
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1093,7 +1108,7 @@ impl ClientType {
         match *self {
             ClientType::Registered { acc_loc, .. } => Ok(acc_loc),
             ClientType::FromKeys { .. } |
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1101,7 +1116,7 @@ impl ClientType {
         match *self {
             ClientType::Registered { ref user_cred, .. } => Ok(user_cred),
             ClientType::FromKeys { .. } |
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1109,7 +1124,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref cm_addr, .. } |
             ClientType::Registered { ref cm_addr, .. } => Ok(cm_addr),
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1117,7 +1132,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { owner_key, .. } => Ok(owner_key),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_pk),
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1125,7 +1140,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.sign_pk),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_pk),
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1133,7 +1148,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.sign_sk.clone()),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.sign_sk.clone()),
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1141,7 +1156,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.enc_pk),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.enc_pk),
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 
@@ -1149,7 +1164,7 @@ impl ClientType {
         match *self {
             ClientType::FromKeys { ref keys, .. } => Ok(keys.enc_sk.clone()),
             ClientType::Registered { ref acc, .. } => Ok(acc.maid_keys.enc_sk.clone()),
-            ClientType::Unregistered => Err(CoreError::OperationForbidden),
+            ClientType::Unregistered { .. } => Err(CoreError::OperationForbidden),
         }
     }
 }
