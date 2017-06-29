@@ -449,8 +449,6 @@ impl<T: 'static> Client<T> {
 
         let (routing, routing_rx) = setup_routing(opt_id, self.inner().client_type.config())?;
 
-        self.inner().net_tx.send(NetworkEvent::Connected)?;
-
         let joiner = spawn_routing_thread(routing_rx,
                                           self.inner().core_tx.clone(),
                                           self.inner().net_tx.clone());
@@ -458,6 +456,8 @@ impl<T: 'static> Client<T> {
         self.inner_mut().hooks.clear();
         self.inner_mut().routing = routing;
         self.inner_mut().joiner = joiner;
+
+        self.inner().net_tx.send(NetworkEvent::Connected)?;
 
         Ok(())
     }

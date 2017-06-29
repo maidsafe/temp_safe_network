@@ -247,7 +247,12 @@ mod tests {
 
             let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
             assert_eq!(err_code, 0);
+            assert_eq!(event, disconnected);
+
+            let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            assert_eq!(err_code, 0);
             assert_eq!(event, connected);
+
 
             unsafe { authenticator_free(auth) };
         }
