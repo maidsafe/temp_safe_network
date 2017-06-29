@@ -108,6 +108,30 @@ pub unsafe extern "C" fn login(account_locator: *const c_char,
     })
 }
 
+/// Try to restore a failed connection with the network.
+#[no_mangle]
+pub unsafe extern "C" fn auth_reconnect(auth: *mut Authenticator,
+                                        user_data: *mut c_void,
+                                        o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+    let user_data = OpaqueCtx(user_data);
+    let res = (*auth).send(move |client| {
+                               try_cb!(client.restart_routing().map_err(AuthError::from),
+                                       user_data.0,
+                                       o_cb);
+                               o_cb(user_data.0, FFI_RESULT_OK);
+                               None
+                           });
+    if let Err(e) = res {
+        let e = AuthError::from(e);
+        let (error_code, description) = ffi_error!(e);
+        o_cb(user_data.0,
+             FfiResult {
+                 error_code,
+                 description: description.as_ptr(),
+             });
+    }
+}
+
 /// Discard and clean up the previously allocated authenticator instance.
 /// Use this only if the authenticator is obtained from one of the auth
 /// functions in this crate (`create_acc`, `login`, `create_unregistered`).
@@ -171,6 +195,7 @@ mod tests {
     #[cfg(all(test, feature = "use-mock-routing"))]
     #[test]
     fn network_status_callback() {
+        use ffi_utils::test_utils::call_0;
         use ffi_utils::test_utils::{send_via_user_data, sender_as_user_data};
         use safe_core::NetworkEvent;
         use std::time::Duration;
@@ -207,6 +232,27 @@ mod tests {
 
             let disconnected: i32 = NetworkEvent::Disconnected.into();
             assert_eq!(event, disconnected);
+
+            // Reconnect with the network
+            unsafe { unwrap!(call_0(|ud, cb| auth_reconnect(auth, ud, cb))) };
+
+            let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            assert_eq!(err_code, 0);
+
+            let connected: i32 = NetworkEvent::Connected.into();
+            assert_eq!(event, connected);
+
+            // The reconnection should be fine if we're already connected.
+            unsafe { unwrap!(call_0(|ud, cb| auth_reconnect(auth, ud, cb))) };
+
+            let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            assert_eq!(err_code, 0);
+            assert_eq!(event, disconnected);
+
+            let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            assert_eq!(err_code, 0);
+            assert_eq!(event, connected);
+
 
             unsafe { authenticator_free(auth) };
         }

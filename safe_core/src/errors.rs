@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use futures::sync::mpsc::SendError;
 use maidsafe_utilities::serialisation::SerialisationError;
 use routing::{ClientError, InterfaceError, RoutingError};
 use routing::messaging;
@@ -72,6 +73,18 @@ pub enum CoreError {
 impl<'a> From<&'a str> for CoreError {
     fn from(error: &'a str) -> CoreError {
         CoreError::Unexpected(error.to_string())
+    }
+}
+
+impl From<String> for CoreError {
+    fn from(error: String) -> CoreError {
+        CoreError::Unexpected(error)
+    }
+}
+
+impl<T> From<SendError<T>> for CoreError {
+    fn from(error: SendError<T>) -> CoreError {
+        CoreError::from(format!("Couldn't send message to the channel: {}", error))
     }
 }
 

@@ -26,7 +26,9 @@ use safe_core::ipc::resp::access_container_enc_key;
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 
 /// Retrieves the authenticator configuration file
-pub fn access_container(client: &Client) -> Box<AuthFuture<MDataInfo>> {
+pub fn access_container<T>(client: &Client<T>) -> Box<AuthFuture<MDataInfo>>
+    where T: 'static
+{
     let parent = fry!(client.config_root_dir());
     let key = fry!(parent.enc_entry_key(b"access-container"));
 
@@ -52,11 +54,13 @@ pub fn access_container_nonce(access_container: &MDataInfo)
 }
 
 /// Gets an access container entry
-pub fn access_container_entry(client: &Client,
-                              access_container: &MDataInfo,
-                              app_id: &str,
-                              app_keys: AppKeys)
-                              -> Box<AuthFuture<(u64, Option<AccessContainerEntry>)>> {
+pub fn access_container_entry<T>(client: &Client<T>,
+                                 access_container: &MDataInfo,
+                                 app_id: &str,
+                                 app_keys: AppKeys)
+                                 -> Box<AuthFuture<(u64, Option<AccessContainerEntry>)>>
+    where T: 'static
+{
     let nonce = fry!(access_container_nonce(access_container));
     let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
 
@@ -77,13 +81,15 @@ pub fn access_container_entry(client: &Client,
 }
 
 /// Adds a new entry to the authenticator access container
-pub fn put_access_container_entry(client: &Client,
-                                  access_container: &MDataInfo,
-                                  app_id: &str,
-                                  app_keys: &AppKeys,
-                                  permissions: &AccessContainerEntry,
-                                  version: Option<u64>)
-                                  -> Box<AuthFuture<()>> {
+pub fn put_access_container_entry<T>(client: &Client<T>,
+                                     access_container: &MDataInfo,
+                                     app_id: &str,
+                                     app_keys: &AppKeys,
+                                     permissions: &AccessContainerEntry,
+                                     version: Option<u64>)
+                                     -> Box<AuthFuture<()>>
+    where T: 'static
+{
     let nonce = fry!(access_container_nonce(access_container));
     let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
     let plaintext = fry!(serialise(&permissions));

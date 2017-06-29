@@ -25,17 +25,17 @@ use utils::FutureExt;
 /// Reader is used to read contents of a File. It can read in chunks if the
 /// file happens to be very large
 #[allow(dead_code)]
-pub struct Reader {
-    client: Client,
-    self_encryptor: SelfEncryptor<SelfEncryptionStorage>,
+pub struct Reader<T> {
+    client: Client<T>,
+    self_encryptor: SelfEncryptor<SelfEncryptionStorage<T>>,
 }
 
-impl Reader {
+impl<T: 'static> Reader<T> {
     /// Create a new instance of Reader
-    pub fn new(client: Client,
-               storage: SelfEncryptionStorage,
+    pub fn new(client: Client<T>,
+               storage: SelfEncryptionStorage<T>,
                file: &File)
-               -> Box<NfsFuture<Reader>> {
+               -> Box<NfsFuture<Reader<T>>> {
         data_map::get(&client, file.data_map_name())
             .and_then(move |data_map| {
                           let self_encryptor = SelfEncryptor::new(storage, data_map)?;

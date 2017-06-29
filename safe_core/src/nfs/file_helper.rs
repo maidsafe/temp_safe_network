@@ -25,11 +25,14 @@ use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
 
 /// Insert the file into the directory.
-pub fn insert<T: AsRef<str>>(client: Client,
-                             parent: MDataInfo,
-                             name: T,
-                             file: &File)
-                             -> Box<NfsFuture<()>> {
+pub fn insert<S, T>(client: Client<T>,
+                    parent: MDataInfo,
+                    name: S,
+                    file: &File)
+                    -> Box<NfsFuture<()>>
+    where S: AsRef<str>,
+          T: 'static
+{
     let name = name.as_ref();
     trace!("Inserting file with name '{}'", name);
 
@@ -52,15 +55,16 @@ pub fn insert<T: AsRef<str>>(client: Client,
 }
 
 /// Gets a file from the directory
-#[cfg_attr(rustfmt, rustfmt_skip)]
-pub fn fetch<S: AsRef<str>>(client: Client,
-                            parent: MDataInfo,
-                            name: S)
-                            -> Box<NfsFuture<(u64, File)>> {
-    parent.enc_entry_key(name.as_ref().as_bytes())
+pub fn fetch<S, T>(client: Client<T>, parent: MDataInfo, name: S) -> Box<NfsFuture<(u64, File)>>
+    where S: AsRef<str>,
+          T: 'static
+{
+    parent
+        .enc_entry_key(name.as_ref().as_bytes())
         .into_future()
         .and_then(move |key| {
-                      client.get_mdata_value(parent.name, parent.type_tag, key)
+                      client
+                          .get_mdata_value(parent.name, parent.type_tag, key)
                           .map(move |value| (value, parent))
                   })
         .and_then(move |(value, parent)| {
@@ -73,17 +77,20 @@ pub fn fetch<S: AsRef<str>>(client: Client,
 }
 
 /// Returns a reader for reading the file contents
-pub fn read(client: Client, file: &File) -> Box<NfsFuture<Reader>> {
+pub fn read<T: 'static>(client: Client<T>, file: &File) -> Box<NfsFuture<Reader<T>>> {
     trace!("Reading file {:?}", file);
     Reader::new(client.clone(), SelfEncryptionStorage::new(client), file)
 }
 
 /// Delete a file from the Directory
-pub fn delete<S: AsRef<str>>(client: &Client,
-                             parent: &MDataInfo,
-                             name: S,
-                             version: u64)
-                             -> Box<NfsFuture<()>> {
+pub fn delete<S, T>(client: &Client<T>,
+                    parent: &MDataInfo,
+                    name: S,
+                    version: u64)
+                    -> Box<NfsFuture<()>>
+    where S: AsRef<str>,
+          T: 'static
+{
     let name = name.as_ref();
     trace!("Deleting file with name {}.", name);
 
@@ -100,12 +107,15 @@ pub fn delete<S: AsRef<str>>(client: &Client,
 /// Updates the file.
 /// If `version` is 0, the current version is first retrieved from the network,
 /// and that version incremented by one is then used as the actual version.
-pub fn update<S: AsRef<str>>(client: Client,
-                             parent: MDataInfo,
-                             name: S,
-                             file: &File,
-                             version: u64)
-                             -> Box<NfsFuture<()>> {
+pub fn update<S, T>(client: Client<T>,
+                    parent: MDataInfo,
+                    name: S,
+                    file: &File,
+                    version: u64)
+                    -> Box<NfsFuture<()>>
+    where S: AsRef<str>,
+          T: 'static
+{
     let name = name.as_ref();
     trace!("Updating file with name '{}'", name);
 
@@ -145,13 +155,16 @@ pub fn update<S: AsRef<str>>(client: Client,
 /// object is returned, through which the data for the file can be written to
 /// the network. The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
-pub fn update_content<S: Into<String>>(client: Client,
-                                       parent: MDataInfo,
-                                       name: S,
-                                       file: File,
-                                       version: u64,
-                                       mode: Mode)
-                                       -> Box<NfsFuture<Writer>> {
+pub fn update_content<S, T>(client: Client<T>,
+                            parent: MDataInfo,
+                            name: S,
+                            file: File,
+                            version: u64,
+                            mode: Mode)
+                            -> Box<NfsFuture<Writer<T>>>
+    where S: Into<String>,
+          T: 'static
+{
     let name = name.into();
     trace!("Updating content in file with name {}", name);
 
@@ -169,11 +182,14 @@ pub fn update_content<S: Into<String>>(client: Client,
 /// file can be written to the network.
 /// The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
-pub fn create<S: Into<String>>(client: Client,
-                               parent: MDataInfo,
-                               name: S,
-                               user_metadata: Vec<u8>)
-                               -> Box<NfsFuture<Writer>> {
+pub fn create<S, T>(client: Client<T>,
+                    parent: MDataInfo,
+                    name: S,
+                    user_metadata: Vec<u8>)
+                    -> Box<NfsFuture<Writer<T>>>
+    where S: Into<String>,
+          T: 'static
+{
     let name = name.into();
     trace!("Creating file with name {}.", name);
 
@@ -209,7 +225,7 @@ mod tests {
     const ORIG_SIZE: usize = 100;
     const NEW_SIZE: usize = 50;
 
-    fn create_test_file(client: &Client) -> Box<NfsFuture<(MDataInfo, File)>> {
+    fn create_test_file(client: &Client<()>) -> Box<NfsFuture<(MDataInfo, File)>> {
         let user_root = unwrap!(client.user_root_dir());
 
         file_helper::create(client.clone(), user_root.clone(), "hello.txt", Vec::new())

@@ -107,7 +107,7 @@ fn main() {
     }
 
     if args.flag_get_pk {
-        let sign_pk = unwrap!(Client::sign_pk_from_seed(&seed));
+        let sign_pk = unwrap!(Client::<()>::sign_pk_from_seed(&seed));
         return println!("Public Signing Key: {:?}", sign_pk.0);
     }
 

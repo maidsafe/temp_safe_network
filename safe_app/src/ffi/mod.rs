@@ -118,6 +118,30 @@ pub unsafe extern "C" fn app_registered(app_id: *const c_char,
     })
 }
 
+/// Try to restore a failed connection with the network.
+#[no_mangle]
+pub unsafe extern "C" fn app_reconnect(app: *mut App,
+                                       user_data: *mut c_void,
+                                       o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+    let user_data = OpaqueCtx(user_data);
+    let res = (*app).send(move |client, _| {
+                              try_cb!(client.restart_routing().map_err(AppError::from),
+                                      user_data.0,
+                                      o_cb);
+                              o_cb(user_data.0, FFI_RESULT_OK);
+                              None
+                          });
+    if let Err(e) = res {
+        let e = AppError::from(e);
+        let (error_code, description) = ffi_error!(e);
+        o_cb(user_data.0,
+             FfiResult {
+                 error_code,
+                 description: description.as_ptr(),
+             });
+    }
+}
+
 /// Discard and clean up the previously allocated app instance.
 /// Use this only if the app is obtained from one of the auth
 /// functions in this crate. Using `app` after a call to this
@@ -148,7 +172,7 @@ unsafe fn call_network_observer(event: Result<NetworkEvent, AppError>,
 mod tests {
     use super::*;
     use App;
-    use ffi_utils::test_utils::{call_1, send_via_user_data, sender_as_user_data};
+    use ffi_utils::test_utils::{call_0, call_1, send_via_user_data, sender_as_user_data};
     use maidsafe_utilities::serialisation::serialise;
     use safe_core::NetworkEvent;
     use safe_core::ipc::BootstrapConfig;
@@ -186,6 +210,26 @@ mod tests {
 
             let disconnected: i32 = NetworkEvent::Disconnected.into();
             assert_eq!(event, disconnected);
+
+            // Reconnect with the network
+            unsafe { unwrap!(call_0(|ud, cb| app_reconnect(app, ud, cb))) };
+
+            let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            assert_eq!(err_code, 0);
+
+            let connected: i32 = NetworkEvent::Connected.into();
+            assert_eq!(event, connected);
+
+            // The reconnection should be fine if we're already connected.
+            unsafe { unwrap!(call_0(|ud, cb| app_reconnect(app, ud, cb))) };
+
+            let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            assert_eq!(err_code, 0);
+            assert_eq!(event, disconnected);
+
+            let (err_code, event): (i32, i32) = unwrap!(rx.recv_timeout(Duration::from_secs(10)));
+            assert_eq!(err_code, 0);
+            assert_eq!(event, connected);
 
             unsafe { app_free(app) };
         }

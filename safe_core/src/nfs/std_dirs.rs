@@ -28,7 +28,7 @@ use utils::FutureExt;
 /// A registration helper function to create the set of default dirs
 /// in the users root directory.
 /// Note: It does not check whether those might exits already.
-pub fn create_std_dirs(client: Client) -> Box<NfsFuture<()>> {
+pub fn create_std_dirs<T: 'static>(client: Client<T>) -> Box<NfsFuture<()>> {
     let root_dir = fry!(client.user_root_dir());
     let mut creations = vec![];
     for _ in DEFAULT_PRIVATE_DIRS.iter() {

@@ -28,7 +28,9 @@ const PUBLIC_ID_USER_ROOT_ENTRY_KEY: &'static [u8] = b"_publicId";
 const PUBLIC_ID_CONFIG_ROOT_ENTRY_KEY: &'static [u8] = b"public-id";
 
 /// Create mutable data for Public ID.
-pub fn create<T: Into<String>>(client: &Client, public_id: T) -> Box<AuthFuture<()>> {
+pub fn create<S: Into<String>, T: 'static>(client: &Client<T>,
+                                           public_id: S)
+                                           -> Box<AuthFuture<()>> {
     // TODO: This could be optimized by executing the operations in parallel.
     // The operations to parallelise are:
     //     1. Insert the Public ID mdata info into the user root.
@@ -119,7 +121,7 @@ pub fn create<T: Into<String>>(client: &Client, public_id: T) -> Box<AuthFuture<
 }
 
 /// Retrieve the Public ID string.
-pub fn get(client: &Client) -> Box<AuthFuture<String>> {
+pub fn get<T: 'static>(client: &Client<T>) -> Box<AuthFuture<String>> {
     let client = client.clone();
 
     client

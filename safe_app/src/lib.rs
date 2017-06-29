@@ -167,7 +167,7 @@ impl App {
     fn new<N, F>(mut network_observer: N, setup: F) -> Result<Self, AppError>
         where N: FnMut(Result<NetworkEvent, AppError>) + Send + 'static,
               F: FnOnce(Handle, CoreMsgTx<AppContext>, NetworkTx)
-                        -> Result<(Client, AppContext), AppError> + Send + 'static
+                        -> Result<(Client<AppContext>, AppContext), AppError> + Send + 'static
     {
         let (tx, rx) = std_mpsc::sync_channel(0);
 
@@ -200,8 +200,8 @@ impl App {
 
     /// Send a message to app's event loop
     pub fn send<F>(&self, f: F) -> Result<(), AppError>
-        where F: FnOnce(&Client, &AppContext) -> Option<Box<Future<Item=(), Error=()>>>
-                 + Send + 'static
+        where F: FnOnce(&Client<AppContext>, &AppContext)
+                        -> Option<Box<Future<Item = (), Error = ()>>> + Send + 'static
     {
         let msg = CoreMsg::new(f);
         let core_tx = unwrap!(self.core_tx.lock());
@@ -281,13 +281,15 @@ impl AppContext {
     }
 
     /// Refresh access info by fetching it from the network.
-    pub fn refresh_access_info(&self, client: &Client) -> Box<AppFuture<()>> {
+    pub fn refresh_access_info(&self, client: &Client<AppContext>) -> Box<AppFuture<()>> {
         let reg = fry!(self.as_registered()).clone();
         refresh_access_info(reg, client)
     }
 
     /// Fetch a list of container names that this app has access to
-    pub fn get_container_names(&self, client: &Client) -> Box<AppFuture<BTreeSet<String>>> {
+    pub fn get_container_names(&self,
+                               client: &Client<AppContext>)
+                               -> Box<AppFuture<BTreeSet<String>>> {
         let reg = fry!(self.as_registered()).clone();
 
         fetch_access_info(reg.clone(), client)
@@ -300,7 +302,7 @@ impl AppContext {
 
     /// Fetch mdata_info for the given container name.
     pub fn get_container_mdata_info<T: Into<String>>(&self,
-                                                     client: &Client,
+                                                     client: &Client<AppContext>,
                                                      name: T)
                                                      -> Box<AppFuture<MDataInfo>> {
         let reg = fry!(self.as_registered()).clone();
@@ -319,7 +321,7 @@ impl AppContext {
 
     /// Check the given permission for the given directory.
     pub fn is_permitted<T: Into<String>>(&self,
-                                         client: &Client,
+                                         client: &Client<AppContext>,
                                          name: T,
                                          permission: Permission)
                                          -> Box<AppFuture<bool>> {
@@ -345,28 +347,28 @@ impl AppContext {
     }
 }
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
-fn refresh_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<()>> {
+fn refresh_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> Box<AppFuture<()>> {
     let entry_key = fry!(access_container_enc_key(&context.app_id,
                                                   &context.sym_enc_key,
                                                   &context.access_container_info.nonce));
 
-    client.get_mdata_value(context.access_container_info.id,
-                           context.access_container_info.tag,
-                           entry_key)
+    client
+        .get_mdata_value(context.access_container_info.id,
+                         context.access_container_info.tag,
+                         entry_key)
         .map_err(AppError::from)
         .and_then(move |value| {
-            let encoded = utils::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
-            let decoded = deserialise(&encoded)?;
+                      let encoded = utils::symmetric_decrypt(&value.content, &context.sym_enc_key)?;
+                      let decoded = deserialise(&encoded)?;
 
-            *context.access_info.borrow_mut() = decoded;
+                      *context.access_info.borrow_mut() = decoded;
 
-            Ok(())
-        })
+                      Ok(())
+                  })
         .into_box()
 }
 
-fn fetch_access_info(context: Rc<Registered>, client: &Client) -> Box<AppFuture<()>> {
+fn fetch_access_info(context: Rc<Registered>, client: &Client<AppContext>) -> Box<AppFuture<()>> {
     if context.access_info.borrow().is_empty() {
         refresh_access_info(context, client)
     } else {
