@@ -143,7 +143,8 @@ impl Vault {
             Event::SectionSplit(_) |
             Event::SectionMerge(_) |
             Event::Connected |
-            Event::Tick => {
+            Event::Tick |
+            Event::ProxyRateLimitExceeded(_) => {
                 res = EventResult::Ignored;
                 Ok(())
             }
