@@ -30,43 +30,43 @@ use utils;
 // Helper macro to receive a routing event and assert it's a response
 // success.
 macro_rules! expect_success {
-        ($rx:expr, $msg_id:expr, $res:path) => {
-            match unwrap!($rx.recv_timeout(Duration::from_secs(10))) {
-                Event::Response {
-                    response: $res { res, msg_id, }, ..
-                } => {
-                    assert_eq!(msg_id, $msg_id);
+    ($rx:expr, $msg_id:expr, $res:path) => {
+        match unwrap!($rx.recv_timeout(Duration::from_secs(10))) {
+            Event::Response {
+                response: $res { res, msg_id, }, ..
+            } => {
+                assert_eq!(msg_id, $msg_id);
 
-                    match res {
-                        Ok(value) => value,
-                        Err(err) => panic!("Unexpected error {:?}", err),
-                    }
+                match res {
+                    Ok(value) => value,
+                    Err(err) => panic!("Unexpected error {:?}", err),
                 }
-                event => panic!("Unexpected event {:?}", event),
             }
+            event => panic!("Unexpected event {:?}", event),
         }
     }
+}
 
 // Helper macro to receive a routing event and assert it's a response
 // failure.
 macro_rules! expect_failure {
-        ($rx:expr, $msg_id:expr, $res:path, $err:pat) => {
-            match unwrap!($rx.recv_timeout(Duration::from_secs(10))) {
-                Event::Response {
-                    response: $res { res, msg_id, }, ..
-                } => {
-                    assert_eq!(msg_id, $msg_id);
+    ($rx:expr, $msg_id:expr, $res:path, $err:pat) => {
+        match unwrap!($rx.recv_timeout(Duration::from_secs(10))) {
+            Event::Response {
+                response: $res { res, msg_id, }, ..
+            } => {
+                assert_eq!(msg_id, $msg_id);
 
-                    match res {
-                        Ok(_) => panic!("Unexpected success"),
-                        Err($err) => (),
-                        Err(err) => panic!("Unexpected error {:?}", err),
-                    }
+                match res {
+                    Ok(_) => panic!("Unexpected success"),
+                    Err($err) => (),
+                    Err(err) => panic!("Unexpected error {:?}", err),
                 }
-                event => panic!("Unexpected event {:?}", event),
             }
+            event => panic!("Unexpected event {:?}", event),
         }
     }
+}
 
 #[test]
 fn immutable_data_basics() {
@@ -937,6 +937,37 @@ fn balance_check() {
                     msg_id,
                     Response::PutIData,
                     ClientError::LowBalance);
+}
+
+#[test]
+fn simulate_rate_limit_errors() {
+    let (mut routing, routing_rx, full_id) = setup();
+    let owner_key = *full_id.public_id().signing_public_key();
+    let client_mgr = create_account(&mut routing, &routing_rx, owner_key);
+
+    // Initialy the request should succeed.
+    let msg_id = MessageId::new();
+    unwrap!(routing.get_account_info(client_mgr, msg_id));
+    let _ = expect_success!(routing_rx, msg_id, Response::GetAccountInfo);
+
+    // The next `failure_count` requests should fail on rate limit error.
+    let failure_count = 2;
+    routing.simulate_rate_limit_errors(failure_count);
+
+    for _ in 0..failure_count {
+        let msg_id = MessageId::new();
+        unwrap!(routing.get_account_info(client_mgr, msg_id));
+
+        match unwrap!(routing_rx.recv()) {
+            Event::ProxyRateLimitExceeded(resp_msg_id) => assert_eq!(resp_msg_id, msg_id),
+            x => panic!("Unexpected {:?}", x),
+        }
+    }
+
+    // The next request should succeed again.
+    let msg_id = MessageId::new();
+    unwrap!(routing.get_account_info(client_mgr, msg_id));
+    let _ = expect_success!(routing_rx, msg_id, Response::GetAccountInfo);
 }
 
 fn setup() -> (Routing, Receiver<Event>, FullId) {

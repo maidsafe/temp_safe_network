@@ -71,6 +71,7 @@ pub struct Routing {
     client_auth: Authority<XorName>,
     max_ops_countdown: Option<Cell<u64>>,
     timeout_simulation: bool,
+    rate_limit_error_count: Cell<usize>,
 }
 
 impl Routing {
@@ -97,6 +98,7 @@ impl Routing {
                client_auth: client_auth,
                max_ops_countdown: None,
                timeout_simulation: false,
+               rate_limit_error_count: Cell::new(0),
            })
     }
 
@@ -105,7 +107,7 @@ impl Routing {
                             dst: Authority<XorName>,
                             msg_id: MessageId)
                             -> Result<(), InterfaceError> {
-        if self.timeout_simulation {
+        if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
@@ -140,7 +142,7 @@ impl Routing {
                      data: ImmutableData,
                      msg_id: MessageId)
                      -> Result<(), InterfaceError> {
-        if self.timeout_simulation {
+        if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
@@ -182,7 +184,7 @@ impl Routing {
                      name: XorName,
                      msg_id: MessageId)
                      -> Result<(), InterfaceError> {
-        if self.timeout_simulation {
+        if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
@@ -215,7 +217,7 @@ impl Routing {
                      msg_id: MessageId,
                      _requester: sign::PublicKey)
                      -> Result<(), InterfaceError> {
-        if self.timeout_simulation {
+        if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
@@ -618,7 +620,7 @@ impl Routing {
                                       dst: Authority<XorName>,
                                       msg_id: MessageId)
                                       -> Result<(), InterfaceError> {
-        if self.timeout_simulation {
+        if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
@@ -655,7 +657,7 @@ impl Routing {
                         version: u64,
                         msg_id: MessageId)
                         -> Result<(), InterfaceError> {
-        if self.timeout_simulation {
+        if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
@@ -699,7 +701,7 @@ impl Routing {
                         version: u64,
                         msg_id: MessageId)
                         -> Result<(), InterfaceError> {
-        if self.timeout_simulation {
+        if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
@@ -746,14 +748,21 @@ impl Routing {
             dst: dst,
         };
 
-        let sender = self.sender.clone();
+        self.send_event(delay_ms, event)
+    }
 
-        let _ = thread::named(DELAY_THREAD_NAME, move || {
-            std::thread::sleep(Duration::from_millis(delay_ms));
-            if let Err(err) = sender.send(event) {
-                error!("mpsc-send failure: {:?}", err);
-            }
-        });
+    fn send_event(&self, delay_ms: u64, event: Event) {
+        if delay_ms > 0 {
+            let sender = self.sender.clone();
+            let _ = thread::named(DELAY_THREAD_NAME, move || {
+                std::thread::sleep(Duration::from_millis(delay_ms));
+                if let Err(err) = sender.send(event) {
+                    error!("mpsc-send failure: {:?}", err);
+                }
+            });
+        } else if let Err(err) = self.sender.send(event) {
+            error!("mpsc-send failure: {:?}", err);
+        }
     }
 
     fn client_name(&self) -> XorName {
@@ -837,7 +846,7 @@ impl Routing {
         where F: FnOnce(MutableData, &mut Vault) -> Result<R, ClientError>,
               G: FnOnce(Result<R, ClientError>) -> Response
     {
-        if self.timeout_simulation {
+        if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
 
@@ -900,22 +909,6 @@ impl Routing {
         }
     }
 
-    #[cfg(any(feature = "testing", test))]
-    pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
-        self.max_ops_countdown = max_ops_count.map(Cell::new)
-    }
-
-    #[cfg(any(feature = "testing", test))]
-    pub fn simulate_disconnect(&self) {
-        let sender = self.sender.clone();
-        let _ = std::thread::spawn(move || unwrap!(sender.send(Event::Terminate)));
-    }
-
-    #[cfg(any(feature = "testing", test))]
-    pub fn set_simulate_timeout(&mut self, enable: bool) {
-        self.timeout_simulation = enable;
-    }
-
     pub fn bootstrap_config() -> Result<BootstrapConfig, InterfaceError> {
         Ok(BootstrapConfig::default())
     }
@@ -951,8 +944,44 @@ impl Routing {
                  })
     }
 
+    fn simulate_network_errors(&self, msg_id: MessageId) -> bool {
+        if self.timeout_simulation {
+            return true;
+        }
+
+        if self.rate_limit_error_count.get() > 0 {
+            self.rate_limit_error_count
+                .set(self.rate_limit_error_count.get() - 1);
+            self.send_event(0, Event::ProxyRateLimitExceeded(msg_id));
+            return true;
+        }
+
+        false
+    }
+
     fn client_key(&self) -> &sign::PublicKey {
         self.full_id.public_id().signing_public_key()
+    }
+}
+
+#[cfg(any(feature = "testing", test))]
+impl Routing {
+    pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
+        self.max_ops_countdown = max_ops_count.map(Cell::new)
+    }
+
+    pub fn simulate_disconnect(&self) {
+        let sender = self.sender.clone();
+        let _ = std::thread::spawn(move || unwrap!(sender.send(Event::Terminate)));
+    }
+
+    pub fn set_simulate_timeout(&mut self, enable: bool) {
+        self.timeout_simulation = enable;
+    }
+
+    // The following `count` requests will fail with exceeded rate limit.
+    pub fn simulate_rate_limit_errors(&mut self, count: usize) {
+        self.rate_limit_error_count = Cell::new(count);
     }
 }
 
