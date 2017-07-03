@@ -190,14 +190,12 @@ impl Routing {
 
         let res = if let Err(err) = self.verify_network_limits(msg_id, "get_idata") {
             Err(err)
+        } else if let Err(err) = vault.authorise_read(&dst, &name) {
+            Err(err)
         } else {
-            if let Err(err) = vault.authorise_read(&dst, &name) {
-                Err(err)
-            } else {
-                match vault.get_data(&DataId::immutable(name)) {
-                    Some(Data::Immutable(data)) => Ok(data),
-                    _ => Err(ClientError::NoSuchData),
-                }
+            match vault.get_data(&DataId::immutable(name)) {
+                Some(Data::Immutable(data)) => Ok(data),
+                _ => Err(ClientError::NoSuchData),
             }
         };
 
@@ -670,13 +668,11 @@ impl Routing {
             };
 
             let mut vault = lock_vault(true);
-            let res = if let Some(account) = vault.get_account_mut(&name) {
+            if let Some(account) = vault.get_account_mut(&name) {
                 account.ins_auth_key(key, version)
             } else {
                 Err(ClientError::NoSuchAccount)
-            };
-
-            res
+            }
         };
 
 
@@ -710,13 +706,11 @@ impl Routing {
             };
 
             let mut vault = lock_vault(true);
-            let res = if let Some(account) = vault.get_account_mut(&name) {
+            if let Some(account) = vault.get_account_mut(&name) {
                 account.del_auth_key(&key, version)
             } else {
                 Err(ClientError::NoSuchAccount)
-            };
-
-            res
+            }
         };
 
         self.send_response(DEL_AUTH_KEY_DELAY_MS,
