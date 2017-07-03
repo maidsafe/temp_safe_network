@@ -238,6 +238,19 @@ extern crate tiny_keccak;
 #[macro_use]
 extern crate unwrap;
 
+macro_rules! log_or_panic {
+    ($log_level:expr, $($arg:tt)*) => {{
+        use std::thread;
+        use log::LogLevel;
+
+        if cfg!(any(test, feature = "use-mock-crust")) && !thread::panicking() {
+            panic!($($arg)*);
+        } else {
+            log!($log_level, $($arg)*);
+        }
+    }};
+}
+
 /// For unit and integration tests only
 #[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]
 #[macro_use]

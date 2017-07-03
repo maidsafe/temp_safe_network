@@ -101,7 +101,14 @@ impl Mutation {
 
     /// Apply the mutation to the mutable data, without performing any validations.
     pub fn apply(&self, data: &mut MutableData) {
-        assert_eq!(DataId::Mutable(data.id()), self.data_id());
+        let data_id = DataId::Mutable(data.id());
+        if data_id != self.data_id() {
+            log_or_panic!(LogLevel::Error,
+                          "invalid data for mutation ({:?} instead of {:?})",
+                          data_id,
+                          self.data_id());
+            return;
+        }
 
         match *self {
             Mutation::MutateMDataEntries { ref actions, .. } => {
@@ -127,7 +134,11 @@ impl Mutation {
                     let _ = data.change_owner_without_validation(*owner, version);
                 }
             }
-            _ => panic!("incompatible mutation ({:?})", self.mutation_type()),
+            _ => {
+                log_or_panic!(LogLevel::Error,
+                              "incompatible mutation ({:?})",
+                              self.mutation_type())
+            }
         }
     }
 }
