@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
+use log::LogLevel;
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName};
 use rust_sodium::crypto::sign;

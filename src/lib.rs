@@ -225,6 +225,7 @@ extern crate config_file_handler;
 extern crate quick_error;
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate rand;
+#[macro_use]
 extern crate routing;
 #[cfg(not(feature = "use-mock-crypto"))]
 extern crate rust_sodium;
@@ -237,19 +238,6 @@ extern crate tempdir;
 extern crate tiny_keccak;
 #[macro_use]
 extern crate unwrap;
-
-macro_rules! log_or_panic {
-    ($log_level:expr, $($arg:tt)*) => {{
-        use std::thread;
-        use log::LogLevel;
-
-        if cfg!(any(test, feature = "use-mock-crust")) && !thread::panicking() {
-            panic!($($arg)*);
-        } else {
-            log!($log_level, $($arg)*);
-        }
-    }};
-}
 
 /// For unit and integration tests only
 #[cfg(any(feature = "use-mock-crust", feature = "use-mock-routing"))]

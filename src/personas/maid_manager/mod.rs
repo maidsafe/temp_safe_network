@@ -589,7 +589,7 @@ impl MaidManager {
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete: Vec<_> = self.request_cache
             .iter()
-            .filter_map(|(msg_id, entry)| if accounts_to_delete.contains(&entry.src.name()) {
+            .filter_map(|(msg_id, entry)| if accounts_to_delete.contains(entry.src.name()) {
                             Some(*msg_id)
                         } else {
                             None
