@@ -260,6 +260,7 @@ pub mod test_utils;
 #[cfg(all(feature = "use-mock-crust", not(feature = "use-mock-routing")))]
 pub mod mock_crust_detail;
 
+mod authority;
 mod cache;
 mod chunk_store;
 mod config_handler;

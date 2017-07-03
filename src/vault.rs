@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use authority::{ClientAuthority, ClientManagerAuthority};
 use cache::Cache;
 #[cfg(feature = "use-mock-crust")]
 use chunk_store::Error as ChunkStoreError;
@@ -204,11 +205,20 @@ impl Vault {
                     .handle_group_refresh(&mut self.routing_node, &serialised_msg)
             }
             // ========== GetAccountInfo ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::GetAccountInfo(msg_id)) => {
                 self.maid_manager
-                    .handle_get_account_info(&mut self.routing_node, src, dst, msg_id)
+                    .handle_get_account_info(&mut self.routing_node,
+                                             ClientAuthority {
+                                                 client_id,
+                                                 proxy_node_name,
+                                             },
+                                             ClientManagerAuthority(dst_name),
+                                             msg_id)
             }
             // ========== GetIData ==========
             (Authority::Client { .. },
@@ -221,11 +231,21 @@ impl Vault {
                     .handle_get_idata(&mut self.routing_node, src, dst, name, msg_id)
             }
             // ========== PutIData ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::PutIData { data, msg_id }) => {
                 self.maid_manager
-                    .handle_put_idata(&mut self.routing_node, src, dst, data, msg_id)
+                    .handle_put_idata(&mut self.routing_node,
+                                      ClientAuthority {
+                                          client_id,
+                                          proxy_node_name,
+                                      },
+                                      ClientManagerAuthority(dst_name),
+                                      data,
+                                      msg_id)
             }
             (Authority::ClientManager(_),
              Authority::NaeManager(_),
@@ -234,15 +254,26 @@ impl Vault {
                     .handle_put_idata(&mut self.routing_node, src, dst, data, msg_id)
             }
             // ========== PutMData ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::PutMData {
                  data,
                  msg_id,
                  requester,
              }) => {
                 self.maid_manager
-                    .handle_put_mdata(&mut self.routing_node, src, dst, data, msg_id, requester)
+                    .handle_put_mdata(&mut self.routing_node,
+                                      ClientAuthority {
+                                          client_id,
+                                          proxy_node_name,
+                                      },
+                                      ClientManagerAuthority(dst_name),
+                                      data,
+                                      msg_id,
+                                      requester)
             }
             (Authority::ClientManager(_),
              Authority::NaeManager(_),
@@ -341,8 +372,11 @@ impl Vault {
                                             msg_id)
             }
             // ========== MutateMDataEntries ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::MutateMDataEntries {
                  name,
                  tag,
@@ -352,8 +386,11 @@ impl Vault {
              }) => {
                 self.maid_manager
                     .handle_mutate_mdata_entries(&mut self.routing_node,
-                                                 src,
-                                                 dst,
+                                                 ClientAuthority {
+                                                     client_id,
+                                                     proxy_node_name,
+                                                 },
+                                                 ClientManagerAuthority(dst_name),
                                                  name,
                                                  tag,
                                                  actions,
@@ -421,8 +458,11 @@ impl Vault {
                                                         msg_id)
             }
             // ========== SetMDataUserPermissions ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::SetMDataUserPermissions {
                  name,
                  tag,
@@ -434,8 +474,11 @@ impl Vault {
              }) => {
                 self.maid_manager
                     .handle_set_mdata_user_permissions(&mut self.routing_node,
-                                                       src,
-                                                       dst,
+                                                       ClientAuthority {
+                                                           client_id,
+                                                           proxy_node_name,
+                                                       },
+                                                       ClientManagerAuthority(dst_name),
                                                        name,
                                                        tag,
                                                        user,
@@ -468,8 +511,11 @@ impl Vault {
                                                        requester)
             }
             // ========== DelMDataUserPermissions ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::DelMDataUserPermissions {
                  name,
                  tag,
@@ -480,8 +526,11 @@ impl Vault {
              }) => {
                 self.maid_manager
                     .handle_del_mdata_user_permissions(&mut self.routing_node,
-                                                       src,
-                                                       dst,
+                                                       ClientAuthority {
+                                                           client_id,
+                                                           proxy_node_name,
+                                                       },
+                                                       ClientManagerAuthority(dst_name),
                                                        name,
                                                        tag,
                                                        user,
@@ -511,8 +560,11 @@ impl Vault {
                                                        requester)
             }
             // ========== ChangeMDataOwner ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::ChangeMDataOwner {
                  name,
                  tag,
@@ -522,15 +574,18 @@ impl Vault {
              }) => {
                 self.maid_manager
                     .handle_change_mdata_owner(&mut self.routing_node,
-                                               src,
-                                               dst,
+                                               ClientAuthority {
+                                                   client_id,
+                                                   proxy_node_name,
+                                               },
+                                               ClientManagerAuthority(dst_name),
                                                name,
                                                tag,
                                                new_owners,
                                                version,
                                                msg_id)
             }
-            (Authority::ClientManager(_),
+            (Authority::ClientManager(src_name),
              Authority::NaeManager(_),
              Request::ChangeMDataOwner {
                  name,
@@ -541,7 +596,7 @@ impl Vault {
              }) => {
                 self.data_manager
                     .handle_change_mdata_owner(&mut self.routing_node,
-                                               src,
+                                               ClientManagerAuthority(src_name),
                                                dst,
                                                name,
                                                tag,
@@ -550,33 +605,64 @@ impl Vault {
                                                msg_id)
             }
             // ========== ListAuthKeysAndVersion ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::ListAuthKeysAndVersion(msg_id)) => {
                 self.maid_manager
-                    .handle_list_auth_keys_and_version(&mut self.routing_node, src, dst, msg_id)
+                    .handle_list_auth_keys_and_version(&mut self.routing_node,
+                                                       ClientAuthority {
+                                                           client_id,
+                                                           proxy_node_name,
+                                                       },
+                                                       ClientManagerAuthority(dst_name),
+                                                       msg_id)
             }
             // ========== InsAuthKey ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::InsAuthKey {
                  key,
                  version,
                  msg_id,
              }) => {
                 self.maid_manager
-                    .handle_ins_auth_key(&mut self.routing_node, src, dst, key, version, msg_id)
+                    .handle_ins_auth_key(&mut self.routing_node,
+                                         ClientAuthority {
+                                             client_id,
+                                             proxy_node_name,
+                                         },
+                                         ClientManagerAuthority(dst_name),
+                                         key,
+                                         version,
+                                         msg_id)
             }
             // ========== DelAuthKey ==========
-            (Authority::Client { .. },
-             Authority::ClientManager(_),
+            (Authority::Client {
+                 client_id,
+                 proxy_node_name,
+             },
+             Authority::ClientManager(dst_name),
              Request::DelAuthKey {
                  key,
                  version,
                  msg_id,
              }) => {
                 self.maid_manager
-                    .handle_del_auth_key(&mut self.routing_node, src, dst, key, version, msg_id)
+                    .handle_del_auth_key(&mut self.routing_node,
+                                         ClientAuthority {
+                                             client_id,
+                                             proxy_node_name,
+                                         },
+                                         ClientManagerAuthority(dst_name),
+                                         key,
+                                         version,
+                                         msg_id)
             }
 
             // ========== Invalid Request ==========
