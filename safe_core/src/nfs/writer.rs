@@ -16,11 +16,9 @@
 // relating to use of the SAFE Network Software.
 
 use chrono::Utc;
-use client::{Client, MDataInfo};
-use futures::{Future, future};
-use maidsafe_utilities::serialisation::serialise;
+use client::Client;
+use futures::Future;
 use nfs::{File, NfsFuture, data_map};
-use routing::EntryActions;
 use self_encryption::SequentialEncryptor;
 use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
@@ -29,8 +27,8 @@ use utils::FutureExt;
 pub enum Mode {
     /// Will create new data
     Overwrite,
-    /// Will modify the existing data
-    Modify,
+    /// Will append content to the existing data
+    Append,
 }
 
 /// Writer is used to write contents to a File and especially in chunks if the
@@ -38,10 +36,7 @@ pub enum Mode {
 pub struct Writer<T> {
     client: Client<T>,
     file: File,
-    parent: MDataInfo,
-    file_name: String,
     self_encryptor: SequentialEncryptor<SelfEncryptionStorage<T>>,
-    version: Option<u64>,
 }
 
 impl<T: 'static> Writer<T> {
@@ -49,34 +44,27 @@ impl<T: 'static> Writer<T> {
     pub fn new(client: Client<T>,
                storage: SelfEncryptionStorage<T>,
                mode: Mode,
-               parent: MDataInfo,
-               file: File,
-               file_name: String,
-               version: Option<u64>)
+               file: File)
                -> Box<NfsFuture<Writer<T>>> {
         let fut = match mode {
-            Mode::Modify => {
+            Mode::Append => {
                 data_map::get(&client, file.data_map_name())
                     .map(Some)
                     .into_box()
             }
-            Mode::Overwrite => future::ok(None).into_box(),
+            Mode::Overwrite => ok!(None),
         };
-
         let client = client.clone();
         fut.and_then(move |data_map| {
                           SequentialEncryptor::new(storage, data_map).map_err(From::from)
                       })
-            .map(move |encryptor| {
-                Writer {
-                    client: client,
-                    parent: parent,
-                    file: file,
-                    self_encryptor: encryptor,
-                    file_name: file_name,
-                    version: version,
-                }
-            })
+            .map(move |self_encryptor| {
+                     Writer {
+                         client,
+                         file,
+                         self_encryptor,
+                     }
+                 })
             .map_err(From::from)
             .into_box()
     }
@@ -93,44 +81,24 @@ impl<T: 'static> Writer<T> {
 
     /// close is invoked only after all the data is completely written. The
     /// file/blob is saved only when the close is invoked. Returns the final
-    /// `File` that was written to the network.
+    /// `File` with the data_map stored on the network.
     pub fn close(self) -> Box<NfsFuture<File>> {
         trace!("Writer induced self-encryptor close.");
 
         let mut file = self.file;
-        let parent = self.parent;
-        let file_name = self.file_name;
         let size = self.self_encryptor.len();
-        let version = self.version;
-
         let client = self.client;
-        let client2 = client.clone();
 
         self.self_encryptor
             .close()
             .map_err(From::from)
             .and_then(move |(data_map, _)| data_map::put(&client, &data_map))
-            .and_then(move |data_map_name| {
-                file.set_data_map_name(data_map_name);
-                file.set_modified_time(Utc::now());
-                file.set_size(size);
-
-                let key = fry!(parent.enc_entry_key(file_name.as_bytes()));
-                let plaintext = fry!(serialise(&file));
-                let ciphertext = fry!(parent.enc_entry_value(&plaintext));
-
-                let actions = if let Some(version) = version {
-                    EntryActions::new().update(key, ciphertext, version)
-                } else {
-                    EntryActions::new().ins(key, ciphertext, 0)
-                };
-
-                client2
-                    .mutate_mdata_entries(parent.name, parent.type_tag, actions.into())
-                    .map(move |_| file)
-                    .map_err(From::from)
-                    .into_box()
-            })
+            .map(move |data_map_name| {
+                     file.set_data_map_name(data_map_name);
+                     file.set_modified_time(Utc::now());
+                     file.set_size(size);
+                     file
+                 })
             .into_box()
     }
 }

@@ -15,26 +15,44 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use App;
+use {App, AppContext};
 use errors::AppError;
 use ffi::helper::send_with_mdata_info;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use futures::Future;
-use object_cache::MDataInfoHandle;
+use object_cache::{FileHandle, MDataInfoHandle};
 use safe_core::FutureExt;
+use safe_core::nfs::{Mode, Reader, Writer, file_helper};
 use safe_core::nfs::File as NativeFile;
 use safe_core::nfs::ffi::File;
-use safe_core::nfs::file_helper;
+use std::{ptr, slice};
 use std::os::raw::{c_char, c_void};
-use std::ptr;
+
+/// Holds context for file operations, depending on the mode.
+pub struct FileContext {
+    reader: Option<Reader<AppContext>>,
+    writer: Option<Writer<AppContext>>,
+}
+
+/// Replaces the entire content of the file when writing data.
+pub static OPEN_MODE_OVERWRITE: u64 = 1;
+/// Appends to existing data in the file.
+pub static OPEN_MODE_APPEND: u64 = 2;
+/// Open file to read.
+pub static OPEN_MODE_READ: u64 = 4;
+/// Read entire contents of a file.
+pub static FILE_READ_TO_END: u64 = 0;
 
 /// Retrieve file with the given name, and its version, from the directory.
 #[no_mangle]
-pub unsafe extern "C" fn file_fetch(app: *const App,
-                                    parent_h: MDataInfoHandle,
-                                    file_name: *const c_char,
-                                    user_data: *mut c_void,
-                                    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File, u64)) {
+pub unsafe extern "C" fn dir_fetch_file(app: *const App,
+                                        parent_h: MDataInfoHandle,
+                                        file_name: *const c_char,
+                                        user_data: *mut c_void,
+                                        o_cb: extern "C" fn(*mut c_void,
+                                                            FfiResult,
+                                                            *const File,
+                                                            u64)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file_name = from_c_str(file_name)?;
         let user_data = OpaqueCtx(user_data);
@@ -68,12 +86,12 @@ pub unsafe extern "C" fn file_fetch(app: *const App,
 
 /// Insert the file into the parent directory.
 #[no_mangle]
-pub unsafe extern "C" fn file_insert(app: *const App,
-                                     parent_h: MDataInfoHandle,
-                                     file_name: *const c_char,
-                                     file: *const File,
-                                     user_data: *mut c_void,
-                                     o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn dir_insert_file(app: *const App,
+                                         parent_h: MDataInfoHandle,
+                                         file_name: *const c_char,
+                                         file: *const File,
+                                         user_data: *mut c_void,
+                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
@@ -84,16 +102,16 @@ pub unsafe extern "C" fn file_insert(app: *const App,
     })
 }
 
-/// Update (replace) file at the given name with the new file.
+/// Replace the file in the parent directory.
 /// If `version` is 0, the correct version is obtained automatically.
 #[no_mangle]
-pub unsafe extern "C" fn file_update(app: *const App,
-                                     parent_h: MDataInfoHandle,
-                                     file_name: *const c_char,
-                                     file: *const File,
-                                     version: u64,
-                                     user_data: *mut c_void,
-                                     o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+pub unsafe extern "C" fn dir_update_file(app: *const App,
+                                         parent_h: MDataInfoHandle,
+                                         file_name: *const c_char,
+                                         file: *const File,
+                                         version: u64,
+                                         user_data: *mut c_void,
+                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
     catch_unwind_cb(user_data, o_cb, || {
         let file = NativeFile::clone_from_repr_c(file)?;
         let file_name = from_c_str(file_name)?;
@@ -104,24 +122,259 @@ pub unsafe extern "C" fn file_update(app: *const App,
     })
 }
 
+/// Delete the file in the parent directory.
+#[no_mangle]
+pub unsafe extern "C" fn dir_delete_file(app: *const App,
+                                         parent_h: MDataInfoHandle,
+                                         file_name: *const c_char,
+                                         version: u64,
+                                         user_data: *mut c_void,
+                                         o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let file_name = from_c_str(file_name)?;
+        send_with_mdata_info(app, parent_h, user_data, o_cb, move |client, _, parent| {
+            file_helper::delete(client, parent, file_name, version)
+        })
+    })
+}
+
+/// Open the file to read of write its contents
+#[no_mangle]
+pub unsafe extern "C" fn file_open(app: *const App,
+                                   file: *const File,
+                                   open_mode: u64,
+                                   user_data: *mut c_void,
+                                   o_cb: extern "C" fn(*mut c_void, FfiResult, FileHandle)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let file = NativeFile::clone_from_repr_c(file)?;
+
+        (*app).send(move |client, context| {
+            let context = context.clone();
+
+            // Initialise the reader if OPEN_MODE_READ is requested
+            let reader = if open_mode & OPEN_MODE_READ != 0 {
+                file_helper::read(client.clone(), &file)
+                    .map(Some)
+                    .into_box()
+            } else {
+                ok!(None)
+            };
+
+            // Initialise the writer if one of write modes is requested
+            let writer = if open_mode & (OPEN_MODE_OVERWRITE | OPEN_MODE_APPEND) != 0 {
+                let writer_mode = if open_mode & OPEN_MODE_APPEND != 0 {
+                    Mode::Append
+                } else {
+                    Mode::Overwrite
+                };
+                file_helper::write(client.clone(), file, writer_mode)
+                    .map(Some)
+                    .into_box()
+            } else {
+                ok!(None)
+            };
+
+            reader
+                .join(writer)
+                .map(move |(reader, writer)| {
+                         let file_ctx = FileContext { reader, writer };
+                         let file_h = context.object_cache().insert_file(file_ctx);
+                         o_cb(user_data.0, FFI_RESULT_OK, file_h);
+                     })
+                .map_err(move |err| {
+                    let err = AppError::from(err);
+                    let (error_code, description) = ffi_error!(err);
+                    o_cb(user_data.0,
+                         FfiResult {
+                             error_code,
+                             description: description.as_ptr(),
+                         },
+                         0);
+                })
+                .into_box()
+                .into()
+        })
+    })
+}
+
+/// Get a size of file opened for read.
+#[no_mangle]
+pub unsafe extern "C" fn file_size(app: *const App,
+                                   file_h: FileHandle,
+                                   user_data: *mut c_void,
+                                   o_cb: extern "C" fn(*mut c_void, FfiResult, u64)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+
+        (*app).send(move |_client, context| {
+            let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
+
+            if let Some(ref reader) = file_ctx.reader {
+                o_cb(user_data.0, FFI_RESULT_OK, reader.size());
+            } else {
+                let (error_code, description) =
+                    ffi_error!(AppError::Unexpected("Invalid file mode".to_owned()));
+                o_cb(user_data.0,
+                     FfiResult {
+                         error_code,
+                         description: description.as_ptr(),
+                     },
+                     0);
+            }
+            None
+        })
+    })
+}
+
+/// Read data from file.
+#[no_mangle]
+pub unsafe extern "C" fn file_read(app: *const App,
+                                   file_h: FileHandle,
+                                   position: u64,
+                                   len: u64,
+                                   user_data: *mut c_void,
+                                   o_cb: extern "C" fn(*mut c_void, FfiResult, *const u8, usize)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+
+        (*app).send(move |_client, context| {
+            let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
+
+            if let Some(ref reader) = file_ctx.reader {
+                reader
+                    .read(position,
+                          if len == FILE_READ_TO_END {
+                              reader.size() - position
+                          } else {
+                              len
+                          })
+                    .map(move |data| {
+                             o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
+                         })
+                    .map_err(move |err| {
+                        let err = AppError::from(err);
+                        let (error_code, description) = ffi_error!(err);
+                        o_cb(user_data.0,
+                             FfiResult {
+                                 error_code,
+                                 description: description.as_ptr(),
+                             },
+                             ptr::null_mut(),
+                             0);
+                    })
+                    .into_box()
+                    .into()
+            } else {
+                let (error_code, description) =
+                    ffi_error!(AppError::Unexpected("Invalid file mode".to_owned()));
+                o_cb(user_data.0,
+                     FfiResult {
+                         error_code,
+                         description: description.as_ptr(),
+                     },
+                     ptr::null_mut(),
+                     0);
+                None
+            }
+        })
+    })
+}
+
+/// Write data to file in smaller chunks.
+#[no_mangle]
+pub unsafe extern "C" fn file_write(app: *const App,
+                                    file_h: FileHandle,
+                                    data: *const u8,
+                                    size: usize,
+                                    user_data: *mut c_void,
+                                    o_cb: extern "C" fn(*mut c_void, FfiResult)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+        let data = slice::from_raw_parts(data, size);
+
+        (*app).send(move |_client, context| {
+            let file_ctx = try_cb!(context.object_cache().get_file(file_h), user_data, o_cb);
+
+            if let Some(ref writer) = file_ctx.writer {
+                writer
+                    .write(data)
+                    .then(move |res| {
+                        let (error_code, description) = ffi_result!(res.map_err(AppError::from));
+                        o_cb(user_data.0,
+                             FfiResult {
+                                 error_code,
+                                 description: description.as_ptr(),
+                             });
+                        Ok(())
+                    })
+                    .into_box()
+                    .into()
+            } else {
+                let (error_code, description) =
+                    ffi_error!(AppError::Unexpected("Invalid file mode".to_owned()));
+                o_cb(user_data.0,
+                     FfiResult {
+                         error_code,
+                         description: description.as_ptr(),
+                     });
+                None
+            }
+        })
+    })
+}
+
+/// Close is invoked only after all the data is completely written. The
+/// file is saved only when `close` is invoked.
+#[no_mangle]
+pub unsafe extern "C" fn file_close(app: *const App,
+                                    file_h: FileHandle,
+                                    user_data: *mut c_void,
+                                    o_cb: extern "C" fn(*mut c_void, FfiResult, *const File)) {
+    catch_unwind_cb(user_data, o_cb, || {
+        let user_data = OpaqueCtx(user_data);
+
+        (*app).send(move |_client, context| {
+            let file_ctx = try_cb!(context.object_cache().remove_file(file_h), user_data, o_cb);
+
+            if let Some(writer) = file_ctx.writer {
+                writer
+                    .close()
+                    .map(move |file| { o_cb(user_data.0, FFI_RESULT_OK, &file.into_repr_c()); })
+                    .map_err(move |err| {
+                        let err = AppError::from(err);
+                        let (error_code, description) = ffi_error!(err);
+                        o_cb(user_data.0,
+                             FfiResult {
+                                 error_code,
+                                 description: description.as_ptr(),
+                             },
+                             ::std::ptr::null());
+                    })
+                    .into_box()
+                    .into()
+            } else {
+                // The reader will be dropped automatically
+                o_cb(user_data.0, FFI_RESULT_OK, ::std::ptr::null());
+                None
+            }
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use App;
     use errors::AppError;
-    use ffi::cipher_opt::CipherOpt;
-    use ffi::immutable_data::*;
     use ffi_utils::ErrorCode;
     use ffi_utils::test_utils::{call_0, call_1, call_2, call_vec_u8};
     use futures::Future;
-    use object_cache::CipherOptHandle;
-    use routing::{XOR_NAME_LEN, XorName};
     use safe_core::ipc::Permission;
     use safe_core::nfs::File as NativeFile;
     use safe_core::nfs::NfsError;
     use std::collections::HashMap;
     use std::ffi::CString;
-    use test_utils::{create_app_with_access, run, run_now};
+    use test_utils::{create_app_with_access, run};
 
     #[test]
     fn basics() {
@@ -147,7 +400,7 @@ mod tests {
 
         // fetching non-existing file fails.
         let res: Result<(NativeFile, u64), i32> = unsafe {
-            call_2(|ud, cb| file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb))
+            call_2(|ud, cb| dir_fetch_file(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb))
         };
 
         match res {
@@ -163,100 +416,187 @@ mod tests {
 
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               file_insert(&app,
-                                           container_info_h,
-                                           ffi_file_name0.as_ptr(),
-                                           &ffi_file,
-                                           ud,
-                                           cb)
+                               dir_insert_file(&app,
+                                               container_info_h,
+                                               ffi_file_name0.as_ptr(),
+                                               &ffi_file,
+                                               ud,
+                                               cb)
                            }))
         }
 
         // Fetch it back.
-        let (retrieved_file, retrieved_version): (NativeFile, u64) = unsafe {
-            unwrap!(call_2(|ud, cb| {
-                               file_fetch(&app, container_info_h, ffi_file_name0.as_ptr(), ud, cb)
-                           }))
-        };
+        let (retrieved_file, retrieved_version): (NativeFile, u64) =
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                                   dir_fetch_file(&app,
+                                                  container_info_h,
+                                                  ffi_file_name0.as_ptr(),
+                                                  ud,
+                                                  cb)
+                               }))
+            };
         assert_eq!(retrieved_file.user_metadata(), &user_metadata[..]);
         assert_eq!(retrieved_file.size(), 0);
         assert_eq!(retrieved_version, 0);
 
-        // Create non-empty file.
-        let cipher_opt_h = run_now(&app, |_, context| {
+        // Delete file.
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                               dir_delete_file(&app,
+                                               container_info_h,
+                                               ffi_file_name0.as_ptr(),
+                                               1,
+                                               ud,
+                                               cb)
+                           }))
+        }
+    }
+
+    // Tests NFS functions for writing and updating file contents.
+    // 1. Create an empty file, open it for writing, write contents.
+    // 2. Insert file into a container.
+    // 3. Fetch the file from a container, check that it has a correct version.
+    // 4. Open the file again, now in a combined append + read mode.
+    // 5. Read the file contents; it should be the same as we have written it.
+    // 6. Append a string to a file contents (by using `OPEN_MODE_APPEND`, _not_
+    // by rewriting the existing data with an appended string).
+    // 7. Update the file in the directory.
+    // 8. Fetch the updated file version again and ensure that it contains
+    // the expected string.
+    #[test]
+    fn open_file() {
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert("_videos".to_string(),
+                                             btree_set![Permission::Read,
+                                                        Permission::Insert,
+                                                        Permission::Update,
+                                                        Permission::Delete]);
+
+        let app = create_app_with_access(container_permissions);
+
+        let container_info_h = run(&app, move |client, context| {
+            let context = context.clone();
+
             context
-                .object_cache()
-                .insert_cipher_opt(CipherOpt::PlainText)
+                .get_container_mdata_info(client, "_videos")
+                .map(move |info| context.object_cache().insert_mdata_info(info))
         });
 
-        let content = b"hello world";
-        let content_name = unsafe { put_file_content(&app, content, cipher_opt_h) };
-
-        let mut file = NativeFile::new(Vec::new());
-        file.set_data_map_name(content_name);
+        // Create non-empty file.
+        let file = NativeFile::new(Vec::new());
         let ffi_file = file.into_repr_c();
 
         let file_name1 = "file1.txt";
         let ffi_file_name1 = unwrap!(CString::new(file_name1));
 
+        let content = b"hello world";
+
+        let write_h = unsafe {
+            unwrap!(call_1(|ud, cb| file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)))
+        };
+
+        let written_file: NativeFile = unsafe {
+            unwrap!(call_0(|ud, cb| {
+                               file_write(&app, write_h, content.as_ptr(), content.len(), ud, cb)
+                           }));
+            unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
+        };
+
         unsafe {
             unwrap!(call_0(|ud, cb| {
-                               file_insert(&app,
-                                           container_info_h,
-                                           ffi_file_name1.as_ptr(),
-                                           &ffi_file,
-                                           ud,
-                                           cb)
+                               dir_insert_file(&app,
+                                               container_info_h,
+                                               ffi_file_name1.as_ptr(),
+                                               &written_file.into_repr_c(),
+                                               ud,
+                                               cb)
                            }))
         }
 
         // Fetch it back.
-        let (file, _version): (NativeFile, u64) = {
+        let (file, version): (NativeFile, u64) = {
             unsafe {
                 unwrap!(call_2(|ud, cb| {
-                                   file_fetch(&app,
-                                              container_info_h,
-                                              ffi_file_name1.as_ptr(),
-                                              ud,
-                                              cb)
+                                   dir_fetch_file(&app,
+                                                  container_info_h,
+                                                  ffi_file_name1.as_ptr(),
+                                                  ud,
+                                                  cb)
                                }))
             }
         };
+        assert_eq!(version, 0);
 
-        // Read the content.
-        let retrieved_content = unsafe { get_file_content(&app, file.data_map_name().0) };
+        // Read the content and append data
+        let read_write_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                               file_open(&app,
+                                         &file.into_repr_c(),
+                                         OPEN_MODE_READ | OPEN_MODE_APPEND,
+                                         ud,
+                                         cb)
+                           }))
+        };
+
+        let retrieved_content = unsafe {
+            unwrap!(call_vec_u8(|ud, cb| {
+                                    file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
+                                }))
+        };
         assert_eq!(retrieved_content, content);
-    }
 
-    // FIXME: rustfmt is choking on this.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    unsafe fn put_file_content(app: &App,
-                               content: &[u8],
-                               cipher_opt_h: CipherOptHandle)
-                               -> XorName {
-        let writer_h = unwrap!(call_1(|ud, cb| idata_new_self_encryptor(app, ud, cb)));
-        unwrap!(call_0(|ud, cb| {
-            idata_write_to_self_encryptor(app, writer_h, content.as_ptr(), content.len(), ud, cb)
-        }));
-        let name = unwrap!(call_1(|ud, cb| {
-            idata_close_self_encryptor(app, writer_h, cipher_opt_h, ud, cb)
-        }));
+        let append_content = b" appended";
 
-        XorName(name)
-    }
+        let written_file: NativeFile = unsafe {
+            unwrap!(call_0(|ud, cb| {
+                               file_write(&app,
+                                          read_write_h,
+                                          append_content.as_ptr(),
+                                          append_content.len(),
+                                          ud,
+                                          cb)
+                           }));
+            unwrap!(call_1(|ud, cb| file_close(&app, read_write_h, ud, cb)))
+        };
 
-    // FIXME: rustfmt is choking on this.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    unsafe fn get_file_content(app: &App, name: [u8; XOR_NAME_LEN]) -> Vec<u8> {
-        let reader_h = unwrap!(call_1(|ud, cb| {
-            idata_fetch_self_encryptor(app, &name, ud, cb)
-        }));
-        let size = unwrap!(call_1(|ud, cb| {
-            idata_size(app, reader_h, ud, cb)
-        }));
+        // Update it in the dir
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                dir_update_file(&app,
+                                container_info_h,
+                                ffi_file_name1.as_ptr(),
+                                &written_file.into_repr_c(),
+                                1,
+                                ud,
+                                cb)
+            }))
+        }
 
-        unwrap!(call_vec_u8(|ud, cb| {
-            idata_read_from_self_encryptor(app, reader_h, 0, size, ud, cb)
-        }))
+        // Read the updated content
+        let (file, version): (NativeFile, u64) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                                   dir_fetch_file(&app,
+                                                  container_info_h,
+                                                  ffi_file_name1.as_ptr(),
+                                                  ud,
+                                                  cb)
+                               }))
+            }
+        };
+        assert_eq!(version, 1);
+
+        let read_h = unsafe {
+            unwrap!(call_1(|ud, cb| file_open(&app, &file.into_repr_c(), OPEN_MODE_READ, ud, cb)))
+        };
+
+        let retrieved_content = unsafe {
+            unwrap!(call_vec_u8(|ud, cb| file_read(&app, read_h, 0, FILE_READ_TO_END, ud, cb)))
+        };
+        assert_eq!(retrieved_content, b"hello world appended");
+
+        let f: *const File = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
+        assert!(f.is_null());
     }
 }
