@@ -20,7 +20,7 @@ use errors::AppError;
 use ffi::helper::send_with_mdata_info;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use futures::Future;
-use object_cache::{FileHandle, MDataInfoHandle};
+use object_cache::{FileContextHandle, MDataInfoHandle};
 use safe_core::FutureExt;
 use safe_core::nfs::{Mode, Reader, Writer, file_helper};
 use safe_core::nfs::File as NativeFile;
@@ -144,7 +144,7 @@ pub unsafe extern "C" fn file_open(app: *const App,
                                    file: *const File,
                                    open_mode: u64,
                                    user_data: *mut c_void,
-                                   o_cb: extern "C" fn(*mut c_void, FfiResult, FileHandle)) {
+                                   o_cb: extern "C" fn(*mut c_void, FfiResult, FileContextHandle)) {
     catch_unwind_cb(user_data, o_cb, || {
         let user_data = OpaqueCtx(user_data);
         let file = NativeFile::clone_from_repr_c(file)?;
@@ -201,7 +201,7 @@ pub unsafe extern "C" fn file_open(app: *const App,
 /// Get a size of file opened for read.
 #[no_mangle]
 pub unsafe extern "C" fn file_size(app: *const App,
-                                   file_h: FileHandle,
+                                   file_h: FileContextHandle,
                                    user_data: *mut c_void,
                                    o_cb: extern "C" fn(*mut c_void, FfiResult, u64)) {
     catch_unwind_cb(user_data, o_cb, || {
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn file_size(app: *const App,
 /// Read data from file.
 #[no_mangle]
 pub unsafe extern "C" fn file_read(app: *const App,
-                                   file_h: FileHandle,
+                                   file_h: FileContextHandle,
                                    position: u64,
                                    len: u64,
                                    user_data: *mut c_void,
@@ -284,7 +284,7 @@ pub unsafe extern "C" fn file_read(app: *const App,
 /// Write data to file in smaller chunks.
 #[no_mangle]
 pub unsafe extern "C" fn file_write(app: *const App,
-                                    file_h: FileHandle,
+                                    file_h: FileContextHandle,
                                     data: *const u8,
                                     size: usize,
                                     user_data: *mut c_void,
@@ -328,7 +328,7 @@ pub unsafe extern "C" fn file_write(app: *const App,
 /// file is saved only when `close` is invoked.
 #[no_mangle]
 pub unsafe extern "C" fn file_close(app: *const App,
-                                    file_h: FileHandle,
+                                    file_h: FileContextHandle,
                                     user_data: *mut c_void,
                                     o_cb: extern "C" fn(*mut c_void, FfiResult, *const File)) {
     catch_unwind_cb(user_data, o_cb, || {

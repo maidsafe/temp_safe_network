@@ -73,7 +73,7 @@ pub type SelfEncryptorWriterHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type SignKeyHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
-pub type FileHandle = ObjectHandle;
+pub type FileContextHandle = ObjectHandle;
 
 /// Contains session object cache
 pub struct ObjectCache {
@@ -258,8 +258,8 @@ impl_cache!(sign_key,
             remove_sign_key);
 impl_cache!(file,
             FileContext,
-            FileHandle,
-            InvalidFileHandle,
+            FileContextHandle,
+            InvalidFileContextHandle,
             get_file,
             insert_file,
             remove_file);

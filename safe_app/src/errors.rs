@@ -104,7 +104,7 @@ mod codes {
     pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1012;
     pub const ERR_IO_ERROR: i32 = -1013;
     pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1014;
-    pub const ERR_INVALID_FILE_HANDLE: i32 = -1015;
+    pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1015;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
@@ -147,7 +147,7 @@ pub enum AppError {
     /// Invalid secret key handle
     InvalidEncryptSecKeyHandle,
     /// Invalid file writer handle
-    InvalidFileHandle,
+    InvalidFileContextHandle,
 
     /// Error while self-encrypting data
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
@@ -191,7 +191,7 @@ impl Display for AppError {
             }
             AppError::InvalidSignKeyHandle => write!(formatter, "Invalid sign key handle"),
             AppError::InvalidEncryptSecKeyHandle => write!(formatter, "Invalid secret key handle"),
-            AppError::InvalidFileHandle => write!(formatter, "Invalid file handle"),
+            AppError::InvalidFileContextHandle => write!(formatter, "Invalid file context handle"),
             AppError::SelfEncryption(ref error) => {
                 write!(formatter, "Self-encryption error: {}", error)
             }
@@ -348,7 +348,7 @@ impl ErrorCode for AppError {
             AppError::InvalidSelfEncryptorHandle => ERR_INVALID_SELF_ENCRYPTOR_HANDLE,
             AppError::InvalidSignKeyHandle => ERR_INVALID_SIGN_KEY_HANDLE,
             AppError::InvalidEncryptSecKeyHandle => ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE,
-            AppError::InvalidFileHandle => ERR_INVALID_FILE_HANDLE,
+            AppError::InvalidFileContextHandle => ERR_INVALID_FILE_CONTEXT_HANDLE,
             AppError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
             AppError::InvalidSelfEncryptorReadOffsets => ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS,
             AppError::IoError(_) => ERR_IO_ERROR,
