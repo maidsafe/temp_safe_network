@@ -213,8 +213,7 @@ pub unsafe extern "C" fn file_size(app: *const App,
             if let Some(ref reader) = file_ctx.reader {
                 o_cb(user_data.0, FFI_RESULT_OK, reader.size());
             } else {
-                let (error_code, description) =
-                    ffi_error!(AppError::Unexpected("Invalid file mode".to_owned()));
+                let (error_code, description) = ffi_error!(AppError::InvalidFileMode);
                 o_cb(user_data.0,
                      FfiResult {
                          error_code,
@@ -266,8 +265,7 @@ pub unsafe extern "C" fn file_read(app: *const App,
                     .into_box()
                     .into()
             } else {
-                let (error_code, description) =
-                    ffi_error!(AppError::Unexpected("Invalid file mode".to_owned()));
+                let (error_code, description) = ffi_error!(AppError::InvalidFileMode);
                 o_cb(user_data.0,
                      FfiResult {
                          error_code,
@@ -311,8 +309,7 @@ pub unsafe extern "C" fn file_write(app: *const App,
                     .into_box()
                     .into()
             } else {
-                let (error_code, description) =
-                    ffi_error!(AppError::Unexpected("Invalid file mode".to_owned()));
+                let (error_code, description) = ffi_error!(AppError::InvalidFileMode);
                 o_cb(user_data.0,
                      FfiResult {
                          error_code,
