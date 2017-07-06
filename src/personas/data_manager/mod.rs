@@ -14,6 +14,7 @@ use self::mutation::{Mutation, MutationType};
 use GROUP_SIZE;
 use QUORUM;
 use accumulator::Accumulator;
+use authority::ClientManagerAuthority;
 use chunk_store::{Chunk, ChunkId, ChunkStore};
 #[cfg(feature = "use-mock-crust")]
 use chunk_store::Error as ChunkStoreError;
@@ -780,7 +781,7 @@ impl DataManager {
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_change_mdata_owner(&mut self,
                                      routing_node: &mut RoutingNode,
-                                     src: Authority<XorName>,
+                                     src: ClientManagerAuthority,
                                      dst: Authority<XorName>,
                                      name: XorName,
                                      tag: u64,
@@ -797,10 +798,9 @@ impl DataManager {
 
         let res = self.fetch_mdata(name, tag)
             .and_then(|data| {
-                let client_name = utils::client_name(&src);
                 let new_owner = extract_owner(new_owners)?;
 
-                if utils::verify_mdata_owner(&data, client_name) {
+                if utils::verify_mdata_owner(&data, src.name()) {
                     data.clone().change_owner(new_owner, version)?;
                     self.validate_concurrent_mutations(Some(&data), &mutation)
                 } else {
@@ -808,7 +808,7 @@ impl DataManager {
                 }
             });
 
-        self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
+        self.start_pending_mutation(routing_node, src.into(), dst, mutation, res, msg_id)
     }
 
     pub fn handle_node_added(&mut self,
