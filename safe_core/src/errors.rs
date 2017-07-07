@@ -208,9 +208,7 @@ impl Display for CoreError {
                 write!(formatter, "Unable to obtain generator for random data")
             }
             CoreError::OperationForbidden => write!(formatter, "Forbidden operation requested"),
-            CoreError::Unexpected(ref error) => {
-                write!(formatter, "Unexpected (probably a logic error): {}", error)
-            }
+            CoreError::Unexpected(ref error) => write!(formatter, "Unexpected: {}", error),
             CoreError::RoutingError(ref error) => {
                 // TODO - use `{}` once `RoutingError` implements `std::error::Error`.
                 write!(formatter, "Routing internal error: {:?}", error)
