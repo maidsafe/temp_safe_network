@@ -7,27 +7,26 @@ license = "GPL-3.0"
 name = "safe_core"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_client_libs"
-version = "0.23.0"
+version = "0.24.0"
 
 [dependencies]
 base64 = "~0.4.1"
 chrono = { version = "~0.4.0", features = ["serde"] }
 ffi_utils = { path = "../ffi_utils", version = "~0.1.0" }
 fs2 = "~0.4.2"
-futures = "~0.1.11"
+futures = "~0.1.14"
 lazy_static = "~0.2.4"
 log = "~0.3.7"
 lru-cache = "~0.1.0"
 maidsafe_utilities = "~0.13.0"
 rand = "~0.3.15"
-# routing = "~0.27.1"
-routing = { git = "https://github.com/maidsafe/routing.git" }
+routing = "~0.31.0"
 rust_sodium = "~0.3.0"
-serde = "~1.0.8"
-serde_derive = "~1.0.8"
-self_encryption = { git = "https://github.com/maidsafe/self_encryption.git" }
+serde = "~1.0.9"
+serde_derive = "~1.0.9"
+self_encryption = "~0.10.0"
 tiny-keccak = "~1.2.1"
-tokio-core = "~0.1.6"
+tokio-core = "~0.1.8"
 unwrap = "~1.1.0"
 
 [dev-dependencies]
