@@ -1,5 +1,14 @@
 # Safe Core - Change Log
 
+## [0.24.0]
+- Use asynchronous I/O and futures for interfacing with Routing
+- Deprecate and remove StructuredData and AppendableData types
+- Introduce a new data type instead: MutableData
+- Implement URI-based IPC interaction between apps required for supporting mobile devices
+- Integrate with routing 0.31.0
+- Move all FFI functions to their own separate crates
+- Refactor and simplify the NFS module
+
 ## [0.23.0]
 - Integrate with routing 0.28.5
 - Invitation based account creation support in client (API change)

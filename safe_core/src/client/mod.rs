@@ -1246,6 +1246,10 @@ fn setup_routing(full_id: Option<FullId>,
     trace!("Waiting to get connected to the Network...");
     match routing_rx.recv_timeout(Duration::from_secs(CONNECTION_TIMEOUT_SECS)) {
         Ok(Event::Connected) => (),
+        Ok(Event::Terminate) => {
+            // TODO: Consider adding a separate error type for this
+            return Err(CoreError::from("Could not connect to the SAFE Network".to_string()));
+        }
         Err(RecvTimeoutError::Timeout) => {
             return Err(CoreError::RequestTimeout);
         }
