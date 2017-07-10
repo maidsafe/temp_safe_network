@@ -31,7 +31,7 @@ use safe_core::ipc::{self, AuthReq, BootstrapConfig, ContainersReq, IpcError, Ip
 use safe_core::ipc::req::ffi::AppExchangeInfo as FfiAppExchangeInfo;
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, File, NfsError, file_helper};
+use safe_core::nfs::{DEFAULT_PRIVATE_DIRS, DEFAULT_PUBLIC_DIRS, File, Mode, NfsError, file_helper};
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
@@ -790,13 +790,14 @@ fn create_file<T: Into<String>>(authenticator: &Authenticator,
                                 -> Result<(), AuthError> {
     let name = name.into();
     try_run(authenticator, |client| {
-        file_helper::create(client.clone(), container_info, name, vec![])
-            .and_then(move |writer| {
-                          writer
-                              .write(&content)
-                              .and_then(move |_| writer.close())
-                              .map(|_| ())
-                      })
+        let c2 = client.clone();
+
+        file_helper::write(client.clone(), File::new(vec![]), Mode::Overwrite)
+            .then(move |res| {
+                      let writer = unwrap!(res);
+                      writer.write(&content).and_then(move |_| writer.close())
+                  })
+            .then(move |file| file_helper::insert(c2, container_info, name, &unwrap!(file)))
             .map_err(From::from)
     })
 }

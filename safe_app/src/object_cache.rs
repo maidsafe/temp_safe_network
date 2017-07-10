@@ -21,6 +21,7 @@
 use super::errors::AppError;
 use AppContext;
 use ffi::cipher_opt::CipherOpt;
+use ffi::nfs::FileContext;
 use lru_cache::LruCache;
 use routing::{EntryAction, PermissionSet, User, Value};
 use rust_sodium::crypto::{box_, sign};
@@ -71,6 +72,8 @@ pub type SelfEncryptorReaderHandle = ObjectHandle;
 pub type SelfEncryptorWriterHandle = ObjectHandle;
 /// Disambiguating `ObjectHandle`
 pub type SignKeyHandle = ObjectHandle;
+/// Disambiguating `ObjectHandle`
+pub type FileContextHandle = ObjectHandle;
 
 /// Contains session object cache
 pub struct ObjectCache {
@@ -88,6 +91,7 @@ pub struct ObjectCache {
     se_reader: Store<SelfEncryptor<SelfEncryptionStorage<AppContext>>>,
     se_writer: Store<SequentialEncryptor<SelfEncryptionStorage<AppContext>>>,
     sign_key: Store<sign::PublicKey>,
+    file: Store<FileContext>,
 }
 
 impl ObjectCache {
@@ -108,6 +112,7 @@ impl ObjectCache {
             se_reader: Store::new(),
             se_writer: Store::new(),
             sign_key: Store::new(),
+            file: Store::new(),
         }
     }
 
@@ -127,6 +132,7 @@ impl ObjectCache {
         self.se_reader.clear();
         self.se_writer.clear();
         self.sign_key.clear();
+        self.file.clear();
     }
 }
 
@@ -250,6 +256,13 @@ impl_cache!(sign_key,
             get_sign_key,
             insert_sign_key,
             remove_sign_key);
+impl_cache!(file,
+            FileContext,
+            FileContextHandle,
+            InvalidFileContextHandle,
+            get_file,
+            insert_file,
+            remove_file);
 
 impl Default for ObjectCache {
     fn default() -> Self {

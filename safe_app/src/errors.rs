@@ -81,14 +81,9 @@ mod codes {
     pub const ERR_STRING_ERROR: i32 = -205;
 
     // NFS errors.
-    pub const ERR_DIRECTORY_EXISTS: i32 = -300;
-    pub const ERR_DESTINATION_AND_SOURCE_ARE_SAME: i32 = -301;
-    pub const ERR_DIRECTORY_NOT_FOUND: i32 = -302;
-    pub const ERR_FILE_EXISTS: i32 = -303;
-    pub const ERR_FILE_DOES_NOT_MATCH: i32 = -304;
-    pub const ERR_FILE_NOT_FOUND: i32 = -305;
-    pub const ERR_INVALID_RANGE: i32 = -306;
-    pub const ERR_INVALID_PARAMETER: i32 = -307;
+    pub const ERR_FILE_EXISTS: i32 = -300;
+    pub const ERR_FILE_NOT_FOUND: i32 = -301;
+    pub const ERR_INVALID_RANGE: i32 = -302;
 
     // App errors
     pub const ERR_NO_SUCH_CONTAINER: i32 = -1002;
@@ -104,6 +99,8 @@ mod codes {
     pub const ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS: i32 = -1012;
     pub const ERR_IO_ERROR: i32 = -1013;
     pub const ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE: i32 = -1014;
+    pub const ERR_INVALID_FILE_CONTEXT_HANDLE: i32 = -1015;
+    pub const ERR_INVALID_FILE_MODE: i32 = -1016;
 
     pub const ERR_UNEXPECTED: i32 = -2000;
 }
@@ -124,6 +121,8 @@ pub enum AppError {
     OperationForbidden,
     /// Container not found
     NoSuchContainer,
+    /// Invalid file mode (e.g. trying to write when file is opened for reading only)
+    InvalidFileMode,
 
     /// Invalid CipherOpt handle
     InvalidCipherOptHandle,
@@ -145,6 +144,8 @@ pub enum AppError {
     InvalidSignKeyHandle,
     /// Invalid secret key handle
     InvalidEncryptSecKeyHandle,
+    /// Invalid file writer handle
+    InvalidFileContextHandle,
 
     /// Error while self-encrypting data
     SelfEncryption(SelfEncryptionError<SelfEncryptionStorageError>),
@@ -162,11 +163,16 @@ impl Display for AppError {
         match *self {
             AppError::CoreError(ref error) => write!(formatter, "Core error: {}", error),
             AppError::IpcError(ref error) => write!(formatter, "IPC error: {:?}", error),
-            AppError::NfsError(ref error) => write!(formatter, "NFS error: {:?}", error),
+            AppError::NfsError(ref error) => write!(formatter, "NFS error: {}", error),
             AppError::EncodeDecodeError => write!(formatter, "Serialisation error"),
             AppError::OperationForbidden => write!(formatter, "Forbidden operation"),
             AppError::NoSuchContainer => write!(formatter, "Container not found"),
             AppError::InvalidCipherOptHandle => write!(formatter, "Invalid CipherOpt handle"),
+            AppError::InvalidFileMode => {
+                write!(formatter,
+                       "Invalid file mode (e.g. trying to write when \
+                       file is opened for reading only)")
+            }
             AppError::InvalidEncryptPubKeyHandle => {
                 write!(formatter, "Invalid encrypt (box_) key handle")
             }
@@ -188,6 +194,7 @@ impl Display for AppError {
             }
             AppError::InvalidSignKeyHandle => write!(formatter, "Invalid sign key handle"),
             AppError::InvalidEncryptSecKeyHandle => write!(formatter, "Invalid secret key handle"),
+            AppError::InvalidFileContextHandle => write!(formatter, "Invalid file context handle"),
             AppError::SelfEncryption(ref error) => {
                 write!(formatter, "Self-encryption error: {}", error)
             }
@@ -318,14 +325,9 @@ impl ErrorCode for AppError {
             AppError::NfsError(ref err) => {
                 match *err {
                     NfsError::CoreError(ref err) => core_error_code(err),
-                    NfsError::DirectoryExists => ERR_DIRECTORY_EXISTS,
-                    NfsError::DestinationAndSourceAreSame => ERR_DESTINATION_AND_SOURCE_ARE_SAME,
-                    NfsError::DirectoryNotFound => ERR_DIRECTORY_NOT_FOUND,
                     NfsError::FileExists => ERR_FILE_EXISTS,
-                    NfsError::FileDoesNotMatch => ERR_FILE_DOES_NOT_MATCH,
                     NfsError::FileNotFound => ERR_FILE_NOT_FOUND,
                     NfsError::InvalidRange => ERR_INVALID_RANGE,
-                    NfsError::InvalidParameter => ERR_INVALID_PARAMETER,
                     NfsError::EncodeDecodeError(_) => ERR_ENCODE_DECODE_ERROR,
                     NfsError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
                     NfsError::Unexpected(_) => ERR_UNEXPECTED,
@@ -344,6 +346,8 @@ impl ErrorCode for AppError {
             AppError::InvalidSelfEncryptorHandle => ERR_INVALID_SELF_ENCRYPTOR_HANDLE,
             AppError::InvalidSignKeyHandle => ERR_INVALID_SIGN_KEY_HANDLE,
             AppError::InvalidEncryptSecKeyHandle => ERR_INVALID_ENCRYPT_SEC_KEY_HANDLE,
+            AppError::InvalidFileContextHandle => ERR_INVALID_FILE_CONTEXT_HANDLE,
+            AppError::InvalidFileMode => ERR_INVALID_FILE_MODE,
             AppError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
             AppError::InvalidSelfEncryptorReadOffsets => ERR_INVALID_SELF_ENCRYPTOR_READ_OFFSETS,
             AppError::IoError(_) => ERR_IO_ERROR,

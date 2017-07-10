@@ -131,9 +131,7 @@ pub fn update<S, T>(client: Client<T>,
                   })
         .into_future()
         .and_then(move |(key, content)| if version != 0 {
-                      Ok((key, content, version, parent))
-                          .into_future()
-                          .into_box()
+                      ok!((key, content, version, parent))
                   } else {
                       client
                           .get_mdata_value(parent.name, parent.type_tag, key.clone())
@@ -155,51 +153,15 @@ pub fn update<S, T>(client: Client<T>,
 /// object is returned, through which the data for the file can be written to
 /// the network. The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
-pub fn update_content<S, T>(client: Client<T>,
-                            parent: MDataInfo,
-                            name: S,
-                            file: File,
-                            version: u64,
-                            mode: Mode)
-                            -> Box<NfsFuture<Writer<T>>>
-    where S: Into<String>,
-          T: 'static
+pub fn write<T>(client: Client<T>, file: File, mode: Mode) -> Box<NfsFuture<Writer<T>>>
+    where T: 'static
 {
-    let name = name.into();
-    trace!("Updating content in file with name {}", name);
+    trace!("Creating a writer for a file");
 
     Writer::new(client.clone(),
                 SelfEncryptionStorage::new(client),
                 mode,
-                parent,
-                file,
-                name,
-                Some(version))
-}
-
-/// Helper function to create a file in a given directory.
-/// A writer object is returned, through which the data for the
-/// file can be written to the network.
-/// The file is actually saved in the directory listing only after
-/// `writer.close()` is invoked
-pub fn create<S, T>(client: Client<T>,
-                    parent: MDataInfo,
-                    name: S,
-                    user_metadata: Vec<u8>)
-                    -> Box<NfsFuture<Writer<T>>>
-    where S: Into<String>,
-          T: 'static
-{
-    let name = name.into();
-    trace!("Creating file with name {}.", name);
-
-    Writer::new(client.clone(),
-                SelfEncryptionStorage::new(client),
-                Mode::Overwrite,
-                parent,
-                File::new(user_metadata),
-                name,
-                None)
+                file)
 }
 
 // This is different from `impl From<CoreError> for NfsError`, because it maps
@@ -226,9 +188,10 @@ mod tests {
     const NEW_SIZE: usize = 50;
 
     fn create_test_file(client: &Client<()>) -> Box<NfsFuture<(MDataInfo, File)>> {
+        let c2 = client.clone();
         let user_root = unwrap!(client.user_root_dir());
 
-        file_helper::create(client.clone(), user_root.clone(), "hello.txt", Vec::new())
+        file_helper::write(client.clone(), File::new(Vec::new()), Mode::Overwrite)
             .then(move |res| {
                       let writer = unwrap!(res);
 
@@ -236,7 +199,12 @@ mod tests {
                           .write(&[0u8; ORIG_SIZE])
                           .and_then(move |_| writer.close())
                   })
-            .map(move |file| (user_root, file))
+            .then(move |res| {
+                      let file = unwrap!(res);
+
+                      file_helper::insert(c2, user_root.clone(), "hello.txt", &file)
+                          .map(move |_| (user_root, file))
+                  })
             .into_box()
     }
 
@@ -267,30 +235,45 @@ mod tests {
         random_client(|client| {
             let c2 = client.clone();
             let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
 
             create_test_file(client)
                 .then(move |res| {
-                    // Updating file - full rewrite
-                    let (dir, file) = unwrap!(res);
-                    file_helper::update_content(c2, dir, "hello.txt", file, 1, Mode::Overwrite)
-                })
+                          // Updating file - full rewrite
+                          let (dir, file) = unwrap!(res);
+
+                          file_helper::write(c2, file, Mode::Overwrite).map(move |writer| {
+                                                                                (writer, dir)
+                                                                            })
+                      })
                 .then(move |res| {
-                          let writer = unwrap!(res);
+                          let (writer, dir) = unwrap!(res);
                           writer
                               .write(&[1u8; NEW_SIZE])
                               .and_then(move |_| writer.close())
+                              .map(move |file| (file, dir))
                       })
                 .then(move |res| {
-                          let file = unwrap!(res);
-                          file_helper::read(c3, &file)
+                          let (file, dir) = unwrap!(res);
+                          file_helper::update(c3, dir.clone(), "hello.txt", &file, 1)
+                              .map(move |_| dir)
                       })
-                .then(|res| {
+                .then(move |res| {
+                          let dir = unwrap!(res);
+                          file_helper::fetch(c4, dir, "hello.txt")
+                      })
+                .then(move |res| {
+                          let (_version, file) = unwrap!(res);
+                          file_helper::read(c5, &file)
+                      })
+                .then(move |res| {
                           let reader = unwrap!(res);
                           let size = reader.size();
                           println!("reading {} bytes", size);
                           reader.read(0, size)
                       })
-                .map(|data| {
+                .map(move |data| {
                          assert_eq!(data, vec![1u8; 50]);
                      })
         });
@@ -304,9 +287,10 @@ mod tests {
 
             create_test_file(client)
                 .then(move |res| {
-                          let (dir, file) = unwrap!(res);
+                          let (_dir, file) = unwrap!(res);
+
                           // Update - should append (after S.E behaviour changed)
-                          file_helper::update_content(c2, dir, "hello.txt", file, 1, Mode::Modify)
+                          file_helper::write(c2, file, Mode::Append)
                       })
                 .then(move |res| {
                           let writer = unwrap!(res);
@@ -318,17 +302,17 @@ mod tests {
                           let file = unwrap!(res);
                           file_helper::read(c3, &file)
                       })
-                .then(|res| {
-                    let reader = unwrap!(res);
-                    let size = reader.size();
-                    reader
-                        .read(0, size)
-                        .map(move |data| {
-                                 assert_eq!(size, (ORIG_SIZE + APPEND_SIZE) as u64);
-                                 assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
-                                 assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
-                             })
-                })
+                .then(move |res| {
+                          let reader = unwrap!(res);
+                          let size = reader.size();
+                          println!("reading {} bytes", size);
+                          reader.read(0, size)
+                      })
+                .map(move |data| {
+                         assert_eq!(data.len(), ORIG_SIZE + APPEND_SIZE);
+                         assert_eq!(data[0..ORIG_SIZE].to_owned(), vec![0u8; ORIG_SIZE]);
+                         assert_eq!(&data[ORIG_SIZE..], [2u8; APPEND_SIZE]);
+                     })
         });
     }
 

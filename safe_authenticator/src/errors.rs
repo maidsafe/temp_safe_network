@@ -82,14 +82,9 @@ mod codes {
     pub const ERR_STRING_ERROR: i32 = -205;
 
     // NFS errors.
-    pub const ERR_DIRECTORY_EXISTS: i32 = -300;
-    pub const ERR_DESTINATION_AND_SOURCE_ARE_SAME: i32 = -301;
-    pub const ERR_DIRECTORY_NOT_FOUND: i32 = -302;
-    pub const ERR_FILE_EXISTS: i32 = -303;
-    pub const ERR_FILE_DOES_NOT_MATCH: i32 = -304;
-    pub const ERR_FILE_NOT_FOUND: i32 = -305;
-    pub const ERR_INVALID_RANGE: i32 = -306;
-    pub const ERR_INVALID_PARAMETER: i32 = -307;
+    pub const ERR_FILE_EXISTS: i32 = -300;
+    pub const ERR_FILE_NOT_FOUND: i32 = -301;
+    pub const ERR_INVALID_RANGE: i32 = -302;
 
     // Authenticator errors
     pub const ERR_IO_ERROR: i32 = -1013;
@@ -239,14 +234,9 @@ impl ErrorCode for AuthError {
             AuthError::NfsError(ref err) => {
                 match *err {
                     NfsError::CoreError(ref err) => core_error_code(err),
-                    NfsError::DirectoryExists => ERR_DIRECTORY_EXISTS,
-                    NfsError::DestinationAndSourceAreSame => ERR_DESTINATION_AND_SOURCE_ARE_SAME,
-                    NfsError::DirectoryNotFound => ERR_DIRECTORY_NOT_FOUND,
                     NfsError::FileExists => ERR_FILE_EXISTS,
-                    NfsError::FileDoesNotMatch => ERR_FILE_DOES_NOT_MATCH,
                     NfsError::FileNotFound => ERR_FILE_NOT_FOUND,
                     NfsError::InvalidRange => ERR_INVALID_RANGE,
-                    NfsError::InvalidParameter => ERR_INVALID_PARAMETER,
                     NfsError::EncodeDecodeError(_) => ERR_ENCODE_DECODE_ERROR,
                     NfsError::SelfEncryption(_) => ERR_SELF_ENCRYPTION,
                     NfsError::Unexpected(_) => ERR_UNEXPECTED,

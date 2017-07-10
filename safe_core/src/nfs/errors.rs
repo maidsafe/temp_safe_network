@@ -26,22 +26,12 @@ use std::fmt;
 pub enum NfsError {
     /// Client Error
     CoreError(CoreError),
-    /// If Directory already exists with the same name in the same level
-    DirectoryExists,
-    /// Destination is Same as the Source
-    DestinationAndSourceAreSame,
-    /// Directory not found
-    DirectoryNotFound,
-    /// File Already exists with the same name in a directory
+    /// File already exists with the same name in a directory
     FileExists,
-    /// File does not match with the existing file in the directory listing
-    FileDoesNotMatch,
     /// File not found
     FileNotFound,
     /// Invalid byte range specified
     InvalidRange,
-    /// Validation error - if the field passed as parameter is not valid
-    InvalidParameter,
     /// Unexpected error
     Unexpected(String),
     /// Unsuccessful Serialisation or Deserialisation
@@ -74,20 +64,38 @@ impl From<SelfEncryptionError<SelfEncryptionStorageError>> for NfsError {
     }
 }
 
+impl fmt::Display for NfsError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            NfsError::CoreError(ref error) => write!(f, "Client Errror: {}", error),
+            NfsError::FileExists => {
+                write!(f, "File already exists with the same name in a directory")
+            }
+            NfsError::FileNotFound => write!(f, "File not found"),
+
+            NfsError::InvalidRange => write!(f, "Invalid byte range specified"),
+            NfsError::Unexpected(ref error) => write!(f, "Unexpected error - {:?}", error),
+            NfsError::EncodeDecodeError(ref error) => {
+                write!(f,
+                       "Unsuccessful Serialisation or Deserialisation: {:?}",
+                       error)
+            }
+            NfsError::SelfEncryption(ref error) => {
+                write!(f,
+                       "Error while self-encrypting/-decrypting data: {:?}",
+                       error)
+            }
+        }
+    }
+}
+
 impl fmt::Debug for NfsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             NfsError::CoreError(ref error) => write!(f, "NfsError::CoreError -> {:?}", error),
-            NfsError::DirectoryExists => write!(f, "NfsError::DirectoryExists"),
-            NfsError::DestinationAndSourceAreSame => {
-                write!(f, "NfsError::DestinationAndSourceAreSame")
-            }
-            NfsError::DirectoryNotFound => write!(f, "NfsError::DirectoryNotFound"),
             NfsError::FileExists => write!(f, "NfsError::FileExists"),
-            NfsError::FileDoesNotMatch => write!(f, "NfsError::FileDoesNotMatch"),
             NfsError::FileNotFound => write!(f, "NfsError::FileNotFound"),
             NfsError::InvalidRange => write!(f, "NfsError::InvalidRange"),
-            NfsError::InvalidParameter => write!(f, "NfsError::InvalidParameter"),
             NfsError::Unexpected(ref error) => write!(f, "NfsError::Unexpected -> {:?}", error),
             NfsError::EncodeDecodeError(ref error) => {
                 write!(f, "NfsError::EncodeDecodeError -> {:?}", error)
