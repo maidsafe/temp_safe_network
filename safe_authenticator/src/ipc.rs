@@ -285,12 +285,12 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
 
 /// Revoke app access
 #[no_mangle]
-pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
-                                                  app_id: *const c_char,
-                                                  user_data: *mut c_void,
-                                                  o_cb: extern "C" fn(*mut c_void,
-                                                                      FfiResult,
-                                                                      *const c_char)) {
+pub unsafe extern "C" fn auth_revoke_app(auth: *const Authenticator,
+                                         app_id: *const c_char,
+                                         user_data: *mut c_void,
+                                         o_cb: extern "C" fn(*mut c_void,
+                                                             FfiResult,
+                                                             *const c_char)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {

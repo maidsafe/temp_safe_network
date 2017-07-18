@@ -137,7 +137,7 @@ pub unsafe extern "C" fn auth_reconnect(auth: *mut Authenticator,
 /// functions in this crate (`create_acc`, `login`, `create_unregistered`).
 /// Using `auth` after a call to this function is undefined behaviour.
 #[no_mangle]
-pub unsafe extern "C" fn authenticator_free(auth: *mut Authenticator) {
+pub unsafe extern "C" fn auth_free(auth: *mut Authenticator) {
     let _ = Box::from_raw(auth);
 }
 
@@ -169,7 +169,7 @@ mod tests {
                 }))
             };
             assert!(!auth_h.is_null());
-            unsafe { authenticator_free(auth_h) };
+            unsafe { auth_free(auth_h) };
         }
 
         {
@@ -184,7 +184,7 @@ mod tests {
                                }))
             };
             assert!(!auth_h.is_null());
-            unsafe { authenticator_free(auth_h) };
+            unsafe { auth_free(auth_h) };
         }
 
         unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
@@ -254,7 +254,7 @@ mod tests {
             assert_eq!(event, connected);
 
 
-            unsafe { authenticator_free(auth) };
+            unsafe { auth_free(auth) };
         }
 
         unsafe extern "C" fn net_event_cb(user_data: *mut c_void, err_code: i32, event: i32) {
