@@ -17,6 +17,8 @@
 
 /// `MDataInfo` utilities.
 pub mod mdata_info;
+/// Operations with recovery.
+pub mod recovery;
 
 mod account;
 #[cfg(feature = "use-mock-routing")]
@@ -1408,13 +1410,14 @@ mod tests {
             let client2 = client.clone();
             let client3 = client.clone();
 
-            client.get_idata(*orig_data.name())
+            client
+                .get_idata(*orig_data.name())
                 .then(move |res| {
-                    let data = unwrap!(res);
-                    assert_eq!(data, orig_data);
-                    let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
-                    client2.set_user_root_dir(dir)
-                })
+                          let data = unwrap!(res);
+                          assert_eq!(data, orig_data);
+                          let dir = unwrap!(MDataInfo::random_private(DIR_TAG));
+                          client2.set_user_root_dir(dir)
+                      })
                 .then(move |res| {
                     let e = match res {
                         Ok(_) => {

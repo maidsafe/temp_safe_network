@@ -82,7 +82,7 @@ mod errors;
 mod event;
 pub mod ffi;
 
-pub use self::client::{Client, ClientKeys, MDataInfo, mdata_info};
+pub use self::client::{Client, ClientKeys, MDataInfo, mdata_info, recovery};
 pub use self::errors::CoreError;
 pub use self::event::{CoreEvent, NetworkEvent, NetworkRx, NetworkTx};
 pub use self::event_loop::{CoreFuture, CoreMsg, CoreMsgRx, CoreMsgTx};
