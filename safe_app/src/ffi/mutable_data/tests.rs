@@ -37,8 +37,7 @@ fn md_created_by_app_1() {
     run(&app, |client, _app_context| {
         let mut rng = unwrap!(OsRng::new());
 
-        let mut owners = BTreeSet::new();
-        owners.insert(unwrap!(client.public_signing_key()));
+        let owners = btree_set![unwrap!(client.public_signing_key())];
         let name: XorName = rng.gen();
         let mdata =
             unwrap!(MutableData::new(name, DIR_TAG, BTreeMap::new(), BTreeMap::new(), owners));
