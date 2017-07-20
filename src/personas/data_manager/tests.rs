@@ -68,7 +68,7 @@ fn idata_basics() {
 
     // Simulate receiving the refresh. This should result in the data being
     // put into the chunk store.
-    unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+    unwrap!(dm.handle_group_refresh(&mut node, refresh));
 
     // Get the data back and assert its the same data we put in originally.
     let msg_id = MessageId::new();
@@ -121,7 +121,7 @@ fn mdata_basics() {
 
     // Simulate receiving the refresh. This should result in the data being
     // put into the chunk store.
-    unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+    unwrap!(dm.handle_group_refresh(&mut node, refresh));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response, Response::PutMData { res: Ok(()), .. });
@@ -197,7 +197,7 @@ fn mdata_mutations() {
 
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
-    unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+    unwrap!(dm.handle_group_refresh(&mut node, refresh));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
@@ -282,7 +282,7 @@ fn mdata_change_owner() {
                                          msg_id));
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
-    unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+    unwrap!(dm.handle_group_refresh(&mut node, refresh));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(message.response, Response::ChangeMDataOwner { res: Ok(()), .. });
@@ -607,11 +607,11 @@ fn mdata_non_conflicting_parallel_mutations() {
 
     let message = unwrap!(node.sent_requests.remove(&msg_id_0));
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
-    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+    unwrap!(dm.handle_group_refresh(&mut node, payload));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id_1));
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
-    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+    unwrap!(dm.handle_group_refresh(&mut node, payload));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id_0));
     assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
@@ -691,7 +691,7 @@ fn mdata_conflicting_parallel_mutations() {
 
     // After receiving the group refresh, the first mutation succeeds and the second
     // one is rejected.
-    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+    unwrap!(dm.handle_group_refresh(&mut node, payload));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id_0));
     assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
@@ -759,11 +759,11 @@ fn mdata_parallel_mutations_limits() {
     // Refresh both mutations.
     let message = unwrap!(node.sent_requests.remove(&msg_id_0));
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
-    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+    unwrap!(dm.handle_group_refresh(&mut node, payload));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id_1));
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
-    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+    unwrap!(dm.handle_group_refresh(&mut node, payload));
 
     // Both requests should succeed.
     let message = unwrap!(node.sent_responses.remove(&msg_id_0));
@@ -806,7 +806,7 @@ fn mdata_parallel_mutations_limits() {
     // Only the first mutation should result in refresh being sent.
     let message = unwrap!(node.sent_requests.remove(&msg_id_0));
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
-    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+    unwrap!(dm.handle_group_refresh(&mut node, payload));
 
     assert!(!node.sent_requests.contains_key(&msg_id_1));
 

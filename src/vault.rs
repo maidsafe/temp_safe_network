@@ -122,6 +122,10 @@ impl Vault {
     }
 
     fn process_event(&mut self, event: Event) -> EventResult {
+        #[cfg(feature = "use-mock-crust")]
+        self.data_manager
+            .pop_group_refresh(&mut self.routing_node);
+
         let mut res = EventResult::Processed;
         let event_res = match event {
             Event::Request { request, src, dst } => self.on_request(request, src, dst),
@@ -202,7 +206,7 @@ impl Vault {
              Authority::NaeManager(_),
              Request::Refresh(serialised_msg, _)) => {
                 self.data_manager
-                    .handle_group_refresh(&mut self.routing_node, &serialised_msg)
+                    .handle_group_refresh(&mut self.routing_node, serialised_msg)
             }
             // ========== GetAccountInfo ==========
             (Authority::Client {
@@ -850,6 +854,13 @@ impl Vault {
     /// Vault routing_table
     pub fn routing_table(&self) -> &RoutingTable<XorName> {
         unwrap!(self.routing_node.routing_table())
+    }
+
+    /// Set whether `DataManager` group refreshes should be delayed or not on this vault.
+    /// Any un-handled delayed group refreshes in the cache will be handled and purged.
+    pub fn delay_group_refreshes(&mut self, delayed: bool) {
+        self.data_manager
+            .delay_group_refreshes(&mut self.routing_node, delayed)
     }
 }
 

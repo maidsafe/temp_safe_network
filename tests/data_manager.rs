@@ -834,13 +834,13 @@ fn mutable_data_concurrent_mutations() {
     verify_data_is_stored(&mut nodes, &mut client, &all_data);
 }
 
-// Concurrently put and mutate a mutable data.
-// Verify the data is consistently stored (it may or might not be mutated, depending
-// on the order in which the request are processed by the nodes).
+// Put a mutable data then immediately mutate it, meanwhile simulates out-of-order group_refresh.
+// This test was used to expose an issue that a mutate request conflicts with a `PutMData` entry in
+// the pending_writes of DM's cahe.
 #[test]
-fn mutable_data_concurrent_put_and_mutate() {
+fn mutable_data_put_and_mutate() {
     let seed = None;
-    let node_count = TEST_NET_SIZE;
+    let node_count = GROUP_SIZE;
     let iterations = test_utils::iterations();
 
     let network = Network::new(GROUP_SIZE, seed);
@@ -877,20 +877,29 @@ fn mutable_data_concurrent_put_and_mutate() {
         unwrap!(data.set_user_permissions(User::Anyone, permissions, 1, client_key0));
         let _ = clients[0].put_mdata(data.clone());
 
-        let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
-        let _ = clients[1].mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
+        let node_index = rng.gen_range(0, nodes.len());
+        nodes[node_index].delay_group_refreshes(true);
 
         event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
         trace!("Processed {} events.", event_count);
 
-        // Try to receive response for the PutMData request.
+        let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
+        let _ = clients[1].mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
+
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
+        nodes[node_index].delay_group_refreshes(false);
+        // Required to ensure the group leader handle delayed group refresh messages.
+        // Hence the response to the client is guaranteed to be sent.
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
+        trace!("Processed {} events.", event_count);
+
         while let Ok(event) = clients[0].try_recv() {
             if let Event::Response { response: Response::PutMData { res, .. }, .. } = event {
                 trace!("Client {:?} received PutMData response: {:?}",
                        clients[0].name(),
                        res);
                 if res.is_ok() {
-                    let _ = all_data.insert(data_name, data);
+                    let _ = all_data.insert(data_name, data.clone());
                 }
 
                 break;
