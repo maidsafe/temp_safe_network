@@ -91,7 +91,7 @@ pub fn put_access_container_entry<T>(
     app_id: &str,
     app_keys: &AppKeys,
     permissions: &AccessContainerEntry,
-    version: Option<u64>,
+    version: u64,
 ) -> Box<AuthFuture<()>>
 where
     T: 'static,
@@ -101,10 +101,10 @@ where
     let plaintext = fry!(serialise(&permissions));
     let ciphertext = fry!(symmetric_encrypt(&plaintext, &app_keys.enc_key, None));
 
-    let actions = if let Some(version) = version {
-        EntryActions::new().update(key, ciphertext, version)
-    } else {
+    let actions = if version == 0 {
         EntryActions::new().ins(key, ciphertext, 0)
+    } else {
+        EntryActions::new().update(key, ciphertext, version)
     };
 
     client
@@ -113,6 +113,31 @@ where
             access_container.type_tag,
             actions.into(),
         )
+        .map_err(From::from)
+        .into_box()
+}
+
+/// Deletes entry from the access container.
+pub fn delete_access_container_entry<T: 'static>(
+    client: &Client<T>,
+    access_container: &MDataInfo,
+    app_id: &str,
+    app_keys: &AppKeys,
+    version: u64,
+) -> Box<AuthFuture<Vec<u8>>> {
+    let entry_name = {
+        let nonce = fry!(access_container_nonce(&access_container));
+        fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce))
+    };
+
+    let actions = EntryActions::new().del(entry_name.clone(), version);
+    client
+        .mutate_mdata_entries(
+            access_container.name,
+            access_container.type_tag,
+            actions.into(),
+        )
+        .map(move |_| entry_name)
         .map_err(From::from)
         .into_box()
 }
