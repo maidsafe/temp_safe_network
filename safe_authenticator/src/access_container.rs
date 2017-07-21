@@ -55,6 +55,16 @@ pub fn access_container_nonce(
     }
 }
 
+/// Gets access container entry key corresponding to the given app.
+pub fn access_container_key(
+    access_container: &MDataInfo,
+    app_id: &str,
+    app_keys: &AppKeys,
+) -> Result<Vec<u8>, AuthError> {
+    let nonce = access_container_nonce(access_container)?;
+    Ok(access_container_enc_key(app_id, &app_keys.enc_key, nonce)?)
+}
+
 /// Gets an access container entry
 pub fn access_container_entry<T>(
     client: &Client<T>,
@@ -65,8 +75,7 @@ pub fn access_container_entry<T>(
 where
     T: 'static,
 {
-    let nonce = fry!(access_container_nonce(access_container));
-    let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
+    let key = fry!(access_container_key(access_container, app_id, &app_keys));
 
     client
         .get_mdata_value(access_container.name, access_container.type_tag, key)
@@ -96,8 +105,7 @@ pub fn put_access_container_entry<T>(
 where
     T: 'static,
 {
-    let nonce = fry!(access_container_nonce(access_container));
-    let key = fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce));
+    let key = fry!(access_container_key(access_container, app_id, app_keys));
     let plaintext = fry!(serialise(&permissions));
     let ciphertext = fry!(symmetric_encrypt(&plaintext, &app_keys.enc_key, None));
 
@@ -124,20 +132,15 @@ pub fn delete_access_container_entry<T: 'static>(
     app_id: &str,
     app_keys: &AppKeys,
     version: u64,
-) -> Box<AuthFuture<Vec<u8>>> {
-    let entry_name = {
-        let nonce = fry!(access_container_nonce(&access_container));
-        fry!(access_container_enc_key(app_id, &app_keys.enc_key, nonce))
-    };
-
-    let actions = EntryActions::new().del(entry_name.clone(), version);
+) -> Box<AuthFuture<()>> {
+    let key = fry!(access_container_key(access_container, app_id, app_keys));
+    let actions = EntryActions::new().del(key, version);
     client
         .mutate_mdata_entries(
             access_container.name,
             access_container.type_tag,
             actions.into(),
         )
-        .map(move |_| entry_name)
         .map_err(From::from)
         .into_box()
 }
