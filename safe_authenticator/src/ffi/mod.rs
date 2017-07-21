@@ -25,6 +25,9 @@ pub mod logging;
 use Authenticator;
 use errors::AuthError;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, catch_unwind_cb, from_c_str};
+use futures::Future;
+use safe_core::FutureExt;
+use safe_core::ffi::AccountInfo as FfiAccountInfo;
 use std::os::raw::{c_char, c_void};
 
 /// Create a registered client. This or any one of the other companion
@@ -132,6 +135,35 @@ pub unsafe extern "C" fn auth_reconnect(auth: *mut Authenticator,
     }
 }
 
+/// Get the account usage statistics.
+#[no_mangle]
+pub unsafe extern "C" fn auth_account_info(auth: *mut Authenticator,
+                                           user_data: *mut c_void,
+                                           o_cb: extern "C" fn(*mut c_void,
+                                                               FfiResult,
+                                                               *const FfiAccountInfo)) {
+    let user_data = OpaqueCtx(user_data);
+    let res = (*auth).send(move |client| {
+        client
+            .get_account_info()
+            .map(move |acc_info| {
+                     let ffi_acc = FfiAccountInfo {
+                         mutations_done: acc_info.mutations_done,
+                         mutations_available: acc_info.mutations_available,
+                     };
+                     o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
+                 })
+            .map_err(move |e| {
+                         call_result_cb!(Err::<(), AuthError>(AuthError::from(e)), user_data, o_cb);
+                     })
+            .into_box()
+            .into()
+    });
+    if let Err(..) = res {
+        call_result_cb!(res, user_data, o_cb);
+    }
+}
+
 /// Discard and clean up the previously allocated authenticator instance.
 /// Use this only if the authenticator is obtained from one of the auth
 /// functions in this crate (`create_acc`, `login`, `create_unregistered`).
@@ -146,6 +178,8 @@ mod tests {
     use super::*;
     use Authenticator;
     use ffi_utils::test_utils::call_1;
+    use routing::ImmutableData;
+    use safe_core::ffi::AccountInfo;
     use safe_core::utils;
     use std::ffi::CString;
     use std::os::raw::c_void;
@@ -185,10 +219,6 @@ mod tests {
             };
             assert!(!auth_h.is_null());
             unsafe { auth_free(auth_h) };
-        }
-
-        unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
-            assert_eq!(err_code, 0);
         }
     }
 
@@ -260,5 +290,50 @@ mod tests {
         unsafe extern "C" fn net_event_cb(user_data: *mut c_void, err_code: i32, event: i32) {
             send_via_user_data(user_data, (err_code, event));
         }
+    }
+
+    #[test]
+    fn account_info() {
+        let acc_locator = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
+        let acc_password = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
+        let invitation = unwrap!(CString::new(unwrap!(utils::generate_random_string(10))));
+
+        let auth: *mut Authenticator = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                create_acc(acc_locator.as_ptr(),
+                           acc_password.as_ptr(),
+                           invitation.as_ptr(),
+                           ud,
+                           ud,
+                           net_event_cb,
+                           cb)
+            }))
+        };
+
+        let orig_stats: AccountInfo =
+            unsafe { unwrap!(call_1(|ud, cb| auth_account_info(auth, ud, cb))) };
+        assert!(orig_stats.mutations_available > 0);
+
+        unsafe {
+            unwrap!((*auth).send(move |client| {
+                                     client
+                                         .put_idata(ImmutableData::new(vec![1, 2, 3]))
+                                         .map_err(move |_| ())
+                                         .into_box()
+                                         .into()
+                                 }));
+        }
+
+        let stats: AccountInfo =
+            unsafe { unwrap!(call_1(|ud, cb| auth_account_info(auth, ud, cb))) };
+        assert_eq!(stats.mutations_done, orig_stats.mutations_done + 1);
+        assert_eq!(stats.mutations_available,
+                   orig_stats.mutations_available - 1);
+
+        unsafe { auth_free(auth) };
+    }
+
+    unsafe extern "C" fn net_event_cb(_user_data: *mut c_void, err_code: i32, _event: i32) {
+        assert_eq!(err_code, 0);
     }
 }
