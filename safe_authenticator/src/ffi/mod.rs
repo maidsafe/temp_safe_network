@@ -124,14 +124,8 @@ pub unsafe extern "C" fn auth_reconnect(auth: *mut Authenticator,
                                o_cb(user_data.0, FFI_RESULT_OK);
                                None
                            });
-    if let Err(e) = res {
-        let e = AuthError::from(e);
-        let (error_code, description) = ffi_error!(e);
-        o_cb(user_data.0,
-             FfiResult {
-                 error_code,
-                 description: description.as_ptr(),
-             });
+    if let Err(..) = res {
+        call_result_cb!(res, user_data, o_cb);
     }
 }
 
@@ -154,7 +148,7 @@ pub unsafe extern "C" fn auth_account_info(auth: *mut Authenticator,
                      o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
                  })
             .map_err(move |e| {
-                         call_result_cb!(Err::<(), AuthError>(AuthError::from(e)), user_data, o_cb);
+                         call_result_cb!(Err::<(), _>(AuthError::from(e)), user_data, o_cb);
                      })
             .into_box()
             .into()

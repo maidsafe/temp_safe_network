@@ -30,7 +30,6 @@ use safe_core::ipc::req::ffi::{self, ContainerPermissions};
 use safe_core::utils::symmetric_decrypt;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
-use std::ptr;
 use tiny_keccak::sha3_256;
 
 /// Application registered in the authenticator
@@ -100,14 +99,9 @@ pub unsafe extern "C" fn auth_rm_revoked_app(auth: *const Authenticator,
                           })
                 .and_then(move |_| remove_app_container(c4, &app_id2))
                 .then(move |res| {
-                    let (error_code, description) = ffi_result!(res);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
-                    Ok(())
-                })
+                          call_result_cb!(res, user_data, o_cb);
+                          Ok(())
+                      })
                 .into_box()
                 .into()
         })
@@ -166,15 +160,8 @@ pub unsafe extern "C" fn auth_revoked_apps(auth: *const Authenticator,
                         Ok(())
                     })
                     .map_err(move |e| {
-                        let (error_code, description) = ffi_error!(e);
-                        o_cb(user_data.0,
-                             FfiResult {
-                                 error_code,
-                                 description: description.as_ptr(),
-                             },
-                             ptr::null(),
-                             0)
-                    })
+                                 call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                             })
                     .into_box()
                     .into()
             })?;
@@ -261,15 +248,8 @@ pub unsafe extern "C" fn auth_registered_apps(auth: *const Authenticator,
                         Ok(())
                     })
                     .map_err(move |e| {
-                        let (error_code, description) = ffi_error!(e);
-                        o_cb(user_data.0,
-                             FfiResult {
-                                 error_code,
-                                 description: description.as_ptr(),
-                             },
-                             ptr::null(),
-                             0)
-                    })
+                                 call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                             })
                     .into_box()
                     .into()
             })?;

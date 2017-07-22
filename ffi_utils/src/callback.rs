@@ -46,6 +46,13 @@ impl<T: CallbackArgs> Callback for extern "C" fn(*mut c_void, FfiResult, a: T) {
     }
 }
 
+impl<T: CallbackArgs> Callback for unsafe extern "C" fn(*mut c_void, FfiResult, a: T) {
+    type Args = T;
+    fn call(&self, user_data: *mut c_void, error: FfiResult, args: Self::Args) {
+        unsafe { self(user_data, error, args) }
+    }
+}
+
 impl<T0: CallbackArgs, T1: CallbackArgs> Callback
     for extern "C" fn(*mut c_void, FfiResult, a0: T0, a1: T1) {
     type Args = (T0, T1);
@@ -82,6 +89,12 @@ impl CallbackArgs for bool {
 }
 
 impl CallbackArgs for u32 {
+    fn default() -> Self {
+        0
+    }
+}
+
+impl CallbackArgs for i32 {
     fn default() -> Self {
         0
     }

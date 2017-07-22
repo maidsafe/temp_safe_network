@@ -34,7 +34,6 @@ use object_cache::{MDataEntriesHandle, MDataEntryActionsHandle, MDataInfoHandle,
 use routing::MutableData;
 use safe_core::{CoreError, FutureExt};
 use std::os::raw::c_void;
-use std::ptr;
 
 /// Special value that represents an empty permission set.
 #[no_mangle]
@@ -98,14 +97,9 @@ pub unsafe extern "C" fn mdata_put(app: *const App,
                 .put_mdata(data)
                 .map_err(AppError::from)
                 .then(move |result| {
-                    let (error_code, description) = ffi_result!(result);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
-                    Ok(())
-                })
+                          call_result_cb!(result, user_data, o_cb);
+                          Ok(())
+                      })
                 .into_box()
                 .into()
         })
@@ -186,16 +180,8 @@ pub unsafe extern "C" fn mdata_get_value(app: *const App,
                      })
                 .map_err(AppError::from)
                 .map_err(move |err| {
-                    let (error_code, description) = ffi_error!(err);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         ptr::null(),
-                         0,
-                         0)
-                })
+                             call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })
@@ -286,14 +272,9 @@ pub unsafe fn mdata_mutate_entries(app: *const App,
                 .mutate_mdata_entries(info.name, info.type_tag, actions.clone())
                 .map_err(AppError::from)
                 .then(move |result| {
-                    let (error_code, description) = ffi_result!(result);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
-                    Ok(())
-                })
+                          call_result_cb!(result, user_data, o_cb);
+                          Ok(())
+                      })
                 .into_box()
                 .into()
         })
@@ -350,14 +331,8 @@ pub unsafe fn mdata_list_user_permissions(app: *const App,
                      })
                 .map_err(AppError::from)
                 .map_err(move |err| {
-                    let (error_code, description) = ffi_error!(err);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         0)
-                })
+                             call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })
@@ -395,14 +370,9 @@ pub unsafe fn mdata_set_user_permissions(app: *const App,
                 .set_mdata_user_permissions(info.name, info.type_tag, user, permission_set, version)
                 .map_err(AppError::from)
                 .then(move |result| {
-                    let (error_code, description) = ffi_result!(result);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
-                    Ok(())
-                })
+                          call_result_cb!(result, user_data, o_cb);
+                          Ok(())
+                      })
                 .into_box()
                 .into()
         })
@@ -434,14 +404,9 @@ pub unsafe fn mdata_del_user_permissions(app: *const App,
                 .del_mdata_user_permissions(info.name, info.type_tag, user, version)
                 .map_err(AppError::from)
                 .then(move |result| {
-                    let (error_code, description) = ffi_result!(result);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
-                    Ok(())
-                })
+                          call_result_cb!(result, user_data, o_cb);
+                          Ok(())
+                      })
                 .into_box()
                 .into()
         })
@@ -471,14 +436,9 @@ pub unsafe extern "C" fn mdata_change_owner(app: *const App,
                 .change_mdata_owner(info.name, info.type_tag, new_owner, version)
                 .map_err(AppError::from)
                 .then(move |result| {
-                    let (error_code, description) = ffi_result!(result);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
-                    Ok(())
-                })
+                          call_result_cb!(result, user_data, o_cb);
+                          Ok(())
+                      })
                 .into_box()
                 .into()
         })

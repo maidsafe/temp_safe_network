@@ -157,7 +157,7 @@ pub unsafe extern "C" fn app_account_info(app: *mut App,
                      o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
                  })
             .map_err(move |e| {
-                         call_result_cb!(Err::<(), AppError>(AppError::from(e)), user_data, o_cb);
+                         call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
                      })
             .into_box()
             .into()
@@ -181,14 +181,8 @@ unsafe fn call_network_observer(event: Result<NetworkEvent, AppError>,
                                 o_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32)) {
     match event {
         Ok(event) => o_cb(user_data, FFI_RESULT_OK, event.into()),
-        Err(err) => {
-            let (error_code, description) = ffi_error!(err);
-            o_cb(user_data,
-                 FfiResult {
-                     error_code,
-                     description: description.as_ptr(),
-                 },
-                 0)
+        res @ Err(..) => {
+            call_result_cb!(res, user_data, o_cb);
         }
     }
 }

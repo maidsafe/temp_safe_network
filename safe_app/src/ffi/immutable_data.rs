@@ -26,7 +26,6 @@ use routing::{XOR_NAME_LEN, XorName};
 use safe_core::{FutureExt, SelfEncryptionStorage, immutable_data};
 use self_encryption::{SelfEncryptor, SequentialEncryptor};
 use std::os::raw::c_void;
-use std::ptr;
 
 type SEWriterHandle = SelfEncryptorWriterHandle;
 type SEReaderHandle = SelfEncryptorReaderHandle;
@@ -53,14 +52,8 @@ pub unsafe extern "C" fn idata_new_self_encryptor(app: *const App,
                          o_cb(user_data.0, FFI_RESULT_OK, handle);
                      })
                 .map_err(move |e| {
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         0);
-                })
+                             call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                         })
                 .into_box();
 
             Some(fut)
@@ -86,27 +79,17 @@ pub unsafe extern "C" fn idata_write_to_self_encryptor(app: *const App,
             let fut = {
                 match context.object_cache().get_se_writer(se_h) {
                     Ok(writer) => writer.write(&data_slice),
-                    Err(e) => {
-                        let (error_code, description) = ffi_error!(e);
-                        o_cb(user_data.0,
-                             FfiResult {
-                                 error_code,
-                                 description: description.as_ptr(),
-                             });
+                    res @ Err(..) => {
+                        call_result_cb!(res, user_data, o_cb);
                         return None;
                     }
                 }
             };
             let fut = fut.map_err(AppError::from)
                 .then(move |res| {
-                    let (error_code, description) = ffi_result!(res);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
-                    Ok(())
-                })
+                          call_result_cb!(res, user_data, o_cb);
+                          Ok(())
+                      })
                 .into_box();
             Some(fut)
         })
@@ -161,14 +144,8 @@ pub unsafe extern "C" fn idata_close_self_encryptor(app: *const App,
                 .then(move |result| {
                     match result {
                         Ok(name) => o_cb(user_data.0, FFI_RESULT_OK, &name.0),
-                        Err(e) => {
-                            let (error_code, description) = ffi_error!(e);
-                            o_cb(user_data.0,
-                                 FfiResult {
-                                     error_code,
-                                     description: description.as_ptr(),
-                                 },
-                                 ptr::null())
+                        res @ Err(..) => {
+                            call_result_cb!(res, user_data, o_cb);
                         }
                     }
                     Ok(())
@@ -215,14 +192,8 @@ pub unsafe extern "C" fn idata_fetch_self_encryptor(app: *const App,
                          o_cb(user_data.0, FFI_RESULT_OK, handle);
                      })
                 .map_err(move |e| {
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         0);
-                })
+                             call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })
@@ -245,15 +216,8 @@ pub unsafe extern "C" fn idata_serialised_size(app: *const App,
                 .get_idata(name)
                 .map(move |idata| o_cb(user_data.0, FFI_RESULT_OK, idata.serialised_size()))
                 .map_err(move |e| {
-                    let e = AppError::from(e);
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         0);
-                })
+                             call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })
@@ -274,14 +238,8 @@ pub unsafe extern "C" fn idata_size(app: *const App,
                 Ok(se) => {
                     o_cb(user_data.0, FFI_RESULT_OK, se.len());
                 }
-                Err(e) => {
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         0);
+                res @ Err(..) => {
+                    call_result_cb!(res, user_data, o_cb);
                 }
             };
             None
@@ -307,29 +265,16 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
         (*app).send(move |_, context| {
             let se = match context.object_cache().get_se_reader(se_h) {
                 Ok(r) => r,
-                Err(e) => {
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         ptr::null(),
-                         0);
+                res @ Err(..) => {
+                    call_result_cb!(res, user_data, o_cb);
                     return None;
                 }
             };
 
             if from_pos + len > se.len() {
-                let (error_code, description) =
-                    ffi_error!(AppError::InvalidSelfEncryptorReadOffsets);
-                o_cb(user_data.0,
-                     FfiResult {
-                         error_code,
-                         description: description.as_ptr(),
-                     },
-                     ptr::null_mut(),
-                     0);
+                call_result_cb!(Err::<(), _>(AppError::InvalidSelfEncryptorReadOffsets),
+                                user_data,
+                                o_cb);
                 return None;
             }
 
@@ -337,15 +282,8 @@ pub unsafe extern "C" fn idata_read_from_self_encryptor(app: *const App,
                 .map(move |data| { o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len()); })
                 .map_err(AppError::from)
                 .map_err(move |e| {
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         ptr::null(),
-                         0);
-                })
+                             call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                         })
                 .into_box();
 
             Some(fut)
@@ -364,15 +302,10 @@ pub unsafe extern "C" fn idata_self_encryptor_writer_free(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let res = context.object_cache().remove_se_writer(handle);
-            let (error_code, description) = ffi_result!(res);
-            o_cb(user_data.0,
-                 FfiResult {
-                     error_code,
-                     description: description.as_ptr(),
-                 });
-            None
-        })
+                        let res = context.object_cache().remove_se_writer(handle);
+                        call_result_cb!(res, user_data, o_cb);
+                        None
+                    })
     });
 }
 
@@ -387,15 +320,10 @@ pub unsafe extern "C" fn idata_self_encryptor_reader_free(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let res = context.object_cache().remove_se_reader(handle);
-            let (error_code, description) = ffi_result!(res);
-            o_cb(user_data.0,
-                 FfiResult {
-                     error_code,
-                     description: description.as_ptr(),
-                 });
-            None
-        })
+                        let res = context.object_cache().remove_se_reader(handle);
+                        call_result_cb!(res, user_data, o_cb);
+                        None
+                    })
     })
 }
 
