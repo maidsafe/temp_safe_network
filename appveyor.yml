@@ -25,10 +25,10 @@ configuration:
 
 build_script:
   - |-
-    cd ffi_utils && cargo build --verbose --release
-    cd ..\safe_core && cargo rustc --verbose --release --features testing --profile test --lib -- -Zno-trans
-    cd ..\safe_app && cargo rustc --verbose --release --features testing --profile test --lib -- -Zno-trans
-    cd ..\safe_authenticator && cargo rustc --verbose --features testing --release --profile test --lib -- -Zno-trans
+    cd ffi_utils && cargo check --verbose --release --lib --tests
+    cd ..\safe_core && cargo check --verbose --release --features testing --lib --tests
+    cd ..\safe_app && cargo check --verbose --release --features testing --lib --tests
+    cd ..\safe_authenticator && cargo check --verbose --features testing --release --lib --tests
 
 test_script:
   - |-
