@@ -35,7 +35,6 @@ use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
-use std::ptr;
 use tiny_keccak::sha3_256;
 
 const CONFIG_FILE: &'static [u8] = b"authenticator-config";
@@ -183,14 +182,9 @@ pub unsafe extern "C" fn auth_unregistered_decode_ipc_msg(msg: *const c_char,
                 o_unregistered(user_data.0, req_id);
             }
             _ => {
-                let (error_code, description) =
-                    ffi_error!(AuthError::CoreError(CoreError::OperationForbidden));
-                o_err(user_data.0,
-                      FfiResult {
-                          error_code,
-                          description: description.as_ptr(),
-                      },
-                      ptr::null_mut());
+                call_result_cb!(Err::<(), _>(AuthError::CoreError(CoreError::OperationForbidden)),
+                                user_data,
+                                o_err);
             }
         }
 
@@ -253,29 +247,17 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
                             Ok(IpcMsg::Resp { .. }) |
                             Ok(IpcMsg::Revoked { .. }) |
                             Ok(IpcMsg::Err(..)) => {
-                                let (error_code, description) = ffi_error!(
-                                        AuthError::Unexpected("Unexpected msg \
+                                let err = AuthError::Unexpected("Unexpected msg \
                                                                type"
-                                          .to_owned()));
-                                o_err(user_data.0,
-                                      FfiResult {
-                                          error_code,
-                                          description: description.as_ptr(),
-                                      },
-                                      ptr::null_mut());
+                                                                        .to_owned());
+                                call_result_cb!(Err::<(), _>(err), user_data, o_err);
                             }
                         }
                         Ok(())
                     })
                     .map_err(move |err| {
-                        let (error_code, description) = ffi_error!(err);
-                        o_err(user_data.0,
-                              FfiResult {
-                                  error_code,
-                                  description: description.as_ptr(),
-                              },
-                              ptr::null_mut());
-                    })
+                                 call_result_cb!(Err::<(), _>(err), user_data, o_err);
+                             })
                     .into_box()
                     .into()
             })?;
@@ -285,12 +267,12 @@ pub unsafe extern "C" fn auth_decode_ipc_msg(auth: *const Authenticator,
 
 /// Revoke app access
 #[no_mangle]
-pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
-                                                  app_id: *const c_char,
-                                                  user_data: *mut c_void,
-                                                  o_cb: extern "C" fn(*mut c_void,
-                                                                      FfiResult,
-                                                                      *const c_char)) {
+pub unsafe extern "C" fn auth_revoke_app(auth: *const Authenticator,
+                                         app_id: *const c_char,
+                                         user_data: *mut c_void,
+                                         o_cb: extern "C" fn(*mut c_void,
+                                                             FfiResult,
+                                                             *const c_char)) {
     let user_data = OpaqueCtx(user_data);
 
     catch_unwind_cb(user_data.0, o_cb, || -> Result<_, AuthError> {
@@ -385,14 +367,8 @@ pub unsafe extern "C" fn authenticator_revoke_app(auth: *const Authenticator,
                                   Ok(())
                               })
                     .map_err(move |e| {
-                        let (error_code, description) = ffi_error!(e);
-                        o_cb(user_data.0,
-                             FfiResult {
-                                 error_code,
-                                 description: description.as_ptr(),
-                             },
-                             ptr::null())
-                    })
+                                 call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                             })
                     .into_box()
                     .into()
             })?;
@@ -570,14 +546,8 @@ pub unsafe extern "C" fn encode_auth_resp(auth: *const Authenticator,
                                 .into_box()
                         })
                         .map_err(move |e| {
-                            let (error_code, description) = ffi_error!(e);
-                            o_cb(user_data.0,
-                                 FfiResult {
-                                     error_code,
-                                     description: description.as_ptr(),
-                                 },
-                                 ptr::null())
-                        })
+                                     call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                                 })
                         .into_box()
                         .into()
                 })?;

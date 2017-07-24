@@ -23,7 +23,6 @@ use safe_core::FutureExt;
 use safe_core::ipc::req::ffi::Permission;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
-use std::ptr;
 
 /// Fetch access info from the network.
 #[no_mangle]
@@ -38,14 +37,9 @@ pub unsafe extern "C" fn access_container_refresh_access_info(app: *const App,
             context
                 .refresh_access_info(client)
                 .then(move |res| {
-                    let (error_code, description) = ffi_result!(res);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         });
-                    Ok(())
-                })
+                          call_result_cb!(res, user_data, o_cb);
+                          Ok(())
+                      })
                 .into_box()
                 .into()
         })
@@ -84,15 +78,8 @@ pub unsafe extern "C" fn access_container_get_names(app: *const App,
                          c_str_vec.len() as u32);
                 })
                 .map_err(move |e| {
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         ptr::null(),
-                         0);
-                })
+                             call_result_cb!(Err::<(), _>(e), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })
@@ -122,14 +109,8 @@ MDataInfoHandle)){
                          o_cb(user_data.0, FFI_RESULT_OK, handle);
                      })
                 .map_err(move |err| {
-                    let (error_code, description) = ffi_error!(err);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         0)
-                })
+                             call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })
@@ -154,14 +135,8 @@ pub unsafe extern "C" fn access_container_is_permitted(app: *const App,
                 .is_permitted(client, name, permission)
                 .map(move |answer| o_cb(user_data.0, FFI_RESULT_OK, answer))
                 .map_err(move |err| {
-                    let (error_code, description) = ffi_error!(err);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         false)
-                })
+                             call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })

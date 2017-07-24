@@ -149,14 +149,8 @@ pub unsafe extern "C" fn cipher_opt_new_asymmetric(app: *const App,
                       .object_cache()
                       .get_encrypt_key(peer_encrypt_key_h) {
                 Ok(pk) => *pk,
-                Err(e) => {
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         0);
+                res @ Err(..) => {
+                    call_result_cb!(res, user_data, o_cb);
                     return None;
                 }
             };
@@ -179,15 +173,10 @@ pub unsafe extern "C" fn cipher_opt_free(app: *const App,
 
     catch_unwind_cb(user_data, o_cb, || {
         (*app).send(move |_, context| {
-            let res = context.object_cache().remove_cipher_opt(handle);
-            let (error_code, description) = ffi_result!(res);
-            o_cb(user_data.0,
-                 FfiResult {
-                     error_code,
-                     description: description.as_ptr(),
-                 });
-            None
-        })
+                        let res = context.object_cache().remove_cipher_opt(handle);
+                        call_result_cb!(res, user_data, o_cb);
+                        None
+                    })
     });
 }
 

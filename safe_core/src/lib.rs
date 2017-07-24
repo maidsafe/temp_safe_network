@@ -80,6 +80,7 @@ pub mod self_encryption_storage;
 mod client;
 mod errors;
 mod event;
+pub mod ffi;
 
 pub use self::client::{Client, ClientKeys, MDataInfo, mdata_info};
 pub use self::errors::CoreError;

@@ -69,15 +69,8 @@ pub unsafe extern "C" fn dir_fetch_file(app: *const App,
                      })
                 .map_err(AppError::from)
                 .map_err(move |err| {
-                    let (error_code, description) = ffi_error!(err);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         ptr::null(),
-                         0)
-                })
+                             call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })
@@ -183,15 +176,8 @@ pub unsafe extern "C" fn file_open(app: *const App,
                          o_cb(user_data.0, FFI_RESULT_OK, file_h);
                      })
                 .map_err(move |err| {
-                    let err = AppError::from(err);
-                    let (error_code, description) = ffi_error!(err);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         0);
-                })
+                             call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
+                         })
                 .into_box()
                 .into()
         })
@@ -213,13 +199,7 @@ pub unsafe extern "C" fn file_size(app: *const App,
             if let Some(ref reader) = file_ctx.reader {
                 o_cb(user_data.0, FFI_RESULT_OK, reader.size());
             } else {
-                let (error_code, description) = ffi_error!(AppError::InvalidFileMode);
-                o_cb(user_data.0,
-                     FfiResult {
-                         error_code,
-                         description: description.as_ptr(),
-                     },
-                     0);
+                call_result_cb!(Err::<(), _>(AppError::InvalidFileMode), user_data, o_cb);
             }
             None
         })
@@ -252,27 +232,14 @@ pub unsafe extern "C" fn file_read(app: *const App,
                              o_cb(user_data.0, FFI_RESULT_OK, data.as_ptr(), data.len());
                          })
                     .map_err(move |err| {
-                        let err = AppError::from(err);
-                        let (error_code, description) = ffi_error!(err);
-                        o_cb(user_data.0,
-                             FfiResult {
-                                 error_code,
-                                 description: description.as_ptr(),
-                             },
-                             ptr::null_mut(),
-                             0);
-                    })
+                                 call_result_cb!(Err::<(), _>(AppError::from(err)),
+                                                 user_data,
+                                                 o_cb);
+                             })
                     .into_box()
                     .into()
             } else {
-                let (error_code, description) = ffi_error!(AppError::InvalidFileMode);
-                o_cb(user_data.0,
-                     FfiResult {
-                         error_code,
-                         description: description.as_ptr(),
-                     },
-                     ptr::null_mut(),
-                     0);
+                call_result_cb!(Err::<(), _>(AppError::InvalidFileMode), user_data, o_cb);
                 None
             }
         })
@@ -298,23 +265,13 @@ pub unsafe extern "C" fn file_write(app: *const App,
                 writer
                     .write(data)
                     .then(move |res| {
-                        let (error_code, description) = ffi_result!(res.map_err(AppError::from));
-                        o_cb(user_data.0,
-                             FfiResult {
-                                 error_code,
-                                 description: description.as_ptr(),
-                             });
-                        Ok(())
-                    })
+                              call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
+                              Ok(())
+                          })
                     .into_box()
                     .into()
             } else {
-                let (error_code, description) = ffi_error!(AppError::InvalidFileMode);
-                o_cb(user_data.0,
-                     FfiResult {
-                         error_code,
-                         description: description.as_ptr(),
-                     });
+                call_result_cb!(Err::<(), _>(AppError::InvalidFileMode), user_data, o_cb);
                 None
             }
         })
@@ -339,20 +296,15 @@ pub unsafe extern "C" fn file_close(app: *const App,
                     .close()
                     .map(move |file| { o_cb(user_data.0, FFI_RESULT_OK, &file.into_repr_c()); })
                     .map_err(move |err| {
-                        let err = AppError::from(err);
-                        let (error_code, description) = ffi_error!(err);
-                        o_cb(user_data.0,
-                             FfiResult {
-                                 error_code,
-                                 description: description.as_ptr(),
-                             },
-                             ::std::ptr::null());
-                    })
+                                 call_result_cb!(Err::<(), _>(AppError::from(err)),
+                                                 user_data,
+                                                 o_cb);
+                             })
                     .into_box()
                     .into()
             } else {
                 // The reader will be dropped automatically
-                o_cb(user_data.0, FFI_RESULT_OK, ::std::ptr::null());
+                o_cb(user_data.0, FFI_RESULT_OK, ptr::null());
                 None
             }
         })

@@ -19,7 +19,7 @@ use App;
 use AppContext;
 use errors::AppError;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx};
-use ffi_utils::callback::{Callback, CallbackArgs};
+use ffi_utils::callback::Callback;
 use futures::Future;
 use object_cache::MDataInfoHandle;
 use safe_core::{Client, FutureExt, MDataInfo};
@@ -42,17 +42,10 @@ pub unsafe fn send_sync<C, F>(app: *const App,
     (*app).send(move |client, context| {
         match f(client, context) {
             Ok(args) => o_cb.call(user_data.0, FFI_RESULT_OK, args),
-            Err(err) => {
-                let (error_code, description) = ffi_error!(err);
-                o_cb.call(user_data.0,
-                          FfiResult {
-                              error_code,
-                              description: description.as_ptr(),
-                          },
-                          C::Args::default())
+            res @ Err(..) => {
+                call_result_cb!(res, user_data, o_cb);
             }
         }
-
         None
     })
 }
@@ -62,7 +55,7 @@ pub unsafe fn send_sync<C, F>(app: *const App,
 pub unsafe fn send_with_mdata_info<C, F, U, E>(app: *const App,
                                                info_h: MDataInfoHandle,
                                                user_data: *mut c_void,
-                                               cb: C,
+                                               o_cb: C,
                                                f: F)
                                                -> Result<(), AppError>
     where C: Callback + Copy + Send + 'static,
@@ -74,19 +67,15 @@ pub unsafe fn send_with_mdata_info<C, F, U, E>(app: *const App,
     let user_data = OpaqueCtx(user_data);
 
     (*app).send(move |client, context| {
-        let info = try_cb!(context.object_cache().get_mdata_info(info_h), user_data, cb);
+        let info = try_cb!(context.object_cache().get_mdata_info(info_h),
+                           user_data,
+                           o_cb);
         f(client, context, &*info)
-            .map(move |args| cb.call(user_data.0, FFI_RESULT_OK, args))
+            .map(move |args| o_cb.call(user_data.0, FFI_RESULT_OK, args))
             .map_err(AppError::from)
             .map_err(move |err| {
-                let (error_code, description) = ffi_error!(err);
-                cb.call(user_data.0,
-                        FfiResult {
-                            error_code,
-                            description: description.as_ptr(),
-                        },
-                        C::Args::default())
-            })
+                         call_result_cb!(Err::<(), _>(err), user_data, o_cb);
+                     })
             .into_box()
             .into()
     })

@@ -67,19 +67,26 @@ macro_rules! ffi_error_code {
 }
 
 #[macro_export]
+macro_rules! call_result_cb {
+    ($result:expr, $user_data:expr, $cb:expr) => {
+        #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
+        #[allow(unused)]
+        use $crate::callback::{Callback, CallbackArgs};
+        let (error_code, description) = ffi_result!($result);
+        $cb.call($user_data.into(), FfiResult {
+            error_code,
+            description: description.as_ptr()
+        }, CallbackArgs::default());
+    }
+}
+
+#[macro_export]
 macro_rules! try_cb {
     ($result:expr, $user_data:expr, $cb:expr) => {
         match $result {
             Ok(value) => value,
-            Err(err) => {
-                #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
-                #[allow(unused)]
-                use $crate::callback::{Callback, CallbackArgs};
-                let (error_code, description) = ffi_error!(err);
-                $cb.call($user_data.into(), FfiResult {
-                    error_code,
-                    description: description.as_ptr()
-                }, CallbackArgs::default());
+            e @ Err(_) => {
+                call_result_cb!(e, $user_data, $cb);
                 return None;
             }
         }

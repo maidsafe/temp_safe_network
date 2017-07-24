@@ -21,8 +21,8 @@ use ffi::apps::*;
 use ffi_utils::{FfiResult, ReprC, StringError, base64_encode, from_c_str};
 use ffi_utils::test_utils::{call_1, call_vec, send_via_user_data, sender_as_user_data};
 use futures::{Future, future};
-use ipc::{authenticator_revoke_app, encode_auth_resp, encode_containers_resp,
-          encode_unregistered_resp, get_config};
+use ipc::{auth_revoke_app, encode_auth_resp, encode_containers_resp, encode_unregistered_resp,
+          get_config};
 use maidsafe_utilities::serialisation::deserialise;
 use routing::User;
 use safe_core::{CoreError, MDataInfo, mdata_info};
@@ -718,12 +718,11 @@ fn lists_of_registered_and_revoked_apps() {
     let authenticator = create_account_and_login();
 
     // Initially, there are no registered or revoked apps.
-    let registered: Vec<RegisteredAppId> = unsafe {
-        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
-    };
+    let registered: Vec<RegisteredAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(&authenticator, ud, cb))) };
 
     let revoked: Vec<RevokedAppId> =
-        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
+        unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };
 
     assert!(registered.is_empty());
     assert!(revoked.is_empty());
@@ -745,12 +744,11 @@ fn lists_of_registered_and_revoked_apps() {
     let _ = unwrap!(register_app(&authenticator, &auth_req2));
 
     // There are now two registered apps, but no revoked apps.
-    let registered: Vec<RegisteredAppId> = unsafe {
-        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
-    };
+    let registered: Vec<RegisteredAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(&authenticator, ud, cb))) };
 
     let revoked: Vec<RevokedAppId> =
-        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
+        unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };
 
     assert_eq!(registered.len(), 2);
     assert!(revoked.is_empty());
@@ -759,12 +757,11 @@ fn lists_of_registered_and_revoked_apps() {
     revoke(&authenticator, &auth_req1.app.id);
 
     // There is now one registered and one revoked app.
-    let registered: Vec<RegisteredAppId> = unsafe {
-        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
-    };
+    let registered: Vec<RegisteredAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(&authenticator, ud, cb))) };
 
     let revoked: Vec<RevokedAppId> =
-        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
+        unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };
 
     assert_eq!(registered.len(), 1);
     assert_eq!(revoked.len(), 1);
@@ -772,11 +769,10 @@ fn lists_of_registered_and_revoked_apps() {
     // Re-register the first app - now there must be 2 registered apps again
     let _ = unwrap!(register_app(&authenticator, &auth_req1));
 
-    let registered: Vec<RegisteredAppId> = unsafe {
-        unwrap!(call_vec(|ud, cb| authenticator_registered_apps(&authenticator, ud, cb)))
-    };
+    let registered: Vec<RegisteredAppId> =
+        unsafe { unwrap!(call_vec(|ud, cb| auth_registered_apps(&authenticator, ud, cb))) };
     let revoked: Vec<RevokedAppId> =
-        unsafe { unwrap!(call_vec(|ud, cb| authenticator_revoked_apps(&authenticator, ud, cb))) };
+        unsafe { unwrap!(call_vec(|ud, cb| auth_revoked_apps(&authenticator, ud, cb))) };
 
     assert_eq!(registered.len(), 2);
     assert_eq!(revoked.len(), 0);
@@ -828,7 +824,7 @@ fn revoke(authenticator: &Authenticator, app_id: &str) {
 
     let revoke_resp: String = unsafe {
         let app_id = unwrap!(CString::new(app_id));
-        unwrap!(call_1(|ud, cb| authenticator_revoke_app(authenticator, app_id.as_ptr(), ud, cb)))
+        unwrap!(call_1(|ud, cb| auth_revoke_app(authenticator, app_id.as_ptr(), ud, cb)))
     };
 
     // Assert the callback is called with error-code 0 and FfiString contains

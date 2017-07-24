@@ -22,8 +22,10 @@
 use super::App;
 use super::errors::AppError;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
+use futures::Future;
 use maidsafe_utilities::serialisation::deserialise;
-use safe_core::NetworkEvent;
+use safe_core::{FutureExt, NetworkEvent};
+use safe_core::ffi::AccountInfo as FfiAccountInfo;
 use safe_core::ipc::{AuthGranted, BootstrapConfig};
 use safe_core::ipc::resp::ffi::AuthGranted as FfiAuthGranted;
 use std::os::raw::{c_char, c_void};
@@ -131,14 +133,37 @@ pub unsafe extern "C" fn app_reconnect(app: *mut App,
                               o_cb(user_data.0, FFI_RESULT_OK);
                               None
                           });
-    if let Err(e) = res {
-        let e = AppError::from(e);
-        let (error_code, description) = ffi_error!(e);
-        o_cb(user_data.0,
-             FfiResult {
-                 error_code,
-                 description: description.as_ptr(),
-             });
+    if let Err(..) = res {
+        call_result_cb!(res, user_data, o_cb);
+    }
+}
+
+/// Get the account usage statistics.
+#[no_mangle]
+pub unsafe extern "C" fn app_account_info(app: *mut App,
+                                          user_data: *mut c_void,
+                                          o_cb: extern "C" fn(*mut c_void,
+                                                              FfiResult,
+                                                              *const FfiAccountInfo)) {
+    let user_data = OpaqueCtx(user_data);
+    let res = (*app).send(move |client, _| {
+        client
+            .get_account_info()
+            .map(move |acc_info| {
+                     let ffi_acc = FfiAccountInfo {
+                         mutations_done: acc_info.mutations_done,
+                         mutations_available: acc_info.mutations_available,
+                     };
+                     o_cb(user_data.0, FFI_RESULT_OK, &ffi_acc);
+                 })
+            .map_err(move |e| {
+                         call_result_cb!(Err::<(), _>(AppError::from(e)), user_data, o_cb);
+                     })
+            .into_box()
+            .into()
+    });
+    if let Err(..) = res {
+        call_result_cb!(res, user_data, o_cb);
     }
 }
 
@@ -156,32 +181,59 @@ unsafe fn call_network_observer(event: Result<NetworkEvent, AppError>,
                                 o_cb: unsafe extern "C" fn(*mut c_void, FfiResult, i32)) {
     match event {
         Ok(event) => o_cb(user_data, FFI_RESULT_OK, event.into()),
-        Err(err) => {
-            let (error_code, description) = ffi_error!(err);
-            o_cb(user_data,
-                 FfiResult {
-                     error_code,
-                     description: description.as_ptr(),
-                 },
-                 0)
+        res @ Err(..) => {
+            call_result_cb!(res, user_data, o_cb);
         }
     }
 }
 
-#[cfg(all(test, feature = "use-mock-routing"))]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use App;
-    use ffi_utils::test_utils::{call_0, call_1, send_via_user_data, sender_as_user_data};
-    use maidsafe_utilities::serialisation::serialise;
-    use safe_core::NetworkEvent;
-    use safe_core::ipc::BootstrapConfig;
-    use std::os::raw::c_void;
-    use std::sync::mpsc;
-    use std::time::Duration;
+    use ffi_utils::test_utils::call_1;
+    use routing::ImmutableData;
+    use safe_core::ffi::AccountInfo;
+    use test_utils::create_app;
 
     #[test]
+    fn account_info() {
+        let app = create_app();
+        let app = Box::into_raw(Box::new(app));
+
+        let orig_stats: AccountInfo =
+            unsafe { unwrap!(call_1(|ud, cb| app_account_info(app, ud, cb))) };
+        assert!(orig_stats.mutations_available > 0);
+
+        unsafe {
+            unwrap!((*app).send(move |client, _| {
+                                    client
+                                        .put_idata(ImmutableData::new(vec![1, 2, 3]))
+                                        .map_err(move |_| ())
+                                        .into_box()
+                                        .into()
+                                }));
+        }
+
+        let stats: AccountInfo = unsafe { unwrap!(call_1(|ud, cb| app_account_info(app, ud, cb))) };
+        assert_eq!(stats.mutations_done, orig_stats.mutations_done + 1);
+        assert_eq!(stats.mutations_available,
+                   orig_stats.mutations_available - 1);
+
+        unsafe { app_free(app) };
+    }
+
+    #[cfg(all(test, feature = "use-mock-routing"))]
+    #[test]
     fn network_status_callback() {
+        use App;
+        use ffi_utils::test_utils::{call_0, send_via_user_data, sender_as_user_data};
+        use maidsafe_utilities::serialisation::serialise;
+        use safe_core::NetworkEvent;
+        use safe_core::ipc::BootstrapConfig;
+        use std::os::raw::c_void;
+        use std::sync::mpsc;
+        use std::time::Duration;
+
         {
             let (tx, rx) = mpsc::channel();
 

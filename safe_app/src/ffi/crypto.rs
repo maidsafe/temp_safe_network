@@ -23,7 +23,6 @@ use maidsafe_utilities::serialisation::{deserialise, serialise};
 use object_cache::{EncryptPubKeyHandle, EncryptSecKeyHandle, SignKeyHandle};
 use rust_sodium::crypto::{box_, sealedbox, sign};
 use std::os::raw::c_void;
-use std::ptr;
 use std::slice;
 use tiny_keccak::sha3_256;
 
@@ -247,16 +246,8 @@ pub unsafe extern "C" fn encrypt(app: *const App,
 
             match serialise(&(nonce, ciphertext)) {
                 Ok(result) => o_cb(user_data.0, FFI_RESULT_OK, result.as_ptr(), result.len()),
-                Err(e) => {
-                    let e = AppError::from(e);
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         ptr::null(),
-                         0)
+                res @ Err(..) => {
+                    call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
                 }
             }
 
@@ -295,16 +286,8 @@ pub unsafe extern "C" fn decrypt(app: *const App,
                          plaintext.as_ptr(),
                          plaintext.len());
                 }
-                Err(e) => {
-                    let e = AppError::from(e);
-                    let (error_code, description) = ffi_error!(e);
-                    o_cb(user_data.0,
-                         FfiResult {
-                             error_code,
-                             description: description.as_ptr(),
-                         },
-                         ptr::null(),
-                         0)
+                res @ Err(..) => {
+                    call_result_cb!(res.map_err(AppError::from), user_data, o_cb);
                 }
             }
 
