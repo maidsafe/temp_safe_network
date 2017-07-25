@@ -19,7 +19,7 @@ use super::routing::Routing;
 use super::vault::DEFAULT_MAX_MUTATIONS;
 use rand;
 use routing::{AccountInfo, Action, Authority, ClientError, EntryAction, EntryActions, Event,
-              FullId, ImmutableData, MessageId, MutableData, PermissionSet, Response,
+              FullId, ImmutableData, MessageId, MutableData, PermissionSet, Request, Response,
               TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 use rust_sodium::crypto::sign;
 use std::sync::mpsc::{self, Receiver};
@@ -1022,6 +1022,98 @@ fn simulate_rate_limit_errors() {
     let msg_id = MessageId::new();
     unwrap!(routing.get_account_info(client_mgr, msg_id));
     let _ = expect_success!(routing_rx, msg_id, Response::GetAccountInfo);
+}
+
+#[test]
+fn request_hooks() {
+    let (mut routing, routing_rx, full_id) = setup();
+
+    routing.set_request_hook(move |req| {
+        match req {
+            &Request::PutMData { ref data, msg_id, .. } if data.tag() == 10000u64 => {
+                // Send an OK response but don't put data on the mock vault
+                Some(Response::PutMData {
+                    res: Ok(()),
+                    msg_id,
+                })
+            }
+            &Request::MutateMDataEntries { tag, msg_id, .. } if tag == 12345u64 => {
+                Some(Response::MutateMDataEntries {
+                    res: Err(ClientError::from("hello world")),
+                    msg_id,
+                })
+            }
+            // Pass-through
+            _ => None,
+        }
+    });
+
+    // Create account
+    let owner_key = *full_id.public_id().signing_public_key();
+    let client_mgr = create_account(&mut routing, &routing_rx, owner_key);
+
+    // Construct MutableData (but hook won't allow to store it on the network
+    // if the tag is 10000)
+    let name = rand::random();
+    let tag = 10000u64;
+
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        Default::default(),
+                                        btree_set!(owner_key)));
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.put_mdata(client_mgr, data, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::PutMData);
+
+    // Check that this MData is not available
+    let msg_id = MessageId::new();
+    unwrap!(routing.get_mdata_version(Authority::NaeManager(name), name, tag, msg_id));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::GetMDataVersion,
+                    ClientError::NoSuchData);
+
+    // Put an MData with a different tag, this should be stored now
+    let name = rand::random();
+    let tag = 12345u64;
+
+    let data = unwrap!(MutableData::new(name,
+                                        tag,
+                                        Default::default(),
+                                        Default::default(),
+                                        btree_set!(owner_key)));
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.put_mdata(client_mgr, data, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::PutMData);
+
+    // Try adding some entries - this should fail, as the hook function
+    // won't allow to put entries to MD with a tag 12345
+    let key0 = b"key0";
+    let value0_v0 = unwrap!(utils::generate_random_vector(10));
+
+    let actions = btree_map![
+            key0.to_vec() => EntryAction::Ins(Value {
+                content: value0_v0.clone(),
+                entry_version: 0,
+            })
+        ];
+
+    let msg_id = MessageId::new();
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions.clone(), msg_id,
+                                         owner_key));
+    expect_failure!(routing_rx,
+                    msg_id,
+                    Response::MutateMDataEntries,
+                    ClientError::NetworkOther(..));
+
+    // Now remove the hook function and try again - this should succeed now
+    routing.remove_request_hook();
+
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions, msg_id, owner_key));
+    expect_success!(routing_rx, msg_id, Response::MutateMDataEntries);
 }
 
 fn setup() -> (Routing, Receiver<Event>, FullId) {

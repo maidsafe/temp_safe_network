@@ -191,7 +191,8 @@ impl Authenticator {
                             .ins(KEY_APPS.to_vec(), Vec::new(), 0)
                             .ins(KEY_ACCESS_CONTAINER.to_vec(), fry!(serialise(&dir)), 0)
                             .into();
-                        let actions = fry!(mdata_info::encrypt_entry_actions(&config_dir, &actions));
+                        let actions = fry!(mdata_info::encrypt_entry_actions(&config_dir,
+                                                                             &actions));
 
                         c2.mutate_mdata_entries(config_dir.name,
                                                        config_dir.type_tag,
