@@ -22,6 +22,7 @@ use futures::Future;
 use futures::future::{self, Either, Loop};
 use routing::{Action, ClientError, EntryAction, EntryError, MutableData, PermissionSet, User,
               Value, XorName};
+use rust_sodium::crypto::sign;
 use std::collections::BTreeMap;
 use utils::FutureExt;
 
@@ -169,7 +170,7 @@ fn update_mdata<T: 'static>(client: &Client<T>, data: MutableData) -> Box<CoreFu
                 &client2,
                 *data.name(),
                 data.tag(),
-                permissions,
+                &permissions,
                 data.permissions().clone(),
                 version + 1,
             ).map(move |_| (data, entries))
@@ -179,7 +180,7 @@ fn update_mdata<T: 'static>(client: &Client<T>, data: MutableData) -> Box<CoreFu
                 &client3,
                 *data.name(),
                 data.tag(),
-                entries,
+                &entries,
                 data.entries().clone(),
             )
         })
@@ -191,7 +192,7 @@ fn update_mdata_entries<T: 'static>(
     client: &Client<T>,
     name: XorName,
     tag: u64,
-    current_entries: BTreeMap<Vec<u8>, Value>,
+    current_entries: &BTreeMap<Vec<u8>, Value>,
     desired_entries: BTreeMap<Vec<u8>, Value>,
 ) -> Box<CoreFuture<()>> {
     let actions = desired_entries
@@ -216,7 +217,7 @@ fn update_mdata_permissions<T: 'static>(
     client: &Client<T>,
     name: XorName,
     tag: u64,
-    current_permissions: BTreeMap<User, PermissionSet>,
+    current_permissions: &BTreeMap<User, PermissionSet>,
     desired_permissions: BTreeMap<User, PermissionSet>,
     version: u64,
 ) -> Box<CoreFuture<()>> {
@@ -264,19 +265,14 @@ fn fix_entry_actions(
 
 fn fix_entry_action(action: EntryAction, error: &EntryError) -> Option<EntryAction> {
     match (action, *error) {
-        (EntryAction::Ins(value), EntryError::EntryExists(current_version)) => {
-            Some(EntryAction::Update(Value {
-                content: value.content,
-                entry_version: current_version + 1,
-            }))
-        }
-        (EntryAction::Update(value), EntryError::NoSuchEntry) => Some(EntryAction::Ins(value)),
+        (EntryAction::Ins(value), EntryError::EntryExists(current_version)) |
         (EntryAction::Update(value), EntryError::InvalidSuccessor(current_version)) => {
             Some(EntryAction::Update(Value {
                 content: value.content,
                 entry_version: current_version + 1,
             }))
         }
+        (EntryAction::Update(value), EntryError::NoSuchEntry) => Some(EntryAction::Ins(value)),
         (EntryAction::Del(_), EntryError::NoSuchEntry) => None,
         (EntryAction::Del(_), EntryError::InvalidSuccessor(current_version)) => {
             Some(EntryAction::Del(current_version + 1))
@@ -309,6 +305,40 @@ fn union_permission_sets(a: &PermissionSet, b: &PermissionSet) -> PermissionSet 
         },
     )
 
+}
+
+/// Insert key to maid managers.
+/// Covers the `InvalidSuccessor` error case (it should not fail if the key already exists).
+pub fn ins_auth_key<T: 'static>(
+    client: &Client<T>,
+    key: sign::PublicKey,
+    version: u64,
+) -> Box<CoreFuture<()>> {
+    let state = (0, version);
+    let client = client.clone();
+
+    future::loop_fn(state, move |(attempts, version)| {
+        client
+            .ins_auth_key(key, version)
+            .map(|_| Loop::Break(()))
+            .or_else(move |error| match error {
+                CoreError::RoutingClientError(ClientError::InvalidSuccessor(current_version)) => {
+                    if attempts < MAX_ATTEMPTS {
+                        Ok(Loop::Continue((attempts + 1, current_version + 1)))
+                    } else {
+                        Err(error)
+                    }
+                }
+                CoreError::RequestTimeout => {
+                    if attempts < MAX_ATTEMPTS {
+                        Ok(Loop::Continue((attempts + 1, version)))
+                    } else {
+                        Err(CoreError::RequestTimeout)
+                    }
+                }
+                error => Err(error),
+            })
+    }).into_box()
 }
 
 #[cfg(test)]

@@ -302,6 +302,7 @@ mod tests {
             name: rand::random(),
             type_tag: 0,
             enc_info: Some((secretbox::gen_key(), None)),
+            new_enc_info: None,
         };
         let key = Vec::from("str of key");
         let enc_key = unwrap!(info.enc_entry_key(&key));

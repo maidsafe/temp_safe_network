@@ -21,7 +21,7 @@ use errors::CoreError;
 use futures::Future;
 use nfs::{NfsError, NfsFuture};
 use routing::MutableData;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use utils::FutureExt;
 
 /// create a new directory emulation
@@ -34,8 +34,7 @@ pub fn create_dir<T: 'static>(client: &Client<T>, is_public: bool) -> Box<NfsFut
                 fry!(MDataInfo::random_private(DIR_TAG))
             };
 
-            let mut owners = BTreeSet::new();
-            owners.insert(pub_key);
+            let owners = btree_set![pub_key];
             let dir_md = fry!(
                 MutableData::new(
                     dir.name,
