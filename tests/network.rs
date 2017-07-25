@@ -121,8 +121,10 @@ impl DebugId for ImmutableData {
 
 impl DebugId for MutableData {
     fn debug_id(&self) -> String {
-        format!("mutable chunk (name: {:?}, tag: {})",
-                self.name(),
-                self.tag())
+        format!(
+            "mutable chunk (name: {:?}, tag: {})",
+            self.name(),
+            self.tag()
+        )
     }
 }
