@@ -38,6 +38,10 @@ pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<String>> 
     let c6 = client.clone();
     let c7 = client.clone();
 
+    // 1. Delete the app key from MaidManagers
+    // 2. Get the access container and remove the revoked app from it
+    // 3. Remove the app's key from containers permissions
+    // 4. Re-encrypt private containers that the app had access to
     config::get_app(client, app_id)
         .and_then(move |app| {
             delete_app_auth_key(&c2, app.keys.sign_pk).map(move |_| app)

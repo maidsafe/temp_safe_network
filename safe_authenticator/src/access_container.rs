@@ -15,13 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Routines that control the access container.
+//!
+//! Access container is stored in the user's config root dir.
+
 use super::{AccessContainerEntry, AuthError, AuthFuture};
 use config::KEY_ACCESS_CONTAINER;
 use futures::Future;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::EntryActions;
 use rust_sodium::crypto::secretbox;
-use safe_core::{Client, FutureExt, MDataInfo};
+use safe_core::{Client, FutureExt, MDataInfo, recovery};
 use safe_core::ipc::AppKeys;
 use safe_core::ipc::resp::access_container_enc_key;
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
@@ -116,13 +120,12 @@ where
         EntryActions::new().update(key, ciphertext, version)
     };
 
-    client
-        .mutate_mdata_entries(
-            access_container.name,
-            access_container.type_tag,
-            actions.into(),
-        )
-        .map_err(From::from)
+    recovery::mutate_mdata_entries(
+        client,
+        access_container.name,
+        access_container.type_tag,
+        actions.into(),
+    ).map_err(From::from)
         .into_box()
 }
 
@@ -136,12 +139,11 @@ pub fn delete_access_container_entry<T: 'static>(
 ) -> Box<AuthFuture<()>> {
     let key = fry!(access_container_key(access_container, app_id, app_keys));
     let actions = EntryActions::new().del(key, version);
-    client
-        .mutate_mdata_entries(
-            access_container.name,
-            access_container.type_tag,
-            actions.into(),
-        )
-        .map_err(From::from)
+    recovery::mutate_mdata_entries(
+        client,
+        access_container.name,
+        access_container.type_tag,
+        actions.into(),
+    ).map_err(From::from)
         .into_box()
 }

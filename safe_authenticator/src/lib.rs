@@ -69,6 +69,7 @@ pub mod ipc;
 pub mod public_id;
 
 mod access_container;
+mod app_container;
 mod config;
 mod errors;
 mod revocation;
@@ -175,27 +176,37 @@ impl Authenticator {
             let core_tx2 = core_tx.clone();
             unwrap!(core_tx.send(CoreMsg::new(move |client, &()| {
                 let client = client.clone();
-                create_std_dirs(client.clone()).map_err(AuthError::from).and_then(move |()| {
-                    create_dir(&client, false).map_err(AuthError::from).and_then(move |dir| {
-                        let config_dir = unwrap!(client.config_root_dir());
+                let c2 = client.clone();
+
+                create_std_dirs(client.clone())
+                    .map_err(AuthError::from)
+                    .and_then(move |_| {
+                        create_dir(&client, false)
+                            .map_err(AuthError::from)
+                    })
+                    .and_then(move |dir| {
+                        let config_dir = unwrap!(c2.config_root_dir());
 
                         let actions = EntryActions::new()
                             .ins(KEY_APPS.to_vec(), Vec::new(), 0)
-                            .ins(KEY_ACCESS_CONTAINER.to_vec(), serialise(&dir)?, 0)
+                            .ins(KEY_ACCESS_CONTAINER.to_vec(), fry!(serialise(&dir)), 0)
                             .into();
-                        let actions = mdata_info::encrypt_entry_actions(&config_dir, &actions)?;
+                        let actions = fry!(mdata_info::encrypt_entry_actions(&config_dir, &actions));
 
-                        Ok(client.mutate_mdata_entries(config_dir.name,
+                        c2.mutate_mdata_entries(config_dir.name,
                                                        config_dir.type_tag,
-                                                       actions))
-                    }).and_then(move |fut| {
-                        fut.map_err(AuthError::from)
-                    }).map(move |()| {
+                                                    actions)
+                            .map_err(AuthError::from)
+                            .into_box()
+                    })
+                    .map(move |()| {
                         unwrap!(tx.send(Ok(core_tx2)));
                     })
-                }).map_err(move |e| {
-                    unwrap!(tx2.send(Err(AuthError::from(e))));
-                }).into_box().into()
+                    .map_err(move |e| {
+                        unwrap!(tx2.send(Err(AuthError::from(e))));
+                    })
+                    .into_box()
+                    .into()
             })));
 
             event_loop::run(el, &client, &(), core_rx);

@@ -19,11 +19,12 @@ use AccessContainerEntry;
 use AuthError;
 use Authenticator;
 use access_container::{access_container, access_container_nonce};
+use app_container;
 use config;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str,
                 vec_into_raw_parts};
 use futures::Future;
-use ipc::{AppState, app_state, remove_app_container};
+use ipc::{AppState, app_state};
 use maidsafe_utilities::serialisation::deserialise;
 use safe_core::FutureExt;
 use safe_core::ipc::{IpcError, access_container_enc_key};
@@ -101,7 +102,7 @@ pub unsafe extern "C" fn auth_rm_revoked_app(
 
                     config::update_apps(&c3, &auth_cfg, cfg_version + 1)
                 })
-                .and_then(move |_| remove_app_container(c4, &app_id2))
+                .and_then(move |_| app_container::remove(c4, &app_id2))
                 .then(move |res| {
                     call_result_cb!(res, user_data, o_cb);
                     Ok(())

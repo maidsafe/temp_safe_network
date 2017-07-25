@@ -193,7 +193,7 @@ where
         EntryActions::new().update(key, encoded, version)
     };
 
-    recovery::mutate_mdata_entries(&client, parent.name, parent.type_tag, actions.into())
+    recovery::mutate_mdata_entries(client, parent.name, parent.type_tag, actions.into())
         .map_err(From::from)
         .into_box()
 }
