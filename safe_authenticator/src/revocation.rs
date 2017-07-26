@@ -19,8 +19,8 @@ use super::{AccessContainerEntry, AuthError, AuthFuture};
 use access_container::{access_container, access_container_entry, access_container_key,
                        delete_access_container_entry};
 use config;
+use config::AppInfo;
 use futures::{Future, future};
-use ipc::AppInfo;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{EntryActions, User};
 use rust_sodium::crypto::sign;

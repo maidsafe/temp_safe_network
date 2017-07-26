@@ -16,9 +16,9 @@
 // relating to use of the SAFE Network Software.
 
 use super::{AccessContainerEntry, AuthError, AuthFuture, Authenticator};
-use super::access_container::{access_container, access_container_entry, put_access_container_entry};
-use app_container;
-use config::{self, Apps};
+use access_container::{access_container, access_container_entry, put_access_container_entry};
+use app_auth::{self, AppState, app_state};
+use config;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, StringError, base64_encode,
                 catch_unwind_cb, from_c_str};
 use futures::{Future, future};
@@ -28,30 +28,14 @@ use routing::{ClientError, User};
 use rust_sodium::crypto::sign;
 use safe_core::{Client, CoreError, FutureExt, MDataInfo, recovery};
 use safe_core::ipc::{self, IpcError, IpcMsg, decode_msg};
-use safe_core::ipc::req::{AppExchangeInfo, AuthReq, ContainersReq, IpcReq};
+use safe_core::ipc::req::{AuthReq, ContainersReq, IpcReq};
 use safe_core::ipc::req::ffi::{Permission, convert_permission_set};
 use safe_core::ipc::req::ffi::AuthReq as FfiAuthReq;
 use safe_core::ipc::req::ffi::ContainersReq as FfiContainersReq;
-use safe_core::ipc::resp::{AccessContInfo, AppKeys, AuthGranted, IpcResp};
+use safe_core::ipc::resp::IpcResp;
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
-use tiny_keccak::sha3_256;
-
-/// App data stored in the authenticator configuration.
-///
-/// We need to store it even for revoked apps because we need to
-/// preserve the app keys. An app can encrypt data and create mutable data
-/// instances on its own, so we need to make sure that the app can
-/// access the encrypted data in future, even if the app was revoked
-/// at some point.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AppInfo {
-    /// Application info (id, name, vendor, etc.)
-    pub info: AppExchangeInfo,
-    /// Application keys
-    pub keys: AppKeys,
-}
 
 /// Decodes a given encoded IPC message and returns either an `IpcMsg` struct or
 /// an error code + description & an encoded `IpcMsg::Resp` in case of an error
@@ -346,113 +330,39 @@ pub unsafe extern "C" fn encode_auth_resp(
                 resp.as_ptr(),
             );
         } else {
-            let permissions = auth_req.containers.clone();
+            let app_id = auth_req.app.id.clone();
+            let app_id2 = app_id.clone();
 
             (*auth).send(move |client| {
-                let app_id = auth_req.app.id.clone();
-                let app_id2 = app_id.clone();
-                let app_id3 = app_id.clone();
-                let app_container = auth_req.app_container;
-
-                let c2 = client.clone();
-                let c3 = client.clone();
-                let c4 = client.clone();
-
-                config::list_apps(client)
-                    .and_then(move |(_cfg_version, config)| {
-                        app_state(&c2, &config, app_id.clone()).map(
-                            move |app_state| {
-                                (config, app_state, app_id)
+                app_auth::authenticate(client, auth_req)
+                    .and_then(move |auth_granted| {
+                        let resp = encode_response(
+                            &IpcMsg::Resp {
+                                req_id: req_id,
+                                resp: IpcResp::Auth(Ok(auth_granted)),
                             },
-                        )
+                            &app_id,
+                        )?;
+
+                        Ok(o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr()))
                     })
-                    .and_then(move |(mut config, app_state, app_id)| {
-                        // Determine an app state. If it's revoked we can reuse existing
-                        // keys stored in the config. And if it is authorised, we just
-                        // return the app info from the config.
-                        match app_state {
-                            AppState::NotAuthenticated => {
-                                let owner_key = fry!(c3.owner_key().map_err(AuthError::from));
-                                let keys = AppKeys::random(owner_key);
-                                let app = AppInfo {
-                                    info: auth_req.app,
-                                    keys: keys,
-                                };
-                                config::insert_app(&c3, app.clone())
-                                    .map(move |_| (app, app_state))
-                                    .into_box()
-                            }
-                            AppState::Authenticated | AppState::Revoked => {
-                                let app_entry_name = sha3_256(app_id.as_bytes());
-                                if let Some(app) = config.remove(&app_entry_name) {
-                                    ok!((app, app_state))
-                                } else {
-                                    err!(AuthError::Unexpected(
-                                        "Logical error - couldn't \
-                                                                    find a revoked app in config"
-                                            .to_owned(),
-                                    ))
-                                }
-                            }
-                        }
-                    })
-                    .and_then(move |(app, app_state)| {
-                        let granted_future = match app_state {
-                            AppState::Authenticated => {
-                                // Return info of the already registered app
-                                let app_keys = app.keys.clone();
-                                let bootstrap_config = fry!(Client::<()>::bootstrap_config());
-
-                                access_container(&c4)
-                                    .and_then(move |dir| {
-                                        let access_container =
-                                            AccessContInfo::from_mdata_info(dir)?;
-                                        Ok(AuthGranted {
-                                            app_keys: app_keys,
-                                            bootstrap_config: bootstrap_config,
-                                            access_container: access_container,
-                                        })
-                                    })
-                                    .into_box()
-                            }
-                            AppState::NotAuthenticated |
-                            AppState::Revoked => {
-                                // Register a new app or restore a previously registered app
-                                authenticate_app(&c4, app, app_container, permissions)
-                            }
-                        };
-
-                        granted_future
-                            .and_then(move |auth_granted| {
-                                let resp = encode_response(
-                                    &IpcMsg::Resp {
-                                        req_id: req_id,
-                                        resp: IpcResp::Auth(Ok(auth_granted)),
-                                    },
-                                    &app_id2,
-                                )?;
-
-                                Ok(o_cb(user_data.0, FFI_RESULT_OK, resp.as_ptr()))
-                            })
-                            .or_else(move |e| -> Result<(), AuthError> {
-                                let (error_code, description) = ffi_error!(e);
-                                let resp = encode_response(
-                                    &IpcMsg::Resp {
-                                        req_id: req_id,
-                                        resp: IpcResp::Auth(Err(e.into())),
-                                    },
-                                    &app_id3,
-                                )?;
-                                Ok(o_cb(
-                                    user_data.0,
-                                    FfiResult {
-                                        error_code,
-                                        description: description.as_ptr(),
-                                    },
-                                    resp.as_ptr(),
-                                ))
-                            })
-                            .into_box()
+                    .or_else(move |e| -> Result<(), AuthError> {
+                        let (error_code, description) = ffi_error!(e);
+                        let resp = encode_response(
+                            &IpcMsg::Resp {
+                                req_id: req_id,
+                                resp: IpcResp::Auth(Err(e.into())),
+                            },
+                            &app_id2,
+                        )?;
+                        Ok(o_cb(
+                            user_data.0,
+                            FfiResult {
+                                error_code,
+                                description: description.as_ptr(),
+                            },
+                            resp.as_ptr(),
+                        ))
                     })
                     .map_err(move |e| {
                         call_result_cb!(Err::<(), _>(e), user_data, o_cb);
@@ -591,7 +501,7 @@ pub unsafe extern "C" fn encode_containers_resp(
 }
 
 /// Updates containers permissions (adds a given key to the permissions set)
-fn update_container_perms(
+pub fn update_container_perms(
     client: &Client<()>,
     permissions: HashMap<String, BTreeSet<Permission>>,
     sign_pk: sign::PublicKey,
@@ -646,136 +556,8 @@ fn update_container_perms(
         .into_box()
 }
 
-/// Registers an app in Maid Managers and in the access container.
-///
-/// 1. Insert app's key to Maid Managers
-/// 2. Update container permissions for requested containers
-/// 3. Create the app container (if it's been requested)
-/// 4. Insert or update the access container entry for an app
-/// 5. Return `AuthGranted`
-fn authenticate_app(
-    client: &Client<()>,
-    app: AppInfo,
-    app_container: bool,
-    permissions: HashMap<String, BTreeSet<Permission>>,
-) -> Box<AuthFuture<AuthGranted>> {
-    let c2 = client.clone();
-    let c3 = client.clone();
-    let c4 = client.clone();
-    let c5 = client.clone();
-    let c6 = client.clone();
-    let c7 = client.clone();
-
-    let sign_pk = app.keys.sign_pk;
-    let app_keys = app.keys.clone();
-    let app_info = app.info.clone();
-    let app_id = app_info.id.clone();
-
-    client
-        .list_auth_keys_and_version()
-        .and_then(move |(_, version)| {
-            recovery::ins_auth_key(&c2, app.keys.sign_pk, version + 1)
-        })
-        .map_err(AuthError::from)
-        .and_then(move |_| update_container_perms(&c3, permissions, sign_pk))
-        .and_then(move |perms| if app_container {
-            app_container::fetch(c4, app_id, sign_pk)
-                .map(move |mdata_info| (Some(mdata_info), perms))
-                .into_box()
-        } else {
-            ok!((None, perms))
-        })
-        .and_then(move |(app_container, perms)| {
-            // Update access_container
-            access_container(&c5).map(move |dir| (dir, app_container, perms))
-        })
-        .and_then(move |(dir, app_container, mut perms)| {
-            if let Some(mdata_info) = app_container {
-                // Store info about the app's dedicated container in the access container
-                let access =
-                    btree_set![
-                    Permission::Read,
-                    Permission::Insert,
-                    Permission::Update,
-                    Permission::Delete,
-                    Permission::ManagePermissions,
-                ];
-                let _ = perms.insert(format!("apps/{}", app_info.id), (mdata_info, access));
-            };
-            access_container_entry(&c6, &dir, &app_info.id, app_keys.clone()).then(move |res| {
-                let version = match res {
-                    // Updating an existing entry
-                    Ok((version, _)) => version + 1,
-                    // Adding a new access container entry
-                    Err(AuthError::CoreError(
-                            CoreError::RoutingClientError(
-                                ClientError::NoSuchEntry))) => 0,
-                    // Error has occurred while trying to get an existing entry
-                    Err(e) => return Err(e),
-                };
-                Ok((version, app_info, app_keys, dir, perms))
-            })
-        })
-        .and_then(move |(version, app_info, app_keys, dir, perms)| {
-            put_access_container_entry(&c7, &dir, &app_info.id, &app_keys, &perms, version)
-                .map(move |_| (dir, app_keys))
-        })
-        .and_then(move |(dir, app_keys)| {
-            Ok(AuthGranted {
-                app_keys: app_keys,
-                bootstrap_config: Client::<()>::bootstrap_config()?,
-                access_container: AccessContInfo::from_mdata_info(dir)?,
-            })
-        })
-        .into_box()
-}
-
 fn encode_response(msg: &IpcMsg, app_id: &str) -> Result<CString, IpcError> {
     let app_id = base64_encode(app_id.as_bytes());
     let resp = ipc::encode_msg(msg, &format!("safe-{}", app_id))?;
     Ok(CString::new(resp).map_err(StringError::from)?)
-}
-
-/// Represents current app state
-#[derive(Debug)]
-pub enum AppState {
-    /// Exists in the authenticator config, access container, and registered in MaidManagers
-    Authenticated,
-    /// Exists in the authenticator config but not in access container and MaidManagers
-    Revoked,
-    /// Doesn't exist in the authenticator config
-    NotAuthenticated,
-}
-
-/// Returns a current app state (`Authenticated` if it has an entry
-/// in the config file AND the access container, `Revoked` if it has
-/// an entry in the config but not in the access container, and `NotAuthenticated`
-/// if it's not registered anywhere).
-pub fn app_state(client: &Client<()>, apps: &Apps, app_id: String) -> Box<AuthFuture<AppState>> {
-    let c2 = client.clone();
-    let app_id_hash = sha3_256(app_id.clone().as_bytes());
-
-    if let Some(app) = apps.get(&app_id_hash) {
-        let app_keys = app.keys.clone();
-        access_container(client)
-            .and_then(move |dir| {
-                access_container_entry(&c2, &dir, &app_id, app_keys)
-            })
-            .then(move |res| {
-                match res {
-                    Ok((_version, Some(_))) => Ok(AppState::Authenticated),
-                    Ok((_, None)) |
-                        Err(AuthError::CoreError(
-                            CoreError::RoutingClientError(
-                                ClientError::NoSuchEntry))) => {
-                            // App is not in access container, so it is revoked
-                            Ok(AppState::Revoked)
-                        }
-                    Err(e) => Err(e),
-                }
-            })
-            .into_box()
-    } else {
-        ok!(AppState::NotAuthenticated)
-    }
 }

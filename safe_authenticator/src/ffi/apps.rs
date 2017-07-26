@@ -19,12 +19,12 @@ use AccessContainerEntry;
 use AuthError;
 use Authenticator;
 use access_container::{access_container, access_container_nonce};
+use app_auth::{AppState, app_state};
 use app_container;
 use config;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, SafePtr, catch_unwind_cb, from_c_str,
                 vec_into_raw_parts};
 use futures::Future;
-use ipc::{AppState, app_state};
 use maidsafe_utilities::serialisation::deserialise;
 use safe_core::FutureExt;
 use safe_core::ipc::{IpcError, access_container_enc_key};

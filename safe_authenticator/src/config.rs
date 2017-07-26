@@ -18,17 +18,33 @@
 use super::{AuthError, AuthFuture};
 use futures::Future;
 use futures::future::{self, Either};
-use ipc::AppInfo;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{ClientError, EntryActions};
 use safe_core::{Client, CoreError, FutureExt, recovery};
 use safe_core::ipc::IpcError;
+use safe_core::ipc::req::AppExchangeInfo;
+use safe_core::ipc::resp::AppKeys;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::collections::{HashMap, VecDeque};
 use tiny_keccak::sha3_256;
 
 // TODO: remove the `allow(unused)` attributes.
+
+/// App data stored in the authenticator configuration.
+///
+/// We need to store it even for revoked apps because we need to
+/// preserve the app keys. An app can encrypt data and create mutable data
+/// instances on its own, so we need to make sure that the app can
+/// access the encrypted data in future, even if the app was revoked
+/// at some point.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AppInfo {
+    /// Application info (id, name, vendor, etc.)
+    pub info: AppExchangeInfo,
+    /// Application keys
+    pub keys: AppKeys,
+}
 
 /// Config file key under which the list of registered apps is stored.
 pub const KEY_APPS: &'static [u8] = b"apps";
