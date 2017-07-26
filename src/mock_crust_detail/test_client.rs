@@ -24,6 +24,8 @@ use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, Bootst
               ClientError, EntryAction, Event, EventStream, FullId, ImmutableData, MessageId,
               MutableData, PermissionSet, PublicId, Response, TYPE_TAG_SESSION_PACKET, User,
               Value, XorName};
+use routing::Config as RoutingConfig;
+use routing::DevConfig as RoutingDevConfig;
 use routing::mock_crust::{self, Network, ServiceHandle};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -70,19 +72,29 @@ pub struct TestClient {
 
 impl TestClient {
     /// Create a test client for the mock network
-    pub fn new(network: &Network<PublicId>, config: Option<BootstrapConfig>) -> Self {
-        Self::with_id(network, config, FullId::new())
+    pub fn new(network: &Network<PublicId>, bootstrap_config: Option<BootstrapConfig>) -> Self {
+        Self::with_id(network, bootstrap_config, FullId::new())
     }
 
     /// Create a test client with the given `FullId`.
     pub fn with_id(
         network: &Network<PublicId>,
-        config: Option<BootstrapConfig>,
+        bootstrap_config: Option<BootstrapConfig>,
         full_id: FullId,
     ) -> Self {
-        let handle = network.new_service_handle(config.clone(), None);
+        let handle = network.new_service_handle(bootstrap_config.clone(), None);
+        let routing_config = RoutingConfig {
+            dev: Some(RoutingDevConfig {
+                min_section_size: Some(network.min_section_size()),
+                ..RoutingDevConfig::default()
+            }),
+        };
         let client = mock_crust::make_current(&handle, || {
-            unwrap!(Client::new(Some(full_id.clone()), config))
+            unwrap!(Client::new(
+                Some(full_id.clone()),
+                bootstrap_config,
+                routing_config,
+            ))
         });
 
         let client_manager = Authority::ClientManager(*full_id.public_id().name());

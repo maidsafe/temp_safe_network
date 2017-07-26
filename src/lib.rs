@@ -212,7 +212,6 @@
 extern crate accumulator;
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate fake_clock;
-extern crate fs2;
 extern crate hex;
 #[cfg(feature = "use-mock-crust")]
 extern crate itertools;

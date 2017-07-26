@@ -31,84 +31,46 @@ use personas::data_manager::{self, DataManager};
 use personas::data_manager::DataId;
 use personas::maid_manager::{self, MaidManager};
 use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
+#[cfg(feature = "use-mock-crust")]
+use routing::Config as RoutingConfig;
 pub use routing::Event;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
 pub use routing::Node as RoutingNode;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
 use routing::NodeBuilder;
-#[cfg(not(feature = "use-mock-crust"))]
+#[cfg(feature = "use-mock-crypto")]
+use routing::mock_crypto::rust_sodium;
+#[cfg(not(feature = "use-mock-crypto"))]
 use rust_sodium;
 use rust_sodium::crypto::sign;
-use std::env;
-use std::path::Path;
-use tempdir::TempDir;
-
-pub const CHUNK_STORE_DIR: &'static str = "safe_vault_chunk_store";
-const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Main struct to hold all personas and Routing instance
 pub struct Vault {
     maid_manager: MaidManager,
     data_manager: DataManager,
     routing_node: RoutingNode,
-    // We need to store this field for `TempDir` to remain valid
-    // for the time of the vault existence.
-    _chunk_root_tmp_dir: Option<TempDir>,
 }
 
 impl Vault {
     /// Creates a network Vault instance.
     pub fn new(first_vault: bool, use_cache: bool) -> Result<Self, InternalError> {
-        let config = match config_handler::read_config_file() {
-            Ok(cfg) => cfg,
-            Err(InternalError::FileHandler(e)) => {
-                error!("Config file could not be parsed: {:?}", e);
-                return Err(From::from(e));
-            }
-            Err(e) => return Err(From::from(e)),
-        };
+        let config = config_handler::read_config_file().map_err(|error| {
+            warn!("Failed to parse vault config file: {:?}", error);
+            error
+        })?;
         let builder = RoutingNode::builder().first(first_vault);
-
-        match Self::vault_with_config(builder, use_cache, config.clone()) {
-            Ok(vault) => Ok(vault),
-            Err(InternalError::ChunkStore(e)) => {
-                error!(
-                    "Incorrect path {:?} for chunk_store_root: {:?}",
-                    config.chunk_store_root,
-                    e
-                );
-                Err(From::from(e))
-            }
-            Err(e) => Err(From::from(e)),
-        }
+        Self::vault_with_config(builder, use_cache, config)
     }
 
-    /// Allow construct vault with config for mock-crust tests.
     fn vault_with_config(
-        mut builder: NodeBuilder,
+        builder: NodeBuilder,
         use_cache: bool,
         config: Config,
     ) -> Result<Self, InternalError> {
-        #[cfg(not(feature = "use-mock-crust"))] rust_sodium::init();
-
-        let deny_other_local_nodes = config.dev.as_ref().map_or(true, |dev_config| {
-            !dev_config.allow_multiple_lan_nodes
+        rust_sodium::init();
+        let disable_mutation_limit = config.dev.as_ref().map_or(false, |dev_config| {
+            dev_config.disable_mutation_limit
         });
-
-        let (tmp_dir, chunk_store_root) = if deny_other_local_nodes {
-            builder = builder.deny_other_local_nodes();
-            let mut chunk_store_root = match config.chunk_store_root {
-                Some(path_str) => Path::new(&path_str).to_path_buf(),
-                None => env::temp_dir(),
-            };
-            chunk_store_root.push(CHUNK_STORE_DIR);
-            (None, chunk_store_root)
-        } else {
-            let tmp_dir = TempDir::new(CHUNK_STORE_DIR)?;
-            let path_buf = tmp_dir.path().to_path_buf();
-            (Some(tmp_dir), path_buf)
-        };
-
         let routing_node = if use_cache {
             builder.cache(Box::new(Cache::new())).create()
         } else {
@@ -116,15 +78,13 @@ impl Vault {
         }?;
 
         Ok(Vault {
-            maid_manager: MaidManager::new(config.invite_key.map(sign::PublicKey)),
-            data_manager: DataManager::new(
-                chunk_store_root,
-                config.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY),
-            )?,
+            maid_manager: MaidManager::new(
+                config.invite_key.map(sign::PublicKey),
+                disable_mutation_limit,
+            ),
+            data_manager: DataManager::new(config.chunk_store_root, config.max_capacity)?,
             routing_node: routing_node,
-            _chunk_root_tmp_dir: tmp_dir,
         })
-
     }
 
     /// Run the event loop, processing events received from Routing.
@@ -965,12 +925,19 @@ impl Vault {
 #[cfg(feature = "use-mock-crust")]
 impl Vault {
     /// Allow construct vault with config for mock-crust tests.
-    pub fn new_with_config(
+    pub fn new_with_configs(
         first_vault: bool,
         use_cache: bool,
         config: Config,
+        routing_config: RoutingConfig,
     ) -> Result<Self, InternalError> {
-        Self::vault_with_config(RoutingNode::builder().first(first_vault), use_cache, config)
+        Self::vault_with_config(
+            RoutingNode::builder().first(first_vault).config(
+                routing_config,
+            ),
+            use_cache,
+            config,
+        )
     }
 
     /// Non-blocking call to process any events in the event queue, returning true if

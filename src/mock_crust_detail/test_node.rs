@@ -23,6 +23,8 @@ use itertools::Itertools;
 use personas::data_manager::DataId;
 use rand::{self, Rng};
 use routing::{BootstrapConfig, PublicId, RoutingTable, XorName, Xorable};
+use routing::Config as RoutingConfig;
+use routing::DevConfig as RoutingDevConfig;
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use std::env;
 use std::fs;
@@ -41,12 +43,18 @@ impl TestNode {
     /// create a test node for mock network
     pub fn new(
         network: &Network<PublicId>,
-        crust_config: Option<BootstrapConfig>,
+        bootstrap_config: Option<BootstrapConfig>,
         config: Option<Config>,
         first_node: bool,
         use_cache: bool,
     ) -> Self {
-        let handle = network.new_service_handle(crust_config, None);
+        let handle = network.new_service_handle(bootstrap_config, None);
+        let routing_config = RoutingConfig {
+            dev: Some(RoutingDevConfig {
+                min_section_size: Some(network.min_section_size()),
+                ..RoutingDevConfig::default()
+            }),
+        };
         let temp_root = env::temp_dir();
 
         // Note: using non-deterministic rng here to prevent multiple threads to
@@ -77,7 +85,12 @@ impl TestNode {
             }
         };
         let vault = mock_crust::make_current(&handle, || {
-            unwrap!(Vault::new_with_config(first_node, use_cache, vault_config))
+            unwrap!(Vault::new_with_configs(
+                first_node,
+                use_cache,
+                vault_config,
+                routing_config,
+            ))
         });
 
         TestNode {
@@ -159,14 +172,14 @@ pub fn create_nodes(
     ));
     while nodes[0].poll() > 0 {}
 
-    let crust_config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let bootstrap_config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
 
     // Create other nodes using the seed node endpoint as bootstrap contact.
     for _ in 1..size {
         // (2nd to Nth node clone the config objects.)
         nodes.push(TestNode::new(
             network,
-            Some(crust_config.clone()),
+            Some(bootstrap_config.clone()),
             config.clone(),
             false,
             use_cache,
@@ -197,10 +210,10 @@ pub fn add_node_with_config(
     index: usize,
     use_cache: bool,
 ) {
-    let crust_config = BootstrapConfig::with_contacts(&[nodes[index].endpoint()]);
+    let bootstrap_config = BootstrapConfig::with_contacts(&[nodes[index].endpoint()]);
     nodes.push(TestNode::new(
         network,
-        Some(crust_config),
+        Some(bootstrap_config),
         Some(config),
         false,
         use_cache,

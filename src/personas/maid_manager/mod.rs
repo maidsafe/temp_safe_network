@@ -60,10 +60,12 @@ pub struct MaidManager {
     invite_key: Option<sign::PublicKey>,
     /// The ongoing requests from clients to create a new account.
     account_creation_cache: LruCache<MessageId, CachedAccountCreation>,
+    /// Dev option to allow clients to make unlimited mutation requests.
+    disable_mutation_limit: bool,
 }
 
 impl MaidManager {
-    pub fn new(invite_key: Option<sign::PublicKey>) -> MaidManager {
+    pub fn new(invite_key: Option<sign::PublicKey>, disable_mutation_limit: bool) -> MaidManager {
         MaidManager {
             accounts: HashMap::default(),
             data_ops_msg_id_accumulator: MessageIdAccumulator::new(
@@ -76,6 +78,7 @@ impl MaidManager {
                 Duration::from_secs(ACCOUNT_CREATION_TIMEOUT_SECS),
                 ACCOUNT_CREATION_LIMIT,
             ),
+            disable_mutation_limit,
         }
     }
 
@@ -381,7 +384,7 @@ impl MaidManager {
 
             match res {
                 Ok(()) => {
-                    let _ = self.accounts.insert(*src.name(), Account::default());
+                    let _ = self.accounts.insert(*src.name(), Account::new(self.disable_mutation_limit));
                     self.forward_put_mdata(routing_node,
                                            src,
                                            dst,
@@ -855,7 +858,7 @@ impl MaidManager {
             let len = self.accounts.len();
             match self.accounts.entry(*src.name()) {
                 Entry::Vacant(entry) => {
-                    let _ = entry.insert(Account::default());
+                    let _ = entry.insert(Account::new(self.disable_mutation_limit));
                     info!("Managing {} client accounts.", len + 1);
                     Ok(PutMDataAction::Forward(data))
                 }
@@ -1250,9 +1253,10 @@ impl MaidManager {
         }
 
         let accounts_len = self.accounts.len();
+        let disable_mutation_limit = self.disable_mutation_limit;
         let account = self.accounts.entry(account_name).or_insert_with(|| {
             info!("Managing {} client accounts.", accounts_len + 1);
-            Account::default()
+            Account::new(disable_mutation_limit)
         });
 
         Some(account)

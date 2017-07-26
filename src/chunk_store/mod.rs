@@ -18,7 +18,9 @@
 //! # Chunk Store
 //! A simple, non-persistent, disk-based key-value store.
 
-use fs2::FileExt;
+#[cfg(test)]
+mod tests;
+
 use hex::{FromHex, ToHex};
 use maidsafe_utilities::serialisation::{self, SerialisationError};
 use serde::Serialize;
@@ -28,11 +30,13 @@ use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+use tempdir::TempDir;
+
+const CHUNK_STORE_DIR: &'static str = "safe_vault_chunk_store";
+const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 
 /// The max name length for a chunk file.
 const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
-/// The name of the lock file for the chunk directory.
-const LOCK_FILE_NAME: &'static str = "lock";
 
 quick_error! {
     /// `ChunkStore` error.
@@ -79,26 +83,51 @@ pub trait ChunkId<K>: Serialize {
 ///
 /// The data chunks are deleted when the `ChunkStore` goes out of scope.
 pub struct ChunkStore<K> {
-    rootdir: PathBuf,
-    lock_file: Option<File>,
+    root_dir: TempDir,
     max_space: u64,
     used_space: u64,
     phantom: PhantomData<K>,
 }
 
-impl<K> ChunkStore<K>
-where
-    K: DeserializeOwned + Serialize,
-{
-    /// Creates a new `ChunkStore` with `max_space` allowed storage space.
+impl<K: DeserializeOwned + Serialize> ChunkStore<K> {
+    /// Creates a new `ChunkStore`.
     ///
-    /// The data is stored in a root directory. If `root` doesn't exist, it will be created.
-    pub fn new(root: PathBuf, max_space: u64) -> Result<Self, Error> {
-        let lock_file = Self::lock_and_clear_dir(&root)?;
+    /// The maximum storage space is defined by `capacity`, or `DEFAULT_MAX_CAPACITY` if this is
+    /// `None`.
+    ///
+    /// The data is stored in a temporary directory which is deleted when the process exits.  This
+    /// directory is named as per `CHUNK_STORE_DIR` with a random suffix.  If `root` is `Some`, then
+    /// `root` is created and the directory is created inside it.  If `root` is `None`, then the
+    /// directory is created inside [`env::temp_dir()`][1].
+    ///
+    /// If the directory cannot be created, or if a test chunk cannot be created therein, the
+    /// function returns an error.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/env/fn.temp_dir.html
+    pub fn new(root: Option<String>, capacity: Option<u64>) -> Result<Self, Error> {
+        let root_dir = match root {
+            Some(path) => {
+                fs::create_dir_all(&path)?;
+                TempDir::new_in(&path, CHUNK_STORE_DIR)
+            }
+            None => TempDir::new(CHUNK_STORE_DIR),
+        }?;
+        let max_space = capacity.unwrap_or(DEFAULT_MAX_CAPACITY);
+
+        // Verify that chunk files can be created.
+        let name: String = (0..MAX_CHUNK_FILE_NAME_LENGTH).map(|_| '0').collect();
+        let _ = File::create(root_dir.path().join(name.clone()))?;
+        let _ = fs::remove_file(root_dir.path().join(name));
+
+        info!(
+            "Created chunk store at {} with capacity of {} bytes.",
+            root_dir.path().display(),
+            max_space
+        );
+
         Ok(ChunkStore {
-            rootdir: root,
-            lock_file: Some(lock_file),
-            max_space: max_space,
+            root_dir,
+            max_space,
             used_space: 0,
             phantom: PhantomData,
         })
@@ -172,7 +201,7 @@ where
 
     /// Lists all keys of currently stored data.
     pub fn keys(&self) -> Vec<K> {
-        fs::read_dir(&self.rootdir)
+        fs::read_dir(self.root_dir.path())
             .and_then(|dir_entries| {
                 let dir_entry_to_routing_name = |dir_entry: io::Result<fs::DirEntry>| {
                     dir_entry
@@ -186,36 +215,14 @@ where
             .unwrap_or_else(|_| Vec::new())
     }
 
-    /// Returns the maximum amount of storage space available for this ChunkStore.
+    /// Returns the maximum amount of storage space available for this `ChunkStore`.
     pub fn max_space(&self) -> u64 {
         self.max_space
     }
 
-    /// Returns the amount of storage space already used by this ChunkStore.
+    /// Returns the amount of storage space already used by this `ChunkStore`.
     pub fn used_space(&self) -> u64 {
         self.used_space
-    }
-
-    /// Creates and clears the given root directory and returns a locked file inside it.
-    fn lock_and_clear_dir(root: &PathBuf) -> Result<File, Error> {
-        // Create the chunk directory and a lock file.
-        fs::create_dir_all(&root)?;
-        let lock_file_path = root.join(LOCK_FILE_NAME);
-        let lock_file = File::create(&lock_file_path)?;
-        lock_file.try_lock_exclusive()?;
-
-        // Verify that chunk files can be created.
-        let name: String = (0..MAX_CHUNK_FILE_NAME_LENGTH).map(|_| '0').collect();
-        let _ = File::create(&root.join(name))?;
-
-        // Clear the chunk directory.
-        for entry_result in fs::read_dir(&root)? {
-            let entry = entry_result?;
-            if entry.path() != lock_file_path.as_path() {
-                fs::remove_file(entry.path())?;
-            }
-        }
-        Ok(lock_file)
     }
 
     fn do_delete(&mut self, file_path: &Path) -> Result<(), Error> {
@@ -230,16 +237,6 @@ where
     fn file_path<I: ChunkId<K>>(&self, id: &I) -> Result<PathBuf, Error> {
         let filename = serialisation::serialise(&id.to_key())?.to_hex();
         let path_name = Path::new(&filename);
-        Ok(self.rootdir.join(path_name))
+        Ok(self.root_dir.path().join(path_name))
     }
 }
-
-impl<K> Drop for ChunkStore<K> {
-    fn drop(&mut self) {
-        let _ = self.lock_file.take().iter().map(File::unlock);
-        let _ = fs::remove_dir_all(&self.rootdir);
-    }
-}
-
-#[cfg(test)]
-mod test;

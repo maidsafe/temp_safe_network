@@ -26,7 +26,6 @@ use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
-use std::path::PathBuf;
 use std::time::Duration;
 use tiny_keccak;
 use utils::{self, HashMap, HashSet, Instant};
@@ -86,7 +85,10 @@ pub struct DataManager {
 }
 
 impl DataManager {
-    pub fn new(chunk_store_root: PathBuf, capacity: u64) -> Result<DataManager, InternalError> {
+    pub fn new(
+        chunk_store_root: Option<String>,
+        capacity: Option<u64>,
+    ) -> Result<DataManager, InternalError> {
         let chunk_store = ChunkStore::new(chunk_store_root, capacity)?;
         let accumulator_duration = Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS);
 
