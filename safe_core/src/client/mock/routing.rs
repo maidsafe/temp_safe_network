@@ -1029,7 +1029,6 @@ impl Routing {
 #[cfg(any(feature = "testing", test))]
 impl Routing {
     /// Set hook function to override response results for test purposes.
-    #[allow(unused)]
     pub fn set_request_hook<F>(&mut self, hook: F)
     where
         F: FnMut(&Request) -> Option<Response> + 'static,
@@ -1039,7 +1038,6 @@ impl Routing {
     }
 
     /// Removes hook function to override response results
-    #[allow(unused)]
     pub fn remove_request_hook(&mut self) {
         self.request_hook = None;
     }

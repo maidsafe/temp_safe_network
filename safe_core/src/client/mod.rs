@@ -41,9 +41,9 @@ use ipc::BootstrapConfig;
 use lru_cache::LruCache;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use maidsafe_utilities::thread::{self, Joiner};
-use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, EntryAction, Event,
-              FullId, ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet,
-              Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
+use routing::{ACC_LOGIN_ENTRY_KEY, AccountInfo, AccountPacket, Authority, ClientError,
+              EntryAction, Event, FullId, ImmutableData, InterfaceError, MessageId, MutableData,
+              PermissionSet, Response, TYPE_TAG_SESSION_PACKET, User, Value, XorName};
 #[cfg(not(feature = "use-mock-routing"))]
 use routing::Client as Routing;
 use rust_sodium::crypto::box_;
@@ -209,6 +209,7 @@ impl<T: 'static> Client<T> {
             core_tx,
             net_tx,
             Some(&id_seed),
+            setup_routing,
         )
     }
 
@@ -233,22 +234,24 @@ impl<T: 'static> Client<T> {
             core_tx,
             net_tx,
             None,
+            setup_routing,
         )
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
     /// create a fresh acc for the user in the SAFE-network.
-    pub fn registered_impl(
-        acc_locator: &[u8],
-        acc_password: &[u8],
-        invitation: &str,
-        el_handle: Handle,
-        core_tx: CoreMsgTx<T>,
-        net_tx: NetworkTx,
-        id_seed: Option<&Seed>,
-    ) -> Result<Client<T>, CoreError>
-    where
-        T: 'static,
+    fn registered_impl<F>(acc_locator: &[u8],
+                          acc_password: &[u8],
+                          invitation: &str,
+                          el_handle: Handle,
+                          core_tx: CoreMsgTx<T>,
+                          net_tx: NetworkTx,
+                          id_seed: Option<&Seed>,
+                          routing_init_fn: F)
+                          -> Result<Client<T>, CoreError>
+        where T: 'static,
+              F: FnOnce(Option<FullId>, Option<BootstrapConfig>)
+                        -> Result<(Routing, Receiver<Event>), CoreError>
     {
         trace!("Creating an account.");
 
@@ -261,11 +264,11 @@ impl<T: 'static> Client<T> {
         let pub_key = maid_keys.sign_pk;
         let full_id = Some(maid_keys.clone().into());
 
-        let (mut routing, routing_rx) = setup_routing(full_id, None)?;
+        let (mut routing, routing_rx) = routing_init_fn(full_id, None)?;
 
         let user_root_dir = MDataInfo::random_private(DIR_TAG)?;
         let config_dir = MDataInfo::random_private(DIR_TAG)?;
-        let acc = Account::new(maid_keys, user_root_dir.clone(), config_dir.clone());
+        let mut acc = Account::new(maid_keys, user_root_dir.clone(), config_dir.clone());
 
         let acc_ciphertext = acc.encrypt(&user_cred.password, &user_cred.pin)?;
         let acc_data =
@@ -311,6 +314,32 @@ impl<T: 'static> Client<T> {
         create_empty_dir(&mut routing, &routing_rx, cm_addr, &user_root_dir, pub_key)?;
         create_empty_dir(&mut routing, &routing_rx, cm_addr, &config_dir, pub_key)?;
 
+        // Update account packet - root directories have been created successfully
+        // (so we don't have to recover them after login).
+        acc.root_dirs_created = true;
+
+        let res = sync_loop_fn(|| {
+            let actions = try_request!(Self::prepare_account_packet_update(&acc, &user_cred, 1));
+            let msg_id = MessageId::new();
+            try_request!(routing.mutate_mdata_entries(
+                cm_addr,
+                acc_loc,
+                TYPE_TAG_SESSION_PACKET,
+                actions,
+                msg_id,
+                pub_key,
+            ));
+            wait_for_response!(routing_rx, Response::MutateMDataEntries, msg_id)
+        });
+        match res {
+            Ok(_) => (),
+            Err(err) => {
+                warn!("Could not update account on the Network: {:?}", err);
+                return Err(err);
+            }
+        }
+
+        // Create the client
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
@@ -321,7 +350,7 @@ impl<T: 'static> Client<T> {
             client_type: ClientType::reg(acc, acc_loc, user_cred, cm_addr),
             timeout: Duration::from_secs(REQUEST_TIMEOUT_SECS),
             joiner: joiner,
-            session_packet_version: 0,
+            session_packet_version: 1,
             net_tx: net_tx,
             core_tx: core_tx,
         }))
@@ -381,7 +410,7 @@ impl<T: 'static> Client<T> {
 
         let dst = Authority::NaeManager(acc_loc);
 
-        let (acc_content, acc_version) = {
+        let (acc_content, mut acc_version) = {
             trace!("Creating throw-away routing getter for account packet.");
             let (mut routing, routing_rx) = setup_routing(None, None)?;
 
@@ -408,7 +437,7 @@ impl<T: 'static> Client<T> {
             }
         };
 
-        let acc = match deserialise::<AccountPacket>(&acc_content)? {
+        let mut acc = match deserialise::<AccountPacket>(&acc_content)? {
             AccountPacket::AccPkt(acc_content) |
             AccountPacket::WithInvitation { acc_pkt: acc_content, .. } => {
                 Account::decrypt(&acc_content, &user_cred.password, &user_cred.pin)?
@@ -417,11 +446,55 @@ impl<T: 'static> Client<T> {
 
         let id_packet = acc.maid_keys.clone().into();
 
-        let digest = sha3_256(&acc.maid_keys.sign_pk.0);
+        let pub_key = acc.maid_keys.sign_pk;
+        let digest = sha3_256(&pub_key.0);
         let cm_addr = Authority::ClientManager(XorName(digest));
 
         trace!("Creating an actual routing...");
-        let (routing, routing_rx) = setup_routing(Some(id_packet), None)?;
+        let (mut routing, routing_rx) = setup_routing(Some(id_packet), None)?;
+
+        // Recover root directories if they were not created at the time of registration
+        // due to a failure.
+        if !acc.root_dirs_created {
+            create_empty_dir(&mut routing, &routing_rx, cm_addr, &acc.user_root, pub_key)?;
+            create_empty_dir(
+                &mut routing,
+                &routing_rx,
+                cm_addr,
+                &acc.config_root,
+                pub_key,
+            )?;
+
+            // Update session packet - root dirs have been created
+            acc.root_dirs_created = true;
+            acc_version += 1;
+
+            let res = sync_loop_fn(|| {
+                let actions = try_request!(Self::prepare_account_packet_update(
+                    &acc,
+                    &user_cred,
+                    acc_version,
+                ));
+                let msg_id = MessageId::new();
+                try_request!(routing.mutate_mdata_entries(
+                    cm_addr,
+                    acc_loc,
+                    TYPE_TAG_SESSION_PACKET,
+                    actions,
+                    msg_id,
+                    pub_key,
+                ));
+                wait_for_response!(routing_rx, Response::MutateMDataEntries, msg_id)
+            });
+            match res {
+                Ok(_) => (),
+                Err(err) => {
+                    warn!("Could not update account on the Network: {:?}", err);
+                    return Err(err);
+                }
+            }
+        }
+
         let joiner = spawn_routing_thread(routing_rx, core_tx.clone(), net_tx.clone());
 
         Ok(Self::new(Inner {
@@ -891,17 +964,23 @@ impl<T: 'static> Client<T> {
         Ok(Routing::bootstrap_config()?)
     }
 
+    fn prepare_account_packet_update(
+        account: &Account,
+        keys: &UserCred,
+        entry_version: u64,
+    ) -> Result<BTreeMap<Vec<u8>, EntryAction>, CoreError> {
+        let encrypted_account = account.encrypt(&keys.password, &keys.pin)?;
+        let content = serialise(&AccountPacket::AccPkt(encrypted_account))?;
+        Ok(btree_map![
+            ACC_LOGIN_ENTRY_KEY.to_owned() => EntryAction::Update(Value {
+                content,
+                entry_version,
+            })
+        ])
+    }
+
     fn update_account_packet(&self) -> Box<CoreFuture<()>> {
         trace!("Updating account packet.");
-
-        let data_name = fry!(self.inner().client_type.acc_loc());
-
-        let encrypted_account = {
-            let inner = self.inner();
-            let account = fry!(inner.client_type.acc());
-            let keys = fry!(inner.client_type.user_cred());
-            fry!(account.encrypt(&keys.password, &keys.pin))
-        };
 
         let entry_version = {
             let mut inner = self.inner_mut();
@@ -909,18 +988,21 @@ impl<T: 'static> Client<T> {
             inner.session_packet_version
         };
 
-        let content = fry!(serialise(&AccountPacket::AccPkt(encrypted_account)));
+        let update = {
+            let inner = self.inner();
+            let account = fry!(inner.client_type.acc());
+            let keys = fry!(inner.client_type.user_cred());
 
-        let mut actions = BTreeMap::new();
-        let _ = actions.insert(
-            ACC_LOGIN_ENTRY_KEY.to_owned(),
-            EntryAction::Update(Value {
-                content,
+            fry!(Self::prepare_account_packet_update(
+                account,
+                keys,
                 entry_version,
-            }),
-        );
+            ))
+        };
 
-        self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, actions)
+        let data_name = fry!(self.inner().client_type.acc_loc());
+
+        self.mutate_mdata_entries(data_name, TYPE_TAG_SESSION_PACKET, update)
     }
 
     /// Sends a request and returns a future that resolves to the response.
@@ -981,6 +1063,31 @@ impl<T: 'static> Client<T> {
 #[cfg(any(all(test, feature = "use-mock-routing"),
             all(feature = "testing", feature = "use-mock-routing")))]
 impl<T: 'static> Client<T> {
+    /// Allows to customise the Routing client before registering a new account
+    pub fn registered_with_hook<F>(acc_locator: &str,
+                                   acc_password: &str,
+                                   invitation: &str,
+                                   el_handle: Handle,
+                                   core_tx: CoreMsgTx<T>,
+                                   net_tx: NetworkTx,
+                                   routing_init_fn: F)
+                                   -> Result<Client<T>, CoreError>
+        where T: 'static,
+              F: FnOnce(Option<FullId>, Option<BootstrapConfig>)
+                        -> Result<(Routing, Receiver<Event>), CoreError>
+    {
+        Self::registered_impl(
+            acc_locator.as_bytes(),
+            acc_password.as_bytes(),
+            invitation,
+            el_handle,
+            core_tx,
+            net_tx,
+            None,
+            routing_init_fn,
+        )
+    }
+
     #[doc(hidden)]
     pub fn set_network_limits(&self, max_ops_count: Option<u64>) {
         self.inner.borrow_mut().routing.set_network_limits(
@@ -1307,6 +1414,7 @@ where
 }
 
 /// Creates an empty dir to hold configuration or user data
+/// This function is synchronous (blocks the execution thread).
 fn create_empty_dir(
     routing: &mut Routing,
     routing_rx: &Receiver<Event>,
@@ -1324,14 +1432,20 @@ fn create_empty_dir(
 
     let res = sync_loop_fn(|| {
         let msg_id = MessageId::new();
-        try_request!(routing.put_mdata(dst, dir_md.clone(), msg_id, owner_key));
+        let req = routing.put_mdata(dst, dir_md.clone(), msg_id, owner_key);
+        try_request!(req);
         wait_for_response!(routing_rx, Response::PutMData, msg_id)
     });
 
-    res.map_err(|err| {
-        warn!("Could not put directory to the Network: {:?}", err);
-        err
-    })
+    match res {
+        // If the dir is already created, then skip this error for the purpose
+        // of operations recovery
+        Ok(()) | Err(CoreError::RoutingClientError(ClientError::DataExists)) => Ok(()),
+        Err(err) => {
+            warn!("Could not put directory to the Network: {:?}", err);
+            Err(err)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1344,6 +1458,8 @@ mod tests {
     #[cfg(feature = "use-mock-routing")]
     use rand;
     use routing::{ClientError, ImmutableData};
+    #[cfg(feature = "use-mock-routing")]
+    use routing::{Request, Response};
     use tokio_core::reactor::Core;
     use utils;
     use utils::test_utils::{finish, random_client, setup_client};
@@ -1649,5 +1765,87 @@ mod tests {
                     Ok::<_, CoreError>(())
                 })
         })
+    }
+
+    // 1. Try to create a new user's account using `safe_core::Client::registered`
+    // 2. Simulate an error for a second `PutMData` operation with a
+    // type_tag == `safe_core::DIR_TAG`. This will meddle with user's config dir creation.
+    // 3. Make sure that the operation has failed. Login with chosen credentials.
+    // Login should succeed.
+    // 4. Make sure that both user's root dir and the config dir actually exist.
+    #[cfg(feature = "use-mock-routing")]
+    #[test]
+    fn account_creation_recovery() {
+        let el = unwrap!(Core::new());
+        let (core_tx, _): (CoreMsgTx<()>, _) = mpsc::unbounded();
+        let (net_tx, _) = mpsc::unbounded();
+
+        let sec_0 = unwrap!(utils::generate_random_string(10));
+        let sec_1 = unwrap!(utils::generate_random_string(10));
+        let inv = unwrap!(utils::generate_random_string(10));
+
+        let routing_hook = move |full_id, cfg| match setup_routing(full_id, cfg) {
+            Ok((mut routing, routing_rx)) => {
+                let mut reqs_counter = 0;
+
+                routing.set_request_hook(move |req| {
+                    // Simulate an error during the config dir creation.
+                    match req {
+                        &Request::PutMData { ref data, msg_id, .. } if data.tag() == DIR_TAG => {
+                            reqs_counter += 1;
+
+                            if reqs_counter == 2 {
+                                Some(Response::PutMData {
+                                    res: Err(ClientError::NetworkFull),
+                                    msg_id,
+                                })
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
+                });
+                Ok((routing, routing_rx))
+            }
+            res => res,
+        };
+
+        // Account creation - should fail because root dirs couldn't be created
+        let res = Client::registered_with_hook(
+            &sec_0,
+            &sec_1,
+            &inv,
+            el.handle(),
+            core_tx.clone(),
+            net_tx.clone(),
+            routing_hook,
+        );
+        match res {
+            Ok(_) => panic!("Account creation should not succeed"),
+            Err(CoreError::RoutingClientError(ClientError::NetworkFull)) => (),
+            Err(err) => panic!("Unexpected {:?}", err),
+        }
+
+        // Try to login with the same credentials - it should succeed
+        setup_client(|el_h, core_tx, net_tx| Client::login(&sec_0, &sec_1, el_h, core_tx, net_tx),
+                     move |client| {
+            // Make sure that user's root dir and the config dir actually exist.
+            let config_dir = unwrap!(client.config_root_dir());
+            let c2 = client.clone();
+
+            client
+                .get_mdata_version(config_dir.name, config_dir.type_tag)
+                .then(move |res| {
+                          assert_eq!(unwrap!(res), 0);
+
+                          let root_dir = unwrap!(c2.user_root_dir());
+                          c2.get_mdata_version(root_dir.name, root_dir.type_tag)
+                      })
+                .then(move |res| {
+                          assert_eq!(unwrap!(res), 0);
+                          finish()
+                      })
+        });
     }
 }
