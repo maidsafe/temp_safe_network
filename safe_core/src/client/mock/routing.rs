@@ -31,7 +31,9 @@ use std::sync::mpsc::Sender;
 use std::time::Duration;
 use tiny_keccak::sha3_256;
 
-type RequestHookFn = Fn(&Request) -> Option<Response> + 'static;
+/// Function that is used to tap into routing requests
+/// and return preconditioned responsed.
+pub type RequestHookFn = FnMut(&Request) -> Option<Response> + 'static;
 
 const CONNECT_THREAD_NAME: &'static str = "Mock routing connect";
 const DELAY_THREAD_NAME: &'static str = "Mock routing delay";
@@ -153,16 +155,20 @@ impl Routing {
         let data_name = *data.name();
         let nae_auth = Authority::NaeManager(data_name);
 
-        if let Some(ref hook) = self.request_hook {
-            if let Some(response) = hook(&Request::PutIData {
-                data: data.clone(),
-                msg_id,
-            })
-            {
+        if self.request_hook.is_some() {
+            let override_response = if let Some(ref mut hook) = self.request_hook {
+                hook(&Request::PutIData {
+                    data: data.clone(),
+                    msg_id,
+                })
+            } else {
+                None
+            };
+            if let Some(response) = override_response {
                 self.send_response(PUT_IDATA_DELAY_MS, nae_auth, self.client_auth, response);
                 return Ok(());
             }
-        }
+        };
 
         if self.simulate_network_errors(msg_id) {
             return Ok(());
@@ -205,8 +211,13 @@ impl Routing {
     ) -> Result<(), InterfaceError> {
         let nae_auth = Authority::NaeManager(name);
 
-        if let Some(ref hook) = self.request_hook {
-            if let Some(response) = hook(&Request::GetIData { name, msg_id }) {
+        if self.request_hook.is_some() {
+            let override_response = if let Some(ref mut hook) = self.request_hook {
+                hook(&Request::GetIData { name, msg_id })
+            } else {
+                None
+            };
+            if let Some(response) = override_response {
                 self.send_response(GET_IDATA_DELAY_MS, nae_auth, self.client_auth, response);
                 return Ok(());
             }
@@ -249,13 +260,17 @@ impl Routing {
         let data_name = DataId::mutable(*data.name(), data.tag());
         let nae_auth = Authority::NaeManager(*data_name.name());
 
-        if let Some(ref hook) = self.request_hook {
-            if let Some(response) = hook(&Request::PutMData {
-                data: data.clone(),
-                msg_id,
-                requester,
-            })
-            {
+        if self.request_hook.is_some() {
+            let override_response = if let Some(ref mut hook) = self.request_hook {
+                hook(&Request::PutMData {
+                    data: data.clone(),
+                    msg_id,
+                    requester,
+                })
+            } else {
+                None
+            };
+            if let Some(response) = override_response {
                 self.send_response(GET_IDATA_DELAY_MS, nae_auth, self.client_auth, response);
                 return Ok(());
             }
@@ -287,7 +302,7 @@ impl Routing {
             // Put normal data.
             vault
                 .authorise_mutation(&dst, self.client_key())
-                .and_then(|_| self.verify_owner(&dst, data.owners()))
+                .and_then(|_| Self::verify_owner(&dst, data.owners()))
                 .and_then(|_| if vault.contains_data(&data_name) {
                     Err(ClientError::DataExists)
                 } else {
@@ -627,7 +642,7 @@ impl Routing {
             };
 
             // Only the current owner can change ownership for MD
-            match self.verify_owner(&dst, data.owners()) {
+            match Self::verify_owner(&dst, data.owners()) {
                 Err(ClientError::InvalidOwners) => return Err(ClientError::AccessDenied),
                 Err(e) => return Err(e),
                 Ok(_) => (),
@@ -791,7 +806,7 @@ impl Routing {
     }
 
     fn read_mdata<F, G, R>(
-        &self,
+        &mut self,
         dst: Authority<XorName>,
         name: XorName,
         tag: u64,
@@ -822,7 +837,7 @@ impl Routing {
     }
 
     fn mutate_mdata<F, G, R>(
-        &self,
+        &mut self,
         dst: Authority<XorName>,
         name: XorName,
         tag: u64,
@@ -837,8 +852,9 @@ impl Routing {
         F: FnOnce(&mut MutableData) -> Result<R, ClientError>,
         G: FnOnce(Result<R, ClientError>) -> Response,
     {
+        let client_key = *self.client_key();
         let mutate = |mut data: MutableData, vault: &mut Vault| {
-            vault.authorise_mutation(&dst, self.client_key())?;
+            vault.authorise_mutation(&dst, &client_key)?;
 
             let output = f(&mut data)?;
             vault.insert_data(DataId::mutable(name, tag), Data::Mutable(data));
@@ -850,6 +866,7 @@ impl Routing {
         self.with_mdata(
             name,
             tag,
+
             request,
             Some(requester),
             log_label,
@@ -861,7 +878,7 @@ impl Routing {
     }
 
     fn with_mdata<F, G, R>(
-        &self,
+        &mut self,
         name: XorName,
         tag: u64,
         request: Request,
@@ -879,11 +896,16 @@ impl Routing {
         let nae_auth = Authority::NaeManager(name);
         let msg_id = request.message_id().clone();
 
-        if let Some(ref hook) = self.request_hook {
-            if let Some(response) = hook(&request) {
+        if self.request_hook.is_some() {
+            let override_response = if let Some(ref mut hook) = self.request_hook {
+                hook(&request)
+            } else {
+                None
+            };
+            if let Some(response) = override_response {
                 self.send_response(delay_ms, nae_auth, self.client_auth, response);
                 return Ok(());
-            }
+            };
         }
 
         if self.simulate_network_errors(msg_id) {
@@ -913,7 +935,6 @@ impl Routing {
     }
 
     fn verify_owner(
-        &self,
         dst: &Authority<XorName>,
         owner_keys: &BTreeSet<sign::PublicKey>,
     ) -> Result<(), ClientError> {
@@ -1011,7 +1032,7 @@ impl Routing {
     #[allow(unused)]
     pub fn set_request_hook<F>(&mut self, hook: F)
     where
-        F: Fn(&Request) -> Option<Response> + 'static,
+        F: FnMut(&Request) -> Option<Response> + 'static,
     {
         let hook: Box<RequestHookFn> = Box::new(hook);
         self.request_hook = Some(hook);

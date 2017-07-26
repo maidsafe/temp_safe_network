@@ -1102,8 +1102,8 @@ fn request_hooks() {
         ];
 
     let msg_id = MessageId::new();
-    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions.clone(), msg_id,
-                                         owner_key));
+    unwrap!(routing.mutate_mdata_entries(client_mgr, name, tag, actions.clone(),
+                                         msg_id, owner_key));
     expect_failure!(routing_rx,
                     msg_id,
                     Response::MutateMDataEntries,

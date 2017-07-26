@@ -20,7 +20,7 @@ mod routing;
 mod tests;
 mod vault;
 
-pub use self::routing::Routing;
+pub use self::routing::{RequestHookFn, Routing};
 use routing::XorName;
 
 /// Identifier of immutable data
