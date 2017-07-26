@@ -836,6 +836,220 @@ fn lists_of_registered_and_revoked_apps() {
     assert_eq!(revoked.len(), 0);
 }
 
+// Test operation recovery for app authentication
+//
+// 1. Create a test app and try to authenticate it (with `app_container` set to true).
+//
+// 2. Simulate a network failure after the `mutate_mdata_entries` operation (relating to the
+// addition of the app to the user's config dir) - it should leave the app in the
+// `Revoked` state (as it is listen in the config root, but not in the access
+// container)
+// 3. Try to authenticate the app again, it should continue without errors
+//
+// 4. Simulate a network failure after the `ins_auth_key` operation.
+// The authentication op should fail.
+// 5. Try to authenticate the app again, it should continue without errors
+//
+// 6. Simulate a network failure for the `set_mdata_user_permissions` operation
+// (relating to the app's container - so that it will be created successfuly, but fail
+// at the permissions set stage).
+// 7. Try to authenticate the app again, it should continue without errors.
+//
+// 8. Simulate a network failure for the `mutate_mdata_entries` operation
+// (relating to update of the access container).
+// 9. Try to authenticate the app again, it should succeed now.
+//
+// 10. Check that the app's container has been created.
+// 11. Check that the app's container has required permissions.
+// 12. Check that the app's container is listed in the access container entry for
+// the app.
+#[cfg(feature = "use-mock-routing")]
+#[test]
+fn app_authentication_recovery() {
+    use safe_core::MockRouting;
+    use routing::{ClientError, Request, Response};
+    use safe_core::utils;
+
+    let locator = unwrap!(utils::generate_random_string(10));
+    let password = unwrap!(utils::generate_random_string(10));
+    let invitation = unwrap!(utils::generate_random_string(10));
+
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        routing.set_request_hook(move |req| {
+            match *req {
+                // Simulate a network failure after
+                // the `mutate_mdata_entries` operation (relating to
+                // the addition of the app to the user's config dir)
+                Request::InsAuthKey { msg_id, .. } => {
+                    Some(Response::InsAuthKey {
+                             res: Err(ClientError::LowBalance),
+                             msg_id,
+                         })
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::create_acc_with_hook(locator.clone(),
+                                                           password.clone(),
+                                                           invitation,
+                                                           |_| (),
+                                                           routing_hook));
+
+    // Create a test app and try to authenticate it (with `app_container` set to true).
+    let auth_req = AuthReq {
+        app: unwrap!(rand_app()),
+        app_container: true,
+        containers: create_containers_req(),
+    };
+    let app_id = auth_req.app.id.clone();
+
+    // App authentication request should fail and leave the app in the
+    // `Revoked` state (as it is listen in the config root, but not in the access
+    // container)
+    match register_app(&auth, &auth_req) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Simulate a network failure for the `update_container_perms` step -
+    // it should fail at the second container (`_videos`)
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        let mut reqs_counter = 0;
+
+        routing.set_request_hook(move |req| {
+            match *req {
+                Request::SetMDataUserPermissions { msg_id, .. } => {
+                    reqs_counter += 1;
+
+                    if reqs_counter == 2 {
+                        Some(Response::SetMDataUserPermissions {
+                                 res: Err(ClientError::LowBalance),
+                                 msg_id,
+                             })
+                    } else {
+                        None
+                    }
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::login_with_hook(locator.clone(),
+                                                      password.clone(),
+                                                      |_| (),
+                                                      routing_hook));
+    match register_app(&auth, &auth_req) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Simulate a network failure for the `app_container` setup step -
+    // it should fail at the third request for `SetMDataPermissions` (after
+    // setting permissions for 2 requested containers, `_video` and `_documents`)
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        let mut reqs_counter = 0;
+
+        routing.set_request_hook(move |req| {
+            match *req {
+                Request::SetMDataUserPermissions { msg_id, .. } => {
+                    reqs_counter += 1;
+
+                    if reqs_counter == 3 {
+                        Some(Response::SetMDataUserPermissions {
+                                 res: Err(ClientError::LowBalance),
+                                 msg_id,
+                             })
+                    } else {
+                        None
+                    }
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::login_with_hook(locator.clone(),
+                                                      password.clone(),
+                                                      |_| (),
+                                                      routing_hook));
+    match register_app(&auth, &auth_req) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Simulate a network failure for the `MutateMDataEntries` request, which
+    // is supposed to setup the access container entry for the app
+    let routing_hook = move |mut routing: MockRouting| -> MockRouting {
+        routing.set_request_hook(move |req| {
+            match *req {
+                Request::MutateMDataEntries { msg_id, .. } => {
+                    // None
+                    Some(Response::SetMDataUserPermissions {
+                             res: Err(ClientError::LowBalance),
+                             msg_id,
+                         })
+
+                }
+                // Pass-through
+                _ => None,
+            }
+        });
+        routing
+    };
+    let auth = unwrap!(Authenticator::login_with_hook(locator.clone(),
+                                                      password.clone(),
+                                                      |_| (),
+                                                      routing_hook));
+    match register_app(&auth, &auth_req) {
+        Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
+        x => panic!("Unexpected {:?}", x),
+    }
+
+    // Now try to authenticate the app without network failure simulation -
+    // it should succeed.
+    let auth = unwrap!(Authenticator::login(locator.clone(), password.clone(), |_| ()));
+    let auth_granted = match register_app(&auth, &auth_req) {
+        Ok(auth_granted) => auth_granted,
+        x => panic!("Unexpected {:?}", x),
+    };
+
+    // Check that the app's container has been created and that the access container
+    // contains info about all of the requested containers.
+    let mut ac_entries = access_container(&auth, app_id.clone(), auth_granted.clone());
+    let (_videos_md, _) = unwrap!(ac_entries.remove("_videos"));
+    let (_documents_md, _) = unwrap!(ac_entries.remove("_documents"));
+    let (app_container_md, _) = unwrap!(ac_entries.remove(&format!("apps/{}", app_id.clone())));
+
+    let app_pk = auth_granted.app_keys.sign_pk;
+
+    run(&auth, move |client| {
+        let c2 = client.clone();
+
+        client
+            .get_mdata_version(app_container_md.name, app_container_md.type_tag)
+            .then(move |res| {
+                      let version = unwrap!(res);
+                      assert!(version > 0);
+
+                      // Check that the app's container has required permissions.
+                      c2.list_mdata_permissions(app_container_md.name, app_container_md.type_tag)
+                  })
+            .then(move |res| {
+                      let perms = unwrap!(res);
+                      assert!(perms.contains_key(&User::Key(app_pk)));
+                      assert_eq!(perms.len(), 1);
+
+                      Ok(())
+                  })
+    });
+}
+
 // Create file in the given container, with the given name and content.
 fn create_file<T: Into<String>>(
     authenticator: &Authenticator,
