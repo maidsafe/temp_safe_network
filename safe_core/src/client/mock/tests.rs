@@ -1029,15 +1029,15 @@ fn request_hooks() {
     let (mut routing, routing_rx, full_id) = setup();
 
     routing.set_request_hook(move |req| {
-        match req {
-            &Request::PutMData { ref data, msg_id, .. } if data.tag() == 10000u64 => {
+        match *req {
+            Request::PutMData { ref data, msg_id, .. } if data.tag() == 10000u64 => {
                 // Send an OK response but don't put data on the mock vault
                 Some(Response::PutMData {
                     res: Ok(()),
                     msg_id,
                 })
             }
-            &Request::MutateMDataEntries { tag, msg_id, .. } if tag == 12345u64 => {
+            Request::MutateMDataEntries { tag, msg_id, .. } if tag == 12345u64 => {
                 Some(Response::MutateMDataEntries {
                     res: Err(ClientError::from("hello world")),
                     msg_id,

@@ -67,6 +67,8 @@ fn lock_vault(write: bool) -> VaultGuard<'static> {
     vault::lock(&VAULT, write)
 }
 
+/// Mock routing implementation that mirrors the behaviour
+/// of the real network but is not connected to it
 pub struct Routing {
     sender: Sender<Event>,
     full_id: FullId,
@@ -78,6 +80,8 @@ pub struct Routing {
 }
 
 impl Routing {
+    /// Initialises mock routing.
+    /// The function signature mirrors `routing::Client`.
     pub fn new(
         sender: Sender<Event>,
         id: Option<FullId>,
@@ -628,7 +632,7 @@ impl Routing {
                           Request::ChangeMDataOwner {
                               name,
                               tag,
-                              new_owners: btree_set![new_owner.clone()],
+                              new_owners: btree_set![new_owner],
                               version,
                               msg_id,
                           },
@@ -663,6 +667,23 @@ impl Routing {
         dst: Authority<XorName>,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        if self.request_hook.is_some() {
+            let override_response = if let Some(ref mut hook) = self.request_hook {
+                hook(&Request::ListAuthKeysAndVersion(msg_id))
+            } else {
+                None
+            };
+            if let Some(response) = override_response {
+                self.send_response(
+                    LIST_AUTH_KEYS_AND_VERSION_DELAY_MS,
+                    dst,
+                    self.client_auth,
+                    response,
+                );
+                return Ok(());
+            }
+        };
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -701,6 +722,22 @@ impl Routing {
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        if self.request_hook.is_some() {
+            let override_response = if let Some(ref mut hook) = self.request_hook {
+                hook(&Request::InsAuthKey {
+                    key,
+                    version,
+                    msg_id,
+                })
+            } else {
+                None
+            };
+            if let Some(response) = override_response {
+                self.send_response(INS_AUTH_KEY_DELAY_MS, dst, self.client_auth, response);
+                return Ok(());
+            }
+        };
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -739,6 +776,22 @@ impl Routing {
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InterfaceError> {
+        if self.request_hook.is_some() {
+            let override_response = if let Some(ref mut hook) = self.request_hook {
+                hook(&Request::DelAuthKey {
+                    key,
+                    version,
+                    msg_id,
+                })
+            } else {
+                None
+            };
+            if let Some(response) = override_response {
+                self.send_response(DEL_AUTH_KEY_DELAY_MS, dst, self.client_auth, response);
+                return Ok(());
+            }
+        };
+
         if self.simulate_network_errors(msg_id) {
             return Ok(());
         }
@@ -894,7 +947,7 @@ impl Routing {
         G: FnOnce(Result<R, ClientError>) -> Response,
     {
         let nae_auth = Authority::NaeManager(name);
-        let msg_id = request.message_id().clone();
+        let msg_id = *request.message_id();
 
         if self.request_hook.is_some() {
             let override_response = if let Some(ref mut hook) = self.request_hook {
@@ -968,6 +1021,7 @@ impl Routing {
         }
     }
 
+    /// Returns the default boostrap config
     pub fn bootstrap_config() -> Result<BootstrapConfig, InterfaceError> {
         Ok(BootstrapConfig::default())
     }
@@ -1042,20 +1096,23 @@ impl Routing {
         self.request_hook = None;
     }
 
+    /// Sets a maximum number of operations
     pub fn set_network_limits(&mut self, max_ops_count: Option<u64>) {
         self.max_ops_countdown = max_ops_count.map(Cell::new)
     }
 
+    /// Simulates network disconnect
     pub fn simulate_disconnect(&self) {
         let sender = self.sender.clone();
         let _ = std::thread::spawn(move || unwrap!(sender.send(Event::Terminate)));
     }
 
+    /// Simulates network timeouts
     pub fn set_simulate_timeout(&mut self, enable: bool) {
         self.timeout_simulation = enable;
     }
 
-    // The following `count` requests will fail with exceeded rate limit.
+    /// The following `count` requests will fail with exceeded rate limit.
     pub fn simulate_rate_limit_errors(&mut self, count: usize) {
         self.rate_limit_error_count = Cell::new(count);
     }

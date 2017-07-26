@@ -30,6 +30,8 @@ pub use self::account::ClientKeys;
 pub use self::mdata_info::MDataInfo;
 #[cfg(feature = "use-mock-routing")]
 use self::mock::Routing;
+#[cfg(feature = "use-mock-routing")]
+pub use self::mock::Routing as MockRouting;
 use super::DIR_TAG;
 use errors::CoreError;
 use event::{CoreEvent, NetworkEvent, NetworkTx};
@@ -209,7 +211,7 @@ impl<T: 'static> Client<T> {
             core_tx,
             net_tx,
             Some(&id_seed),
-            setup_routing,
+            |routing| routing,
         )
     }
 
@@ -226,32 +228,31 @@ impl<T: 'static> Client<T> {
     where
         T: 'static,
     {
-        Self::registered_impl(
-            acc_locator.as_bytes(),
-            acc_password.as_bytes(),
-            invitation,
-            el_handle,
-            core_tx,
-            net_tx,
-            None,
-            setup_routing,
-        )
+        Self::registered_impl(acc_locator.as_bytes(),
+                              acc_password.as_bytes(),
+                              invitation,
+                              el_handle,
+                              core_tx,
+                              net_tx,
+                              None,
+                              |routing| routing)
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
     /// create a fresh acc for the user in the SAFE-network.
-    fn registered_impl<F>(acc_locator: &[u8],
-                          acc_password: &[u8],
-                          invitation: &str,
-                          el_handle: Handle,
-                          core_tx: CoreMsgTx<T>,
-                          net_tx: NetworkTx,
-                          id_seed: Option<&Seed>,
-                          routing_init_fn: F)
-                          -> Result<Client<T>, CoreError>
-        where T: 'static,
-              F: FnOnce(Option<FullId>, Option<BootstrapConfig>)
-                        -> Result<(Routing, Receiver<Event>), CoreError>
+    fn registered_impl<F>(
+        acc_locator: &[u8],
+        acc_password: &[u8],
+        invitation: &str,
+        el_handle: Handle,
+        core_tx: CoreMsgTx<T>,
+        net_tx: NetworkTx,
+        id_seed: Option<&Seed>,
+        routing_wrapper_fn: F,
+    ) -> Result<Client<T>, CoreError>
+    where
+        T: 'static,
+        F: Fn(Routing) -> Routing,
     {
         trace!("Creating an account.");
 
@@ -264,7 +265,8 @@ impl<T: 'static> Client<T> {
         let pub_key = maid_keys.sign_pk;
         let full_id = Some(maid_keys.clone().into());
 
-        let (mut routing, routing_rx) = routing_init_fn(full_id, None)?;
+        let (mut routing, routing_rx) = setup_routing(full_id, None)?;
+        routing = routing_wrapper_fn(routing);
 
         let user_root_dir = MDataInfo::random_private(DIR_TAG)?;
         let config_dir = MDataInfo::random_private(DIR_TAG)?;
@@ -367,7 +369,14 @@ impl<T: 'static> Client<T> {
         T: 'static,
     {
         let arr = Self::divide_seed(seed)?;
-        Self::login_impl(arr[0], arr[1], el_handle, core_tx, net_tx)
+        Self::login_impl(
+            arr[0],
+            arr[1],
+            el_handle,
+            core_tx,
+            net_tx,
+            |routing| routing,
+        )
     }
 
     /// This is a Gateway function to the Maidsafe network. This will help
@@ -382,24 +391,25 @@ impl<T: 'static> Client<T> {
     where
         T: 'static,
     {
-        Self::login_impl(
-            acc_locator.as_bytes(),
-            acc_password.as_bytes(),
-            el_handle,
-            core_tx,
-            net_tx,
-        )
+        Self::login_impl(acc_locator.as_bytes(),
+                         acc_password.as_bytes(),
+                         el_handle,
+                         core_tx,
+                         net_tx,
+                         |routing| routing)
     }
 
-    fn login_impl(
+    fn login_impl<F>(
         acc_locator: &[u8],
         acc_password: &[u8],
         el_handle: Handle,
         core_tx: CoreMsgTx<T>,
         net_tx: NetworkTx,
+        routing_wrapper_fn: F,
     ) -> Result<Client<T>, CoreError>
     where
         T: 'static,
+        F: Fn(Routing) -> Routing,
     {
         trace!("Attempting to log into an acc.");
 
@@ -413,6 +423,7 @@ impl<T: 'static> Client<T> {
         let (acc_content, mut acc_version) = {
             trace!("Creating throw-away routing getter for account packet.");
             let (mut routing, routing_rx) = setup_routing(None, None)?;
+            routing = routing_wrapper_fn(routing);
 
             let res = sync_loop_fn(|| {
                 let msg_id = MessageId::new();
@@ -452,6 +463,7 @@ impl<T: 'static> Client<T> {
 
         trace!("Creating an actual routing...");
         let (mut routing, routing_rx) = setup_routing(Some(id_packet), None)?;
+        routing = routing_wrapper_fn(routing);
 
         // Recover root directories if they were not created at the time of registration
         // due to a failure.
@@ -1063,18 +1075,19 @@ impl<T: 'static> Client<T> {
 #[cfg(any(all(test, feature = "use-mock-routing"),
             all(feature = "testing", feature = "use-mock-routing")))]
 impl<T: 'static> Client<T> {
-    /// Allows to customise the Routing client before registering a new account
-    pub fn registered_with_hook<F>(acc_locator: &str,
-                                   acc_password: &str,
-                                   invitation: &str,
-                                   el_handle: Handle,
-                                   core_tx: CoreMsgTx<T>,
-                                   net_tx: NetworkTx,
-                                   routing_init_fn: F)
-                                   -> Result<Client<T>, CoreError>
-        where T: 'static,
-              F: FnOnce(Option<FullId>, Option<BootstrapConfig>)
-                        -> Result<(Routing, Receiver<Event>), CoreError>
+    /// Allows to customise the mock Routing client before registering a new account
+    pub fn registered_with_hook<F>(
+        acc_locator: &str,
+        acc_password: &str,
+        invitation: &str,
+        el_handle: Handle,
+        core_tx: CoreMsgTx<T>,
+        net_tx: NetworkTx,
+        routing_wrapper_fn: F,
+    ) -> Result<Client<T>, CoreError>
+    where
+        T: 'static,
+        F: Fn(Routing) -> Routing,
     {
         Self::registered_impl(
             acc_locator.as_bytes(),
@@ -1084,7 +1097,30 @@ impl<T: 'static> Client<T> {
             core_tx,
             net_tx,
             None,
-            routing_init_fn,
+            routing_wrapper_fn,
+        )
+    }
+
+    /// Allows to customise the mock Routing client before logging into the network
+    pub fn login_with_hook<F>(
+        acc_locator: &str,
+        acc_password: &str,
+        el_handle: Handle,
+        core_tx: CoreMsgTx<T>,
+        net_tx: NetworkTx,
+        routing_wrapper_fn: F,
+    ) -> Result<Client<T>, CoreError>
+    where
+        T: 'static,
+        F: Fn(Routing) -> Routing,
+    {
+        Self::login_impl(
+            acc_locator.as_bytes(),
+            acc_password.as_bytes(),
+            el_handle,
+            core_tx,
+            net_tx,
+            routing_wrapper_fn,
         )
     }
 
@@ -1784,31 +1820,29 @@ mod tests {
         let sec_1 = unwrap!(utils::generate_random_string(10));
         let inv = unwrap!(utils::generate_random_string(10));
 
-        let routing_hook = move |full_id, cfg| match setup_routing(full_id, cfg) {
-            Ok((mut routing, routing_rx)) => {
-                let mut reqs_counter = 0;
+        let routing_hook = move |mut routing: Routing| {
+            let mut reqs_counter = 0;
 
-                routing.set_request_hook(move |req| {
-                    // Simulate an error during the config dir creation.
-                    match req {
-                        &Request::PutMData { ref data, msg_id, .. } if data.tag() == DIR_TAG => {
-                            reqs_counter += 1;
+            routing.set_request_hook(move |req| -> Option<Response> {
+                // Simulate an error during the config dir creation.
+                match *req {
+                    Request::PutMData { ref data, msg_id, .. } if data.tag() == DIR_TAG => {
+                        reqs_counter += 1;
 
-                            if reqs_counter == 2 {
-                                Some(Response::PutMData {
-                                    res: Err(ClientError::NetworkFull),
-                                    msg_id,
-                                })
-                            } else {
-                                None
-                            }
+                        if reqs_counter == 2 {
+                            Some(Response::PutMData {
+                                res: Err(ClientError::NetworkFull),
+                                msg_id,
+                            })
+                        } else {
+                            None
                         }
-                        _ => None,
                     }
-                });
-                Ok((routing, routing_rx))
-            }
-            res => res,
+                    _ => None,
+                }
+            });
+
+            routing
         };
 
         // Account creation - should fail because root dirs couldn't be created
