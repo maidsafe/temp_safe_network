@@ -364,4 +364,61 @@ mod tests {
                 })
         });
     }
+
+    // Test deleting an entry and then re-adding it.
+    // We should be able to successfully open and read the re-added file.
+    #[test]
+    fn file_delete_then_add() {
+        random_client(|client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+            let c5 = client.clone();
+            let c6 = client.clone();
+
+            create_test_file(client)
+                .then(move |res| {
+                          let (dir, file) = unwrap!(res);
+                          file_helper::delete(&c2, &dir, "hello.txt", 1).map(move |_| (dir, file))
+                      })
+                .then(move |res| {
+                          let (dir, file) = unwrap!(res);
+
+                          file_helper::write(c3, file, Mode::Overwrite).map(move |writer| {
+                                                                                (writer, dir)
+                                                                            })
+                      })
+                .then(move |res| {
+                          let (writer, dir) = unwrap!(res);
+
+                          writer
+                              .write(&[1u8; NEW_SIZE])
+                              .and_then(move |_| writer.close())
+                              .map(move |file| (file, dir))
+                      })
+                .then(move |res| {
+                          let (file, dir) = unwrap!(res);
+                          file_helper::update(c4, dir.clone(), "hello.txt", &file, 2)
+                              .map(move |_| dir)
+                      })
+                .then(move |res| {
+                          let dir = unwrap!(res);
+                          file_helper::fetch(c5, dir, "hello.txt")
+                      })
+                .then(move |res| {
+                          let (version, file) = unwrap!(res);
+                          assert_eq!(version, 2);
+                          file_helper::read(c6, &file)
+                      })
+                .then(move |res| {
+                          let reader = unwrap!(res);
+                          let size = reader.size();
+                          println!("reading {} bytes", size);
+                          reader.read(0, size)
+                      })
+                .map(move |data| {
+                         assert_eq!(data, vec![1u8; NEW_SIZE]);
+                     })
+        });
+    }
 }

@@ -452,6 +452,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
         };
 
+        // Insert file into container.
         unsafe {
             unwrap!(call_0(|ud, cb| {
                                dir_insert_file(&app,
@@ -547,5 +548,149 @@ mod tests {
 
         let f: *const File = unsafe { unwrap!(call_1(|ud, cb| file_close(&app, read_h, ud, cb))) };
         assert!(f.is_null());
+    }
+
+    // Tests that NFS functions still work after deleting and updating file contents.
+    // 1. Create an empty file, open it for writing, write original contents.
+    // 2. Insert file into the container.
+    // 3. Delete file in the container.
+    // 4. Create non-empty file with new contents.
+    // 5. Update the file in the container with new contents and version.
+    // 6. Fetch the file from the container, check that it has the updated version.
+    // 7. Read the file contents and ensure that they correspond to the data from step 4.
+    #[test]
+    fn delete_then_open_file() {
+        let mut container_permissions = HashMap::new();
+        let _ = container_permissions.insert("_videos".to_string(),
+                                             btree_set![Permission::Read,
+                                                        Permission::Insert,
+                                                        Permission::Update,
+                                                        Permission::Delete]);
+
+        let app = create_app_with_access(container_permissions);
+
+        let container_info_h = run(&app, move |client, context| {
+            let context = context.clone();
+
+            context
+                .get_container_mdata_info(client, "_videos")
+                .map(move |info| context.object_cache().insert_mdata_info(info))
+        });
+
+        // Create non-empty file.
+        let file = NativeFile::new(Vec::new());
+        let ffi_file = file.into_repr_c();
+
+        let file_name2 = "file2.txt";
+        let ffi_file_name2 = unwrap!(CString::new(file_name2));
+
+        let content_original = b"hello world";
+
+        let write_h = unsafe {
+            unwrap!(call_1(|ud, cb| file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)))
+        };
+
+        let written_file: NativeFile = unsafe {
+            unwrap!(call_0(|ud, cb| {
+                               file_write(&app,
+                                          write_h,
+                                          content_original.as_ptr(),
+                                          content_original.len(),
+                                          ud,
+                                          cb)
+                           }));
+            unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
+        };
+
+        // Insert file into container.
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                               dir_insert_file(&app,
+                                               container_info_h,
+                                               ffi_file_name2.as_ptr(),
+                                               &written_file.into_repr_c(),
+                                               ud,
+                                               cb)
+                           }))
+        }
+
+        // Delete file.
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                               dir_delete_file(&app,
+                                               container_info_h,
+                                               ffi_file_name2.as_ptr(),
+                                               1,
+                                               ud,
+                                               cb)
+                           }))
+        }
+
+        // Create new non-empty file.
+        let file = NativeFile::new(Vec::new());
+        let ffi_file = file.into_repr_c();
+
+        let content_new = b"hello goodbye";
+
+        let write_h = unsafe {
+            unwrap!(call_1(|ud, cb| file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)))
+        };
+
+        let new_file: NativeFile = unsafe {
+            unwrap!(call_0(|ud, cb| {
+                               file_write(&app,
+                                          write_h,
+                                          content_new.as_ptr(),
+                                          content_new.len(),
+                                          ud,
+                                          cb)
+                           }));
+            unwrap!(call_1(|ud, cb| file_close(&app, write_h, ud, cb)))
+        };
+
+        // Update file in container.
+        unsafe {
+            unwrap!(call_0(|ud, cb| {
+                dir_update_file(&app,
+                                container_info_h,
+                                ffi_file_name2.as_ptr(),
+                                &new_file.into_repr_c(),
+                                2,
+                                ud,
+                                cb)
+            }))
+        }
+
+        // Fetch the file.
+        let (file, version): (NativeFile, u64) = {
+            unsafe {
+                unwrap!(call_2(|ud, cb| {
+                                   dir_fetch_file(&app,
+                                                  container_info_h,
+                                                  ffi_file_name2.as_ptr(),
+                                                  ud,
+                                                  cb)
+                               }))
+            }
+        };
+        assert_eq!(version, 2);
+
+        // Read the content.
+        let read_write_h = unsafe {
+            unwrap!(call_1(|ud, cb| {
+                               file_open(&app,
+                                         &file.into_repr_c(),
+                                         OPEN_MODE_READ | OPEN_MODE_APPEND,
+                                         ud,
+                                         cb)
+                           }))
+        };
+
+        let retrieved_content = unsafe {
+            unwrap!(call_vec_u8(|ud, cb| {
+                                    file_read(&app, read_write_h, 0, FILE_READ_TO_END, ud, cb)
+                                }))
+        };
+        assert_eq!(retrieved_content, content_new);
     }
 }
