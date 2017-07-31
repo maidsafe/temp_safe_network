@@ -24,6 +24,7 @@ use tiny_keccak::sha3_256;
 use utils::{symmetric_decrypt, symmetric_encrypt};
 
 const REENCRYPT_ERROR: &'static str = "Cannot reencrypt without new_enc_info";
+const DECRYPT_ERROR: &'static str = "Cannot decrypt without new_enc_info";
 
 /// Information allowing to locate and access mutable data on the network.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -103,6 +104,15 @@ impl MDataInfo {
             symmetric_decrypt(cipher, key)
         } else {
             Ok(cipher.to_vec())
+        }
+    }
+
+    /// Try to decrypt mdata entry using the new encryption info
+    pub fn decrypt_new_enc_info(&self, cipher: &[u8]) -> Result<Vec<u8>, CoreError> {
+        if let Some((ref key, _)) = self.new_enc_info {
+            symmetric_decrypt(cipher, key)
+        } else {
+            Err(CoreError::from(DECRYPT_ERROR))
         }
     }
 

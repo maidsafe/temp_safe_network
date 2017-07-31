@@ -52,19 +52,14 @@ pub const KEY_APPS: &'static [u8] = b"apps";
 /// Key under which the access container info is stored.
 pub const KEY_ACCESS_CONTAINER: &'static [u8] = b"access-container";
 
-/// Config file key under which the operation queue is stored.
-#[allow(unused)]
-pub const KEY_OPERATION_QUEUE: &'static [u8] = b"operation-queue";
+/// Config file key under which the revocation queue is stored.
+pub const KEY_REVOCATION_QUEUE: &'static [u8] = b"revocation-queue";
 
 /// Maps from a SHA-3 hash of an app ID to app info
 pub type Apps = HashMap<[u8; 32], AppInfo>;
-
-/// Ongoing composite operation.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Operation {
-    /// Ongoing revocation of app with the given id.
-    AppRevocation { app_id: String },
-}
+/// Contains a queue of revocations that are currently running or have failed
+/// String refers to `app_id`.
+pub type RevocationQueue = VecDeque<String>;
 
 /// Retrieves apps registered with the authenticator
 pub fn list_apps(client: &Client<()>) -> Box<AuthFuture<(u64, Apps)>> {
@@ -103,66 +98,64 @@ pub fn insert_app(client: &Client<()>, app: AppInfo) -> Box<AuthFuture<()>> {
 }
 
 
-/// Push a new operation to the operation queue.
-#[allow(unused)]
-pub fn push_to_operation_queue(client: &Client<()>, op: Operation) -> Box<AuthFuture<()>> {
+/// Push a new operation to the revocation queue.
+pub fn push_to_revocation_queue(client: &Client<()>, app_id: String) -> Box<AuthFuture<()>> {
     let client = client.clone();
-    get_operation_queue(&client)
-        .then(move |res| {
-            let (version, mut queue) = match res {
-                Ok(value) => value,
-                Err(AuthError::CoreError(
-                    CoreError::RoutingClientError(ClientError::NoSuchEntry)
-                )) => {
-                    (0, Default::default())
-                }
-                Err(error) => return future::err(error).into_box(),
-            };
-
-            queue.push_back(op);
-            update_operation_queue(&client, &queue, version + 1)
+    get_revocation_queue(&client)
+        .and_then(move |res| {
+            let (version, mut queue) = res.map(|(version, queue)| (version + 1, queue))
+                .unwrap_or_else(|| (0, Default::default()));
+            queue.push_back(app_id);
+            update_revocation_queue(&client, &queue, version)
         })
         .into_box()
 }
 
-/// Pop from the operation queue.
-#[allow(unused)]
-pub fn pop_from_operation_queue(client: &Client<()>) -> Box<AuthFuture<Option<Operation>>> {
+/// Pop from the revocation queue.
+/// Returns the removed entry & the revocation queue with the removed entry in a tuple.
+/// If there are no entries left in the queue, returns just `None` along with the revocation queue.
+/// If no revocation queue is found in the config, returns `None`
+#[cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
+pub fn pop_from_revocation_queue(
+    client: &Client<()>,
+) -> Box<AuthFuture<Option<(Option<String>, RevocationQueue)>>> {
     let client = client.clone();
-    get_operation_queue(&client)
-        .then(move |res| {
-            let (version, mut queue) = match res {
-                Ok(value) => value,
-                Err(AuthError::CoreError(
-                    CoreError::RoutingClientError(ClientError::NoSuchEntry)
-                )) => {
-                    return Either::A(future::ok(None));
-                }
-                Err(error) => return Either::A(future::err(error)),
-            };
-
+    get_revocation_queue(&client)
+        .and_then(move |res| if let Some((version, mut queue)) = res {
             let op = queue.pop_front();
-            Either::B(update_operation_queue(&client, &queue, version + 1).map(
-                move |_| op,
+            Either::B(update_revocation_queue(&client, &queue, version + 1).map(
+                move |_| Some((op, queue)),
             ))
+        } else {
+            return Either::A(future::ok(None));
         })
         .into_box()
 }
 
-/// Get authenticator's operation queue.
-#[allow(unused)]
-pub fn get_operation_queue(client: &Client<()>) -> Box<AuthFuture<(u64, VecDeque<Operation>)>> {
-    get_entry(client, KEY_OPERATION_QUEUE)
+/// Get authenticator's revocation queue.
+/// Returns version and the revocation queue in a tuple.
+/// If the queue is not found on the config file, returns `None`.
+pub fn get_revocation_queue(
+    client: &Client<()>,
+) -> Box<AuthFuture<Option<(u64, RevocationQueue)>>> {
+    get_entry(client, KEY_REVOCATION_QUEUE)
+        .then(move |res| match res {
+            Ok(value) => ok!(Some(value)),
+            Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::NoSuchEntry))) => {
+                ok!(None)
+            }
+            Err(error) => return err!(error),
+        })
+        .into_box()
 }
 
 /// Update authenticator's operation queue.
-#[allow(unused)]
-pub fn update_operation_queue(
+pub fn update_revocation_queue(
     client: &Client<()>,
-    queue: &VecDeque<Operation>,
+    queue: &RevocationQueue,
     version: u64,
 ) -> Box<AuthFuture<()>> {
-    update_entry(client, KEY_OPERATION_QUEUE, queue, version)
+    update_entry(client, KEY_REVOCATION_QUEUE, queue, version)
 }
 
 fn get_entry<T>(client: &Client<()>, key: &[u8]) -> Box<AuthFuture<(u64, T)>>

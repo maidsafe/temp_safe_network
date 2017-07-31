@@ -20,28 +20,83 @@ use access_container::{access_container, access_container_entry, access_containe
                        delete_access_container_entry};
 use config;
 use config::AppInfo;
-use futures::{Future, future};
+use futures::Future;
+use futures::future::{self, Loop};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use routing::{EntryActions, User};
 use rust_sodium::crypto::sign;
-use safe_core::{Client, FutureExt, MDataInfo};
+use safe_core::{Client, CoreError, FutureExt, MDataInfo};
 use safe_core::ipc::IpcError;
 use safe_core::recovery;
 use safe_core::utils::{symmetric_decrypt, symmetric_encrypt};
+use std::collections::HashMap;
 
-/// Revoke app access
+/// Revokes app access using a revocation queue
 pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<String>> {
+    let app_id = app_id.to_string();
+    let client = client.clone();
+
+    // 1. Get the topmost queue item which contains an app ID
+    //    (or use the provided app_id if it's empty)
+    // 2. Revoke a single app from the queue
+    // 3. Remove the app_id from the queue, start over with step 1 if the queue is not empty
+    future::loop_fn(app_id, move |app_id| {
+        let c2 = client.clone();
+        let c3 = client.clone();
+        let c4 = client.clone();
+        let c5 = client.clone();
+        let app_id2 = app_id.clone();
+
+        config::get_revocation_queue(&c2)
+            .and_then(move |res| {
+                let (_version, queue) = res.unwrap_or_else(|| (0, Default::default()));
+                let current_item = queue.front().cloned().unwrap_or_else(|| app_id.clone());
+                let fut = if !queue.contains(&app_id) {
+                    config::push_to_revocation_queue(&c3, app_id)
+                } else {
+                    // The queue already contains this app, do nothing
+                    ok!(())
+                };
+                fut.map(move |_| current_item)
+            })
+            .and_then(move |app_id| revoke_single_app(&c4, &app_id))
+            .and_then(move |_| config::pop_from_revocation_queue(&c5))
+            .and_then(move |opt_queue| {
+                let (app_id, queue) = opt_queue.ok_or_else(|| {
+                    AuthError::from(
+                        "No revocation queue \
+                                                     found in the config file",
+                    )
+                })?;
+                if let Some(next_app_id) = queue.front().cloned() {
+                    Ok(Loop::Continue(next_app_id))
+                } else {
+                    Ok(Loop::Break(app_id.unwrap_or(app_id2)))
+                }
+            })
+    }).into_box()
+
+}
+
+/// Revoke access for a single app
+fn revoke_single_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<()>> {
     let c2 = client.clone();
     let c3 = client.clone();
     let c4 = client.clone();
     let c5 = client.clone();
     let c6 = client.clone();
     let c7 = client.clone();
+    let c8 = client.clone();
 
-    // 1. Delete the app key from MaidManagers
-    // 2. Get the access container and remove the revoked app from it
+    // 1. Put the provided app_id into the revocation queue
+    // 2. Delete the app key from MaidManagers
     // 3. Remove the app's key from containers permissions
+    // 4. Refresh the containers info from the user's root dir (as the access
+    //    container entry is not updated with the new keys info - so we have to
+    //    make sure that we use correct encryption keys if the previous revoke\
+    //    attempt has failed)
     // 4. Re-encrypt private containers that the app had access to
+    // 5. Remove the revoked app from the access container
     config::get_app(client, app_id)
         .and_then(move |app| {
             delete_app_auth_key(&c2, app.keys.sign_pk).map(move |_| app)
@@ -60,34 +115,62 @@ pub fn revoke_app(client: &Client<()>, app_id: &str) -> Box<AuthFuture<String>> 
                     ))
                 })
         })
-        .and_then(move |(app, access_container, version, permissions)| {
+        .and_then(move |(app,
+               access_container,
+               ac_entry_version,
+               permissions)| {
+            revoke_container_perms(&c5, &permissions, app.keys.sign_pk).map(move |_| {
+                (app, access_container, ac_entry_version, permissions)
+            })
+        })
+        .and_then(move |(app,
+               access_container,
+               ac_entry_version,
+               permissions)| {
+            refresh_from_user_root_dir(&c6, permissions).map(move |refreshed_containers| {
+                (
+                    app,
+                    access_container,
+                    ac_entry_version,
+                    refreshed_containers,
+                )
+            })
+        })
+        .and_then(move |(app,
+               access_container,
+               ac_entry_version,
+               permissions)| {
+            reencrypt_private_containers(&c7, access_container.clone(), permissions.clone(), &app)
+                .map(move |_| (app, access_container, ac_entry_version))
+        })
+        .and_then(move |(app, access_container, version)| {
             delete_access_container_entry(
-                &c5,
+                &c8,
                 &access_container,
                 &app.info.id,
                 &app.keys,
                 version + 1,
-            ).map(move |_| (app, access_container, permissions))
-        })
-        .and_then(move |(app, access_container, permissions)| {
-            revoke_container_perms(&c6, &permissions, app.keys.sign_pk)
-                .map(move |_| (app, access_container, permissions))
-        })
-        .and_then(move |(app, access_container, permissions)| {
-            reencrypt_private_containers(&c7, access_container, permissions, &app)
-                .map(move |_| app.info.id)
+            )
         })
         .into_box()
 }
 
-// Delete the app's auth key from the MaidManager - this prevents the app from
-// performing any more mutations.
+/// Delete the app's auth key from the Maid Manager - this prevents the app from
+/// performing any more mutations.
 fn delete_app_auth_key(client: &Client<()>, key: sign::PublicKey) -> Box<AuthFuture<()>> {
     let client = client.clone();
 
     client
         .list_auth_keys_and_version()
-        .and_then(move |(_, version)| client.del_auth_key(key, version + 1))
+        .and_then(move |(listed_keys, version)| if listed_keys.contains(
+            &key,
+        )
+        {
+            client.del_auth_key(key, version + 1)
+        } else {
+            // The key has been removed already
+            ok!(())
+        })
         .map_err(From::from)
         .into_box()
 }
@@ -130,13 +213,14 @@ fn reencrypt_private_containers(
     containers: AccessContainerEntry,
     revoked_app: &AppInfo,
 ) -> Box<AuthFuture<()>> {
-    // 1. Generate new encryption keys for all the containers to be reencrypted.
-    // 2. Update the user root dir and the access container to use the new keys.
-    // 3. Perform the actual reencryption of the containers.
-    // 4. Update the user root dir and access container again, commiting or aborting
+    // 1. Make sure to get the latest containers info from the root dir (as it
+    //    could have been updated on the previous failed revocation)
+    // 2. Generate new encryption keys for all the containers to be reencrypted.
+    // 3. Update the user root dir and the access container to use the new keys.
+    // 4. Perform the actual reencryption of the containers.
+    // 5. Update the user root dir and access container again, commiting or aborting
     //    the encryption keys change, depending on whether the re-encryption of the
     //    corresponding container succeeded or failed.
-
     let c2 = client.clone();
     let c3 = client.clone();
 
@@ -170,10 +254,43 @@ fn start_new_containers_enc_info(containers: AccessContainerEntry) -> Vec<(Strin
     containers
         .into_iter()
         .map(|(container, (mut mdata_info, _))| {
-            mdata_info.start_new_enc_info();
+            if mdata_info.new_enc_info.is_none() {
+                mdata_info.start_new_enc_info();
+            }
             (container, mdata_info)
         })
         .collect()
+}
+
+/// Fetches containers info from the user's root dir
+fn refresh_from_user_root_dir(
+    client: &Client<()>,
+    containers: AccessContainerEntry,
+) -> Box<AuthFuture<AccessContainerEntry>> {
+    let user_root = fry!(client.user_root_dir());
+
+    client
+        .list_mdata_entries(user_root.name, user_root.type_tag)
+        .and_then(move |entries| {
+            let mut refreshed = HashMap::new();
+            for (container, (mdata_info, perms)) in containers {
+                let key = user_root.enc_entry_key(container.as_bytes())?;
+
+                let _ = refreshed.insert(
+                    container,
+                    if let Some(new_value) = entries.get(&key) {
+                        let decoded = user_root.decrypt(&new_value.content)?;
+                        let root_mdata_info = deserialise::<MDataInfo>(&decoded)?;
+                        (root_mdata_info, perms)
+                    } else {
+                        (mdata_info, perms)
+                    },
+                );
+            }
+            Ok(refreshed)
+        })
+        .map_err(AuthError::from)
+        .into_box()
 }
 
 fn update_user_root_dir(
@@ -293,16 +410,28 @@ fn reencrypt_containers(
                         continue;
                     }
 
-                    let new_key = mdata_info.reencrypt_entry_key(&old_key)?;
-                    let new_content = mdata_info.reencrypt_entry_value(&value.content)?;
+                    // Try to see if we've already re-encrypted key and a value on a previous
+                    // try that's possibly has failed with an error
+                    match mdata_info.decrypt_new_enc_info(&old_key) {
+                        Ok(_old_key) => {
+                            // It's already re-encrypted - do nothing about it.
+                            ()
+                        }
+                        Err(CoreError::SymmetricDecipherFailure) => {
+                            // It hasn't been reencrypted yet
+                            let new_key = mdata_info.reencrypt_entry_key(&old_key)?;
+                            let new_content = mdata_info.reencrypt_entry_value(&value.content)?;
 
-                    // Delete the old entry with the old key and
-                    // insert the re-encrypted entry with a new key
-                    actions = actions.del(old_key, value.entry_version + 1).ins(
-                        new_key,
-                        new_content,
-                        0,
-                    );
+                            // Delete the old entry with the old key and
+                            // insert the re-encrypted entry with a new key
+                            actions = actions.del(old_key, value.entry_version + 1).ins(
+                                new_key,
+                                new_content,
+                                0,
+                            );
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
 
                 Ok((mdata_info, actions))

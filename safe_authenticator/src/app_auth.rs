@@ -205,7 +205,8 @@ fn authenticate_new_app(
         .and_then(move |(dir, app_container, mut perms)| {
             if let Some(mdata_info) = app_container {
                 // Store info about the app's dedicated container in the access container
-                let access = btree_set![
+                let access =
+                    btree_set![
                     Permission::Read,
                     Permission::Insert,
                     Permission::Update,

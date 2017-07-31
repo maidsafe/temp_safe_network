@@ -882,9 +882,9 @@ fn app_authentication_recovery() {
                 // the addition of the app to the user's config dir)
                 Request::InsAuthKey { msg_id, .. } => {
                     Some(Response::InsAuthKey {
-                             res: Err(ClientError::LowBalance),
-                             msg_id,
-                         })
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
                 }
                 // Pass-through
                 _ => None,
@@ -892,11 +892,13 @@ fn app_authentication_recovery() {
         });
         routing
     };
-    let auth = unwrap!(Authenticator::create_acc_with_hook(locator.clone(),
-                                                           password.clone(),
-                                                           invitation,
-                                                           |_| (),
-                                                           routing_hook));
+    let auth = unwrap!(Authenticator::create_acc_with_hook(
+        locator.clone(),
+        password.clone(),
+        invitation,
+        |_| (),
+        routing_hook,
+    ));
 
     // Create a test app and try to authenticate it (with `app_container` set to true).
     let auth_req = AuthReq {
@@ -926,9 +928,9 @@ fn app_authentication_recovery() {
 
                     if reqs_counter == 2 {
                         Some(Response::SetMDataUserPermissions {
-                                 res: Err(ClientError::LowBalance),
-                                 msg_id,
-                             })
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
                     } else {
                         None
                     }
@@ -939,10 +941,12 @@ fn app_authentication_recovery() {
         });
         routing
     };
-    let auth = unwrap!(Authenticator::login_with_hook(locator.clone(),
-                                                      password.clone(),
-                                                      |_| (),
-                                                      routing_hook));
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        routing_hook,
+    ));
     match register_app(&auth, &auth_req) {
         Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
         x => panic!("Unexpected {:?}", x),
@@ -961,9 +965,9 @@ fn app_authentication_recovery() {
 
                     if reqs_counter == 3 {
                         Some(Response::SetMDataUserPermissions {
-                                 res: Err(ClientError::LowBalance),
-                                 msg_id,
-                             })
+                            res: Err(ClientError::LowBalance),
+                            msg_id,
+                        })
                     } else {
                         None
                     }
@@ -974,10 +978,12 @@ fn app_authentication_recovery() {
         });
         routing
     };
-    let auth = unwrap!(Authenticator::login_with_hook(locator.clone(),
-                                                      password.clone(),
-                                                      |_| (),
-                                                      routing_hook));
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        routing_hook,
+    ));
     match register_app(&auth, &auth_req) {
         Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
         x => panic!("Unexpected {:?}", x),
@@ -991,9 +997,9 @@ fn app_authentication_recovery() {
                 Request::MutateMDataEntries { msg_id, .. } => {
                     // None
                     Some(Response::SetMDataUserPermissions {
-                             res: Err(ClientError::LowBalance),
-                             msg_id,
-                         })
+                        res: Err(ClientError::LowBalance),
+                        msg_id,
+                    })
 
                 }
                 // Pass-through
@@ -1002,10 +1008,12 @@ fn app_authentication_recovery() {
         });
         routing
     };
-    let auth = unwrap!(Authenticator::login_with_hook(locator.clone(),
-                                                      password.clone(),
-                                                      |_| (),
-                                                      routing_hook));
+    let auth = unwrap!(Authenticator::login_with_hook(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+        routing_hook,
+    ));
     match register_app(&auth, &auth_req) {
         Err(AuthError::CoreError(CoreError::RoutingClientError(ClientError::LowBalance))) => (),
         x => panic!("Unexpected {:?}", x),
@@ -1013,7 +1021,11 @@ fn app_authentication_recovery() {
 
     // Now try to authenticate the app without network failure simulation -
     // it should succeed.
-    let auth = unwrap!(Authenticator::login(locator.clone(), password.clone(), |_| ()));
+    let auth = unwrap!(Authenticator::login(
+        locator.clone(),
+        password.clone(),
+        |_| (),
+    ));
     let auth_granted = match register_app(&auth, &auth_req) {
         Ok(auth_granted) => auth_granted,
         x => panic!("Unexpected {:?}", x),
@@ -1034,19 +1046,19 @@ fn app_authentication_recovery() {
         client
             .get_mdata_version(app_container_md.name, app_container_md.type_tag)
             .then(move |res| {
-                      let version = unwrap!(res);
-                      assert!(version > 0);
+                let version = unwrap!(res);
+                assert!(version > 0);
 
-                      // Check that the app's container has required permissions.
-                      c2.list_mdata_permissions(app_container_md.name, app_container_md.type_tag)
-                  })
+                // Check that the app's container has required permissions.
+                c2.list_mdata_permissions(app_container_md.name, app_container_md.type_tag)
+            })
             .then(move |res| {
-                      let perms = unwrap!(res);
-                      assert!(perms.contains_key(&User::Key(app_pk)));
-                      assert_eq!(perms.len(), 1);
+                let perms = unwrap!(res);
+                assert!(perms.contains_key(&User::Key(app_pk)));
+                assert_eq!(perms.len(), 1);
 
-                      Ok(())
-                  })
+                Ok(())
+            })
     });
 }
 
