@@ -1245,11 +1245,15 @@ fn create_file<T: Into<String>>(
     try_run(authenticator, |client| {
         let c2 = client.clone();
 
-        file_helper::write(client.clone(), File::new(vec![]), Mode::Overwrite)
-            .then(move |res| {
-                let writer = unwrap!(res);
-                writer.write(&content).and_then(move |_| writer.close())
-            })
+        file_helper::write(
+            client.clone(),
+            File::new(vec![]),
+            Mode::Overwrite,
+            container_info.enc_key().cloned(),
+        ).then(move |res| {
+            let writer = unwrap!(res);
+            writer.write(&content).and_then(move |_| writer.close())
+        })
             .then(move |file| {
                 file_helper::insert(c2, container_info, name, &unwrap!(file))
             })

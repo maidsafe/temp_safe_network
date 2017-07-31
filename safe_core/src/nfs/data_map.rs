@@ -23,26 +23,37 @@ use immutable_data;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::NfsFuture;
 use routing::XorName;
+use rust_sodium::crypto::secretbox;
 use self_encryption::DataMap;
 use utils::FutureExt;
 
-// GET `DataMap` from the network.
-pub fn get<T: 'static>(client: &Client<T>, name: &XorName) -> Box<NfsFuture<DataMap>> {
-    immutable_data::get_value(client, name, None)
+// Get `DataMap` from the network.
+// If the `DataMap` is encrypted, an `encryption_key` must be passed in to decrypt it.
+pub fn get<T: 'static>(
+    client: &Client<T>,
+    name: &XorName,
+    encryption_key: Option<secretbox::Key>,
+) -> Box<NfsFuture<DataMap>> {
+    immutable_data::get_value(client, name, encryption_key)
         .map_err(From::from)
         .and_then(move |content| deserialise(&content).map_err(From::from))
         .into_box()
 }
 
-// PUT `DataMap` on the network.
-pub fn put<T: 'static>(client: &Client<T>, data_map: &DataMap) -> Box<NfsFuture<XorName>> {
+// Put `DataMap` on the network.
+// If `encryption_key` is passed in, the `DataMap` will be encrypted.
+pub fn put<T: 'static>(
+    client: &Client<T>,
+    data_map: &DataMap,
+    encryption_key: Option<secretbox::Key>,
+) -> Box<NfsFuture<XorName>> {
     let client = client.clone();
     let client2 = client.clone();
 
     future::result(serialise(&data_map))
         .map_err(From::from)
         .and_then(move |encoded| {
-            immutable_data::create(&client, &encoded, None)
+            immutable_data::create(&client, &encoded, encryption_key)
         })
         .and_then(move |data| {
             let name = *data.name();

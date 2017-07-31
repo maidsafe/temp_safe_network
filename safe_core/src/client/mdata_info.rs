@@ -80,6 +80,11 @@ impl MDataInfo {
         Ok(Self::new_public(rng.gen(), type_tag))
     }
 
+    /// Returns the encryption key, if any.
+    pub fn enc_key(&self) -> Option<&secretbox::Key> {
+        self.enc_info.as_ref().map(|&(ref key, _)| key)
+    }
+
     /// encrypt the the key for the mdata entry accordingly
     pub fn enc_entry_key(&self, plain_text: &[u8]) -> Result<Vec<u8>, CoreError> {
         if let Some((ref key, seed)) = self.enc_info {

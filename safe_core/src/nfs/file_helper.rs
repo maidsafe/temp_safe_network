@@ -21,6 +21,7 @@ use futures::{Future, IntoFuture};
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use nfs::{File, Mode, NfsError, NfsFuture, Reader, Writer};
 use routing::{ClientError, EntryActions};
+use rust_sodium::crypto::secretbox;
 use self_encryption_storage::SelfEncryptionStorage;
 use utils::FutureExt;
 
@@ -82,9 +83,18 @@ where
 }
 
 /// Returns a reader for reading the file contents
-pub fn read<T: 'static>(client: Client<T>, file: &File) -> Box<NfsFuture<Reader<T>>> {
+pub fn read<T: 'static>(
+    client: Client<T>,
+    file: &File,
+    encryption_key: Option<secretbox::Key>,
+) -> Box<NfsFuture<Reader<T>>> {
     trace!("Reading file {:?}", file);
-    Reader::new(client.clone(), SelfEncryptionStorage::new(client), file)
+    Reader::new(
+        client.clone(),
+        SelfEncryptionStorage::new(client),
+        file,
+        encryption_key,
+    )
 }
 
 /// Delete a file from the Directory
@@ -164,7 +174,12 @@ where
 /// object is returned, through which the data for the file can be written to
 /// the network. The file is actually saved in the directory listing only after
 /// `writer.close()` is invoked
-pub fn write<T>(client: Client<T>, file: File, mode: Mode) -> Box<NfsFuture<Writer<T>>>
+pub fn write<T>(
+    client: Client<T>,
+    file: File,
+    mode: Mode,
+    encryption_key: Option<secretbox::Key>,
+) -> Box<NfsFuture<Writer<T>>>
 where
     T: 'static,
 {
@@ -173,8 +188,9 @@ where
     Writer::new(
         client.clone(),
         SelfEncryptionStorage::new(client),
-        mode,
         file,
+        mode,
+        encryption_key,
     )
 }
 
@@ -193,7 +209,9 @@ mod tests {
     use client::{Client, MDataInfo};
     use errors::CoreError;
     use futures::Future;
-    use nfs::{File, Mode, NfsFuture, file_helper};
+    use nfs::{File, Mode, NfsError, NfsFuture, file_helper};
+    use rand::{self, Rng};
+    use rust_sodium::crypto::secretbox;
     use utils::FutureExt;
     use utils::test_utils::random_client;
 
@@ -205,14 +223,18 @@ mod tests {
         let c2 = client.clone();
         let user_root = unwrap!(client.user_root_dir());
 
-        file_helper::write(client.clone(), File::new(Vec::new()), Mode::Overwrite)
-            .then(move |res| {
-                let writer = unwrap!(res);
+        file_helper::write(
+            client.clone(),
+            File::new(Vec::new()),
+            Mode::Overwrite,
+            user_root.enc_key().cloned(),
+        ).then(move |res| {
+            let writer = unwrap!(res);
 
-                writer.write(&[0u8; ORIG_SIZE]).and_then(
-                    move |_| writer.close(),
-                )
-            })
+            writer.write(&[0u8; ORIG_SIZE]).and_then(
+                move |_| writer.close(),
+            )
+        })
             .then(move |res| {
                 let file = unwrap!(res);
 
@@ -229,8 +251,8 @@ mod tests {
 
             create_test_file(client)
                 .then(move |res| {
-                    let (_dir, file) = unwrap!(res);
-                    file_helper::read(c2, &file)
+                    let (dir, file) = unwrap!(res);
+                    file_helper::read(c2, &file, dir.enc_key().cloned())
                 })
                 .then(|res| {
                     let reader = unwrap!(res);
@@ -245,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn file_update_rewrite() {
+    fn file_update_overwrite() {
         random_client(|client| {
             let c2 = client.clone();
             let c3 = client.clone();
@@ -257,7 +279,8 @@ mod tests {
                     // Updating file - full rewrite
                     let (dir, file) = unwrap!(res);
 
-                    file_helper::write(c2, file, Mode::Overwrite).map(move |writer| (writer, dir))
+                    file_helper::write(c2, file, Mode::Overwrite, dir.enc_key().cloned())
+                        .map(move |writer| (writer, dir))
                 })
                 .then(move |res| {
                     let (writer, dir) = unwrap!(res);
@@ -272,11 +295,12 @@ mod tests {
                 })
                 .then(move |res| {
                     let dir = unwrap!(res);
-                    file_helper::fetch(c4, dir, "hello.txt")
+                    let fut = file_helper::fetch(c4, dir.clone(), "hello.txt");
+                    fut.map(move |(version, file)| (dir, version, file))
                 })
                 .then(move |res| {
-                    let (_version, file) = unwrap!(res);
-                    file_helper::read(c5, &file)
+                    let (dir, _version, file) = unwrap!(res);
+                    file_helper::read(c5, &file, dir.enc_key().cloned())
                 })
                 .then(move |res| {
                     let reader = unwrap!(res);
@@ -298,20 +322,22 @@ mod tests {
 
             create_test_file(client)
                 .then(move |res| {
-                    let (_dir, file) = unwrap!(res);
+                    let (dir, file) = unwrap!(res);
 
                     // Update - should append (after S.E behaviour changed)
-                    file_helper::write(c2, file, Mode::Append)
+                    file_helper::write(c2, file, Mode::Append, dir.enc_key().cloned())
+                        .map(move |writer| (dir, writer))
                 })
                 .then(move |res| {
-                    let writer = unwrap!(res);
-                    writer.write(&[2u8; APPEND_SIZE]).and_then(
-                        move |_| writer.close(),
-                    )
+                    let (dir, writer) = unwrap!(res);
+                    writer
+                        .write(&[2u8; APPEND_SIZE])
+                        .and_then(move |_| writer.close())
+                        .map(move |file| (dir, file))
                 })
                 .then(move |res| {
-                    let file = unwrap!(res);
-                    file_helper::read(c3, &file)
+                    let (dir, file) = unwrap!(res);
+                    file_helper::read(c3, &file, dir.enc_key().cloned())
                 })
                 .then(move |res| {
                     let reader = unwrap!(res);
@@ -428,5 +454,70 @@ mod tests {
                     assert_eq!(data, vec![1u8; NEW_SIZE]);
                 })
         });
+    }
+
+    // Create and store encrypted file and make sure it can only be read back with
+    // the original encryption key.
+    #[test]
+    fn encryption() {
+        random_client(|client| {
+            let c2 = client.clone();
+            let c3 = client.clone();
+            let c4 = client.clone();
+
+            let mut rng = rand::thread_rng();
+
+            let content: Vec<u8> = rng.gen_iter().take(ORIG_SIZE).collect();
+            let content2 = content.clone();
+
+            let key = secretbox::gen_key();
+            let wrong_key = secretbox::gen_key();
+
+
+            file_helper::write(
+                client.clone(),
+                File::new(Vec::new()),
+                Mode::Overwrite,
+                Some(key.clone()),
+            ).then(move |res| {
+                let writer = unwrap!(res);
+                writer.write(&content).and_then(move |_| writer.close())
+            })
+                .then(move |res| {
+                    // Attempt to read without an encryption key fails.
+                    let file = unwrap!(res);
+                    file_helper::read(c2, &file, None)
+                        .and_then(|_| Err(NfsError::from("Unexpected success")))
+                        .or_else(move |_error| -> Result<_, NfsError> {
+                            // TODO: assert the error is of the expected variant.
+                            Ok(file)
+                        })
+                })
+                .then(move |res| {
+                    // Attempt to read using incorrect encryption key fails.
+                    let file = unwrap!(res);
+                    file_helper::read(c3, &file, Some(wrong_key))
+                        .and_then(|_| Err(NfsError::from("Unexpected success")))
+                        .or_else(move |error| match error {
+                            NfsError::CoreError(CoreError::SymmetricDecipherFailure) => Ok(file),
+                            error => Err(error),
+                        })
+                })
+                .then(move |res| {
+                    // Attempt to read using original encryption key succeeds.
+                    let file = unwrap!(res);
+                    file_helper::read(c4, &file, Some(key))
+                })
+                .then(move |res| {
+                    let reader = unwrap!(res);
+                    let size = reader.size();
+                    reader.read(0, size)
+                })
+                .then(move |res| -> Result<_, NfsError> {
+                    let retrieved_content = unwrap!(res);
+                    assert_eq!(retrieved_content, content2);
+                    Ok(())
+                })
+        })
     }
 }

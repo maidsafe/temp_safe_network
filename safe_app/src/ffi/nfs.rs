@@ -20,6 +20,7 @@ use errors::AppError;
 use ffi::helper::send_with_mdata_info;
 use ffi_utils::{FFI_RESULT_OK, FfiResult, OpaqueCtx, ReprC, catch_unwind_cb, from_c_str};
 use futures::Future;
+use futures::future::{self, Either};
 use object_cache::{FileContextHandle, MDataInfoHandle};
 use safe_core::FutureExt;
 use safe_core::nfs::{Mode, Reader, Writer, file_helper};
@@ -142,54 +143,56 @@ pub unsafe extern "C" fn dir_delete_file(
 #[no_mangle]
 pub unsafe extern "C" fn file_open(
     app: *const App,
+    parent_h: MDataInfoHandle,
     file: *const File,
     open_mode: u64,
     user_data: *mut c_void,
     o_cb: extern "C" fn(*mut c_void, FfiResult, FileContextHandle),
 ) {
     catch_unwind_cb(user_data, o_cb, || {
-        let user_data = OpaqueCtx(user_data);
         let file = NativeFile::clone_from_repr_c(file)?;
 
-        (*app).send(move |client, context| {
-            let context = context.clone();
+        send_with_mdata_info(
+            app,
+            parent_h,
+            user_data,
+            o_cb,
+            move |client, context, parent| {
+                let context = context.clone();
 
-            // Initialise the reader if OPEN_MODE_READ is requested
-            let reader = if open_mode & OPEN_MODE_READ != 0 {
-                file_helper::read(client.clone(), &file)
-                    .map(Some)
-                    .into_box()
-            } else {
-                ok!(None)
-            };
-
-            // Initialise the writer if one of write modes is requested
-            let writer = if open_mode & (OPEN_MODE_OVERWRITE | OPEN_MODE_APPEND) != 0 {
-                let writer_mode = if open_mode & OPEN_MODE_APPEND != 0 {
-                    Mode::Append
+                // Initialise the reader if OPEN_MODE_READ is requested
+                let reader = if open_mode & OPEN_MODE_READ != 0 {
+                    let fut = file_helper::read(client.clone(), &file, parent.enc_key().cloned())
+                        .map(Some);
+                    Either::A(fut)
                 } else {
-                    Mode::Overwrite
+                    Either::B(future::ok(None))
                 };
-                file_helper::write(client.clone(), file, writer_mode)
-                    .map(Some)
-                    .into_box()
-            } else {
-                ok!(None)
-            };
 
-            reader
-                .join(writer)
-                .map(move |(reader, writer)| {
+                // Initialise the writer if one of write modes is requested
+                let writer = if open_mode & (OPEN_MODE_OVERWRITE | OPEN_MODE_APPEND) != 0 {
+                    let writer_mode = if open_mode & OPEN_MODE_APPEND != 0 {
+                        Mode::Append
+                    } else {
+                        Mode::Overwrite
+                    };
+                    let fut = file_helper::write(
+                        client.clone(),
+                        file,
+                        writer_mode,
+                        parent.enc_key().cloned(),
+                    ).map(Some);
+                    Either::A(fut)
+                } else {
+                    Either::B(future::ok(None))
+                };
+
+                reader.join(writer).map(move |(reader, writer)| {
                     let file_ctx = FileContext { reader, writer };
-                    let file_h = context.object_cache().insert_file(file_ctx);
-                    o_cb(user_data.0, FFI_RESULT_OK, file_h);
+                    context.object_cache().insert_file(file_ctx)
                 })
-                .map_err(move |err| {
-                    call_result_cb!(Err::<(), _>(AppError::from(err)), user_data, o_cb);
-                })
-                .into_box()
-                .into()
-        })
+            },
+        )
     })
 }
 
@@ -462,7 +465,14 @@ mod tests {
 
         let write_h = unsafe {
             unwrap!(call_1(|ud, cb| {
-                file_open(&app, &ffi_file, OPEN_MODE_OVERWRITE, ud, cb)
+                file_open(
+                    &app,
+                    container_info_h,
+                    &ffi_file,
+                    OPEN_MODE_OVERWRITE,
+                    ud,
+                    cb,
+                )
             }))
         };
 
@@ -502,6 +512,7 @@ mod tests {
             unwrap!(call_1(|ud, cb| {
                 file_open(
                     &app,
+                    container_info_h,
                     &file.into_repr_c(),
                     OPEN_MODE_READ | OPEN_MODE_APPEND,
                     ud,
@@ -560,7 +571,14 @@ mod tests {
 
         let read_h = unsafe {
             unwrap!(call_1(|ud, cb| {
-                file_open(&app, &file.into_repr_c(), OPEN_MODE_READ, ud, cb)
+                file_open(
+                    &app,
+                    container_info_h,
+                    &file.into_repr_c(),
+                    OPEN_MODE_READ,
+                    ud,
+                    cb,
+                )
             }))
         };
 
